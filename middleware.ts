@@ -1,3 +1,4 @@
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { type NextRequest, NextResponse } from 'next/server';
 import { rootDomain } from '@/lib/utils';
 
@@ -8,17 +9,13 @@ function extractSubdomain(request: NextRequest): string | null {
 
   // Local development environment
   if (url.includes('localhost') || url.includes('127.0.0.1')) {
-    // Try to extract subdomain from the full URL
     const fullUrlMatch = url.match(/http:\/\/([^.]+)\.localhost/);
     if (fullUrlMatch && fullUrlMatch[1]) {
       return fullUrlMatch[1];
     }
-
-    // Fallback to host header approach
     if (hostname.includes('.localhost')) {
       return hostname.split('.')[0];
     }
-
     return null;
   }
 
@@ -40,7 +37,20 @@ function extractSubdomain(request: NextRequest): string | null {
   return isSubdomain ? hostname.replace(`.${rootDomainFormatted}`, '') : null;
 }
 
-export async function middleware(request: NextRequest) {
+// Routes that require authentication when on a subdomain
+const isProtectedSubdomainRoute = createRouteMatcher([
+  '/s/(.*)'
+]);
+
+// Routes that are always public
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/admin(.*)'
+]);
+
+export default clerkMiddleware(async (auth, request: NextRequest) => {
   const { pathname } = request.nextUrl;
   const subdomain = extractSubdomain(request);
 
@@ -50,24 +60,43 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/', request.url));
     }
 
-    // For the root path on a subdomain, rewrite to the subdomain page
+    // Rewrite root and all paths on a subdomain to /s/[subdomain]/...
     if (pathname === '/') {
+      // Protect dashboard — require auth
+      const { userId } = await auth();
+      if (!userId) {
+        const signInUrl = new URL('/sign-in', request.url);
+        signInUrl.searchParams.set('redirect_url', request.url);
+        return NextResponse.redirect(signInUrl);
+      }
       return NextResponse.rewrite(new URL(`/s/${subdomain}`, request.url));
+    }
+
+    // For other paths on the subdomain, proxy them through /s/[subdomain]
+    const rewrittenPath = `/s/${subdomain}${pathname}`;
+    const { userId } = await auth();
+    if (!userId) {
+      const signInUrl = new URL('/sign-in', request.url);
+      signInUrl.searchParams.set('redirect_url', request.url);
+      return NextResponse.redirect(signInUrl);
+    }
+    return NextResponse.rewrite(new URL(rewrittenPath, request.url));
+  }
+
+  // On root domain: protect /s/* routes, allow everything else
+  if (isProtectedSubdomainRoute(request) && !isPublicRoute(request)) {
+    const { userId } = await auth();
+    if (!userId) {
+      const signInUrl = new URL('/sign-in', request.url);
+      return NextResponse.redirect(signInUrl);
     }
   }
 
-  // On the root domain, allow normal access
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [
-    /*
-     * Match all paths except for:
-     * 1. /api routes
-     * 2. /_next (Next.js internals)
-     * 3. all root files inside /public (e.g. /favicon.ico)
-     */
     '/((?!api|_next|[\\w-]+\\.\\w+).*)'
   ]
 };

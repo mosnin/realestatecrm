@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  name      String?
+  avatar    String?
+  bio       String?
+  createdAt DateTime @default(now())
+  space     Space?
+}
+
+model Space {
+  id        String   @id @default(cuid())
+  subdomain String   @unique
+  name      String
+  emoji     String
+  createdAt DateTime @default(now())
+  ownerId   String   @unique
+  owner     User     @relation(fields: [ownerId], references: [id])
+
+  contacts Contact[]
+  deals    Deal[]
+  stages   DealStage[]
+  messages Message[]
+  settings SpaceSetting?
+}
+
+model SpaceSetting {
+  id            String  @id @default(cuid())
+  spaceId       String  @unique
+  space         Space   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  notifications Boolean @default(true)
+  timezone      String  @default("UTC")
+}
+
+model Contact {
+  id           String        @id @default(cuid())
+  spaceId      String
+  space        Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name         String
+  email        String?
+  phone        String?
+  address      String?
+  notes        String?
+  type         ContactType   @default(OTHER)
+  tags         String[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  dealContacts DealContact[]
+}
+
+enum ContactType {
+  BUYER
+  SELLER
+  AGENT
+  OTHER
+}
+
+model Deal {
+  id           String        @id @default(cuid())
+  spaceId      String
+  space        Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  value        Float?
+  address      String?
+  priority     Priority      @default(MEDIUM)
+  closeDate    DateTime?
+  stageId      String
+  stage        DealStage     @relation(fields: [stageId], references: [id])
+  position     Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  dealContacts DealContact[]
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model DealStage {
+  id       String @id @default(cuid())
+  spaceId  String
+  space    Space  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name     String
+  color    String @default("#6366f1")
+  position Int    @default(0)
+  deals    Deal[]
+}
+
+model DealContact {
+  dealId    String
+  contactId String
+  deal      Deal    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@id([dealId, contactId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  spaceId   String
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+}

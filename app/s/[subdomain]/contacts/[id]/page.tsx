@@ -1,0 +1,142 @@
+import { notFound } from 'next/navigation';
+import { db } from '@/lib/db';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { ArrowLeft, Mail, Phone, MapPin, FileText, Briefcase } from 'lucide-react';
+
+const TYPE_COLORS: Record<string, string> = {
+  BUYER: 'bg-blue-100 text-blue-700',
+  SELLER: 'bg-green-100 text-green-700',
+  AGENT: 'bg-purple-100 text-purple-700',
+  OTHER: 'bg-gray-100 text-gray-700'
+};
+
+export default async function ContactDetailPage({
+  params
+}: {
+  params: Promise<{ subdomain: string; id: string }>;
+}) {
+  const { subdomain, id } = await params;
+
+  const contact = await db.contact.findUnique({
+    where: { id },
+    include: {
+      dealContacts: {
+        include: {
+          deal: { include: { stage: true } }
+        }
+      }
+    }
+  });
+
+  if (!contact) notFound();
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href={`/s/${subdomain}/contacts`}>
+            <ArrowLeft size={18} />
+          </Link>
+        </Button>
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">{contact.name}</h2>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${TYPE_COLORS[contact.type]}`}>
+            {contact.type}
+          </span>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Contact Info</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {contact.email && (
+            <div className="flex items-center gap-3 text-sm">
+              <Mail size={16} className="text-muted-foreground flex-shrink-0" />
+              <a href={`mailto:${contact.email}`} className="hover:underline">
+                {contact.email}
+              </a>
+            </div>
+          )}
+          {contact.phone && (
+            <div className="flex items-center gap-3 text-sm">
+              <Phone size={16} className="text-muted-foreground flex-shrink-0" />
+              <a href={`tel:${contact.phone}`} className="hover:underline">
+                {contact.phone}
+              </a>
+            </div>
+          )}
+          {contact.address && (
+            <div className="flex items-center gap-3 text-sm">
+              <MapPin size={16} className="text-muted-foreground flex-shrink-0" />
+              <span>{contact.address}</span>
+            </div>
+          )}
+          {contact.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {contact.tags.map((tag) => (
+                <Badge key={tag} variant="secondary">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          )}
+          {contact.notes && (
+            <div className="flex gap-3 text-sm">
+              <FileText size={16} className="text-muted-foreground flex-shrink-0 mt-0.5" />
+              <p className="text-muted-foreground whitespace-pre-wrap">{contact.notes}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Briefcase size={18} />
+            Associated Deals
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {contact.dealContacts.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No deals associated with this contact.</p>
+          ) : (
+            <div className="space-y-3">
+              {contact.dealContacts.map(({ deal }) => (
+                <Link
+                  key={deal.id}
+                  href={`/s/${subdomain}/deals`}
+                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors"
+                >
+                  <div>
+                    <p className="font-medium text-sm">{deal.title}</p>
+                    {deal.address && (
+                      <p className="text-xs text-muted-foreground">{deal.address}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white"
+                      style={{ backgroundColor: deal.stage.color }}
+                    >
+                      {deal.stage.name}
+                    </span>
+                    {deal.value != null && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        ${deal.value.toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

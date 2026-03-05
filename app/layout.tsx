@@ -1,16 +1,12 @@
 import type { Metadata } from 'next';
-import { Geist } from 'next/font/google';
+import { GeistSans } from 'geist/font/sans';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin']
-});
-
 export const metadata: Metadata = {
-  title: 'Platforms Starter Kit',
-  description: 'Next.js template for building a multi-tenant SaaS.'
+  title: 'Real Estate CRM',
+  description: 'A multi-tenant real estate CRM platform.'
 };
 
 export default function RootLayout({
@@ -19,11 +15,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} antialiased`}>
-        {children}
-        <SpeedInsights />
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en">
+        <body className={`${GeistSans.variable} antialiased`}>
+          {children}
+          <SpeedInsights />
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
