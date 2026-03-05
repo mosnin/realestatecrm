@@ -10,14 +10,16 @@ export default async function HomePage() {
   const { userId } = await auth();
 
   if (userId) {
-    // Look up the user in our DB
-    const user = await db.user.findUnique({ where: { clerkId: userId } });
-    if (user) {
-      // If user already has a space, redirect to their dashboard
-      const space = await getSpaceByOwnerId(user.id);
-      if (space) {
-        redirect(`${protocol}://${space.subdomain}.${rootDomain}`);
+    try {
+      const user = await db.user.findUnique({ where: { clerkId: userId } });
+      if (user) {
+        const space = await getSpaceByOwnerId(user.id);
+        if (space) {
+          redirect(`${protocol}://${space.subdomain}.${rootDomain}`);
+        }
       }
+    } catch {
+      // DB unavailable — render the form anyway
     }
   }
 
