@@ -128,6 +128,16 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
               />
             </div>
 
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-1">
+              <p className="text-sm font-medium">AI & Vector Keys</p>
+              <p className="text-xs text-muted-foreground">
+                Workspace settings store an optional Anthropic key only. OpenAI and Zilliz credentials are project-level environment variables.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                In Vercel, set <code className="font-mono">OPENAI_API_KEY</code>, <code className="font-mono">ZILLIZ_URI</code>, and <code className="font-mono">ZILLIZ_TOKEN</code>.
+              </p>
+            </div>
+
             <div className="space-y-1">
               <Label htmlFor="anthropicApiKey">Anthropic API Key</Label>
               <Input
