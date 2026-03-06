@@ -11,7 +11,7 @@ export default function NotFound() {
 
   useEffect(() => {
     // Extract subdomain from URL if we're on a subdomain page
-    if (pathname?.startsWith('/subdomain/')) {
+    if (pathname?.startsWith('/s/')) {
       const extractedSubdomain = pathname.split('/')[2];
       if (extractedSubdomain) {
         setSubdomain(extractedSubdomain);

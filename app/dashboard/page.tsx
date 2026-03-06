@@ -8,17 +8,23 @@ export default async function DashboardRedirectPage() {
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
 
+  let targetSubdomain: string | null = null;
+
   try {
     const user = await db.user.findUnique({ where: { clerkId: userId } });
 
     if (user) {
       const space = await getSpaceByOwnerId(user.id);
       if (space) {
-        redirect(`/s/${space.subdomain}`);
+        targetSubdomain = space.subdomain;
       }
     }
   } catch {
     // If DB is temporarily unavailable, keep the user on setup UI instead of crashing.
+  }
+
+  if (targetSubdomain) {
+    redirect(`/s/${targetSubdomain}`);
   }
 
   return (
