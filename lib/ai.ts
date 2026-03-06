@@ -18,6 +18,10 @@ function textStream(message: string): ReadableStream {
   });
 }
 
+function looksLikeAnthropicKey(key?: string | null) {
+  return !!key && key.startsWith('sk-ant-');
+}
+
 export async function chatWithRAG(
   messages: ChatMessage[],
   spaceId: string,
@@ -94,61 +98,67 @@ export async function chatWithRAG(
     .filter(Boolean)
     .join('\n');
 
-  if (anthropicKey) {
+  // Prefer OpenAI when available, because embeddings already rely on it in this app
+  // and users may accidentally save non-Anthropic keys in workspace settings.
+  if (openAIKey) {
     try {
-      const anthropic = new Anthropic({ apiKey: anthropicKey });
-      const stream = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        stream: true
+      const openai = new OpenAI({ apiKey: openAIKey });
+      const stream = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        temperature: 0.2,
+        stream: true,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages.map((m) => ({ role: m.role, content: m.content }))
+        ]
       });
 
       return new ReadableStream({
         async start(controller) {
           for await (const event of stream) {
-            if (
-              event.type === 'content_block_delta' &&
-              event.delta.type === 'text_delta'
-            ) {
-              controller.enqueue(new TextEncoder().encode(event.delta.text));
-            }
+            const delta = event.choices[0]?.delta?.content;
+            if (delta) controller.enqueue(new TextEncoder().encode(delta));
           }
           controller.close();
         }
       });
     } catch (error) {
-      // If Anthropic fails and OpenAI is available, fallback instead of surfacing a hard failure.
-      if (!openAIKey) {
-        const message = error instanceof Error ? error.message : 'Unknown Anthropic error';
+      const message = error instanceof Error ? error.message : 'Unknown OpenAI error';
+      if (!looksLikeAnthropicKey(anthropicKey)) {
         return textStream(`AI provider error: ${message}`);
       }
     }
   }
 
-  if (!openAIKey) {
-    return textStream('AI provider error: OpenAI key is not configured.');
+  if (!looksLikeAnthropicKey(anthropicKey)) {
+    return textStream('AI provider error: Anthropic key is missing or invalid.');
   }
 
-  const openai = new OpenAI({ apiKey: openAIKey });
-  const stream = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    temperature: 0.2,
-    stream: true,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      ...messages.map((m) => ({ role: m.role, content: m.content }))
-    ]
-  });
+  try {
+    const anthropic = new Anthropic({ apiKey: anthropicKey });
+    const stream = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      stream: true
+    });
 
-  return new ReadableStream({
-    async start(controller) {
-      for await (const event of stream) {
-        const delta = event.choices[0]?.delta?.content;
-        if (delta) controller.enqueue(new TextEncoder().encode(delta));
+    return new ReadableStream({
+      async start(controller) {
+        for await (const event of stream) {
+          if (
+            event.type === 'content_block_delta' &&
+            event.delta.type === 'text_delta'
+          ) {
+            controller.enqueue(new TextEncoder().encode(event.delta.text));
+          }
+        }
+        controller.close();
       }
-      controller.close();
-    }
-  });
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown Anthropic error';
+    return textStream(`AI provider error: ${message}`);
+  }
 }
