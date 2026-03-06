@@ -21,7 +21,6 @@ import {
   EmojiPickerFooter
 } from '@/components/ui/emoji-picker';
 import { createSubdomainAction } from '@/app/actions';
-import { rootDomain } from '@/lib/utils';
 
 type CreateState = {
   error?: string;
@@ -33,22 +32,18 @@ type CreateState = {
 function SubdomainInput({ defaultValue }: { defaultValue?: string }) {
   return (
     <div className="space-y-2">
-      <Label htmlFor="subdomain">Subdomain</Label>
-      <div className="flex items-center">
-        <div className="relative flex-1">
-          <Input
-            id="subdomain"
-            name="subdomain"
-            placeholder="your-subdomain"
-            defaultValue={defaultValue}
-            className="w-full rounded-r-none focus:z-10"
-            required
-          />
-        </div>
-        <span className="bg-gray-100 px-3 border border-l-0 border-input rounded-r-md text-gray-500 min-h-[36px] flex items-center">
-          .{rootDomain}
-        </span>
-      </div>
+      <Label htmlFor="subdomain">Workspace name</Label>
+      <Input
+        id="subdomain"
+        name="subdomain"
+        placeholder="your-workspace"
+        defaultValue={defaultValue}
+        className="w-full"
+        required
+      />
+      <p className="text-xs text-gray-500">
+        This is used as your internal workspace identifier.
+      </p>
     </div>
   );
 }
@@ -117,7 +112,7 @@ function IconPicker({
           </Card>
         </div>
         <p className="text-xs text-gray-500">
-          Select an emoji to represent your subdomain
+          Select an emoji to represent your workspace
         </p>
       </div>
     </div>
@@ -143,7 +138,7 @@ export function SubdomainForm() {
       )}
 
       <Button type="submit" className="w-full" disabled={isPending || !icon}>
-        {isPending ? 'Creating...' : 'Create Subdomain'}
+        {isPending ? 'Creating...' : 'Create Workspace'}
       </Button>
     </form>
   );

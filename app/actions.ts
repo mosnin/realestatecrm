@@ -6,7 +6,6 @@ import { db } from '@/lib/db';
 import { isValidIcon } from '@/lib/subdomains';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { rootDomain, protocol } from '@/lib/utils';
 
 const DEFAULT_STAGES = [
   { name: 'Lead', color: '#94a3b8', position: 0 },
@@ -30,7 +29,7 @@ export async function createSubdomainAction(
   const icon = formData.get('icon') as string;
 
   if (!subdomain || !icon) {
-    return { success: false, error: 'Subdomain and icon are required' };
+    return { success: false, error: 'Workspace name and icon are required' };
   }
 
   if (!isValidIcon(icon)) {
@@ -50,7 +49,7 @@ export async function createSubdomainAction(
       icon,
       success: false,
       error:
-        'Subdomain can only have lowercase letters, numbers, and hyphens. Please try again.'
+        'Workspace name can only have lowercase letters, numbers, and hyphens. Please try again.'
     };
   }
 
@@ -62,7 +61,7 @@ export async function createSubdomainAction(
       subdomain,
       icon,
       success: false,
-      error: 'This subdomain is already taken'
+      error: 'This workspace name is already taken'
     };
   }
 
@@ -105,7 +104,7 @@ export async function createSubdomainAction(
     }
   });
 
-  redirect(`${protocol}://${sanitizedSubdomain}.${rootDomain}`);
+  redirect('/dashboard');
 }
 
 export async function deleteSubdomainAction(

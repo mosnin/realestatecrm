@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { SubdomainForm } from './subdomain-form';
-import { rootDomain, protocol } from '@/lib/utils';
 import { getSpaceByOwnerId } from '@/lib/space';
 import { db } from '@/lib/db';
 
@@ -15,7 +14,7 @@ export default async function HomePage() {
       if (user) {
         const space = await getSpaceByOwnerId(user.id);
         if (space) {
-          redirect(`${protocol}://${space.subdomain}.${rootDomain}`);
+          redirect('/dashboard');
         }
       }
     } catch {
@@ -57,7 +56,7 @@ export default async function HomePage() {
             Real Estate CRM
           </h1>
           <p className="mt-3 text-lg text-gray-600">
-            Create your CRM space with a custom subdomain
+            Create your CRM workspace and jump into your dashboard
           </p>
         </div>
 
