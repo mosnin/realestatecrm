@@ -25,7 +25,6 @@ interface SettingsFormProps {
 export function SettingsForm({ space, settings }: SettingsFormProps) {
   const router = useRouter();
   const [name, setName] = useState(space.name);
-  const [emoji, setEmoji] = useState(space.emoji);
   const [notifications, setNotifications] = useState(
     settings?.notifications ?? true
   );
@@ -51,7 +50,6 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
         body: JSON.stringify({
           subdomain: space.subdomain,
           name,
-          emoji,
           notifications,
           phoneNumber,
           myConnections,
@@ -102,16 +100,6 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="emoji">Workspace Emoji</Label>
-              <Input
-                id="emoji"
-                value={emoji}
-                onChange={(e) => setEmoji(e.target.value)}
-                maxLength={10}
               />
             </div>
 

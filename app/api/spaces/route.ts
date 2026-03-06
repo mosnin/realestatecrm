@@ -20,7 +20,10 @@ export async function PATCH(req: NextRequest) {
 
   const space = await db.space.update({
     where: { subdomain },
-    data: { name, emoji }
+    data: {
+      name,
+      ...(emoji !== undefined ? { emoji } : {})
+    }
   });
 
   await db.spaceSetting.upsert({
@@ -43,9 +46,11 @@ export async function PATCH(req: NextRequest) {
   });
 
   // Update Redis emoji
-  const existing = await redis.get<any>(`subdomain:${subdomain}`);
+  const existing = await redis.get<any>(`subdomain:${subdomain}`).catch(() => null);
   if (existing) {
-    await redis.set(`subdomain:${subdomain}`, { ...existing, emoji });
+    await redis
+      .set(`subdomain:${subdomain}`, { ...existing, emoji })
+      .catch(() => null);
   }
 
   return NextResponse.json(space);
@@ -57,7 +62,7 @@ export async function DELETE(req: NextRequest) {
 
   const { subdomain } = await req.json();
 
-  await redis.del(`subdomain:${subdomain}`);
+  await redis.del(`subdomain:${subdomain}`).catch(() => null);
   await db.space.delete({ where: { subdomain } }).catch(() => null);
 
   return NextResponse.json({ success: true });
