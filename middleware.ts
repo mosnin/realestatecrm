@@ -22,8 +22,8 @@ function extractSubdomain(request: NextRequest): string | null {
   // Production environment
   const rootDomainFormatted = rootDomain.split(':')[0];
 
-  // Always treat www as the root domain alias
-  if (hostname === `www.${rootDomainFormatted}` || hostname === 'www') {
+  // Always treat any www host as a root-domain alias (never a tenant subdomain)
+  if (hostname.startsWith('www.') || hostname === 'www') {
     return null;
   }
 
@@ -42,7 +42,12 @@ function extractSubdomain(request: NextRequest): string | null {
   if (!isSubdomain) return null;
 
   const candidate = hostname.replace(`.${rootDomainFormatted}`, '');
-  return candidate === 'www' ? null : candidate;
+
+  if (!candidate || candidate === 'www' || candidate.includes('.')) {
+    return null;
+  }
+
+  return candidate;
 }
 
 // Routes that require authentication when on a subdomain
