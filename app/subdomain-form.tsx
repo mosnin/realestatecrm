@@ -30,7 +30,7 @@ export function SubdomainForm() {
           className="w-full"
           required
         />
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-neutral-500">
           This is used as your internal workspace identifier.
         </p>
       </div>

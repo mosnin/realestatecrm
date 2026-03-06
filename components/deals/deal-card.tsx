@@ -14,9 +14,9 @@ type DealWithRelations = Deal & {
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-  LOW: 'bg-gray-100 text-gray-600',
-  MEDIUM: 'bg-yellow-100 text-yellow-700',
-  HIGH: 'bg-red-100 text-red-700'
+  LOW: 'bg-neutral-500/20 text-neutral-400',
+  MEDIUM: 'bg-yellow-500/20 text-yellow-400',
+  HIGH: 'bg-red-500/20 text-red-400'
 };
 
 interface DealCardProps {
@@ -62,7 +62,7 @@ export function DealCard({ deal, onEdit, onDelete }: DealCardProps) {
               )}
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 {deal.value != null && (
-                  <span className="flex items-center gap-1 text-xs font-medium text-green-700">
+                  <span className="flex items-center gap-1 text-xs font-medium text-green-400">
                     <DollarSign size={11} />
                     {deal.value.toLocaleString()}
                   </span>

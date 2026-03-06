@@ -7,9 +7,9 @@ import Link from 'next/link';
 import { ArrowLeft, Mail, Phone, MapPin, FileText, Briefcase, CalendarDays, Wallet } from 'lucide-react';
 
 const TYPE_COLORS: Record<string, string> = {
-  QUALIFICATION: 'bg-blue-100 text-blue-700',
-  TOUR: 'bg-amber-100 text-amber-700',
-  APPLICATION: 'bg-green-100 text-green-700'
+  QUALIFICATION: 'bg-blue-500/20 text-blue-400',
+  TOUR: 'bg-amber-500/20 text-amber-400',
+  APPLICATION: 'bg-green-500/20 text-green-400'
 };
 
 function formatType(type: string) {
