@@ -9,6 +9,15 @@ export interface ChatMessage {
   content: string;
 }
 
+function textStream(message: string): ReadableStream {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(message));
+      controller.close();
+    }
+  });
+}
+
 export async function chatWithRAG(
   messages: ChatMessage[],
   spaceId: string,
@@ -17,15 +26,11 @@ export async function chatWithRAG(
 ): Promise<ReadableStream> {
   const anthropicKey = apiKey || process.env.ANTHROPIC_API_KEY;
   const openAIKey = process.env.OPENAI_API_KEY;
+
   if (!anthropicKey && !openAIKey) {
-    return new ReadableStream({
-      start(controller) {
-        controller.enqueue(new TextEncoder().encode(
-          'No AI API key configured. Add ANTHROPIC_API_KEY or OPENAI_API_KEY in environment variables, or set a workspace key in Settings → AI.'
-        ));
-        controller.close();
-      }
-    });
+    return textStream(
+      'No AI API key configured. Add ANTHROPIC_API_KEY or OPENAI_API_KEY in environment variables, or set a workspace key in Settings → AI.'
+    );
   }
 
   const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
@@ -76,7 +81,7 @@ export async function chatWithRAG(
       );
     }
   } catch {
-    // Zilliz not configured yet — proceed without RAG context
+    // Embeddings or Zilliz may not be configured — proceed without RAG context
   }
 
   const systemPrompt = [
@@ -90,28 +95,40 @@ export async function chatWithRAG(
     .join('\n');
 
   if (anthropicKey) {
-    const anthropic = new Anthropic({ apiKey: anthropicKey });
-    const stream = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
-      stream: true
-    });
+    try {
+      const anthropic = new Anthropic({ apiKey: anthropicKey });
+      const stream = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        stream: true
+      });
 
-    return new ReadableStream({
-      async start(controller) {
-        for await (const event of stream) {
-          if (
-            event.type === 'content_block_delta' &&
-            event.delta.type === 'text_delta'
-          ) {
-            controller.enqueue(new TextEncoder().encode(event.delta.text));
+      return new ReadableStream({
+        async start(controller) {
+          for await (const event of stream) {
+            if (
+              event.type === 'content_block_delta' &&
+              event.delta.type === 'text_delta'
+            ) {
+              controller.enqueue(new TextEncoder().encode(event.delta.text));
+            }
           }
+          controller.close();
         }
-        controller.close();
+      });
+    } catch (error) {
+      // If Anthropic fails and OpenAI is available, fallback instead of surfacing a hard failure.
+      if (!openAIKey) {
+        const message = error instanceof Error ? error.message : 'Unknown Anthropic error';
+        return textStream(`AI provider error: ${message}`);
       }
-    });
+    }
+  }
+
+  if (!openAIKey) {
+    return textStream('AI provider error: OpenAI key is not configured.');
   }
 
   const openai = new OpenAI({ apiKey: openAIKey });

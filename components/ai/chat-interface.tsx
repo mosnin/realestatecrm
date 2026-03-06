@@ -46,8 +46,13 @@ export function ChatInterface({ subdomain, initialMessages }: ChatInterfaceProps
         body: JSON.stringify({ messages: newMessages, subdomain })
       });
 
-      if (!res.ok || !res.body) {
-        throw new Error('Failed to connect');
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || 'Failed to connect');
+      }
+
+      if (!res.body) {
+        throw new Error('No response body from AI API');
       }
 
       const reader = res.body.getReader();
@@ -61,11 +66,12 @@ export function ChatInterface({ subdomain, initialMessages }: ChatInterfaceProps
         setMessages([...newMessages, { role: 'assistant', content: accumulated }]);
       }
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Sorry, I encountered an error. Please try again.';
       setMessages([
         ...newMessages,
         {
           role: 'assistant',
-          content: 'Sorry, I encountered an error. Please try again.'
+          content: message
         }
       ]);
     } finally {
