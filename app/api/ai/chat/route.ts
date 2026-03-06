@@ -21,7 +21,9 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const stream = await chatWithRAG(messages, space.id, space.name);
+  // Use per-space API key if set, otherwise fall back to env var
+  const settings = await db.spaceSetting.findUnique({ where: { spaceId: space.id } });
+  const stream = await chatWithRAG(messages, space.id, space.name, (settings as any)?.anthropicApiKey);
 
   // Collect the full response text to save to DB (non-blocking)
   const [streamForResponse, streamForSave] = stream.tee();

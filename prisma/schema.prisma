@@ -43,6 +43,7 @@ model SpaceSetting {
   myConnections     String?
   aiPersonalization String?
   billingSettings   String?
+  anthropicApiKey   String?
 }
 
 model Contact {

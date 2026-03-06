@@ -15,7 +15,8 @@ export async function PATCH(req: NextRequest) {
     phoneNumber,
     myConnections,
     aiPersonalization,
-    billingSettings
+    billingSettings,
+    anthropicApiKey
   } = await req.json();
 
   const space = await db.space.update({
@@ -33,7 +34,8 @@ export async function PATCH(req: NextRequest) {
       phoneNumber,
       myConnections,
       aiPersonalization,
-      billingSettings
+      billingSettings,
+      anthropicApiKey: anthropicApiKey || null
     } as any,
     create: {
       spaceId: space.id,
@@ -41,7 +43,8 @@ export async function PATCH(req: NextRequest) {
       phoneNumber,
       myConnections,
       aiPersonalization,
-      billingSettings
+      billingSettings,
+      anthropicApiKey: anthropicApiKey || null
     } as any
   });
 

@@ -3,8 +3,6 @@ import { embedText } from '@/lib/embeddings';
 import { searchVectors } from '@/lib/zilliz';
 import { db } from '@/lib/db';
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -13,8 +11,21 @@ export interface ChatMessage {
 export async function chatWithRAG(
   messages: ChatMessage[],
   spaceId: string,
-  spaceName: string
+  spaceName: string,
+  apiKey?: string | null
 ): Promise<ReadableStream> {
+  const resolvedKey = apiKey || process.env.ANTHROPIC_API_KEY;
+  if (!resolvedKey) {
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(
+          'No Anthropic API key configured. Please add your API key in Settings → AI.'
+        ));
+        controller.close();
+      }
+    });
+  }
+  const anthropic = new Anthropic({ apiKey: resolvedKey });
   const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
   const queryText = lastUserMessage?.content ?? '';
 

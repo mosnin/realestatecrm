@@ -15,6 +15,7 @@ type UserSettings = {
   myConnections?: string | null;
   aiPersonalization?: string | null;
   billingSettings?: string | null;
+  anthropicApiKey?: string | null;
 };
 
 interface SettingsFormProps {
@@ -36,6 +37,9 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
   const [billingSettings, setBillingSettings] = useState(
     settings?.billingSettings ?? ''
   );
+  const [anthropicApiKey, setAnthropicApiKey] = useState(
+    settings?.anthropicApiKey ?? ''
+  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -54,7 +58,8 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
           phoneNumber,
           myConnections,
           aiPersonalization,
-          billingSettings
+          billingSettings,
+          anthropicApiKey
         })
       });
       setSaved(true);
@@ -121,6 +126,20 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
                 onChange={(e) => setMyConnections(e.target.value)}
                 placeholder="Brokerages, lenders, partners"
               />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="anthropicApiKey">Anthropic API Key</Label>
+              <Input
+                id="anthropicApiKey"
+                type="password"
+                value={anthropicApiKey}
+                onChange={(e) => setAnthropicApiKey(e.target.value)}
+                placeholder="sk-ant-..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Required for the AI Assistant. Get your key at console.anthropic.com.
+              </p>
             </div>
 
             <div className="space-y-1">
