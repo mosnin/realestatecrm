@@ -23,7 +23,7 @@ export default async function DashboardLayout({
   if (!space) notFound();
 
   return (
-    <div className="flex min-h-screen bg-[#0a0a0a] text-white">
+    <div className="flex min-h-screen bg-background text-foreground">
       <Sidebar
         subdomain={subdomain}
         spaceName={space.name}

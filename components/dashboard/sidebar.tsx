@@ -33,15 +33,15 @@ export function Sidebar({ subdomain, spaceName, spaceEmoji }: SidebarProps) {
   const base = `/s/${subdomain}`;
 
   return (
-    <aside className="hidden md:flex flex-col w-60 min-h-screen bg-[#0a0a0a] border-r border-white/10">
+    <aside className="hidden md:flex flex-col w-60 min-h-screen bg-sidebar border-r border-sidebar-border">
       {/* Logo / Space name */}
-      <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
+      <div className="flex items-center gap-3 px-5 py-5 border-b border-sidebar-border">
         <span className="text-2xl">{spaceEmoji}</span>
         <div className="min-w-0">
-          <p className="font-semibold text-sm truncate text-white">
+          <p className="font-semibold text-sm truncate text-sidebar-foreground">
             {spaceName}
           </p>
-          <p className="text-xs text-neutral-500 truncate">{subdomain}</p>
+          <p className="text-xs text-muted-foreground truncate">{subdomain}</p>
         </div>
       </div>
 
@@ -60,8 +60,8 @@ export function Sidebar({ subdomain, spaceName, spaceEmoji }: SidebarProps) {
               className={cn(
                 'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-white/10 text-white'
-                  : 'text-neutral-400 hover:bg-white/5 hover:text-white'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
               )}
             >
               <item.icon size={18} />
@@ -71,8 +71,8 @@ export function Sidebar({ subdomain, spaceName, spaceEmoji }: SidebarProps) {
         })}
       </nav>
 
-      <div className="px-5 py-4 border-t border-white/10">
-        <div className="flex items-center gap-2 text-xs text-neutral-600">
+      <div className="px-5 py-4 border-t border-sidebar-border">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Building2 size={14} />
           <span>WorkflowRouting</span>
         </div>

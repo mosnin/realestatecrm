@@ -28,11 +28,11 @@ export default async function DashboardRedirectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] p-6 flex items-center justify-center">
-      <div className="w-full max-w-md rounded-xl border border-white/10 bg-white/[0.03] p-8 space-y-6">
+    <div className="min-h-screen bg-background p-6 flex items-center justify-center">
+      <div className="w-full max-w-md rounded-xl border border-border bg-card p-8 space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-white">Create your workspace</h1>
-          <p className="mt-2 text-neutral-500 text-sm">
+          <h1 className="text-2xl font-bold">Create your workspace</h1>
+          <p className="mt-2 text-muted-foreground text-sm">
             You&apos;re signed in. Set up your workspace to continue to your dashboard.
           </p>
         </div>

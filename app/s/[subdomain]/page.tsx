@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getSpaceFromSubdomain } from '@/lib/space';
 import { db } from '@/lib/db';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Briefcase, DollarSign, TrendingUp } from 'lucide-react';
 import type { Metadata } from 'next';
 import { rootDomain } from '@/lib/utils';
@@ -49,43 +50,66 @@ export default async function DashboardPage({
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 
-  const statCards = [
-    { label: 'Clients', value: contactCount, icon: Users },
-    { label: 'Deals', value: dealCount, icon: Briefcase },
-    { label: 'Pipeline Value', value: formatCurrency(totalValue), icon: DollarSign },
-    { label: 'Active Stages', value: stages.length, icon: TrendingUp }
-  ];
-
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight text-white">Overview</h2>
-        <p className="text-neutral-500">
+        <h2 className="text-2xl font-bold tracking-tight">Overview</h2>
+        <p className="text-muted-foreground">
           Welcome back to {space.emoji} {space.name}
         </p>
       </div>
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {statCards.map((card) => (
-          <div key={card.label} className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-neutral-500">{card.label}</span>
-              <card.icon size={16} className="text-neutral-600" />
-            </div>
-            <div className="text-2xl font-bold text-white">{card.value}</div>
-          </div>
-        ))}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Clients</CardTitle>
+            <Users size={16} className="text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{contactCount}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Deals</CardTitle>
+            <Briefcase size={16} className="text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dealCount}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Pipeline Value</CardTitle>
+            <DollarSign size={16} className="text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(totalValue)}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Active Stages</CardTitle>
+            <TrendingUp size={16} className="text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stages.length}</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Deals by stage */}
-      <div className="rounded-xl border border-white/10 bg-white/[0.03]">
-        <div className="px-6 py-4 border-b border-white/10">
-          <h3 className="text-sm font-semibold text-white">Pipeline by Stage</h3>
-        </div>
-        <div className="p-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Pipeline by Stage</CardTitle>
+        </CardHeader>
+        <CardContent>
           {dealsByStage.length === 0 ? (
-            <p className="text-neutral-500 text-sm">No stages yet.</p>
+            <p className="text-muted-foreground text-sm">No stages yet.</p>
           ) : (
             <div className="space-y-3">
               {dealsByStage.map((stage) => (
@@ -95,20 +119,20 @@ export default async function DashboardPage({
                       className="w-3 h-3 rounded-full flex-shrink-0"
                       style={{ backgroundColor: stage.color }}
                     />
-                    <span className="text-sm font-medium text-neutral-200">{stage.name}</span>
-                    <span className="text-xs text-neutral-600">
+                    <span className="text-sm font-medium">{stage.name}</span>
+                    <span className="text-xs text-muted-foreground">
                       {stage.count} deal{stage.count !== 1 ? 's' : ''}
                     </span>
                   </div>
-                  <span className="text-sm font-semibold text-white">
+                  <span className="text-sm font-semibold">
                     {formatCurrency(stage.value)}
                   </span>
                 </div>
               ))}
             </div>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

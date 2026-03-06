@@ -28,7 +28,7 @@ export function MobileNav({ subdomain }: MobileNavProps) {
   const base = `/s/${subdomain}`;
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a] border-t border-white/10 flex">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border flex">
       {navItems.map((item) => {
         const href = `${base}${item.href}`;
         const isActive =
@@ -41,7 +41,7 @@ export function MobileNav({ subdomain }: MobileNavProps) {
             href={href}
             className={cn(
               'flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors',
-              isActive ? 'text-white' : 'text-neutral-600'
+              isActive ? 'text-foreground' : 'text-muted-foreground'
             )}
           >
             <item.icon size={20} />

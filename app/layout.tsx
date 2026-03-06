@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { ClerkProvider } from '@clerk/nextjs';
-import { dark } from '@clerk/themes';
+import { ThemeProvider } from '@/components/theme-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -16,10 +16,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider appearance={{ baseTheme: dark, variables: { colorBackground: '#0a0a0a', colorPrimary: 'white', colorInputBackground: '#141414' } }}>
-      <html lang="en" className="dark">
-        <body className={`${GeistSans.variable} antialiased bg-[#0a0a0a]`}>
-          {children}
+    <ClerkProvider>
+      <html lang="en" className="dark" suppressHydrationWarning>
+        <head>
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='light'){document.documentElement.classList.remove('dark')}else{document.documentElement.classList.add('dark')}}catch(e){}})();`,
+            }}
+          />
+        </head>
+        <body className={`${GeistSans.variable} antialiased bg-background text-foreground`}>
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
           <SpeedInsights />
         </body>
       </html>

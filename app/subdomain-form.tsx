@@ -30,12 +30,12 @@ export function SubdomainForm() {
           className="w-full"
           required
         />
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-muted-foreground">
           This is used as your internal workspace identifier.
         </p>
       </div>
 
-      {state?.error && <div className="text-sm text-red-500">{state.error}</div>}
+      {state?.error && <div className="text-sm text-destructive">{state.error}</div>}
 
       <Button type="submit" className="w-full" disabled={isPending}>
         {isPending ? 'Creating...' : 'Create Workspace'}

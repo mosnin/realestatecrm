@@ -1,7 +1,7 @@
 'use client';
 
 import { UserButton } from '@clerk/nextjs';
-import { Menu } from 'lucide-react';
+import { Menu, Sun, Moon } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -21,6 +21,8 @@ import {
   SheetTitle,
   SheetTrigger
 } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { useTheme } from '@/components/theme-provider';
 
 const navItems = [
   { href: '', label: 'Overview', icon: LayoutDashboard },
@@ -42,18 +44,19 @@ export function Header({ subdomain, spaceName, spaceEmoji, title }: HeaderProps)
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const base = `/s/${subdomain}`;
+  const { theme, toggleTheme } = useTheme();
 
   return (
-    <header className="h-14 border-b border-white/10 flex items-center justify-between px-4 md:px-6 bg-[#0a0a0a] sticky top-0 z-40">
+    <header className="h-14 border-b border-border flex items-center justify-between px-4 md:px-6 bg-background sticky top-0 z-40">
       <div className="flex items-center gap-3">
         {/* Mobile menu trigger */}
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger className="md:hidden">
-            <Menu size={20} className="text-neutral-400" />
+            <Menu size={20} className="text-muted-foreground" />
           </SheetTrigger>
-          <SheetContent side="left" className="w-60 p-0 bg-[#0a0a0a] border-white/10">
-            <SheetHeader className="px-5 py-5 border-b border-white/10">
-              <SheetTitle className="flex items-center gap-3 text-white">
+          <SheetContent side="left" className="w-60 p-0 bg-sidebar border-sidebar-border">
+            <SheetHeader className="px-5 py-5 border-b border-sidebar-border">
+              <SheetTitle className="flex items-center gap-3 text-sidebar-foreground">
                 <span className="text-2xl">{spaceEmoji}</span>
                 <span className="text-sm font-semibold">{spaceName}</span>
               </SheetTitle>
@@ -73,8 +76,8 @@ export function Header({ subdomain, spaceName, spaceEmoji, title }: HeaderProps)
                     className={cn(
                       'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                       isActive
-                        ? 'bg-white/10 text-white'
-                        : 'text-neutral-400 hover:bg-white/5 hover:text-white'
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
                     )}
                   >
                     <item.icon size={18} />
@@ -86,11 +89,21 @@ export function Header({ subdomain, spaceName, spaceEmoji, title }: HeaderProps)
           </SheetContent>
         </Sheet>
 
-        <span className="font-semibold text-sm md:hidden text-white">{spaceEmoji} {spaceName}</span>
-        <h1 className="font-semibold text-sm hidden md:block text-white">{title}</h1>
+        <span className="font-semibold text-sm md:hidden">{spaceEmoji} {spaceName}</span>
+        <h1 className="font-semibold text-sm hidden md:block">{title}</h1>
       </div>
 
-      <UserButton />
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleTheme}
+          className="h-8 w-8"
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </Button>
+        <UserButton />
+      </div>
     </header>
   );
 }
