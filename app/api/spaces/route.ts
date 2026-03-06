@@ -7,7 +7,16 @@ export async function PATCH(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { subdomain, name, emoji, notifications } = await req.json();
+  const {
+    subdomain,
+    name,
+    emoji,
+    notifications,
+    phoneNumber,
+    myConnections,
+    aiPersonalization,
+    billingSettings
+  } = await req.json();
 
   const space = await db.space.update({
     where: { subdomain },
@@ -16,8 +25,21 @@ export async function PATCH(req: NextRequest) {
 
   await db.spaceSetting.upsert({
     where: { spaceId: space.id },
-    update: { notifications },
-    create: { spaceId: space.id, notifications }
+    update: {
+      notifications,
+      phoneNumber,
+      myConnections,
+      aiPersonalization,
+      billingSettings
+    } as any,
+    create: {
+      spaceId: space.id,
+      notifications,
+      phoneNumber,
+      myConnections,
+      aiPersonalization,
+      billingSettings
+    } as any
   });
 
   // Update Redis emoji

@@ -24,7 +24,8 @@ export async function GET(req: NextRequest) {
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
           { email: { contains: search, mode: 'insensitive' } },
-          { phone: { contains: search, mode: 'insensitive' } }
+          { phone: { contains: search, mode: 'insensitive' } },
+          { preferences: { contains: search, mode: 'insensitive' } }
         ]
       }),
       ...(type && type !== 'ALL' && { type: type as any })
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
-  const { subdomain, name, email, phone, address, notes, type, tags } = body;
+  const { subdomain, name, email, phone, budget, preferences, properties, address, notes, type, tags } = body;
 
   const space = await getSpaceFromSubdomain(subdomain);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
@@ -53,9 +54,12 @@ export async function POST(req: NextRequest) {
       phone: phone || null,
       address: address || null,
       notes: notes || null,
-      type: type || 'OTHER',
+      type: type || 'QUALIFICATION',
+      budget: budget != null && budget !== '' ? parseFloat(budget) : null,
+      preferences: preferences || null,
+      properties: properties || [],
       tags: tags || []
-    }
+    } as any
   });
 
   // Async vectorization — don't block the response

@@ -36,11 +36,14 @@ export async function PATCH(
       name: body.name,
       email: body.email ?? null,
       phone: body.phone ?? null,
+      budget: body.budget != null && body.budget !== '' ? parseFloat(body.budget) : null,
+      preferences: body.preferences ?? null,
+      properties: body.properties ?? [],
       address: body.address ?? null,
       notes: body.notes ?? null,
       type: body.type,
       tags: body.tags ?? []
-    }
+    } as any
   });
 
   syncContact(contact).catch(console.error);

@@ -34,11 +34,15 @@ model Space {
 }
 
 model SpaceSetting {
-  id            String  @id @default(cuid())
-  spaceId       String  @unique
-  space         Space   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  notifications Boolean @default(true)
-  timezone      String  @default("UTC")
+  id                String  @id @default(cuid())
+  spaceId           String  @unique
+  space             Space   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  notifications     Boolean @default(true)
+  timezone          String  @default("UTC")
+  phoneNumber       String?
+  myConnections     String?
+  aiPersonalization String?
+  billingSettings   String?
 }
 
 model Contact {
@@ -50,18 +54,20 @@ model Contact {
   phone        String?
   address      String?
   notes        String?
-  type         ContactType   @default(OTHER)
+  budget       Float?
+  preferences  String?
+  properties   String[]
+  type         ClientType    @default(QUALIFICATION)
   tags         String[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   dealContacts DealContact[]
 }
 
-enum ContactType {
-  BUYER
-  SELLER
-  AGENT
-  OTHER
+enum ClientType {
+  QUALIFICATION
+  TOUR
+  APPLICATION
 }
 
 model Deal {

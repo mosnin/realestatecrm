@@ -24,7 +24,7 @@ export default async function SettingsPage({
     <div className="space-y-6 max-w-xl">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
-        <p className="text-muted-foreground">Manage your space preferences</p>
+        <p className="text-muted-foreground">Manage your profile, connections, AI, and billing preferences</p>
       </div>
       <SettingsForm space={space} settings={settings} />
     </div>

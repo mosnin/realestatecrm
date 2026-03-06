@@ -68,7 +68,7 @@ export async function chatWithRAG(
 
   const systemPrompt = [
     `You are an intelligent real estate CRM assistant for the space "${spaceName}".`,
-    `You help with managing contacts (buyers, sellers, agents) and real estate deals.`,
+    `You help with managing clients through qualification, tour, and application stages, plus real estate deals.`,
     contextBlocks.length
       ? `\nHere is relevant CRM data for this query:\n\n${contextBlocks.join('\n\n')}`
       : ''

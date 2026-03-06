@@ -90,13 +90,13 @@ export function ChatInterface({ subdomain, initialMessages }: ChatInterfaceProps
           <div>
             <p className="font-semibold text-foreground">AI Assistant</p>
             <p className="text-sm mt-1">
-              Ask me about your contacts, deals, or anything about your pipeline.
+              Ask me about your clients, deals, or anything about your pipeline.
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-sm">
             {[
               'Show me my highest value deals',
-              'Which contacts are buyers?',
+              'Which clients are in tour stage?',
               'What deals are in Negotiation?',
               'Summarize my pipeline'
             ].map((suggestion) => (
@@ -138,7 +138,7 @@ export function ChatInterface({ subdomain, initialMessages }: ChatInterfaceProps
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about your contacts or deals... (Enter to send, Shift+Enter for newline)"
+            placeholder="Ask about your clients or deals... (Enter to send, Shift+Enter for newline)"
             rows={2}
             className="resize-none"
             disabled={isStreaming}

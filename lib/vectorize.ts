@@ -1,14 +1,32 @@
 import { embedText } from '@/lib/embeddings';
 import { upsertVector, deleteVector } from '@/lib/zilliz';
-import type { Contact, Deal } from '@prisma/client';
+import type { Deal } from '@prisma/client';
 
-export async function syncContact(contact: Contact) {
+type VectorContact = {
+  id: string;
+  spaceId: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+  preferences?: string | null;
+  properties?: string[];
+  budget?: number | null;
+  type: string;
+  tags: string[];
+};
+
+export async function syncContact(contact: VectorContact) {
   const text = [
     contact.name,
     contact.email,
     contact.phone,
     contact.address,
     contact.notes,
+    contact.preferences,
+    (contact.properties ?? []).join(' '),
+    contact.budget != null ? `$${contact.budget}` : null,
     contact.type,
     contact.tags.join(' ')
   ]
