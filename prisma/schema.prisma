@@ -56,7 +56,7 @@ model Contact {
   notes        String?
   budget       Float?
   preferences  String?
-  properties   String[]
+  properties   String[]      @default([])
   type         ClientType    @default(QUALIFICATION)
   tags         String[]
   createdAt    DateTime      @default(now())
