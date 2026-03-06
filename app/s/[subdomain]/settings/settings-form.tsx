@@ -7,20 +7,34 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
-import type { Space, SpaceSetting } from '@prisma/client';
+import type { Space } from '@prisma/client';
+
+type UserSettings = {
+  notifications?: boolean;
+  phoneNumber?: string | null;
+  myConnections?: string | null;
+  aiPersonalization?: string | null;
+  billingSettings?: string | null;
+};
 
 interface SettingsFormProps {
   space: Space;
-  settings: SpaceSetting | null;
+  settings: UserSettings | null;
 }
 
 export function SettingsForm({ space, settings }: SettingsFormProps) {
   const router = useRouter();
   const [name, setName] = useState(space.name);
-  const [emoji, setEmoji] = useState(space.emoji);
   const [notifications, setNotifications] = useState(
     settings?.notifications ?? true
+  );
+  const [phoneNumber, setPhoneNumber] = useState(settings?.phoneNumber ?? '');
+  const [myConnections, setMyConnections] = useState(settings?.myConnections ?? '');
+  const [aiPersonalization, setAiPersonalization] = useState(
+    settings?.aiPersonalization ?? ''
+  );
+  const [billingSettings, setBillingSettings] = useState(
+    settings?.billingSettings ?? ''
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -36,8 +50,11 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
         body: JSON.stringify({
           subdomain: space.subdomain,
           name,
-          emoji,
-          notifications
+          notifications,
+          phoneNumber,
+          myConnections,
+          aiPersonalization,
+          billingSettings
         })
       });
       setSaved(true);
@@ -51,7 +68,7 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
   async function handleDelete() {
     if (
       !confirm(
-        `Are you sure you want to delete "${space.name}"? This will permanently delete all contacts, deals, and data. This cannot be undone.`
+        `Are you sure you want to delete "${space.name}"? This will permanently delete all clients, deals, and data. This cannot be undone.`
       )
     )
       return;
@@ -73,12 +90,12 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Space Settings</CardTitle>
+          <CardTitle>User Settings</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSave} className="space-y-4">
             <div className="space-y-1">
-              <Label htmlFor="name">Space Name</Label>
+              <Label htmlFor="name">Workspace Name</Label>
               <Input
                 id="name"
                 value={name}
@@ -87,12 +104,42 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="emoji">Emoji Icon</Label>
+              <Label htmlFor="number">Number</Label>
               <Input
-                id="emoji"
-                value={emoji}
-                onChange={(e) => setEmoji(e.target.value)}
-                maxLength={10}
+                id="number"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="(555) 123-4567"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="connections">My Connections</Label>
+              <Input
+                id="connections"
+                value={myConnections}
+                onChange={(e) => setMyConnections(e.target.value)}
+                placeholder="Brokerages, lenders, partners"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="aiPersonalization">AI Personalization</Label>
+              <Input
+                id="aiPersonalization"
+                value={aiPersonalization}
+                onChange={(e) => setAiPersonalization(e.target.value)}
+                placeholder="Tone, writing style, playbooks"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="billingSettings">Billing Settings</Label>
+              <Input
+                id="billingSettings"
+                value={billingSettings}
+                onChange={(e) => setBillingSettings(e.target.value)}
+                placeholder="Plan, payment method, billing contact"
               />
             </div>
 
@@ -130,7 +177,7 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-4">
-            Deleting your space is permanent and will remove all contacts, deals,
+            Deleting your space is permanent and will remove all clients, deals,
             and data. This cannot be undone.
           </p>
           <Button

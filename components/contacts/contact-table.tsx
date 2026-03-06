@@ -9,7 +9,6 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -22,25 +21,51 @@ import {
 import { ContactForm } from './contact-form';
 import { Plus, Search, Trash2, Pencil } from 'lucide-react';
 import Link from 'next/link';
-import type { Contact } from '@prisma/client';
+
+type Client = {
+  id: string;
+  name: string;
+  type: 'QUALIFICATION' | 'TOUR' | 'APPLICATION';
+  phone: string | null;
+  email: string | null;
+  budget: number | null;
+  preferences: string | null;
+  properties: string[];
+  createdAt: string;
+  address: string | null;
+  notes: string | null;
+  tags: string[];
+};
 
 const TYPE_COLORS: Record<string, string> = {
-  BUYER: 'bg-blue-100 text-blue-700',
-  SELLER: 'bg-green-100 text-green-700',
-  AGENT: 'bg-purple-100 text-purple-700',
-  OTHER: 'bg-gray-100 text-gray-700'
+  QUALIFICATION: 'bg-blue-100 text-blue-700',
+  TOUR: 'bg-amber-100 text-amber-700',
+  APPLICATION: 'bg-green-100 text-green-700'
 };
 
 interface ContactTableProps {
   subdomain: string;
 }
 
+function formatType(type: string) {
+  return type.charAt(0) + type.slice(1).toLowerCase();
+}
+
+function formatCurrency(value: number | null) {
+  if (value == null) return '—';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  }).format(value);
+}
+
 export function ContactTable({ subdomain }: ContactTableProps) {
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [addOpen, setAddOpen] = useState(false);
-  const [editContact, setEditContact] = useState<Contact | null>(null);
+  const [editContact, setEditContact] = useState<Client | null>(null);
 
   const fetchContacts = useCallback(async () => {
     const params = new URLSearchParams({ subdomain, search, type: typeFilter });
@@ -73,7 +98,7 @@ export function ContactTable({ subdomain }: ContactTableProps) {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this contact?')) return;
+    if (!confirm('Delete this client?')) return;
     await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
     fetchContacts();
   }
@@ -84,27 +109,26 @@ export function ContactTable({ subdomain }: ContactTableProps) {
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search contacts..."
+            placeholder="Search clients..."
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">All types</SelectItem>
-            <SelectItem value="BUYER">Buyer</SelectItem>
-            <SelectItem value="SELLER">Seller</SelectItem>
-            <SelectItem value="AGENT">Agent</SelectItem>
-            <SelectItem value="OTHER">Other</SelectItem>
+            <SelectItem value="ALL">All</SelectItem>
+            <SelectItem value="QUALIFICATION">Qualification</SelectItem>
+            <SelectItem value="TOUR">Tour</SelectItem>
+            <SelectItem value="APPLICATION">Application</SelectItem>
           </SelectContent>
         </Select>
         <Button onClick={() => setAddOpen(true)}>
           <Plus size={16} className="mr-2" />
-          Add Contact
+          Add Client
         </Button>
       </div>
 
@@ -114,17 +138,20 @@ export function ContactTable({ subdomain }: ContactTableProps) {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead className="hidden sm:table-cell">Email</TableHead>
               <TableHead className="hidden md:table-cell">Phone</TableHead>
-              <TableHead className="hidden lg:table-cell">Tags</TableHead>
+              <TableHead className="hidden lg:table-cell">Email</TableHead>
+              <TableHead className="hidden xl:table-cell">Budget</TableHead>
+              <TableHead className="hidden xl:table-cell">Date Joined</TableHead>
+              <TableHead className="hidden 2xl:table-cell">Preferences</TableHead>
+              <TableHead className="hidden 2xl:table-cell">Properties</TableHead>
               <TableHead className="w-24">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {contacts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                  No contacts found. Add your first contact!
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  No clients found. Add your first client!
                 </TableCell>
               </TableRow>
             ) : (
@@ -142,23 +169,26 @@ export function ContactTable({ subdomain }: ContactTableProps) {
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${TYPE_COLORS[contact.type]}`}
                     >
-                      {contact.type}
+                      {formatType(contact.type)}
                     </span>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
-                    {contact.email ?? '—'}
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
                     {contact.phone ?? '—'}
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    <div className="flex flex-wrap gap-1">
-                      {contact.tags.slice(0, 3).map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
+                  <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
+                    {contact.email ?? '—'}
+                  </TableCell>
+                  <TableCell className="hidden xl:table-cell text-muted-foreground text-sm">
+                    {formatCurrency(contact.budget)}
+                  </TableCell>
+                  <TableCell className="hidden xl:table-cell text-muted-foreground text-sm">
+                    {new Date(contact.createdAt).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="hidden 2xl:table-cell text-muted-foreground text-sm max-w-52 truncate">
+                    {contact.preferences ?? '—'}
+                  </TableCell>
+                  <TableCell className="hidden 2xl:table-cell text-muted-foreground text-sm max-w-52 truncate">
+                    {contact.properties.length ? contact.properties.join(', ') : '—'}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
@@ -172,8 +202,8 @@ export function ContactTable({ subdomain }: ContactTableProps) {
                       <Button
                         size="icon"
                         variant="ghost"
+                        className="text-destructive"
                         onClick={() => handleDelete(contact.id)}
-                        className="text-destructive hover:text-destructive"
                       >
                         <Trash2 size={14} />
                       </Button>
@@ -186,28 +216,30 @@ export function ContactTable({ subdomain }: ContactTableProps) {
         </Table>
       </div>
 
+      <ContactForm open={addOpen} onOpenChange={setAddOpen} onSubmit={handleAdd} title="Add Client" />
+
       <ContactForm
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        onSubmit={handleAdd}
+        open={!!editContact}
+        onOpenChange={(o) => !o && setEditContact(null)}
+        onSubmit={handleEdit}
+        title="Edit Client"
+        defaultValues={
+          editContact
+            ? {
+                name: editContact.name,
+                email: editContact.email ?? '',
+                phone: editContact.phone ?? '',
+                budget: editContact.budget?.toString() ?? '',
+                preferences: editContact.preferences ?? '',
+                properties: editContact.properties.join(', '),
+                address: editContact.address ?? '',
+                notes: editContact.notes ?? '',
+                type: editContact.type,
+                tags: editContact.tags.join(', ')
+              }
+            : undefined
+        }
       />
-      {editContact && (
-        <ContactForm
-          open={!!editContact}
-          onOpenChange={(o) => !o && setEditContact(null)}
-          onSubmit={handleEdit}
-          defaultValues={{
-            name: editContact.name,
-            email: editContact.email ?? '',
-            phone: editContact.phone ?? '',
-            address: editContact.address ?? '',
-            notes: editContact.notes ?? '',
-            type: editContact.type as any,
-            tags: editContact.tags.join(', ')
-          }}
-          title="Edit Contact"
-        />
-      )}
     </div>
   );
 }

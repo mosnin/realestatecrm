@@ -3,10 +3,8 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redis } from '@/lib/redis';
 import { db } from '@/lib/db';
-import { isValidIcon } from '@/lib/subdomains';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { rootDomain, protocol } from '@/lib/utils';
 
 const DEFAULT_STAGES = [
   { name: 'Lead', color: '#94a3b8', position: 0 },
@@ -27,19 +25,9 @@ export async function createSubdomainAction(
   }
 
   const subdomain = formData.get('subdomain') as string;
-  const icon = formData.get('icon') as string;
 
-  if (!subdomain || !icon) {
-    return { success: false, error: 'Subdomain and icon are required' };
-  }
-
-  if (!isValidIcon(icon)) {
-    return {
-      subdomain,
-      icon,
-      success: false,
-      error: 'Please enter a valid emoji (maximum 10 characters)'
-    };
+  if (!subdomain) {
+    return { success: false, error: 'Workspace name is required' };
   }
 
   const sanitizedSubdomain = subdomain.toLowerCase().replace(/[^a-z0-9-]/g, '');
@@ -47,22 +35,21 @@ export async function createSubdomainAction(
   if (sanitizedSubdomain !== subdomain) {
     return {
       subdomain,
-      icon,
       success: false,
       error:
-        'Subdomain can only have lowercase letters, numbers, and hyphens. Please try again.'
+        'Workspace name can only have lowercase letters, numbers, and hyphens. Please try again.'
     };
   }
 
-  const subdomainAlreadyExists = await redis.get(
-    `subdomain:${sanitizedSubdomain}`
-  );
+  const subdomainAlreadyExists = await db.space.findUnique({
+    where: { subdomain: sanitizedSubdomain },
+    select: { id: true }
+  });
   if (subdomainAlreadyExists) {
     return {
       subdomain,
-      icon,
       success: false,
-      error: 'This subdomain is already taken'
+      error: 'This workspace name is already taken'
     };
   }
 
@@ -83,29 +70,30 @@ export async function createSubdomainAction(
   if (existingSpace) {
     return {
       subdomain,
-      icon,
       success: false,
       error: 'You already have a space. Each account is limited to one space.'
     };
   }
 
-  await redis.set(`subdomain:${sanitizedSubdomain}`, {
-    emoji: icon,
-    createdAt: Date.now()
-  });
+  await redis
+    .set(`subdomain:${sanitizedSubdomain}`, {
+      emoji: '🏢',
+      createdAt: Date.now()
+    })
+    .catch(() => null);
 
   await db.space.create({
     data: {
       subdomain: sanitizedSubdomain,
       name: sanitizedSubdomain,
-      emoji: icon,
+      emoji: '🏢',
       ownerId: dbUser.id,
       settings: { create: {} },
       stages: { create: DEFAULT_STAGES }
     }
   });
 
-  redirect(`${protocol}://${sanitizedSubdomain}.${rootDomain}`);
+  redirect('/dashboard');
 }
 
 export async function deleteSubdomainAction(
@@ -113,7 +101,7 @@ export async function deleteSubdomainAction(
   formData: FormData
 ) {
   const subdomain = formData.get('subdomain') as string;
-  await redis.del(`subdomain:${subdomain}`);
+  await redis.del(`subdomain:${subdomain}`).catch(() => null);
   await db.space.delete({ where: { subdomain } }).catch(() => null);
   revalidatePath('/admin');
   return { success: 'Space deleted successfully' };

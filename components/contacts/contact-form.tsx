@@ -25,15 +25,22 @@ const schema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().optional(),
+  budget: z.string().optional(),
+  preferences: z.string().optional(),
+  properties: z.string().optional(),
   address: z.string().optional(),
   notes: z.string().optional(),
-  type: z.enum(['BUYER', 'SELLER', 'AGENT', 'OTHER']),
+  type: z.enum(['QUALIFICATION', 'TOUR', 'APPLICATION']),
   tags: z.string().optional()
 });
 
 type FormData = z.infer<typeof schema>;
 
-type SubmitData = Omit<FormData, 'tags'> & { tags: string[] };
+type SubmitData = Omit<FormData, 'tags' | 'properties' | 'budget'> & {
+  tags: string[];
+  properties: string[];
+  budget?: number;
+};
 
 interface ContactFormProps {
   open: boolean;
@@ -48,7 +55,7 @@ export function ContactForm({
   onOpenChange,
   onSubmit,
   defaultValues,
-  title = 'Add Contact'
+  title = 'Add Client'
 }: ContactFormProps) {
   const {
     register,
@@ -60,7 +67,7 @@ export function ContactForm({
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      type: 'OTHER',
+      type: 'QUALIFICATION',
       ...defaultValues
     }
   });
@@ -71,8 +78,12 @@ export function ContactForm({
     const tags = data.tags
       ? data.tags.split(',').map((t) => t.trim()).filter(Boolean)
       : [];
-    const { tags: _rawTags, ...rest } = data;
-    await onSubmit({ ...rest, tags });
+    const properties = data.properties
+      ? data.properties.split(',').map((p) => p.trim()).filter(Boolean)
+      : [];
+    const budget = data.budget ? parseFloat(data.budget) : undefined;
+    const { tags: _rawTags, properties: _rawProperties, ...rest } = data;
+    await onSubmit({ ...rest, budget, properties, tags });
     reset();
     onOpenChange(false);
   }
@@ -93,7 +104,7 @@ export function ContactForm({
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="type">Type</Label>
+            <Label htmlFor="type">Client Type</Label>
             <Select
               value={type}
               onValueChange={(v) => setValue('type', v as any)}
@@ -102,10 +113,9 @@ export function ContactForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="BUYER">Buyer</SelectItem>
-                <SelectItem value="SELLER">Seller</SelectItem>
-                <SelectItem value="AGENT">Agent</SelectItem>
-                <SelectItem value="OTHER">Other</SelectItem>
+                <SelectItem value="QUALIFICATION">Qualification</SelectItem>
+                <SelectItem value="TOUR">Tour</SelectItem>
+                <SelectItem value="APPLICATION">Application</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -124,6 +134,21 @@ export function ContactForm({
           </div>
 
           <div className="space-y-1">
+            <Label htmlFor="budget">Budget (optional)</Label>
+            <Input id="budget" type="number" step="0.01" {...register('budget')} />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="preferences">Preferences</Label>
+            <Textarea id="preferences" rows={3} {...register('preferences')} />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="properties">Properties (comma-separated)</Label>
+            <Input id="properties" placeholder="123 Main St, Sunset Villas #12" {...register('properties')} />
+          </div>
+
+          <div className="space-y-1">
             <Label htmlFor="address">Address</Label>
             <Input id="address" {...register('address')} />
           </div>
@@ -139,7 +164,7 @@ export function ContactForm({
           </div>
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save Contact'}
+            {isSubmitting ? 'Saving...' : 'Save Client'}
           </Button>
         </form>
       </SheetContent>

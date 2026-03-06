@@ -4,23 +4,53 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft, Mail, Phone, MapPin, FileText, Briefcase } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, FileText, Briefcase, CalendarDays, Wallet } from 'lucide-react';
 
 const TYPE_COLORS: Record<string, string> = {
-  BUYER: 'bg-blue-100 text-blue-700',
-  SELLER: 'bg-green-100 text-green-700',
-  AGENT: 'bg-purple-100 text-purple-700',
-  OTHER: 'bg-gray-100 text-gray-700'
+  QUALIFICATION: 'bg-blue-100 text-blue-700',
+  TOUR: 'bg-amber-100 text-amber-700',
+  APPLICATION: 'bg-green-100 text-green-700'
 };
 
-export default async function ContactDetailPage({
+function formatType(type: string) {
+  return type.charAt(0) + type.slice(1).toLowerCase();
+}
+
+export default async function ClientDetailPage({
   params
 }: {
   params: Promise<{ subdomain: string; id: string }>;
 }) {
   const { subdomain, id } = await params;
 
-  const contact = await db.contact.findUnique({
+  type ClientWithDeals = {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    budget: number | null;
+    createdAt: Date;
+    address: string | null;
+    preferences: string | null;
+    properties: string[];
+    tags: string[];
+    notes: string | null;
+    type: 'QUALIFICATION' | 'TOUR' | 'APPLICATION';
+    dealContacts: Array<{
+      deal: {
+        id: string;
+        title: string;
+        address: string | null;
+        value: number | null;
+        stage: {
+          name: string;
+          color: string;
+        };
+      };
+    }>;
+  };
+
+  const contact: ClientWithDeals | null = await db.contact.findUnique({
     where: { id },
     include: {
       dealContacts: {
@@ -34,7 +64,7 @@ export default async function ContactDetailPage({
   if (!contact) notFound();
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
           <Link href={`/s/${subdomain}/contacts`}>
@@ -44,14 +74,14 @@ export default async function ContactDetailPage({
         <div>
           <h2 className="text-2xl font-bold tracking-tight">{contact.name}</h2>
           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${TYPE_COLORS[contact.type]}`}>
-            {contact.type}
+            {formatType(contact.type)}
           </span>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Contact Info</CardTitle>
+          <CardTitle>Client Profile</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {contact.email && (
@@ -70,16 +100,50 @@ export default async function ContactDetailPage({
               </a>
             </div>
           )}
+          {contact.budget != null && (
+            <div className="flex items-center gap-3 text-sm">
+              <Wallet size={16} className="text-muted-foreground flex-shrink-0" />
+              <span>
+                {new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: 'USD',
+                  maximumFractionDigits: 0
+                }).format(contact.budget)}
+              </span>
+            </div>
+          )}
+          <div className="flex items-center gap-3 text-sm">
+            <CalendarDays size={16} className="text-muted-foreground flex-shrink-0" />
+            <span>Date Joined: {new Date(contact.createdAt).toLocaleDateString()}</span>
+          </div>
           {contact.address && (
             <div className="flex items-center gap-3 text-sm">
               <MapPin size={16} className="text-muted-foreground flex-shrink-0" />
               <span>{contact.address}</span>
             </div>
           )}
+          {contact.preferences && (
+            <div className="flex gap-3 text-sm">
+              <FileText size={16} className="text-muted-foreground flex-shrink-0 mt-0.5" />
+              <p className="text-muted-foreground whitespace-pre-wrap">
+                <span className="font-medium text-foreground">Preferences: </span>
+                {contact.preferences}
+              </p>
+            </div>
+          )}
+          {contact.properties.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {contact.properties.map((property) => (
+                <Badge key={property} variant="secondary">
+                  {property}
+                </Badge>
+              ))}
+            </div>
+          )}
           {contact.tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {contact.tags.map((tag) => (
-                <Badge key={tag} variant="secondary">
+                <Badge key={tag} variant="outline">
                   {tag}
                 </Badge>
               ))}
@@ -103,7 +167,7 @@ export default async function ContactDetailPage({
         </CardHeader>
         <CardContent>
           {contact.dealContacts.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No deals associated with this contact.</p>
+            <p className="text-muted-foreground text-sm">No deals associated with this client.</p>
           ) : (
             <div className="space-y-3">
               {contact.dealContacts.map(({ deal }) => (
