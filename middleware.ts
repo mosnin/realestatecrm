@@ -5,7 +5,7 @@ import { rootDomain } from '@/lib/utils';
 function extractSubdomain(request: NextRequest): string | null {
   const url = request.url;
   const host = request.headers.get('host') || '';
-  const hostname = host.split(':')[0];
+  const hostname = host.split(':')[0].toLowerCase().replace(/\.$/, '');
 
   // Local development environment
   if (url.includes('localhost') || url.includes('127.0.0.1')) {
@@ -22,6 +22,11 @@ function extractSubdomain(request: NextRequest): string | null {
   // Production environment
   const rootDomainFormatted = rootDomain.split(':')[0];
 
+  // Always treat www as the root domain alias
+  if (hostname === `www.${rootDomainFormatted}` || hostname === 'www') {
+    return null;
+  }
+
   // Handle preview deployment URLs (tenant---branch-name.vercel.app)
   if (hostname.includes('---') && hostname.endsWith('.vercel.app')) {
     const parts = hostname.split('---');
@@ -34,7 +39,10 @@ function extractSubdomain(request: NextRequest): string | null {
     hostname !== `www.${rootDomainFormatted}` &&
     hostname.endsWith(`.${rootDomainFormatted}`);
 
-  return isSubdomain ? hostname.replace(`.${rootDomainFormatted}`, '') : null;
+  if (!isSubdomain) return null;
+
+  const candidate = hostname.replace(`.${rootDomainFormatted}`, '');
+  return candidate === 'www' ? null : candidate;
 }
 
 // Routes that require authentication when on a subdomain

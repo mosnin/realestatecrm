@@ -2,11 +2,15 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 function normalizeRootDomain(value: string) {
-  return value
+  const sanitized = value
     .trim()
+    .toLowerCase()
     .replace(/^https?:\/\//, '')
-    .replace(/\/$/, '')
+    .split('/')[0]
+    .replace(/\.$/, '')
     .replace(/^www\./, '');
+
+  return sanitized;
 }
 
 export const protocol =
