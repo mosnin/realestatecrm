@@ -23,7 +23,34 @@ export default async function ClientDetailPage({
 }) {
   const { subdomain, id } = await params;
 
-  const contact = (await db.contact.findUnique({
+  type ClientWithDeals = {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    budget: number | null;
+    createdAt: Date;
+    address: string | null;
+    preferences: string | null;
+    properties: string[];
+    tags: string[];
+    notes: string | null;
+    type: 'QUALIFICATION' | 'TOUR' | 'APPLICATION';
+    dealContacts: Array<{
+      deal: {
+        id: string;
+        title: string;
+        address: string | null;
+        value: number | null;
+        stage: {
+          name: string;
+          color: string;
+        };
+      };
+    }>;
+  };
+
+  const contact: ClientWithDeals | null = await db.contact.findUnique({
     where: { id },
     include: {
       dealContacts: {
@@ -32,7 +59,7 @@ export default async function ClientDetailPage({
         }
       }
     }
-  })) as any;
+  });
 
   if (!contact) notFound();
 
