@@ -29,8 +29,10 @@ model Space {
   contacts Contact[]
   deals    Deal[]
   stages   DealStage[]
-  messages Message[]
-  settings SpaceSetting?
+  messages    Message[]
+  settings    SpaceSetting?
+  retellAgent RetellAgent?
+  leads       Lead[]
 }
 
 model SpaceSetting {
@@ -121,4 +123,61 @@ model Message {
   role      String
   content   String
   createdAt DateTime @default(now())
+}
+
+model RetellAgent {
+  id            String      @id @default(cuid())
+  spaceId       String      @unique
+  space         Space       @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  retellAgentId String      @unique
+  phoneNumber   String
+  telephonyType TelephonyType
+  greeting      String?
+  market        String?
+  brokerageName String?
+  status        AgentStatus @default(ACTIVE)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+enum TelephonyType {
+  RETELL_MANAGED
+  TWILIO
+}
+
+enum AgentStatus {
+  ACTIVE
+  ERROR
+  INACTIVE
+}
+
+model Lead {
+  id               String    @id @default(cuid())
+  spaceId          String
+  space            Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  callId           String    @unique
+  phone            String
+  score            LeadScore @default(COLD)
+  intent           LeadIntent?
+  budget           String?
+  timeline         String?
+  preferredAreas   String[]  @default([])
+  preApproved      Boolean   @default(false)
+  transcriptSummary String?
+  transcript       String?
+  recordingUrl     String?
+  callDuration     Int?
+  createdAt        DateTime  @default(now())
+}
+
+enum LeadScore {
+  HOT
+  WARM
+  COLD
+}
+
+enum LeadIntent {
+  BUYER
+  SELLER
+  BOTH
 }

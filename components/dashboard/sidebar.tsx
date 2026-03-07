@@ -9,7 +9,9 @@ import {
   Bot,
   User,
   Settings,
-  Building2
+  Building2,
+  PhoneIncoming,
+  Headphones,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +19,8 @@ const navItems = [
   { href: '', label: 'Home', icon: LayoutDashboard },
   { href: '/contacts', label: 'Clients', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
+  { href: '/leads', label: 'Leads', icon: PhoneIncoming },
+  { href: '/setup-agent', label: 'AI Agent', icon: Headphones },
   { href: '/ai', label: 'AI Assistant', icon: Bot },
   { href: '/profile', label: 'Profile', icon: User },
   { href: '/settings', label: 'Settings', icon: Settings }

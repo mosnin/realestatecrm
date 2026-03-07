@@ -3,6 +3,7 @@ import { GeistSans } from 'geist/font/sans';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { ThemeProvider } from '@/components/theme-provider';
+import { Toaster } from 'sonner';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -29,6 +30,7 @@ export default function RootLayout({
           <ThemeProvider>
             {children}
           </ThemeProvider>
+          <Toaster richColors position="top-right" />
           <SpeedInsights />
         </body>
       </html>
