@@ -50,6 +50,7 @@ import type { Conversation, VapiMessage } from '@/lib/types/vapi';
 interface ConversationHistoryProps {
   spaceId: string;
   initialConversations: Conversation[];
+  initialSearch?: string;
 }
 
 const typeConfig = {
@@ -100,10 +101,11 @@ function formatPhoneNumber(phone: string | null): string {
 export function ConversationHistory({
   spaceId,
   initialConversations,
+  initialSearch = '',
 }: ConversationHistoryProps) {
   const [conversations] = useState(initialConversations);
   const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [isSyncing, setIsSyncing] = useState(false);
 
   const filtered = conversations.filter((c) => {

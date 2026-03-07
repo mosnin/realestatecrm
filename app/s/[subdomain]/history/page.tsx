@@ -6,10 +6,13 @@ import { ConversationHistory } from './conversation-history';
 
 export default async function HistoryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ subdomain: string }>;
+  searchParams: Promise<{ search?: string }>;
 }) {
   const { subdomain } = await params;
+  const { search } = await searchParams;
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
 
@@ -36,6 +39,7 @@ export default async function HistoryPage({
       <ConversationHistory
         spaceId={space.id}
         initialConversations={JSON.parse(JSON.stringify(conversations))}
+        initialSearch={search}
       />
     </div>
   );

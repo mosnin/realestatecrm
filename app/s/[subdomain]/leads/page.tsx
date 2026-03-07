@@ -33,6 +33,7 @@ export default async function LeadsPage({
 
       <LeadsDashboard
         spaceId={space.id}
+        subdomain={subdomain}
         initialLeads={JSON.parse(JSON.stringify(initialLeads))}
       />
     </div>

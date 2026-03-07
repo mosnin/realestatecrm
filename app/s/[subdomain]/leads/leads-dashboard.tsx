@@ -34,12 +34,15 @@ import {
   ThermometerSun,
   Snowflake,
   PhoneIncoming,
+  History,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useRealtimeLeads } from '@/hooks/use-realtime-leads';
 import type { Lead } from '@/lib/types/vapi';
 
 interface LeadsDashboardProps {
   spaceId: string;
+  subdomain: string;
   initialLeads: Lead[];
 }
 
@@ -90,6 +93,7 @@ function formatPhoneNumber(phone: string) {
 
 export function LeadsDashboard({
   spaceId,
+  subdomain,
   initialLeads,
 }: LeadsDashboardProps) {
   const handleNewLead = useCallback((newLead: Lead) => {
@@ -157,7 +161,7 @@ export function LeadsDashboard({
               </TableHeader>
               <TableBody>
                 {leads.map((lead) => (
-                  <LeadTableRow key={lead.id} lead={lead} />
+                  <LeadTableRow key={lead.id} lead={lead} subdomain={subdomain} />
                 ))}
               </TableBody>
             </Table>
@@ -168,7 +172,7 @@ export function LeadsDashboard({
       {/* Mobile cards */}
       <div className="md:hidden space-y-3">
         {leads.map((lead) => (
-          <LeadCard key={lead.id} lead={lead} />
+          <LeadCard key={lead.id} lead={lead} subdomain={subdomain} />
         ))}
       </div>
     </>
@@ -212,7 +216,7 @@ function ScoreBadge({ score }: { score: Lead['score'] }) {
   );
 }
 
-function LeadTableRow({ lead }: { lead: Lead }) {
+function LeadTableRow({ lead, subdomain }: { lead: Lead; subdomain: string }) {
   return (
     <TableRow>
       <TableCell className="font-mono text-sm">
@@ -253,6 +257,11 @@ function LeadTableRow({ lead }: { lead: Lead }) {
           >
             <Phone size={14} />
           </Button>
+          <Button variant="ghost" size="sm" asChild title="View call log">
+            <Link href={`/s/${subdomain}/history?search=${encodeURIComponent(lead.phone)}`}>
+              <History size={14} />
+            </Link>
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -269,7 +278,7 @@ function LeadTableRow({ lead }: { lead: Lead }) {
   );
 }
 
-function LeadCard({ lead }: { lead: Lead }) {
+function LeadCard({ lead, subdomain }: { lead: Lead; subdomain: string }) {
   return (
     <Card>
       <CardContent className="pt-4 space-y-3">
@@ -315,14 +324,11 @@ function LeadCard({ lead }: { lead: Lead }) {
             <Phone size={14} className="mr-1" />
             Call Back
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            onClick={() => toast.success('Lead added to CRM contacts')}
-          >
-            <UserPlus size={14} className="mr-1" />
-            Add to CRM
+          <Button variant="outline" size="sm" className="flex-1" asChild>
+            <Link href={`/s/${subdomain}/history?search=${encodeURIComponent(lead.phone)}`}>
+              <History size={14} className="mr-1" />
+              Call Log
+            </Link>
           </Button>
           {lead.transcriptSummary && <TranscriptDialog lead={lead} />}
         </div>
