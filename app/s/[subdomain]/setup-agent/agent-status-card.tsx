@@ -10,10 +10,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Phone, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
-import type { RetellAgentRecord } from '@/lib/types/retell';
+import type { VapiAgentRecord } from '@/lib/types/vapi';
 
 interface AgentStatusCardProps {
-  agent: RetellAgentRecord;
+  agent: VapiAgentRecord;
   subdomain: string;
 }
 
@@ -53,7 +53,8 @@ export function AgentStatusCard({ agent, subdomain }: AgentStatusCardProps) {
           <Badge variant={status.variant}>{status.label}</Badge>
         </div>
         <CardDescription>
-          Agent created on{' '}
+          Voice & SMS lead qualification powered by Vapi AI.
+          Created{' '}
           {new Date(agent.createdAt).toLocaleDateString('en-US', {
             dateStyle: 'medium',
           })}
@@ -66,12 +67,8 @@ export function AgentStatusCard({ agent, subdomain }: AgentStatusCardProps) {
             <p className="font-mono font-medium">{agent.phoneNumber}</p>
           </div>
           <div>
-            <p className="text-muted-foreground">Telephony</p>
-            <p className="font-medium">
-              {agent.telephonyType === 'RETELL_MANAGED'
-                ? 'Retell Managed'
-                : 'Twilio'}
-            </p>
+            <p className="text-muted-foreground">Provider</p>
+            <p className="font-medium">Twilio + Vapi</p>
           </div>
           {agent.market && (
             <div>
@@ -102,6 +99,12 @@ export function AgentStatusCard({ agent, subdomain }: AgentStatusCardProps) {
             <a href={`/s/${subdomain}/leads`}>
               <ExternalLink size={14} className="mr-2" />
               View Leads
+            </a>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <a href={`/s/${subdomain}/history`}>
+              <ExternalLink size={14} className="mr-2" />
+              History
             </a>
           </Button>
         </div>

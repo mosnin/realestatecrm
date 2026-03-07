@@ -27,50 +27,13 @@ import {
 } from 'lucide-react';
 import { createAgentAction } from './actions';
 
-// Flat schema with conditional validation via superRefine
-const telephonySchema = z
-  .object({
-    telephonyType: z.enum(['RETELL_MANAGED', 'TWILIO']),
-    areaCode: z.string().optional(),
-    twilioAccountSid: z.string().optional(),
-    twilioAuthToken: z.string().optional(),
-    twilioPhoneNumber: z.string().optional(),
-    twilioFriendlyName: z.string().optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.telephonyType === 'RETELL_MANAGED') {
-      if (data.areaCode && !/^\d{3}$/.test(data.areaCode)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Must be a 3-digit area code',
-          path: ['areaCode'],
-        });
-      }
-    }
-    if (data.telephonyType === 'TWILIO') {
-      if (!data.twilioAccountSid) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Account SID is required',
-          path: ['twilioAccountSid'],
-        });
-      }
-      if (!data.twilioAuthToken) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Auth Token is required',
-          path: ['twilioAuthToken'],
-        });
-      }
-      if (!data.twilioPhoneNumber || !/^\+1\d{10}$/.test(data.twilioPhoneNumber)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Must be E.164 format (e.g., +12125551234)',
-          path: ['twilioPhoneNumber'],
-        });
-      }
-    }
-  });
+const telephonySchema = z.object({
+  areaCode: z
+    .string()
+    .regex(/^\d{3}$/, 'Must be a 3-digit area code')
+    .optional()
+    .or(z.literal('')),
+});
 
 const agentSchema = z.object({
   greeting: z.string().min(1, 'Greeting is required'),
@@ -97,7 +60,7 @@ export function AgentSetupForm() {
       {/* Step indicators */}
       <div className="flex items-center gap-2 text-sm">
         <Badge variant={step === 1 ? 'default' : 'secondary'}>
-          1. Telephony
+          1. Phone Number
         </Badge>
         <ArrowRight size={14} className="text-muted-foreground" />
         <Badge variant={step === 2 ? 'default' : 'secondary'}>
@@ -106,7 +69,10 @@ export function AgentSetupForm() {
       </div>
 
       {result ? (
-        <SuccessCard agentId={result.agentId} phoneNumber={result.phoneNumber} />
+        <SuccessCard
+          agentId={result.agentId}
+          phoneNumber={result.phoneNumber}
+        />
       ) : step === 1 ? (
         <TelephonyStep
           onNext={(data) => {
@@ -149,17 +115,17 @@ export function AgentSetupForm() {
   );
 }
 
-function TelephonyStep({ onNext }: { onNext: (data: TelephonyData) => void }) {
-  const [type, setType] = useState<'RETELL_MANAGED' | 'TWILIO'>(
-    'RETELL_MANAGED'
-  );
+function TelephonyStep({
+  onNext,
+}: {
+  onNext: (data: TelephonyData) => void;
+}) {
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<TelephonyData>({
     resolver: zodResolver(telephonySchema),
-    defaultValues: { telephonyType: 'RETELL_MANAGED' },
   });
 
   return (
@@ -167,141 +133,36 @@ function TelephonyStep({ onNext }: { onNext: (data: TelephonyData) => void }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Phone size={20} />
-          Choose Your Phone Setup
+          Get Your AI Phone Number
         </CardTitle>
         <CardDescription>
-          Select how you want to connect a phone number to your AI agent.
+          We'll provision a dedicated phone number for your AI lead
+          qualification agent. Voice and SMS enabled.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onNext)} className="space-y-6">
-          {/* Radio group */}
-          <div className="space-y-3">
-            <label className="flex items-start gap-3 p-4 border rounded-lg cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors">
-              <input
-                type="radio"
-                value="RETELL_MANAGED"
-                checked={type === 'RETELL_MANAGED'}
-                {...register('telephonyType', {
-                  onChange: (e) => setType(e.target.value),
-                })}
-                className="mt-1"
-              />
-              <div>
-                <p className="font-medium text-sm">
-                  Buy a Retell-managed number
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Retell provisions and manages the number for you. Easiest
-                  option.
-                </p>
-              </div>
-            </label>
-
-            <label className="flex items-start gap-3 p-4 border rounded-lg cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors">
-              <input
-                type="radio"
-                value="TWILIO"
-                checked={type === 'TWILIO'}
-                {...register('telephonyType', {
-                  onChange: (e) => setType(e.target.value),
-                })}
-                className="mt-1"
-              />
-              <div>
-                <p className="font-medium text-sm">
-                  Connect my Twilio number
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Use your existing Twilio account and phone number via SIP
-                  trunking.
-                </p>
-              </div>
-            </label>
-          </div>
-
-          {/* Conditional fields */}
-          {type === 'RETELL_MANAGED' && (
-            <div className="space-y-2">
-              <Label htmlFor="areaCode">
-                Preferred Area Code{' '}
-                <span className="text-muted-foreground">(optional)</span>
-              </Label>
-              <Input
-                id="areaCode"
-                placeholder="212"
-                maxLength={3}
-                {...register('areaCode')}
-              />
-              {errors.areaCode && (
-                <p className="text-sm text-destructive">
-                  {errors.areaCode.message}
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Leave blank for any available US number.
+          <div className="space-y-2">
+            <Label htmlFor="areaCode">
+              Preferred Area Code{' '}
+              <span className="text-muted-foreground">(optional)</span>
+            </Label>
+            <Input
+              id="areaCode"
+              placeholder="212"
+              maxLength={3}
+              {...register('areaCode')}
+            />
+            {errors.areaCode && (
+              <p className="text-sm text-destructive">
+                {errors.areaCode.message}
               </p>
-            </div>
-          )}
-
-          {type === 'TWILIO' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="twilioAccountSid">Twilio Account SID</Label>
-                <Input
-                  id="twilioAccountSid"
-                  placeholder="AC..."
-                  {...register('twilioAccountSid')}
-                />
-                {errors.twilioAccountSid && (
-                  <p className="text-sm text-destructive">
-                    {errors.twilioAccountSid.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="twilioAuthToken">Auth Token</Label>
-                <Input
-                  id="twilioAuthToken"
-                  type="password"
-                  placeholder="Your Twilio auth token"
-                  {...register('twilioAuthToken')}
-                />
-                {errors.twilioAuthToken && (
-                  <p className="text-sm text-destructive">
-                    {errors.twilioAuthToken.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="twilioPhoneNumber">Phone Number (E.164)</Label>
-                <Input
-                  id="twilioPhoneNumber"
-                  placeholder="+12125551234"
-                  {...register('twilioPhoneNumber')}
-                />
-                {errors.twilioPhoneNumber && (
-                  <p className="text-sm text-destructive">
-                    {errors.twilioPhoneNumber.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="twilioFriendlyName">
-                  Friendly Name{' '}
-                  <span className="text-muted-foreground">(optional)</span>
-                </Label>
-                <Input
-                  id="twilioFriendlyName"
-                  placeholder="My Lead Line"
-                  {...register('twilioFriendlyName')}
-                />
-              </div>
-            </div>
-          )}
+            )}
+            <p className="text-xs text-muted-foreground">
+              Enter a 3-digit US area code to get a local number, or leave
+              blank for any available number.
+            </p>
+          </div>
 
           <Button type="submit" className="w-full">
             Continue to Agent Setup
@@ -439,7 +300,7 @@ function SuccessCard({
           Agent is Live!
         </CardTitle>
         <CardDescription>
-          Your AI lead qualification agent is ready to take calls.
+          Your AI lead qualification agent is ready to take calls and SMS.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -461,7 +322,12 @@ function SuccessCard({
           <ul className="space-y-1 text-muted-foreground list-disc list-inside">
             <li>Share this number on Zillow, Realtor.com, or your website</li>
             <li>Leads will be automatically qualified and scored</li>
-            <li>Check the Leads dashboard for incoming qualified leads</li>
+            <li>
+              Check the Leads dashboard for incoming qualified leads
+            </li>
+            <li>
+              View conversation transcripts in the History tab
+            </li>
           </ul>
         </div>
 

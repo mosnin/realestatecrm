@@ -12,6 +12,7 @@ import {
   Building2,
   PhoneIncoming,
   Headphones,
+  History,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -20,6 +21,7 @@ const navItems = [
   { href: '/contacts', label: 'Clients', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
   { href: '/leads', label: 'Leads', icon: PhoneIncoming },
+  { href: '/history', label: 'History', icon: History },
   { href: '/setup-agent', label: 'AI Agent', icon: Headphones },
   { href: '/ai', label: 'AI Assistant', icon: Bot },
   { href: '/profile', label: 'Profile', icon: User },

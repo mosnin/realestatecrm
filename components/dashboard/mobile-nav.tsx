@@ -5,17 +5,17 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
-  Briefcase,
-  Bot,
   PhoneIncoming,
+  History,
+  Bot,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '', label: 'Home', icon: LayoutDashboard },
   { href: '/contacts', label: 'Clients', icon: Users },
-  { href: '/deals', label: 'Deals', icon: Briefcase },
   { href: '/leads', label: 'Leads', icon: PhoneIncoming },
+  { href: '/history', label: 'History', icon: History },
   { href: '/ai', label: 'AI', icon: Bot },
 ];
 

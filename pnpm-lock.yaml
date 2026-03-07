@@ -92,9 +92,6 @@ importers:
       react-hook-form:
         specifier: ^7.71.2
         version: 7.71.2(react@19.1.0)
-      retell-sdk:
-        specifier: ^5.7.0
-        version: 5.7.0
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -2229,9 +2226,6 @@ packages:
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
     engines: {node: '>=0.10.0'}
-
-  retell-sdk@5.7.0:
-    resolution: {integrity: sha512-+Y0fZVRlhfXPhfuZYjsTuvA+GNMgBbCHMOZkNuqqqqL0eb+cNKghW6y4d0FDekKqN0Ip4YaOtseUTvF9RF32bA==}
 
   retry@0.12.0:
     resolution: {integrity: sha512-9LkiTwjUh6rT555DtE9rTX+BKByPfrMzEAtnlEtdEwr3Nkffwiihqe2bWADg+OQRjt9gl6ICdmB/ZFDCGAtSow==}
@@ -4515,8 +4509,6 @@ snapshots:
   remeda@2.33.4: {}
 
   require-directory@2.1.1: {}
-
-  retell-sdk@5.7.0: {}
 
   retry@0.12.0: {}
 

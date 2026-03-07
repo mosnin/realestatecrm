@@ -36,7 +36,7 @@ import {
   PhoneIncoming,
 } from 'lucide-react';
 import { useRealtimeLeads } from '@/hooks/use-realtime-leads';
-import type { Lead } from '@/lib/types/retell';
+import type { Lead } from '@/lib/types/vapi';
 
 interface LeadsDashboardProps {
   spaceId: string;

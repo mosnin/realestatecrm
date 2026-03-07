@@ -4,11 +4,11 @@ import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { getSpaceByOwnerId } from '@/lib/space';
 import {
-  createRetellAgent,
-  buyRetellPhoneNumber,
-  importTwilioPhoneNumber,
-} from '@/lib/retell';
-import type { AgentConfig } from '@/lib/types/retell';
+  createVapiAssistant,
+  buyTwilioNumber,
+  importTwilioNumberToVapi,
+} from '@/lib/vapi';
+import type { AgentConfig } from '@/lib/types/vapi';
 
 export async function createAgentAction(config: AgentConfig) {
   const { userId } = await auth();
@@ -21,62 +21,41 @@ export async function createAgentAction(config: AgentConfig) {
   if (!space) throw new Error('Space not found');
 
   // Check if agent already exists
-  const existing = await db.retellAgent.findUnique({
+  const existing = await db.vapiAgent.findUnique({
     where: { spaceId: space.id },
   });
   if (existing) {
-    throw new Error('Agent already exists for this space. Delete the existing agent first.');
+    throw new Error(
+      'Agent already exists for this space. Delete the existing agent first.'
+    );
   }
 
   try {
-    // 1. Create the Retell agent with custom prompt
-    const { agent } = await createRetellAgent({
+    // 1. Create the Vapi assistant with lead qualification prompt
+    const assistant = await createVapiAssistant({
       greeting: config.greeting,
       market: config.market,
       brokerageName: config.brokerageName,
       spaceId: space.id,
     });
 
-    // 2. Set up phone number based on telephony type
-    let phoneNumber: string;
+    // 2. Buy a Twilio number via master account
+    const twilioNumber = await buyTwilioNumber(config.areaCode || undefined);
 
-    if (config.telephonyType === 'RETELL_MANAGED') {
-      const phone = await buyRetellPhoneNumber(
-        agent.agent_id,
-        config.areaCode
-      );
-      phoneNumber = phone.phone_number;
-    } else {
-      // Twilio import
-      if (
-        !config.twilioAccountSid ||
-        !config.twilioAuthToken ||
-        !config.twilioPhoneNumber
-      ) {
-        throw new Error('Twilio credentials are required');
-      }
+    // 3. Import the Twilio number into Vapi and link to assistant
+    const vapiPhone = await importTwilioNumberToVapi(
+      twilioNumber.phoneNumber,
+      assistant.id
+    );
 
-      // Validate E.164 format
-      if (!/^\+1\d{10}$/.test(config.twilioPhoneNumber)) {
-        throw new Error('Phone number must be in E.164 format (e.g., +12125551234)');
-      }
-
-      const imported = await importTwilioPhoneNumber(
-        agent.agent_id,
-        config.twilioPhoneNumber,
-        config.twilioAccountSid,
-        config.twilioAuthToken
-      );
-      phoneNumber = imported.phone_number;
-    }
-
-    // 3. Store in database
-    const record = await db.retellAgent.create({
+    // 4. Store in database
+    const record = await db.vapiAgent.create({
       data: {
         spaceId: space.id,
-        retellAgentId: agent.agent_id,
-        phoneNumber,
-        telephonyType: config.telephonyType,
+        vapiAssistantId: assistant.id,
+        vapiPhoneNumberId: vapiPhone.id,
+        phoneNumber: twilioNumber.phoneNumber,
+        twilioSid: twilioNumber.sid,
         greeting: config.greeting,
         market: config.market,
         brokerageName: config.brokerageName,
@@ -86,18 +65,22 @@ export async function createAgentAction(config: AgentConfig) {
 
     return {
       success: true,
-      agentId: record.retellAgentId,
+      agentId: record.vapiAssistantId,
       phoneNumber: record.phoneNumber,
     };
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Failed to create agent';
 
-    // Check for common Retell API errors
-    if (message.includes('rate limit')) {
-      throw new Error('Rate limited by Retell API. Please try again in a minute.');
+    if (message.includes('rate limit') || message.includes('429')) {
+      throw new Error(
+        'Rate limited. Please try again in a minute.'
+      );
     }
-    if (message.includes('already in use') || message.includes('duplicate')) {
+    if (
+      message.includes('already in use') ||
+      message.includes('duplicate')
+    ) {
       throw new Error('This phone number is already in use.');
     }
 
@@ -115,7 +98,7 @@ export async function getAgentStatus() {
   const space = await getSpaceByOwnerId(user.id);
   if (!space) return null;
 
-  return db.retellAgent.findUnique({
+  return db.vapiAgent.findUnique({
     where: { spaceId: space.id },
   });
 }

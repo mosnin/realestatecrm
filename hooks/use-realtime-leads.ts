@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useCallback, useRef, useState } from 'react';
-import type { Lead } from '@/lib/types/retell';
+import type { Lead } from '@/lib/types/vapi';
 
 interface UseRealtimeLeadsOptions {
   spaceId: string;

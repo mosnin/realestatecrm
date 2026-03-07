@@ -2,10 +2,9 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { getSpaceFromSubdomain } from '@/lib/space';
-import { AgentSetupForm } from './agent-setup-form';
-import { AgentStatusCard } from './agent-status-card';
+import { ConversationHistory } from './conversation-history';
 
-export default async function SetupAgentPage({
+export default async function HistoryPage({
   params,
 }: {
   params: Promise<{ subdomain: string }>;
@@ -17,27 +16,27 @@ export default async function SetupAgentPage({
   const space = await getSpaceFromSubdomain(subdomain);
   if (!space) redirect('/');
 
-  const existingAgent = await db.vapiAgent.findUnique({
+  const conversations = await db.conversation.findMany({
     where: { spaceId: space.id },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
   });
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
-          AI Lead Qualification Agent
+          Conversation History
         </h1>
         <p className="text-muted-foreground mt-1">
-          Set up your personal AI agent to qualify inbound leads via phone and
-          SMS automatically.
+          Voice call transcripts and SMS conversations from your AI agent.
         </p>
       </div>
 
-      {existingAgent ? (
-        <AgentStatusCard agent={existingAgent} subdomain={subdomain} />
-      ) : (
-        <AgentSetupForm />
-      )}
+      <ConversationHistory
+        spaceId={space.id}
+        initialConversations={JSON.parse(JSON.stringify(conversations))}
+      />
     </div>
   );
 }
