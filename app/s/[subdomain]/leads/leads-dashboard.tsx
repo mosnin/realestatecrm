@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -92,17 +92,14 @@ export function LeadsDashboard({
   spaceId,
   initialLeads,
 }: LeadsDashboardProps) {
-  const [leads, setLeads] = useState<Lead[]>(initialLeads);
-
   const handleNewLead = useCallback((newLead: Lead) => {
-    setLeads((prev) => [newLead, ...prev]);
     const score = scoreConfig[newLead.score];
     toast.success(`New ${score.label} Lead!`, {
       description: `${formatPhoneNumber(newLead.phone)}${newLead.budget ? ` - Budget: ${newLead.budget}` : ''}`,
     });
   }, []);
 
-  useRealtimeLeads({ spaceId, onNewLead: handleNewLead });
+  const leads = useRealtimeLeads({ spaceId, initialLeads, onNewLead: handleNewLead });
 
   if (leads.length === 0) {
     return <EmptyState />;

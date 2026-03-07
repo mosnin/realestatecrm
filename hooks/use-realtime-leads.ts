@@ -1,48 +1,53 @@
 'use client';
 
-import { useEffect, useCallback, useRef } from 'react';
-import { getSupabaseClient } from '@/lib/supabase';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import type { Lead } from '@/lib/types/retell';
 
 interface UseRealtimeLeadsOptions {
   spaceId: string;
+  initialLeads: Lead[];
   onNewLead?: (lead: Lead) => void;
+  pollIntervalMs?: number;
 }
 
 export function useRealtimeLeads({
   spaceId,
+  initialLeads,
   onNewLead,
+  pollIntervalMs = 5000,
 }: UseRealtimeLeadsOptions) {
+  const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const onNewLeadRef = useRef(onNewLead);
   onNewLeadRef.current = onNewLead;
+  const latestTimestampRef = useRef<string>(
+    initialLeads[0]?.createdAt
+      ? new Date(initialLeads[0].createdAt).toISOString()
+      : new Date().toISOString()
+  );
 
-  const subscribe = useCallback(() => {
-    const supabase = getSupabaseClient();
-
-    const channel = supabase
-      .channel(`leads:${spaceId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'Lead',
-          filter: `spaceId=eq.${spaceId}`,
-        },
-        (payload) => {
-          const newLead = payload.new as Lead;
-          onNewLeadRef.current?.(newLead);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+  const poll = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/leads?spaceId=${spaceId}&after=${encodeURIComponent(latestTimestampRef.current)}`
+      );
+      if (!res.ok) return;
+      const newLeads: Lead[] = await res.json();
+      if (newLeads.length > 0) {
+        latestTimestampRef.current = new Date(
+          newLeads[0].createdAt
+        ).toISOString();
+        setLeads((prev) => [...newLeads, ...prev]);
+        newLeads.forEach((lead) => onNewLeadRef.current?.(lead));
+      }
+    } catch {
+      // Silently ignore polling errors
+    }
   }, [spaceId]);
 
   useEffect(() => {
-    const unsubscribe = subscribe();
-    return unsubscribe;
-  }, [subscribe]);
+    const interval = setInterval(poll, pollIntervalMs);
+    return () => clearInterval(interval);
+  }, [poll, pollIntervalMs]);
+
+  return leads;
 }
