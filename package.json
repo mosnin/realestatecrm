@@ -19,6 +19,7 @@
     "@radix-ui/react-label": "^2.1.6",
     "@radix-ui/react-popover": "^1.1.13",
     "@radix-ui/react-slot": "^1.2.2",
+    "@tanstack/react-query": "^5.90.21",
     "@upstash/redis": "^1.34.9",
     "@vercel/analytics": "^1.5.0",
     "@vercel/speed-insights": "^1.2.0",
@@ -35,6 +36,8 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-hook-form": "^7.71.2",
+    "retell-sdk": "^5.7.0",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.0",
     "zod": "^4.3.6"
   },

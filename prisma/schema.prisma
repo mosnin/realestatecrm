@@ -17,6 +17,31 @@ model User {
   space     Space?
 }
 
+// ─── Retell AI enums ─────────────────────────────────────────────────────────
+
+enum TelephonyType {
+  RETELL_MANAGED
+  TWILIO
+}
+
+enum AgentStatus {
+  PENDING
+  ACTIVE
+  ERROR
+}
+
+enum LeadScore {
+  HOT
+  WARM
+  COLD
+}
+
+enum LeadIntent {
+  BUYER
+  SELLER
+  UNKNOWN
+}
+
 model Space {
   id        String   @id @default(cuid())
   subdomain String   @unique
@@ -26,11 +51,13 @@ model Space {
   ownerId   String   @unique
   owner     User     @relation(fields: [ownerId], references: [id])
 
-  contacts Contact[]
-  deals    Deal[]
-  stages   DealStage[]
-  messages Message[]
-  settings SpaceSetting?
+  contacts     Contact[]
+  deals        Deal[]
+  stages       DealStage[]
+  messages     Message[]
+  settings     SpaceSetting?
+  retellAgent  RetellAgent?
+  leads        Lead[]
 }
 
 model SpaceSetting {
@@ -120,4 +147,38 @@ model Message {
   role      String
   content   String
   createdAt DateTime @default(now())
+}
+
+// ─── Retell AI models ─────────────────────────────────────────────────────────
+
+model RetellAgent {
+  id             String        @id @default(cuid())
+  spaceId        String        @unique
+  space          Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  retellAgentId  String
+  retellLlmId    String
+  phoneNumber    String
+  telephonyType  TelephonyType
+  status         AgentStatus   @default(PENDING)
+  greetingText   String
+  brokerageName  String
+  primaryMarket  String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model Lead {
+  id                String     @id @default(cuid())
+  spaceId           String
+  space             Space      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  callId            String     @unique
+  phone             String
+  score             LeadScore  @default(COLD)
+  intent            LeadIntent @default(UNKNOWN)
+  budget            String?
+  timeline          String?
+  preferredAreas    String?
+  transcriptSummary String?
+  transcript        String?
+  createdAt         DateTime   @default(now())
 }

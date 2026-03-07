@@ -4,6 +4,7 @@ import { getSpaceFromSubdomain } from '@/lib/space';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
+import { Providers } from '@/components/providers';
 
 export default async function DashboardLayout({
   children,
@@ -36,7 +37,9 @@ export default async function DashboardLayout({
           spaceEmoji={space.emoji}
           title={space.name}
         />
-        <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">{children}</main>
+        <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
+            <Providers>{children}</Providers>
+          </main>
       </div>
       <MobileNav subdomain={subdomain} />
     </div>
