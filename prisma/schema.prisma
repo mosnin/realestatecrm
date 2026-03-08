@@ -34,6 +34,7 @@ model Space {
   vapiAgent     VapiAgent?
   leads         Lead[]
   conversations Conversation[]
+  agentFlow     AgentFlow?
 }
 
 model SpaceSetting {
@@ -202,4 +203,15 @@ enum ConversationType {
   VOICE_INBOUND
   VOICE_OUTBOUND
   SMS
+}
+
+model AgentFlow {
+  id        String   @id @default(cuid())
+  spaceId   String   @unique
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  nodes     Json     @default("[]")
+  edges     Json     @default("[]")
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

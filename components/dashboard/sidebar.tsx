@@ -13,6 +13,7 @@ import {
   PhoneIncoming,
   Headphones,
   History,
+  Workflow,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +24,7 @@ const navItems = [
   { href: '/leads', label: 'Leads', icon: PhoneIncoming },
   { href: '/history', label: 'History', icon: History },
   { href: '/setup-agent', label: 'AI Agent', icon: Headphones },
+  { href: '/agent-builder', label: 'Flow Builder', icon: Workflow },
   { href: '/ai', label: 'AI Assistant', icon: Bot },
   { href: '/profile', label: 'Profile', icon: User },
   { href: '/settings', label: 'Settings', icon: Settings }
