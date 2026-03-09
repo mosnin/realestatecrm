@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Copy, Check } from 'lucide-react';
 
 export function CopyLinkButton({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
@@ -9,12 +9,26 @@ export function CopyLinkButton({ url }: { url: string }) {
   async function onCopy() {
     await navigator.clipboard.writeText(url);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    setTimeout(() => setCopied(false), 1800);
   }
 
   return (
-    <Button type="button" variant="outline" size="sm" onClick={onCopy}>
-      {copied ? 'Copied' : 'Copy link'}
-    </Button>
+    <button
+      type="button"
+      onClick={onCopy}
+      className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-colors"
+    >
+      {copied ? (
+        <>
+          <Check size={13} className="text-green-600" />
+          <span className="text-green-700 dark:text-green-400">Copied!</span>
+        </>
+      ) : (
+        <>
+          <Copy size={13} />
+          Copy link
+        </>
+      )}
+    </button>
   );
 }

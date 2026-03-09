@@ -53,7 +53,7 @@ export default async function DashboardLayout({
           spaceName={space.name}
           title={space.name}
         />
-        <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">{children}</main>
+        <main className="flex-1 px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7">{children}</main>
       </div>
       <MobileNav subdomain={subdomain} />
     </div>

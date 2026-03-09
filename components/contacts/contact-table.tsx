@@ -1,14 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -16,11 +8,12 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from '@/components/ui/select';
 import { ContactForm } from './contact-form';
-import { Plus, Search, Trash2, Pencil } from 'lucide-react';
+import { Plus, Search, Trash2, Pencil, Phone, Mail, Wallet, MapPin } from 'lucide-react';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 type Client = {
   id: string;
@@ -37,27 +30,36 @@ type Client = {
   tags: string[];
 };
 
-const TYPE_COLORS: Record<string, string> = {
-  QUALIFICATION: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
-  TOUR: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
-  APPLICATION: 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'
+const TYPE_META: Record<string, { label: string; className: string }> = {
+  QUALIFICATION: {
+    label: 'Qualifying',
+    className: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
+  },
+  TOUR: {
+    label: 'Tour',
+    className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+  },
+  APPLICATION: {
+    label: 'Applied',
+    className: 'bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-400',
+  },
 };
 
 interface ContactTableProps {
   subdomain: string;
 }
 
-function formatType(type: string) {
-  return type.charAt(0) + type.slice(1).toLowerCase();
-}
-
 function formatCurrency(value: number | null) {
-  if (value == null) return '—';
+  if (value == null) return null;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    maximumFractionDigits: 0
+    maximumFractionDigits: 0,
   }).format(value);
+}
+
+function getInitials(name: string) {
+  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
 export function ContactTable({ subdomain }: ContactTableProps) {
@@ -66,11 +68,13 @@ export function ContactTable({ subdomain }: ContactTableProps) {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [addOpen, setAddOpen] = useState(false);
   const [editContact, setEditContact] = useState<Client | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const fetchContacts = useCallback(async () => {
     const params = new URLSearchParams({ subdomain, search, type: typeFilter });
     const res = await fetch(`/api/contacts?${params}`);
     if (res.ok) setContacts(await res.json());
+    setLoading(false);
   }, [subdomain, search, typeFilter]);
 
   useEffect(() => {
@@ -81,7 +85,7 @@ export function ContactTable({ subdomain }: ContactTableProps) {
     await fetch('/api/contacts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, subdomain })
+      body: JSON.stringify({ ...data, subdomain }),
     });
     fetchContacts();
   }
@@ -91,133 +95,175 @@ export function ContactTable({ subdomain }: ContactTableProps) {
     await fetch(`/api/contacts/${editContact.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
     });
     setEditContact(null);
     fetchContacts();
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this client?')) return;
+    if (!confirm('Remove this client?')) return;
     await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
     fetchContacts();
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-3">
+      {/* Controls */}
+      <div className="flex flex-col sm:flex-row gap-2.5">
         <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Search
+            size={15}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             placeholder="Search clients..."
-            className="pl-9"
+            className="pl-9 bg-card"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All</SelectItem>
-            <SelectItem value="QUALIFICATION">Qualification</SelectItem>
-            <SelectItem value="TOUR">Tour</SelectItem>
-            <SelectItem value="APPLICATION">Application</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button onClick={() => setAddOpen(true)}>
-          <Plus size={16} className="mr-2" />
-          Add Client
-        </Button>
+        <div className="flex gap-2">
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-40 bg-card">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All stages</SelectItem>
+              <SelectItem value="QUALIFICATION">Qualifying</SelectItem>
+              <SelectItem value="TOUR">Tour</SelectItem>
+              <SelectItem value="APPLICATION">Applied</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={() => setAddOpen(true)} className="gap-2 flex-shrink-0">
+            <Plus size={15} />
+            Add client
+          </Button>
+        </div>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead className="hidden md:table-cell">Phone</TableHead>
-              <TableHead className="hidden lg:table-cell">Email</TableHead>
-              <TableHead className="hidden xl:table-cell">Budget</TableHead>
-              <TableHead className="hidden xl:table-cell">Date Joined</TableHead>
-              <TableHead className="hidden 2xl:table-cell">Preferences</TableHead>
-              <TableHead className="hidden 2xl:table-cell">Properties</TableHead>
-              <TableHead className="w-24">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {contacts.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                  No clients found. Add your first client!
-                </TableCell>
-              </TableRow>
-            ) : (
-              contacts.map((contact) => (
-                <TableRow key={contact.id}>
-                  <TableCell>
-                    <Link
-                      href={`/s/${subdomain}/contacts/${contact.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {contact.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${TYPE_COLORS[contact.type]}`}
-                    >
-                      {formatType(contact.type)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
-                    {contact.phone ?? '—'}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
-                    {contact.email ?? '—'}
-                  </TableCell>
-                  <TableCell className="hidden xl:table-cell text-muted-foreground text-sm">
-                    {formatCurrency(contact.budget)}
-                  </TableCell>
-                  <TableCell className="hidden xl:table-cell text-muted-foreground text-sm">
-                    {new Date(contact.createdAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell className="hidden 2xl:table-cell text-muted-foreground text-sm max-w-52 truncate">
-                    {contact.preferences ?? '—'}
-                  </TableCell>
-                  <TableCell className="hidden 2xl:table-cell text-muted-foreground text-sm max-w-52 truncate">
-                    {contact.properties.length ? contact.properties.join(', ') : '—'}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setEditContact(contact)}
-                      >
-                        <Pencil size={14} />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-destructive"
-                        onClick={() => handleDelete(contact.id)}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
+      {/* Count line */}
+      {!loading && (
+        <p className="text-xs text-muted-foreground">
+          {contacts.length} {contacts.length === 1 ? 'client' : 'clients'}
+          {typeFilter !== 'ALL' ? ` · ${TYPE_META[typeFilter]?.label ?? typeFilter}` : ''}
+        </p>
+      )}
+
+      {/* Card grid */}
+      {loading ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="rounded-xl border border-border bg-card px-5 py-4 animate-pulse">
+              <div className="flex gap-3">
+                <div className="w-9 h-9 rounded-full bg-muted flex-shrink-0" />
+                <div className="flex-1 space-y-2 pt-1">
+                  <div className="h-3.5 bg-muted rounded w-3/4" />
+                  <div className="h-3 bg-muted rounded w-1/2" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : contacts.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card py-16 text-center px-6">
+          <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+            <Search size={20} className="text-muted-foreground" />
+          </div>
+          <p className="font-semibold text-foreground mb-1">No clients found</p>
+          <p className="text-sm text-muted-foreground">
+            {search
+              ? `No clients match "${search}".`
+              : 'Add your first client to get started.'}
+          </p>
+          {!search && (
+            <Button onClick={() => setAddOpen(true)} className="mt-4 gap-2" size="sm">
+              <Plus size={14} /> Add client
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {contacts.map((contact) => {
+            const meta = TYPE_META[contact.type];
+            return (
+              <div
+                key={contact.id}
+                className="group rounded-xl border border-border bg-card overflow-hidden transition-all duration-150 hover:shadow-md hover:-translate-y-px"
+              >
+                <div className="px-4 py-4">
+                  {/* Header row */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary flex-shrink-0">
+                        {getInitials(contact.name)}
+                      </div>
+                      <div className="min-w-0">
+                        <Link
+                          href={`/s/${subdomain}/contacts/${contact.id}`}
+                          className="font-semibold text-sm hover:text-primary transition-colors truncate block"
+                        >
+                          {contact.name}
+                        </Link>
+                        <span className={cn('inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 mt-1', meta.className)}>
+                          {meta.label}
+                        </span>
+                      </div>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                    {/* Actions – visible on hover */}
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setEditContact(contact)}
+                        className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(contact.id)}
+                        className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Info pills */}
+                  <div className="space-y-1.5">
+                    {contact.phone && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Phone size={11} className="flex-shrink-0" />
+                        <span className="truncate">{contact.phone}</span>
+                      </div>
+                    )}
+                    {contact.email && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Mail size={11} className="flex-shrink-0" />
+                        <span className="truncate">{contact.email}</span>
+                      </div>
+                    )}
+                    {contact.budget != null && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Wallet size={11} className="flex-shrink-0" />
+                        <span>{formatCurrency(contact.budget)}/mo</span>
+                      </div>
+                    )}
+                    {contact.preferences && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <MapPin size={11} className="flex-shrink-0" />
+                        <span className="truncate">{contact.preferences}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <ContactForm open={addOpen} onOpenChange={setAddOpen} onSubmit={handleAdd} title="Add Client" />
-
       <ContactForm
         open={!!editContact}
         onOpenChange={(o) => !o && setEditContact(null)}
@@ -235,7 +281,7 @@ export function ContactTable({ subdomain }: ContactTableProps) {
                 address: editContact.address ?? '',
                 notes: editContact.notes ?? '',
                 type: editContact.type,
-                tags: editContact.tags.join(', ')
+                tags: editContact.tags.join(', '),
               }
             : undefined
         }

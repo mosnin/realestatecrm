@@ -1,206 +1,254 @@
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft, Mail, Phone, MapPin, FileText, Briefcase, CalendarDays, Wallet } from 'lucide-react';
+import {
+  ArrowLeft,
+  Mail,
+  Phone,
+  MapPin,
+  FileText,
+  CalendarDays,
+  Wallet,
+  ExternalLink,
+} from 'lucide-react';
 
-const TYPE_COLORS: Record<string, string> = {
-  QUALIFICATION: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
-  TOUR: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
-  APPLICATION: 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'
+const TYPE_META: Record<string, { label: string; className: string }> = {
+  QUALIFICATION: {
+    label: 'Qualifying',
+    className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-400 dark:border-blue-500/30',
+  },
+  TOUR: {
+    label: 'Tour scheduled',
+    className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30',
+  },
+  APPLICATION: {
+    label: 'Applied',
+    className: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-500/15 dark:text-green-400 dark:border-green-500/30',
+  },
 };
 
-function formatType(type: string) {
-  return type.charAt(0) + type.slice(1).toLowerCase();
+function getInitials(name: string) {
+  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
 export default async function ClientDetailPage({
-  params
+  params,
 }: {
   params: Promise<{ subdomain: string; id: string }>;
 }) {
   const { subdomain, id } = await params;
 
-  type ClientWithDeals = {
-    id: string;
-    name: string;
-    email: string | null;
-    phone: string | null;
-    budget: number | null;
-    createdAt: Date;
-    address: string | null;
-    preferences: string | null;
-    properties: string[];
-    tags: string[];
-    notes: string | null;
-    type: 'QUALIFICATION' | 'TOUR' | 'APPLICATION';
-    dealContacts: Array<{
-      deal: {
-        id: string;
-        title: string;
-        address: string | null;
-        value: number | null;
-        stage: {
-          name: string;
-          color: string;
-        };
-      };
-    }>;
-  };
-
-  const contact: ClientWithDeals | null = await db.contact.findUnique({
+  const contact = await db.contact.findUnique({
     where: { id },
     include: {
       dealContacts: {
-        include: {
-          deal: { include: { stage: true } }
-        }
-      }
-    }
+        include: { deal: { include: { stage: true } } },
+      },
+    },
   });
 
   if (!contact) notFound();
 
+  const meta = TYPE_META[contact.type];
+
+  const formatCurrency = (n: number) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(n);
+
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+    <div className="max-w-2xl space-y-5">
+      {/* Back nav */}
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-muted-foreground">
           <Link href={`/s/${subdomain}/contacts`}>
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} />
           </Link>
         </Button>
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">{contact.name}</h2>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${TYPE_COLORS[contact.type]}`}>
-            {formatType(contact.type)}
-          </span>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Link href={`/s/${subdomain}/contacts`} className="hover:text-foreground transition-colors">
+            Clients
+          </Link>
+          <span>/</span>
+          <span className="text-foreground font-medium">{contact.name}</span>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Client Profile</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {contact.email && (
-            <div className="flex items-center gap-3 text-sm">
-              <Mail size={16} className="text-muted-foreground flex-shrink-0" />
-              <a href={`mailto:${contact.email}`} className="hover:underline">
-                {contact.email}
-              </a>
-            </div>
-          )}
-          {contact.phone && (
-            <div className="flex items-center gap-3 text-sm">
-              <Phone size={16} className="text-muted-foreground flex-shrink-0" />
-              <a href={`tel:${contact.phone}`} className="hover:underline">
-                {contact.phone}
-              </a>
-            </div>
-          )}
-          {contact.budget != null && (
-            <div className="flex items-center gap-3 text-sm">
-              <Wallet size={16} className="text-muted-foreground flex-shrink-0" />
-              <span>
-                {new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: 'USD',
-                  maximumFractionDigits: 0
-                }).format(contact.budget)}
+      {/* Profile header card */}
+      <div className="rounded-2xl border border-border bg-card px-6 py-5">
+        <div className="flex items-start gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-xl font-bold text-primary flex-shrink-0">
+            {getInitials(contact.name)}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight">{contact.name}</h1>
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span
+                className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-1 border ${meta.className}`}
+              >
+                {meta.label}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Added {new Date(contact.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
               </span>
             </div>
-          )}
-          <div className="flex items-center gap-3 text-sm">
-            <CalendarDays size={16} className="text-muted-foreground flex-shrink-0" />
-            <span>Date Joined: {new Date(contact.createdAt).toLocaleDateString()}</span>
           </div>
-          {contact.address && (
-            <div className="flex items-center gap-3 text-sm">
-              <MapPin size={16} className="text-muted-foreground flex-shrink-0" />
-              <span>{contact.address}</span>
-            </div>
-          )}
-          {contact.preferences && (
-            <div className="flex gap-3 text-sm">
-              <FileText size={16} className="text-muted-foreground flex-shrink-0 mt-0.5" />
-              <p className="text-muted-foreground whitespace-pre-wrap">
-                <span className="font-medium text-foreground">Preferences: </span>
-                {contact.preferences}
+        </div>
+
+        {/* Quick contact row */}
+        {(contact.email || contact.phone) && (
+          <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-3">
+            {contact.phone && (
+              <a
+                href={`tel:${contact.phone}`}
+                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-foreground"
+              >
+                <Phone size={14} className="text-muted-foreground" />
+                {contact.phone}
+              </a>
+            )}
+            {contact.email && (
+              <a
+                href={`mailto:${contact.email}`}
+                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-foreground"
+              >
+                <Mail size={14} className="text-muted-foreground" />
+                {contact.email}
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Application details */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="px-6 py-4 border-b border-border">
+          <h2 className="text-sm font-semibold">Application details</h2>
+        </div>
+        <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {contact.budget != null && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Monthly budget</p>
+              <p className="text-sm font-semibold text-foreground">
+                {formatCurrency(contact.budget)}<span className="text-muted-foreground font-normal">/mo</span>
               </p>
             </div>
           )}
-          {contact.properties.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {contact.properties.map((property) => (
-                <Badge key={property} variant="secondary">
-                  {property}
-                </Badge>
-              ))}
+          {contact.address && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Current address</p>
+              <p className="text-sm text-foreground">{contact.address}</p>
             </div>
           )}
-          {contact.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {contact.tags.map((tag) => (
-                <Badge key={tag} variant="outline">
+          {contact.preferences && (
+            <div className="sm:col-span-2">
+              <p className="text-xs text-muted-foreground mb-1">Preferred areas</p>
+              <p className="text-sm text-foreground">{contact.preferences}</p>
+            </div>
+          )}
+          {contact.properties.length > 0 && (
+            <div className="sm:col-span-2">
+              <p className="text-xs text-muted-foreground mb-2">Properties of interest</p>
+              <div className="flex flex-wrap gap-1.5">
+                {contact.properties.map((property) => (
+                  <Badge key={property} variant="secondary" className="text-xs font-medium">
+                    {property}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Notes */}
+      {contact.notes && (
+        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+          <div className="px-6 py-4 border-b border-border">
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              <FileText size={14} className="text-muted-foreground" /> Notes
+            </h2>
+          </div>
+          <div className="px-6 py-4">
+            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+              {contact.notes}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Tags */}
+      {contact.tags.filter((t) => t !== 'application-link' && t !== 'new-lead').length > 0 && (
+        <div className="rounded-2xl border border-border bg-card px-6 py-4">
+          <p className="text-xs text-muted-foreground mb-2">Tags</p>
+          <div className="flex flex-wrap gap-1.5">
+            {contact.tags
+              .filter((t) => t !== 'application-link' && t !== 'new-lead')
+              .map((tag) => (
+                <Badge key={tag} variant="outline" className="text-xs">
                   {tag}
                 </Badge>
               ))}
-            </div>
-          )}
-          {contact.notes && (
-            <div className="flex gap-3 text-sm">
-              <FileText size={16} className="text-muted-foreground flex-shrink-0 mt-0.5" />
-              <p className="text-muted-foreground whitespace-pre-wrap">{contact.notes}</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Briefcase size={18} />
-            Associated Deals
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* Associated deals */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="px-6 py-4 border-b border-border">
+          <h2 className="text-sm font-semibold">Associated deals</h2>
+        </div>
+        <div className="px-6 py-4">
           {contact.dealContacts.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No deals associated with this client.</p>
+            <div className="text-center py-4">
+              <p className="text-sm text-muted-foreground">No deals linked.</p>
+              <Link
+                href={`/s/${subdomain}/deals`}
+                className="text-xs text-primary font-medium hover:underline mt-1 inline-block"
+              >
+                Go to deals →
+              </Link>
+            </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {contact.dealContacts.map(({ deal }) => (
                 <Link
                   key={deal.id}
                   href={`/s/${subdomain}/deals`}
-                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors"
+                  className="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors group"
                 >
-                  <div>
-                    <p className="font-medium text-sm">{deal.title}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{deal.title}</p>
                     {deal.address && (
-                      <p className="text-xs text-muted-foreground">{deal.address}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {deal.address}
+                      </p>
                     )}
                   </div>
-                  <div className="text-right">
+                  <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                    {deal.value != null && (
+                      <p className="text-sm font-semibold tabular-nums">
+                        ${deal.value.toLocaleString()}
+                      </p>
+                    )}
                     <span
-                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white"
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold text-white"
                       style={{ backgroundColor: deal.stage.color }}
                     >
                       {deal.stage.name}
                     </span>
-                    {deal.value != null && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        ${deal.value.toLocaleString()}
-                      </p>
-                    )}
+                    <ExternalLink size={13} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </Link>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
