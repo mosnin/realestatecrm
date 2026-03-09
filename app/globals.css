@@ -271,3 +271,26 @@
 .lead-feed-scroll:hover {
   animation-play-state: paused;
 }
+
+
+@keyframes rainbow-outline-shift {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.rainbow-outline-btn {
+  border-color: transparent;
+  background-image:
+    linear-gradient(var(--background), var(--background)),
+    linear-gradient(90deg, #0d9488, #3b82f6, #a855f7, #f59e0b, #ef4444, #0d9488);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-size: 100% 100%, 200% 100%;
+  animation: rainbow-outline-shift 5s linear infinite;
+}
+
+.dark .rainbow-outline-btn {
+  background-image:
+    linear-gradient(var(--background), var(--background)),
+    linear-gradient(90deg, #14b8a6, #60a5fa, #c084fc, #fbbf24, #f87171, #14b8a6);
+}
