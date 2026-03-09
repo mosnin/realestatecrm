@@ -16,6 +16,7 @@ import { PulseFitHero } from '@/components/ui/pulse-fit-hero';
 import { BrandLogo } from '@/components/brand-logo';
 import Testimonials from '@/components/ui/testimonials-columns-1';
 import ScrollFAQAccordion from '@/components/ui/scroll-faqaccordion';
+import { Navbar } from '@/components/navbar';
 
 const pillNav = [
   { id: 'problem', label: 'Problem' },
@@ -193,11 +194,14 @@ function onTrack(name: string, props?: Record<string, string>) {
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-background text-foreground scroll-smooth relative overflow-x-hidden">
+    <div className="min-h-svh w-full bg-background text-foreground">
+      <Navbar />
+      <main className="flex-1 scroll-smooth relative overflow-x-hidden">
       {/* Radial hero glow */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(20,184,166,0.12),transparent_70%)]" />
 
       <PulseFitHero
+        showHeader={false}
         logo="Chippi"
         navigation={[
           { label: 'Problem', onClick: () => { onTrack('pill_nav_click', { section: 'problem', source: 'hero_nav' }); window.location.hash = '#problem'; } },
@@ -533,6 +537,7 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+      </main>
     </div>
   );
 }

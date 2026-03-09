@@ -42,6 +42,7 @@ interface PulseFitHeroProps {
   programs?: ProgramCard[];
   className?: string;
   children?: React.ReactNode;
+  showHeader?: boolean;
 }
 
 export function PulseFitHero({
@@ -62,7 +63,8 @@ export function PulseFitHero({
   socialProof,
   programs = [],
   className,
-  children
+  children,
+  showHeader = true
 }: PulseFitHeroProps) {
   return (
     <section
@@ -74,6 +76,7 @@ export function PulseFitHero({
       role="banner"
       aria-label="Hero section"
     >
+      {showHeader && (
       <motion.header
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -106,6 +109,8 @@ export function PulseFitHero({
           </button>
         )}
       </motion.header>
+
+      )}
 
       {children ? (
         <div className="relative z-10 flex-1 flex items-center justify-center w-full">{children}</div>
