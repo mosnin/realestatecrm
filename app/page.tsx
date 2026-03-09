@@ -5,17 +5,14 @@ import {
   ArrowRight,
   Bot,
   CheckCircle2,
-  CircleDashed,
   ClipboardList,
   Gauge,
   Link2,
   MessageSquareMore,
-  Moon,
   Sparkles,
-  Sun,
 } from 'lucide-react';
 import { track } from '@vercel/analytics';
-import { useTheme } from '@/components/theme-provider';
+import { PulseFitHero } from '@/components/ui/pulse-fit-hero';
 import { BrandLogo } from '@/components/brand-logo';
 
 const pillNav = [
@@ -133,115 +130,76 @@ function onTrack(name: string, props?: Record<string, string>) {
 }
 
 export default function HomePage() {
-  const { theme, toggleTheme } = useTheme();
-
   return (
     <div className="min-h-screen bg-background text-foreground scroll-smooth relative overflow-x-hidden">
       {/* Radial hero glow */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(20,184,166,0.12),transparent_70%)]" />
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 h-16 grid grid-cols-[auto_1fr_auto] items-center gap-6">
-          <Link href="/" className="flex items-center gap-2">
-            <BrandLogo className="h-7" alt="Chippi" />
-          </Link>
-
-          <nav className="hidden lg:flex justify-center">
-            <div className="inline-flex items-center gap-0.5 rounded-full border border-border bg-card/80 px-1.5 py-1.5 shadow-sm">
-              {pillNav.map((item) => (
-                <a
-                  key={item.id}
-                  href={`#${item.id}`}
-                  onClick={() => onTrack('pill_nav_click', { section: item.id, source: 'header_pill_menu' })}
-                  className="whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-                >
-                  {item.label}
-                </a>
-              ))}
-            </div>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
-            <Link
-              href="/sign-in"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/sign-up"
-              onClick={() => onTrack('hero_cta_click', { location: 'header' })}
-              className="text-sm bg-primary text-primary-foreground px-4 py-2 rounded-full font-semibold hover:opacity-90 transition-opacity"
-            >
-              Start free trial
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero */}
-      <section className="pt-24 md:pt-32 pb-16 px-6 relative">
-        <div className="max-w-4xl mx-auto text-center space-y-7">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-primary/25 bg-primary/5 text-xs text-primary font-medium">
-            <CircleDashed size={12} />
-            Leasing-first workflow for solo realtors
-          </div>
-
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.06]">
-            Qualify leasing leads<br className="hidden md:block" /> without the chaos
-          </h1>
-
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            One intake link. Structured qualification. Practical AI scoring.
-            Follow up faster from one clean workflow.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-            <Link
-              href="/sign-up"
-              onClick={() => onTrack('hero_cta_click', { location: 'hero' })}
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-7 py-3 rounded-full font-semibold hover:opacity-90 transition-opacity shadow-sm"
-            >
-              Start free trial <ArrowRight size={16} />
-            </Link>
-            <a
-              href="#how-it-works"
-              onClick={() => onTrack('pill_nav_click', { section: 'how-it-works', source: 'hero' })}
-              className="px-7 py-3 rounded-full font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
-            >
-              See how it works
-            </a>
-          </div>
-
-          <p className="text-xs text-muted-foreground pt-1">7-day free trial &middot; No credit card required</p>
-        </div>
-
-        {/* Hero proof chips */}
-        <div className="mt-14 grid sm:grid-cols-3 gap-3 text-left max-w-3xl mx-auto">
-          {[
-            { label: 'One intake link', sub: 'Share once. Capture every renter in one place.', accent: 'bg-primary/5 border-primary/20' },
-            { label: 'Structured qualification', sub: 'Budget, timeline, areas — collected automatically.', accent: 'bg-surface border-border' },
-            { label: 'Practical lead scoring', sub: 'AI priority with context you can actually trust.', accent: 'bg-surface border-border' }
-          ].map((item) => (
-            <div
-              key={item.label}
-              className={`rounded-xl border ${item.accent} px-4 py-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]`}
-            >
-              <p className="text-xs font-semibold text-foreground">{item.label}</p>
-              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{item.sub}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <PulseFitHero
+        logo="Chippi"
+        navigation={[
+          { label: 'Problem', onClick: () => { onTrack('pill_nav_click', { section: 'problem', source: 'hero_nav' }); window.location.hash = '#problem'; } },
+          { label: 'Solution', onClick: () => { onTrack('pill_nav_click', { section: 'solution', source: 'hero_nav' }); window.location.hash = '#solution'; } },
+          { label: 'How it works', onClick: () => { onTrack('pill_nav_click', { section: 'how-it-works', source: 'hero_nav' }); window.location.hash = '#how-it-works'; } },
+          { label: 'Pricing', onClick: () => { onTrack('pill_nav_click', { section: 'pricing', source: 'hero_nav' }); window.location.hash = '#pricing'; } },
+          { label: 'FAQ', onClick: () => { onTrack('pill_nav_click', { section: 'faq', source: 'hero_nav' }); window.location.hash = '#faq'; } }
+        ]}
+        ctaButton={{
+          label: 'Log in',
+          onClick: () => {
+            onTrack('hero_cta_click', { location: 'hero_nav_login' });
+            window.location.href = '/sign-in';
+          }
+        }}
+        title="Qualify leasing leads without the chaos"
+        subtitle="One intake link. Structured qualification. Practical AI scoring. Follow up faster from one clean workflow."
+        primaryAction={{
+          label: 'Start free trial',
+          onClick: () => {
+            onTrack('hero_cta_click', { location: 'hero' });
+            window.location.href = '/sign-up';
+          }
+        }}
+        secondaryAction={{
+          label: 'See how it works',
+          onClick: () => {
+            onTrack('pill_nav_click', { section: 'how-it-works', source: 'hero' });
+            window.location.hash = '#how-it-works';
+          }
+        }}
+        disclaimer="*7-day free trial · No credit card required"
+        socialProof={{
+          avatars: [
+            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop',
+            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop',
+            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop',
+            'https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?w=80&h=80&fit=crop'
+          ],
+          text: 'Built for modern solo realtors handling renter and leasing leads'
+        }}
+        programs={[
+          {
+            image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400&h=500&fit=crop',
+            category: 'INTAKE',
+            title: 'One clean renter application link'
+          },
+          {
+            image: 'https://images.unsplash.com/photo-1560185007-cde436f6a4d0?w=400&h=500&fit=crop',
+            category: 'QUALIFICATION',
+            title: 'Budget, timeline, and area details in one flow'
+          },
+          {
+            image: 'https://images.unsplash.com/photo-1554995207-c18c203602cb?w=400&h=500&fit=crop',
+            category: 'SCORING',
+            title: 'Practical lead scoring you can explain'
+          },
+          {
+            image: 'https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?w=400&h=500&fit=crop',
+            category: 'FOLLOW-UP',
+            title: 'Triage faster from one lightweight command center'
+          }
+        ]}
+      />
 
       {/* Problem */}
       <section id="problem" className="py-20 px-6 border-t border-border">
