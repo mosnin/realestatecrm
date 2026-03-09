@@ -700,7 +700,12 @@ export function OnboardingWizard({ initialState, clerkName, clerkEmail }: Wizard
     await fetch('/api/onboarding', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'save_profile', ...data })
+      body: JSON.stringify({
+        action: 'save_profile',
+        name: data.name,
+        phoneNumber: data.phone,
+        businessName: data.businessName
+      })
     });
   }
 

@@ -2,6 +2,17 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+function isPrismaMissingColumnError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+
+  // Prisma P2022 = "The column ... does not exist in the current database".
+  // We also keep a message fallback for environments where error codes are stripped.
+  return (
+    error.message.includes('P2022') ||
+    error.message.toLowerCase().includes('does not exist in the current database')
+  );
+}
+
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -97,11 +108,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'save_profile') {
-      const { name, phoneNumber, businessName } = body as {
+      const { name, phoneNumber, phone, businessName } = body as {
         name: string;
         phoneNumber: string;
+        phone?: string;
         businessName: string;
       };
+      const normalizedPhone = phoneNumber ?? phone ?? '';
 
       await db.user.update({
         where: { id: user.id },
@@ -109,11 +122,21 @@ export async function POST(req: NextRequest) {
       });
 
       if (user.space) {
-        await db.spaceSetting.upsert({
-          where: { spaceId: user.space.id },
-          update: { phoneNumber, businessName },
-          create: { spaceId: user.space.id, phoneNumber, businessName }
-        });
+        try {
+          await db.spaceSetting.upsert({
+            where: { spaceId: user.space.id },
+            update: { phoneNumber: normalizedPhone, businessName },
+            create: { spaceId: user.space.id, phoneNumber: normalizedPhone, businessName }
+          });
+        } catch (error) {
+          if (!isPrismaMissingColumnError(error)) throw error;
+          // Legacy DB schema fallback: only guaranteed baseline setting fields.
+          await db.spaceSetting.upsert({
+            where: { spaceId: user.space.id },
+            update: {},
+            create: { spaceId: user.space.id }
+          });
+        }
       }
 
       return NextResponse.json({ success: true });
@@ -141,11 +164,20 @@ export async function POST(req: NextRequest) {
 
       if (user.space) {
         // Space already created — just update settings
-        await db.spaceSetting.upsert({
-          where: { spaceId: user.space.id },
-          update: { intakePageTitle, intakePageIntro, businessName },
-          create: { spaceId: user.space.id, intakePageTitle, intakePageIntro, businessName }
-        });
+        try {
+          await db.spaceSetting.upsert({
+            where: { spaceId: user.space.id },
+            update: { intakePageTitle, intakePageIntro, businessName },
+            create: { spaceId: user.space.id, intakePageTitle, intakePageIntro, businessName }
+          });
+        } catch (error) {
+          if (!isPrismaMissingColumnError(error)) throw error;
+          await db.spaceSetting.upsert({
+            where: { spaceId: user.space.id },
+            update: {},
+            create: { spaceId: user.space.id }
+          });
+        }
         return NextResponse.json({ success: true, subdomain: user.space.subdomain });
       }
 
@@ -166,25 +198,42 @@ export async function POST(req: NextRequest) {
         { name: 'Declined', color: '#ef4444', position: 5 }
       ];
 
-      const space = await db.space.create({
-        data: {
-          subdomain: sanitized,
-          name: businessName || sanitized,
-          emoji: '🏠',
-          ownerId: user.id,
-          settings: {
-            create: {
-              intakePageTitle: intakePageTitle || 'Rental Application',
-              intakePageIntro:
-                intakePageIntro ||
-                "Share a few details so I can review your rental fit faster.",
-              businessName,
-              phoneNumber: null
-            }
-          },
-          stages: { create: DEFAULT_STAGES }
-        }
-      });
+      let space;
+      try {
+        space = await db.space.create({
+          data: {
+            subdomain: sanitized,
+            name: businessName || sanitized,
+            emoji: '🏠',
+            ownerId: user.id,
+            settings: {
+              create: {
+                intakePageTitle: intakePageTitle || 'Rental Application',
+                intakePageIntro:
+                  intakePageIntro ||
+                  "Share a few details so I can review your rental fit faster.",
+                businessName,
+                phoneNumber: null
+              }
+            },
+            stages: { create: DEFAULT_STAGES }
+          }
+        });
+      } catch (error) {
+        if (!isPrismaMissingColumnError(error)) throw error;
+        // Some environments have an older SpaceSetting table. Create a space with
+        // baseline settings only so onboarding can proceed instead of hard-failing.
+        space = await db.space.create({
+          data: {
+            subdomain: sanitized,
+            name: businessName || sanitized,
+            emoji: '🏠',
+            ownerId: user.id,
+            settings: { create: {} },
+            stages: { create: DEFAULT_STAGES }
+          }
+        });
+      }
 
       await db.user.update({
         where: { id: user.id },
