@@ -66,6 +66,10 @@ model Contact {
   properties   String[]      @default([])
   type         ClientType    @default(QUALIFICATION)
   tags         String[]
+  leadScore    Float?
+  scoreLabel   String?       @default("unscored")
+  scoreSummary String?
+  scoringStatus String       @default("pending")
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   dealContacts DealContact[]

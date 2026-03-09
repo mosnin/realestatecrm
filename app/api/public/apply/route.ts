@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSpaceFromSubdomain } from '@/lib/space';
+import { scoreLeadApplication } from '@/lib/lead-scoring';
+import type { LeadScoringResult } from '@/lib/lead-scoring';
 
 function normalizePhone(input: string) {
   return input.replace(/\D/g, '');
@@ -53,7 +55,17 @@ export async function POST(req: NextRequest) {
     if (existingRecentLead) {
       const existingNormalizedPhone = normalizePhone(existingRecentLead.phone ?? '');
       if (existingNormalizedPhone && existingNormalizedPhone === normalizedPhone) {
-        return NextResponse.json({ success: true, id: existingRecentLead.id }, { status: 200 });
+        return NextResponse.json(
+          {
+            success: true,
+            id: existingRecentLead.id,
+            scoringStatus: existingRecentLead.scoringStatus,
+            leadScore: existingRecentLead.leadScore,
+            scoreLabel: existingRecentLead.scoreLabel,
+            scoreSummary: existingRecentLead.scoreSummary,
+          },
+          { status: 200 }
+        );
       }
     }
 
@@ -69,10 +81,78 @@ export async function POST(req: NextRequest) {
         type: 'QUALIFICATION',
         properties: [],
         tags: ['application-link', 'new-lead'],
+        scoringStatus: 'pending',
+        scoreLabel: 'unscored',
       },
     });
 
-    return NextResponse.json({ success: true, id: contact.id }, { status: 201 });
+    console.info('[apply] submission persisted', { contactId: contact.id, spaceId: space.id });
+
+    let scoring: LeadScoringResult = {
+      scoringStatus: 'failed',
+      leadScore: null,
+      scoreLabel: 'unscored',
+      scoreSummary: 'Scoring unavailable right now. Lead saved successfully.'
+    };
+
+    try {
+      scoring = await scoreLeadApplication({
+        contactId: contact.id,
+        name: safeName,
+        email: email ? String(email) : null,
+        phone: safePhone,
+        budget: budget != null && budget !== '' ? Number.parseFloat(String(budget)) : null,
+        timeline: timeline ? String(timeline) : null,
+        preferredAreas: preferredAreas ? String(preferredAreas) : null,
+        notes: notes ? String(notes) : null,
+      });
+
+      await db.contact.update({
+        where: { id: contact.id },
+        data: {
+          scoringStatus: scoring.scoringStatus,
+          leadScore: scoring.leadScore,
+          scoreLabel: scoring.scoreLabel,
+          scoreSummary: scoring.scoreSummary,
+        },
+      });
+
+      console.info('[apply] scoring state persisted', {
+        contactId: contact.id,
+        scoringStatus: scoring.scoringStatus,
+        scoreLabel: scoring.scoreLabel,
+      });
+    } catch (error) {
+      console.error('[apply] scoring persistence failed', { contactId: contact.id, error });
+      await db.contact
+        .update({
+          where: { id: contact.id },
+          data: {
+            scoringStatus: 'failed',
+            leadScore: null,
+            scoreLabel: 'unscored',
+            scoreSummary: 'Scoring unavailable right now. Lead saved successfully.'
+          }
+        })
+        .catch((fallbackErr: unknown) =>
+          console.error('[apply] failed to persist fallback scoring state', {
+            contactId: contact.id,
+            fallbackErr
+          })
+        );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        id: contact.id,
+        scoringStatus: scoring.scoringStatus,
+        leadScore: scoring.leadScore,
+        scoreLabel: scoring.scoreLabel,
+        scoreSummary: scoring.scoreSummary,
+      },
+      { status: 201 }
+    );
   } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }

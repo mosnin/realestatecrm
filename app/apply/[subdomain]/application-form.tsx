@@ -9,6 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 export function ApplicationForm({ subdomain }: { subdomain: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [scoreState, setScoreState] = useState<{
+    scoringStatus?: string;
+    leadScore?: number | null;
+    scoreLabel?: string;
+    scoreSummary?: string | null;
+  } | null>(null);
   const submissionLockRef = useRef(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -38,6 +44,8 @@ export function ApplicationForm({ subdomain }: { subdomain: string }) {
       });
 
       if (response.ok) {
+        const result = await response.json().catch(() => ({}));
+        setScoreState(result);
         setSubmitted(true);
       }
     } finally {
@@ -54,6 +62,22 @@ export function ApplicationForm({ subdomain }: { subdomain: string }) {
           <p className="text-sm text-muted-foreground mt-2">
             An agent will review your info and follow up shortly.
           </p>
+          <div className="mt-4 rounded-md border border-border bg-muted/40 p-3">
+            {scoreState?.scoringStatus === 'scored' ? (
+              <>
+                <p className="text-sm font-medium">
+                  Lead score: {Math.round(scoreState.leadScore ?? 0)} ({scoreState.scoreLabel})
+                </p>
+                {scoreState.scoreSummary ? (
+                  <p className="text-xs text-muted-foreground mt-1">{scoreState.scoreSummary}</p>
+                ) : null}
+              </>
+            ) : scoreState?.scoringStatus === 'pending' ? (
+              <p className="text-sm font-medium">Scoring is in progress. Your lead was saved.</p>
+            ) : (
+              <p className="text-sm font-medium">Scoring is currently unavailable. Your lead was saved.</p>
+            )}
+          </div>
         </CardContent>
       </Card>
     );
