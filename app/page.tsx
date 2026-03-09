@@ -13,10 +13,10 @@ import {
 } from 'lucide-react';
 import { track } from '@vercel/analytics';
 import { PulseFitHero } from '@/components/ui/pulse-fit-hero';
-import { BrandLogo } from '@/components/brand-logo';
 import Testimonials from '@/components/ui/testimonials-columns-1';
 import ScrollFAQAccordion from '@/components/ui/scroll-faqaccordion';
 import { Navbar } from '@/components/navbar';
+import AnimatedFooter from '@/components/ui/animated-footer';
 
 const pillNav = [
   { id: 'problem', label: 'Problem' },
@@ -487,59 +487,20 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-card">
-        <div className="max-w-6xl mx-auto px-6 py-14">
-          <div className="grid md:grid-cols-[1.8fr_1fr_1fr_1fr] gap-10">
-            <div>
-              <BrandLogo className="h-7" alt="Chippi" />
-              <p className="mt-4 text-sm text-muted-foreground leading-relaxed max-w-xs">
-                Chippi helps solo realtors handle leasing leads faster with one intake link,
-                structured qualification, and clean follow-up workflow.
-              </p>
-              <Link
-                href="/sign-up"
-                onClick={() => onTrack('footer_cta_click', { location: 'footer_card' })}
-                className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
-              >
-                Start free trial
-              </Link>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">Product</p>
-              <ul className="mt-4 space-y-2.5 text-sm text-muted-foreground">
-                <li><a href="#solution" className="hover:text-foreground transition-colors">Solution</a></li>
-                <li><a href="#proof" className="hover:text-foreground transition-colors">Product proof</a></li>
-                <li><a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a></li>
-                <li><a href="#faq" className="hover:text-foreground transition-colors">FAQ</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">Company</p>
-              <ul className="mt-4 space-y-2.5 text-sm text-muted-foreground">
-                <li><a href="#testimonials" className="hover:text-foreground transition-colors">Customer feedback</a></li>
-                <li><a href="https://x.com" target="_blank" rel="noreferrer" className="hover:text-foreground transition-colors">X / Twitter</a></li>
-                <li><a href="https://linkedin.com" target="_blank" rel="noreferrer" className="hover:text-foreground transition-colors">LinkedIn</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">Legal</p>
-              <ul className="mt-4 space-y-2.5 text-sm text-muted-foreground">
-                <li><Link href="/legal/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link></li>
-                <li><Link href="/legal/terms" className="hover:text-foreground transition-colors">Terms of Service</Link></li>
-                <li><Link href="/legal/cookies" className="hover:text-foreground transition-colors">Cookie Policy</Link></li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="mt-12 pt-6 border-t border-border text-xs text-muted-foreground flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
-            <p>&copy; {new Date().getFullYear()} Chippi. Leasing workflow clarity for modern realtors.</p>
-            <p>Launch wedge: renter and leasing lead intake + qualification.</p>
-          </div>
-        </div>
-      </footer>
+      <AnimatedFooter
+        leftLinks={[
+          { href: '#solution', label: 'Product' },
+          { href: '#pricing', label: 'Pricing' },
+          { href: '#faq', label: 'FAQ' }
+        ]}
+        rightLinks={[
+          { href: '/legal/privacy', label: 'Privacy' },
+          { href: '/legal/terms', label: 'Terms' },
+          { href: '/legal/cookies', label: 'Cookies' },
+          { href: '/sign-in', label: 'Log in' }
+        ]}
+        copyrightText={`© ${new Date().getFullYear()} Chippi. Leasing workflow clarity for modern realtors.`}
+      />
       </main>
     </div>
   );
