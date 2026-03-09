@@ -2,6 +2,69 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+function isPrismaMissingColumnError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+
+  // Prisma P2022 = "The column ... does not exist in the current database".
+  // We also keep a message fallback for environments where error codes are stripped.
+  return (
+    error.message.includes('P2022') ||
+    error.message.toLowerCase().includes('does not exist in the current database')
+  );
+}
+
+function isPrismaUnknownSpaceSettingFieldError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return [
+    'Unknown argument `phoneNumber`',
+    'Unknown argument `businessName`',
+    'Unknown argument `intakePageTitle`',
+    'Unknown argument `intakePageIntro`',
+    'Unknown argument `myConnections`'
+  ].some((snippet) => error.message.includes(snippet));
+}
+
+function isLegacySpaceSettingShapeError(error: unknown) {
+  return (
+    isPrismaMissingColumnError(error) ||
+    isPrismaUnknownSpaceSettingFieldError(error)
+  );
+}
+
+function isPrismaUnknownOnboardingFieldError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return [
+    'Unknown argument `onboarded`',
+    'Unknown argument `onboardingCurrentStep`',
+    'Unknown argument `onboardingStartedAt`',
+    'Unknown argument `onboardingCompletedAt`'
+  ].some((snippet) => error.message.includes(snippet));
+}
+
+async function updateOnboardingUserFields(
+  userId: string,
+  data: Record<string, unknown>
+) {
+  try {
+    await db.user.update({
+      where: { id: userId },
+      data
+    });
+  } catch (error) {
+    if (!isPrismaUnknownOnboardingFieldError(error)) throw error;
+    // Deployed Prisma client may be older than the schema and not recognize
+    // onboarding fields yet. In that case, allow flow to continue.
+  }
+}
+
+function getSafeUserEmail(userId: string, clerkEmail?: string | null) {
+  const normalized = clerkEmail?.trim();
+  if (normalized) return normalized;
+  // Clerk can return no primary email in some account states.
+  // User.email is unique in our DB, so empty-string fallbacks cause P2002 collisions.
+  return `${userId}@no-email.local`;
+}
+
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -21,14 +84,14 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      step: user.onboardingCurrentStep,
-      completed: !!user.onboardingCompletedAt,
+      step: (user as any).onboardingCurrentStep ?? 1,
+      completed: !!((user as any).onboarded || (user as any).onboardingCompletedAt),
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
-        onboardingStartedAt: user.onboardingStartedAt,
-        onboardingCompletedAt: user.onboardingCompletedAt
+        onboardingStartedAt: (user as any).onboardingStartedAt ?? null,
+        onboardingCompletedAt: (user as any).onboardingCompletedAt ?? null
       },
       space: user.space
         ? {
@@ -61,47 +124,49 @@ export async function POST(req: NextRequest) {
   try {
     // Ensure user record exists
     const clerkUser = await currentUser();
+    const safeEmail = getSafeUserEmail(
+      userId,
+      clerkUser?.emailAddresses?.[0]?.emailAddress
+    );
     const user = await db.user.upsert({
       where: { clerkId: userId },
-      update: {},
+      update: {
+        email: safeEmail,
+        name: clerkUser?.fullName ?? clerkUser?.firstName ?? undefined
+      },
       create: {
         clerkId: userId,
-        email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
-        name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
-        onboardingStartedAt: new Date()
+        email: safeEmail,
+        name: clerkUser?.fullName ?? clerkUser?.firstName ?? null
       },
       include: { space: { include: { settings: true } } }
     });
 
     if (action === 'start') {
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          onboardingCurrentStep: 1,
-          onboardingStartedAt: user.onboardingStartedAt ?? new Date()
-        }
+      await updateOnboardingUserFields(user.id, {
+        onboardingCurrentStep: 1,
+        onboardingStartedAt: (user as any).onboardingStartedAt ?? new Date()
       });
       return NextResponse.json({ success: true });
     }
 
     if (action === 'save_step') {
       const { step } = body as { step: number };
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          onboardingCurrentStep: step,
-          onboardingStartedAt: user.onboardingStartedAt ?? new Date()
-        }
+      await updateOnboardingUserFields(user.id, {
+        onboardingCurrentStep: step,
+        onboardingStartedAt: (user as any).onboardingStartedAt ?? new Date()
       });
       return NextResponse.json({ success: true });
     }
 
     if (action === 'save_profile') {
-      const { name, phoneNumber, businessName } = body as {
+      const { name, phoneNumber, phone, businessName } = body as {
         name: string;
         phoneNumber: string;
+        phone?: string;
         businessName: string;
       };
+      const normalizedPhone = phoneNumber ?? phone ?? '';
 
       await db.user.update({
         where: { id: user.id },
@@ -109,11 +174,21 @@ export async function POST(req: NextRequest) {
       });
 
       if (user.space) {
-        await db.spaceSetting.upsert({
-          where: { spaceId: user.space.id },
-          update: { phoneNumber, businessName },
-          create: { spaceId: user.space.id, phoneNumber, businessName }
-        });
+        try {
+          await db.spaceSetting.upsert({
+            where: { spaceId: user.space.id },
+            update: { phoneNumber: normalizedPhone, businessName },
+            create: { spaceId: user.space.id, phoneNumber: normalizedPhone, businessName }
+          });
+        } catch (error) {
+          if (!isLegacySpaceSettingShapeError(error)) throw error;
+          // Legacy DB schema fallback: only guaranteed baseline setting fields.
+          await db.spaceSetting.upsert({
+            where: { spaceId: user.space.id },
+            update: {},
+            create: { spaceId: user.space.id }
+          });
+        }
       }
 
       return NextResponse.json({ success: true });
@@ -141,11 +216,20 @@ export async function POST(req: NextRequest) {
 
       if (user.space) {
         // Space already created — just update settings
-        await db.spaceSetting.upsert({
-          where: { spaceId: user.space.id },
-          update: { intakePageTitle, intakePageIntro, businessName },
-          create: { spaceId: user.space.id, intakePageTitle, intakePageIntro, businessName }
-        });
+        try {
+          await db.spaceSetting.upsert({
+            where: { spaceId: user.space.id },
+            update: { intakePageTitle, intakePageIntro, businessName },
+            create: { spaceId: user.space.id, intakePageTitle, intakePageIntro, businessName }
+          });
+        } catch (error) {
+          if (!isLegacySpaceSettingShapeError(error)) throw error;
+          await db.spaceSetting.upsert({
+            where: { spaceId: user.space.id },
+            update: {},
+            create: { spaceId: user.space.id }
+          });
+        }
         return NextResponse.json({ success: true, subdomain: user.space.subdomain });
       }
 
@@ -166,30 +250,44 @@ export async function POST(req: NextRequest) {
         { name: 'Declined', color: '#ef4444', position: 5 }
       ];
 
-      const space = await db.space.create({
-        data: {
-          subdomain: sanitized,
-          name: businessName || sanitized,
-          emoji: '🏠',
-          ownerId: user.id,
-          settings: {
-            create: {
-              intakePageTitle: intakePageTitle || 'Rental Application',
-              intakePageIntro:
-                intakePageIntro ||
-                "Share a few details so I can review your rental fit faster.",
-              businessName,
-              phoneNumber: null
-            }
-          },
-          stages: { create: DEFAULT_STAGES }
-        }
-      });
+      let space;
+      try {
+        space = await db.space.create({
+          data: {
+            subdomain: sanitized,
+            name: businessName || sanitized,
+            emoji: '🏠',
+            ownerId: user.id,
+            settings: {
+              create: {
+                intakePageTitle: intakePageTitle || 'Rental Application',
+                intakePageIntro:
+                  intakePageIntro ||
+                  "Share a few details so I can review your rental fit faster.",
+                businessName,
+                phoneNumber: null
+              }
+            },
+            stages: { create: DEFAULT_STAGES }
+          }
+        });
+      } catch (error) {
+        if (!isLegacySpaceSettingShapeError(error)) throw error;
+        // Some environments have an older SpaceSetting table. Create a space with
+        // baseline settings only so onboarding can proceed instead of hard-failing.
+        space = await db.space.create({
+          data: {
+            subdomain: sanitized,
+            name: businessName || sanitized,
+            emoji: '🏠',
+            ownerId: user.id,
+            settings: { create: {} },
+            stages: { create: DEFAULT_STAGES }
+          }
+        });
+      }
 
-      await db.user.update({
-        where: { id: user.id },
-        data: { onboardingCurrentStep: 4 }
-      });
+      await updateOnboardingUserFields(user.id, { onboardingCurrentStep: 4 });
 
       return NextResponse.json({ success: true, subdomain: space.subdomain });
     }
@@ -210,25 +308,28 @@ export async function POST(req: NextRequest) {
         create: { spaceId: user.space.id, notifications: emailNotifications }
       });
 
-      await db.spaceSetting.update({
-        where: { spaceId: user.space.id },
-        data: {
-          myConnections: JSON.stringify({
-            defaultSubmissionStatus: defaultSubmissionStatus || 'New'
-          })
-        }
-      });
+      try {
+        await db.spaceSetting.update({
+          where: { spaceId: user.space.id },
+          data: {
+            myConnections: JSON.stringify({
+              defaultSubmissionStatus: defaultSubmissionStatus || 'New'
+            })
+          }
+        });
+      } catch (error) {
+        if (!isLegacySpaceSettingShapeError(error)) throw error;
+        // Optional legacy field write; safe to skip.
+      }
 
       return NextResponse.json({ success: true });
     }
 
     if (action === 'complete') {
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          onboardingCurrentStep: 7,
-          onboardingCompletedAt: new Date()
-        }
+      await updateOnboardingUserFields(user.id, {
+        onboarded: true,
+        onboardingCurrentStep: 7,
+        onboardingCompletedAt: new Date()
       });
       return NextResponse.json({ success: true });
     }
@@ -251,8 +352,9 @@ export async function POST(req: NextRequest) {
 
   } catch (err) {
     console.error('[onboarding POST] action:', action, err);
+    const message = err instanceof Error ? err.message : 'Server error. Please try again.';
     return NextResponse.json(
-      { error: 'Server error. Please try again.' },
+      { error: message },
       { status: 500 }
     );
   }
