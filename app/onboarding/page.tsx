@@ -49,8 +49,9 @@ export default async function OnboardingPage() {
     // Migration likely pending — fall through, wizard renders empty
   }
 
-  // If user has already completed onboarding, redirect to dashboard
-  if (((dbUser as any)?.onboarded || (dbUser as any)?.onboardingCompletedAt) && dbUser.space) {
+  // If user already has a workspace, never show onboarding again.
+  // This avoids loops when onboarding flags are unavailable/out-of-sync.
+  if (dbUser?.space) {
     redirect(`/s/${dbUser.space.subdomain}`);
   }
 
