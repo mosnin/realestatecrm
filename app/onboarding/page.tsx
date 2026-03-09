@@ -37,7 +37,7 @@ export default async function OnboardingPage() {
 
   // Onboarding visibility depends only on onboarding completion.
   // Workspace navigation is handled separately once completion is confirmed.
-  const onboardingCompleted = !!dbUser?.onboardingCompletedAt;
+  const onboardingCompleted = !!dbUser?.onboardingCompletedAt || !!dbUser?.space;
   console.info('[onboarding-page] state read', {
     clerkId: userId,
     onboardingCompleted,
@@ -45,6 +45,14 @@ export default async function OnboardingPage() {
   });
 
   if (onboardingCompleted && dbUser?.space) {
+    if (!dbUser.onboardingCompletedAt) {
+      await db.user
+        .update({
+          where: { id: dbUser.id },
+          data: { onboardingCompletedAt: new Date(), onboardingCurrentStep: 7 }
+        })
+        .catch(() => null);
+    }
     redirect(`/s/${dbUser.space.subdomain}`);
   }
 
@@ -77,7 +85,7 @@ export default async function OnboardingPage() {
 
   const initialState = {
     step: dbUser?.onboardingCurrentStep ?? 1,
-    completed: !!dbUser?.onboardingCompletedAt,
+    completed: onboardingCompleted,
     user: {
       id: dbUser?.id ?? '',
       name: dbUser?.name ?? null,
