@@ -5,11 +5,24 @@ const globalForRetell = globalThis as unknown as {
   retell: Retell | undefined;
 };
 
-export const retell =
-  globalForRetell.retell ??
-  new Retell({ apiKey: process.env.RETELL_API_KEY! });
+function getRetellClient(): Retell {
+  if (globalForRetell.retell) {
+    return globalForRetell.retell;
+  }
 
-if (process.env.NODE_ENV !== 'production') globalForRetell.retell = retell;
+  const apiKey = process.env.RETELL_API_KEY;
+  if (!apiKey) {
+    throw new Error('RETELL_API_KEY not configured');
+  }
+
+  const client = new Retell({ apiKey });
+
+  if (process.env.NODE_ENV !== 'production') {
+    globalForRetell.retell = client;
+  }
+
+  return client;
+}
 
 const BASE_AGENT_PROMPT = `You are an AI real estate assistant for {{brokerage_name}}, specializing in the {{market}} market.
 
@@ -43,6 +56,8 @@ export async function createRetellAgent(config: {
   brokerageName: string;
   spaceId: string;
 }) {
+  const retell = getRetellClient();
+
   // Create a Retell LLM with lead qualification prompt
   const llm = await retell.llm.create({
     general_prompt: buildAgentPrompt(config),
@@ -111,6 +126,8 @@ export async function buyRetellPhoneNumber(
   agentId: string,
   areaCode?: string
 ) {
+  const retell = getRetellClient();
+
   const phoneNumber = await retell.phoneNumber.create({
     inbound_agent_id: agentId,
     area_code: areaCode ? parseInt(areaCode) : undefined,
@@ -124,6 +141,8 @@ export async function importTwilioPhoneNumber(
   twilioAccountSid: string,
   twilioAuthToken: string
 ) {
+  const retell = getRetellClient();
+
   // Construct the Twilio SIP trunk termination URI
   const terminationUri = `${twilioAccountSid}.pstn.twilio.com`;
 
