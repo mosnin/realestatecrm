@@ -14,7 +14,6 @@ import {
 import { track } from '@vercel/analytics';
 import { PulseFitHero } from '@/components/ui/pulse-fit-hero';
 import { BrandLogo } from '@/components/brand-logo';
-import CombinedFeaturedSection from '@/components/ui/combined-featured-section';
 import Testimonials from '@/components/ui/testimonials-columns-1';
 import ScrollFAQAccordion from '@/components/ui/scroll-faqaccordion';
 
@@ -308,8 +307,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      <CombinedFeaturedSection />
 
       {/* Problem */}
       <section id="problem" className="py-20 px-6 border-t border-border">

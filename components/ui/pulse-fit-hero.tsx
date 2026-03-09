@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { ChevronDown, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BrandLogo } from '@/components/brand-logo';
 
 interface NavigationItem {
   label: string;
@@ -79,7 +80,9 @@ export function PulseFitHero({
         transition={{ duration: 0.6 }}
         className="relative z-20 flex flex-row justify-between items-center px-6 lg:px-10 py-8"
       >
-        <div className="text-2xl font-bold tracking-tight text-foreground">{logo}</div>
+        <div className="flex items-center" aria-label={logo}>
+          <BrandLogo className="h-7" alt="Chippi" />
+        </div>
 
         <nav className="hidden lg:flex flex-row items-center gap-7" aria-label="Main navigation">
           {navigation.map((item, index) => (
