@@ -9,13 +9,13 @@ import {
   Zap,
   BarChart3,
   ArrowRight,
-  Building2,
   Star,
   CheckCircle2,
   Sun,
   Moon,
 } from 'lucide-react';
 import { useTheme } from '@/components/theme-provider';
+import { BrandLogo } from '@/components/brand-logo';
 
 const features = [
   {
@@ -71,8 +71,7 @@ export default function HomePage() {
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-neutral-200/80 bg-white/80 backdrop-blur-xl dark:border-white/10 dark:bg-[#0a0a0a]/80">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            <Building2 size={22} className="text-neutral-900 dark:text-white" />
-            <span className="font-semibold text-[15px] tracking-tight">WorkflowRouting</span>
+            <BrandLogo className="h-7" alt="Chippi" />
           </Link>
 
           <nav className="hidden md:flex items-center gap-8 text-sm text-neutral-600 dark:text-neutral-400">

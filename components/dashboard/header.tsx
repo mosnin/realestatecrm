@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
+import { BrandLogo } from '@/components/brand-logo';
 
 const navItems = [
   { href: '', label: 'Overview', icon: LayoutDashboard },
@@ -36,11 +37,10 @@ const navItems = [
 interface HeaderProps {
   subdomain: string;
   spaceName: string;
-  spaceEmoji: string;
   title: string;
 }
 
-export function Header({ subdomain, spaceName, spaceEmoji, title }: HeaderProps) {
+export function Header({ subdomain, spaceName, title }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const base = `/s/${subdomain}`;
@@ -57,7 +57,7 @@ export function Header({ subdomain, spaceName, spaceEmoji, title }: HeaderProps)
           <SheetContent side="left" className="w-60 p-0 bg-sidebar border-sidebar-border">
             <SheetHeader className="px-5 py-5 border-b border-sidebar-border">
               <SheetTitle className="flex items-center gap-3 text-sidebar-foreground">
-                <span className="text-2xl">{spaceEmoji}</span>
+                <BrandLogo className="h-6" alt="Chippi" />
                 <span className="text-sm font-semibold">{spaceName}</span>
               </SheetTitle>
             </SheetHeader>
@@ -89,7 +89,10 @@ export function Header({ subdomain, spaceName, spaceEmoji, title }: HeaderProps)
           </SheetContent>
         </Sheet>
 
-        <span className="font-semibold text-sm md:hidden">{spaceEmoji} {spaceName}</span>
+        <span className="font-semibold text-sm md:hidden flex items-center gap-2">
+          <BrandLogo className="h-5" alt="Chippi" />
+          {spaceName}
+        </span>
         <h1 className="font-semibold text-sm hidden md:block">{title}</h1>
       </div>
 

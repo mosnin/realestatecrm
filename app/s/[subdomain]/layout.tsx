@@ -33,7 +33,6 @@ export default async function DashboardLayout({
         <Header
           subdomain={subdomain}
           spaceName={space.name}
-          spaceEmoji={space.emoji}
           title={space.name}
         />
         <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">{children}</main>

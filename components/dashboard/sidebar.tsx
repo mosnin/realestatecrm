@@ -9,9 +9,9 @@ import {
   Bot,
   User,
   Settings,
-  Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BrandLogo } from '@/components/brand-logo';
 
 const navItems = [
   { href: '', label: 'Home', icon: LayoutDashboard },
@@ -73,8 +73,7 @@ export function Sidebar({ subdomain, spaceName, spaceEmoji }: SidebarProps) {
 
       <div className="px-5 py-4 border-t border-sidebar-border">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Building2 size={14} />
-          <span>WorkflowRouting</span>
+          <BrandLogo className="h-4" alt="Chippi" />
         </div>
       </div>
     </aside>
