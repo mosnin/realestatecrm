@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { ChevronDown, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BrandLogo } from '@/components/brand-logo';
 
 interface NavigationItem {
   label: string;
@@ -41,6 +42,7 @@ interface PulseFitHeroProps {
   programs?: ProgramCard[];
   className?: string;
   children?: React.ReactNode;
+  showHeader?: boolean;
 }
 
 export function PulseFitHero({
@@ -61,7 +63,8 @@ export function PulseFitHero({
   socialProof,
   programs = [],
   className,
-  children
+  children,
+  showHeader = true
 }: PulseFitHeroProps) {
   return (
     <section
@@ -73,13 +76,16 @@ export function PulseFitHero({
       role="banner"
       aria-label="Hero section"
     >
+      {showHeader && (
       <motion.header
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
         className="relative z-20 flex flex-row justify-between items-center px-6 lg:px-10 py-8"
       >
-        <div className="text-2xl font-bold tracking-tight text-foreground">{logo}</div>
+        <div className="flex items-center" aria-label={logo}>
+          <BrandLogo className="h-7" alt="Chippi" />
+        </div>
 
         <nav className="hidden lg:flex flex-row items-center gap-7" aria-label="Main navigation">
           {navigation.map((item, index) => (
@@ -97,17 +103,19 @@ export function PulseFitHero({
         {ctaButton && (
           <button
             onClick={ctaButton.onClick}
-            className="px-5 py-2.5 rounded-full border border-border bg-background text-foreground text-sm font-semibold hover:bg-muted transition-colors"
+            className="rainbow-outline-btn px-5 py-2.5 rounded-full border border-border bg-background text-foreground text-sm font-semibold hover:bg-muted transition-colors"
           >
             {ctaButton.label}
           </button>
         )}
       </motion.header>
 
+      )}
+
       {children ? (
         <div className="relative z-10 flex-1 flex items-center justify-center w-full">{children}</div>
       ) : (
-        <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 pt-10 md:pt-16">
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 pt-28 md:pt-16">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}

@@ -25,9 +25,19 @@ export default async function DashboardLayout({
   try {
     const dbUser = await db.user.findUnique({
       where: { clerkId: userId },
-      select: { onboardingCompletedAt: true }
+      select: { id: true, onboardingCompletedAt: true, space: { select: { id: true } } }
     });
-    onboardingCompleted = !!dbUser?.onboardingCompletedAt;
+    onboardingCompleted = !!dbUser?.onboardingCompletedAt || !!dbUser?.space;
+
+    if (dbUser?.space && !dbUser.onboardingCompletedAt) {
+      // Legacy accounts may have a workspace but missing onboardingCompletedAt.
+      await db.user
+        .update({
+          where: { id: dbUser.id },
+          data: { onboardingCompletedAt: new Date(), onboardingCurrentStep: 7 }
+        })
+        .catch(() => null);
+    }
     console.info('[onboarding-guard] /s layout read', {
       clerkId: userId,
       subdomain,

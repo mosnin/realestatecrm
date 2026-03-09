@@ -13,10 +13,10 @@ import {
 } from 'lucide-react';
 import { track } from '@vercel/analytics';
 import { PulseFitHero } from '@/components/ui/pulse-fit-hero';
-import { BrandLogo } from '@/components/brand-logo';
-import CombinedFeaturedSection from '@/components/ui/combined-featured-section';
 import Testimonials from '@/components/ui/testimonials-columns-1';
 import ScrollFAQAccordion from '@/components/ui/scroll-faqaccordion';
+import { Navbar } from '@/components/navbar';
+import AnimatedFooter from '@/components/ui/animated-footer';
 
 const pillNav = [
   { id: 'problem', label: 'Problem' },
@@ -77,13 +77,38 @@ const howItWorks = [
   }
 ];
 
-const marqueeQuotes = [
-  '"Feels way cleaner than managing renter leads in DMs."',
-  '"I can finally tell who to follow up with first."',
-  '"The intake flow makes me look organized right away."',
-  '"Simple on purpose. That\'s exactly what I needed."',
-  '"I open one view and know what to do next."'
+const leadFeedItems = [
+  {
+    name: 'New rental application',
+    description: 'Jordan Reyes · Budget $2,800 · Midtown · Move-in Aug 1',
+    time: 'just now',
+    icon: '📝',
+    color: '#0d9488'
+  },
+  {
+    name: 'Lead scored: warm',
+    description: 'Ava Thompson · Score 68 · Strong timeline match',
+    time: '2m ago',
+    icon: '📊',
+    color: '#f59e0b'
+  },
+  {
+    name: 'New renter inquiry',
+    description: 'Carlos Mendez · 2BR · Pet friendly · Downtown',
+    time: '4m ago',
+    icon: '🏠',
+    color: '#3b82f6'
+  },
+  {
+    name: 'Priority lead',
+    description: 'Nina Patel · Score 82 · Ready to tour this week',
+    time: '7m ago',
+    icon: '⚡',
+    color: '#ef4444'
+  }
 ];
+
+const animatedLeadFeed = Array.from({ length: 3 }, () => leadFeedItems).flat();
 
 const faqs = [
   {
@@ -128,17 +153,57 @@ const faqs = [
   }
 ];
 
+function LeadFeedItem({
+  name,
+  description,
+  icon,
+  color,
+  time
+}: {
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  time: string;
+}) {
+  return (
+    <figure className="mx-auto w-full rounded-2xl border border-border bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.06)] transition-transform duration-200 hover:scale-[1.02]">
+      <div className="flex items-center gap-3">
+        <div
+          className="flex h-10 w-10 items-center justify-center rounded-2xl text-lg"
+          style={{ backgroundColor: color }}
+        >
+          <span>{icon}</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <figcaption className="flex items-center gap-1 text-sm font-semibold text-foreground">
+            <span className="truncate">{name}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-xs font-normal text-muted-foreground">{time}</span>
+          </figcaption>
+          <p className="truncate text-sm text-muted-foreground">{description}</p>
+        </div>
+      </div>
+    </figure>
+  );
+}
+
 function onTrack(name: string, props?: Record<string, string>) {
   track(name, props);
 }
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-background text-foreground scroll-smooth relative overflow-x-hidden">
+    <div className="min-h-svh w-full bg-background text-foreground">
+      <Navbar />
+      <main className="flex-1 scroll-smooth relative overflow-x-hidden">
       {/* Radial hero glow */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(20,184,166,0.12),transparent_70%)]" />
 
-      <PulseFitHero
+      <section id="hero">
+        <PulseFitHero
+          className="pt-[116px] md:pt-[126px]"
+        showHeader={false}
         logo="Chippi"
         navigation={[
           { label: 'Problem', onClick: () => { onTrack('pill_nav_click', { section: 'problem', source: 'hero_nav' }); window.location.hash = '#problem'; } },
@@ -222,11 +287,33 @@ export default function HomePage() {
             title: 'Professional intake experience every time'
           }
         ]}
-      />
+        />
+      </section>
 
-      <CombinedFeaturedSection />
+      {/* Live lead flow */}
+      <section className="px-6 py-16 border-t border-border">
+        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1fr_1.1fr] lg:items-center">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary">Live workflow signal</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">
+              See new applications and lead context arrive in real time.
+            </h2>
+            <p className="mt-4 max-w-lg text-sm leading-relaxed text-muted-foreground md:text-base">
+              Chippi captures structured renter submissions, adds scoring context, and keeps your next actions clear — so you can respond faster with less back-and-forth.
+            </p>
+          </div>
 
-      <Testimonials />
+          <div className="relative h-[460px] overflow-hidden rounded-2xl border border-border bg-surface/60 p-3">
+            <div className="lead-feed-scroll space-y-3">
+              {animatedLeadFeed.map((item, idx) => (
+                <LeadFeedItem key={`${item.name}-${idx}`} {...item} />
+              ))}
+            </div>
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-background to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background to-transparent" />
+          </div>
+        </div>
+      </section>
 
       {/* Problem */}
       <section id="problem" className="py-20 px-6 border-t border-border">
@@ -324,28 +411,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Testimonials marquee */}
-      <section id="testimonials" className="py-20 px-0 border-t border-border overflow-hidden">
-        <div className="max-w-5xl mx-auto px-6 mb-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Early feedback</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">What agents are saying.</h2>
-        </div>
-        <div className="marquee-track">
-          <div className="marquee-content">
-            {[...marqueeQuotes, ...marqueeQuotes].map((quote, i) => (
-              <button
-                key={`${quote}-${i}`}
-                type="button"
-                onClick={() => onTrack('testimonial_interaction', { index: String(i) })}
-                className="rounded-full border border-border bg-card px-5 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors whitespace-nowrap shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
-              >
-                {quote}
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Pricing */}
       <section id="pricing" className="py-20 px-6 border-t border-border">
         <div className="max-w-lg mx-auto">
@@ -387,6 +452,8 @@ export default function HomePage() {
         </div>
       </section>
 
+      <Testimonials />
+
       {/* FAQ */}
       <section id="faq" className="py-20 px-6 border-t border-border">
         <ScrollFAQAccordion
@@ -420,59 +487,21 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-card">
-        <div className="max-w-6xl mx-auto px-6 py-14">
-          <div className="grid md:grid-cols-[1.8fr_1fr_1fr_1fr] gap-10">
-            <div>
-              <BrandLogo className="h-7" alt="Chippi" />
-              <p className="mt-4 text-sm text-muted-foreground leading-relaxed max-w-xs">
-                Chippi helps solo realtors handle leasing leads faster with one intake link,
-                structured qualification, and clean follow-up workflow.
-              </p>
-              <Link
-                href="/sign-up"
-                onClick={() => onTrack('footer_cta_click', { location: 'footer_card' })}
-                className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
-              >
-                Start free trial
-              </Link>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">Product</p>
-              <ul className="mt-4 space-y-2.5 text-sm text-muted-foreground">
-                <li><a href="#solution" className="hover:text-foreground transition-colors">Solution</a></li>
-                <li><a href="#proof" className="hover:text-foreground transition-colors">Product proof</a></li>
-                <li><a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a></li>
-                <li><a href="#faq" className="hover:text-foreground transition-colors">FAQ</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">Company</p>
-              <ul className="mt-4 space-y-2.5 text-sm text-muted-foreground">
-                <li><a href="#testimonials" className="hover:text-foreground transition-colors">Customer feedback</a></li>
-                <li><a href="https://x.com" target="_blank" rel="noreferrer" className="hover:text-foreground transition-colors">X / Twitter</a></li>
-                <li><a href="https://linkedin.com" target="_blank" rel="noreferrer" className="hover:text-foreground transition-colors">LinkedIn</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">Legal</p>
-              <ul className="mt-4 space-y-2.5 text-sm text-muted-foreground">
-                <li><Link href="/legal/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link></li>
-                <li><Link href="/legal/terms" className="hover:text-foreground transition-colors">Terms of Service</Link></li>
-                <li><Link href="/legal/cookies" className="hover:text-foreground transition-colors">Cookie Policy</Link></li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="mt-12 pt-6 border-t border-border text-xs text-muted-foreground flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
-            <p>&copy; {new Date().getFullYear()} Chippi. Leasing workflow clarity for modern realtors.</p>
-            <p>Launch wedge: renter and leasing lead intake + qualification.</p>
-          </div>
-        </div>
-      </footer>
+      <AnimatedFooter
+        leftLinks={[
+          { href: '#solution', label: 'Product' },
+          { href: '#pricing', label: 'Pricing' },
+          { href: '#faq', label: 'FAQ' }
+        ]}
+        rightLinks={[
+          { href: '/legal/privacy', label: 'Privacy' },
+          { href: '/legal/terms', label: 'Terms' },
+          { href: '/legal/cookies', label: 'Cookies' },
+          { href: '/sign-in', label: 'Log in' }
+        ]}
+        copyrightText={`© ${new Date().getFullYear()} Chippi. Leasing workflow clarity for modern realtors.`}
+      />
+      </main>
     </div>
   );
 }
