@@ -113,11 +113,16 @@ export default function ScrollFAQAccordion({
         Answers to common questions about pricing, setup, and lead scoring workflows.
       </p>
 
-      <Accordion.Root type="single" collapsible value={openItem || ""}>
+      <Accordion.Root
+        type="single"
+        collapsible
+        value={openItem || ""}
+        onValueChange={(value) => setOpenItem(value || null)}
+      >
         {data.map((item) => (
           <Accordion.Item value={item.id.toString()} key={item.id} className="mb-6">
             <Accordion.Header>
-              <Accordion.Trigger className="flex w-full items-center justify-start gap-x-4 cursor-default">
+              <Accordion.Trigger className="flex w-full items-center justify-start gap-x-4 cursor-pointer">
                 <div
                   className={cn(
                     "relative flex items-center space-x-2 rounded-xl p-2 transition-colors",
