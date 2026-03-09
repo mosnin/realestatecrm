@@ -202,6 +202,7 @@ export default function HomePage() {
 
       <section id="hero">
         <PulseFitHero
+          className="pt-6 md:pt-10"
         showHeader={false}
         logo="Chippi"
         navigation={[
