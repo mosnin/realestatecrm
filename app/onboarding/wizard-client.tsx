@@ -698,7 +698,15 @@ export function OnboardingWizard({ initialState, clerkName, clerkEmail }: Wizard
   }
 
   async function goTo(nextStep: number) {
-    await saveStep(nextStep);
+    try {
+      await saveStep(nextStep);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Could not save onboarding progress. Continuing locally.';
+      toast.error(message);
+    }
     setStep(nextStep);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
