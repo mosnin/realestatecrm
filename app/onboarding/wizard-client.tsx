@@ -715,10 +715,15 @@ export function OnboardingWizard({ initialState, clerkName, clerkEmail }: Wizard
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'create_space', ...data })
     });
-    const json = await res.json();
+    let json: { error?: string; subdomain?: string } = {};
+    try {
+      json = await res.json();
+    } catch {
+      throw new Error('Server error — please try again.');
+    }
     if (!res.ok) throw new Error(json.error || 'Failed to create intake link');
-    setSubdomain(json.subdomain);
-    return { subdomain: json.subdomain };
+    setSubdomain(json.subdomain ?? data.subdomain);
+    return { subdomain: json.subdomain ?? data.subdomain };
   }
 
   async function handleNotificationsSave(data: {
