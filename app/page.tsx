@@ -200,7 +200,8 @@ export default function HomePage() {
       {/* Radial hero glow */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(20,184,166,0.12),transparent_70%)]" />
 
-      <PulseFitHero
+      <section id="hero">
+        <PulseFitHero
         showHeader={false}
         logo="Chippi"
         navigation={[
@@ -285,7 +286,8 @@ export default function HomePage() {
             title: 'Professional intake experience every time'
           }
         ]}
-      />
+        />
+      </section>
 
       {/* Live lead flow */}
       <section className="px-6 py-16 border-t border-border">
