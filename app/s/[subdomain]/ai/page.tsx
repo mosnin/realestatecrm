@@ -27,8 +27,8 @@ export default async function AIPage({
     <div className="space-y-4 h-full">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">AI Assistant</h2>
-        <p className="text-muted-foreground">
-          Chat with your real estate data using AI
+        <p className="text-muted-foreground text-sm">
+          Ask about your leads, clients, or pipeline — get instant answers from your leasing data
         </p>
       </div>
       <ChatInterface subdomain={subdomain} initialMessages={messages} />

@@ -4,7 +4,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { DealCard } from './deal-card';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, LayoutList } from 'lucide-react';
 import type { Deal, DealStage, Contact, DealContact } from '@prisma/client';
 
 type DealWithRelations = Deal & {
@@ -34,14 +34,14 @@ export function KanbanColumn({
   return (
     <div className="flex flex-col w-72 flex-shrink-0">
       {/* Column header */}
-      <div className="flex items-center justify-between mb-3 px-1">
+      <div className="flex items-center justify-between mb-3 px-0.5">
         <div className="flex items-center gap-2">
           <span
-            className="w-3 h-3 rounded-full"
+            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
             style={{ backgroundColor: stage.color }}
           />
           <span className="font-semibold text-sm">{stage.name}</span>
-          <span className="text-xs text-muted-foreground bg-muted rounded-full px-2">
+          <span className="text-[11px] text-muted-foreground bg-muted rounded-full px-2 py-0.5 font-medium tabular-nums">
             {deals.length}
           </span>
         </div>
@@ -55,8 +55,10 @@ export function KanbanColumn({
       {/* Drop zone */}
       <div
         ref={setNodeRef}
-        className={`flex-1 min-h-20 rounded-lg transition-colors ${
-          isOver ? 'bg-accent/30' : 'bg-muted/30'
+        className={`flex-1 min-h-24 rounded-xl transition-all duration-150 ${
+          isOver
+            ? 'bg-primary/5 border-2 border-dashed border-primary/30'
+            : 'bg-muted/20 border-2 border-transparent'
         } p-2`}
       >
         <SortableContext
@@ -71,18 +73,23 @@ export function KanbanColumn({
               onDelete={onDeleteDeal}
             />
           ))}
+          {deals.length === 0 && !isOver && (
+            <div className="flex flex-col items-center justify-center py-8 gap-2 text-muted-foreground/40">
+              <LayoutList size={20} />
+              <p className="text-xs">No deals yet</p>
+            </div>
+          )}
         </SortableContext>
       </div>
 
-      <Button
-        variant="ghost"
-        size="sm"
-        className="mt-2 w-full justify-start text-muted-foreground text-xs"
+      <button
+        type="button"
+        className="mt-2 w-full flex items-center gap-1.5 px-2 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
         onClick={() => onAddDeal(stage.id)}
       >
-        <Plus size={14} className="mr-1" />
+        <Plus size={13} />
         Add deal
-      </Button>
+      </button>
     </div>
   );
 }

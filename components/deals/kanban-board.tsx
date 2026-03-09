@@ -16,9 +16,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { KanbanColumn } from './kanban-column';
 import { DealForm } from './deal-form';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { GripVertical } from 'lucide-react';
+import { Plus, GripVertical } from 'lucide-react';
 import type { Deal, DealStage, Contact, DealContact } from '@prisma/client';
 
 type DealWithRelations = Deal & {
@@ -158,12 +156,12 @@ export function KanbanBoard({ subdomain }: KanbanBoardProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Deals</h2>
-          <p className="text-muted-foreground">Manage your real estate pipeline</p>
+          <h2 className="text-2xl font-bold tracking-tight">Pipeline</h2>
+          <p className="text-muted-foreground text-sm">Track active deals through your leasing stages</p>
         </div>
         <Button onClick={() => { setDefaultStageId(stages[0]?.id ?? ''); setAddDealOpen(true); }}>
-          <Plus size={16} className="mr-2" />
-          Add Deal
+          <Plus size={16} className="mr-1.5" />
+          Add deal
         </Button>
       </div>
 
@@ -189,14 +187,12 @@ export function KanbanBoard({ subdomain }: KanbanBoardProps) {
           </div>
           <DragOverlay>
             {activeDeal && (
-              <Card className="w-72 shadow-lg opacity-90">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-2">
-                    <GripVertical size={16} className="text-muted-foreground" />
-                    <p className="font-medium text-sm">{activeDeal.title}</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="w-72 rounded-xl border border-primary/30 bg-card px-3.5 py-3 shadow-[0_8px_24px_-8px_rgba(13,148,136,0.35)] opacity-95 rotate-1">
+                <div className="flex items-center gap-2">
+                  <GripVertical size={15} className="text-primary/50 flex-shrink-0" />
+                  <p className="font-semibold text-sm truncate">{activeDeal.title}</p>
+                </div>
+              </div>
             )}
           </DragOverlay>
         </DndContext>

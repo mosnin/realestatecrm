@@ -50,6 +50,27 @@ interface ContactFormProps {
   title?: string;
 }
 
+function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">{label}</p>
+      <div className="space-y-3">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Field({ id, label, error, children }: { id?: string; label: string; error?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
 export function ContactForm({
   open,
   onOpenChange,
@@ -91,80 +112,72 @@ export function ContactForm({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="overflow-y-auto">
-        <SheetHeader>
+        <SheetHeader className="pb-2">
           <SheetTitle>{title}</SheetTitle>
         </SheetHeader>
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 mt-6">
-          <div className="space-y-1">
-            <Label htmlFor="name">Name *</Label>
-            <Input id="name" {...register('name')} />
-            {errors.name && (
-              <p className="text-xs text-destructive">{errors.name.message}</p>
-            )}
-          </div>
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6 mt-5">
+          <FieldGroup label="Identity">
+            <Field id="name" label="Name *" error={errors.name?.message}>
+              <Input id="name" {...register('name')} />
+            </Field>
+            <Field id="type" label="Stage">
+              <Select
+                value={type}
+                onValueChange={(v) => setValue('type', v as FormData['type'])}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="QUALIFICATION">Qualifying</SelectItem>
+                  <SelectItem value="TOUR">Tour</SelectItem>
+                  <SelectItem value="APPLICATION">Applied</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </FieldGroup>
 
-          <div className="space-y-1">
-            <Label htmlFor="type">Client Type</Label>
-            <Select
-              value={type}
-              onValueChange={(v) => setValue('type', v as any)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="QUALIFICATION">Qualification</SelectItem>
-                <SelectItem value="TOUR">Tour</SelectItem>
-                <SelectItem value="APPLICATION">Application</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="border-t border-border" />
 
-          <div className="space-y-1">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" {...register('email')} />
-            {errors.email && (
-              <p className="text-xs text-destructive">{errors.email.message}</p>
-            )}
-          </div>
+          <FieldGroup label="Contact">
+            <Field id="email" label="Email" error={errors.email?.message}>
+              <Input id="email" type="email" {...register('email')} />
+            </Field>
+            <Field id="phone" label="Phone">
+              <Input id="phone" {...register('phone')} />
+            </Field>
+          </FieldGroup>
 
-          <div className="space-y-1">
-            <Label htmlFor="phone">Phone</Label>
-            <Input id="phone" {...register('phone')} />
-          </div>
+          <div className="border-t border-border" />
 
-          <div className="space-y-1">
-            <Label htmlFor="budget">Budget (optional)</Label>
-            <Input id="budget" type="number" step="0.01" {...register('budget')} />
-          </div>
+          <FieldGroup label="Qualification">
+            <Field id="budget" label="Monthly budget">
+              <Input id="budget" type="number" step="0.01" placeholder="e.g. 2500" {...register('budget')} />
+            </Field>
+            <Field id="preferences" label="Preferences & requirements">
+              <Textarea id="preferences" rows={3} placeholder="Neighborhoods, bedrooms, pet-friendly…" {...register('preferences')} />
+            </Field>
+            <Field id="properties" label="Properties of interest (comma-separated)">
+              <Input id="properties" placeholder="123 Main St, Sunset Villas #12" {...register('properties')} />
+            </Field>
+          </FieldGroup>
 
-          <div className="space-y-1">
-            <Label htmlFor="preferences">Preferences</Label>
-            <Textarea id="preferences" rows={3} {...register('preferences')} />
-          </div>
+          <div className="border-t border-border" />
 
-          <div className="space-y-1">
-            <Label htmlFor="properties">Properties (comma-separated)</Label>
-            <Input id="properties" placeholder="123 Main St, Sunset Villas #12" {...register('properties')} />
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="address">Address</Label>
-            <Input id="address" {...register('address')} />
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="tags">Tags (comma-separated)</Label>
-            <Input id="tags" placeholder="first-time buyer, luxury, referral" {...register('tags')} />
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea id="notes" rows={4} {...register('notes')} />
-          </div>
+          <FieldGroup label="Additional">
+            <Field id="address" label="Current address">
+              <Input id="address" {...register('address')} />
+            </Field>
+            <Field id="tags" label="Tags (comma-separated)">
+              <Input id="tags" placeholder="first-time renter, referral, urgent" {...register('tags')} />
+            </Field>
+            <Field id="notes" label="Notes">
+              <Textarea id="notes" rows={3} {...register('notes')} />
+            </Field>
+          </FieldGroup>
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save Client'}
+            {isSubmitting ? 'Saving...' : 'Save client'}
           </Button>
         </form>
       </SheetContent>
