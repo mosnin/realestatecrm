@@ -2,8 +2,13 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { OnboardingWizard } from './wizard-client';
+import type { User, Space, SpaceSetting } from '@prisma/client';
 
 export const metadata = { title: 'Set up Chippi' };
+
+type DbUser = User & {
+  space: (Space & { settings: SpaceSetting | null }) | null;
+};
 
 export default async function OnboardingPage() {
   const { userId } = await auth();
@@ -11,49 +16,66 @@ export default async function OnboardingPage() {
 
   const clerkUser = await currentUser();
 
-  // Load user + space from DB
-  let dbUser = await db.user.findUnique({
-    where: { clerkId: userId },
-    include: {
-      space: {
-        include: { settings: true }
-      }
-    }
-  });
+  // Load user + space from DB.
+  // Wrapped in try/catch to handle the period between deployment and migration
+  // completion — wizard renders in a fresh state and the API endpoints will
+  // also fail gracefully until the DB is up to date.
+  let dbUser: DbUser | null = null;
 
-  // If user has already completed onboarding, send them to the dashboard
+  try {
+    dbUser = await db.user.findUnique({
+      where: { clerkId: userId },
+      include: {
+        space: {
+          include: { settings: true }
+        }
+      }
+    });
+  } catch {
+    // Migration likely pending — fall through, wizard renders empty
+  }
+
+  // If user has already completed onboarding, redirect to dashboard
   if (dbUser?.onboardingCompletedAt && dbUser.space) {
     redirect(`/s/${dbUser.space.subdomain}`);
   }
 
-  // Start onboarding record if not yet started
+  // Bootstrap user record if this is their first load
   if (!dbUser) {
-    dbUser = await db.user.create({
-      data: {
-        clerkId: userId,
-        email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
-        name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
-        onboardingStartedAt: new Date(),
-        onboardingCurrentStep: 1
-      },
-      include: { space: { include: { settings: true } } }
-    });
+    try {
+      dbUser = await db.user.create({
+        data: {
+          clerkId: userId,
+          email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
+          name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
+          onboardingStartedAt: new Date(),
+          onboardingCurrentStep: 1
+        },
+        include: { space: { include: { settings: true } } }
+      });
+    } catch {
+      // Still failing (migration pending) — wizard renders with Clerk data only
+    }
   } else if (!dbUser.onboardingStartedAt) {
-    await db.user.update({
-      where: { id: dbUser.id },
-      data: { onboardingStartedAt: new Date() }
-    });
+    try {
+      await db.user.update({
+        where: { id: dbUser.id },
+        data: { onboardingStartedAt: new Date() }
+      });
+    } catch {
+      // Non-fatal
+    }
   }
 
   const initialState = {
-    step: dbUser.onboardingCurrentStep ?? 1,
-    completed: !!dbUser.onboardingCompletedAt,
+    step: dbUser?.onboardingCurrentStep ?? 1,
+    completed: !!dbUser?.onboardingCompletedAt,
     user: {
-      id: dbUser.id,
-      name: dbUser.name,
-      email: dbUser.email
+      id: dbUser?.id ?? '',
+      name: dbUser?.name ?? null,
+      email: dbUser?.email ?? (clerkUser?.emailAddresses?.[0]?.emailAddress ?? '')
     },
-    space: dbUser.space
+    space: dbUser?.space
       ? {
           id: dbUser.space.id,
           subdomain: dbUser.space.subdomain,

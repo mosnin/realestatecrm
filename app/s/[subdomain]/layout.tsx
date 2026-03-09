@@ -21,11 +21,18 @@ export default async function DashboardLayout({
   }
 
   // Gate dashboard access until onboarding is complete
-  const dbUser = await db.user.findUnique({
-    where: { clerkId: userId },
-    select: { onboardingCompletedAt: true }
-  });
-  if (!dbUser?.onboardingCompletedAt) {
+  let onboardingCompleted = false;
+  try {
+    const dbUser = await db.user.findUnique({
+      where: { clerkId: userId },
+      select: { onboardingCompletedAt: true }
+    });
+    onboardingCompleted = !!dbUser?.onboardingCompletedAt;
+  } catch {
+    // DB schema mismatch (migration pending) — send to onboarding which will self-heal
+    redirect('/onboarding');
+  }
+  if (!onboardingCompleted) {
     redirect('/onboarding');
   }
 
