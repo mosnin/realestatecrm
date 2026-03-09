@@ -20,20 +20,29 @@ export default async function DashboardLayout({
     return null; // Middleware handles redirect
   }
 
-  // Gate dashboard access until onboarding is complete
-  let onboardingCompleted = false;
+  // Resolve this user's workspace mapping.
+  let userSpaceSubdomain: string | null = null;
   try {
     const dbUser = await db.user.findUnique({
       where: { clerkId: userId },
-      select: { onboardingCompletedAt: true }
+      select: {
+        space: { select: { subdomain: true } }
+      }
     });
-    onboardingCompleted = !!dbUser?.onboardingCompletedAt;
+    userSpaceSubdomain = dbUser?.space?.subdomain ?? null;
   } catch {
-    // DB schema mismatch (migration pending) — send to onboarding which will self-heal
+    // DB schema mismatch (migration pending)
     redirect('/onboarding');
   }
-  if (!onboardingCompleted) {
+
+  // If this user doesn't have a workspace yet, onboarding is required.
+  if (!userSpaceSubdomain) {
     redirect('/onboarding');
+  }
+
+  // Prevent accessing someone else's workspace path.
+  if (userSpaceSubdomain !== subdomain) {
+    redirect(`/s/${userSpaceSubdomain}`);
   }
 
   const space = await getSpaceFromSubdomain(subdomain);

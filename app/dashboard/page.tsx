@@ -12,8 +12,9 @@ export default async function DashboardRedirectPage() {
       include: { space: true }
     });
 
-    // If onboarding is complete and space exists, go to dashboard
-    if (user?.onboardingCompletedAt && user.space) {
+    // If a workspace exists, send user to it. This avoids onboarding loops
+    // in environments where onboarding fields are missing in Prisma runtime.
+    if (user?.space) {
       redirect(`/s/${user.space.subdomain}`);
     }
   } catch {
