@@ -26,15 +26,16 @@ model Space {
   ownerId   String   @unique
   owner     User     @relation(fields: [ownerId], references: [id])
 
-  contacts      Contact[]
-  deals         Deal[]
-  stages        DealStage[]
-  messages      Message[]
-  settings      SpaceSetting?
-  vapiAgent     VapiAgent?
-  leads         Lead[]
-  conversations Conversation[]
-  agentFlow     AgentFlow?
+  contacts            Contact[]
+  deals               Deal[]
+  stages              DealStage[]
+  messages            Message[]
+  settings            SpaceSetting?
+  vapiAgent           VapiAgent?
+  leads               Lead[]
+  conversations       Conversation[]
+  agentFlow           AgentFlow?
+  rentalApplications  RentalApplication[]
 }
 
 model SpaceSetting {
@@ -51,22 +52,23 @@ model SpaceSetting {
 }
 
 model Contact {
-  id           String        @id @default(cuid())
-  spaceId      String
-  space        Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  name         String
-  email        String?
-  phone        String?
-  address      String?
-  notes        String?
-  budget       Float?
-  preferences  String?
-  properties   String[]      @default([])
-  type         ClientType    @default(QUALIFICATION)
-  tags         String[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  dealContacts DealContact[]
+  id                  String               @id @default(cuid())
+  spaceId             String
+  space               Space                @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name                String
+  email               String?
+  phone               String?
+  address             String?
+  notes               String?
+  budget              Float?
+  preferences         String?
+  properties          String[]             @default([])
+  type                ClientType           @default(QUALIFICATION)
+  tags                String[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  dealContacts        DealContact[]
+  rentalApplications  RentalApplication[]
 }
 
 enum ClientType {
@@ -214,4 +216,157 @@ model AgentFlow {
   version   Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─── Rental Application Models ───────────────────────────────────────────────
+
+model RentalApplication {
+  id              String              @id @default(cuid())
+  spaceId         String
+  space           Space               @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  contactId       String?
+  contact         Contact?            @relation(fields: [contactId], references: [id])
+
+  // Property selection
+  propertyAddress String?
+  unitType        String?
+  targetMoveIn    DateTime?
+  monthlyRent     Float?
+  leaseTerm       String?
+  occupantCount   Int?
+
+  // Status & progress
+  status          ApplicationStatus   @default(DRAFT)
+  currentStep     Int                 @default(1)
+  completedSteps  String[]            @default([])
+
+  // Qualification
+  summary         String?
+  qualScore       QualScore?
+
+  submittedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  applicants      RentalApplicant[]
+  documents       ApplicationDocument[]
+
+  @@index([spaceId])
+  @@index([contactId])
+}
+
+enum ApplicationStatus {
+  DRAFT
+  IN_PROGRESS
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum QualScore {
+  HOT
+  WARM
+  COLD
+}
+
+model RentalApplicant {
+  id            String            @id @default(cuid())
+  applicationId String
+  application   RentalApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  isPrimary     Boolean           @default(true)
+
+  // Basics
+  legalName     String?
+  email         String?
+  phone         String?
+  dateOfBirth   DateTime?
+  idLastFour    String?
+
+  // Current living situation
+  currentAddress  String?
+  housingStatus   HousingStatus?
+  currentPayment  Float?
+  lengthAtAddress String?
+  reasonForMoving String?
+
+  // Household
+  adultsOnApp           Int?
+  children              Int?
+  roommates             Int?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+
+  // Income
+  employmentStatus   EmploymentStatus?
+  employerName       String?
+  monthlyGrossIncome Float?
+  additionalIncome   Float?
+
+  // Rental history
+  currentLandlordName  String?
+  currentLandlordPhone String?
+  prevLandlordName     String?
+  prevLandlordPhone    String?
+  rentPaidOnTime       Boolean?
+  latePayments         Int?
+  leaseViolations      Boolean?
+  referencePermission  Boolean?
+
+  // Screening
+  priorEvictions      Boolean?
+  outstandingBalances Boolean?
+  bankruptcy          Boolean?
+  backgroundConsent   Boolean?
+  hasPets             Boolean?
+  petDetails          String?
+  smokingDeclaration  Boolean?
+
+  // Consents
+  screeningConsent    Boolean?
+  truthCertification  Boolean?
+  electronicSignature String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([applicationId])
+}
+
+enum HousingStatus {
+  OWN
+  RENT
+  RENT_FREE
+}
+
+enum EmploymentStatus {
+  FULL_TIME
+  PART_TIME
+  SELF_EMPLOYED
+  UNEMPLOYED
+  RETIRED
+  STUDENT
+  OTHER
+}
+
+model ApplicationDocument {
+  id            String            @id @default(cuid())
+  applicationId String
+  application   RentalApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  applicantId   String?
+  type          DocType
+  fileName      String
+  fileUrl       String
+  uploadedAt    DateTime          @default(now())
+
+  @@index([applicationId])
+}
+
+enum DocType {
+  GOVERNMENT_ID
+  PAY_STUB
+  BANK_STATEMENT
+  OFFER_LETTER
+  PET_DOCUMENTATION
+  OTHER
 }

@@ -6,7 +6,7 @@ import {
   LayoutDashboard,
   Users,
   PhoneIncoming,
-  History,
+  ClipboardList,
   Bot,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -15,7 +15,7 @@ const navItems = [
   { href: '', label: 'Home', icon: LayoutDashboard },
   { href: '/contacts', label: 'Clients', icon: Users },
   { href: '/leads', label: 'Leads', icon: PhoneIncoming },
-  { href: '/history', label: 'History', icon: History },
+  { href: '/applications', label: 'Apply', icon: ClipboardList },
   { href: '/ai', label: 'AI', icon: Bot },
 ];
 

@@ -14,6 +14,7 @@ import {
   Headphones,
   History,
   Workflow,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/contacts', label: 'Clients', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
   { href: '/leads', label: 'Leads', icon: PhoneIncoming },
+  { href: '/applications', label: 'Applications', icon: ClipboardList },
   { href: '/history', label: 'History', icon: History },
   { href: '/setup-agent', label: 'AI Agent', icon: Headphones },
   { href: '/agent-builder', label: 'Flow Builder', icon: Workflow },
