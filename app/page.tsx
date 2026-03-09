@@ -218,8 +218,6 @@ export default function HomePage() {
 
       <CombinedFeaturedSection />
 
-      <Testimonials />
-
       {/* Problem */}
       <section id="problem" className="py-20 px-6 border-t border-border">
         <div className="max-w-5xl mx-auto">
@@ -356,6 +354,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <Testimonials />
 
       {/* FAQ */}
       <section id="faq" className="py-20 px-6 border-t border-border">
