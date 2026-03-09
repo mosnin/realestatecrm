@@ -13,6 +13,7 @@ import {
 import { ContactForm } from './contact-form';
 import { Plus, Search, Trash2, Pencil, Phone, Mail, Wallet, MapPin, Calendar, ArrowUpDown } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 type Client = {
@@ -66,6 +67,7 @@ function sortContacts(contacts: Client[], key: SortKey): Client[] {
 }
 
 export function ContactTable({ subdomain }: { subdomain: string }) {
+  const router = useRouter();
   const [contacts, setContacts]       = useState<Client[]>([]);
   const [search, setSearch]           = useState('');
   const [typeFilter, setTypeFilter]   = useState('ALL');
@@ -195,10 +197,15 @@ export function ContactTable({ subdomain }: { subdomain: string }) {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {sorted.map((contact) => {
             const meta = TYPE_META[contact.type];
+            const detailUrl = `/s/${subdomain}/contacts/${contact.id}`;
             return (
               <div
                 key={contact.id}
-                className="group rounded-xl border border-border bg-card overflow-hidden transition-all duration-150 hover:shadow-md hover:-translate-y-px flex flex-col"
+                role="button"
+                tabIndex={0}
+                onClick={() => router.push(detailUrl)}
+                onKeyDown={(e) => e.key === 'Enter' && router.push(detailUrl)}
+                className="group rounded-xl border border-border bg-card overflow-hidden transition-all duration-150 hover:shadow-md hover:border-primary/30 hover:-translate-y-px flex flex-col cursor-pointer"
               >
                 <div className="px-4 pt-4 pb-3 flex-1">
                   {/* Header row */}
@@ -208,22 +215,25 @@ export function ContactTable({ subdomain }: { subdomain: string }) {
                         {getInitials(contact.name)}
                       </div>
                       <div className="min-w-0">
-                        <Link
-                          href={`/s/${subdomain}/contacts/${contact.id}`}
-                          className="font-semibold text-sm hover:text-primary transition-colors truncate block"
-                        >
-                          {contact.name}
-                        </Link>
+                        <p className="font-semibold text-sm truncate">{contact.name}</p>
                         <span className={cn('inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 mt-1', meta.className)}>
                           {meta.label}
                         </span>
                       </div>
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                      <button type="button" onClick={() => setEditContact(contact)} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setEditContact(contact); }}
+                        className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                      >
                         <Pencil size={13} />
                       </button>
-                      <button type="button" onClick={() => handleDelete(contact.id)} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleDelete(contact.id); }}
+                        className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      >
                         <Trash2 size={13} />
                       </button>
                     </div>
