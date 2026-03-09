@@ -22,6 +22,20 @@ export default async function LeadsPage({
     take: 100,
   });
 
+  const unreadLeads = leads.filter((lead) => lead.tags.includes('new-lead'));
+
+  // Viewing the leads page marks previously unread leads as read.
+  if (unreadLeads.length) {
+    await Promise.all(
+      unreadLeads.map((lead) =>
+        db.contact.update({
+          where: { id: lead.id },
+          data: { tags: lead.tags.filter((tag) => tag !== 'new-lead') }
+        })
+      )
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -29,6 +43,11 @@ export default async function LeadsPage({
         <p className="text-muted-foreground mt-1">
           Leads submitted through your public application link.
         </p>
+        {unreadLeads.length > 0 ? (
+          <p className="text-sm text-primary mt-2">
+            {unreadLeads.length} new lead{unreadLeads.length !== 1 ? 's' : ''} just marked as read.
+          </p>
+        ) : null}
       </div>
 
       <Card>
