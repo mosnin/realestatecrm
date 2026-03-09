@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -35,11 +35,10 @@ import {
   Snowflake,
   PhoneIncoming,
 } from 'lucide-react';
-import { useRealtimeLeads } from '@/hooks/use-realtime-leads';
 import type { Lead } from '@/lib/types/retell';
 
 interface LeadsDashboardProps {
-  spaceId: string;
+  subdomain: string;
   initialLeads: Lead[];
 }
 
@@ -89,20 +88,61 @@ function formatPhoneNumber(phone: string) {
 }
 
 export function LeadsDashboard({
-  spaceId,
+  subdomain,
   initialLeads,
 }: LeadsDashboardProps) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
 
   const handleNewLead = useCallback((newLead: Lead) => {
-    setLeads((prev) => [newLead, ...prev]);
     const score = scoreConfig[newLead.score];
     toast.success(`New ${score.label} Lead!`, {
       description: `${formatPhoneNumber(newLead.phone)}${newLead.budget ? ` - Budget: ${newLead.budget}` : ''}`,
     });
   }, []);
 
-  useRealtimeLeads({ spaceId, onNewLead: handleNewLead });
+  useEffect(() => {
+    setLeads(initialLeads);
+  }, [initialLeads]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const pollLeads = async () => {
+      try {
+        const response = await fetch(
+          `/api/leads?subdomain=${encodeURIComponent(subdomain)}&take=50`,
+          {
+            cache: 'no-store',
+          }
+        );
+
+        if (!response.ok) return;
+
+        const nextLeads = (await response.json()) as Lead[];
+        if (!mounted || nextLeads.length === 0) return;
+
+        setLeads((prev) => {
+          const prevIds = new Set(prev.map((lead) => lead.id));
+          const insertedLeads = nextLeads.filter((lead) => !prevIds.has(lead.id));
+
+          for (const lead of insertedLeads) {
+            handleNewLead(lead);
+          }
+
+          return nextLeads;
+        });
+      } catch {
+        // Ignore polling errors and continue in next cycle
+      }
+    };
+
+    const interval = setInterval(pollLeads, 15000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [subdomain, handleNewLead]);
 
   if (leads.length === 0) {
     return <EmptyState />;
