@@ -234,3 +234,23 @@
   animation: marquee 30s linear infinite;
 }
 .marquee-track:hover .marquee-content { animation-play-state: paused; }
+
+@keyframes animation-path {
+  0% {
+    offset-distance: 0%;
+  }
+  100% {
+    offset-distance: 100%;
+  }
+}
+
+@keyframes scaleUp {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

@@ -14,7 +14,7 @@ import {
 import { track } from '@vercel/analytics';
 import { PulseFitHero } from '@/components/ui/pulse-fit-hero';
 import { BrandLogo } from '@/components/brand-logo';
-import FeatureSection from '@/components/ui/feature-section';
+import CombinedFeaturedSection from '@/components/ui/combined-featured-section';
 
 const pillNav = [
   { id: 'problem', label: 'Problem' },
@@ -222,7 +222,7 @@ export default function HomePage() {
         ]}
       />
 
-      <FeatureSection />
+      <CombinedFeaturedSection />
 
       {/* Problem */}
       <section id="problem" className="py-20 px-6 border-t border-border">
