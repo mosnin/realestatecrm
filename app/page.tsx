@@ -16,6 +16,7 @@ import { PulseFitHero } from '@/components/ui/pulse-fit-hero';
 import { BrandLogo } from '@/components/brand-logo';
 import CombinedFeaturedSection from '@/components/ui/combined-featured-section';
 import Testimonials from '@/components/ui/testimonials-columns-1';
+import ScrollFAQAccordion from '@/components/ui/scroll-faqaccordion';
 
 const pillNav = [
   { id: 'problem', label: 'Problem' },
@@ -388,29 +389,14 @@ export default function HomePage() {
 
       {/* FAQ */}
       <section id="faq" className="py-20 px-6 border-t border-border">
-        <div className="max-w-3xl mx-auto">
-          <p className="text-xs font-semibold uppercase tracking-widest text-primary">FAQ</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Answers before you start</h2>
-          <div className="mt-8 space-y-2">
-            {faqs.map((item, index) => (
-              <details
-                key={item.q}
-                className="group rounded-xl border border-border bg-card px-5 py-4 transition-shadow hover:shadow-[0_1px_4px_rgba(0,0,0,0.07)]"
-                onToggle={(e) => {
-                  if ((e.currentTarget as HTMLDetailsElement).open) {
-                    onTrack('faq_expand', { question_index: String(index + 1) });
-                  }
-                }}
-              >
-                <summary className="cursor-pointer list-none font-medium text-sm flex items-center justify-between gap-4">
-                  <span>{item.q}</span>
-                  <span className="text-muted-foreground/60 group-open:rotate-45 transition-transform flex-shrink-0 text-lg leading-none">+</span>
-                </summary>
-                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{item.a}</p>
-              </details>
-            ))}
-          </div>
-        </div>
+        <ScrollFAQAccordion
+          className="py-0"
+          data={faqs.map((item, index) => ({
+            id: index + 1,
+            question: item.q,
+            answer: item.a,
+          }))}
+        />
       </section>
 
       {/* Closing CTA */}
