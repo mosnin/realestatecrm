@@ -13,6 +13,31 @@ function isPrismaMissingColumnError(error: unknown) {
   );
 }
 
+function isPrismaUnknownOnboardingFieldError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return [
+    'Unknown argument `onboardingCurrentStep`',
+    'Unknown argument `onboardingStartedAt`',
+    'Unknown argument `onboardingCompletedAt`'
+  ].some((snippet) => error.message.includes(snippet));
+}
+
+async function updateOnboardingUserFields(
+  userId: string,
+  data: Record<string, unknown>
+) {
+  try {
+    await db.user.update({
+      where: { id: userId },
+      data
+    });
+  } catch (error) {
+    if (!isPrismaUnknownOnboardingFieldError(error)) throw error;
+    // Deployed Prisma client may be older than the schema and not recognize
+    // onboarding fields yet. In that case, allow flow to continue.
+  }
+}
+
 function getSafeUserEmail(userId: string, clerkEmail?: string | null) {
   const normalized = clerkEmail?.trim();
   if (normalized) return normalized;
@@ -40,14 +65,14 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      step: user.onboardingCurrentStep,
-      completed: !!user.onboardingCompletedAt,
+      step: (user as any).onboardingCurrentStep ?? 1,
+      completed: !!(user as any).onboardingCompletedAt,
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
-        onboardingStartedAt: user.onboardingStartedAt,
-        onboardingCompletedAt: user.onboardingCompletedAt
+        onboardingStartedAt: (user as any).onboardingStartedAt ?? null,
+        onboardingCompletedAt: (user as any).onboardingCompletedAt ?? null
       },
       space: user.space
         ? {
@@ -93,31 +118,24 @@ export async function POST(req: NextRequest) {
       create: {
         clerkId: userId,
         email: safeEmail,
-        name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
-        onboardingStartedAt: new Date()
+        name: clerkUser?.fullName ?? clerkUser?.firstName ?? null
       },
       include: { space: { include: { settings: true } } }
     });
 
     if (action === 'start') {
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          onboardingCurrentStep: 1,
-          onboardingStartedAt: user.onboardingStartedAt ?? new Date()
-        }
+      await updateOnboardingUserFields(user.id, {
+        onboardingCurrentStep: 1,
+        onboardingStartedAt: (user as any).onboardingStartedAt ?? new Date()
       });
       return NextResponse.json({ success: true });
     }
 
     if (action === 'save_step') {
       const { step } = body as { step: number };
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          onboardingCurrentStep: step,
-          onboardingStartedAt: user.onboardingStartedAt ?? new Date()
-        }
+      await updateOnboardingUserFields(user.id, {
+        onboardingCurrentStep: step,
+        onboardingStartedAt: (user as any).onboardingStartedAt ?? new Date()
       });
       return NextResponse.json({ success: true });
     }
@@ -250,10 +268,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      await db.user.update({
-        where: { id: user.id },
-        data: { onboardingCurrentStep: 4 }
-      });
+      await updateOnboardingUserFields(user.id, { onboardingCurrentStep: 4 });
 
       return NextResponse.json({ success: true, subdomain: space.subdomain });
     }
@@ -287,12 +302,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'complete') {
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          onboardingCurrentStep: 7,
-          onboardingCompletedAt: new Date()
-        }
+      await updateOnboardingUserFields(user.id, {
+        onboardingCurrentStep: 7,
+        onboardingCompletedAt: new Date()
       });
       return NextResponse.json({ success: true });
     }
