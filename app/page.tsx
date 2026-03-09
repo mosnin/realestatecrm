@@ -179,24 +179,44 @@ export default function HomePage() {
         }}
         programs={[
           {
-            image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400&h=500&fit=crop',
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhGMcGZtyL4M4bkN4ih0093zMY_rTFuC96zzFIKtfwmOWquEs3Sk-XRKpCOBGtRQ-B0Hs7Rxh5oIU2jDmnzroGPjanrMOnCJMUh-mvhVo4q41zDaWyJ2YAbRdZ5QvOb87XQCWPwWoseCUovKM4wfWAv8xMB0vJrHwEThu7hixCGPrl8Cp3wR4FlOaLqOg7J/s320/image%20(9).webp',
             category: 'INTAKE',
             title: 'One clean renter application link'
           },
           {
-            image: 'https://images.unsplash.com/photo-1560185007-cde436f6a4d0?w=400&h=500&fit=crop',
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjD2O0IZ0h1I9vgmeVaPXnzI_jW-QQ5F2btwiicMK3w6VOFalshOQf1fMcTcp_JoZxLgBSldtUuuzgtiX5wtgUiveo61ZhHTbTXOh4QvdWt2hh26xU_TNtGNShy50mFfd_9dOrVz3Nb4mZ80Wme1dn9piIUfmAZSoBhHLeNxTouqIlTDeudwAdhOxQACp2R/s320/image%20(20).webp',
             category: 'QUALIFICATION',
             title: 'Budget, timeline, and area details in one flow'
           },
           {
-            image: 'https://images.unsplash.com/photo-1554995207-c18c203602cb?w=400&h=500&fit=crop',
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjvxm32eiKeYuMWzVrE8ceLPgtIYxarpuF7MEQ0x7GLvXHv0R3Imatn_HB7Dp0JKBmSj-OZV1Dh7YaLICwsJcvf0NGepCD8P57GplS_D6LvtH55equqXGab5FlQ3OeEREih8cJhxk3m6CM44jJWuqJaR4RaNA9KoNhyphenhyphen-kTPOFgTO3GUz3Vob52fX_yeXwKg/w376-h503/image%20(18).webp',
             category: 'SCORING',
             title: 'Practical lead scoring you can explain'
           },
           {
-            image: 'https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?w=400&h=500&fit=crop',
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgLwJ0YL6WhcH21NDvTvwXf5QzFLnC9EswU6WJxsSkJIF-OwI0AmQOSJKdK7glFSkhj9EKVvYLnoioJYcV4Zk8pOTWiz5tnzjtokZbsg0NNLndICQYwkpC3YxNumbpb4lihz_TX1wPalludzUsnYUlVsbMlpewT7dGbidTVxejO_eOxy68KODvFyK0scsoA/w378-h506/image%20(19).webp',
             category: 'FOLLOW-UP',
             title: 'Triage faster from one lightweight command center'
+          },
+          {
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhiZ1tFXPwDXluFGeBqEXACxplP1iQ_81eRUVIUZNQerUihAeSWaTbqR1NzLPIcSqzwY8Vx3UWSMzn81oISmradd83ibWnDpKcf3m0ucXTOqy1Nf5QrXQGMQ5oxDQye-GMbYA_egtdzlGCO7ZlbMg2Go0qwi0BPcZHpH7MS9Cd4XQfY8cNueudPbwD_wtyz/s320/image%20(16).webp',
+            category: 'WORKFLOW',
+            title: 'Stay organized from inquiry to follow-up'
+          },
+          {
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhngTR2PdwGNsbqWfcYeys1VueaJnXPMxAP_HddEbm9_0hovwbXHtcpvYFKTm6O5XyVkQA7CzwrprZnhw801GuxYa3rU00L-fvptf4Fz_RTVNClMkUtonP-02eE53c4qcX88_xux8oHXnTjh0RIDJ-6m1y6UOrxFxYhwDW0bZpaeePK-IA3pFFXWvrUIU8s/s320/image%20(14).webp',
+            category: 'CRM',
+            title: 'All lead context in one command center'
+          },
+          {
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEi3PfScU4mNCfuh2GZwML64cHH2FnC-YKJJWySY8JuKSxgM4nh5oRzYmBWmG99vw25ltzW6mM8TOTnc7jZEgYM0R2bPKcysD3SbTFKXmukopF5mmLOH5fMx8H-X_0ZMu5JejkHbrJMe9oDP1nWQ1zMMHhkX3xICg3erJjvwQQtloybCJQbiaftespj8mNYv/s320/image%20(10).webp',
+            category: 'SPEED',
+            title: 'Act faster with cleaner lead data'
+          },
+          {
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh-6yyH4q_xbd0MXJyqr5v-qlp9sTNJwWtuTGZqSM1g3NmyLuMGTshyphenhyphenOlGWsdZBn7sC4jK7-c2bLa_EniNXh9YDIPdEMXRDGPUzOqcozCUFEnWCtOndrTSzrkjG9Q0FoLhyIuH_RIKhDGi4zY4G0D45iYnQM3mz-2jGd3Zlu23YPnaxG6COSM-REkO2Kw3S/s320/image%20(12).webp',
+            category: 'CONSISTENCY',
+            title: 'Professional intake experience every time'
           }
         ]}
       />

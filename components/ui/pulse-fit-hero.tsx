@@ -107,7 +107,7 @@ export function PulseFitHero({
       {children ? (
         <div className="relative z-10 flex-1 flex items-center justify-center w-full">{children}</div>
       ) : (
-        <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4">
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 pt-10 md:pt-16">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
