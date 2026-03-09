@@ -5,9 +5,6 @@ import { motion } from "framer-motion";
 import * as Accordion from "@radix-ui/react-accordion";
 import { Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useGSAP } from "@gsap/react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 interface FAQItem {
   id: number;
@@ -62,49 +59,10 @@ export default function ScrollFAQAccordion({
   answerClassName,
 }: ScrollFAQAccordionProps) {
   const [openItem, setOpenItem] = React.useState<string | null>(null);
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const contentRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
-
-  React.useEffect(() => {
-    if (typeof window !== "undefined") {
-      gsap.registerPlugin(ScrollTrigger);
-    }
-  }, []);
-
-  useGSAP(() => {
-    if (!containerRef.current || data.length === 0) return;
-
-    ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
-
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: containerRef.current,
-        start: "top top",
-        end: `+=${data.length * 200}`,
-        scrub: 0.3,
-        pin: true,
-        markers: false,
-      },
-    });
-
-    data.forEach((item, index) => {
-      const contentRef = contentRefs.current.get(item.id.toString());
-      if (contentRef) {
-        tl.add(() => {
-          setOpenItem(item.id.toString());
-        }, index * 2);
-      }
-    });
-
-    return () => {
-      ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
-    };
-  }, [data]);
 
   return (
     <div
-      ref={containerRef}
-      className={cn("max-w-4xl mx-auto text-center py-16 h-[300vh]", className)}
+      className={cn("max-w-4xl mx-auto text-center py-16", className)}
     >
       <h2 className="text-3xl font-semibold tracking-tight mb-2 text-foreground">
         Frequently Asked Questions
@@ -168,9 +126,6 @@ export default function ScrollFAQAccordion({
 
             <Accordion.Content asChild forceMount>
               <motion.div
-                ref={(el) => {
-                  if (el) contentRefs.current.set(item.id.toString(), el);
-                }}
                 initial="collapsed"
                 animate={openItem === item.id.toString() ? "open" : "collapsed"}
                 variants={{

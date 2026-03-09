@@ -77,14 +77,6 @@ const howItWorks = [
   }
 ];
 
-const marqueeQuotes = [
-  '"Feels way cleaner than managing renter leads in DMs."',
-  '"I can finally tell who to follow up with first."',
-  '"The intake flow makes me look organized right away."',
-  '"Simple on purpose. That\'s exactly what I needed."',
-  '"I open one view and know what to do next."'
-];
-
 const faqs = [
   {
     q: 'What is Chippi?',
@@ -319,28 +311,6 @@ export default function HomePage() {
                 <h3 className="mt-4 font-semibold">{card.title}</h3>
                 <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{card.description}</p>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials marquee */}
-      <section id="testimonials" className="py-20 px-0 border-t border-border overflow-hidden">
-        <div className="max-w-5xl mx-auto px-6 mb-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Early feedback</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">What agents are saying.</h2>
-        </div>
-        <div className="marquee-track">
-          <div className="marquee-content">
-            {[...marqueeQuotes, ...marqueeQuotes].map((quote, i) => (
-              <button
-                key={`${quote}-${i}`}
-                type="button"
-                onClick={() => onTrack('testimonial_interaction', { index: String(i) })}
-                className="rounded-full border border-border bg-card px-5 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors whitespace-nowrap shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
-              >
-                {quote}
-              </button>
             ))}
           </div>
         </div>
