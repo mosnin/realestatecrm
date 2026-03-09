@@ -17,10 +17,10 @@ function isLegacySpaceSettingFieldError(error: unknown) {
 export default async function PublicApplyPage({
   params,
 }: {
-  params: Promise<{ subdomain: string }>;
+  params: Promise<{ slug: string }>;
 }) {
-  const { subdomain } = await params;
-  const space = await getSpaceFromSubdomain(subdomain);
+  const { slug } = await params;
+  const space = await getSpaceFromSubdomain(slug);
   if (!space) notFound();
 
   let settings: { intakePageTitle?: string | null; intakePageIntro?: string | null } | null = null;
@@ -41,7 +41,7 @@ export default async function PublicApplyPage({
 
   return (
     <ApplicationForm
-      subdomain={subdomain}
+      subdomain={slug}
       spaceName={space.name}
       pageTitle={pageTitle}
       pageIntro={pageIntro}
