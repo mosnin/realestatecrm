@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { db } from '@/lib/db';
 import { getSpaceFromSubdomain } from '@/lib/space';
 import { ApplicationForm } from './application-form';
 
@@ -11,14 +12,22 @@ export default async function PublicApplyPage({
   const space = await getSpaceFromSubdomain(subdomain);
   if (!space) notFound();
 
+  const settings = await db.spaceSetting.findUnique({
+    where: { spaceId: space.id },
+    select: { intakePageTitle: true, intakePageIntro: true }
+  });
+
+  const pageTitle = settings?.intakePageTitle || `Apply with ${space.name}`;
+  const pageIntro =
+    settings?.intakePageIntro ||
+    "Share your rental preferences and we'll follow up with next steps.";
+
   return (
     <div className="min-h-screen bg-background px-4 py-12">
       <div className="max-w-xl mx-auto space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold">Apply with {space.name}</h1>
-          <p className="text-muted-foreground mt-2">
-            Share your rental preferences and we&apos;ll follow up with next steps.
-          </p>
+          <h1 className="text-3xl font-bold">{pageTitle}</h1>
+          <p className="text-muted-foreground mt-2">{pageIntro}</p>
         </div>
         <ApplicationForm subdomain={subdomain} />
       </div>

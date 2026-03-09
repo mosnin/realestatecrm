@@ -7,14 +7,17 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  clerkId   String   @unique
-  email     String   @unique
-  name      String?
-  avatar    String?
-  bio       String?
-  createdAt DateTime @default(now())
-  space     Space?
+  id                    String    @id @default(cuid())
+  clerkId               String    @unique
+  email                 String    @unique
+  name                  String?
+  avatar                String?
+  bio                   String?
+  createdAt             DateTime  @default(now())
+  onboardingCurrentStep Int       @default(1)
+  onboardingStartedAt   DateTime?
+  onboardingCompletedAt DateTime?
+  space                 Space?
 }
 
 model Space {
@@ -44,6 +47,9 @@ model SpaceSetting {
   aiPersonalization String?
   billingSettings   String?
   anthropicApiKey   String?
+  businessName      String?
+  intakePageTitle   String?
+  intakePageIntro   String?
 }
 
 model Contact {

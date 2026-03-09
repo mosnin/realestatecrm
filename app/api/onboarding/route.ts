@@ -1,0 +1,228 @@
+import { auth, currentUser } from '@clerk/nextjs/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+
+export async function GET() {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const user = await db.user.findUnique({
+    where: { clerkId: userId },
+    include: {
+      space: {
+        include: { settings: true }
+      }
+    }
+  });
+
+  if (!user) {
+    return NextResponse.json({ step: 1, completed: false, user: null, space: null });
+  }
+
+  return NextResponse.json({
+    step: user.onboardingCurrentStep,
+    completed: !!user.onboardingCompletedAt,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      onboardingStartedAt: user.onboardingStartedAt,
+      onboardingCompletedAt: user.onboardingCompletedAt
+    },
+    space: user.space
+      ? {
+          id: user.space.id,
+          subdomain: user.space.subdomain,
+          name: user.space.name,
+          settings: user.space.settings
+        }
+      : null
+  });
+}
+
+export async function POST(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const body = await req.json();
+  const { action } = body;
+
+  // Ensure user record exists
+  const clerkUser = await currentUser();
+  const user = await db.user.upsert({
+    where: { clerkId: userId },
+    update: {},
+    create: {
+      clerkId: userId,
+      email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
+      name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
+      onboardingStartedAt: new Date()
+    },
+    include: { space: { include: { settings: true } } }
+  });
+
+  if (action === 'start') {
+    await db.user.update({
+      where: { id: user.id },
+      data: {
+        onboardingCurrentStep: 1,
+        onboardingStartedAt: user.onboardingStartedAt ?? new Date()
+      }
+    });
+    return NextResponse.json({ success: true });
+  }
+
+  if (action === 'save_step') {
+    const { step } = body;
+    await db.user.update({
+      where: { id: user.id },
+      data: {
+        onboardingCurrentStep: step,
+        onboardingStartedAt: user.onboardingStartedAt ?? new Date()
+      }
+    });
+    return NextResponse.json({ success: true });
+  }
+
+  if (action === 'save_profile') {
+    const { name, phoneNumber, businessName } = body;
+
+    await db.user.update({
+      where: { id: user.id },
+      data: { name: name || user.name }
+    });
+
+    if (user.space) {
+      await db.spaceSetting.upsert({
+        where: { spaceId: user.space.id },
+        update: { phoneNumber, businessName },
+        create: { spaceId: user.space.id, phoneNumber, businessName }
+      });
+    }
+
+    return NextResponse.json({ success: true });
+  }
+
+  if (action === 'create_space') {
+    const { subdomain, intakePageTitle, intakePageIntro, businessName } = body;
+
+    if (!subdomain) {
+      return NextResponse.json({ error: 'Subdomain is required' }, { status: 400 });
+    }
+
+    const sanitized = subdomain.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (sanitized !== subdomain) {
+      return NextResponse.json(
+        { error: 'Only lowercase letters, numbers, and hyphens allowed' },
+        { status: 400 }
+      );
+    }
+
+    const existing = await db.space.findUnique({
+      where: { subdomain: sanitized },
+      select: { id: true }
+    });
+    if (existing) {
+      return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
+    }
+
+    if (user.space) {
+      // Space already created — just update settings
+      await db.spaceSetting.upsert({
+        where: { spaceId: user.space.id },
+        update: { intakePageTitle, intakePageIntro, businessName },
+        create: { spaceId: user.space.id, intakePageTitle, intakePageIntro, businessName }
+      });
+      return NextResponse.json({ success: true, subdomain: user.space.subdomain });
+    }
+
+    const DEFAULT_STAGES = [
+      { name: 'New', color: '#94a3b8', position: 0 },
+      { name: 'Reviewing', color: '#60a5fa', position: 1 },
+      { name: 'Showing', color: '#a78bfa', position: 2 },
+      { name: 'Applied', color: '#f59e0b', position: 3 },
+      { name: 'Approved', color: '#22c55e', position: 4 },
+      { name: 'Declined', color: '#ef4444', position: 5 }
+    ];
+
+    const space = await db.space.create({
+      data: {
+        subdomain: sanitized,
+        name: businessName || sanitized,
+        emoji: '🏠',
+        ownerId: user.id,
+        settings: {
+          create: {
+            intakePageTitle: intakePageTitle || 'Rental Application',
+            intakePageIntro:
+              intakePageIntro ||
+              "Share a few details so I can review your rental fit faster.",
+            businessName,
+            phoneNumber: null
+          }
+        },
+        stages: { create: DEFAULT_STAGES }
+      }
+    });
+
+    await db.user.update({
+      where: { id: user.id },
+      data: { onboardingCurrentStep: 4 }
+    });
+
+    return NextResponse.json({ success: true, subdomain: space.subdomain });
+  }
+
+  if (action === 'save_notifications') {
+    const { emailNotifications, defaultSubmissionStatus } = body;
+
+    if (!user.space) {
+      return NextResponse.json({ error: 'No space found' }, { status: 400 });
+    }
+
+    await db.spaceSetting.upsert({
+      where: { spaceId: user.space.id },
+      update: { notifications: emailNotifications },
+      create: { spaceId: user.space.id, notifications: emailNotifications }
+    });
+
+    // Store default submission status in myConnections JSON field for now
+    await db.spaceSetting.update({
+      where: { spaceId: user.space.id },
+      data: {
+        myConnections: JSON.stringify({
+          defaultSubmissionStatus: defaultSubmissionStatus || 'New'
+        })
+      }
+    });
+
+    return NextResponse.json({ success: true });
+  }
+
+  if (action === 'complete') {
+    await db.user.update({
+      where: { id: user.id },
+      data: {
+        onboardingCurrentStep: 7,
+        onboardingCompletedAt: new Date()
+      }
+    });
+    return NextResponse.json({ success: true });
+  }
+
+  if (action === 'check_slug') {
+    const { slug } = body;
+    if (!slug) return NextResponse.json({ available: false });
+    const sanitized = slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (sanitized !== slug || slug.length < 3) {
+      return NextResponse.json({ available: false, reason: 'invalid' });
+    }
+    const existing = await db.space.findUnique({
+      where: { subdomain: sanitized },
+      select: { id: true }
+    });
+    return NextResponse.json({ available: !existing });
+  }
+
+  return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+}

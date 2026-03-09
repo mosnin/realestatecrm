@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSubdomain } from '@/lib/space';
 import { Sidebar } from '@/components/dashboard/sidebar';
@@ -18,6 +18,15 @@ export default async function DashboardLayout({
 
   if (!userId) {
     return null; // Middleware handles redirect
+  }
+
+  // Gate dashboard access until onboarding is complete
+  const dbUser = await db.user.findUnique({
+    where: { clerkId: userId },
+    select: { onboardingCompletedAt: true }
+  });
+  if (!dbUser?.onboardingCompletedAt) {
+    redirect('/onboarding');
   }
 
   const space = await getSpaceFromSubdomain(subdomain);
