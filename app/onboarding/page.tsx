@@ -16,6 +16,7 @@ type DbUser = {
     settings: Record<string, unknown> | null;
   } | null;
   onboardingCurrentStep?: number;
+  onboarded?: boolean;
   onboardingStartedAt?: Date | null;
   onboardingCompletedAt?: Date | null;
 };
@@ -49,7 +50,7 @@ export default async function OnboardingPage() {
   }
 
   // If user has already completed onboarding, redirect to dashboard
-  if ((dbUser as any)?.onboardingCompletedAt && dbUser.space) {
+  if (((dbUser as any)?.onboarded || (dbUser as any)?.onboardingCompletedAt) && dbUser.space) {
     redirect(`/s/${dbUser.space.subdomain}`);
   }
 
@@ -82,7 +83,7 @@ export default async function OnboardingPage() {
 
   const initialState = {
     step: (dbUser as any)?.onboardingCurrentStep ?? 1,
-    completed: !!(dbUser as any)?.onboardingCompletedAt,
+    completed: !!((dbUser as any)?.onboarded || (dbUser as any)?.onboardingCompletedAt),
     user: {
       id: dbUser?.id ?? '',
       name: dbUser?.name ?? null,

@@ -34,6 +34,7 @@ function isLegacySpaceSettingShapeError(error: unknown) {
 function isPrismaUnknownOnboardingFieldError(error: unknown) {
   if (!(error instanceof Error)) return false;
   return [
+    'Unknown argument `onboarded`',
     'Unknown argument `onboardingCurrentStep`',
     'Unknown argument `onboardingStartedAt`',
     'Unknown argument `onboardingCompletedAt`'
@@ -84,7 +85,7 @@ export async function GET() {
 
     return NextResponse.json({
       step: (user as any).onboardingCurrentStep ?? 1,
-      completed: !!(user as any).onboardingCompletedAt,
+      completed: !!((user as any).onboarded || (user as any).onboardingCompletedAt),
       user: {
         id: user.id,
         name: user.name,
@@ -326,6 +327,7 @@ export async function POST(req: NextRequest) {
 
     if (action === 'complete') {
       await updateOnboardingUserFields(user.id, {
+        onboarded: true,
         onboardingCurrentStep: 7,
         onboardingCompletedAt: new Date()
       });

@@ -14,6 +14,7 @@ model User {
   avatar                String?
   bio                   String?
   createdAt             DateTime  @default(now())
+  onboarded             Boolean   @default(false)
   onboardingCurrentStep Int       @default(1)
   onboardingStartedAt   DateTime?
   onboardingCompletedAt DateTime?
