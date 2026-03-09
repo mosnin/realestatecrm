@@ -113,12 +113,29 @@ export default function HomePage() {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <div className="min-h-screen bg-background text-foreground scroll-smooth">
-      <header className="sticky top-0 z-50 border-b border-border/80 bg-background/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+    <div className="min-h-screen bg-background text-foreground scroll-smooth relative overflow-x-hidden">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(ellipse_at_top,rgba(20,184,166,0.14),transparent_60%)]" />
+
+      <header className="sticky top-0 z-50 border-b border-border/80 bg-background/75 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+        <div className="max-w-7xl mx-auto px-6 h-16 grid grid-cols-[auto_1fr_auto] items-center gap-6">
           <Link href="/" className="flex items-center gap-2.5">
             <BrandLogo className="h-7" alt="Chippi" />
           </Link>
+
+          <nav className="hidden lg:flex justify-center">
+            <div className="inline-flex items-center gap-1 rounded-full border border-border bg-background/70 p-1.5 shadow-sm">
+              {pillNav.map((item) => (
+                <a
+                  key={item.id}
+                  href={`#${item.id}`}
+                  onClick={() => onTrack('pill_nav_click', { section: item.id, source: 'header_pill_menu' })}
+                  className="whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface transition-all"
+                >
+                  {item.label}
+                </a>
+              ))}
+            </div>
+          </nav>
 
           <div className="flex items-center gap-3">
             <button
@@ -146,7 +163,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="pt-20 md:pt-24 pb-12 px-6">
+      <section className="pt-20 md:pt-24 pb-12 px-6 relative">
         <div className="max-w-5xl mx-auto text-center space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-surface text-xs text-muted-foreground">
             <CircleDashed size={12} className="text-primary" />
@@ -175,28 +192,24 @@ export default function HomePage() {
               See how it works
             </a>
           </div>
+
+          <div className="mt-10 grid sm:grid-cols-3 gap-3 text-left max-w-4xl mx-auto">
+            {[
+              { label: 'One intake link', tone: 'text-primary' },
+              { label: 'Structured qualification', tone: 'text-lead-cold' },
+              { label: 'Practical lead scoring', tone: 'text-lead-warm' }
+            ].map((item) => (
+              <div key={item.label} className="rounded-xl border border-border bg-card/90 p-4 shadow-[0_12px_30px_-22px_rgba(17,24,39,0.45)]">
+                <p className={`text-xs font-semibold uppercase tracking-wide ${item.tone}`}>{item.label}</p>
+                <p className="mt-2 text-xs text-muted-foreground">Built for leasing speed, clarity, and cleaner daily execution.</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      <div className="sticky top-16 z-40 px-6 pb-8">
-        <nav className="max-w-5xl mx-auto overflow-x-auto no-scrollbar">
-          <div className="inline-flex gap-2 p-2 rounded-full border border-border bg-background/70 backdrop-blur-md">
-            {pillNav.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                onClick={() => onTrack('pill_nav_click', { section: item.id, source: 'pill_menu' })}
-                className="whitespace-nowrap rounded-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-surface transition-all"
-              >
-                {item.label}
-              </a>
-            ))}
-          </div>
-        </nav>
-      </div>
-
       <section id="problem" className="py-16 px-6 border-t border-border">
-        <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8 items-start">
+        <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8 items-start rounded-2xl border border-border bg-card p-8 shadow-[0_20px_50px_-40px_rgba(17,24,39,0.45)]">
           <div>
             <p className="text-sm text-primary font-medium">The problem</p>
             <h2 className="mt-2 text-3xl font-semibold tracking-tight">
@@ -212,14 +225,14 @@ export default function HomePage() {
       </section>
 
       <section id="solution" className="py-16 px-6">
-        <div className="max-w-5xl mx-auto rounded-2xl border border-border bg-card p-8 md:p-10">
+        <div className="max-w-5xl mx-auto rounded-2xl border border-border bg-card p-8 md:p-10 shadow-[0_20px_50px_-40px_rgba(17,24,39,0.45)]">
           <p className="text-sm text-primary font-medium">The solution</p>
           <h2 className="mt-2 text-3xl font-semibold tracking-tight">One clean place to capture, qualify, and organize leasing leads.</h2>
           <div className="mt-6 grid md:grid-cols-2 gap-4 text-sm text-muted-foreground">
-            <div className="rounded-xl border border-border bg-surface p-4">One link intake</div>
-            <div className="rounded-xl border border-border bg-surface p-4">Structured qualification</div>
-            <div className="rounded-xl border border-border bg-surface p-4">Lightweight CRM clarity</div>
-            <div className="rounded-xl border border-border bg-surface p-4">Practical AI assistance</div>
+            <div className="rounded-xl border border-border bg-surface p-4 hover:-translate-y-0.5 transition-transform">One link intake</div>
+            <div className="rounded-xl border border-border bg-surface p-4 hover:-translate-y-0.5 transition-transform">Structured qualification</div>
+            <div className="rounded-xl border border-border bg-surface p-4 hover:-translate-y-0.5 transition-transform">Lightweight CRM clarity</div>
+            <div className="rounded-xl border border-border bg-surface p-4 hover:-translate-y-0.5 transition-transform">Practical AI assistance</div>
           </div>
         </div>
       </section>
@@ -306,7 +319,7 @@ export default function HomePage() {
       </section>
 
       <section id="pricing" className="py-16 px-6 border-t border-border">
-        <div className="max-w-3xl mx-auto rounded-2xl border border-border bg-card p-8 text-center">
+        <div className="max-w-3xl mx-auto rounded-2xl border border-border bg-card p-8 text-center shadow-[0_24px_60px_-45px_rgba(20,184,166,0.65)]">
           <p className="text-sm text-primary font-medium">Pricing</p>
           <h2 className="mt-2 text-3xl font-semibold tracking-tight">One simple plan</h2>
           <p className="mt-4 text-muted-foreground">
@@ -369,7 +382,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      <footer className="border-t border-border bg-surface/70">
+      <footer className="border-t border-border bg-surface/70 relative">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-primary/10 to-transparent" />
         <div className="max-w-6xl mx-auto px-6 py-14">
           <div className="rounded-2xl border border-border bg-background p-8 md:p-10">
             <div className="grid md:grid-cols-[1.5fr_1fr_1fr_1fr] gap-10">
