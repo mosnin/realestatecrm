@@ -3,6 +3,17 @@ import { db } from '@/lib/db';
 import { getSpaceFromSubdomain } from '@/lib/space';
 import { ApplicationForm } from './application-form';
 
+function isLegacySpaceSettingFieldError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return [
+    'Unknown argument `intakePageTitle`',
+    'Unknown argument `intakePageIntro`',
+    'Unknown field `intakePageTitle`',
+    'Unknown field `intakePageIntro`',
+    'does not exist in the current database'
+  ].some((snippet) => error.message.includes(snippet));
+}
+
 export default async function PublicApplyPage({
   params,
 }: {
@@ -12,10 +23,17 @@ export default async function PublicApplyPage({
   const space = await getSpaceFromSubdomain(subdomain);
   if (!space) notFound();
 
-  const settings = await db.spaceSetting.findUnique({
-    where: { spaceId: space.id },
-    select: { intakePageTitle: true, intakePageIntro: true }
-  });
+  let settings: { intakePageTitle?: string | null; intakePageIntro?: string | null } | null = null;
+  try {
+    settings = await db.spaceSetting.findUnique({
+      where: { spaceId: space.id },
+      select: { intakePageTitle: true, intakePageIntro: true }
+    });
+  } catch (error) {
+    if (!isLegacySpaceSettingFieldError(error)) throw error;
+    // Legacy Prisma/schema shape: fall back to default apply-page copy.
+    settings = null;
+  }
 
   const pageTitle = settings?.intakePageTitle || `Apply with ${space.name}`;
   const pageIntro =
