@@ -11,8 +11,13 @@ model User {
   clerkId   String   @unique
   email     String   @unique
   name      String?
+  phone     String?
+  businessName String?
   avatar    String?
   bio       String?
+  onboardingStartedAt DateTime?
+  onboardingCompletedAt DateTime?
+  onboardingCurrentStep Int @default(1)
   createdAt DateTime @default(now())
   space     Space?
 }
@@ -22,6 +27,8 @@ model Space {
   subdomain String   @unique
   name      String
   emoji     String
+  intakeDisplayTitle String?
+  intakeIntroLine String?
   createdAt DateTime @default(now())
   ownerId   String   @unique
   owner     User     @relation(fields: [ownerId], references: [id])
