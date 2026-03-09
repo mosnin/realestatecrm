@@ -2,82 +2,123 @@
 
 import Link from 'next/link';
 import {
-  Users,
-  Briefcase,
-  Bot,
-  Shield,
-  Zap,
-  BarChart3,
   ArrowRight,
-  Star,
+  Bot,
   CheckCircle2,
-  Sun,
+  CircleDashed,
+  ClipboardList,
+  Gauge,
+  Link2,
+  MessageSquareMore,
   Moon,
+  Sparkles,
+  Sun,
 } from 'lucide-react';
+import { track } from '@vercel/analytics';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 
-const features = [
+const pillNav = [
+  { id: 'problem', label: 'Problem' },
+  { id: 'solution', label: 'Solution' },
+  { id: 'how-it-works', label: 'How it works' },
+  { id: 'proof', label: 'Product proof' },
+  { id: 'pricing', label: 'Pricing' },
+  { id: 'faq', label: 'FAQ' }
+];
+
+const proofCards = [
   {
-    icon: Users,
-    title: 'Client Pipeline',
+    icon: Link2,
+    title: 'One intake link',
     description:
-      'Track every client from qualification through tour to application. Never lose a lead again.'
+      'Share one clean link in your bio, email, or listing replies. Every renter inquiry starts in the same place.'
   },
   {
-    icon: Briefcase,
-    title: 'Deal Management',
+    icon: ClipboardList,
+    title: 'Structured qualification',
     description:
-      'Kanban boards, deal stages, priorities, and values. See your entire pipeline at a glance.'
+      'Capture budget, move-in date, neighborhoods, household details, and deal blockers in a guided flow.'
   },
   {
-    icon: Bot,
-    title: 'AI Assistant',
+    icon: Gauge,
+    title: 'Practical AI scoring',
     description:
-      'Get instant insights about your pipeline, draft follow-ups, and surface the deals that need attention.'
+      'Get assistive lead priority with context so you know who to call first and why.'
   },
   {
-    icon: BarChart3,
-    title: 'Pipeline Analytics',
+    icon: MessageSquareMore,
+    title: 'Faster follow up',
     description:
-      'Real-time metrics on deal volume, conversion rates, and revenue forecasting across every stage.'
-  },
-  {
-    icon: Shield,
-    title: 'Secure Workspaces',
-    description:
-      'Isolated workspaces for your brokerage. Each agent gets their own environment with full data privacy.'
-  },
-  {
-    icon: Zap,
-    title: 'Built for Speed',
-    description:
-      'Instant search, keyboard shortcuts, and a snappy interface. No loading spinners, no waiting.'
+      'Review qualified records in one lightweight command center instead of piecing together DMs and notes.'
   }
 ];
 
-const stats = [
-  { value: '3x', label: 'Faster deal closing' },
-  { value: '40%', label: 'More client touchpoints' },
-  { value: '2hrs', label: 'Saved per day on admin' },
-  { value: '99.9%', label: 'Uptime guaranteed' }
+const marqueeQuotes = [
+  '“Feels way cleaner than managing renter leads in DMs.”',
+  '“I can finally tell who to follow up with first.”',
+  '“The intake flow makes me look organized right away.”',
+  '“Simple on purpose. That’s exactly what I needed.”',
+  '“I open one view and know what to do next.”'
 ];
+
+const faqs = [
+  {
+    q: 'What is Chippi?',
+    a: 'Chippi is a leasing lead workflow for solo realtors. It helps you capture renter inquiries, qualify them in a structured way, and follow up faster from one clear view.'
+  },
+  {
+    q: 'Who is Chippi for?',
+    a: 'Chippi is built for agents handling renter and leasing leads who want a cleaner daily workflow without a bloated CRM setup.'
+  },
+  {
+    q: 'How does the intake link work?',
+    a: 'You share one intake link. Renters submit details through a guided flow, and each submission becomes a structured lead record in Chippi.'
+  },
+  {
+    q: 'What does AI scoring actually do?',
+    a: 'It helps prioritize lead follow-up by reviewing submitted context and surfacing a practical score. It is assistive, not autopilot.'
+  },
+  {
+    q: 'Do I need to replace my current CRM?',
+    a: 'No. Many agents start Chippi as a leasing command center first, then decide what to sync or keep elsewhere.'
+  },
+  {
+    q: 'How fast can I get set up?',
+    a: 'Most agents can get their intake link live in minutes and start collecting structured renter data the same day.'
+  },
+  {
+    q: 'What happens after a renter submits the form?',
+    a: 'You get a lead record with qualification context, status visibility, and clear next actions for follow-up.'
+  },
+  {
+    q: 'Can I review why a lead was scored a certain way?',
+    a: 'Yes. Chippi keeps the supporting context visible so prioritization is understandable and practical.'
+  },
+  {
+    q: 'How much does Chippi cost?',
+    a: 'Chippi is $97 per month on one simple plan.'
+  },
+  {
+    q: 'Is there a free trial?',
+    a: 'Yes. Every account starts with a 7-day free trial so you can test the workflow before paying.'
+  }
+];
+
+function onTrack(name: string, props?: Record<string, string>) {
+  track(name, props);
+}
 
 export default function HomePage() {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/80 bg-background/80 backdrop-blur-xl">
+    <div className="min-h-screen bg-background text-foreground scroll-smooth">
+      <header className="sticky top-0 z-50 border-b border-border/80 bg-background/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
             <BrandLogo className="h-7" alt="Chippi" />
           </Link>
-
-          <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
-            <a href="#features" className="hover:text-foreground transition-colors">Features</a>
-            <a href="#testimonials" className="hover:text-foreground transition-colors">Testimonials</a>
-          </nav>
 
           <div className="flex items-center gap-3">
             <button
@@ -88,92 +129,300 @@ export default function HomePage() {
             >
               {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Log in</Link>
-            <Link href="/sign-up" className="text-sm bg-primary text-primary-foreground px-4 py-2 rounded-full font-medium hover:opacity-90 transition-colors">Get started</Link>
+            <Link
+              href="/sign-in"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/sign-up"
+              onClick={() => onTrack('hero_cta_click', { location: 'header' })}
+              className="text-sm bg-primary text-primary-foreground px-4 py-2 rounded-full font-medium hover:opacity-90 transition-colors"
+            >
+              Start free trial
+            </Link>
           </div>
         </div>
       </header>
 
-      <section className="pt-40 pb-24 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-surface text-xs text-muted-foreground mb-8">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Now in public beta
+      <section className="pt-20 md:pt-24 pb-12 px-6">
+        <div className="max-w-5xl mx-auto text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-surface text-xs text-muted-foreground">
+            <CircleDashed size={12} className="text-primary" />
+            Leasing-first workflow for solo realtors
           </div>
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.08]">
-            Close more deals.<br />
-            <span className="text-muted-foreground">Spend less time on admin.</span>
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.08]">
+            Qualify leasing leads without the chaos
           </h1>
-          <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            The CRM built for real estate agents who want to focus on selling,
-            not spreadsheets. AI-powered pipeline management that actually helps
-            you close.
+          <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
+            Chippi helps realtors capture, qualify, and organize leasing leads from one clean workflow,
+            so follow up is faster, clearer, and more professional.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link
+              href="/sign-up"
+              onClick={() => onTrack('hero_cta_click', { location: 'hero' })}
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3 rounded-full font-medium hover:opacity-90 transition-colors"
+            >
+              Start free trial <ArrowRight size={16} />
+            </Link>
+            <a
+              href="#how-it-works"
+              onClick={() => onTrack('pill_nav_click', { section: 'how-it-works', source: 'hero' })}
+              className="px-8 py-3 rounded-full font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
+            >
+              See how it works
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <div className="sticky top-16 z-40 px-6 pb-8">
+        <nav className="max-w-5xl mx-auto overflow-x-auto no-scrollbar">
+          <div className="inline-flex gap-2 p-2 rounded-full border border-border bg-background/70 backdrop-blur-md">
+            {pillNav.map((item) => (
+              <a
+                key={item.id}
+                href={`#${item.id}`}
+                onClick={() => onTrack('pill_nav_click', { section: item.id, source: 'pill_menu' })}
+                className="whitespace-nowrap rounded-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-surface transition-all"
+              >
+                {item.label}
+              </a>
+            ))}
+          </div>
+        </nav>
+      </div>
+
+      <section id="problem" className="py-16 px-6 border-t border-border">
+        <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8 items-start">
+          <div>
+            <p className="text-sm text-primary font-medium">The problem</p>
+            <h2 className="mt-2 text-3xl font-semibold tracking-tight">
+              Leasing inquiries move fast. Most workflows don&apos;t.
+            </h2>
+          </div>
+          <p className="text-muted-foreground leading-relaxed">
+            Leads arrive through DMs, listing sites, texts, and forms. Important context gets lost, follow-up
+            order gets fuzzy, and every day starts with cleanup. Chippi gives you one clean intake path and one
+            command center so you can act faster with less manual chaos.
           </p>
         </div>
       </section>
 
-      <section className="border-y border-border bg-surface/80">
-        <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-2 md:grid-cols-4 gap-8">
-          {stats.map((stat) => (
-            <div key={stat.label} className="text-center">
-              <div className="text-3xl md:text-4xl font-bold tracking-tight">{stat.value}</div>
-              <div className="mt-1 text-sm text-muted-foreground">{stat.label}</div>
+      <section id="solution" className="py-16 px-6">
+        <div className="max-w-5xl mx-auto rounded-2xl border border-border bg-card p-8 md:p-10">
+          <p className="text-sm text-primary font-medium">The solution</p>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight">One clean place to capture, qualify, and organize leasing leads.</h2>
+          <div className="mt-6 grid md:grid-cols-2 gap-4 text-sm text-muted-foreground">
+            <div className="rounded-xl border border-border bg-surface p-4">One link intake</div>
+            <div className="rounded-xl border border-border bg-surface p-4">Structured qualification</div>
+            <div className="rounded-xl border border-border bg-surface p-4">Lightweight CRM clarity</div>
+            <div className="rounded-xl border border-border bg-surface p-4">Practical AI assistance</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="how-it-works" className="py-16 px-6 border-t border-border">
+        <div className="max-w-5xl mx-auto">
+          <p className="text-sm text-primary font-medium">How it works</p>
+          <div className="mt-4 grid md:grid-cols-4 gap-4">
+            {[
+              'Share your intake link',
+              'Capture structured renter details',
+              'Review scored leads with context',
+              'Follow up from one workflow'
+            ].map((step, idx) => (
+              <div key={step} className="rounded-xl border border-border bg-card p-5 hover:-translate-y-0.5 transition-transform">
+                <p className="text-xs text-muted-foreground">Step {idx + 1}</p>
+                <p className="mt-2 font-medium">{step}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="why" className="py-16 px-6">
+        <div className="max-w-5xl mx-auto">
+          <p className="text-sm text-primary font-medium">Why Chippi</p>
+          <div className="mt-4 grid md:grid-cols-2 gap-4 text-sm">
+            <div className="rounded-xl border border-border bg-card p-5">
+              <p className="font-medium">Not another bloated CRM</p>
+              <p className="mt-2 text-muted-foreground">Built for leasing first with practical workflows you can run daily.</p>
             </div>
-          ))}
+            <div className="rounded-xl border border-border bg-card p-5">
+              <p className="font-medium">Faster qualification</p>
+              <p className="mt-2 text-muted-foreground">Move from inquiry to prioritized action without spreadsheet cleanup.</p>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-5">
+              <p className="font-medium">Professional follow-up flow</p>
+              <p className="mt-2 text-muted-foreground">Keep context, status, and next steps in one lightweight command center.</p>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-5">
+              <p className="font-medium">Setup in minutes</p>
+              <p className="mt-2 text-muted-foreground">Get your intake link live quickly and start capturing structured leads today.</p>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section id="features" className="py-24 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Everything you need to manage your pipeline</h2>
-            <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">Purpose-built tools for real estate professionals. No bloat, no learning curve.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {features.map((feature) => (
-              <div key={feature.title} className="rounded-xl border border-border bg-card p-6 hover:bg-surface transition-colors">
-                <div className="w-10 h-10 rounded-lg bg-surface flex items-center justify-center mb-4">
-                  <feature.icon size={20} className="text-muted-foreground" />
+      <section id="proof" className="py-16 px-6 border-t border-border">
+        <div className="max-w-5xl mx-auto">
+          <p className="text-sm text-primary font-medium">Product proof</p>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight">Built for clear intake and clear action.</h2>
+          <div className="mt-6 grid md:grid-cols-2 gap-4">
+            {proofCards.map((card) => (
+              <div key={card.title} className="rounded-xl border border-border bg-card p-6">
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-surface text-primary">
+                  <card.icon size={20} />
                 </div>
-                <h3 className="text-[15px] font-semibold mb-2">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
+                <h3 className="mt-4 font-semibold">{card.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{card.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="testimonials" className="py-24 px-6 border-t border-border">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Trusted by agents who close</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {["Sarah Chen", "Marcus Rivera", "Jennifer Park"].map((name) => (
-              <div key={name} className="rounded-xl border border-border bg-card p-6">
-                <div className="flex gap-1 mb-4">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={14} className="fill-amber-400 text-amber-400" />)}</div>
-                <p className="text-sm text-muted-foreground leading-relaxed mb-6">“Finally a CRM that was built for how agents actually work.”</p>
-                <p className="text-sm font-medium">{name}</p>
-              </div>
+      <section id="testimonials" className="py-16 px-0 border-t border-border overflow-hidden">
+        <div className="max-w-5xl mx-auto px-6 mb-5">
+          <p className="text-sm text-primary font-medium">Early feedback</p>
+        </div>
+        <div className="marquee-track">
+          <div className="marquee-content">
+            {[...marqueeQuotes, ...marqueeQuotes].map((quote, i) => (
+              <button
+                key={`${quote}-${i}`}
+                type="button"
+                onClick={() => onTrack('testimonial_interaction', { index: String(i) })}
+                className="rounded-full border border-border bg-card px-5 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {quote}
+              </button>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="py-24 px-6 border-t border-border">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl md:text-5xl font-bold tracking-tight">Ready to close more deals?</h2>
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/sign-up" className="flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-full font-medium hover:opacity-90 transition-colors text-sm">
-              CREATE FREE ACCOUNT <ArrowRight size={16} />
-            </Link>
+      <section id="pricing" className="py-16 px-6 border-t border-border">
+        <div className="max-w-3xl mx-auto rounded-2xl border border-border bg-card p-8 text-center">
+          <p className="text-sm text-primary font-medium">Pricing</p>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight">One simple plan</h2>
+          <p className="mt-4 text-muted-foreground">
+            Fast leasing lead intake, qualification, and follow-up in one workflow.
+          </p>
+          <div className="mt-6">
+            <span className="text-5xl font-bold">$97</span>
+            <span className="text-muted-foreground"> / month</span>
           </div>
-          <div className="mt-6 flex items-center justify-center gap-6 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> No credit card</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Free forever plan</span>
+          <p className="mt-2 text-sm text-muted-foreground">7-day free trial. No long setup cycle.</p>
+          <Link
+            href="/sign-up"
+            onClick={() => onTrack('pricing_cta_click', { location: 'pricing' })}
+            className="mt-8 inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3 rounded-full font-medium hover:opacity-90 transition-colors"
+          >
+            Start free trial <Sparkles size={16} />
+          </Link>
+        </div>
+      </section>
+
+      <section id="faq" className="py-16 px-6 border-t border-border">
+        <div className="max-w-4xl mx-auto">
+          <p className="text-sm text-primary font-medium">FAQ</p>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight">Answers before you start</h2>
+          <div className="mt-8 space-y-3">
+            {faqs.map((item, index) => (
+              <details
+                key={item.q}
+                className="group rounded-xl border border-border bg-card p-5"
+                onToggle={(e) => {
+                  if ((e.currentTarget as HTMLDetailsElement).open) {
+                    onTrack('faq_expand', { question_index: String(index + 1) });
+                  }
+                }}
+              >
+                <summary className="cursor-pointer list-none font-medium flex items-center justify-between gap-4">
+                  <span>{item.q}</span>
+                  <span className="text-muted-foreground group-open:rotate-45 transition-transform">+</span>
+                </summary>
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{item.a}</p>
+              </details>
+            ))}
           </div>
         </div>
       </section>
+
+      <section className="py-20 px-6 border-t border-border">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl md:text-5xl font-bold tracking-tight">One link. Clear leads. Fast action.</h2>
+          <p className="mt-4 text-muted-foreground">
+            Start your free trial and feel the workflow compression in your first week.
+          </p>
+          <Link
+            href="/sign-up"
+            onClick={() => onTrack('footer_cta_click', { location: 'close_cta' })}
+            className="mt-8 inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3 rounded-full font-medium hover:opacity-90 transition-colors"
+          >
+            Start free trial <ArrowRight size={16} />
+          </Link>
+        </div>
+      </section>
+
+      <footer className="border-t border-border bg-surface/70">
+        <div className="max-w-6xl mx-auto px-6 py-14">
+          <div className="rounded-2xl border border-border bg-background p-8 md:p-10">
+            <div className="grid md:grid-cols-[1.5fr_1fr_1fr_1fr] gap-10">
+              <div>
+                <BrandLogo className="h-8" alt="Chippi" />
+                <p className="mt-4 text-sm text-muted-foreground max-w-sm">
+                  Chippi helps solo realtors handle leasing leads faster with one intake link, structured qualification, and clean follow-up workflow.
+                </p>
+                <Link
+                  href="/sign-up"
+                  onClick={() => onTrack('footer_cta_click', { location: 'footer_card' })}
+                  className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm font-medium hover:opacity-90"
+                >
+                  Start free trial
+                </Link>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold">Product</p>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  <li><a href="#solution" className="hover:text-foreground">Solution</a></li>
+                  <li><a href="#proof" className="hover:text-foreground">Product proof</a></li>
+                  <li><a href="#pricing" className="hover:text-foreground">Pricing</a></li>
+                  <li><a href="#faq" className="hover:text-foreground">FAQ</a></li>
+                </ul>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold">Company</p>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  <li><a href="#testimonials" className="hover:text-foreground">Customer feedback</a></li>
+                  <li><a href="https://x.com" target="_blank" rel="noreferrer" className="hover:text-foreground">X / Twitter</a></li>
+                  <li><a href="https://linkedin.com" target="_blank" rel="noreferrer" className="hover:text-foreground">LinkedIn</a></li>
+                </ul>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold">Legal</p>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  <li><Link href="/legal/privacy" className="hover:text-foreground">Privacy Policy</Link></li>
+                  <li><Link href="/legal/terms" className="hover:text-foreground">Terms of Service</Link></li>
+                  <li><Link href="/legal/cookies" className="hover:text-foreground">Cookie Policy</Link></li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-10 pt-6 border-t border-border text-xs text-muted-foreground flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
+              <p>© {new Date().getFullYear()} Chippi. Leasing workflow clarity for modern realtors.</p>
+              <p>Launch wedge: renter and leasing lead intake + qualification.</p>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
