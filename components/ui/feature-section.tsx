@@ -49,7 +49,7 @@ export default function FeatureSection() {
     <section className="relative w-full py-20 px-6 border-t border-border bg-background text-foreground">
       <div className="mx-auto max-w-5xl grid grid-cols-1 md:grid-cols-2 items-center gap-12">
         <div className="relative w-full max-w-md">
-          <Card className="overflow-hidden bg-card/70 backdrop-blur-sm shadow-xl rounded-xl border-border/70">
+          <Card className="overflow-hidden bg-card shadow-xl rounded-xl border-border/70">
             <CardContent className="relative h-[320px] p-0 overflow-hidden">
               <div className="relative h-full overflow-hidden">
                 <motion.div
@@ -86,8 +86,8 @@ export default function FeatureSection() {
                   ))}
                 </motion.div>
 
-                <div className="absolute top-0 left-0 w-full h-12 bg-gradient-to-b from-background via-background/80 to-transparent pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-background via-background/80 to-transparent pointer-events-none" />
+                <div className="absolute top-0 left-0 w-full h-12 bg-gradient-to-b from-card via-card/85 to-transparent pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-card via-card/85 to-transparent pointer-events-none" />
               </div>
             </CardContent>
           </Card>
