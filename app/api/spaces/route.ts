@@ -3,6 +3,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { redis } from '@/lib/redis';
 
+// GET /api/spaces?action=check_name&name=...&subdomain=...
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const action    = searchParams.get('action');
+  const name      = searchParams.get('name')?.trim();
+  const subdomain = searchParams.get('subdomain');
+
+  if (action !== 'check_name' || !name || !subdomain) {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  }
+
+  // Find any space with this name (case-insensitive), excluding the caller's own space
+  const conflict = await db.space.findFirst({
+    where: {
+      name: { equals: name, mode: 'insensitive' },
+      subdomain: { not: subdomain },
+    },
+    select: { id: true },
+  });
+
+  return NextResponse.json({ available: !conflict });
+}
+
 export async function PATCH(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -13,18 +36,30 @@ export async function PATCH(req: NextRequest) {
     emoji,
     notifications,
     phoneNumber,
-    myConnections,
     aiPersonalization,
-    billingSettings,
-    anthropicApiKey
+    anthropicApiKey,
   } = await req.json();
+
+  // Validate name uniqueness when name is being changed
+  if (name) {
+    const conflict = await db.space.findFirst({
+      where: {
+        name: { equals: String(name).trim(), mode: 'insensitive' },
+        subdomain: { not: subdomain },
+      },
+      select: { id: true },
+    });
+    if (conflict) {
+      return NextResponse.json({ error: 'That workspace name is already taken.' }, { status: 409 });
+    }
+  }
 
   const space = await db.space.update({
     where: { subdomain },
     data: {
-      name,
-      ...(emoji !== undefined ? { emoji } : {})
-    }
+      ...(name  !== undefined ? { name: String(name).trim() } : {}),
+      ...(emoji !== undefined ? { emoji } : {}),
+    },
   });
 
   await db.spaceSetting.upsert({
@@ -32,28 +67,22 @@ export async function PATCH(req: NextRequest) {
     update: {
       notifications,
       phoneNumber,
-      myConnections,
       aiPersonalization,
-      billingSettings,
-      anthropicApiKey: anthropicApiKey || null
+      anthropicApiKey: anthropicApiKey || null,
     } as any,
     create: {
       spaceId: space.id,
       notifications,
       phoneNumber,
-      myConnections,
       aiPersonalization,
-      billingSettings,
-      anthropicApiKey: anthropicApiKey || null
-    } as any
+      anthropicApiKey: anthropicApiKey || null,
+    } as any,
   });
 
-  // Update Redis emoji
+  // Keep Redis cache in sync
   const existing = await redis.get<any>(`subdomain:${subdomain}`).catch(() => null);
   if (existing) {
-    await redis
-      .set(`subdomain:${subdomain}`, { ...existing, emoji })
-      .catch(() => null);
+    await redis.set(`subdomain:${subdomain}`, { ...existing, ...(emoji !== undefined ? { emoji } : {}) }).catch(() => null);
   }
 
   return NextResponse.json(space);
