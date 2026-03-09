@@ -2,7 +2,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "prisma migrate deploy && node scripts/ensure-prisma-client-shim.cjs && next build",
+    "build": "node scripts/resolve-failed-migrations.cjs && prisma migrate deploy && node scripts/ensure-prisma-client-shim.cjs && next build",
     "postinstall": "node scripts/ensure-prisma-client-shim.cjs",
     "start": "next start"
   },
