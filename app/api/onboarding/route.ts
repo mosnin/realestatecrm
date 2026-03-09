@@ -13,6 +13,14 @@ function isPrismaMissingColumnError(error: unknown) {
   );
 }
 
+function getSafeUserEmail(userId: string, clerkEmail?: string | null) {
+  const normalized = clerkEmail?.trim();
+  if (normalized) return normalized;
+  // Clerk can return no primary email in some account states.
+  // User.email is unique in our DB, so empty-string fallbacks cause P2002 collisions.
+  return `${userId}@no-email.local`;
+}
+
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -72,12 +80,19 @@ export async function POST(req: NextRequest) {
   try {
     // Ensure user record exists
     const clerkUser = await currentUser();
+    const safeEmail = getSafeUserEmail(
+      userId,
+      clerkUser?.emailAddresses?.[0]?.emailAddress
+    );
     const user = await db.user.upsert({
       where: { clerkId: userId },
-      update: {},
+      update: {
+        email: safeEmail,
+        name: clerkUser?.fullName ?? clerkUser?.firstName ?? undefined
+      },
       create: {
         clerkId: userId,
-        email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
+        email: safeEmail,
         name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
         onboardingStartedAt: new Date()
       },
@@ -300,8 +315,9 @@ export async function POST(req: NextRequest) {
 
   } catch (err) {
     console.error('[onboarding POST] action:', action, err);
+    const message = err instanceof Error ? err.message : 'Server error. Please try again.';
     return NextResponse.json(
-      { error: 'Server error. Please try again.' },
+      { error: message },
       { status: 500 }
     );
   }

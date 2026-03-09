@@ -150,6 +150,10 @@ function StepProfile({
     try {
       await onSave({ name, phone, businessName: business });
       onNext();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to save your profile details.';
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -682,11 +686,15 @@ export function OnboardingWizard({ initialState, clerkName, clerkEmail }: Wizard
   const prefillNotifications = initialState.space?.settings?.notifications ?? true;
 
   async function saveStep(nextStep: number) {
-    await fetch('/api/onboarding', {
+    const res = await fetch('/api/onboarding', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'save_step', step: nextStep })
     });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(data.error || 'Failed to save onboarding progress');
+    }
   }
 
   async function goTo(nextStep: number) {
@@ -697,7 +705,7 @@ export function OnboardingWizard({ initialState, clerkName, clerkEmail }: Wizard
 
   async function handleProfileSave(data: { name: string; phone: string; businessName: string }) {
     setBusinessName(data.businessName);
-    await fetch('/api/onboarding', {
+    const res = await fetch('/api/onboarding', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -707,6 +715,10 @@ export function OnboardingWizard({ initialState, clerkName, clerkEmail }: Wizard
         businessName: data.businessName
       })
     });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(data.error || 'Failed to save profile');
+    }
   }
 
   async function handleCreateSpace(data: {
