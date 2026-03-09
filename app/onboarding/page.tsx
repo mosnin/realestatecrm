@@ -35,8 +35,16 @@ export default async function OnboardingPage() {
     // Migration likely pending — fall through, wizard renders empty
   }
 
-  // If user has already completed onboarding, redirect to dashboard
-  if (dbUser?.onboardingCompletedAt && dbUser.space) {
+  // Onboarding visibility depends only on onboarding completion.
+  // Workspace navigation is handled separately once completion is confirmed.
+  const onboardingCompleted = !!dbUser?.onboardingCompletedAt;
+  console.info('[onboarding-page] state read', {
+    clerkId: userId,
+    onboardingCompleted,
+    hasSpace: !!dbUser?.space
+  });
+
+  if (onboardingCompleted && dbUser?.space) {
     redirect(`/s/${dbUser.space.subdomain}`);
   }
 

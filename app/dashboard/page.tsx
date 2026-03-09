@@ -12,14 +12,25 @@ export default async function DashboardRedirectPage() {
       include: { space: true }
     });
 
-    // If onboarding is complete and space exists, go to dashboard
-    if (user?.onboardingCompletedAt && user.space) {
+    const onboardingCompleted = !!user?.onboardingCompletedAt;
+    console.info('[onboarding-guard] /dashboard read', {
+      clerkId: userId,
+      onboardingCompleted,
+      hasSpace: !!user?.space
+    });
+
+    if (!onboardingCompleted) {
+      redirect('/onboarding');
+    }
+
+    if (user?.space) {
       redirect(`/s/${user.space.subdomain}`);
     }
-  } catch {
-    // DB temporarily unavailable — fall through to onboarding
-  }
 
-  // Default: send to onboarding wizard
-  redirect('/onboarding');
+    // Completed onboarding but missing space should recover via onboarding flow.
+    redirect('/onboarding');
+  } catch (error) {
+    console.error('[onboarding-guard] /dashboard read failed', { clerkId: userId, error });
+    redirect('/onboarding');
+  }
 }

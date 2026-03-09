@@ -610,13 +610,22 @@ function StepGoLive({
 
   async function handleGoToCRM() {
     setCompleting(true);
-    await onComplete();
-    router.push(`/s/${subdomain}`);
+    try {
+      await onComplete();
+      router.push(`/s/${subdomain}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to complete onboarding.');
+      setCompleting(false);
+    }
   }
 
   async function handleTestApp() {
-    await onComplete();
-    window.open(`/apply/${subdomain}`, '_blank');
+    try {
+      await onComplete();
+      window.open(`/apply/${subdomain}`, '_blank');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to complete onboarding.');
+    }
   }
 
   return (
@@ -682,26 +691,36 @@ export function OnboardingWizard({ initialState, clerkName, clerkEmail }: Wizard
   const prefillNotifications = initialState.space?.settings?.notifications ?? true;
 
   async function saveStep(nextStep: number) {
-    await fetch('/api/onboarding', {
+    const res = await fetch('/api/onboarding', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'save_step', step: nextStep })
     });
+    if (!res.ok) {
+      throw new Error('Failed to save onboarding progress. Please try again.');
+    }
   }
 
   async function goTo(nextStep: number) {
-    await saveStep(nextStep);
-    setStep(nextStep);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      await saveStep(nextStep);
+      setStep(nextStep);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to continue onboarding.');
+    }
   }
 
   async function handleProfileSave(data: { name: string; phone: string; businessName: string }) {
     setBusinessName(data.businessName);
-    await fetch('/api/onboarding', {
+    const res = await fetch('/api/onboarding', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'save_profile', ...data })
     });
+    if (!res.ok) {
+      throw new Error('Failed to save profile details.');
+    }
   }
 
   async function handleCreateSpace(data: {
@@ -730,18 +749,29 @@ export function OnboardingWizard({ initialState, clerkName, clerkEmail }: Wizard
     emailNotifications: boolean;
     defaultSubmissionStatus: string;
   }) {
-    await fetch('/api/onboarding', {
+    const res = await fetch('/api/onboarding', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'save_notifications', ...data })
     });
+    if (!res.ok) {
+      throw new Error('Failed to save notification settings.');
+    }
   }
 
   async function handleComplete() {
-    await fetch('/api/onboarding', {
+    const res = await fetch('/api/onboarding', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'complete' })
+    });
+    if (!res.ok) {
+      throw new Error('Could not complete onboarding. Please try again.');
+    }
+
+    const payload = await res.json().catch(() => null);
+    console.info('[onboarding-client] complete acknowledged', {
+      onboardingCompletedAt: payload?.onboardingCompletedAt ?? null
     });
   }
 
