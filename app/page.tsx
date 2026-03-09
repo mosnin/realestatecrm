@@ -5,18 +5,18 @@ import {
   ArrowRight,
   Bot,
   CheckCircle2,
-  CircleDashed,
   ClipboardList,
   Gauge,
   Link2,
   MessageSquareMore,
-  Moon,
   Sparkles,
-  Sun,
 } from 'lucide-react';
 import { track } from '@vercel/analytics';
-import { useTheme } from '@/components/theme-provider';
+import { PulseFitHero } from '@/components/ui/pulse-fit-hero';
 import { BrandLogo } from '@/components/brand-logo';
+import CombinedFeaturedSection from '@/components/ui/combined-featured-section';
+import Testimonials from '@/components/ui/testimonials-columns-1';
+import ScrollFAQAccordion from '@/components/ui/scroll-faqaccordion';
 
 const pillNav = [
   { id: 'problem', label: 'Problem' },
@@ -133,115 +133,100 @@ function onTrack(name: string, props?: Record<string, string>) {
 }
 
 export default function HomePage() {
-  const { theme, toggleTheme } = useTheme();
-
   return (
     <div className="min-h-screen bg-background text-foreground scroll-smooth relative overflow-x-hidden">
       {/* Radial hero glow */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(20,184,166,0.12),transparent_70%)]" />
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 h-16 grid grid-cols-[auto_1fr_auto] items-center gap-6">
-          <Link href="/" className="flex items-center gap-2">
-            <BrandLogo className="h-7" alt="Chippi" />
-          </Link>
+      <PulseFitHero
+        logo="Chippi"
+        navigation={[
+          { label: 'Problem', onClick: () => { onTrack('pill_nav_click', { section: 'problem', source: 'hero_nav' }); window.location.hash = '#problem'; } },
+          { label: 'Solution', onClick: () => { onTrack('pill_nav_click', { section: 'solution', source: 'hero_nav' }); window.location.hash = '#solution'; } },
+          { label: 'How it works', onClick: () => { onTrack('pill_nav_click', { section: 'how-it-works', source: 'hero_nav' }); window.location.hash = '#how-it-works'; } },
+          { label: 'Pricing', onClick: () => { onTrack('pill_nav_click', { section: 'pricing', source: 'hero_nav' }); window.location.hash = '#pricing'; } },
+          { label: 'FAQ', onClick: () => { onTrack('pill_nav_click', { section: 'faq', source: 'hero_nav' }); window.location.hash = '#faq'; } }
+        ]}
+        ctaButton={{
+          label: 'Log in',
+          onClick: () => {
+            onTrack('hero_cta_click', { location: 'hero_nav_login' });
+            window.location.href = '/sign-in';
+          }
+        }}
+        title="Qualify leasing leads without the chaos"
+        subtitle="One intake link. Structured qualification. Practical AI scoring. Follow up faster from one clean workflow."
+        primaryAction={{
+          label: 'Start free trial',
+          onClick: () => {
+            onTrack('hero_cta_click', { location: 'hero' });
+            window.location.href = '/sign-up';
+          }
+        }}
+        secondaryAction={{
+          label: 'See how it works',
+          onClick: () => {
+            onTrack('pill_nav_click', { section: 'how-it-works', source: 'hero' });
+            window.location.hash = '#how-it-works';
+          }
+        }}
+        disclaimer="*7-day free trial · No credit card required"
+        socialProof={{
+          avatars: [
+            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop',
+            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop',
+            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop',
+            'https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?w=80&h=80&fit=crop'
+          ],
+          text: 'Built for modern solo realtors handling renter and leasing leads'
+        }}
+        programs={[
+          {
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhGMcGZtyL4M4bkN4ih0093zMY_rTFuC96zzFIKtfwmOWquEs3Sk-XRKpCOBGtRQ-B0Hs7Rxh5oIU2jDmnzroGPjanrMOnCJMUh-mvhVo4q41zDaWyJ2YAbRdZ5QvOb87XQCWPwWoseCUovKM4wfWAv8xMB0vJrHwEThu7hixCGPrl8Cp3wR4FlOaLqOg7J/s320/image%20(9).webp',
+            category: 'INTAKE',
+            title: 'One clean renter application link'
+          },
+          {
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjD2O0IZ0h1I9vgmeVaPXnzI_jW-QQ5F2btwiicMK3w6VOFalshOQf1fMcTcp_JoZxLgBSldtUuuzgtiX5wtgUiveo61ZhHTbTXOh4QvdWt2hh26xU_TNtGNShy50mFfd_9dOrVz3Nb4mZ80Wme1dn9piIUfmAZSoBhHLeNxTouqIlTDeudwAdhOxQACp2R/s320/image%20(20).webp',
+            category: 'QUALIFICATION',
+            title: 'Budget, timeline, and area details in one flow'
+          },
+          {
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjvxm32eiKeYuMWzVrE8ceLPgtIYxarpuF7MEQ0x7GLvXHv0R3Imatn_HB7Dp0JKBmSj-OZV1Dh7YaLICwsJcvf0NGepCD8P57GplS_D6LvtH55equqXGab5FlQ3OeEREih8cJhxk3m6CM44jJWuqJaR4RaNA9KoNhyphenhyphen-kTPOFgTO3GUz3Vob52fX_yeXwKg/w376-h503/image%20(18).webp',
+            category: 'SCORING',
+            title: 'Practical lead scoring you can explain'
+          },
+          {
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgLwJ0YL6WhcH21NDvTvwXf5QzFLnC9EswU6WJxsSkJIF-OwI0AmQOSJKdK7glFSkhj9EKVvYLnoioJYcV4Zk8pOTWiz5tnzjtokZbsg0NNLndICQYwkpC3YxNumbpb4lihz_TX1wPalludzUsnYUlVsbMlpewT7dGbidTVxejO_eOxy68KODvFyK0scsoA/w378-h506/image%20(19).webp',
+            category: 'FOLLOW-UP',
+            title: 'Triage faster from one lightweight command center'
+          },
+          {
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhiZ1tFXPwDXluFGeBqEXACxplP1iQ_81eRUVIUZNQerUihAeSWaTbqR1NzLPIcSqzwY8Vx3UWSMzn81oISmradd83ibWnDpKcf3m0ucXTOqy1Nf5QrXQGMQ5oxDQye-GMbYA_egtdzlGCO7ZlbMg2Go0qwi0BPcZHpH7MS9Cd4XQfY8cNueudPbwD_wtyz/s320/image%20(16).webp',
+            category: 'WORKFLOW',
+            title: 'Stay organized from inquiry to follow-up'
+          },
+          {
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhngTR2PdwGNsbqWfcYeys1VueaJnXPMxAP_HddEbm9_0hovwbXHtcpvYFKTm6O5XyVkQA7CzwrprZnhw801GuxYa3rU00L-fvptf4Fz_RTVNClMkUtonP-02eE53c4qcX88_xux8oHXnTjh0RIDJ-6m1y6UOrxFxYhwDW0bZpaeePK-IA3pFFXWvrUIU8s/s320/image%20(14).webp',
+            category: 'CRM',
+            title: 'All lead context in one command center'
+          },
+          {
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEi3PfScU4mNCfuh2GZwML64cHH2FnC-YKJJWySY8JuKSxgM4nh5oRzYmBWmG99vw25ltzW6mM8TOTnc7jZEgYM0R2bPKcysD3SbTFKXmukopF5mmLOH5fMx8H-X_0ZMu5JejkHbrJMe9oDP1nWQ1zMMHhkX3xICg3erJjvwQQtloybCJQbiaftespj8mNYv/s320/image%20(10).webp',
+            category: 'SPEED',
+            title: 'Act faster with cleaner lead data'
+          },
+          {
+            image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh-6yyH4q_xbd0MXJyqr5v-qlp9sTNJwWtuTGZqSM1g3NmyLuMGTshyphenhyphenOlGWsdZBn7sC4jK7-c2bLa_EniNXh9YDIPdEMXRDGPUzOqcozCUFEnWCtOndrTSzrkjG9Q0FoLhyIuH_RIKhDGi4zY4G0D45iYnQM3mz-2jGd3Zlu23YPnaxG6COSM-REkO2Kw3S/s320/image%20(12).webp',
+            category: 'CONSISTENCY',
+            title: 'Professional intake experience every time'
+          }
+        ]}
+      />
 
-          <nav className="hidden lg:flex justify-center">
-            <div className="inline-flex items-center gap-0.5 rounded-full border border-border bg-card/80 px-1.5 py-1.5 shadow-sm">
-              {pillNav.map((item) => (
-                <a
-                  key={item.id}
-                  href={`#${item.id}`}
-                  onClick={() => onTrack('pill_nav_click', { section: item.id, source: 'header_pill_menu' })}
-                  className="whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-                >
-                  {item.label}
-                </a>
-              ))}
-            </div>
-          </nav>
+      <CombinedFeaturedSection />
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
-            <Link
-              href="/sign-in"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/sign-up"
-              onClick={() => onTrack('hero_cta_click', { location: 'header' })}
-              className="text-sm bg-primary text-primary-foreground px-4 py-2 rounded-full font-semibold hover:opacity-90 transition-opacity"
-            >
-              Start free trial
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero */}
-      <section className="pt-24 md:pt-32 pb-16 px-6 relative">
-        <div className="max-w-4xl mx-auto text-center space-y-7">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-primary/25 bg-primary/5 text-xs text-primary font-medium">
-            <CircleDashed size={12} />
-            Leasing-first workflow for solo realtors
-          </div>
-
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.06]">
-            Qualify leasing leads<br className="hidden md:block" /> without the chaos
-          </h1>
-
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            One intake link. Structured qualification. Practical AI scoring.
-            Follow up faster from one clean workflow.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-            <Link
-              href="/sign-up"
-              onClick={() => onTrack('hero_cta_click', { location: 'hero' })}
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-7 py-3 rounded-full font-semibold hover:opacity-90 transition-opacity shadow-sm"
-            >
-              Start free trial <ArrowRight size={16} />
-            </Link>
-            <a
-              href="#how-it-works"
-              onClick={() => onTrack('pill_nav_click', { section: 'how-it-works', source: 'hero' })}
-              className="px-7 py-3 rounded-full font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
-            >
-              See how it works
-            </a>
-          </div>
-
-          <p className="text-xs text-muted-foreground pt-1">7-day free trial &middot; No credit card required</p>
-        </div>
-
-        {/* Hero proof chips */}
-        <div className="mt-14 grid sm:grid-cols-3 gap-3 text-left max-w-3xl mx-auto">
-          {[
-            { label: 'One intake link', sub: 'Share once. Capture every renter in one place.', accent: 'bg-primary/5 border-primary/20' },
-            { label: 'Structured qualification', sub: 'Budget, timeline, areas — collected automatically.', accent: 'bg-surface border-border' },
-            { label: 'Practical lead scoring', sub: 'AI priority with context you can actually trust.', accent: 'bg-surface border-border' }
-          ].map((item) => (
-            <div
-              key={item.label}
-              className={`rounded-xl border ${item.accent} px-4 py-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]`}
-            >
-              <p className="text-xs font-semibold text-foreground">{item.label}</p>
-              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{item.sub}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <Testimonials />
 
       {/* Problem */}
       <section id="problem" className="py-20 px-6 border-t border-border">
@@ -404,29 +389,14 @@ export default function HomePage() {
 
       {/* FAQ */}
       <section id="faq" className="py-20 px-6 border-t border-border">
-        <div className="max-w-3xl mx-auto">
-          <p className="text-xs font-semibold uppercase tracking-widest text-primary">FAQ</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Answers before you start</h2>
-          <div className="mt-8 space-y-2">
-            {faqs.map((item, index) => (
-              <details
-                key={item.q}
-                className="group rounded-xl border border-border bg-card px-5 py-4 transition-shadow hover:shadow-[0_1px_4px_rgba(0,0,0,0.07)]"
-                onToggle={(e) => {
-                  if ((e.currentTarget as HTMLDetailsElement).open) {
-                    onTrack('faq_expand', { question_index: String(index + 1) });
-                  }
-                }}
-              >
-                <summary className="cursor-pointer list-none font-medium text-sm flex items-center justify-between gap-4">
-                  <span>{item.q}</span>
-                  <span className="text-muted-foreground/60 group-open:rotate-45 transition-transform flex-shrink-0 text-lg leading-none">+</span>
-                </summary>
-                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{item.a}</p>
-              </details>
-            ))}
-          </div>
-        </div>
+        <ScrollFAQAccordion
+          className="py-0"
+          data={faqs.map((item, index) => ({
+            id: index + 1,
+            question: item.q,
+            answer: item.a,
+          }))}
+        />
       </section>
 
       {/* Closing CTA */}

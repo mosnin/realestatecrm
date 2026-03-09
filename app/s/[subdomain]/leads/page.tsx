@@ -190,6 +190,22 @@ export default async function LeadsPage({
                       <span>{formatBudget(lead.budget)}/mo</span>
                     </div>
                   )}
+                  {lead.scoringStatus === 'scored' && lead.leadScore != null && (
+                    <div className="inline-flex items-center gap-1.5 text-xs bg-emerald-50 rounded-md px-2.5 py-1.5 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 font-medium">
+                      <span>Score {Math.round(lead.leadScore)}</span>
+                      <span className="uppercase">{lead.scoreLabel ?? 'hot'}</span>
+                    </div>
+                  )}
+                  {lead.scoringStatus === 'failed' && (
+                    <div className="inline-flex items-center gap-1.5 text-xs bg-muted rounded-md px-2.5 py-1.5 text-muted-foreground">
+                      <span>Unscored</span>
+                    </div>
+                  )}
+                  {lead.scoringStatus === 'pending' && (
+                    <div className="inline-flex items-center gap-1.5 text-xs bg-amber-50 rounded-md px-2.5 py-1.5 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                      <span>Scoring pending</span>
+                    </div>
+                  )}
                   {timeline && (
                     <div className="inline-flex items-center gap-1.5 text-xs bg-muted rounded-md px-2.5 py-1.5 text-muted-foreground">
                       <Clock size={11} />
@@ -211,6 +227,11 @@ export default async function LeadsPage({
                       <FileText size={12} className="mt-0.5 flex-shrink-0" />
                       <p className="leading-relaxed line-clamp-3">{notes}</p>
                     </div>
+                  </div>
+                )}
+                {lead.scoreSummary && (
+                  <div className="px-5 pb-4 border-t border-border/60 pt-3">
+                    <p className="text-xs text-muted-foreground">Scoring note: {lead.scoreSummary}</p>
                   </div>
                 )}
               </div>

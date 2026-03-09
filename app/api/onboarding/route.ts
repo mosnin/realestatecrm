@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
           onboardingStartedAt: user.onboardingStartedAt ?? new Date()
         }
       });
+      console.info('[onboarding-write] save_step', { userId: user.id, step });
       return NextResponse.json({ success: true });
     }
 
@@ -223,14 +224,16 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'complete') {
+      const completedAt = new Date();
       await db.user.update({
         where: { id: user.id },
         data: {
           onboardingCurrentStep: 7,
-          onboardingCompletedAt: new Date()
+          onboardingCompletedAt: completedAt
         }
       });
-      return NextResponse.json({ success: true });
+      console.info('[onboarding-write] complete', { userId: user.id, onboardingCompletedAt: completedAt.toISOString() });
+      return NextResponse.json({ success: true, onboardingCompletedAt: completedAt.toISOString() });
     }
 
     if (action === 'check_slug') {

@@ -28,7 +28,17 @@ export default async function DashboardLayout({
       select: { onboardingCompletedAt: true }
     });
     onboardingCompleted = !!dbUser?.onboardingCompletedAt;
-  } catch {
+    console.info('[onboarding-guard] /s layout read', {
+      clerkId: userId,
+      subdomain,
+      onboardingCompleted
+    });
+  } catch (error) {
+    console.error('[onboarding-guard] /s layout read failed', {
+      clerkId: userId,
+      subdomain,
+      error
+    });
     // DB schema mismatch (migration pending) — send to onboarding which will self-heal
     redirect('/onboarding');
   }
