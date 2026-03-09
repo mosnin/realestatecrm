@@ -2,12 +2,22 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { OnboardingWizard } from './wizard-client';
-import type { User, Space, SpaceSetting } from '@prisma/client';
 
 export const metadata = { title: 'Set up Chippi' };
 
-type DbUser = User & {
-  space: (Space & { settings: SpaceSetting | null }) | null;
+type DbUser = {
+  id: string;
+  name: string | null;
+  email: string;
+  space: {
+    id: string;
+    subdomain: string;
+    name: string;
+    settings: Record<string, unknown> | null;
+  } | null;
+  onboardingCurrentStep?: number;
+  onboardingStartedAt?: Date | null;
+  onboardingCompletedAt?: Date | null;
 };
 
 export default async function OnboardingPage() {
@@ -15,6 +25,9 @@ export default async function OnboardingPage() {
   if (!userId) redirect('/sign-in');
 
   const clerkUser = await currentUser();
+  const safeEmail =
+    clerkUser?.emailAddresses?.[0]?.emailAddress?.trim() ||
+    `${userId}@no-email.local`;
 
   // Load user + space from DB.
   // Wrapped in try/catch to handle the period between deployment and migration
@@ -36,7 +49,7 @@ export default async function OnboardingPage() {
   }
 
   // If user has already completed onboarding, redirect to dashboard
-  if (dbUser?.onboardingCompletedAt && dbUser.space) {
+  if ((dbUser as any)?.onboardingCompletedAt && dbUser.space) {
     redirect(`/s/${dbUser.space.subdomain}`);
   }
 
@@ -46,30 +59,30 @@ export default async function OnboardingPage() {
       dbUser = await db.user.create({
         data: {
           clerkId: userId,
-          email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
-          name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
-          onboardingStartedAt: new Date(),
-          onboardingCurrentStep: 1
+          email: safeEmail,
+          name: clerkUser?.fullName ?? clerkUser?.firstName ?? null
         },
         include: { space: { include: { settings: true } } }
-      });
+      }) as unknown as DbUser;
     } catch {
       // Still failing (migration pending) — wizard renders with Clerk data only
     }
-  } else if (!dbUser.onboardingStartedAt) {
+  } else if (!(dbUser as any).onboardingStartedAt) {
     try {
-      await db.user.update({
-        where: { id: dbUser.id },
-        data: { onboardingStartedAt: new Date() }
-      });
+      await db.user
+        .update({
+          where: { id: dbUser.id },
+          data: { onboardingStartedAt: new Date() }
+        } as any)
+        .catch(() => null);
     } catch {
       // Non-fatal
     }
   }
 
   const initialState = {
-    step: dbUser?.onboardingCurrentStep ?? 1,
-    completed: !!dbUser?.onboardingCompletedAt,
+    step: (dbUser as any)?.onboardingCurrentStep ?? 1,
+    completed: !!(dbUser as any)?.onboardingCompletedAt,
     user: {
       id: dbUser?.id ?? '',
       name: dbUser?.name ?? null,
@@ -82,11 +95,11 @@ export default async function OnboardingPage() {
           name: dbUser.space.name,
           settings: dbUser.space.settings
             ? {
-                businessName: dbUser.space.settings.businessName,
-                phoneNumber: dbUser.space.settings.phoneNumber,
-                intakePageTitle: dbUser.space.settings.intakePageTitle,
-                intakePageIntro: dbUser.space.settings.intakePageIntro,
-                notifications: dbUser.space.settings.notifications
+                businessName: (dbUser.space.settings as any).businessName,
+                phoneNumber: (dbUser.space.settings as any).phoneNumber,
+                intakePageTitle: (dbUser.space.settings as any).intakePageTitle,
+                intakePageIntro: (dbUser.space.settings as any).intakePageIntro,
+                notifications: (dbUser.space.settings as any).notifications
               }
             : null
         }
