@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Users,
   Briefcase,
+  Bot,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +14,7 @@ const navItems = [
   { href: '', label: 'Home', icon: LayoutDashboard },
   { href: '/contacts', label: 'Clients', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
+  { href: '/ai', label: 'AI', icon: Bot },
 ];
 
 interface MobileNavProps {

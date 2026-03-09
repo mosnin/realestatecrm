@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Users,
   Briefcase,
+  Bot,
   User,
   Settings,
   Building2,
@@ -16,6 +17,7 @@ const navItems = [
   { href: '', label: 'Home', icon: LayoutDashboard },
   { href: '/contacts', label: 'Clients', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
+  { href: '/ai', label: 'AI Assistant', icon: Bot },
   { href: '/profile', label: 'Profile', icon: User },
   { href: '/settings', label: 'Settings', icon: Settings }
 ];

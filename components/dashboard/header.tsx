@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Users,
   Briefcase,
+  Bot,
   User,
   Settings
 } from 'lucide-react';
@@ -27,6 +28,7 @@ const navItems = [
   { href: '', label: 'Overview', icon: LayoutDashboard },
   { href: '/contacts', label: 'Clients', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
+  { href: '/ai', label: 'AI Assistant', icon: Bot },
   { href: '/profile', label: 'Profile', icon: User },
   { href: '/settings', label: 'Settings', icon: Settings }
 ];
