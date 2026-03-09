@@ -240,9 +240,20 @@ model RentalApplication {
   currentStep     Int                 @default(1)
   completedSteps  String[]            @default([])
 
-  // Qualification
+  // Rule-based qualification (deterministic, always runs)
   summary         String?
   qualScore       QualScore?
+
+  // AI scoring (OpenAI Responses API, runs async after submission)
+  aiScore          Int?       // 0–100 priority score
+  aiPriorityLabel  String?    // hot | warm | cold | review
+  aiSummary        String?    // 1–3 sentence triage summary
+  aiReasonTags     Json?      // ["affordable", "docs complete", ...]
+  aiWatchouts      Json?      // ["income tight", "missing docs", ...]
+  aiConfidence     String?    // low | medium | high
+  aiScoredAt       DateTime?
+  aiScoringVersion String?
+  aiScoringPayload Json?      // sanitized payload sent — no PII
 
   submittedAt     DateTime?
   createdAt       DateTime            @default(now())

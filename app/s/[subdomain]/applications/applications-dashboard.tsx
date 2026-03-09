@@ -30,6 +30,9 @@ import {
   PawPrint,
   FileText,
   ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -113,6 +116,13 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+const aiPriorityConfig: Record<string, { label: string; className: string }> = {
+  hot: { label: 'hot', className: 'bg-red-500/10 text-red-600 border-red-500/20' },
+  warm: { label: 'warm', className: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
+  cold: { label: 'cold', className: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+  review: { label: 'review', className: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/20' },
+};
+
 function ApplicationCard({
   application,
   subdomain,
@@ -120,6 +130,8 @@ function ApplicationCard({
   application: ApplicationWithApplicant;
   subdomain: string;
 }) {
+  const [showAiSummary, setShowAiSummary] = useState(false);
+
   const primary = application.applicants[0];
   const qualScore = application.qualScore;
   const scoreInfo = qualScore ? scoreConfig[qualScore] : null;
@@ -131,6 +143,11 @@ function ApplicationCard({
     application.monthlyRent && totalIncome > 0
       ? (totalIncome / application.monthlyRent).toFixed(1)
       : null;
+
+  const hasAiScore = application.aiScore != null;
+  const aiPriority = application.aiPriorityLabel
+    ? aiPriorityConfig[application.aiPriorityLabel]
+    : null;
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -148,7 +165,7 @@ function ApplicationCard({
               </p>
             )}
           </div>
-          <div className="flex gap-2 shrink-0">
+          <div className="flex gap-2 shrink-0 flex-wrap justify-end">
             {scoreInfo && (
               <Badge variant="outline" className={scoreInfo.className}>
                 <scoreInfo.icon size={12} className="mr-1" />
@@ -157,6 +174,30 @@ function ApplicationCard({
             )}
             <Badge className={statusInfo.className}>{statusInfo.label}</Badge>
           </div>
+        </div>
+
+        {/* AI score row */}
+        <div className="flex items-center gap-2">
+          <Sparkles size={13} className="text-muted-foreground shrink-0" />
+          {hasAiScore ? (
+            <>
+              <span className="text-sm font-semibold tabular-nums">
+                {application.aiScore}
+              </span>
+              {aiPriority && (
+                <Badge variant="outline" className={`text-xs ${aiPriority.className}`}>
+                  {aiPriority.label}
+                </Badge>
+              )}
+              {application.aiConfidence && (
+                <span className="text-xs text-muted-foreground">
+                  {application.aiConfidence} confidence
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-xs text-muted-foreground">Score pending</span>
+          )}
         </div>
 
         {/* Key signals grid */}
@@ -202,11 +243,57 @@ function ApplicationCard({
           )}
         </div>
 
-        {/* Summary */}
+        {/* Rule-based summary */}
         {application.summary && (
           <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
             {application.summary}
           </p>
+        )}
+
+        {/* AI summary toggle */}
+        {hasAiScore && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAiSummary((v) => !v)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showAiSummary ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              Show summary
+            </button>
+
+            {showAiSummary && (
+              <div className="mt-2 space-y-2 rounded-lg bg-muted/50 p-3 text-xs">
+                {application.aiSummary && (
+                  <p className="text-foreground leading-relaxed">{application.aiSummary}</p>
+                )}
+                {(application.aiReasonTags ?? []).length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {(application.aiReasonTags ?? []).map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {(application.aiWatchouts ?? []).length > 0 && (
+                  <div className="space-y-0.5">
+                    {(application.aiWatchouts ?? []).map((w) => (
+                      <p key={w} className="text-amber-700">
+                        ⚠ {w}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                <p className="text-muted-foreground/70 pt-1 border-t border-border">
+                  AI triage summary · for follow-up prioritization only
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Footer */}

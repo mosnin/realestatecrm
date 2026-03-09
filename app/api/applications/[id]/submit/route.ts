@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSpaceFromSubdomain } from '@/lib/space';
 import { computeQualScore, generateSummary } from '@/lib/scoring';
+import { scoreApplicationWithAI } from '@/lib/ai-scoring';
 
 // POST /api/applications/[id]/submit  — public, finalizes the application and creates a Contact
 export async function POST(
@@ -138,6 +139,11 @@ export async function POST(
     applicationId: id,
     qualScore,
     contactId: contact.id,
+  });
+
+  // Trigger AI scoring asynchronously — does not block the response
+  scoreApplicationWithAI(id).catch(() => {
+    // Errors already logged inside scoreApplicationWithAI
   });
 
   return NextResponse.json({

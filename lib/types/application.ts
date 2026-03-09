@@ -121,6 +121,16 @@ export interface RentalApplication {
   summary: string | null;
   qualScore: QualScore | null;
 
+  // AI scoring
+  aiScore: number | null;
+  aiPriorityLabel: string | null;
+  aiSummary: string | null;
+  aiReasonTags: string[] | null;
+  aiWatchouts: string[] | null;
+  aiConfidence: string | null;
+  aiScoredAt: string | Date | null;
+  aiScoringVersion: string | null;
+
   submittedAt: string | Date | null;
   createdAt: string | Date;
   updatedAt: string | Date;
