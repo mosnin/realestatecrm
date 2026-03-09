@@ -22,7 +22,7 @@ import {
   FolderOpen,
   PenLine,
   Loader2,
-  CloudCheck,
+  Check,
   ChevronDown,
   CalendarDays,
   AlertCircle,
@@ -1253,7 +1253,7 @@ export function ApplicationForm({
               <><Loader2 size={12} className="animate-spin" /><span>Saving…</span></>
             )}
             {saveIndicator === 'saved' && (
-              <><CloudCheck size={12} className="text-primary" /><span className="text-primary">Saved</span></>
+              <><Check size={12} className="text-primary" /><span className="text-primary">Saved</span></>
             )}
             {saveIndicator === 'idle' && (
               <span className="text-muted-foreground/60">Progress auto-saved</span>
@@ -1278,7 +1278,7 @@ export function ApplicationForm({
                 <span>About 5 minutes</span>
               </div>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <CloudCheck size={12} />
+                <Check size={12} />
                 <span>Progress auto-saved</span>
               </div>
             </div>
