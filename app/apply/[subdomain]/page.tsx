@@ -31,7 +31,6 @@ export default async function PublicApplyPage({
     });
   } catch (error) {
     if (!isLegacySpaceSettingFieldError(error)) throw error;
-    // Legacy Prisma/schema shape: fall back to default apply-page copy.
     settings = null;
   }
 
@@ -41,14 +40,11 @@ export default async function PublicApplyPage({
     "Share your rental preferences and we'll follow up with next steps.";
 
   return (
-    <div className="min-h-screen bg-background px-4 py-12">
-      <div className="max-w-xl mx-auto space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold">{pageTitle}</h1>
-          <p className="text-muted-foreground mt-2">{pageIntro}</p>
-        </div>
-        <ApplicationForm subdomain={subdomain} />
-      </div>
-    </div>
+    <ApplicationForm
+      subdomain={subdomain}
+      spaceName={space.name}
+      pageTitle={pageTitle}
+      pageIntro={pageIntro}
+    />
   );
 }

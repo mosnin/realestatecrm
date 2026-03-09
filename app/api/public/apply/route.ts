@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
       timeline,
       preferredAreas,
       notes,
+      applicationType,
     } = body ?? {};
 
     if (!subdomain || !name || !phone) {
@@ -57,18 +58,39 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const isMultiStep = applicationType === 'multi-step';
+
+    // Determine address from notes (multi-step flow embeds current address in notes)
+    let address: string | null = null;
+    if (notes && typeof notes === 'string') {
+      const match = notes.match(/Current address: ([^\n]+)/);
+      if (match) address = match[1].trim();
+    }
+
+    // Build structured notes
+    let finalNotes: string | null = null;
+    if (notes) {
+      finalNotes = String(notes);
+    } else if (timeline || preferredAreas) {
+      finalNotes = `Timeline: ${timeline ?? 'N/A'}\nPreferred: ${preferredAreas ?? 'N/A'}`;
+    }
+
+    const tags = ['application-link', 'new-lead'];
+    if (isMultiStep) tags.push('multi-step-application');
+
     const contact = await db.contact.create({
       data: {
         spaceId: space.id,
         name: safeName,
         email: email ? String(email) : null,
         phone: safePhone,
+        address: address ?? null,
         budget: budget != null && budget !== '' ? Number.parseFloat(String(budget)) : null,
         preferences: preferredAreas ? String(preferredAreas) : null,
-        notes: notes || timeline ? `Timeline: ${timeline ?? 'N/A'}\n${notes ?? ''}`.trim() : null,
-        type: 'QUALIFICATION',
+        notes: finalNotes,
+        type: isMultiStep ? 'APPLICATION' : 'QUALIFICATION',
         properties: [],
-        tags: ['application-link', 'new-lead'],
+        tags,
       },
     });
 
