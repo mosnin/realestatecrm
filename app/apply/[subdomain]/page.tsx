@@ -37,8 +37,8 @@ export default async function ApplyPage({
             {space.emoji}
           </span>
           <div>
-            <p className="font-semibold text-sm leading-tight">{space.name}</p>
-            <p className="text-xs text-muted-foreground">Rental Application</p>
+            <p className="font-semibold text-sm leading-tight">{space.intakeDisplayTitle ?? space.name}</p>
+            <p className="text-xs text-muted-foreground">{space.intakeIntroLine ?? 'Rental Application'}</p>
           </div>
         </div>
       </header>

@@ -1,6 +1,7 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSubdomain } from '@/lib/space';
+import { db } from '@/lib/db';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
@@ -19,8 +20,14 @@ export default async function DashboardLayout({
     return null; // Middleware handles redirect
   }
 
+  const user = await db.user.findUnique({ where: { clerkId: userId } });
+
   const space = await getSpaceFromSubdomain(subdomain);
   if (!space) notFound();
+
+  if (user && !user.onboardingCompletedAt) {
+    redirect('/onboarding');
+  }
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">

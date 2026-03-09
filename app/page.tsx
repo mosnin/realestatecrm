@@ -1,337 +1,250 @@
 import Link from 'next/link';
 import {
-  Users,
-  Briefcase,
-  Bot,
-  Shield,
-  Zap,
-  BarChart3,
   ArrowRight,
+  BadgeCheck,
   Building2,
+  CheckCircle2,
+  ClipboardCheck,
+  Clock3,
+  MessageSquareMore,
+  Sparkles,
   Star,
-  CheckCircle2
+  TrendingUp,
+  Users,
 } from 'lucide-react';
 
 const features = [
   {
+    icon: ClipboardCheck,
+    title: 'Renter intake that actually converts',
+    description:
+      'Publish a polished intake link in minutes and collect complete, structured applications without back-and-forth.',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Prioritized follow-up queue',
+    description:
+      'See who to call first with clear scoring, summaries, and watchouts so you can move faster with confidence.',
+  },
+  {
     icon: Users,
-    title: 'Client Pipeline',
+    title: 'CRM cards created automatically',
     description:
-      'Track every client from qualification through tour to application. Never lose a lead again.'
+      'Every submission flows into your workspace with the context you need to respond professionally and close faster.',
   },
   {
-    icon: Briefcase,
-    title: 'Deal Management',
+    icon: MessageSquareMore,
+    title: 'AI summaries you can trust',
     description:
-      'Kanban boards, deal stages, priorities, and values. See your entire pipeline at a glance.'
+      'Get concise, practical overviews of each application so you can scan quickly and focus on action.',
   },
   {
-    icon: Bot,
-    title: 'AI Assistant',
+    icon: Clock3,
+    title: 'Built for busy solo realtors',
     description:
-      'Get instant insights about your pipeline, draft follow-ups, and surface the deals that need attention.'
+      'Simple defaults, calm UI, and no setup maze. You can start using Chippi the same day you sign up.',
   },
   {
-    icon: BarChart3,
-    title: 'Pipeline Analytics',
+    icon: BadgeCheck,
+    title: 'Professional applicant experience',
     description:
-      'Real-time metrics on deal volume, conversion rates, and revenue forecasting across every stage.'
+      'Give renters a clean, branded flow that sets expectations and makes your process look organized from day one.',
   },
-  {
-    icon: Shield,
-    title: 'Secure Workspaces',
-    description:
-      'Isolated workspaces for your brokerage. Each agent gets their own environment with full data privacy.'
-  },
-  {
-    icon: Zap,
-    title: 'Built for Speed',
-    description:
-      'Instant search, keyboard shortcuts, and a snappy interface. No loading spinners, no waiting.'
-  }
 ];
 
 const stats = [
-  { value: '3x', label: 'Faster deal closing' },
-  { value: '40%', label: 'More client touchpoints' },
-  { value: '2hrs', label: 'Saved per day on admin' },
-  { value: '99.9%', label: 'Uptime guaranteed' }
-];
-
-const steps = [
-  {
-    step: '01',
-    title: 'Create your workspace',
-    description: 'Sign up and name your workspace in under 30 seconds. No credit card required.'
-  },
-  {
-    step: '02',
-    title: 'Import your clients',
-    description: 'Add your clients and deals manually or let the AI assistant help you organize your pipeline.'
-  },
-  {
-    step: '03',
-    title: 'Close more deals',
-    description: 'Use AI-powered insights, pipeline analytics, and automated follow-ups to win more business.'
-  }
+  { value: '10 min', label: 'to publish your intake link' },
+  { value: '7-step', label: 'guided renter application flow' },
+  { value: '24/7', label: 'application capture for inbound leads' },
+  { value: '1 view', label: 'to see scoring + CRM context' },
 ];
 
 const testimonials = [
   {
-    quote: 'I went from juggling spreadsheets to closing 12 deals in my first quarter using this CRM. The AI assistant is a game-changer.',
-    name: 'Sarah Chen',
-    role: 'Residential Agent, Keller Williams',
-    rating: 5
+    quote:
+      'Chippi made me look like I had a full ops team. My intake link was live in one afternoon and follow-up got way easier.',
+    name: 'Tanya Brooks',
+    role: 'Leasing Agent, Independent',
   },
   {
-    quote: 'The deal pipeline view alone is worth switching. I can see exactly where every transaction stands and what needs my attention today.',
-    name: 'Marcus Rivera',
-    role: 'Broker, RE/MAX Elite',
-    rating: 5
+    quote:
+      'I stopped losing renter leads in text threads. Now applications come in complete and I know who to prioritize instantly.',
+    name: 'Miguel Santos',
+    role: 'Solo Realtor',
   },
   {
-    quote: 'Finally a CRM that was built for how agents actually work. Fast, simple, and the AI saves me hours every week.',
-    name: 'Jennifer Park',
-    role: 'Team Lead, Compass',
-    rating: 5
-  }
+    quote:
+      'The workflow is simple and clean. I send one link, Chippi handles structure, and I spend more time closing.',
+    name: 'Avery Collins',
+    role: 'Broker Associate',
+  },
 ];
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-[#0a0a0a]/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <div className="absolute inset-x-0 top-0 -z-10 h-[520px] bg-gradient-to-b from-blue-100/80 via-cyan-50 to-transparent" />
+
+      <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-2.5">
-            <Building2 size={22} className="text-white" />
-            <span className="font-semibold text-[15px] tracking-tight">WorkflowRouting</span>
+            <div className="rounded-lg bg-blue-600 p-1.5 text-white">
+              <Building2 size={16} />
+            </div>
+            <span className="text-sm font-semibold tracking-tight">Chippi</span>
           </Link>
-
-          <nav className="hidden md:flex items-center gap-8 text-sm text-neutral-400">
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-white transition-colors">How it works</a>
-            <a href="#testimonials" className="hover:text-white transition-colors">Testimonials</a>
+          <nav className="hidden items-center gap-7 text-sm text-slate-600 md:flex">
+            <a href="#features" className="hover:text-slate-900">Features</a>
+            <a href="#how" className="hover:text-slate-900">How it works</a>
+            <a href="#reviews" className="hover:text-slate-900">Reviews</a>
           </nav>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href="/sign-in"
-              className="text-sm text-neutral-400 hover:text-white transition-colors"
-            >
-              Log in
+          <div className="flex items-center gap-2">
+            <Link href="/sign-in" className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+              Sign in
             </Link>
-            <Link
-              href="/sign-up"
-              className="text-sm bg-white text-black px-4 py-2 rounded-full font-medium hover:bg-neutral-200 transition-colors"
-            >
-              Get started
+            <Link href="/sign-up" className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
+              Start free
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="pt-40 pb-24 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-neutral-400 mb-8">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            Now in public beta
-          </div>
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.08]">
-            Close more deals.<br />
-            <span className="text-neutral-500">Spend less time on admin.</span>
-          </h1>
-          <p className="mt-6 text-lg md:text-xl text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-            The CRM built for real estate agents who want to focus on selling,
-            not spreadsheets. AI-powered pipeline management that actually helps
-            you close.
-          </p>
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/sign-up"
-              className="flex items-center gap-2 bg-white text-black px-8 py-3.5 rounded-full font-medium hover:bg-neutral-200 transition-colors text-sm"
-            >
-              START FOR FREE <ArrowRight size={16} />
-            </Link>
-            <Link
-              href="/sign-in"
-              className="flex items-center gap-2 px-8 py-3.5 rounded-full font-medium border border-white/15 text-neutral-300 hover:bg-white/5 transition-colors text-sm"
-            >
-              Sign in to your workspace
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats bar */}
-      <section className="border-y border-white/10 bg-white/[0.02]">
-        <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-2 md:grid-cols-4 gap-8">
-          {stats.map((stat) => (
-            <div key={stat.label} className="text-center">
-              <div className="text-3xl md:text-4xl font-bold tracking-tight">{stat.value}</div>
-              <div className="mt-1 text-sm text-neutral-500">{stat.label}</div>
+      <main>
+        <section className="px-6 pb-14 pt-14 md:pt-20">
+          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-2 lg:items-center">
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                <Sparkles size={13} />
+                Built for renter lead qualification
+              </div>
+              <h1 className="text-4xl font-bold leading-tight tracking-tight text-slate-900 md:text-5xl">
+                Turn renter leads into organized deals with <span className="text-blue-600">Chippi</span>
+              </h1>
+              <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600">
+                Publish one intake link, collect complete applications, and route every submission into a CRM workflow you can act on fast.
+              </p>
+              <div className="mt-7 flex flex-wrap gap-3">
+                <Link href="/sign-up" className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                  Launch your intake flow
+                  <ArrowRight size={15} />
+                </Link>
+                <Link href="/dashboard" className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                  Go to dashboard
+                </Link>
+              </div>
+              <p className="mt-4 text-xs text-slate-500">No credit card required • Setup in minutes</p>
             </div>
-          ))}
-        </div>
-      </section>
 
-      {/* Features */}
-      <section id="features" className="py-24 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
-              Everything you need to manage your pipeline
-            </h2>
-            <p className="mt-4 text-neutral-400 max-w-2xl mx-auto">
-              Purpose-built tools for real estate professionals. No bloat, no learning curve.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {features.map((feature) => (
-              <div
-                key={feature.title}
-                className="rounded-xl border border-white/10 bg-white/[0.03] p-6 hover:bg-white/[0.05] transition-colors"
-              >
-                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center mb-4">
-                  <feature.icon size={20} className="text-neutral-300" />
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-sm font-semibold text-slate-900">Sample application snapshot</p>
+              <div className="mt-4 space-y-3 text-sm">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">Jordan Lee • 2BR Midtown</p>
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">WARM</span>
+                  </div>
+                  <p className="mt-1 text-slate-600">Move-in: May 1 • Income band: moderate</p>
+                  <p className="mt-2 text-slate-700">Summary: Complete docs, stable employment, no eviction flags. Follow up within 24 hours.</p>
                 </div>
-                <h3 className="text-[15px] font-semibold mb-2">{feature.title}</h3>
-                <p className="text-sm text-neutral-500 leading-relaxed">{feature.description}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="text-xs text-slate-500">Submission status</p>
+                    <p className="mt-1 font-semibold">Under review</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="text-xs text-slate-500">Next action</p>
+                    <p className="mt-1 font-semibold">Call this afternoon</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border-y border-slate-200 bg-white px-6 py-10">
+          <div className="mx-auto grid max-w-7xl grid-cols-2 gap-4 md:grid-cols-4">
+            {stats.map((s) => (
+              <div key={s.label} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-2xl font-bold text-slate-900">{s.value}</p>
+                <p className="mt-1 text-xs text-slate-600">{s.label}</p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* How it works */}
-      <section id="how-it-works" className="py-24 px-6 border-t border-white/10">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
-              Up and running in minutes
-            </h2>
-            <p className="mt-4 text-neutral-400">
-              Three simple steps to transform how you manage your real estate business.
-            </p>
+        <section id="features" className="mx-auto max-w-7xl px-6 py-16 md:py-20">
+          <div className="mb-10 max-w-2xl">
+            <h2 className="text-3xl font-bold tracking-tight">Everything you need to launch fast</h2>
+            <p className="mt-3 text-slate-600">Chippi is focused on activation: intake live, submissions captured, and follow-up clearly prioritized.</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {steps.map((item) => (
-              <div key={item.step} className="relative">
-                <div className="text-5xl font-bold text-white/[0.06] mb-4">{item.step}</div>
-                <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
-                <p className="text-sm text-neutral-500 leading-relaxed">{item.description}</p>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {features.map((item) => (
+              <div key={item.title} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <item.icon size={18} className="text-blue-600" />
+                <h3 className="mt-3 font-semibold text-slate-900">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{item.description}</p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Testimonials */}
-      <section id="testimonials" className="py-24 px-6 border-t border-white/10">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
-              Trusted by agents who close
-            </h2>
-            <p className="mt-4 text-neutral-400">
-              Hear from real estate professionals using WorkflowRouting every day.
-            </p>
+        <section id="how" className="border-y border-slate-200 bg-white px-6 py-16 md:py-20">
+          <div className="mx-auto max-w-5xl">
+            <h2 className="text-center text-3xl font-bold tracking-tight">From signup to live intake in 3 steps</h2>
+            <div className="mt-10 grid gap-4 md:grid-cols-3">
+              {[
+                ['01', 'Complete onboarding', 'Add your basics and choose your public intake slug.'],
+                ['02', 'Publish your link', 'Share your branded application link in DMs, email, or listing replies.'],
+                ['03', 'Work qualified leads', 'Chippi routes submissions into CRM cards with score + summary.'],
+              ].map(([num, title, desc]) => (
+                <div key={num} className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                  <p className="text-xs font-semibold text-blue-600">STEP {num}</p>
+                  <p className="mt-2 font-semibold">{title}</p>
+                  <p className="mt-2 text-sm text-slate-600">{desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        </section>
+
+        <section id="reviews" className="mx-auto max-w-7xl px-6 py-16 md:py-20">
+          <h2 className="text-3xl font-bold tracking-tight">Realtors love the speed</h2>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
             {testimonials.map((t) => (
-              <div
-                key={t.name}
-                className="rounded-xl border border-white/10 bg-white/[0.03] p-6"
-              >
-                <div className="flex gap-1 mb-4">
-                  {Array.from({ length: t.rating }).map((_, i) => (
-                    <Star key={i} size={14} className="fill-amber-400 text-amber-400" />
+              <div key={t.name} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-3 flex gap-1 text-amber-500">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star key={i} size={14} className="fill-current" />
                   ))}
                 </div>
-                <p className="text-sm text-neutral-300 leading-relaxed mb-6">
-                  &ldquo;{t.quote}&rdquo;
-                </p>
-                <div>
-                  <p className="text-sm font-medium">{t.name}</p>
-                  <p className="text-xs text-neutral-500">{t.role}</p>
-                </div>
+                <p className="text-sm leading-relaxed text-slate-700">&ldquo;{t.quote}&rdquo;</p>
+                <p className="mt-4 text-sm font-semibold">{t.name}</p>
+                <p className="text-xs text-slate-500">{t.role}</p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* CTA */}
-      <section className="py-24 px-6 border-t border-white/10">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
-            Ready to close more deals?
-          </h2>
-          <p className="mt-4 text-neutral-400 text-lg">
-            Join thousands of agents who switched to a CRM that actually works for real estate.
-          </p>
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/sign-up"
-              className="flex items-center gap-2 bg-white text-black px-8 py-3.5 rounded-full font-medium hover:bg-neutral-200 transition-colors text-sm"
-            >
-              CREATE FREE ACCOUNT <ArrowRight size={16} />
+        <section className="border-t border-slate-200 bg-blue-600 px-6 py-14 text-white">
+          <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">Ready to launch your intake workflow?</h2>
+              <p className="mt-2 text-sm text-blue-100">Create your Chippi workspace and publish your application link today.</p>
+            </div>
+            <Link href="/sign-up" className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+              Start with Chippi
+              <ArrowRight size={14} />
             </Link>
           </div>
-          <div className="mt-6 flex items-center justify-center gap-6 text-xs text-neutral-500">
-            <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> No credit card</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Free forever plan</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 size={14} /> Setup in 30 seconds</span>
-          </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      {/* Footer */}
-      <footer className="border-t border-white/10 bg-white/[0.02]">
-        <div className="max-w-6xl mx-auto px-6 py-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div className="col-span-2 md:col-span-1">
-              <div className="flex items-center gap-2.5 mb-4">
-                <Building2 size={20} className="text-white" />
-                <span className="font-semibold text-sm">WorkflowRouting</span>
-              </div>
-              <p className="text-xs text-neutral-500 leading-relaxed">
-                The modern CRM for real estate professionals who want to close more deals, faster.
-              </p>
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-4">Product</h4>
-              <ul className="space-y-2 text-sm text-neutral-500">
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#how-it-works" className="hover:text-white transition-colors">How it works</a></li>
-                <li><a href="#testimonials" className="hover:text-white transition-colors">Testimonials</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-neutral-500">
-                <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-4">Legal</h4>
-              <ul className="space-y-2 text-sm text-neutral-500">
-                <li><a href="#" className="hover:text-white transition-colors">Privacy</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Terms</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Security</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="mt-12 pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-neutral-600">&copy; 2025 WorkflowRouting. All rights reserved.</p>
-            <div className="flex items-center gap-6 text-xs text-neutral-600">
-              <a href="#" className="hover:text-neutral-400 transition-colors">Twitter</a>
-              <a href="#" className="hover:text-neutral-400 transition-colors">LinkedIn</a>
-              <a href="#" className="hover:text-neutral-400 transition-colors">GitHub</a>
-            </div>
+      <footer className="border-t border-slate-200 bg-white px-6 py-6">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+          <p>© {new Date().getFullYear()} Chippi</p>
+          <div className="flex items-center gap-4">
+            <span className="inline-flex items-center gap-1"><CheckCircle2 size={12} /> Intake-ready by default</span>
+            <span className="inline-flex items-center gap-1"><Sparkles size={12} /> AI-powered triage</span>
           </div>
         </div>
       </footer>
