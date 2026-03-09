@@ -77,6 +77,39 @@ const howItWorks = [
   }
 ];
 
+const leadFeedItems = [
+  {
+    name: 'New rental application',
+    description: 'Jordan Reyes · Budget $2,800 · Midtown · Move-in Aug 1',
+    time: 'just now',
+    icon: '📝',
+    color: '#0d9488'
+  },
+  {
+    name: 'Lead scored: warm',
+    description: 'Ava Thompson · Score 68 · Strong timeline match',
+    time: '2m ago',
+    icon: '📊',
+    color: '#f59e0b'
+  },
+  {
+    name: 'New renter inquiry',
+    description: 'Carlos Mendez · 2BR · Pet friendly · Downtown',
+    time: '4m ago',
+    icon: '🏠',
+    color: '#3b82f6'
+  },
+  {
+    name: 'Priority lead',
+    description: 'Nina Patel · Score 82 · Ready to tour this week',
+    time: '7m ago',
+    icon: '⚡',
+    color: '#ef4444'
+  }
+];
+
+const animatedLeadFeed = Array.from({ length: 3 }, () => leadFeedItems).flat();
+
 const faqs = [
   {
     q: 'What is Chippi?',
@@ -119,6 +152,41 @@ const faqs = [
     a: 'Yes. Every account starts with a 7-day free trial so you can test the workflow before paying.'
   }
 ];
+
+function LeadFeedItem({
+  name,
+  description,
+  icon,
+  color,
+  time
+}: {
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  time: string;
+}) {
+  return (
+    <figure className="mx-auto w-full rounded-2xl border border-border bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.06)] transition-transform duration-200 hover:scale-[1.02]">
+      <div className="flex items-center gap-3">
+        <div
+          className="flex h-10 w-10 items-center justify-center rounded-2xl text-lg"
+          style={{ backgroundColor: color }}
+        >
+          <span>{icon}</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <figcaption className="flex items-center gap-1 text-sm font-semibold text-foreground">
+            <span className="truncate">{name}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-xs font-normal text-muted-foreground">{time}</span>
+          </figcaption>
+          <p className="truncate text-sm text-muted-foreground">{description}</p>
+        </div>
+      </div>
+    </figure>
+  );
+}
 
 function onTrack(name: string, props?: Record<string, string>) {
   track(name, props);
@@ -215,6 +283,31 @@ export default function HomePage() {
           }
         ]}
       />
+
+      {/* Live lead flow */}
+      <section className="px-6 py-16 border-t border-border">
+        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1fr_1.1fr] lg:items-center">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary">Live workflow signal</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">
+              See new applications and lead context arrive in real time.
+            </h2>
+            <p className="mt-4 max-w-lg text-sm leading-relaxed text-muted-foreground md:text-base">
+              Chippi captures structured renter submissions, adds scoring context, and keeps your next actions clear — so you can respond faster with less back-and-forth.
+            </p>
+          </div>
+
+          <div className="relative h-[460px] overflow-hidden rounded-2xl border border-border bg-surface/60 p-3">
+            <div className="lead-feed-scroll space-y-3">
+              {animatedLeadFeed.map((item, idx) => (
+                <LeadFeedItem key={`${item.name}-${idx}`} {...item} />
+              ))}
+            </div>
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-background to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background to-transparent" />
+          </div>
+        </div>
+      </section>
 
       <CombinedFeaturedSection />
 

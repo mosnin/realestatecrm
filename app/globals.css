@@ -254,3 +254,20 @@
     opacity: 1;
   }
 }
+
+@keyframes lead-feed-scroll {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-50%);
+  }
+}
+
+.lead-feed-scroll {
+  animation: lead-feed-scroll 24s linear infinite;
+}
+
+.lead-feed-scroll:hover {
+  animation-play-state: paused;
+}
