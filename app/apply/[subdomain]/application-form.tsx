@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,9 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 export function ApplicationForm({ subdomain }: { subdomain: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const submissionLockRef = useRef(false);
 
-  async function onSubmit(formData: FormData) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (submitting || submissionLockRef.current) return;
+
+    submissionLockRef.current = true;
     setSubmitting(true);
+
+    const formData = new FormData(e.currentTarget);
     const payload = {
       subdomain,
       name: formData.get('name'),
@@ -23,15 +30,19 @@ export function ApplicationForm({ subdomain }: { subdomain: string }) {
       notes: formData.get('notes'),
     };
 
-    const response = await fetch('/api/public/apply', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const response = await fetch('/api/public/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
-    setSubmitting(false);
-    if (response.ok) {
-      setSubmitted(true);
+      if (response.ok) {
+        setSubmitted(true);
+      }
+    } finally {
+      setSubmitting(false);
+      submissionLockRef.current = false;
     }
   }
 
@@ -54,7 +65,7 @@ export function ApplicationForm({ subdomain }: { subdomain: string }) {
         <CardTitle>Rental Application Intake</CardTitle>
       </CardHeader>
       <CardContent>
-        <form action={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4">
           <Input name="name" placeholder="Full name" required />
           <Input name="email" type="email" placeholder="Email (optional)" />
           <Input name="phone" placeholder="Phone number" required />

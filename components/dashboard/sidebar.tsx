@@ -28,9 +28,15 @@ interface SidebarProps {
   subdomain: string;
   spaceName: string;
   spaceEmoji: string;
+  unreadLeadCount: number;
 }
 
-export function Sidebar({ subdomain, spaceName, spaceEmoji }: SidebarProps) {
+export function Sidebar({
+  subdomain,
+  spaceName,
+  spaceEmoji,
+  unreadLeadCount
+}: SidebarProps) {
   const pathname = usePathname();
   const base = `/s/${subdomain}`;
 
@@ -67,7 +73,14 @@ export function Sidebar({ subdomain, spaceName, spaceEmoji }: SidebarProps) {
               )}
             >
               <item.icon size={18} />
-              {item.label}
+              <span className="flex items-center gap-2">
+                {item.label}
+                {item.href === '/leads' && unreadLeadCount > 0 ? (
+                  <span className="inline-flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold">
+                    {unreadLeadCount > 99 ? '99+' : unreadLeadCount}
+                  </span>
+                ) : null}
+              </span>
             </Link>
           );
         })}

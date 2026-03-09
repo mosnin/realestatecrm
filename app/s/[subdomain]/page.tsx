@@ -58,7 +58,7 @@ export default async function DashboardPage({
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 
-  const applicationUrl = `${protocol}://${space.subdomain}.${rootDomain}/apply/${space.subdomain}`;
+  const applicationUrl = `${protocol}://${rootDomain}/apply/${space.subdomain}`;
 
   return (
     <div className="space-y-6">
