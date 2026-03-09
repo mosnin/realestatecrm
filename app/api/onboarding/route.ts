@@ -13,6 +13,24 @@ function isPrismaMissingColumnError(error: unknown) {
   );
 }
 
+function isPrismaUnknownSpaceSettingFieldError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return [
+    'Unknown argument `phoneNumber`',
+    'Unknown argument `businessName`',
+    'Unknown argument `intakePageTitle`',
+    'Unknown argument `intakePageIntro`',
+    'Unknown argument `myConnections`'
+  ].some((snippet) => error.message.includes(snippet));
+}
+
+function isLegacySpaceSettingShapeError(error: unknown) {
+  return (
+    isPrismaMissingColumnError(error) ||
+    isPrismaUnknownSpaceSettingFieldError(error)
+  );
+}
+
 function isPrismaUnknownOnboardingFieldError(error: unknown) {
   if (!(error instanceof Error)) return false;
   return [
@@ -162,7 +180,7 @@ export async function POST(req: NextRequest) {
             create: { spaceId: user.space.id, phoneNumber: normalizedPhone, businessName }
           });
         } catch (error) {
-          if (!isPrismaMissingColumnError(error)) throw error;
+          if (!isLegacySpaceSettingShapeError(error)) throw error;
           // Legacy DB schema fallback: only guaranteed baseline setting fields.
           await db.spaceSetting.upsert({
             where: { spaceId: user.space.id },
@@ -204,7 +222,7 @@ export async function POST(req: NextRequest) {
             create: { spaceId: user.space.id, intakePageTitle, intakePageIntro, businessName }
           });
         } catch (error) {
-          if (!isPrismaMissingColumnError(error)) throw error;
+          if (!isLegacySpaceSettingShapeError(error)) throw error;
           await db.spaceSetting.upsert({
             where: { spaceId: user.space.id },
             update: {},
@@ -253,7 +271,7 @@ export async function POST(req: NextRequest) {
           }
         });
       } catch (error) {
-        if (!isPrismaMissingColumnError(error)) throw error;
+        if (!isLegacySpaceSettingShapeError(error)) throw error;
         // Some environments have an older SpaceSetting table. Create a space with
         // baseline settings only so onboarding can proceed instead of hard-failing.
         space = await db.space.create({
@@ -289,14 +307,19 @@ export async function POST(req: NextRequest) {
         create: { spaceId: user.space.id, notifications: emailNotifications }
       });
 
-      await db.spaceSetting.update({
-        where: { spaceId: user.space.id },
-        data: {
-          myConnections: JSON.stringify({
-            defaultSubmissionStatus: defaultSubmissionStatus || 'New'
-          })
-        }
-      });
+      try {
+        await db.spaceSetting.update({
+          where: { spaceId: user.space.id },
+          data: {
+            myConnections: JSON.stringify({
+              defaultSubmissionStatus: defaultSubmissionStatus || 'New'
+            })
+          }
+        });
+      } catch (error) {
+        if (!isLegacySpaceSettingShapeError(error)) throw error;
+        // Optional legacy field write; safe to skip.
+      }
 
       return NextResponse.json({ success: true });
     }
