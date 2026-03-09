@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
+  PhoneIncoming,
   Briefcase,
   Bot,
   User,
@@ -28,6 +29,7 @@ import { BrandLogo } from '@/components/brand-logo';
 const navItems = [
   { href: '', label: 'Overview', icon: LayoutDashboard },
   { href: '/contacts', label: 'Clients', icon: Users },
+  { href: '/leads', label: 'Leads', icon: PhoneIncoming },
   { href: '/deals', label: 'Deals', icon: Briefcase },
   { href: '/ai', label: 'AI Assistant', icon: Bot },
   { href: '/profile', label: 'Profile', icon: User },

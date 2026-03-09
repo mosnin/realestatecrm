@@ -1,10 +1,12 @@
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import { getSpaceFromSubdomain } from '@/lib/space';
 import { db } from '@/lib/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Briefcase, DollarSign, TrendingUp } from 'lucide-react';
+import { Users, Briefcase, DollarSign, TrendingUp, Link2, ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
-import { rootDomain } from '@/lib/utils';
+import { protocol, rootDomain } from '@/lib/utils';
+import { CopyLinkButton } from './copy-link-button';
 
 export async function generateMetadata({
   params
@@ -24,7 +26,7 @@ export default async function DashboardPage({
   const space = await getSpaceFromSubdomain(subdomain);
   if (!space) notFound();
 
-  const [contactCount, dealCount, deals, stages] = await Promise.all([
+  const [contactCount, dealCount, deals, stages, inboundLeads] = await Promise.all([
     db.contact.count({ where: { spaceId: space.id } }),
     db.deal.count({ where: { spaceId: space.id } }),
     db.deal.findMany({
@@ -34,6 +36,12 @@ export default async function DashboardPage({
     db.dealStage.findMany({
       where: { spaceId: space.id },
       orderBy: { position: 'asc' }
+    }),
+    db.contact.findMany({
+      where: { spaceId: space.id, tags: { has: 'application-link' } },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { id: true, name: true, phone: true, createdAt: true }
     })
   ]);
 
@@ -49,6 +57,8 @@ export default async function DashboardPage({
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+
+  const applicationUrl = `${protocol}://${space.subdomain}.${rootDomain}/apply/${space.subdomain}`;
 
   return (
     <div className="space-y-6">
@@ -101,6 +111,45 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Link2 size={16} className="text-primary" />
+            Application Link
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center gap-3">
+            <code className="text-xs md:text-sm bg-surface border border-border rounded-md px-3 py-2 break-all">{applicationUrl}</code>
+            <CopyLinkButton url={applicationUrl} />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Share this link in listing replies, social bio, or email signatures. New submissions show up in Leads.
+          </p>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Recent inbound leads</p>
+              <Link href={`/s/${subdomain}/leads`} className="text-sm text-primary inline-flex items-center gap-1 hover:underline">
+                View all <ArrowRight size={14} />
+              </Link>
+            </div>
+            {inboundLeads.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No leads yet from the application link.</p>
+            ) : (
+              <div className="space-y-2">
+                {inboundLeads.map((lead) => (
+                  <div key={lead.id} className="rounded-md border border-border px-3 py-2 text-sm">
+                    <p className="font-medium">{lead.name}</p>
+                    <p className="text-muted-foreground text-xs">{lead.phone} • {new Date(lead.createdAt).toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Deals by stage */}
       <Card>
