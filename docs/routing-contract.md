@@ -32,3 +32,9 @@ Chippi does **not** use tenant subdomains.
 - Workspace identity is the `slug` field on `Space`.
 - Routing identity comes only from path params (`/s/:slug`, `/apply/:slug`).
 - Identity must never be inferred from host headers, hostname, or subdomain parsing.
+
+## Storage mapping note
+
+Runtime uses `Space.slug`. For deploy safety, the Prisma model maps this field to the existing DB column via `@map("subdomain")`.
+
+This keeps runtime slug-only while avoiding destructive column renames during rollout.

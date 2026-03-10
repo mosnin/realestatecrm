@@ -1,8 +1,8 @@
 import { protocol, rootDomain } from '@/lib/utils';
 
 /**
- * Single source of truth for slug/slug handling.
- * Chippi uses path slugs (`/apply/:slug`) and never slug URLs.
+ * Single source of truth for slug handling.
+ * Chippi uses path slugs (`/apply/:slug`) and never host-based tenant URLs.
  */
 export function normalizeSlug(raw: string) {
   return raw.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
