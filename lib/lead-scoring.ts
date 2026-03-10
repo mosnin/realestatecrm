@@ -63,6 +63,10 @@ export async function scoreLeadApplication(input: {
     const openai = getOpenAIClient();
     const prompt = toPrompt(input);
 
+    // OpenAI structured outputs (strict: true) only support a subset of
+    // JSON Schema. Constraints like minimum/maximum are NOT supported and
+    // cause the API call to fail. Range validation is handled by the Zod
+    // schema after parsing instead.
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       temperature: 0,
@@ -75,7 +79,7 @@ export async function scoreLeadApplication(input: {
             type: 'object',
             additionalProperties: false,
             properties: {
-              leadScore: { type: 'number', minimum: 0, maximum: 100 },
+              leadScore: { type: 'number' },
               scoreLabel: { type: 'string', enum: ['hot', 'warm', 'cold', 'unscored'] },
               scoreSummary: { type: 'string' }
             },
@@ -134,17 +138,19 @@ export async function scoreLeadApplication(input: {
     }
 
     const safe = parsed.data;
+    // Clamp score to 0-100 as a safety net
+    const clampedScore = Math.max(0, Math.min(100, Math.round(safe.leadScore)));
     console.info('[lead-scoring] success', {
       contactId: input.contactId,
-      leadScore: safe.leadScore,
+      leadScore: clampedScore,
       scoreLabel: safe.scoreLabel
     });
 
     return {
       scoringStatus: 'scored',
-      leadScore: safe.leadScore,
+      leadScore: clampedScore,
       scoreLabel: safe.scoreLabel,
-      scoreSummary: safe.scoreSummary
+      scoreSummary: safe.scoreSummary.slice(0, 300)
     };
   } catch (error) {
     console.error('[lead-scoring] provider call failed', { contactId: input.contactId, error });
