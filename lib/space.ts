@@ -1,8 +1,10 @@
 import { db } from '@/lib/db';
+import { normalizeSlug } from '@/lib/intake';
 
-export async function getSpaceFromSubdomain(subdomain: string) {
+export async function getSpaceFromSlug(inputSlug: string) {
+  const slug = normalizeSlug(inputSlug);
   return db.space.findUnique({
-    where: { subdomain }
+    where: { slug }
   });
 }
 

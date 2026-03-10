@@ -20,12 +20,12 @@ const navItems = [
 ];
 
 interface MobileNavProps {
-  subdomain: string;
+  slug: string;
 }
 
-export function MobileNav({ subdomain }: MobileNavProps) {
+export function MobileNav({ slug }: MobileNavProps) {
   const pathname = usePathname();
-  const base = `/s/${subdomain}`;
+  const base = `/s/${slug}`;
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex safe-area-bottom">

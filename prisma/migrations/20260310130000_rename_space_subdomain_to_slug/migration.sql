@@ -1,0 +1,2 @@
+-- No-op: runtime uses `Space.slug` mapped to DB column `subdomain` via Prisma `@map`.
+-- This avoids destructive column renames and enables safer deploy rollout.

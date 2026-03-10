@@ -1,6 +1,8 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
+import { getOnboardingStatus, shouldBackfillOnboardFromSpace } from '@/lib/onboarding';
+import { resolveDashboardEntry } from '@/lib/onboarding-routing';
 
 export default async function DashboardRedirectPage() {
   const { userId } = await auth();
@@ -12,28 +14,35 @@ export default async function DashboardRedirectPage() {
       include: { space: true }
     });
 
-    const onboardingCompleted = !!user?.onboardingCompletedAt || !!user?.space;
-    console.info('[onboarding-guard] /dashboard read', {
-      clerkId: userId,
-      onboardingCompleted,
-      hasSpace: !!user?.space
-    });
-
-    if (user?.space) {
-      // Legacy accounts may have a workspace but missing onboardingCompletedAt.
-      // Treat workspace existence as completed to avoid onboarding loops.
-      if (!user.onboardingCompletedAt) {
-        await db.user
-          .update({
-            where: { id: user.id },
-            data: { onboardingCompletedAt: new Date(), onboardingCurrentStep: 7 }
-          })
-          .catch(() => null);
-      }
-      redirect(`/s/${user.space.subdomain}`);
+    if (shouldBackfillOnboardFromSpace(user)) {
+      await db.user
+        .update({
+          where: { id: user!.id },
+          data: { onboard: true, onboardingCompletedAt: new Date(), onboardingCurrentStep: 7 }
+        })
+        .catch(() => null);
     }
 
-    // Missing workspace still recovers via onboarding flow.
+    const onboarding = getOnboardingStatus(user);
+
+    const dashboardResolution = resolveDashboardEntry({
+      isOnboarded: onboarding.isOnboarded,
+      hasSpace: onboarding.hasSpace
+    });
+
+    if (dashboardResolution === 'redirect_workspace' && user?.space) {
+      redirect(`/s/${user.space.slug}`);
+    }
+
+    if (dashboardResolution === 'repair_and_redirect_onboarding' && user) {
+      await db.user
+        .update({
+          where: { id: user.id },
+          data: { onboard: false, onboardingCompletedAt: null, onboardingCurrentStep: 1 }
+        })
+        .catch(() => null);
+    }
+
     redirect('/onboarding');
   } catch (error) {
     console.error('[onboarding-guard] /dashboard read failed', { clerkId: userId, error });

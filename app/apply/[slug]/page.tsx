@@ -1,16 +1,16 @@
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
-import { getSpaceFromSubdomain } from '@/lib/space';
+import { getSpaceFromSlug } from '@/lib/space';
 import { ApplicationForm } from './application-form';
 import { Clock, Users, FileText, ArrowRight } from 'lucide-react';
 
 export default async function PublicApplyPage({
   params,
 }: {
-  params: Promise<{ subdomain: string }>;
+  params: Promise<{ slug: string }>;
 }) {
-  const { subdomain } = await params;
-  const space = await getSpaceFromSubdomain(subdomain);
+  const { slug } = await params;
+  const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
   const settings = await db.spaceSetting.findUnique({
@@ -50,7 +50,7 @@ export default async function PublicApplyPage({
           </div>
 
           {/* Form */}
-          <ApplicationForm subdomain={subdomain} businessName={businessName} />
+          <ApplicationForm slug={slug} businessName={businessName} />
 
           {/* Value section */}
           <div className="pt-6 border-t border-border/50">

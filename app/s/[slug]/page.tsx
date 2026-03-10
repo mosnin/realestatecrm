@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { getSpaceFromSubdomain } from '@/lib/space';
+import { getSpaceFromSlug } from '@/lib/space';
 import { db } from '@/lib/db';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -14,16 +14,16 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import type { Metadata } from 'next';
-import { protocol, rootDomain } from '@/lib/utils';
+import { buildIntakeUrl } from '@/lib/intake';
 import { CopyLinkButton } from './copy-link-button';
 
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ subdomain: string }>;
+  params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const { subdomain } = await params;
-  return { title: `${subdomain} — Chippi` };
+  const { slug } = await params;
+  return { title: `${slug} — Chippi` };
 }
 
 function timeAgo(date: Date): string {
@@ -39,10 +39,10 @@ function timeAgo(date: Date): string {
 export default async function DashboardPage({
   params,
 }: {
-  params: Promise<{ subdomain: string }>;
+  params: Promise<{ slug: string }>;
 }) {
-  const { subdomain } = await params;
-  const space = await getSpaceFromSubdomain(subdomain);
+  const { slug } = await params;
+  const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
   const [contactCount, dealCount, deals, stages, recentLeads, newLeadCount] =
@@ -85,7 +85,7 @@ export default async function DashboardPage({
       maximumFractionDigits: 0,
     }).format(n);
 
-  const intakeUrl = `${protocol}://${rootDomain}/apply/${space.subdomain}`;
+  const intakeUrl = buildIntakeUrl(space.slug);
   const totalLeads = await db.contact.count({
     where: { spaceId: space.id, tags: { has: 'application-link' } },
   });
@@ -103,7 +103,7 @@ export default async function DashboardPage({
           </p>
         </div>
         <Link
-          href={`/s/${subdomain}/leads`}
+          href={`/s/${slug}/leads`}
           className="hidden sm:flex items-center gap-1.5 text-sm text-primary font-medium hover:underline underline-offset-2"
         >
           View all leads <ArrowRight size={14} />
@@ -212,7 +212,7 @@ export default async function DashboardPage({
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-semibold">Recent applications</p>
             <Link
-              href={`/s/${subdomain}/leads`}
+              href={`/s/${slug}/leads`}
               className="text-xs text-primary font-medium hover:underline underline-offset-2 flex items-center gap-1"
             >
               View all <ArrowRight size={12} />
@@ -235,7 +235,7 @@ export default async function DashboardPage({
               {recentLeads.map((lead) => {
                 const isNew = lead.tags.includes('new-lead');
                 return (
-                  <Link key={lead.id} href={`/s/${subdomain}/leads`}>
+                  <Link key={lead.id} href={`/s/${slug}/leads`}>
                     <div className={`rounded-xl border bg-card px-4 py-3 hover:shadow-sm transition-all duration-150 ${isNew ? 'border-primary/30' : 'border-border'}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 min-w-0">
@@ -290,7 +290,7 @@ export default async function DashboardPage({
                 <div className="text-center py-4">
                   <p className="text-xs text-muted-foreground">No active deals.</p>
                   <Link
-                    href={`/s/${subdomain}/deals`}
+                    href={`/s/${slug}/deals`}
                     className="text-xs text-primary font-medium hover:underline mt-1 inline-block"
                   >
                     Go to deals →

@@ -33,7 +33,7 @@ Dev server runs at `http://localhost:3000` with Turbopack.
 | OpenAI | Lead scoring, embeddings, AI assistant | `OPENAI_API_KEY` |
 | Anthropic | AI assistant fallback | `ANTHROPIC_API_KEY` |
 | Zilliz/Milvus | Vector search (RAG context) | `ZILLIZ_URI`, `ZILLIZ_TOKEN` |
-| Upstash Redis | Legacy admin/subdomain path | `KV_REST_API_URL`, `KV_REST_API_TOKEN` |
+| Upstash Redis | Legacy admin/slug path | `KV_REST_API_URL`, `KV_REST_API_TOKEN` |
 
 ---
 
@@ -47,7 +47,7 @@ Run these after any change to confirm nothing is fundamentally broken:
 - [ ] Sign-in page loads at `/sign-in`
 - [ ] Authenticated user hitting `/dashboard` is routed correctly (to workspace or onboarding)
 - [ ] `/onboarding` route is accessible for authenticated users
-- [ ] Workspace route `/s/[subdomain]` resolves for valid subdomain
+- [ ] Workspace route `/s/[slug]` resolves for valid slug
 
 ---
 
@@ -58,18 +58,18 @@ Run these after any change to confirm nothing is fundamentally broken:
 - [ ] New user is redirected to `/onboarding` from `/dashboard`
 - [ ] Step 1 (Welcome) renders and "Get started" advances to step 2
 - [ ] Step 2 (Profile) saves name, phone, business name
-- [ ] Step 3 (Intake link) creates Space + subdomain, slug validation works, taken slugs are rejected
+- [ ] Step 3 (Intake link) creates Space + slug, slug validation works, taken slugs are rejected
 - [ ] Step 4 (Application flow) informational screen renders
 - [ ] Step 5 (Notifications) saves notification preferences
 - [ ] Step 6 (CRM preview) renders mock lead card
-- [ ] Step 7 (Go live) shows intake link, copy button works, "Go to my CRM" completes onboarding and redirects to `/s/[subdomain]`
+- [ ] Step 7 (Go live) shows intake link, copy button works, "Go to my CRM" completes onboarding and redirects to `/s/[slug]`
 - [ ] `User.onboardingCompletedAt` is set after completion
 - [ ] Returning to `/dashboard` after completion redirects to workspace
 
 ### B. Intake link and application submission
 
-- [ ] Public apply page loads at `/apply/[valid-subdomain]`
-- [ ] Public apply page returns 404 for invalid subdomain
+- [ ] Public apply page loads at `/apply/[valid-slug]`
+- [ ] Public apply page returns 404 for invalid slug
 - [ ] Form requires name and phone (cannot submit without)
 - [ ] Successful submission shows confirmation with scoring result
 - [ ] Submission creates a Contact in the correct Space
@@ -89,22 +89,22 @@ Run these after any change to confirm nothing is fundamentally broken:
 
 ### D. CRM rendering and actions
 
-- [ ] Leads page (`/s/[subdomain]/leads`) shows intake-sourced contacts
+- [ ] Leads page (`/s/[slug]/leads`) shows intake-sourced contacts
 - [ ] Leads page clears `new-lead` tag from contacts on page load
 - [ ] Unread count badge decrements after viewing leads
 - [ ] Score, budget, timeline, areas, notes render correctly on lead cards
-- [ ] Contacts page (`/s/[subdomain]/contacts`) loads and shows all contacts
+- [ ] Contacts page (`/s/[slug]/contacts`) loads and shows all contacts
 - [ ] Contact creation via CRM form works (CRUD)
 - [ ] Contact type filter (QUALIFICATION, TOUR, APPLICATION) works
 - [ ] Contact search by name/email/phone/preferences works
-- [ ] Deals page (`/s/[subdomain]/deals`) loads with kanban board
+- [ ] Deals page (`/s/[slug]/deals`) loads with kanban board
 - [ ] Deals can be created with stage assignment
 - [ ] Deal drag-and-drop reorders within and across stages
 - [ ] Deal stage CRUD works (create, update, delete)
 
 ### E. AI assistant
 
-- [ ] Chat page (`/s/[subdomain]/ai`) loads
+- [ ] Chat page (`/s/[slug]/ai`) loads
 - [ ] Sending a message streams a response
 - [ ] Messages are persisted in `Message` table (both user and assistant)
 - [ ] Missing both `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` returns explicit error text
@@ -115,15 +115,15 @@ Run these after any change to confirm nothing is fundamentally broken:
 ### F. Auth checks
 
 - [ ] Unauthenticated user accessing `/dashboard` is redirected to `/sign-in`
-- [ ] Unauthenticated user accessing `/s/[subdomain]` is redirected to `/sign-in`
+- [ ] Unauthenticated user accessing `/s/[slug]` is redirected to `/sign-in`
 - [ ] Unauthenticated user accessing `/onboarding` is redirected to `/sign-in`
 - [ ] Authenticated user can access all intended routes
-- [ ] `/apply/[subdomain]` is accessible without auth (public)
+- [ ] `/apply/[slug]` is accessible without auth (public)
 - [ ] API routes return 401 for unauthenticated requests (except `/api/public/apply`)
 
 ### G. Settings
 
-- [ ] Settings page (`/s/[subdomain]/settings`) loads with current values
+- [ ] Settings page (`/s/[slug]/settings`) loads with current values
 - [ ] Saving settings persists changes
 - [ ] Workspace deletion works and redirects to `/`
 - [ ] Anthropic API key field saves and is used by AI assistant

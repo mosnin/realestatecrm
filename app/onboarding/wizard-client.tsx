@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { BrandLogo } from '@/components/brand-logo';
-import { protocol, rootDomain } from '@/lib/utils';
+import { buildIntakePath, buildIntakeUrl } from '@/lib/intake';
 import {
   CheckCircle2,
   ArrowRight,
@@ -47,7 +47,7 @@ interface OnboardingState {
   } | null;
   space: {
     id: string;
-    subdomain: string;
+    slug: string;
     name: string;
     settings: {
       businessName?: string | null;
@@ -233,7 +233,7 @@ function StepIntakeLink({
   spaceExists,
   onCreateSpace
 }: {
-  onNext: (subdomain: string) => void;
+  onNext: (slug: string) => void;
   onBack: () => void;
   initialSlug: string;
   initialTitle: string;
@@ -241,11 +241,11 @@ function StepIntakeLink({
   businessName: string;
   spaceExists: boolean;
   onCreateSpace: (data: {
-    subdomain: string;
+    slug: string;
     intakePageTitle: string;
     intakePageIntro: string;
     businessName: string;
-  }) => Promise<{ subdomain: string }>;
+  }) => Promise<{ slug: string }>;
 }) {
   const [slug, setSlug] = useState(initialSlug);
   const [title, setTitle] = useState(initialTitle || 'Rental Application');
@@ -279,20 +279,20 @@ function StepIntakeLink({
     return () => clearTimeout(timer);
   }, [slug, checkSlug]);
 
-  const previewUrl = `${protocol}://${rootDomain}/apply/${slug || 'your-slug'}`;
+  const previewUrl = buildIntakeUrl(slug || 'your-slug');
 
   async function handleNext() {
     if (!slug || !title || slugAvailable === false) return;
     setSaving(true);
     setError('');
     try {
-      const { subdomain } = await onCreateSpace({
-        subdomain: slug,
+      const { slug: createdSlug } = await onCreateSpace({
+        slug,
         intakePageTitle: title,
         intakePageIntro: intro,
         businessName
       });
-      onNext(subdomain);
+      onNext(createdSlug);
     } catch (e: any) {
       setError(e.message || 'Something went wrong. Try a different slug.');
     } finally {
@@ -518,12 +518,12 @@ function StepNotifications({
 function StepCRMPreview({
   onNext,
   onBack,
-  subdomain,
+  slug,
   businessName
 }: {
   onNext: () => void;
   onBack: () => void;
-  subdomain: string;
+  slug: string;
   businessName: string;
 }) {
   return (
@@ -590,16 +590,16 @@ function StepCRMPreview({
 
 // Step 7: Go Live
 function StepGoLive({
-  subdomain,
+  slug,
   onComplete
 }: {
-  subdomain: string;
+  slug: string;
   onComplete: () => void;
 }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [completing, setCompleting] = useState(false);
-  const intakeUrl = `${protocol}://${rootDomain}/apply/${subdomain}`;
+  const intakeUrl = buildIntakeUrl(slug);
 
   async function copyLink() {
     await navigator.clipboard.writeText(intakeUrl);
@@ -612,7 +612,7 @@ function StepGoLive({
     setCompleting(true);
     try {
       await onComplete();
-      router.push(`/s/${subdomain}`);
+      router.push(`/s/${slug}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to complete onboarding.');
       setCompleting(false);
@@ -622,7 +622,7 @@ function StepGoLive({
   async function handleTestApp() {
     try {
       await onComplete();
-      window.open(`/apply/${subdomain}`, '_blank');
+      window.open(buildIntakePath(slug), '_blank');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to complete onboarding.');
     }
@@ -651,7 +651,7 @@ function StepGoLive({
           {copied ? 'Copied!' : 'Copy link'}
         </Button>
         <Button variant="outline" asChild className="gap-2 text-sm">
-          <a href={`/apply/${subdomain}`} target="_blank" rel="noreferrer">
+          <a href={buildIntakePath(slug)} target="_blank" rel="noreferrer">
             <ExternalLink size={15} /> Preview form
           </a>
         </Button>
@@ -676,7 +676,7 @@ function StepGoLive({
 
 export function OnboardingWizard({ initialState, clerkName, clerkEmail }: WizardProps) {
   const [step, setStep] = useState(initialState.step ?? 1);
-  const [subdomain, setSubdomain] = useState(initialState.space?.subdomain ?? '');
+  const [slug, setSlug] = useState(initialState.space?.slug ?? '');
   const [businessName, setBusinessName] = useState(
     initialState.space?.settings?.businessName ?? ''
   );
@@ -685,7 +685,7 @@ export function OnboardingWizard({ initialState, clerkName, clerkEmail }: Wizard
   const prefillName = initialState.user?.name ?? clerkName ?? '';
   const prefillEmail = initialState.user?.email ?? clerkEmail;
   const prefillPhone = initialState.space?.settings?.phoneNumber ?? '';
-  const prefillSlug = initialState.space?.subdomain ?? '';
+  const prefillSlug = initialState.space?.slug ?? '';
   const prefillTitle = initialState.space?.settings?.intakePageTitle ?? '';
   const prefillIntro = initialState.space?.settings?.intakePageIntro ?? '';
   const prefillNotifications = initialState.space?.settings?.notifications ?? true;
@@ -724,7 +724,7 @@ export function OnboardingWizard({ initialState, clerkName, clerkEmail }: Wizard
   }
 
   async function handleCreateSpace(data: {
-    subdomain: string;
+    slug: string;
     intakePageTitle: string;
     intakePageIntro: string;
     businessName: string;
@@ -734,15 +734,15 @@ export function OnboardingWizard({ initialState, clerkName, clerkEmail }: Wizard
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'create_space', ...data })
     });
-    let json: { error?: string; subdomain?: string } = {};
+    let json: { error?: string; slug?: string } = {};
     try {
       json = await res.json();
     } catch {
       throw new Error('Server error — please try again.');
     }
     if (!res.ok) throw new Error(json.error || 'Failed to create intake link');
-    setSubdomain(json.subdomain ?? data.subdomain);
-    return { subdomain: json.subdomain ?? data.subdomain };
+    setSlug(json.slug ?? data.slug);
+    return { slug: json.slug ?? data.slug };
   }
 
   async function handleNotificationsSave(data: {
@@ -805,13 +805,13 @@ export function OnboardingWizard({ initialState, clerkName, clerkEmail }: Wizard
 
             {step === 3 && (
               <StepIntakeLink
-                onNext={(sub) => { setSubdomain(sub); goTo(4); }}
+                onNext={(sub) => { setSlug(sub); goTo(4); }}
                 onBack={() => goTo(2)}
-                initialSlug={subdomain || prefillSlug}
+                initialSlug={slug || prefillSlug}
                 initialTitle={prefillTitle}
                 initialIntro={prefillIntro}
                 businessName={businessName}
-                spaceExists={!!initialState.space || !!subdomain}
+                spaceExists={!!initialState.space || !!slug}
                 onCreateSpace={handleCreateSpace}
               />
             )}
@@ -836,14 +836,14 @@ export function OnboardingWizard({ initialState, clerkName, clerkEmail }: Wizard
               <StepCRMPreview
                 onNext={() => goTo(7)}
                 onBack={() => goTo(5)}
-                subdomain={subdomain}
+                slug={slug}
                 businessName={businessName}
               />
             )}
 
             {step === 7 && (
               <StepGoLive
-                subdomain={subdomain}
+                slug={slug}
                 onComplete={handleComplete}
               />
             )}

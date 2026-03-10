@@ -11,11 +11,11 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserButton } from '@clerk/nextjs';
 import { Link2, ArrowUpRight, ExternalLink } from 'lucide-react';
-import { protocol, rootDomain } from '@/lib/utils';
+import { buildIntakeUrl } from '@/lib/intake';
 import { CopyLinkButton } from '../copy-link-button';
 
 export default function ProfilePage() {
-  const params = useParams<{ subdomain: string }>();
+  const params = useParams<{ slug: string }>();
   const { user, isLoaded } = useUser();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -54,10 +54,8 @@ export default function ProfilePage() {
     .join('')
     .toUpperCase() || user.emailAddresses[0]?.emailAddress?.[0]?.toUpperCase() || 'U';
 
-  const subdomain = params?.subdomain;
-  const applicationUrl = subdomain
-    ? `${protocol}://${subdomain}.${rootDomain}/apply/${subdomain}`
-    : '';
+  const slug = params?.slug;
+  const applicationUrl = slug ? buildIntakeUrl(slug) : '';
 
   return (
     <div className="space-y-5 max-w-xl">
