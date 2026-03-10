@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserButton } from '@clerk/nextjs';
 import { Link2, ArrowUpRight, ExternalLink } from 'lucide-react';
-import { protocol, rootDomain } from '@/lib/utils';
+import { buildIntakeUrl } from '@/lib/intake';
 import { CopyLinkButton } from '../copy-link-button';
 
 export default function ProfilePage() {
@@ -55,9 +55,7 @@ export default function ProfilePage() {
     .toUpperCase() || user.emailAddresses[0]?.emailAddress?.[0]?.toUpperCase() || 'U';
 
   const subdomain = params?.subdomain;
-  const applicationUrl = subdomain
-    ? `${protocol}://${subdomain}.${rootDomain}/apply/${subdomain}`
-    : '';
+  const applicationUrl = subdomain ? buildIntakeUrl(subdomain) : '';
 
   return (
     <div className="space-y-5 max-w-xl">

@@ -87,7 +87,7 @@ export default async function OnboardingPage() {
       });
       // Re-check: if the upsert found an existing user WITH a space, redirect now.
       if (dbUser.space) {
-        if (!dbUser.onboardingCompletedAt) {
+        if (shouldBackfillOnboardingCompletion(dbUser)) {
           await db.user
             .update({
               where: { id: dbUser.id },
@@ -113,7 +113,7 @@ export default async function OnboardingPage() {
 
   const initialState = {
     step: dbUser?.onboardingCurrentStep ?? 1,
-    completed: !!dbUser?.space,
+    completed: getOnboardingStatus(dbUser).isOnboarded,
     user: {
       id: dbUser?.id ?? '',
       name: dbUser?.name ?? null,
