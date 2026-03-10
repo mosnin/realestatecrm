@@ -1,97 +1,148 @@
 # AGENTS.md
 
-AI operating manual for the Chippi repository.
+Operating manual for AI coding agents working in the Chippi repository.
 
-## 1) Project summary
+All AI agents must read and follow this file before making any changes.
 
-Chippi is a self-serve SaaS for U.S. realtors focused on faster lead handling through intake, qualification, follow-up, and lightweight CRM workflows.
+---
 
-## 2) Current wedge (must protect)
+## 1. Project summary
 
-Current launch wedge:
-- renter + leasing lead qualification
-- for new solo realtors
-- fast setup and activation
-- practical, explainable AI assistance
+Chippi is a self-serve SaaS for U.S. realtors focused on faster lead handling through intake, qualification, follow-up, and lightweight CRM workflows. The product emphasizes speed, clarity, and a polished brand experience for solo realtors handling renter and leasing leads.
 
-Do **not** treat this repo as a “generic CRM expansion” project unless explicitly instructed.
+**Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind 4, Prisma 7 (PostgreSQL), Clerk (auth), OpenAI (scoring + embeddings), Anthropic SDK (assistant fallback), Zilliz/Milvus (vector search), Upstash Redis (legacy metadata), Vercel (deployment target).
 
-## 3) In-scope vs out-of-scope behavior
+---
+
+## 2. Current wedge (must protect)
+
+The launch wedge is narrow and intentional:
+
+- **Who**: new solo realtors in the U.S.
+- **What**: renter and leasing lead qualification
+- **How**: fast setup, intake link activation, explainable AI-assisted scoring, lightweight CRM
+- **Activation event**: intake link generation
+- **Retention signal**: completed applications and repeated workflow use
+
+Do **not** treat this repo as a generic CRM expansion project unless explicitly instructed.
+
+---
+
+## 3. In-scope vs out-of-scope behavior
 
 ### In scope by default
-- small, targeted bug fixes
-- copy updates
-- scoped UI fixes
-- documentation updates
-- narrow improvements to existing requested surfaces
+
+- Small, targeted bug fixes
+- Copy and text updates
+- Scoped UI fixes within existing components
+- Documentation updates
+- Narrow improvements to existing surfaces when explicitly requested
 
 ### Out of scope by default
-- new feature development
-- broad refactors
-- architecture rewrites
-- changing product direction
-- any edits to protected systems (below) without explicit instruction
 
-## 4) Safe workflow for AI agents
+- New feature development
+- Broad refactors or architecture rewrites
+- Changing product direction or scope
+- Adding libraries or dependencies
+- Any edits to protected systems (see section 5) without explicit instruction
+
+---
+
+## 4. Safe workflow for AI agents
 
 Follow this order for every task:
-1. Read relevant files first.
-2. Map code path and system boundary.
-3. Explain diagnosis/plan.
-4. Edit only what task requires.
-5. Validate with commands/manual checks.
-6. Report exact files changed + test evidence.
 
-## 5) Protected areas (explicit)
+1. **Read** relevant files first. Understand the current state.
+2. **Map** the code path and system boundary. Identify which workflow(s) are involved.
+3. **Diagnose** before editing. Explain the root cause or plan.
+4. **Edit** only what the task requires. No cleanup, no drive-by refactors.
+5. **Validate** with commands, manual checks, or build verification.
+6. **Report** exact files changed, why each changed, and how changes were tested.
 
-Do not modify these unless task explicitly requires it:
-1. Onboarding logic (`/onboarding`, `/api/onboarding`)
-2. Public application flow (`/apply`, `/api/public/apply`)
-3. AI prompts / assistant behavior (`lib/ai.ts`)
-4. Lead scoring logic/contracts (`lib/lead-scoring.ts`)
-5. Model configuration/provider routing (OpenAI/Anthropic choices)
-6. CRM state/pipeline logic (contacts/deals/stages APIs and data contracts)
-7. Auth and middleware (Clerk + `middleware.ts`)
-8. Billing-related behavior (if/when implemented)
-9. Database schema/migrations (`prisma/schema.prisma`, `prisma/migrations/*`)
-10. Deployment/build config (`next.config.ts`, build scripts)
-11. Core routing behavior and guard logic
-12. Environment variable handling
+### Pre-edit checklist
 
-## 6) Expected output format by task type
+- [ ] Read all files that will be modified
+- [ ] Confirmed the change stays within one workflow boundary
+- [ ] Confirmed no protected system is touched unless task requires it
+- [ ] Confirmed the change does not introduce new dependencies or features
+
+---
+
+## 5. Protected areas (explicit)
+
+Do **not** modify these unless the task explicitly requires it:
+
+| # | Protected system | Key files |
+|---|---|---|
+| 1 | Onboarding logic | `app/onboarding/*`, `app/api/onboarding/route.ts` |
+| 2 | Application flow logic | `app/apply/*`, `app/api/public/apply/route.ts` |
+| 3 | AI prompts | `lib/ai.ts` (system prompt, provider routing) |
+| 4 | Scoring logic | `lib/lead-scoring.ts` (prompt, schema, thresholds, fallback) |
+| 5 | OpenAI / model configuration | Model names, temperature, response format in `lib/lead-scoring.ts` and `lib/ai.ts` |
+| 6 | CRM state logic | `app/api/contacts/*`, `app/api/deals/*`, `app/api/stages/*` |
+| 7 | Auth | `middleware.ts`, `app/(auth)/*`, Clerk configuration |
+| 8 | Billing | `SpaceSetting.billingSettings`, any future Stripe routes |
+| 9 | Database schema and migrations | `prisma/schema.prisma`, `prisma/migrations/*` |
+| 10 | Deployment configuration | `next.config.ts`, `package.json` scripts, `scripts/*` |
+| 11 | Core routing and middleware | `middleware.ts`, route matchers, redirect logic |
+| 12 | Environment variable handling | `lib/utils.ts` (protocol/domain), `lib/db.ts`, `lib/redis.ts` |
+
+---
+
+## 6. Expected output format by task type
 
 ### Bugfix tasks
-- Root cause
-- Files changed
-- Why fix is minimal/safe
-- Validation steps + results
-- Risks/rollback notes
 
-### Audit/orientation tasks
-- Current behavior map
-- Gaps/risks
-- Unknowns
-- No-change confirmation (if applicable)
+```
+- Root cause: <what caused the bug>
+- Files changed: <list>
+- Why fix is minimal/safe: <explanation>
+- Validation: <steps taken + results>
+- Risks: <side effects or none>
+- Rollback: <how to revert>
+```
+
+### Audit / orientation tasks
+
+```
+- Current behavior map: <what exists>
+- Gaps or risks: <what's missing or fragile>
+- Unknowns: <what could not be confirmed>
+- No-change confirmation: <confirm nothing was modified>
+```
 
 ### Feature tasks (only when explicitly requested)
-- Scope boundaries
-- Affected systems
-- Safety checks and migration impact
-- Test plan and rollback plan
 
-## 7) Definition of done for AI tasks
+```
+- Scope boundaries: <what this feature touches>
+- Affected systems: <list of workflows impacted>
+- Safety checks: <migration impact, protected system overlap>
+- Test plan: <how to verify>
+- Rollback plan: <how to undo>
+```
+
+---
+
+## 7. Definition of done for AI tasks
 
 A task is done only when:
-- requested scope is fully addressed
-- unrelated files are untouched
-- protected systems unchanged unless explicitly required
-- verification has been run and reported
-- final report includes files touched, reason, and checks
 
-## 8) Hard rules
+- [ ] Requested scope is fully addressed
+- [ ] Unrelated files are untouched
+- [ ] Protected systems unchanged unless explicitly required
+- [ ] Verification has been run and reported
+- [ ] Final report includes: files touched, reason for each change, and validation evidence
 
-1. Never edit AI/scoring/prompt systems unless explicitly told.
-2. Never add features unless explicitly told.
-3. Never refactor unrelated code while doing targeted work.
-4. Preserve behavior unless behavior change is requested.
-5. Prefer minimal, scoped edits over “cleanup.”
+---
+
+## 8. Hard rules
+
+1. **Never** edit AI prompts, scoring logic, or model configuration unless explicitly told.
+2. **Never** add features unless explicitly told.
+3. **Never** refactor unrelated code while doing targeted work.
+4. **Never** modify database schema or migrations unless explicitly told.
+5. **Preserve** existing behavior unless behavior change is specifically requested.
+6. **Prefer** minimal, scoped edits over cleanup or improvement.
+7. **Keep** changes within a single workflow boundary whenever possible.
+8. **Report** all files touched and why after every task.
+9. **Read** before writing. Always.
