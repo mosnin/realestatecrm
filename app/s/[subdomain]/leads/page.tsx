@@ -191,9 +191,15 @@ export default async function LeadsPage({
                     </div>
                   )}
                   {lead.scoringStatus === 'scored' && lead.leadScore != null && (
-                    <div className="inline-flex items-center gap-1.5 text-xs bg-emerald-50 rounded-md px-2.5 py-1.5 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 font-medium">
+                    <div className={`inline-flex items-center gap-1.5 text-xs rounded-md px-2.5 py-1.5 font-medium ${
+                      lead.scoreLabel === 'hot'
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                        : lead.scoreLabel === 'warm'
+                          ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                          : 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400'
+                    }`}>
                       <span>Score {Math.round(lead.leadScore)}</span>
-                      <span className="uppercase">{lead.scoreLabel ?? 'hot'}</span>
+                      <span className="uppercase">{lead.scoreLabel}</span>
                     </div>
                   )}
                   {lead.scoringStatus === 'failed' && (

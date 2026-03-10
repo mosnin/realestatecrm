@@ -31,20 +31,14 @@ export default async function OnboardingPage() {
         }
       }
     });
-  } catch {
+  } catch (err) {
+    console.error('[onboarding-page] DB read failed', { clerkId: userId, error: err });
     // Migration likely pending — fall through, wizard renders empty
   }
 
-  // Onboarding visibility depends only on onboarding completion.
-  // Workspace navigation is handled separately once completion is confirmed.
-  const onboardingCompleted = !!dbUser?.onboardingCompletedAt || !!dbUser?.space;
-  console.info('[onboarding-page] state read', {
-    clerkId: userId,
-    onboardingCompleted,
-    hasSpace: !!dbUser?.space
-  });
-
-  if (onboardingCompleted && dbUser?.space) {
+  // Space existence is the canonical "onboarding complete" signal.
+  // If the user has a space, redirect to workspace immediately.
+  if (dbUser?.space) {
     if (!dbUser.onboardingCompletedAt) {
       await db.user
         .update({
@@ -56,11 +50,28 @@ export default async function OnboardingPage() {
     redirect(`/s/${dbUser.space.subdomain}`);
   }
 
-  // Bootstrap user record if this is their first load
+  // If onboardingCompletedAt is set but space is missing, reset completion
+  // so the user can re-run onboarding to create their workspace.
+  if (dbUser?.onboardingCompletedAt && !dbUser.space) {
+    console.warn('[onboarding-page] completed but no space — resetting', { clerkId: userId });
+    await db.user
+      .update({
+        where: { id: dbUser.id },
+        data: { onboardingCompletedAt: null, onboardingCurrentStep: 1 }
+      })
+      .catch(() => null);
+    dbUser = { ...dbUser, onboardingCompletedAt: null, onboardingCurrentStep: 1 };
+  }
+
+  // Bootstrap user record if this is their first load.
+  // Use upsert to avoid unique-constraint errors when the initial findUnique
+  // failed for a transient reason but the user row already exists.
   if (!dbUser) {
     try {
-      dbUser = await db.user.create({
-        data: {
+      dbUser = await db.user.upsert({
+        where: { clerkId: userId },
+        update: {},
+        create: {
           clerkId: userId,
           email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
           name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
@@ -69,6 +80,18 @@ export default async function OnboardingPage() {
         },
         include: { space: { include: { settings: true } } }
       });
+      // Re-check: if the upsert found an existing user WITH a space, redirect now.
+      if (dbUser.space) {
+        if (!dbUser.onboardingCompletedAt) {
+          await db.user
+            .update({
+              where: { id: dbUser.id },
+              data: { onboardingCompletedAt: new Date(), onboardingCurrentStep: 7 }
+            })
+            .catch(() => null);
+        }
+        redirect(`/s/${dbUser.space.subdomain}`);
+      }
     } catch {
       // Still failing (migration pending) — wizard renders with Clerk data only
     }
@@ -85,7 +108,7 @@ export default async function OnboardingPage() {
 
   const initialState = {
     step: dbUser?.onboardingCurrentStep ?? 1,
-    completed: onboardingCompleted,
+    completed: !!dbUser?.space,
     user: {
       id: dbUser?.id ?? '',
       name: dbUser?.name ?? null,

@@ -20,7 +20,10 @@ export default async function DashboardLayout({
     return null; // Middleware handles redirect
   }
 
-  // Gate dashboard access until onboarding is complete
+  // Gate dashboard access until onboarding is complete.
+  // Space existence in the DB is the canonical signal — it means the user
+  // went through workspace creation. We verify against the space for the
+  // current subdomain below, so we only need a lightweight user check here.
   let onboardingCompleted = false;
   try {
     const dbUser = await db.user.findUnique({
@@ -30,7 +33,6 @@ export default async function DashboardLayout({
     onboardingCompleted = !!dbUser?.onboardingCompletedAt || !!dbUser?.space;
 
     if (dbUser?.space && !dbUser.onboardingCompletedAt) {
-      // Legacy accounts may have a workspace but missing onboardingCompletedAt.
       await db.user
         .update({
           where: { id: dbUser.id },
@@ -38,19 +40,16 @@ export default async function DashboardLayout({
         })
         .catch(() => null);
     }
-    console.info('[onboarding-guard] /s layout read', {
-      clerkId: userId,
-      subdomain,
-      onboardingCompleted
-    });
   } catch (error) {
     console.error('[onboarding-guard] /s layout read failed', {
       clerkId: userId,
       subdomain,
       error
     });
-    // DB schema mismatch (migration pending) — send to onboarding which will self-heal
-    redirect('/onboarding');
+    // On transient DB errors, allow the request through rather than
+    // bouncing completed users to onboarding. The space lookup below
+    // will 404 if the subdomain is truly invalid.
+    onboardingCompleted = true;
   }
   if (!onboardingCompleted) {
     redirect('/onboarding');

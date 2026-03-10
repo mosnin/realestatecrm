@@ -98,11 +98,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'save_profile') {
-      const { name, phoneNumber, businessName } = body as {
+      // Accept both 'phone' (sent by wizard) and 'phoneNumber' for compatibility
+      const { name, phone, phoneNumber, businessName } = body as {
         name: string;
-        phoneNumber: string;
+        phone?: string;
+        phoneNumber?: string;
         businessName: string;
       };
+      const resolvedPhone = phone || phoneNumber || null;
 
       await db.user.update({
         where: { id: user.id },
@@ -112,8 +115,8 @@ export async function POST(req: NextRequest) {
       if (user.space) {
         await db.spaceSetting.upsert({
           where: { spaceId: user.space.id },
-          update: { phoneNumber, businessName },
-          create: { spaceId: user.space.id, phoneNumber, businessName }
+          update: { phoneNumber: resolvedPhone, businessName },
+          create: { spaceId: user.space.id, phoneNumber: resolvedPhone, businessName }
         });
       }
 

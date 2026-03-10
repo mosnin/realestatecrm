@@ -124,6 +124,32 @@ export default async function ClientDetailPage({
         )}
       </div>
 
+      {/* Lead score */}
+      {contact.scoringStatus === 'scored' && contact.leadScore != null && (
+        <div className="rounded-2xl border border-border bg-card px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Lead score</p>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold tabular-nums">{Math.round(contact.leadScore)}</span>
+                <span className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-1 uppercase ${
+                  contact.scoreLabel === 'hot'
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                    : contact.scoreLabel === 'warm'
+                      ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                      : 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400'
+                }`}>
+                  {contact.scoreLabel}
+                </span>
+              </div>
+            </div>
+          </div>
+          {contact.scoreSummary && (
+            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{contact.scoreSummary}</p>
+          )}
+        </div>
+      )}
+
       {/* Application details */}
       <div className="rounded-2xl border border-border bg-card overflow-hidden">
         <div className="px-6 py-4 border-b border-border">
