@@ -2,11 +2,11 @@
 
 ## Canonical onboarding completion
 
-A user is considered onboarded **only** when they have a `Space` row linked to their user record.
+A user is considered onboarded **only** when `User.onboard === true`.
 
-- `User.onboardingCompletedAt` is metadata only.
-- If `Space` exists and timestamp is null, we backfill timestamp for legacy consistency.
-- If timestamp exists but `Space` is missing, onboarding is treated as incomplete.
+- `User.onboard` is the canonical source of truth for onboarding state.
+- Workspace existence is used only for one-way legacy backfill (`onboard=false && space exists` -> set `onboard=true`).
+- `onboardingCompletedAt` is metadata only.
 
 This contract is implemented in `lib/onboarding.ts` and used by:
 

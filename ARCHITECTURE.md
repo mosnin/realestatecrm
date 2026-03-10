@@ -8,7 +8,7 @@ System map for Chippi. Based on actual repository contents.
 ## 0. Non-negotiable runtime invariants
 
 1. **Slug-only identity**: Workspace identity is slug-only in runtime (`/s/:slug`, `/apply/:slug`). Never derive workspace identity from host/hostname/header parsing.
-2. **Canonical onboarding completion**: Onboarding completion is determined by workspace existence (`Space` relation), via `lib/onboarding.ts` helpers.
+2. **Canonical onboarding completion**: Onboarding completion is determined only by `User.onboard`, via `lib/onboarding.ts` helpers.
 3. **Canonical intake submission pipeline**: Public intake submissions must go through `app/api/public/apply/route.ts` with `publicApplicationSchema` validation and idempotency safeguards.
 4. **DB naming safety**: Runtime field is `Space.slug`, mapped to DB column `subdomain` via Prisma `@map` for deploy safety; do not perform destructive column renames without an explicit expand/contract plan.
 

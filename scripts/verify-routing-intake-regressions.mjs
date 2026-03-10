@@ -30,9 +30,10 @@ function expectNotContains(file, regex, message) {
   if (regex.test(body)) errors.push(`${rel(file)}: ${message}`);
 }
 
-// 1) Canonical onboarding helper must define onboarding by workspace slug-space existence.
+// 1) Canonical onboarding helper must define onboarding from user.onboard.
 const onboardingHelper = join(repoRoot, 'lib/onboarding.ts');
-expectContains(onboardingHelper, /isOnboarded:\s*hasSpace/, 'onboarding helper must define isOnboarded from hasSpace');
+expectContains(onboardingHelper, /isOnboarded:\s*!!user\?\.onboard/, 'onboarding helper must define isOnboarded from user.onboard');
+expectContains(join(repoRoot, 'prisma/schema.prisma'), /onboard\s+Boolean/, 'User model must include onboard boolean flag');
 
 // 2) Onboarding guards/pages must use shared helper.
 for (const requiredFile of [

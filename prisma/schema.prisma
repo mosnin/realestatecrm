@@ -17,6 +17,7 @@ model User {
   onboardingCurrentStep Int       @default(1)
   onboardingStartedAt   DateTime?
   onboardingCompletedAt DateTime?
+  onboard               Boolean   @default(false)
   space                 Space?
 }
 

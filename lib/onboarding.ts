@@ -1,31 +1,27 @@
 /**
- * Onboarding routing contract:
- * - Canonical completion signal: user has an attached workspace (space).
- * - `onboardingCompletedAt` is metadata and may be backfilled for legacy rows.
- * - If completion timestamp exists without a space, onboarding is incomplete.
+ * Canonical onboarding contract:
+ * - `user.onboard` is the single source of truth for onboarding completion.
+ * - Workspace existence is used only for one-way legacy backfill to make
+ *   `user.onboard` trustworthy over time.
  */
 type OnboardingUser = {
-  onboardingCompletedAt?: Date | null;
+  onboard?: boolean | null;
   space?: { id?: string } | null;
 } | null;
 
 export function getOnboardingStatus(user: OnboardingUser) {
-  const hasSpace = !!user?.space;
-
   return {
     hasUser: !!user,
-    hasSpace,
-    isOnboarded: hasSpace,
-    hasCompletionTimestamp: !!user?.onboardingCompletedAt
+    hasSpace: !!user?.space,
+    isOnboarded: !!user?.onboard,
   };
 }
 
-export function shouldBackfillOnboardingCompletion(user: OnboardingUser) {
+/**
+ * Legacy-heal path: old accounts may have a workspace but onboard=false.
+ * Backfill onboard=true once so every guard can rely on `user.onboard`.
+ */
+export function shouldBackfillOnboardFromSpace(user: OnboardingUser) {
   const status = getOnboardingStatus(user);
-  return status.hasUser && status.hasSpace && !status.hasCompletionTimestamp;
-}
-
-export function shouldResetOrphanedCompletion(user: OnboardingUser) {
-  const status = getOnboardingStatus(user);
-  return status.hasUser && !status.hasSpace && status.hasCompletionTimestamp;
+  return status.hasUser && status.hasSpace && !status.isOnboarded;
 }
