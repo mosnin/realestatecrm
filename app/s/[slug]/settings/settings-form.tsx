@@ -65,7 +65,7 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          subdomain: space.subdomain,
+          slug: space.slug,
           name,
           notifications,
           phoneNumber,
@@ -96,7 +96,7 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
       await fetch(`/api/spaces`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subdomain: space.subdomain })
+        body: JSON.stringify({ slug: space.slug })
       });
       router.push('/');
     } finally {
@@ -107,7 +107,7 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
   return (
     <form onSubmit={handleSave} className="space-y-5 max-w-2xl">
       {/* Workspace */}
-      <SectionBlock title="Workspace" description="Your workspace name and subdomain.">
+      <SectionBlock title="Workspace" description="Your workspace name and slug.">
         <div className="space-y-1.5">
           <Label htmlFor="name">Workspace name</Label>
           <Input
@@ -117,9 +117,9 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Subdomain</Label>
-          <Input value={space.subdomain} disabled />
-          <p className="text-xs text-muted-foreground">Subdomain cannot be changed after creation.</p>
+          <Label>Slug</Label>
+          <Input value={space.slug} disabled />
+          <p className="text-xs text-muted-foreground">Slug cannot be changed after creation.</p>
         </div>
       </SectionBlock>
 

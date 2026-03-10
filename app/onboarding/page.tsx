@@ -53,7 +53,7 @@ export default async function OnboardingPage() {
         })
         .catch(() => null);
     }
-    redirect(`/s/${dbUser.space.subdomain}`);
+    redirect(`/s/${dbUser.space.slug}`);
   }
 
   // Timestamp without workspace is treated as incomplete and reset.
@@ -95,7 +95,7 @@ export default async function OnboardingPage() {
             })
             .catch(() => null);
         }
-        redirect(`/s/${dbUser.space.subdomain}`);
+        redirect(`/s/${dbUser.space.slug}`);
       }
     } catch {
       // Still failing (migration pending) — wizard renders with Clerk data only
@@ -122,7 +122,7 @@ export default async function OnboardingPage() {
     space: dbUser?.space
       ? {
           id: dbUser.space.id,
-          subdomain: dbUser.space.subdomain,
+          slug: dbUser.space.slug,
           name: dbUser.space.name,
           settings: dbUser.space.settings
             ? {

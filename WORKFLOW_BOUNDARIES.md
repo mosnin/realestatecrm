@@ -88,12 +88,12 @@ This document defines clear boundaries between each major workflow in Chippi. AI
 | `create_space` | Creates Space + SpaceSetting + default stages | Touch existing contacts |
 | `save_notifications` | Updates notification preferences | Touch scoring or contacts |
 | `complete` | Sets `onboardingCompletedAt` + step 7 | Touch contacts, scoring, or pipeline |
-| `check_slug` | Checks subdomain availability | Write anything |
+| `check_slug` | Checks slug availability | Write anything |
 
 ### Onboarding completion semantics
 
 - Completion is marked by `User.onboardingCompletedAt` being non-null
-- `app/dashboard/page.tsx` and `app/s/[subdomain]/layout.tsx` both check this field
+- `app/dashboard/page.tsx` and `app/s/[slug]/layout.tsx` both check this field
 - Legacy accounts with space but no completion timestamp are auto-healed (completion set retroactively)
 
 ---
@@ -103,9 +103,9 @@ This document defines clear boundaries between each major workflow in Chippi. AI
 | Attribute | Detail |
 |---|---|
 | **Purpose** | Capture structured prospect applications via public intake form |
-| **Trigger** | Public form submission at `/apply/[subdomain]` |
+| **Trigger** | Public form submission at `/apply/[slug]` |
 | **Source of truth** | `Contact` record created under the target `Space` |
-| **Key files** | `app/apply/[subdomain]/*`, `app/api/public/apply/route.ts` |
+| **Key files** | `app/apply/[slug]/*`, `app/api/public/apply/route.ts` |
 | **Key records** | `Contact` (with tags `['application-link', 'new-lead']`, type `QUALIFICATION`) |
 | **Can change** | Contact creation, intake metadata, scoring status fields on Contact |
 | **Must never change** | `User.onboardingCompletedAt`, `Space` configuration, `DealStage` definitions |
@@ -113,7 +113,7 @@ This document defines clear boundaries between each major workflow in Chippi. AI
 ### Application submission rules
 
 - No auth required (public endpoint)
-- Required fields: `subdomain`, `name`, `phone`
+- Required fields: `slug`, `name`, `phone`
 - Deduplication: same name + normalized phone within 2-minute window
 - Contact created with `scoringStatus: 'pending'` then updated after scoring
 - Timeline and notes are combined into the `notes` field as `Timeline: X\nnotes`
@@ -148,9 +148,9 @@ This document defines clear boundaries between each major workflow in Chippi. AI
 | Attribute | Detail |
 |---|---|
 | **Purpose** | Triage and follow-up operations for the authenticated realtor |
-| **Trigger** | Authenticated workspace usage at `/s/[subdomain]/*` |
+| **Trigger** | Authenticated workspace usage at `/s/[slug]/*` |
 | **Source of truth** | `Contact`, `Deal`, `DealStage`, `DealContact`, `Message` records |
-| **Key files** | `app/s/[subdomain]/*`, `app/api/contacts/*`, `app/api/deals/*`, `app/api/stages/*`, `app/api/ai/chat/*` |
+| **Key files** | `app/s/[slug]/*`, `app/api/contacts/*`, `app/api/deals/*`, `app/api/stages/*`, `app/api/ai/chat/*` |
 | **Can change** | CRM records, pipeline ordering, deal stage assignments, contact lifecycle type, messages |
 | **Must never change** | Scoring prompt/contract, onboarding state, public intake form behavior, model configuration |
 
@@ -173,7 +173,7 @@ This document defines clear boundaries between each major workflow in Chippi. AI
 | **Purpose** | Billing preferences and settings (current visible scope) |
 | **Trigger** | Settings page updates |
 | **Source of truth** | `SpaceSetting.billingSettings` (string field) |
-| **Key files** | `app/s/[subdomain]/settings/*`, `app/api/spaces/route.ts` |
+| **Key files** | `app/s/[slug]/settings/*`, `app/api/spaces/route.ts` |
 | **Can change** | Billing settings field value |
 | **Must never change** | Auth state, onboarding state, scoring logic, CRM core records, contact data |
 | **Status** | Stripe workflow **not confirmed** in current codebase. Field and UI exist but no payment processing. |

@@ -37,15 +37,15 @@ const navItems = [
 ];
 
 interface HeaderProps {
-  subdomain: string;
+  slug: string;
   spaceName: string;
   title: string;
 }
 
-export function Header({ subdomain, spaceName, title }: HeaderProps) {
+export function Header({ slug, spaceName, title }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const base = `/s/${subdomain}`;
+  const base = `/s/${slug}`;
   const { theme, toggleTheme } = useTheme();
 
   return (

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { normalizeSlug } from '@/lib/intake';
 
 export const publicApplicationSchema = z.object({
-  subdomain: z
+  slug: z
     .string()
     .min(1)
     .transform((value) => normalizeSlug(value))
@@ -54,8 +54,8 @@ export function normalizePhone(input: string) {
   return input.replace(/\D/g, '');
 }
 
-export function applicationFingerprintKey(input: Pick<PublicApplicationInput, 'subdomain' | 'name' | 'phone'>) {
+export function applicationFingerprintKey(input: Pick<PublicApplicationInput, 'slug' | 'name' | 'phone'>) {
   const normalizedName = input.name.trim().toLowerCase();
   const normalizedPhone = normalizePhone(input.phone);
-  return `${input.subdomain}:${normalizedName}:${normalizedPhone}`;
+  return `${input.slug}:${normalizedName}:${normalizedPhone}`;
 }

@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Trash2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { deleteSubdomainAction } from '@/app/actions';
+import { deleteSlugAction } from '@/app/actions';
 import { rootDomain, protocol } from '@/lib/utils';
 import { buildIntakeUrl } from '@/lib/intake';
 
 type Tenant = {
-  subdomain: string;
+  slug: string;
   emoji: string;
   createdAt: number;
 };
@@ -25,7 +25,7 @@ function DashboardHeader() {
 
   return (
     <div className="flex justify-between items-center mb-8">
-      <h1 className="text-3xl font-bold">Subdomain Management</h1>
+      <h1 className="text-3xl font-bold">Slug Management</h1>
       <div className="flex items-center gap-4">
         <Link
           href={`${protocol}://${rootDomain}`}
@@ -51,7 +51,7 @@ function TenantGrid({
     return (
       <Card>
         <CardContent className="py-8 text-center">
-          <p className="text-gray-500">No subdomains have been created yet.</p>
+          <p className="text-gray-500">No slugs have been created yet.</p>
         </CardContent>
       </Card>
     );
@@ -60,15 +60,15 @@ function TenantGrid({
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {tenants.map((tenant) => (
-        <Card key={tenant.subdomain}>
+        <Card key={tenant.slug}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xl">{tenant.subdomain}</CardTitle>
+              <CardTitle className="text-xl">{tenant.slug}</CardTitle>
               <form action={action}>
                 <input
                   type="hidden"
-                  name="subdomain"
-                  value={tenant.subdomain}
+                  name="slug"
+                  value={tenant.slug}
                 />
                 <Button
                   variant="ghost"
@@ -95,12 +95,12 @@ function TenantGrid({
             </div>
             <div className="mt-4">
               <a
-                href={buildIntakeUrl(tenant.subdomain)}
+                href={buildIntakeUrl(tenant.slug)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:underline text-sm"
               >
-                Visit subdomain →
+                Visit slug →
               </a>
             </div>
           </CardContent>
@@ -112,7 +112,7 @@ function TenantGrid({
 
 export function AdminDashboard({ tenants }: { tenants: Tenant[] }) {
   const [state, action, isPending] = useActionState<DeleteState, FormData>(
-    deleteSubdomainAction,
+    deleteSlugAction,
     {}
   );
 

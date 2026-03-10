@@ -8,10 +8,10 @@ import { Label } from '@/components/ui/label';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 
 export function ApplicationForm({
-  subdomain,
+  slug,
   businessName
 }: {
-  subdomain: string;
+  slug: string;
   businessName: string;
 }) {
   const [submitting, setSubmitting] = useState(false);
@@ -35,7 +35,7 @@ export function ApplicationForm({
 
     const formData = new FormData(e.currentTarget);
     const payload = {
-      subdomain,
+      slug,
       name: formData.get('name'),
       email: formData.get('email'),
       phone: formData.get('phone'),

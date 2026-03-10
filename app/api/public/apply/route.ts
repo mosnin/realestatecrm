@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { redis } from '@/lib/redis';
-import { getSpaceFromSubdomain } from '@/lib/space';
+import { getSpaceFromSlug } from '@/lib/space';
 import { scoreLeadApplication } from '@/lib/lead-scoring';
 import type { LeadScoringResult } from '@/lib/lead-scoring';
 import {
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   const idempotencyKey = `apply:idempotency:${fingerprint}`;
 
   try {
-    const space = await getSpaceFromSubdomain(payload.subdomain);
+    const space = await getSpaceFromSlug(payload.slug);
     if (!space) {
       return NextResponse.json({ error: 'Space not found' }, { status: 404 });
     }
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     if (!idempotencyLockAcquired) {
       console.info('[apply] proceeding without distributed lock', {
         spaceId: space.id,
-        subdomain: payload.subdomain,
+        slug: payload.slug,
         fingerprint,
       });
     }
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     console.info('[apply] submission persisted', {
       contactId: contact.id,
       spaceId: space.id,
-      subdomain: payload.subdomain,
+      slug: payload.slug,
     });
 
     let scoring: LeadScoringResult = {
@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error('[apply] unhandled submission failure', {
-      subdomain: parsed.data.subdomain,
+      slug: parsed.data.slug,
       error,
     });
     return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 });

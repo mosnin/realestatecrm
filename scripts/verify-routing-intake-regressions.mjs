@@ -30,59 +30,58 @@ function expectNotContains(file, regex, message) {
   if (regex.test(body)) errors.push(`${rel(file)}: ${message}`);
 }
 
-// 1) Canonical onboarding helper must exist and define isOnboarded by space only.
+// 1) Canonical onboarding helper must define onboarding by workspace slug-space existence.
 const onboardingHelper = join(repoRoot, 'lib/onboarding.ts');
-expectContains(
-  onboardingHelper,
-  /isOnboarded:\s*hasSpace/,
-  'onboarding helper must define isOnboarded from hasSpace',
-);
+expectContains(onboardingHelper, /isOnboarded:\s*hasSpace/, 'onboarding helper must define isOnboarded from hasSpace');
 
-// 2) Onboarding guards/pages must use the shared helper.
+// 2) Onboarding guards/pages must use shared helper.
 for (const requiredFile of [
   'app/dashboard/page.tsx',
   'app/onboarding/page.tsx',
-  'app/s/[subdomain]/layout.tsx',
+  'app/s/[slug]/layout.tsx',
   'app/api/onboarding/route.ts',
 ]) {
-  const full = join(repoRoot, requiredFile);
-  expectContains(full, /getOnboardingStatus/, 'must use getOnboardingStatus');
+  expectContains(join(repoRoot, requiredFile), /getOnboardingStatus/, 'must use getOnboardingStatus');
 }
 
-// 3) No subdomain-style intake URL generation in app/lib.
+// 3) Critical runtime files must not contain subdomain naming.
 for (const file of files) {
   const r = rel(file);
-  if (!r.startsWith('app/') && !r.startsWith('lib/')) continue;
-  if (r === 'app/not-found.tsx') continue; // display-only fallback UI
-  const body = read(file);
-  if (/(https?:\/\/\$\{[^}]+\}\.\$\{rootDomain\})|(\$\{[^}]*subdomain[^}]*\}\.\$\{rootDomain\})/.test(body)) {
-    errors.push(`${r}: found subdomain-style URL template`);
+  if (!r.startsWith('app/') && !r.startsWith('components/') && !r.startsWith('lib/')) continue;
+  if (/\bsubdomain\b/i.test(read(file))) {
+    errors.push(`${r}: contains forbidden subdomain naming in runtime path`);
   }
 }
 
-// 4) Profile/dashboard/onboarding intake links must use canonical helper.
-for (const requiredFile of [
-  'app/s/[subdomain]/profile/page.tsx',
-  'app/s/[subdomain]/page.tsx',
-  'app/onboarding/wizard-client.tsx',
-]) {
-  const full = join(repoRoot, requiredFile);
-  expectContains(full, /buildIntakeUrl|buildIntakePath/, 'must use canonical intake helper(s)');
+// 4) No host-based tenant identity inference in runtime paths.
+for (const file of files) {
+  const r = rel(file);
+  if (!r.startsWith('app/') && !r.startsWith('components/') && !r.startsWith('lib/')) continue;
+  const body = read(file);
+  if (/window\.location\.hostname|x-forwarded-host|req\.headers\.get\(['"]host['"]\)/i.test(body)) {
+    errors.push(`${r}: contains host-based identity logic`);
+  }
 }
 
-// 5) Public intake form has exactly one submission endpoint.
-expectContains(
-  join(repoRoot, 'app/apply/[subdomain]/application-form.tsx'),
-  /fetch\('\/api\/public\/apply'/,
-  'form should submit to /api/public/apply',
-);
-expectNotContains(
-  join(repoRoot, 'app/apply/[subdomain]/application-form.tsx'),
-  /fetch\('\/api\/(?!public\/apply)/,
-  'form should not submit to alternate API routes',
-);
+// 5) Product routing must use slug params.
+expectContains(join(repoRoot, 'app/apply/[slug]/page.tsx'), /params:\s*Promise<\{\s*slug:\s*string\s*\}>/, 'public apply route must use slug param');
+expectContains(join(repoRoot, 'app/s/[slug]/layout.tsx'), /params:\s*Promise<\{\s*slug:\s*string\s*\}>/, 'workspace route must use slug param');
 
-// 6) Public apply API must validate schema and perform idempotency protection.
+// 6) Intake links must use canonical helper.
+for (const requiredFile of [
+  'app/s/[slug]/profile/page.tsx',
+  'app/s/[slug]/page.tsx',
+  'app/onboarding/wizard-client.tsx',
+]) {
+  expectContains(join(repoRoot, requiredFile), /buildIntakeUrl|buildIntakePath/, 'must use canonical intake helper(s)');
+}
+
+// 7) Public intake form has exactly one submission endpoint.
+const formFile = join(repoRoot, 'app/apply/[slug]/application-form.tsx');
+expectContains(formFile, /fetch\('\/api\/public\/apply'/, 'form should submit to /api/public/apply');
+expectNotContains(formFile, /fetch\('\/api\/(?!public\/apply)/, 'form should not submit to alternate API routes');
+
+// 8) Public apply API must validate schema and perform idempotency protection.
 const applyApi = join(repoRoot, 'app/api/public/apply/route.ts');
 expectContains(applyApi, /publicApplicationSchema\.safeParse/, 'must validate with shared schema');
 expectContains(applyApi, /idempotencyKey/, 'must create idempotency key');

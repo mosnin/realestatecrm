@@ -22,7 +22,7 @@ model User {
 
 model Space {
   id        String   @id @default(cuid())
-  subdomain String   @unique
+  slug String   @unique
   name      String
   emoji     String
   createdAt DateTime @default(now())

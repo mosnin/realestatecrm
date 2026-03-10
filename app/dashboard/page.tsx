@@ -29,7 +29,7 @@ export default async function DashboardRedirectPage() {
           })
           .catch(() => null);
       }
-      redirect(`/s/${user.space.subdomain}`);
+      redirect(`/s/${user.space.slug}`);
     }
 
     // Missing workspace still recovers via onboarding flow.

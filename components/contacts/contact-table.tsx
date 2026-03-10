@@ -46,7 +46,7 @@ const TYPE_META: Record<string, { label: string; className: string }> = {
 };
 
 interface ContactTableProps {
-  subdomain: string;
+  slug: string;
 }
 
 function formatCurrency(value: number | null) {
@@ -62,7 +62,7 @@ function getInitials(name: string) {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
-export function ContactTable({ subdomain }: ContactTableProps) {
+export function ContactTable({ slug }: ContactTableProps) {
   const [contacts, setContacts] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
@@ -71,11 +71,11 @@ export function ContactTable({ subdomain }: ContactTableProps) {
   const [loading, setLoading] = useState(true);
 
   const fetchContacts = useCallback(async () => {
-    const params = new URLSearchParams({ subdomain, search, type: typeFilter });
+    const params = new URLSearchParams({ slug, search, type: typeFilter });
     const res = await fetch(`/api/contacts?${params}`);
     if (res.ok) setContacts(await res.json());
     setLoading(false);
-  }, [subdomain, search, typeFilter]);
+  }, [slug, search, typeFilter]);
 
   useEffect(() => {
     fetchContacts();
@@ -85,7 +85,7 @@ export function ContactTable({ subdomain }: ContactTableProps) {
     await fetch('/api/contacts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, subdomain }),
+      body: JSON.stringify({ ...data, slug }),
     });
     fetchContacts();
   }
@@ -200,7 +200,7 @@ export function ContactTable({ subdomain }: ContactTableProps) {
                       </div>
                       <div className="min-w-0">
                         <Link
-                          href={`/s/${subdomain}/contacts/${contact.id}`}
+                          href={`/s/${slug}/contacts/${contact.id}`}
                           className="font-semibold text-sm hover:text-primary transition-colors truncate block"
                         >
                           {contact.name}

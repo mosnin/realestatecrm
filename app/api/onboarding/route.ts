@@ -35,7 +35,7 @@ export async function GET() {
       space: user.space
         ? {
             id: user.space.id,
-            subdomain: user.space.subdomain,
+            slug: user.space.slug,
             name: user.space.name,
             settings: user.space.settings
           }
@@ -135,19 +135,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'create_space') {
-      const { subdomain, intakePageTitle, intakePageIntro, businessName } = body as {
-        subdomain: string;
+      const { slug, intakePageTitle, intakePageIntro, businessName } = body as {
+        slug: string;
         intakePageTitle: string;
         intakePageIntro: string;
         businessName: string;
       };
 
-      if (!subdomain) {
-        return NextResponse.json({ error: 'Subdomain is required' }, { status: 400 });
+      if (!slug) {
+        return NextResponse.json({ error: 'Slug is required' }, { status: 400 });
       }
 
-      const sanitized = normalizeSlug(subdomain);
-      if (!isValidSlug(subdomain) || sanitized !== subdomain) {
+      const sanitized = normalizeSlug(slug);
+      if (!isValidSlug(slug) || sanitized !== slug) {
         return NextResponse.json(
           { error: 'Only lowercase letters, numbers, and hyphens allowed' },
           { status: 400 }
@@ -161,11 +161,11 @@ export async function POST(req: NextRequest) {
           update: { intakePageTitle, intakePageIntro, businessName },
           create: { spaceId: user.space.id, intakePageTitle, intakePageIntro, businessName }
         });
-        return NextResponse.json({ success: true, subdomain: user.space.subdomain });
+        return NextResponse.json({ success: true, slug: user.space.slug });
       }
 
       const existing = await db.space.findUnique({
-        where: { subdomain: sanitized },
+        where: { slug: sanitized },
         select: { id: true }
       });
       if (existing) {
@@ -176,10 +176,10 @@ export async function POST(req: NextRequest) {
       // across retries/tabs and avoid ownerId unique constraint races.
       const existingOwnerSpace = await db.space.findUnique({
         where: { ownerId: user.id },
-        select: { subdomain: true, id: true }
+        select: { slug: true, id: true }
       });
       if (existingOwnerSpace) {
-        return NextResponse.json({ success: true, subdomain: existingOwnerSpace.subdomain });
+        return NextResponse.json({ success: true, slug: existingOwnerSpace.slug });
       }
 
       const DEFAULT_STAGES = [
@@ -195,7 +195,7 @@ export async function POST(req: NextRequest) {
       try {
         space = await db.space.create({
           data: {
-            subdomain: sanitized,
+            slug: sanitized,
             name: businessName || sanitized,
             emoji: '🏠',
             ownerId: user.id,
@@ -213,11 +213,11 @@ export async function POST(req: NextRequest) {
           }
         });
       } catch (createError) {
-        const ownerSpace = await db.space.findUnique({ where: { ownerId: user.id }, select: { subdomain: true } });
+        const ownerSpace = await db.space.findUnique({ where: { ownerId: user.id }, select: { slug: true } });
         if (ownerSpace) {
-          return NextResponse.json({ success: true, subdomain: ownerSpace.subdomain });
+          return NextResponse.json({ success: true, slug: ownerSpace.slug });
         }
-        const slugSpace = await db.space.findUnique({ where: { subdomain: sanitized }, select: { id: true } });
+        const slugSpace = await db.space.findUnique({ where: { slug: sanitized }, select: { id: true } });
         if (slugSpace) {
           return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
         }
@@ -229,7 +229,7 @@ export async function POST(req: NextRequest) {
         data: { onboardingCurrentStep: 4 }
       });
 
-      return NextResponse.json({ success: true, subdomain: space.subdomain });
+      return NextResponse.json({ success: true, slug: space.slug });
     }
 
     if (action === 'save_notifications') {
@@ -281,7 +281,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ available: false, reason: 'invalid' });
       }
       const existing = await db.space.findUnique({
-        where: { subdomain: sanitized },
+        where: { slug: sanitized },
         select: { id: true }
       });
       return NextResponse.json({ available: !existing });

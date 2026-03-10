@@ -34,7 +34,7 @@ The launch wedge is:
 What the app is trying to do right now:
 1. Realtor signs up with Clerk.
 2. Realtor completes onboarding.
-3. Realtor gets a subdomain workspace and public intake link.
+3. Realtor gets a slug workspace and public intake link.
 4. Prospect submits a structured rental application.
 5. Submission is saved as a contact/lead in CRM.
 6. Lead is scored (OpenAI-based scoring + summary).
@@ -56,11 +56,11 @@ What is present in code today:
 ### A) User onboarding
 - Route: `/onboarding`
 - Multi-step onboarding persists progress and creates the user’s workspace (`Space`) + default stages.
-- Completion gate redirects users into `/s/[subdomain]` workspace.
+- Completion gate redirects users into `/s/[slug]` workspace.
 
 ### B) Intake link creation
-- Intake link is generated from workspace/subdomain.
-- Public intake URL pattern: `/apply/[subdomain]`.
+- Intake link is generated from workspace/slug.
+- Public intake URL pattern: `/apply/[slug]`.
 - Intake page title/intro can be customized via `SpaceSetting`.
 
 ### C) Prospect application flow
@@ -105,7 +105,7 @@ What is present in code today:
 
 ### Main systems and where logic lives
 - **Onboarding**: `app/onboarding/*`, `app/api/onboarding/route.ts`
-- **Public application intake**: `app/apply/[subdomain]/*`, `app/api/public/apply/route.ts`
+- **Public application intake**: `app/apply/[slug]/*`, `app/api/public/apply/route.ts`
 - **CRM APIs**: `app/api/contacts/*`, `app/api/deals/*`, `app/api/stages/*`
 - **AI assistant**: `app/api/ai/chat/route.ts`, `lib/ai.ts`
 - **Lead scoring**: `lib/lead-scoring.ts` (called by public apply API)
@@ -131,7 +131,7 @@ What is present in code today:
 - **OpenAI** – lead scoring and embeddings.
 - **Anthropic (optional per-space key + env fallback)** – AI assistant provider.
 - **Zilliz/Milvus** – vector storage/search for assistant context.
-- **Upstash Redis** – subdomain/admin metadata path still present.
+- **Upstash Redis** – slug/admin metadata path still present.
 - **Vercel Analytics / Speed Insights** – frontend telemetry packages.
 
 ### Billing
@@ -242,7 +242,7 @@ Standard operating workflow:
 2. Auth checks are present, but fine-grained tenant authorization should always be treated as sensitive/high-risk area.
 3. Build config currently ignores TS/ESLint build errors (`next.config.ts`) — this can hide issues.
 4. Billing/trial backend implementation is not clearly present despite pricing copy.
-5. Repo still contains some legacy multi-tenant/admin patterns (Redis-based subdomain management) alongside Prisma-first app data.
+5. Repo still contains some legacy multi-tenant/admin patterns (Redis-based slug management) alongside Prisma-first app data.
 
 ---
 

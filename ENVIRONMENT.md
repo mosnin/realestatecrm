@@ -17,7 +17,7 @@ All variables found or inferable from code usage:
 | `ANTHROPIC_API_KEY` | `lib/ai.ts` | AI assistant (fallback provider) | **Medium** | Assistant falls back to OpenAI if available; if neither key set, assistant returns error message |
 | `ZILLIZ_URI` | `lib/zilliz.ts` | Milvus/Zilliz vector DB endpoint | **Optional** | Vector sync and RAG context fail silently; assistant works without RAG |
 | `ZILLIZ_TOKEN` | `lib/zilliz.ts` | Milvus/Zilliz authentication | **Optional** | Same as `ZILLIZ_URI` |
-| `KV_REST_API_URL` | `lib/redis.ts` | Upstash Redis endpoint | **Medium** | Legacy admin path and subdomain metadata fail |
+| `KV_REST_API_URL` | `lib/redis.ts` | Upstash Redis endpoint | **Medium** | Legacy admin path and slug metadata fail |
 | `KV_REST_API_TOKEN` | `lib/redis.ts` | Upstash Redis authentication | **Medium** | Same as `KV_REST_API_URL` |
 | `NEXT_PUBLIC_ROOT_DOMAIN` | `lib/utils.ts` | Public URL/domain construction for intake links | **Medium** | Falls back to `workflowrouting.com` (prod) or `localhost:3000` (dev); intake link URLs may be wrong if not set correctly |
 | `NODE_ENV` | `lib/utils.ts`, `lib/db.ts` | Protocol selection (http vs https), Prisma logging level | **Auto-set** | Set automatically by Next.js; do not override manually |
@@ -46,7 +46,7 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 | **OpenAI** | Lead scoring (gpt-4o-mini), text embeddings (text-embedding-3-small), AI assistant primary provider | `lib/lead-scoring.ts`, `lib/embeddings.ts`, `lib/ai.ts` |
 | **Anthropic** | AI assistant fallback provider. Per-workspace key support via SpaceSetting. | `lib/ai.ts` |
 | **Zilliz/Milvus** | Vector storage and similarity search for RAG-enriched AI assistant context | `lib/zilliz.ts`, `lib/embeddings.ts`, `lib/vectorize.ts` |
-| **Upstash Redis** | Legacy subdomain metadata storage, admin dashboard data | `lib/redis.ts`, `lib/subdomains.ts`, `app/actions.ts` |
+| **Upstash Redis** | Legacy slug metadata storage, admin dashboard data | `lib/redis.ts`, `lib/slugs.ts`, `app/actions.ts` |
 | **Vercel** | Deployment target, analytics, speed insights | `@vercel/analytics`, `@vercel/speed-insights` packages |
 
 ---
