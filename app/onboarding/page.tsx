@@ -3,6 +3,11 @@ import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { OnboardingWizard } from './wizard-client';
 import type { User, Space, SpaceSetting } from '@prisma/client';
+import {
+  getOnboardingStatus,
+  shouldBackfillOnboardingCompletion,
+  shouldResetOrphanedCompletion
+} from '@/lib/onboarding';
 
 export const metadata = { title: 'Set up Chippi' };
 
@@ -36,10 +41,11 @@ export default async function OnboardingPage() {
     // Migration likely pending — fall through, wizard renders empty
   }
 
-  // Space existence is the canonical "onboarding complete" signal.
-  // If the user has a space, redirect to workspace immediately.
-  if (dbUser?.space) {
-    if (!dbUser.onboardingCompletedAt) {
+  const onboarding = getOnboardingStatus(dbUser);
+
+  // Canonical completion signal is workspace existence.
+  if (onboarding.isOnboarded && dbUser?.space) {
+    if (shouldBackfillOnboardingCompletion(dbUser)) {
       await db.user
         .update({
           where: { id: dbUser.id },
@@ -50,9 +56,8 @@ export default async function OnboardingPage() {
     redirect(`/s/${dbUser.space.subdomain}`);
   }
 
-  // If onboardingCompletedAt is set but space is missing, reset completion
-  // so the user can re-run onboarding to create their workspace.
-  if (dbUser?.onboardingCompletedAt && !dbUser.space) {
+  // Timestamp without workspace is treated as incomplete and reset.
+  if (shouldResetOrphanedCompletion(dbUser)) {
     console.warn('[onboarding-page] completed but no space — resetting', { clerkId: userId });
     await db.user
       .update({

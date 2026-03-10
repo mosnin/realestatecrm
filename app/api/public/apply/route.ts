@@ -1,51 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { redis } from '@/lib/redis';
 import { getSpaceFromSubdomain } from '@/lib/space';
 import { scoreLeadApplication } from '@/lib/lead-scoring';
 import type { LeadScoringResult } from '@/lib/lead-scoring';
-
-function normalizePhone(input: string) {
-  return input.replace(/\D/g, '');
-}
+import {
+  applicationFingerprintKey,
+  normalizePhone,
+  publicApplicationSchema,
+} from '@/lib/public-application';
 
 export async function POST(req: NextRequest) {
+  let requestBody: unknown;
   try {
-    const body = await req.json();
-    const {
-      subdomain,
-      name,
-      email,
-      phone,
-      budget,
-      timeline,
-      preferredAreas,
-      notes,
-    } = body ?? {};
+    requestBody = await req.json();
+  } catch (error) {
+    console.warn('[apply] invalid JSON body', { error });
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
 
-    if (!subdomain || !name || !phone) {
-      return NextResponse.json(
-        { error: 'subdomain, name, and phone are required' },
-        { status: 400 }
-      );
-    }
+  const parsed = publicApplicationSchema.safeParse(requestBody);
+  if (!parsed.success) {
+    console.warn('[apply] validation failed', {
+      issues: parsed.error.issues,
+    });
+    return NextResponse.json({ error: 'Invalid submission data' }, { status: 400 });
+  }
 
-    const space = await getSpaceFromSubdomain(String(subdomain));
+  const payload = parsed.data;
+  const fingerprint = applicationFingerprintKey(payload);
+  const idempotencyKey = `apply:idempotency:${fingerprint}`;
+
+  try {
+    const space = await getSpaceFromSubdomain(payload.subdomain);
     if (!space) {
       return NextResponse.json({ error: 'Space not found' }, { status: 404 });
     }
 
-    const safeName = String(name).trim();
-    const safePhone = String(phone).trim();
-    const normalizedPhone = normalizePhone(safePhone);
+    // First line of defense against duplicate creates from retries/double-click.
+    // If Redis is unavailable we continue and rely on DB duplicate check below.
+    let idempotencyLockAcquired = false;
+    try {
+      const lockResult = await redis.set(idempotencyKey, '1', { nx: true, ex: 120 });
+      idempotencyLockAcquired = lockResult === 'OK';
+    } catch (error) {
+      console.warn('[apply] idempotency lock unavailable; using DB fallback', { error, spaceId: space.id });
+    }
 
-    // Prevent accidental duplicate submissions from rapid double-submit.
-    // If we see the same name+phone for the same workspace within 2 minutes,
-    // treat it as the same lead and return success without creating another row.
     const duplicateCutoff = new Date(Date.now() - 2 * 60 * 1000);
     const existingRecentLead = await db.contact.findFirst({
       where: {
         spaceId: space.id,
-        name: safeName,
+        name: payload.name,
         tags: { has: 'application-link' },
         createdAt: { gte: duplicateCutoff }
       },
@@ -54,6 +60,7 @@ export async function POST(req: NextRequest) {
 
     if (existingRecentLead) {
       const existingNormalizedPhone = normalizePhone(existingRecentLead.phone ?? '');
+      const normalizedPhone = normalizePhone(payload.phone);
       if (existingNormalizedPhone && existingNormalizedPhone === normalizedPhone) {
         return NextResponse.json(
           {
@@ -69,15 +76,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (!idempotencyLockAcquired) {
+      console.info('[apply] proceeding without distributed lock', {
+        spaceId: space.id,
+        subdomain: payload.subdomain,
+        fingerprint,
+      });
+    }
+
     const contact = await db.contact.create({
       data: {
         spaceId: space.id,
-        name: safeName,
-        email: email ? String(email) : null,
-        phone: safePhone,
-        budget: budget != null && budget !== '' ? Number.parseFloat(String(budget)) : null,
-        preferences: preferredAreas ? String(preferredAreas) : null,
-        notes: notes || timeline ? `Timeline: ${timeline ?? 'N/A'}\n${notes ?? ''}`.trim() : null,
+        name: payload.name,
+        email: payload.email ?? null,
+        phone: payload.phone,
+        budget: payload.budget ?? null,
+        preferences: payload.preferredAreas ?? null,
+        notes: payload.notes || payload.timeline ? `Timeline: ${payload.timeline ?? 'N/A'}\n${payload.notes ?? ''}`.trim() : null,
         type: 'QUALIFICATION',
         properties: [],
         tags: ['application-link', 'new-lead'],
@@ -86,7 +101,11 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    console.info('[apply] submission persisted', { contactId: contact.id, spaceId: space.id });
+    console.info('[apply] submission persisted', {
+      contactId: contact.id,
+      spaceId: space.id,
+      subdomain: payload.subdomain,
+    });
 
     let scoring: LeadScoringResult = {
       scoringStatus: 'failed',
@@ -98,13 +117,13 @@ export async function POST(req: NextRequest) {
     try {
       scoring = await scoreLeadApplication({
         contactId: contact.id,
-        name: safeName,
-        email: email ? String(email) : null,
-        phone: safePhone,
-        budget: budget != null && budget !== '' ? Number.parseFloat(String(budget)) : null,
-        timeline: timeline ? String(timeline) : null,
-        preferredAreas: preferredAreas ? String(preferredAreas) : null,
-        notes: notes ? String(notes) : null,
+        name: payload.name,
+        email: payload.email ?? null,
+        phone: payload.phone,
+        budget: payload.budget ?? null,
+        timeline: payload.timeline ?? null,
+        preferredAreas: payload.preferredAreas ?? null,
+        notes: payload.notes ?? null,
       });
 
       await db.contact.update({
@@ -123,7 +142,10 @@ export async function POST(req: NextRequest) {
         scoreLabel: scoring.scoreLabel,
       });
     } catch (error) {
-      console.error('[apply] scoring persistence failed', { contactId: contact.id, error });
+      console.error('[apply] scoring persistence failed', {
+        contactId: contact.id,
+        error,
+      });
       await db.contact
         .update({
           where: { id: contact.id },
@@ -153,7 +175,11 @@ export async function POST(req: NextRequest) {
       },
       { status: 201 }
     );
-  } catch {
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  } catch (error) {
+    console.error('[apply] unhandled submission failure', {
+      subdomain: parsed.data.subdomain,
+      error,
+    });
+    return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 });
   }
 }

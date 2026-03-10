@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { BrandLogo } from '@/components/brand-logo';
-import { protocol, rootDomain } from '@/lib/utils';
+import { buildIntakePath, buildIntakeUrl } from '@/lib/intake';
 import {
   CheckCircle2,
   ArrowRight,
@@ -279,7 +279,7 @@ function StepIntakeLink({
     return () => clearTimeout(timer);
   }, [slug, checkSlug]);
 
-  const previewUrl = `${protocol}://${rootDomain}/apply/${slug || 'your-slug'}`;
+  const previewUrl = buildIntakeUrl(slug || 'your-slug');
 
   async function handleNext() {
     if (!slug || !title || slugAvailable === false) return;
@@ -599,7 +599,7 @@ function StepGoLive({
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [completing, setCompleting] = useState(false);
-  const intakeUrl = `${protocol}://${rootDomain}/apply/${subdomain}`;
+  const intakeUrl = buildIntakeUrl(subdomain);
 
   async function copyLink() {
     await navigator.clipboard.writeText(intakeUrl);
@@ -622,7 +622,7 @@ function StepGoLive({
   async function handleTestApp() {
     try {
       await onComplete();
-      window.open(`/apply/${subdomain}`, '_blank');
+      window.open(buildIntakePath(subdomain), '_blank');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to complete onboarding.');
     }
@@ -651,7 +651,7 @@ function StepGoLive({
           {copied ? 'Copied!' : 'Copy link'}
         </Button>
         <Button variant="outline" asChild className="gap-2 text-sm">
-          <a href={`/apply/${subdomain}`} target="_blank" rel="noreferrer">
+          <a href={buildIntakePath(subdomain)} target="_blank" rel="noreferrer">
             <ExternalLink size={15} /> Preview form
           </a>
         </Button>

@@ -7,6 +7,7 @@ import { Trash2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { deleteSubdomainAction } from '@/app/actions';
 import { rootDomain, protocol } from '@/lib/utils';
+import { buildIntakeUrl } from '@/lib/intake';
 
 type Tenant = {
   subdomain: string;
@@ -94,7 +95,7 @@ function TenantGrid({
             </div>
             <div className="mt-4">
               <a
-                href={`${protocol}://${tenant.subdomain}.${rootDomain}`}
+                href={buildIntakeUrl(tenant.subdomain)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:underline text-sm"

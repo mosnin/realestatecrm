@@ -1,6 +1,8 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { isValidSlug, normalizeSlug } from '@/lib/intake';
+import { getOnboardingStatus, shouldBackfillOnboardingCompletion } from '@/lib/onboarding';
 
 export async function GET() {
   const { userId } = await auth();
@@ -22,7 +24,7 @@ export async function GET() {
 
     return NextResponse.json({
       step: user.onboardingCurrentStep,
-      completed: !!user.onboardingCompletedAt,
+      completed: getOnboardingStatus(user).isOnboarded,
       user: {
         id: user.id,
         name: user.name,
@@ -72,6 +74,15 @@ export async function POST(req: NextRequest) {
       },
       include: { space: { include: { settings: true } } }
     });
+
+    if (shouldBackfillOnboardingCompletion(user)) {
+      await db.user
+        .update({
+          where: { id: user.id },
+          data: { onboardingCurrentStep: 7, onboardingCompletedAt: new Date() }
+        })
+        .catch(() => null);
+    }
 
     if (action === 'start') {
       await db.user.update({
@@ -135,8 +146,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Subdomain is required' }, { status: 400 });
       }
 
-      const sanitized = subdomain.toLowerCase().replace(/[^a-z0-9-]/g, '');
-      if (sanitized !== subdomain) {
+      const sanitized = normalizeSlug(subdomain);
+      if (!isValidSlug(subdomain) || sanitized !== subdomain) {
         return NextResponse.json(
           { error: 'Only lowercase letters, numbers, and hyphens allowed' },
           { status: 400 }
@@ -161,6 +172,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
       }
 
+      // Re-check owner space right before create to make the operation idempotent
+      // across retries/tabs and avoid ownerId unique constraint races.
+      const existingOwnerSpace = await db.space.findUnique({
+        where: { ownerId: user.id },
+        select: { subdomain: true, id: true }
+      });
+      if (existingOwnerSpace) {
+        return NextResponse.json({ success: true, subdomain: existingOwnerSpace.subdomain });
+      }
+
       const DEFAULT_STAGES = [
         { name: 'New', color: '#94a3b8', position: 0 },
         { name: 'Reviewing', color: '#60a5fa', position: 1 },
@@ -170,25 +191,38 @@ export async function POST(req: NextRequest) {
         { name: 'Declined', color: '#ef4444', position: 5 }
       ];
 
-      const space = await db.space.create({
-        data: {
-          subdomain: sanitized,
-          name: businessName || sanitized,
-          emoji: '🏠',
-          ownerId: user.id,
-          settings: {
-            create: {
-              intakePageTitle: intakePageTitle || 'Rental Application',
-              intakePageIntro:
-                intakePageIntro ||
-                "Share a few details so I can review your rental fit faster.",
-              businessName,
-              phoneNumber: null
-            }
-          },
-          stages: { create: DEFAULT_STAGES }
+      let space;
+      try {
+        space = await db.space.create({
+          data: {
+            subdomain: sanitized,
+            name: businessName || sanitized,
+            emoji: '🏠',
+            ownerId: user.id,
+            settings: {
+              create: {
+                intakePageTitle: intakePageTitle || 'Rental Application',
+                intakePageIntro:
+                  intakePageIntro ||
+                  "Share a few details so I can review your rental fit faster.",
+                businessName,
+                phoneNumber: null
+              }
+            },
+            stages: { create: DEFAULT_STAGES }
+          }
+        });
+      } catch (createError) {
+        const ownerSpace = await db.space.findUnique({ where: { ownerId: user.id }, select: { subdomain: true } });
+        if (ownerSpace) {
+          return NextResponse.json({ success: true, subdomain: ownerSpace.subdomain });
         }
-      });
+        const slugSpace = await db.space.findUnique({ where: { subdomain: sanitized }, select: { id: true } });
+        if (slugSpace) {
+          return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
+        }
+        throw createError;
+      }
 
       await db.user.update({
         where: { id: user.id },
@@ -242,8 +276,8 @@ export async function POST(req: NextRequest) {
     if (action === 'check_slug') {
       const { slug } = body as { slug: string };
       if (!slug) return NextResponse.json({ available: false });
-      const sanitized = slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
-      if (sanitized !== slug || slug.length < 3) {
+      const sanitized = normalizeSlug(slug);
+      if (!isValidSlug(slug) || sanitized !== slug) {
         return NextResponse.json({ available: false, reason: 'invalid' });
       }
       const existing = await db.space.findUnique({

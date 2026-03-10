@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/dashboard/sidebar';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
 import { db } from '@/lib/db';
+import { getOnboardingStatus, shouldBackfillOnboardingCompletion } from '@/lib/onboarding';
 
 export default async function DashboardLayout({
   children,
@@ -20,19 +21,16 @@ export default async function DashboardLayout({
     return null; // Middleware handles redirect
   }
 
-  // Gate dashboard access until onboarding is complete.
-  // Space existence in the DB is the canonical signal — it means the user
-  // went through workspace creation. We verify against the space for the
-  // current subdomain below, so we only need a lightweight user check here.
+  // Gate dashboard access until onboarding is complete using canonical onboarding contract.
   let onboardingCompleted = false;
   try {
     const dbUser = await db.user.findUnique({
       where: { clerkId: userId },
       select: { id: true, onboardingCompletedAt: true, space: { select: { id: true } } }
     });
-    onboardingCompleted = !!dbUser?.onboardingCompletedAt || !!dbUser?.space;
+    onboardingCompleted = getOnboardingStatus(dbUser).isOnboarded;
 
-    if (dbUser?.space && !dbUser.onboardingCompletedAt) {
+    if (shouldBackfillOnboardingCompletion(dbUser)) {
       await db.user
         .update({
           where: { id: dbUser.id },

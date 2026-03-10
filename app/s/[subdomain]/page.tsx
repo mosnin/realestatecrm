@@ -14,7 +14,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import type { Metadata } from 'next';
-import { protocol, rootDomain } from '@/lib/utils';
+import { buildIntakeUrl } from '@/lib/intake';
 import { CopyLinkButton } from './copy-link-button';
 
 export async function generateMetadata({
@@ -85,7 +85,7 @@ export default async function DashboardPage({
       maximumFractionDigits: 0,
     }).format(n);
 
-  const intakeUrl = `${protocol}://${rootDomain}/apply/${space.subdomain}`;
+  const intakeUrl = buildIntakeUrl(space.subdomain);
   const totalLeads = await db.contact.count({
     where: { spaceId: space.id, tags: { has: 'application-link' } },
   });

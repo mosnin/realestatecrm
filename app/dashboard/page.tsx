@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
+import { getOnboardingStatus, shouldBackfillOnboardingCompletion } from '@/lib/onboarding';
 
 export default async function DashboardRedirectPage() {
   const { userId } = await auth();
@@ -12,17 +13,15 @@ export default async function DashboardRedirectPage() {
       include: { space: true }
     });
 
-    const onboardingCompleted = !!user?.onboardingCompletedAt || !!user?.space;
+    const onboarding = getOnboardingStatus(user);
     console.info('[onboarding-guard] /dashboard read', {
       clerkId: userId,
-      onboardingCompleted,
+      onboardingCompleted: onboarding.isOnboarded,
       hasSpace: !!user?.space
     });
 
     if (user?.space) {
-      // Legacy accounts may have a workspace but missing onboardingCompletedAt.
-      // Treat workspace existence as completed to avoid onboarding loops.
-      if (!user.onboardingCompletedAt) {
+      if (shouldBackfillOnboardingCompletion(user)) {
         await db.user
           .update({
             where: { id: user.id },
