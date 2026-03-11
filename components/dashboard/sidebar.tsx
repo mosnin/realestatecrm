@@ -28,15 +28,15 @@ const secondaryNavItems = [
 ];
 
 interface SidebarProps {
-  subdomain: string;
+  slug: string;
   spaceName: string;
   spaceEmoji: string;
   unreadLeadCount: number;
 }
 
-export function Sidebar({ subdomain, spaceName, spaceEmoji, unreadLeadCount }: SidebarProps) {
+export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount }: SidebarProps) {
   const pathname = usePathname();
-  const base = `/s/${subdomain}`;
+  const base = `/s/${slug}`;
 
   return (
     <aside className="hidden md:flex flex-col w-60 min-h-screen bg-sidebar border-r border-sidebar-border shrink-0">
@@ -48,7 +48,7 @@ export function Sidebar({ subdomain, spaceName, spaceEmoji, unreadLeadCount }: S
           </div>
           <div className="min-w-0">
             <p className="font-semibold text-sm leading-tight truncate text-sidebar-foreground">{spaceName}</p>
-            <p className="text-[11px] text-muted-foreground truncate mt-0.5">{subdomain}</p>
+            <p className="text-[11px] text-muted-foreground truncate mt-0.5">{slug}</p>
           </div>
         </div>
       </div>

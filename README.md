@@ -1,16 +1,16 @@
-# Next.js Multi-Tenant Example
+# Chippi Real Estate CRM (Next.js Slug-Routed App)
 
-A production-ready example of a multi-tenant application built with Next.js 15, featuring custom subdomains for each tenant.
+A production-ready example of a workspace-based application built with Next.js 15, featuring custom slugs for each workspace.
 
 ## Features
 
-- ✅ Custom subdomain routing with Next.js middleware
-- ✅ Tenant-specific content and pages
-- ✅ Shared components and layouts across tenants
-- ✅ Redis for tenant data storage
-- ✅ Admin interface for managing tenants
-- ✅ Emoji support for tenant branding
-- ✅ Support for local development with subdomains
+- ✅ Custom slug routing with Next.js middleware
+- ✅ Workspace-specific content and pages
+- ✅ Shared components and layouts across workspaces
+- ✅ Redis for workspace data storage
+- ✅ Admin interface for managing workspaces
+- ✅ Emoji support for workspace branding
+- ✅ Support for local development with slugs
 - ✅ Compatible with Vercel preview deployments
 
 ## Tech Stack
@@ -61,19 +61,19 @@ A production-ready example of a multi-tenant application built with Next.js 15, 
 5. Access the application:
    - Main site: http://localhost:3000
    - Admin panel: http://localhost:3000/admin
-   - Tenants: http://[tenant-name].localhost:3000
+   - Workspaces: http://localhost:3000/s/[workspace-slug]
 
-## Multi-Tenant Architecture
+## Slug-Routed Architecture
 
-This application demonstrates a subdomain-based multi-tenant architecture where:
+This application uses slug-based routing where:
 
-- Each tenant gets their own subdomain (`tenant.yourdomain.com`)
-- The middleware handles routing requests to the correct tenant
-- Tenant data is stored in Redis using a `subdomain:{name}` key pattern
-- The main domain hosts the landing page and admin interface
-- Subdomains are dynamically mapped to tenant-specific content
+- Each workspace is accessed by a URL path slug (`/s/[slug]`)
+- The middleware handles routing requests to the correct workspace
+- Workspace data is stored in Redis using a `slug:{name}` key pattern
+- The main domain hosts the landing page, admin interface, and slug-routed workspace pages
+- Slugs are dynamically mapped to workspace-specific content
 
-The middleware (`middleware.ts`) intelligently detects subdomains across various environments (local development, production, and Vercel preview deployments).
+The middleware (`middleware.ts`) protects authenticated routes while slug lookup is handled in application data access.
 
 ## Deployment
 
@@ -87,4 +87,4 @@ This application is designed to be deployed on Vercel. To deploy:
 For custom domains, make sure to:
 
 1. Add your root domain to Vercel
-2. Set up a wildcard DNS record (`*.yourdomain.com`) on Vercel
+2. Configure routing so `/s/[slug]` paths resolve to your deployment

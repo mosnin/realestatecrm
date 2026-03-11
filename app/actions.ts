@@ -1,10 +1,11 @@
 'use server';
 
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { auth, clerkClient, currentUser } from '@clerk/nextjs/server';
 import { redis } from '@/lib/redis';
 import { db } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { getAdminAuth, isValidAdminRole } from '@/lib/admin-auth';
 
 const DEFAULT_STAGES = [
   { name: 'Lead', color: '#94a3b8', position: 0 },
@@ -15,7 +16,7 @@ const DEFAULT_STAGES = [
   { name: 'Closed Lost', color: '#ef4444', position: 5 }
 ];
 
-export async function createSubdomainAction(
+export async function createSlugAction(
   prevState: any,
   formData: FormData
 ) {
@@ -24,30 +25,30 @@ export async function createSubdomainAction(
     return { success: false, error: 'You must be signed in to create a space' };
   }
 
-  const subdomain = formData.get('subdomain') as string;
+  const slug = formData.get('slug') as string;
 
-  if (!subdomain) {
+  if (!slug) {
     return { success: false, error: 'Workspace name is required' };
   }
 
-  const sanitizedSubdomain = subdomain.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const sanitizedSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
 
-  if (sanitizedSubdomain !== subdomain) {
+  if (sanitizedSlug !== slug) {
     return {
-      subdomain,
+      slug,
       success: false,
       error:
         'Workspace name can only have lowercase letters, numbers, and hyphens. Please try again.'
     };
   }
 
-  const subdomainAlreadyExists = await db.space.findUnique({
-    where: { subdomain: sanitizedSubdomain },
+  const slugAlreadyExists = await db.space.findUnique({
+    where: { slug: sanitizedSlug },
     select: { id: true }
   });
-  if (subdomainAlreadyExists) {
+  if (slugAlreadyExists) {
     return {
-      subdomain,
+      slug,
       success: false,
       error: 'This workspace name is already taken'
     };
@@ -69,14 +70,14 @@ export async function createSubdomainAction(
   });
   if (existingSpace) {
     return {
-      subdomain,
+      slug,
       success: false,
       error: 'You already have a space. Each account is limited to one space.'
     };
   }
 
   await redis
-    .set(`subdomain:${sanitizedSubdomain}`, {
+    .set(`slug:${sanitizedSlug}`, {
       emoji: '🏢',
       createdAt: Date.now()
     })
@@ -84,8 +85,8 @@ export async function createSubdomainAction(
 
   await db.space.create({
     data: {
-      subdomain: sanitizedSubdomain,
-      name: sanitizedSubdomain,
+      slug: sanitizedSlug,
+      name: sanitizedSlug,
       emoji: '🏢',
       ownerId: dbUser.id,
       settings: { create: {} },
@@ -96,13 +97,83 @@ export async function createSubdomainAction(
   redirect('/dashboard');
 }
 
-export async function deleteSubdomainAction(
+export async function deleteSlugAction(
   prevState: any,
   formData: FormData
 ) {
-  const subdomain = formData.get('subdomain') as string;
-  await redis.del(`subdomain:${subdomain}`).catch(() => null);
-  await db.space.delete({ where: { subdomain } }).catch(() => null);
+  const adminAuth = await getAdminAuth();
+  if (!adminAuth.isAuthenticated || !adminAuth.isAdmin) {
+    return { error: 'Unauthorized' };
+  }
+
+  const slug = formData.get('slug') as string;
+  await redis.del(`slug:${slug}`).catch(() => null);
+  await db.space.delete({ where: { slug: slug } }).catch(() => null);
   revalidatePath('/admin');
   return { success: 'Space deleted successfully' };
+}
+
+export async function setUserRoleAction(prevState: any, formData: FormData) {
+  const adminAuth = await getAdminAuth();
+  if (!adminAuth.isAuthenticated || !adminAuth.isAdmin) {
+    return { error: 'Unauthorized' };
+  }
+
+  const targetClerkId = String(formData.get('targetClerkId') ?? '');
+  const nextRole = String(formData.get('role') ?? '');
+
+  if (!targetClerkId || !isValidAdminRole(nextRole)) {
+    return { error: 'Invalid request' };
+  }
+
+  if (targetClerkId === adminAuth.userId && nextRole !== 'admin') {
+    return { error: 'You cannot remove your own admin access.' };
+  }
+
+  const clerk = await clerkClient();
+  const targetUser = await clerk.users.getUser(targetClerkId);
+  await clerk.users.updateUserMetadata(targetClerkId, {
+    publicMetadata: {
+      ...targetUser.publicMetadata,
+      role: nextRole
+    }
+  });
+
+  revalidatePath('/admin');
+  return { success: `Updated role to ${nextRole}.` };
+}
+
+export async function resetUserOnboardingAction(prevState: any, formData: FormData) {
+  const adminAuth = await getAdminAuth();
+  if (!adminAuth.isAuthenticated || !adminAuth.isAdmin) {
+    return { error: 'Unauthorized' };
+  }
+
+  const targetClerkId = String(formData.get('targetClerkId') ?? '');
+  if (!targetClerkId) {
+    return { error: 'Invalid request' };
+  }
+
+  await db.user.updateMany({
+    where: { clerkId: targetClerkId },
+    data: {
+      onboardingCurrentStep: 1,
+      onboardingStartedAt: null,
+      onboardingCompletedAt: null
+    }
+  });
+
+  const clerk = await clerkClient();
+  const targetUser = await clerk.users.getUser(targetClerkId);
+  await clerk.users.updateUserMetadata(targetClerkId, {
+    publicMetadata: {
+      ...targetUser.publicMetadata,
+      onboardingCompleted: false,
+      onboardingCompletedAt: null,
+      spaceSlug: null
+    }
+  });
+
+  revalidatePath('/admin');
+  return { success: 'Onboarding reset for user.' };
 }

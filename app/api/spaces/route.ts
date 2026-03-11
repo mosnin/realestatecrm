@@ -8,7 +8,7 @@ export async function PATCH(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const {
-    subdomain,
+    slug,
     name,
     emoji,
     notifications,
@@ -20,7 +20,7 @@ export async function PATCH(req: NextRequest) {
   } = await req.json();
 
   const space = await db.space.update({
-    where: { subdomain },
+    where: { slug: slug },
     data: {
       name,
       ...(emoji !== undefined ? { emoji } : {})
@@ -49,10 +49,10 @@ export async function PATCH(req: NextRequest) {
   });
 
   // Update Redis emoji
-  const existing = await redis.get<any>(`subdomain:${subdomain}`).catch(() => null);
+  const existing = await redis.get<any>(`slug:${slug}`).catch(() => null);
   if (existing) {
     await redis
-      .set(`subdomain:${subdomain}`, { ...existing, emoji })
+      .set(`slug:${slug}`, { ...existing, emoji })
       .catch(() => null);
   }
 
@@ -63,10 +63,10 @@ export async function DELETE(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { subdomain } = await req.json();
+  const { slug } = await req.json();
 
-  await redis.del(`subdomain:${subdomain}`).catch(() => null);
-  await db.space.delete({ where: { subdomain } }).catch(() => null);
+  await redis.del(`slug:${slug}`).catch(() => null);
+  await db.space.delete({ where: { slug: slug } }).catch(() => null);
 
   return NextResponse.json({ success: true });
 }

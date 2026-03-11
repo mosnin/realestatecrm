@@ -15,6 +15,13 @@ export default async function OnboardingPage() {
   if (!userId) redirect('/sign-in');
 
   const clerkUser = await currentUser();
+  const clerkCompleted = Boolean(
+    clerkUser?.publicMetadata?.onboardingCompleted || clerkUser?.publicMetadata?.onboardingCompletedAt
+  );
+  const clerkSlug =
+    typeof clerkUser?.publicMetadata?.spaceSlug === 'string'
+      ? clerkUser.publicMetadata.spaceSlug
+      : null;
 
   // Load user + space from DB.
   // Wrapped in try/catch to handle the period between deployment and migration
@@ -45,7 +52,11 @@ export default async function OnboardingPage() {
   });
 
   if (onboardingCompleted && dbUser?.space) {
-    redirect(`/s/${dbUser.space.subdomain}`);
+    redirect(`/s/${dbUser.space.slug}`);
+  }
+
+  if (clerkCompleted && clerkSlug) {
+    redirect(`/s/${clerkSlug}`);
   }
 
   // Bootstrap user record if this is their first load
@@ -86,7 +97,7 @@ export default async function OnboardingPage() {
     space: dbUser?.space
       ? {
           id: dbUser.space.id,
-          subdomain: dbUser.space.subdomain,
+          slug: dbUser.space.slug,
           name: dbUser.space.name,
           settings: dbUser.space.settings
             ? {

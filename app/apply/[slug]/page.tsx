@@ -1,15 +1,15 @@
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
-import { getSpaceFromSubdomain } from '@/lib/space';
+import { getSpaceFromSlug } from '@/lib/space';
 import { ApplicationForm } from './application-form';
 
 export default async function PublicApplyPage({
   params,
 }: {
-  params: Promise<{ subdomain: string }>;
+  params: Promise<{ slug: string }>;
 }) {
-  const { subdomain } = await params;
-  const space = await getSpaceFromSubdomain(subdomain);
+  const { slug } = await params;
+  const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
   const settings = await db.spaceSetting.findUnique({
@@ -29,7 +29,7 @@ export default async function PublicApplyPage({
           <h1 className="text-3xl font-bold">{pageTitle}</h1>
           <p className="text-muted-foreground mt-2">{pageIntro}</p>
         </div>
-        <ApplicationForm subdomain={subdomain} />
+        <ApplicationForm slug={slug} />
       </div>
     </div>
   );

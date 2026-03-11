@@ -4,29 +4,29 @@ import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { createSubdomainAction } from '@/app/actions';
+import { createSlugAction } from '@/app/actions';
 
 type CreateState = {
   error?: string;
   success?: boolean;
-  subdomain?: string;
+  slug?: string;
 };
 
-export function SubdomainForm() {
+export function SlugForm() {
   const [state, action, isPending] = useActionState<CreateState, FormData>(
-    createSubdomainAction,
+    createSlugAction,
     {}
   );
 
   return (
     <form action={action} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="subdomain">Workspace name</Label>
+        <Label htmlFor="slug">Workspace name</Label>
         <Input
-          id="subdomain"
-          name="subdomain"
+          id="slug"
+          name="slug"
           placeholder="your-workspace"
-          defaultValue={state?.subdomain}
+          defaultValue={state?.slug}
           className="w-full"
           required
         />

@@ -6,21 +6,14 @@ import { usePathname } from 'next/navigation';
 import { rootDomain, protocol } from '@/lib/utils';
 
 export default function NotFound() {
-  const [subdomain, setSubdomain] = useState<string | null>(null);
+  const [slug, setSlug] = useState<string | null>(null);
   const pathname = usePathname();
 
   useEffect(() => {
-    if (pathname?.startsWith('/s/')) {
-      const extractedSubdomain = pathname.split('/')[2];
-      if (extractedSubdomain) {
-        setSubdomain(extractedSubdomain);
-      }
-    } else {
-      const hostname = window.location.hostname;
-      if (hostname.includes(`.${rootDomain.split(':')[0]}`)) {
-        const extractedSubdomain = hostname.split('.')[0];
-        setSubdomain(extractedSubdomain);
-      }
+    if (!pathname?.startsWith('/s/')) return;
+    const extractedSlug = pathname.split('/')[2];
+    if (extractedSlug) {
+      setSlug(extractedSlug);
     }
   }, [pathname]);
 
@@ -28,17 +21,16 @@ export default function NotFound() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <div className="text-center">
         <h1 className="text-4xl font-bold tracking-tight">
-          {subdomain ? (
+          {slug ? (
             <>
-              <span className="text-muted-foreground">{subdomain}</span>.{rootDomain}{' '}
-              doesn&apos;t exist
+              Workspace <span className="text-muted-foreground">{slug}</span> doesn&apos;t exist
             </>
           ) : (
             'Page Not Found'
           )}
         </h1>
         <p className="mt-3 text-lg text-muted-foreground">
-          {subdomain
+          {slug
             ? "This workspace hasn't been created yet."
             : "The page you're looking for doesn't exist."}
         </p>
@@ -47,7 +39,7 @@ export default function NotFound() {
             href={`${protocol}://${rootDomain}`}
             className="rounded-full bg-primary text-primary-foreground px-6 py-2.5 text-sm font-medium hover:bg-primary/90 transition-colors"
           >
-            {subdomain ? `Create ${subdomain}` : `Go to ${rootDomain}`}
+            {slug ? `Create ${slug}` : `Go to ${rootDomain}`}
           </Link>
         </div>
       </div>

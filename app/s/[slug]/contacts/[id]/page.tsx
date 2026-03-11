@@ -36,9 +36,9 @@ function getInitials(name: string) {
 export default async function ClientDetailPage({
   params,
 }: {
-  params: Promise<{ subdomain: string; id: string }>;
+  params: Promise<{ slug: string; id: string }>;
 }) {
-  const { subdomain, id } = await params;
+  const { slug, id } = await params;
 
   const contact = await db.contact.findUnique({
     where: { id },
@@ -65,12 +65,12 @@ export default async function ClientDetailPage({
       {/* Back nav */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-muted-foreground">
-          <Link href={`/s/${subdomain}/contacts`}>
+          <Link href={`/s/${slug}/contacts`}>
             <ArrowLeft size={16} />
           </Link>
         </Button>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href={`/s/${subdomain}/contacts`} className="hover:text-foreground transition-colors">
+          <Link href={`/s/${slug}/contacts`} className="hover:text-foreground transition-colors">
             Clients
           </Link>
           <span>/</span>
@@ -207,7 +207,7 @@ export default async function ClientDetailPage({
             <div className="text-center py-4">
               <p className="text-sm text-muted-foreground">No deals linked.</p>
               <Link
-                href={`/s/${subdomain}/deals`}
+                href={`/s/${slug}/deals`}
                 className="text-xs text-primary font-medium hover:underline mt-1 inline-block"
               >
                 Go to deals →
@@ -218,7 +218,7 @@ export default async function ClientDetailPage({
               {contact.dealContacts.map(({ deal }) => (
                 <Link
                   key={deal.id}
-                  href={`/s/${subdomain}/deals`}
+                  href={`/s/${slug}/deals`}
                   className="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors group"
                 >
                   <div className="min-w-0">

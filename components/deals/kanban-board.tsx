@@ -27,10 +27,10 @@ type DealWithRelations = Deal & {
 type StageWithDeals = DealStage & { deals: DealWithRelations[] };
 
 interface KanbanBoardProps {
-  subdomain: string;
+  slug: string;
 }
 
-export function KanbanBoard({ subdomain }: KanbanBoardProps) {
+export function KanbanBoard({ slug }: KanbanBoardProps) {
   const [stages, setStages] = useState<StageWithDeals[]>([]);
   const [contacts, setContacts] = useState<Pick<Contact, 'id' | 'name'>[]>([]);
   const [addDealOpen, setAddDealOpen] = useState(false);
@@ -42,12 +42,12 @@ export function KanbanBoard({ subdomain }: KanbanBoardProps) {
 
   const fetchData = useCallback(async () => {
     const [stagesRes, contactsRes] = await Promise.all([
-      fetch(`/api/stages?subdomain=${subdomain}`),
-      fetch(`/api/contacts?subdomain=${subdomain}`)
+      fetch(`/api/stages?slug=${slug}`),
+      fetch(`/api/contacts?slug=${slug}`)
     ]);
     if (stagesRes.ok) setStages(await stagesRes.json());
     if (contactsRes.ok) setContacts(await contactsRes.json());
-  }, [subdomain]);
+  }, [slug]);
 
   useEffect(() => {
     fetchData();
@@ -122,7 +122,7 @@ export function KanbanBoard({ subdomain }: KanbanBoardProps) {
     await fetch('/api/deals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, subdomain })
+      body: JSON.stringify({ ...data, slug })
     });
     fetchData();
   }

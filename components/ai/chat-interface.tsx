@@ -13,11 +13,11 @@ interface Message {
 }
 
 interface ChatInterfaceProps {
-  subdomain: string;
+  slug: string;
   initialMessages: Message[];
 }
 
-export function ChatInterface({ subdomain, initialMessages }: ChatInterfaceProps) {
+export function ChatInterface({ slug, initialMessages }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -43,7 +43,7 @@ export function ChatInterface({ subdomain, initialMessages }: ChatInterfaceProps
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages, subdomain })
+        body: JSON.stringify({ messages: newMessages, slug })
       });
 
       if (!res.ok) {
