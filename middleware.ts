@@ -4,14 +4,14 @@ import { NextResponse } from 'next/server';
 const isProtectedRoute = createRouteMatcher([
   '/dashboard(.*)',
   '/s/(.*)',
-  '/onboarding(.*)'
+  '/onboarding(.*)',
+  '/admin(.*)'
 ]);
 
 const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/admin(.*)'
+  '/sign-up(.*)'
 ]);
 
 export default clerkMiddleware(async (auth, request) => {

@@ -26,34 +26,34 @@ export function isValidIcon(str: string) {
   return str.length >= 1 && str.length <= 10;
 }
 
-type SubdomainData = {
+type SlugData = {
   emoji: string;
   createdAt: number;
 };
 
-export async function getSubdomainData(subdomain: string) {
-  const sanitizedSubdomain = subdomain.toLowerCase().replace(/[^a-z0-9-]/g, '');
-  const data = await redis.get<SubdomainData>(
-    `subdomain:${sanitizedSubdomain}`
+export async function getSlugData(slug: string) {
+  const sanitizedSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const data = await redis.get<SlugData>(
+    `slug:${sanitizedSlug}`
   );
   return data;
 }
 
-export async function getAllSubdomains() {
-  const keys = await redis.keys('subdomain:*');
+export async function getAllSlugs() {
+  const keys = await redis.keys('slug:*');
 
   if (!keys.length) {
     return [];
   }
 
-  const values = await redis.mget<SubdomainData[]>(...keys);
+  const values = await redis.mget<SlugData[]>(...keys);
 
   return keys.map((key, index) => {
-    const subdomain = key.replace('subdomain:', '');
+    const slug = key.replace('slug:', '');
     const data = values[index];
 
     return {
-      subdomain,
+      slug,
       emoji: data?.emoji || '❓',
       createdAt: data?.createdAt || Date.now()
     };

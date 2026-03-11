@@ -15,7 +15,7 @@ import { protocol, rootDomain } from '@/lib/utils';
 import { CopyLinkButton } from '../copy-link-button';
 
 export default function ProfilePage() {
-  const params = useParams<{ subdomain: string }>();
+  const params = useParams<{ slug: string }>();
   const { user, isLoaded } = useUser();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -54,9 +54,9 @@ export default function ProfilePage() {
     .join('')
     .toUpperCase() || user.emailAddresses[0]?.emailAddress?.[0]?.toUpperCase() || 'U';
 
-  const subdomain = params?.subdomain;
-  const applicationUrl = subdomain
-    ? `${protocol}://${subdomain}.${rootDomain}/apply/${subdomain}`
+  const slug = params?.slug;
+  const applicationUrl = slug
+    ? `${protocol}://${slug}.${rootDomain}/apply/${slug}`
     : '';
 
   return (

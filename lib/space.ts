@@ -1,8 +1,8 @@
 import { db } from '@/lib/db';
 
-export async function getSpaceFromSubdomain(subdomain: string) {
+export async function getSpaceFromSlug(slug: string) {
   return db.space.findUnique({
-    where: { subdomain }
+    where: { slug: slug }
   });
 }
 

@@ -1,4 +1,4 @@
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { auth, clerkClient, currentUser } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
@@ -33,7 +33,7 @@ export async function GET() {
       space: user.space
         ? {
             id: user.space.id,
-            subdomain: user.space.subdomain,
+            slug: user.space.slug,
             name: user.space.name,
             settings: user.space.settings
           }
@@ -121,19 +121,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'create_space') {
-      const { subdomain, intakePageTitle, intakePageIntro, businessName } = body as {
-        subdomain: string;
+      const { slug, intakePageTitle, intakePageIntro, businessName } = body as {
+        slug: string;
         intakePageTitle: string;
         intakePageIntro: string;
         businessName: string;
       };
 
-      if (!subdomain) {
-        return NextResponse.json({ error: 'Subdomain is required' }, { status: 400 });
+      if (!slug) {
+        return NextResponse.json({ error: 'Slug is required' }, { status: 400 });
       }
 
-      const sanitized = subdomain.toLowerCase().replace(/[^a-z0-9-]/g, '');
-      if (sanitized !== subdomain) {
+      const sanitized = slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
+      if (sanitized !== slug) {
         return NextResponse.json(
           { error: 'Only lowercase letters, numbers, and hyphens allowed' },
           { status: 400 }
@@ -147,11 +147,17 @@ export async function POST(req: NextRequest) {
           update: { intakePageTitle, intakePageIntro, businessName },
           create: { spaceId: user.space.id, intakePageTitle, intakePageIntro, businessName }
         });
-        return NextResponse.json({ success: true, subdomain: user.space.subdomain });
+
+        const clerk = await clerkClient();
+        await clerk.users.updateUserMetadata(userId, {
+          publicMetadata: { spaceSlug: user.space.slug }
+        });
+
+        return NextResponse.json({ success: true, slug: user.space.slug });
       }
 
       const existing = await db.space.findUnique({
-        where: { subdomain: sanitized },
+        where: { slug: sanitized },
         select: { id: true }
       });
       if (existing) {
@@ -169,7 +175,7 @@ export async function POST(req: NextRequest) {
 
       const space = await db.space.create({
         data: {
-          subdomain: sanitized,
+          slug: sanitized,
           name: businessName || sanitized,
           emoji: '🏠',
           ownerId: user.id,
@@ -192,7 +198,12 @@ export async function POST(req: NextRequest) {
         data: { onboardingCurrentStep: 4 }
       });
 
-      return NextResponse.json({ success: true, subdomain: space.subdomain });
+      const clerk = await clerkClient();
+      await clerk.users.updateUserMetadata(userId, {
+        publicMetadata: { spaceSlug: space.slug }
+      });
+
+      return NextResponse.json({ success: true, slug: space.slug });
     }
 
     if (action === 'save_notifications') {
@@ -232,6 +243,17 @@ export async function POST(req: NextRequest) {
           onboardingCompletedAt: completedAt
         }
       });
+
+      // Mirror completion state to Clerk metadata so route guards can
+      // reliably identify completed users even during transient DB issues.
+      const clerk = await clerkClient();
+      await clerk.users.updateUserMetadata(userId, {
+        publicMetadata: {
+          onboardingCompleted: true,
+          onboardingCompletedAt: completedAt.toISOString()
+        }
+      });
+
       console.info('[onboarding-write] complete', { userId: user.id, onboardingCompletedAt: completedAt.toISOString() });
       return NextResponse.json({ success: true, onboardingCompletedAt: completedAt.toISOString() });
     }
@@ -244,7 +266,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ available: false, reason: 'invalid' });
       }
       const existing = await db.space.findUnique({
-        where: { subdomain: sanitized },
+        where: { slug: sanitized },
         select: { id: true }
       });
       return NextResponse.json({ available: !existing });

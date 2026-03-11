@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-export function ApplicationForm({ subdomain }: { subdomain: string }) {
+export function ApplicationForm({ slug }: { slug: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [scoreState, setScoreState] = useState<{
@@ -26,7 +26,7 @@ export function ApplicationForm({ subdomain }: { subdomain: string }) {
 
     const formData = new FormData(e.currentTarget);
     const payload = {
-      subdomain,
+      slug,
       name: formData.get('name'),
       email: formData.get('email'),
       phone: formData.get('phone'),

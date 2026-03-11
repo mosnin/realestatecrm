@@ -1,19 +1,19 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
-import { getSpaceFromSubdomain } from '@/lib/space';
+import { getSpaceFromSlug } from '@/lib/space';
 import { db } from '@/lib/db';
 import { SettingsForm } from './settings-form';
 
 export default async function SettingsPage({
   params
 }: {
-  params: Promise<{ subdomain: string }>;
+  params: Promise<{ slug: string }>;
 }) {
-  const { subdomain } = await params;
+  const { slug } = await params;
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
 
-  const space = await getSpaceFromSubdomain(subdomain);
+  const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
   const settings = await db.spaceSetting.findUnique({

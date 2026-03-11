@@ -1,15 +1,15 @@
 import { notFound } from 'next/navigation';
-import { getSpaceFromSubdomain } from '@/lib/space';
+import { getSpaceFromSlug } from '@/lib/space';
 import { db } from '@/lib/db';
 import { ChatInterface } from '@/components/ai/chat-interface';
 
 export default async function AIPage({
   params
 }: {
-  params: Promise<{ subdomain: string }>;
+  params: Promise<{ slug: string }>;
 }) {
-  const { subdomain } = await params;
-  const space = await getSpaceFromSubdomain(subdomain);
+  const { slug } = await params;
+  const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
   const recentMessages = await db.message.findMany({
@@ -31,7 +31,7 @@ export default async function AIPage({
           Ask about your leads, clients, or pipeline — get instant answers from your leasing data
         </p>
       </div>
-      <ChatInterface subdomain={subdomain} initialMessages={messages} />
+      <ChatInterface slug={slug} initialMessages={messages} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import { getSpaceFromSubdomain } from '@/lib/space';
+import { getSpaceFromSlug } from '@/lib/space';
 import { Phone, Mail, MapPin, Clock, DollarSign, FileText } from 'lucide-react';
 import Link from 'next/link';
 
@@ -37,13 +37,13 @@ function getInitials(name: string) {
 export default async function LeadsPage({
   params,
 }: {
-  params: Promise<{ subdomain: string }>;
+  params: Promise<{ slug: string }>;
 }) {
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
 
-  const { subdomain } = await params;
-  const space = await getSpaceFromSubdomain(subdomain);
+  const { slug } = await params;
+  const space = await getSpaceFromSlug(slug);
   if (!space) redirect('/');
 
   const leads = await db.contact.findMany({
@@ -109,7 +109,7 @@ export default async function LeadsPage({
             Share your intake link and new renter applications will appear here.
           </p>
           <Link
-            href={`/s/${subdomain}`}
+            href={`/s/${slug}`}
             className="inline-flex items-center gap-1.5 mt-4 text-sm text-primary font-medium hover:underline underline-offset-2"
           >
             Get your intake link →

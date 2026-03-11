@@ -1,14 +1,14 @@
 import { notFound } from 'next/navigation';
-import { getSpaceFromSubdomain } from '@/lib/space';
+import { getSpaceFromSlug } from '@/lib/space';
 import { ContactTable } from '@/components/contacts/contact-table';
 
 export default async function ClientsPage({
   params,
 }: {
-  params: Promise<{ subdomain: string }>;
+  params: Promise<{ slug: string }>;
 }) {
-  const { subdomain } = await params;
-  const space = await getSpaceFromSubdomain(subdomain);
+  const { slug } = await params;
+  const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
   return (
@@ -19,7 +19,7 @@ export default async function ClientsPage({
           Manage your renter pipeline from qualification to application
         </p>
       </div>
-      <ContactTable subdomain={subdomain} />
+      <ContactTable slug={slug} />
     </div>
   );
 }

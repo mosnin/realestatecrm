@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { chatWithRAG } from '@/lib/ai';
-import { getSpaceFromSubdomain } from '@/lib/space';
+import { getSpaceFromSlug } from '@/lib/space';
 import { db } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
@@ -9,9 +9,9 @@ export async function POST(req: NextRequest) {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { messages, subdomain } = await req.json();
+    const { messages, slug } = await req.json();
 
-    const space = await getSpaceFromSubdomain(subdomain);
+    const space = await getSpaceFromSlug(slug);
     if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
 
     // Save user message to DB

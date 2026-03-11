@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSpaceFromSubdomain } from '@/lib/space';
+import { getSpaceFromSlug } from '@/lib/space';
 import { scoreLeadApplication } from '@/lib/lead-scoring';
 import type { LeadScoringResult } from '@/lib/lead-scoring';
 
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      subdomain,
+      slug,
       name,
       email,
       phone,
@@ -22,14 +22,14 @@ export async function POST(req: NextRequest) {
       notes,
     } = body ?? {};
 
-    if (!subdomain || !name || !phone) {
+    if (!slug || !name || !phone) {
       return NextResponse.json(
-        { error: 'subdomain, name, and phone are required' },
+        { error: 'slug, name, and phone are required' },
         { status: 400 }
       );
     }
 
-    const space = await getSpaceFromSubdomain(String(subdomain));
+    const space = await getSpaceFromSlug(String(slug));
     if (!space) {
       return NextResponse.json({ error: 'Space not found' }, { status: 404 });
     }
