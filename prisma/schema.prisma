@@ -6,6 +6,9 @@ datasource db {
   provider = "postgresql"
 }
 
+// CONTRACT: `onboard` is the SINGLE canonical source of truth for onboarding completion.
+// `onboardingCompletedAt` is an audit timestamp only — never use it for routing or guard logic.
+// See docs/CONTRACTS.md for the full onboarding and slug identity contracts.
 model User {
   id                    String    @id @default(cuid())
   clerkId               String    @unique
@@ -16,14 +19,16 @@ model User {
   createdAt             DateTime  @default(now())
   onboardingCurrentStep Int       @default(1)
   onboardingStartedAt   DateTime?
-  onboardingCompletedAt DateTime?
-  onboard               Boolean   @default(false)
+  onboardingCompletedAt DateTime? // Audit-only timestamp. Do NOT use for routing decisions.
+  onboard               Boolean   @default(false) // CANONICAL onboarding truth. See lib/onboarding.ts.
   space                 Space?
 }
 
+// CONTRACT: `slug` is the SINGLE canonical workspace identity. Path-based only (/apply/{slug}).
+// The @map("subdomain") is a legacy DB column name — no subdomain routing exists.
 model Space {
   id        String   @id @default(cuid())
-  slug      String   @unique @map("subdomain")
+  slug      String   @unique @map("subdomain") // Path-based identity. See lib/intake.ts.
   name      String
   emoji     String
   createdAt DateTime @default(now())

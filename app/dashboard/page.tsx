@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import { getOnboardingStatus, shouldBackfillOnboardFromSpace } from '@/lib/onboarding';
+import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
 import { resolveDashboardEntry } from '@/lib/onboarding-routing';
 
 export default async function DashboardRedirectPage() {
@@ -14,13 +14,10 @@ export default async function DashboardRedirectPage() {
       include: { space: true }
     });
 
-    if (shouldBackfillOnboardFromSpace(user)) {
-      await db.user
-        .update({
-          where: { id: user!.id },
-          data: { onboard: true, onboardingCompletedAt: new Date(), onboardingCurrentStep: 7 }
-        })
-        .catch(() => null);
+    try {
+      await ensureOnboardingBackfill(user, db);
+    } catch (err) {
+      console.error('[dashboard] backfill failed', { clerkId: userId, error: err });
     }
 
     const onboarding = getOnboardingStatus(user);
@@ -35,10 +32,13 @@ export default async function DashboardRedirectPage() {
     }
 
     if (dashboardResolution === 'repair_and_redirect_onboarding' && user) {
+      // User is onboarded but has no space (e.g. deleted it).
+      // Reset to full re-onboarding. Note: we preserve onboardingCompletedAt
+      // as an audit timestamp — it is never used for routing decisions.
       await db.user
         .update({
           where: { id: user.id },
-          data: { onboard: false, onboardingCompletedAt: null, onboardingCurrentStep: 1 }
+          data: { onboard: false, onboardingCurrentStep: 1 }
         })
         .catch(() => null);
     }

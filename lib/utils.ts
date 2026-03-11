@@ -22,6 +22,14 @@ const defaultRootDomain =
     ? 'workflowrouting.com'
     : 'localhost:3000';
 
+if (!configuredRootDomain && process.env.NODE_ENV !== 'production') {
+  console.warn(
+    '[chippi] NEXT_PUBLIC_ROOT_DOMAIN is not set. Intake URLs will use the default domain:',
+    defaultRootDomain,
+    '— set this env var to match your actual deployment domain.'
+  );
+}
+
 export const rootDomain =
   normalizeRootDomain(configuredRootDomain || defaultRootDomain);
 

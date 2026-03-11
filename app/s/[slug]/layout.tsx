@@ -5,7 +5,7 @@ import { Sidebar } from '@/components/dashboard/sidebar';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
 import { db } from '@/lib/db';
-import { getOnboardingStatus, shouldBackfillOnboardFromSpace } from '@/lib/onboarding';
+import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
 
 export default async function DashboardLayout({
   children,
@@ -25,16 +25,13 @@ export default async function DashboardLayout({
   try {
     const dbUser = await db.user.findUnique({
       where: { clerkId: userId },
-      select: { id: true, onboard: true, onboardingCompletedAt: true, space: { select: { id: true } } }
+      select: { id: true, onboard: true, space: { select: { id: true } } }
     });
 
-    if (shouldBackfillOnboardFromSpace(dbUser)) {
-      await db.user
-        .update({
-          where: { id: dbUser!.id },
-          data: { onboard: true, onboardingCompletedAt: new Date(), onboardingCurrentStep: 7 }
-        })
-        .catch(() => null);
+    try {
+      await ensureOnboardingBackfill(dbUser, db);
+    } catch (err) {
+      console.error('[onboarding-guard] /s layout backfill failed', { clerkId: userId, slug, error: err });
     }
 
     isOnboarded = getOnboardingStatus(dbUser).isOnboarded;

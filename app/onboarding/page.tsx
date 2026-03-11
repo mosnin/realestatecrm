@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { OnboardingWizard } from './wizard-client';
 import type { User, Space, SpaceSetting } from '@prisma/client';
-import { getOnboardingStatus, shouldBackfillOnboardFromSpace } from '@/lib/onboarding';
+import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
 import { resolveOnboardingPageAccess } from '@/lib/onboarding-routing';
 
 export const metadata = { title: 'Set up Chippi' };
@@ -29,18 +29,18 @@ export default async function OnboardingPage() {
     console.error('[onboarding-page] DB read failed', { clerkId: userId, error: err });
   }
 
-  if (shouldBackfillOnboardFromSpace(dbUser)) {
-    await db.user
-      .update({
-        where: { id: dbUser!.id },
-        data: { onboard: true, onboardingCompletedAt: new Date(), onboardingCurrentStep: 7 }
-      })
-      .catch(() => null);
-    dbUser = dbUser ? { ...dbUser, onboard: true, onboardingCurrentStep: 7 } : dbUser;
+  try {
+    await ensureOnboardingBackfill(dbUser, db);
+  } catch (err) {
+    console.error('[onboarding-page] backfill failed', { clerkId: userId, error: err });
   }
 
   const onboarding = getOnboardingStatus(dbUser);
   if (resolveOnboardingPageAccess({ isOnboarded: onboarding.isOnboarded, hasSpace: onboarding.hasSpace }) === 'redirect_dashboard') {
+    // Skip the /dashboard hop — go directly to workspace if we have a slug
+    if (dbUser?.space?.slug) {
+      redirect(`/s/${dbUser.space.slug}`);
+    }
     redirect('/dashboard');
   }
 

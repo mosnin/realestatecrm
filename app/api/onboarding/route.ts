@@ -2,7 +2,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
-import { getOnboardingStatus, shouldBackfillOnboardFromSpace } from '@/lib/onboarding';
+import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
 
 export async function GET() {
   const { userId } = await auth();
@@ -18,14 +18,10 @@ export async function GET() {
       return NextResponse.json({ step: 1, completed: false, user: null, space: null });
     }
 
-    if (shouldBackfillOnboardFromSpace(user)) {
-      await db.user
-        .update({
-          where: { id: user.id },
-          data: { onboard: true, onboardingCurrentStep: 7, onboardingCompletedAt: new Date() }
-        })
-        .catch(() => null);
-      user.onboard = true;
+    try {
+      await ensureOnboardingBackfill(user, db);
+    } catch (err) {
+      console.error('[onboarding GET] backfill failed', err);
     }
 
     return NextResponse.json({
@@ -82,13 +78,10 @@ export async function POST(req: NextRequest) {
       include: { space: { include: { settings: true } } }
     });
 
-    if (shouldBackfillOnboardFromSpace(user)) {
-      await db.user
-        .update({
-          where: { id: user.id },
-          data: { onboard: true, onboardingCurrentStep: 7, onboardingCompletedAt: new Date() }
-        })
-        .catch(() => null);
+    try {
+      await ensureOnboardingBackfill(user, db);
+    } catch (err) {
+      console.error('[onboarding POST] backfill failed', err);
     }
 
     if (action === 'start') {
@@ -228,8 +221,20 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'complete') {
+      // Idempotent: if already onboarded, return success immediately
+      if (user.onboard) {
+        return NextResponse.json({
+          success: true,
+          onboard: true,
+          onboardingCompletedAt: user.onboardingCompletedAt?.toISOString() ?? new Date().toISOString()
+        });
+      }
+
       if (!user.space) {
-        return NextResponse.json({ error: 'Complete requires a workspace slug' }, { status: 409 });
+        return NextResponse.json(
+          { error: 'Cannot complete onboarding without a workspace. Please create your workspace first.' },
+          { status: 409 }
+        );
       }
 
       const completedAt = new Date();
