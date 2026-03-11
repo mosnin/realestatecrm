@@ -43,9 +43,9 @@ export default async function DashboardRedirectPage() {
         .catch(() => null);
     }
 
-    redirect('/onboarding');
+    redirect('/setup');
   } catch (error) {
     console.error('[onboarding-guard] /dashboard read failed', { clerkId: userId, error });
-    redirect('/onboarding');
+    redirect('/setup');
   }
 }

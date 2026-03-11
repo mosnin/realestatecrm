@@ -38,7 +38,7 @@ expectContains(join(repoRoot, 'prisma/schema.prisma'), /onboard\s+Boolean/, 'Use
 // 2) Onboarding guards/pages must use shared helper.
 for (const requiredFile of [
   'app/dashboard/page.tsx',
-  'app/onboarding/page.tsx',
+  'app/setup/page.tsx',
   'app/s/[slug]/layout.tsx',
   'app/api/onboarding/route.ts',
 ]) {
@@ -72,7 +72,7 @@ expectContains(join(repoRoot, 'app/s/[slug]/layout.tsx'), /params:\s*Promise<\{\
 for (const requiredFile of [
   'app/s/[slug]/profile/page.tsx',
   'app/s/[slug]/page.tsx',
-  'app/onboarding/wizard-client.tsx',
+  'app/setup/configure-form.tsx',
 ]) {
   expectContains(join(repoRoot, requiredFile), /buildIntakeUrl|buildIntakePath/, 'must use canonical intake helper(s)');
 }

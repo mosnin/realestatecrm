@@ -41,7 +41,7 @@ export default async function DashboardLayout({
   }
 
   if (!isOnboarded) {
-    redirect('/onboarding');
+    redirect('/setup');
   }
 
   const space = await getSpaceFromSlug(slug);

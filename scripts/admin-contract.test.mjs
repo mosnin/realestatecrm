@@ -56,7 +56,7 @@ function isProtectedRoute(path) {
   return (
     path.startsWith('/dashboard') ||
     path.startsWith('/s/') ||
-    path.startsWith('/onboarding') ||
+    path.startsWith('/setup') ||
     path.startsWith('/admin')
   );
 }
@@ -109,7 +109,7 @@ test('admin routes are NOT in public routes', () => {
 test('non-admin user can still access regular protected routes', () => {
   assert.equal(resolveMiddleware('/dashboard', 'user1', false), 'allow');
   assert.equal(resolveMiddleware('/s/my-slug', 'user1', false), 'allow');
-  assert.equal(resolveMiddleware('/onboarding', 'user1', false), 'allow');
+  assert.equal(resolveMiddleware('/setup', 'user1', false), 'allow');
 });
 
 test('public routes remain accessible to everyone', () => {
