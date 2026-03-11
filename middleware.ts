@@ -4,23 +4,36 @@ import { NextResponse } from 'next/server';
 const isProtectedRoute = createRouteMatcher([
   '/dashboard(.*)',
   '/s/(.*)',
-  '/onboarding(.*)'
+  '/onboarding(.*)',
+  '/admin(.*)'
 ]);
 
 const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
   '/sign-up(.*)',
-  '/admin(.*)'
+]);
+
+const isAdminRoute = createRouteMatcher([
+  '/admin(.*)',
+  '/api/admin(.*)'
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
   if (isProtectedRoute(request) && !isPublicRoute(request)) {
-    const { userId } = await auth();
-    if (!userId) {
+    const session = await auth();
+    if (!session.userId) {
       const signInUrl = new URL('/sign-in', request.url);
       signInUrl.searchParams.set('redirect_url', request.url);
       return NextResponse.redirect(signInUrl);
+    }
+
+    // Admin route protection: require role=admin in publicMetadata
+    if (isAdminRoute(request)) {
+      const metadata = (session.sessionClaims?.publicMetadata ?? {}) as Record<string, unknown>;
+      if (metadata.role !== 'admin') {
+        return NextResponse.redirect(new URL('/', request.url));
+      }
     }
   }
 
