@@ -24,12 +24,17 @@ export default async function DashboardLayout({
   // Gate: user must exist in our DB. If they have a space, always let them
   // through — having a workspace IS proof of setup. Never redirect workspace
   // owners away; the backfill fixes the `onboard` flag in the background.
-  // IMPORTANT: No .catch(() => null) — DB errors must not be silently
-  // converted to "user not found" which would redirect to /setup.
-  const dbUser = await db.user.findUnique({
-    where: { clerkId: userId },
-    select: { id: true, onboard: true, space: { select: { id: true } } }
-  });
+  let dbUser;
+  try {
+    dbUser = await db.user.findUnique({
+      where: { clerkId: userId },
+      select: { id: true, onboard: true, space: { select: { id: true } } }
+    });
+  } catch (err) {
+    // DB error — show error page, NEVER redirect to /setup
+    console.error('[layout] DB query failed', { clerkId: userId, slug, error: err });
+    throw new Error('Unable to load your account. Please refresh the page.');
+  }
 
   if (!dbUser) {
     redirect('/setup');
@@ -48,7 +53,7 @@ export default async function DashboardLayout({
 
   const unreadLeadCount = await db.contact.count({
     where: { spaceId: space.id, tags: { has: 'new-lead' } }
-  });
+  }).catch(() => 0);
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">

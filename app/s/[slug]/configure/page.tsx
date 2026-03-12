@@ -21,10 +21,16 @@ export default async function ConfigurePage({
 
   const clerkUser = await currentUser();
 
-  const dbUser: DbUser | null = await db.user.findUnique({
-    where: { clerkId: userId },
-    include: { space: { include: { settings: true } } },
-  });
+  let dbUser: DbUser | null = null;
+  try {
+    dbUser = await db.user.findUnique({
+      where: { clerkId: userId },
+      include: { space: { include: { settings: true } } },
+    });
+  } catch (err) {
+    console.error('[configure] DB query failed', { clerkId: userId, error: err });
+    throw new Error('Unable to load your account. Please refresh the page.');
+  }
 
   const initialData = {
     name: dbUser?.name ?? clerkUser?.fullName ?? clerkUser?.firstName ?? '',

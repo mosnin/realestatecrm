@@ -12,12 +12,18 @@ export default async function SetupPage() {
 
   const clerkUser = await currentUser();
 
-  // IMPORTANT: Do NOT use .catch(() => null) here. If the DB query fails,
-  // we must NOT show the "create workspace" form to a user who already has one.
-  const dbUser = await db.user.findUnique({
-    where: { clerkId: userId },
-    include: { space: true },
-  });
+  // On DB error, throw a real error (shows error page) — NEVER show the
+  // "create workspace" form to a user who might already have one.
+  let dbUser;
+  try {
+    dbUser = await db.user.findUnique({
+      where: { clerkId: userId },
+      include: { space: true },
+    });
+  } catch (err) {
+    console.error('[setup] DB query failed', { clerkId: userId, error: err });
+    throw new Error('Unable to load your account. Please refresh the page.');
+  }
 
   // Best-effort backfill (bookkeeping only)
   try {

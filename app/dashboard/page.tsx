@@ -7,12 +7,18 @@ export default async function DashboardRedirectPage() {
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
 
-  // IMPORTANT: Do NOT use .catch(() => null) — silently converting DB errors
-  // into "no user" sends existing users to /setup and shows "create workspace".
-  const user = await db.user.findUnique({
-    where: { clerkId: userId },
-    include: { space: true },
-  });
+  // Wrap in try-catch for build resilience, but on DB error throw a real
+  // error (shows error page) — NEVER convert to null/redirect to /setup.
+  let user;
+  try {
+    user = await db.user.findUnique({
+      where: { clerkId: userId },
+      include: { space: true },
+    });
+  } catch (err) {
+    console.error('[dashboard] DB query failed', { clerkId: userId, error: err });
+    throw new Error('Unable to load your account. Please refresh the page.');
+  }
 
   // Best-effort backfill (bookkeeping only)
   try {
