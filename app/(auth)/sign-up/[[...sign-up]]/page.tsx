@@ -6,7 +6,7 @@ export default function SignUpPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="flex flex-col items-center gap-6">
         <BrandLogo className="h-10" alt="Chippi" />
-        <SignUp forceRedirectUrl="/dashboard" />
+        <SignUp forceRedirectUrl="/dashboard" afterSignUpUrl="/dashboard" signUpForceRedirectUrl="/dashboard" />
       </div>
     </div>
   );
