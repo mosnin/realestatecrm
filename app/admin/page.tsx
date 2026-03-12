@@ -1,4 +1,4 @@
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Users,
@@ -17,23 +17,25 @@ export default async function AdminOverviewPage() {
   try {
     [totalUsers, onboardedUsers, usersWithSpace, totalContacts, totalLeads, recentUsers] =
       await Promise.all([
-        db.user.count(),
-        db.user.count({ where: { onboard: true } }),
-        db.user.count({ where: { space: { isNot: null } } }),
-        db.contact.count(),
-        db.contact.count({ where: { tags: { has: 'application-link' } } }),
-        db.user.findMany({
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            onboard: true,
-            createdAt: true,
-            space: { select: { slug: true } },
-          },
-        }),
+        sql`SELECT COUNT(*)::int AS count FROM "User"`.then(r => (r[0] as { count: number }).count),
+        sql`SELECT COUNT(*)::int AS count FROM "User" WHERE onboard = true`.then(r => (r[0] as { count: number }).count),
+        sql`SELECT COUNT(*)::int AS count FROM "User" u WHERE EXISTS (SELECT 1 FROM "Space" s WHERE s."ownerId" = u.id)`.then(r => (r[0] as { count: number }).count),
+        sql`SELECT COUNT(*)::int AS count FROM "Contact"`.then(r => (r[0] as { count: number }).count),
+        sql`SELECT COUNT(*)::int AS count FROM "Contact" WHERE 'application-link' = ANY(tags)`.then(r => (r[0] as { count: number }).count),
+        sql`
+          SELECT u.id, u.name, u.email, u.onboard, u."createdAt", s."subdomain" AS "spaceSlug"
+          FROM "User" u
+          LEFT JOIN "Space" s ON s."ownerId" = u.id
+          ORDER BY u."createdAt" DESC
+          LIMIT 5
+        `.then(rows => (rows as Record<string, unknown>[]).map(row => ({
+          id: row.id as string,
+          name: row.name as string | null,
+          email: row.email as string,
+          onboard: row.onboard as boolean,
+          createdAt: row.createdAt as Date,
+          space: row.spaceSlug ? { slug: row.spaceSlug as string } : null,
+        }))),
       ]);
   } catch (err) {
     console.error('[admin] DB queries failed', { error: err });

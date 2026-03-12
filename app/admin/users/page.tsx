@@ -1,4 +1,4 @@
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { UserListClient } from './user-list-client';
 
 export const metadata = { title: 'Users — Admin — Chippi' };
@@ -12,39 +12,158 @@ export default async function AdminUsersPage({
   const query = params.q?.trim() || '';
   const filter = params.filter || 'all';
 
-  const where: Record<string, unknown> = {};
+  // Build WHERE conditions
+  const conditions: string[] = [];
+  const values: unknown[] = [];
 
-  // Search filter
   if (query) {
-    where.OR = [
-      { name: { contains: query, mode: 'insensitive' } },
-      { email: { contains: query, mode: 'insensitive' } },
-      { space: { slug: { contains: query, mode: 'insensitive' } } },
-    ];
+    conditions.push(`(u.name ILIKE $1 OR u.email ILIKE $1 OR s."subdomain" ILIKE $1)`);
+    values.push(`%${query}%`);
   }
 
-  // Status filter
-  if (filter === 'onboarded') where.onboard = true;
-  if (filter === 'not-onboarded') where.onboard = false;
-  if (filter === 'has-space') where.space = { isNot: null };
-  if (filter === 'no-space') where.space = { is: null };
+  if (filter === 'onboarded') conditions.push('u.onboard = true');
+  if (filter === 'not-onboarded') conditions.push('u.onboard = false');
+  if (filter === 'has-space') conditions.push('s.id IS NOT NULL');
+  if (filter === 'no-space') conditions.push('s.id IS NULL');
 
-  const users = await db.user.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    take: 200,
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      onboard: true,
-      createdAt: true,
-      onboardingCurrentStep: true,
-      space: { select: { slug: true, name: true, emoji: true } },
-    },
-  });
+  const whereClause = conditions.length > 0 ? conditions.join(' AND ') : 'true';
 
-  const totalCount = await db.user.count();
+  // We need to use tagged template for neon serverless, so we'll handle search differently
+  let users: { id: string; name: string | null; email: string; onboard: boolean; createdAt: Date; onboardingCurrentStep: number; space: { slug: string; name: string; emoji: string } | null }[];
+  let totalCount: number;
+
+  if (query) {
+    const searchPattern = `%${query}%`;
+
+    // Determine base filter for the query with search
+    let rows: Record<string, unknown>[];
+    if (filter === 'onboarded') {
+      rows = await sql`
+        SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
+               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+        FROM "User" u
+        LEFT JOIN "Space" s ON s."ownerId" = u.id
+        WHERE u.onboard = true AND (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."subdomain" ILIKE ${searchPattern})
+        ORDER BY u."createdAt" DESC
+        LIMIT 200
+      ` as Record<string, unknown>[];
+    } else if (filter === 'not-onboarded') {
+      rows = await sql`
+        SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
+               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+        FROM "User" u
+        LEFT JOIN "Space" s ON s."ownerId" = u.id
+        WHERE u.onboard = false AND (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."subdomain" ILIKE ${searchPattern})
+        ORDER BY u."createdAt" DESC
+        LIMIT 200
+      ` as Record<string, unknown>[];
+    } else if (filter === 'has-space') {
+      rows = await sql`
+        SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
+               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+        FROM "User" u
+        LEFT JOIN "Space" s ON s."ownerId" = u.id
+        WHERE s.id IS NOT NULL AND (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."subdomain" ILIKE ${searchPattern})
+        ORDER BY u."createdAt" DESC
+        LIMIT 200
+      ` as Record<string, unknown>[];
+    } else if (filter === 'no-space') {
+      rows = await sql`
+        SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
+               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+        FROM "User" u
+        LEFT JOIN "Space" s ON s."ownerId" = u.id
+        WHERE s.id IS NULL AND (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."subdomain" ILIKE ${searchPattern})
+        ORDER BY u."createdAt" DESC
+        LIMIT 200
+      ` as Record<string, unknown>[];
+    } else {
+      rows = await sql`
+        SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
+               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+        FROM "User" u
+        LEFT JOIN "Space" s ON s."ownerId" = u.id
+        WHERE (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."subdomain" ILIKE ${searchPattern})
+        ORDER BY u."createdAt" DESC
+        LIMIT 200
+      ` as Record<string, unknown>[];
+    }
+
+    users = rows.map(row => ({
+      id: row.id as string,
+      name: row.name as string | null,
+      email: row.email as string,
+      onboard: row.onboard as boolean,
+      createdAt: row.createdAt as Date,
+      onboardingCurrentStep: row.onboardingCurrentStep as number,
+      space: row.spaceSlug ? { slug: row.spaceSlug as string, name: row.spaceName as string, emoji: row.spaceEmoji as string } : null,
+    }));
+  } else {
+    let rows: Record<string, unknown>[];
+    if (filter === 'onboarded') {
+      rows = await sql`
+        SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
+               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+        FROM "User" u
+        LEFT JOIN "Space" s ON s."ownerId" = u.id
+        WHERE u.onboard = true
+        ORDER BY u."createdAt" DESC
+        LIMIT 200
+      ` as Record<string, unknown>[];
+    } else if (filter === 'not-onboarded') {
+      rows = await sql`
+        SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
+               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+        FROM "User" u
+        LEFT JOIN "Space" s ON s."ownerId" = u.id
+        WHERE u.onboard = false
+        ORDER BY u."createdAt" DESC
+        LIMIT 200
+      ` as Record<string, unknown>[];
+    } else if (filter === 'has-space') {
+      rows = await sql`
+        SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
+               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+        FROM "User" u
+        LEFT JOIN "Space" s ON s."ownerId" = u.id
+        WHERE s.id IS NOT NULL
+        ORDER BY u."createdAt" DESC
+        LIMIT 200
+      ` as Record<string, unknown>[];
+    } else if (filter === 'no-space') {
+      rows = await sql`
+        SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
+               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+        FROM "User" u
+        LEFT JOIN "Space" s ON s."ownerId" = u.id
+        WHERE s.id IS NULL
+        ORDER BY u."createdAt" DESC
+        LIMIT 200
+      ` as Record<string, unknown>[];
+    } else {
+      rows = await sql`
+        SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
+               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+        FROM "User" u
+        LEFT JOIN "Space" s ON s."ownerId" = u.id
+        ORDER BY u."createdAt" DESC
+        LIMIT 200
+      ` as Record<string, unknown>[];
+    }
+
+    users = rows.map(row => ({
+      id: row.id as string,
+      name: row.name as string | null,
+      email: row.email as string,
+      onboard: row.onboard as boolean,
+      createdAt: row.createdAt as Date,
+      onboardingCurrentStep: row.onboardingCurrentStep as number,
+      space: row.spaceSlug ? { slug: row.spaceSlug as string, name: row.spaceName as string, emoji: row.spaceEmoji as string } : null,
+    }));
+  }
+
+  const countRows = await sql`SELECT COUNT(*)::int AS count FROM "User"`;
+  totalCount = (countRows[0] as { count: number }).count;
 
   return (
     <div className="space-y-5 max-w-5xl">

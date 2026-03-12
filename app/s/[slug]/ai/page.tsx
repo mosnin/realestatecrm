@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getSpaceFromSlug } from '@/lib/space';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { ChatInterface } from '@/components/ai/chat-interface';
 
 export default async function AIPage({
@@ -14,12 +14,10 @@ export default async function AIPage({
 
   let messages: { role: 'user' | 'assistant'; content: string }[] = [];
   try {
-    const recentMessages = await db.message.findMany({
-      where: { spaceId: space.id },
-      orderBy: { createdAt: 'asc' },
-      take: 50
-    });
-    messages = recentMessages.map((m) => ({
+    const rows = await sql`
+      SELECT * FROM "Message" WHERE "spaceId" = ${space.id} ORDER BY "createdAt" ASC LIMIT 50
+    `;
+    messages = (rows as { role: string; content: string }[]).map((m) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content
     }));

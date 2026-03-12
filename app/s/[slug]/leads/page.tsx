@@ -1,9 +1,10 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { getSpaceFromSlug } from '@/lib/space';
 import { Phone, Mail, MapPin, Clock, DollarSign, FileText } from 'lucide-react';
 import Link from 'next/link';
+import type { Contact } from '@/lib/types';
 
 function timeAgo(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -46,13 +47,15 @@ export default async function LeadsPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) redirect('/');
 
-  let leads: Awaited<ReturnType<typeof db.contact.findMany>> = [];
+  let leads: Contact[] = [];
   try {
-    leads = await db.contact.findMany({
-      where: { spaceId: space.id, tags: { has: 'application-link' } },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+    const rows = await sql`
+      SELECT * FROM "Contact"
+      WHERE "spaceId" = ${space.id} AND 'application-link' = ANY(tags)
+      ORDER BY "createdAt" DESC
+      LIMIT 100
+    `;
+    leads = rows as Contact[];
   } catch (err) {
     console.error('[leads] DB query failed', { slug, error: err });
     return (
@@ -72,10 +75,7 @@ export default async function LeadsPage({
     try {
       await Promise.all(
         unreadLeads.map((lead) =>
-          db.contact.update({
-            where: { id: lead.id },
-            data: { tags: lead.tags.filter((tag) => tag !== 'new-lead') },
-          })
+          sql`UPDATE "Contact" SET tags = array_remove(tags, 'new-lead'), "updatedAt" = NOW() WHERE id = ${lead.id}`
         )
       );
     } catch {

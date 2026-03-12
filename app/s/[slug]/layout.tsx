@@ -4,7 +4,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 
 export default async function DashboardLayout({
@@ -26,10 +26,22 @@ export default async function DashboardLayout({
   // shows the generic "Application error" page).
   let dbUser;
   try {
-    dbUser = await db.user.findUnique({
-      where: { clerkId: userId },
-      select: { id: true, onboard: true, space: { select: { id: true } } }
-    });
+    const rows = await sql`
+      SELECT u.id, u.onboard, s.id AS "spaceId"
+      FROM "User" u
+      LEFT JOIN "Space" s ON s."ownerId" = u.id
+      WHERE u."clerkId" = ${userId}
+    `;
+    if (rows[0]) {
+      const row = rows[0] as Record<string, unknown>;
+      dbUser = {
+        id: row.id as string,
+        onboard: row.onboard as boolean,
+        space: row.spaceId ? { id: row.spaceId as string } : null,
+      };
+    } else {
+      dbUser = null;
+    }
   } catch (err) {
     console.error('[layout] DB query failed', { clerkId: userId, slug, error: err });
     return (
@@ -56,7 +68,7 @@ export default async function DashboardLayout({
 
   // Best-effort backfill: set onboard=true if user has a space but flag is false.
   try {
-    await ensureOnboardingBackfill(dbUser, db);
+    await ensureOnboardingBackfill(dbUser);
   } catch (err) {
     console.error('[layout] backfill failed (non-blocking)', { clerkId: userId, slug, error: err });
   }
@@ -64,9 +76,16 @@ export default async function DashboardLayout({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  const unreadLeadCount = await db.contact.count({
-    where: { spaceId: space.id, tags: { has: 'new-lead' } }
-  }).catch(() => 0);
+  let unreadLeadCount = 0;
+  try {
+    const countRows = await sql`
+      SELECT COUNT(*)::int AS count FROM "Contact"
+      WHERE "spaceId" = ${space.id} AND 'new-lead' = ANY(tags)
+    `;
+    unreadLeadCount = (countRows[0] as { count: number })?.count ?? 0;
+  } catch {
+    unreadLeadCount = 0;
+  }
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">

@@ -4,7 +4,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Badge } from '@/components/ui/badge';
 import { GripVertical, Pencil, Trash2, DollarSign } from 'lucide-react';
-import type { Deal, DealStage, Contact, DealContact } from '@prisma/client';
+import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 type DealWithRelations = Deal & {

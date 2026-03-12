@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { buildIntakeUrl } from '@/lib/intake';
 import { getOnboardingStatus } from '@/lib/onboarding';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { UserActions } from './user-actions';
+import type { User, Space, SpaceSetting } from '@/lib/types';
 
 export async function generateMetadata({
   params,
@@ -26,10 +27,10 @@ export async function generateMetadata({
   params: Promise<{ userId: string }>;
 }) {
   const { userId } = await params;
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: { name: true, email: true },
-  });
+  const rows = await sql`
+    SELECT name, email FROM "User" WHERE id = ${userId}
+  `;
+  const user = rows[0] as { name: string | null; email: string } | undefined;
   return {
     title: `${user?.name || user?.email || 'User'} — Admin — Chippi`,
   };
@@ -83,57 +84,68 @@ export default async function AdminUserDetailPage({
 }) {
   const { userId } = await params;
 
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    include: {
-      space: {
-        include: {
-          settings: true,
-          _count: {
-            select: {
-              contacts: true,
-              deals: true,
-              stages: true,
-            },
-          },
-        },
-      },
-    },
-  });
+  // Fetch user
+  const userRows = await sql`SELECT * FROM "User" WHERE id = ${userId}`;
+  if (!userRows[0]) notFound();
+  const user = userRows[0] as User;
 
-  if (!user) notFound();
+  // Fetch space
+  const spaceRows = await sql`
+    SELECT *, "subdomain" AS "slug" FROM "Space" WHERE "ownerId" = ${user.id} LIMIT 1
+  `;
+  const spaceRow = spaceRows[0] as (Space & Record<string, unknown>) | undefined;
 
-  const onboarding = getOnboardingStatus(user);
-  const intakeUrl = user.space ? buildIntakeUrl(user.space.slug) : null;
+  // Fetch settings + counts if space exists
+  let settings: SpaceSetting | null = null;
+  let contactCount = 0, dealCount = 0, stageCount = 0;
+  if (spaceRow) {
+    const [settingsRows, contactCountRows, dealCountRows, stageCountRows] = await Promise.all([
+      sql`SELECT * FROM "SpaceSetting" WHERE "spaceId" = ${spaceRow.id}`,
+      sql`SELECT COUNT(*)::int AS count FROM "Contact" WHERE "spaceId" = ${spaceRow.id}`,
+      sql`SELECT COUNT(*)::int AS count FROM "Deal" WHERE "spaceId" = ${spaceRow.id}`,
+      sql`SELECT COUNT(*)::int AS count FROM "DealStage" WHERE "spaceId" = ${spaceRow.id}`,
+    ]);
+    settings = (settingsRows[0] as SpaceSetting) ?? null;
+    contactCount = (contactCountRows[0] as { count: number }).count;
+    dealCount = (dealCountRows[0] as { count: number }).count;
+    stageCount = (stageCountRows[0] as { count: number }).count;
+  }
+
+  // Assemble the full user object matching what JSX expects
+  const space = spaceRow
+    ? {
+        ...spaceRow,
+        settings,
+        _count: { contacts: contactCount, deals: dealCount, stages: stageCount },
+      }
+    : null;
+
+  const fullUser = { ...user, space };
+
+  const onboarding = getOnboardingStatus(fullUser);
+  const intakeUrl = fullUser.space ? buildIntakeUrl(fullUser.space.slug) : null;
 
   // Get recent leads for this user's space
-  const recentLeads = user.space
-    ? await db.contact.findMany({
-        where: {
-          spaceId: user.space.id,
-          tags: { has: 'application-link' },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        select: {
-          id: true,
-          name: true,
-          phone: true,
-          createdAt: true,
-          scoringStatus: true,
-          scoreLabel: true,
-        },
-      })
-    : [];
+  let recentLeads: { id: string; name: string; phone: string | null; createdAt: Date; scoringStatus: string; scoreLabel: string | null }[] = [];
+  if (fullUser.space) {
+    const leadRows = await sql`
+      SELECT id, name, phone, "createdAt", "scoringStatus", "scoreLabel"
+      FROM "Contact"
+      WHERE "spaceId" = ${fullUser.space.id} AND 'application-link' = ANY(tags)
+      ORDER BY "createdAt" DESC
+      LIMIT 5
+    `;
+    recentLeads = leadRows as typeof recentLeads;
+  }
 
-  const failedLeads = user.space
-    ? await db.contact.count({
-        where: {
-          spaceId: user.space.id,
-          scoringStatus: 'failed',
-        },
-      })
-    : 0;
+  let failedLeads = 0;
+  if (fullUser.space) {
+    const failedRows = await sql`
+      SELECT COUNT(*)::int AS count FROM "Contact"
+      WHERE "spaceId" = ${fullUser.space.id} AND "scoringStatus" = 'failed'
+    `;
+    failedLeads = (failedRows[0] as { count: number }).count;
+  }
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -150,7 +162,7 @@ export default async function AdminUserDetailPage({
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary flex-shrink-0">
-            {(user.name || user.email || '?')
+            {(fullUser.name || fullUser.email || '?')
               .split(' ')
               .map((n: string) => n[0])
               .join('')
@@ -159,9 +171,9 @@ export default async function AdminUserDetailPage({
           </div>
           <div>
             <h1 className="text-xl font-semibold tracking-tight">
-              {user.name || 'No name'}
+              {fullUser.name || 'No name'}
             </h1>
-            <p className="text-sm text-muted-foreground">{user.email}</p>
+            <p className="text-sm text-muted-foreground">{fullUser.email}</p>
           </div>
         </div>
         <span
@@ -178,32 +190,32 @@ export default async function AdminUserDetailPage({
       {/* Account details */}
       <Card>
         <CardContent className="px-5 py-4 divide-y divide-border">
-          <InfoRow icon={Mail} label="Email" value={user.email} />
-          <InfoRow icon={Hash} label="Internal ID" value={user.id} mono />
-          <InfoRow icon={Hash} label="Clerk ID" value={user.clerkId} mono />
+          <InfoRow icon={Mail} label="Email" value={fullUser.email} />
+          <InfoRow icon={Hash} label="Internal ID" value={fullUser.id} mono />
+          <InfoRow icon={Hash} label="Clerk ID" value={fullUser.clerkId} mono />
           <InfoRow
             icon={Calendar}
             label="Created"
-            value={formatDate(user.createdAt)}
+            value={formatDate(fullUser.createdAt)}
           />
           <InfoRow
             icon={CheckCircle2}
             label="Onboarding status"
             value={
               onboarding.isOnboarded
-                ? `Complete (step ${user.onboardingCurrentStep})`
-                : `In progress — step ${user.onboardingCurrentStep} of 7`
+                ? `Complete (step ${fullUser.onboardingCurrentStep})`
+                : `In progress — step ${fullUser.onboardingCurrentStep} of 7`
             }
           />
           <InfoRow
             icon={Calendar}
             label="Onboarding started"
-            value={formatDate(user.onboardingStartedAt)}
+            value={formatDate(fullUser.onboardingStartedAt)}
           />
           <InfoRow
             icon={Calendar}
             label="Onboarding completed"
-            value={formatDate(user.onboardingCompletedAt)}
+            value={formatDate(fullUser.onboardingCompletedAt)}
           />
         </CardContent>
       </Card>
@@ -211,27 +223,27 @@ export default async function AdminUserDetailPage({
       {/* Workspace details */}
       <div>
         <p className="text-sm font-semibold mb-3">Workspace</p>
-        {user.space ? (
+        {fullUser.space ? (
           <Card>
             <CardContent className="px-5 py-4 divide-y divide-border">
               <InfoRow
                 icon={Building2}
                 label="Name"
-                value={`${user.space.emoji} ${user.space.name}`}
+                value={`${fullUser.space.emoji} ${fullUser.space.name}`}
               />
-              <InfoRow icon={Hash} label="Slug" value={user.space.slug} mono />
+              <InfoRow icon={Hash} label="Slug" value={fullUser.space.slug} mono />
               {intakeUrl && (
                 <InfoRow icon={Link2} label="Intake URL" value={intakeUrl} mono />
               )}
               <InfoRow
                 icon={Phone}
                 label="Phone"
-                value={user.space.settings?.phoneNumber || null}
+                value={fullUser.space.settings?.phoneNumber || null}
               />
               <InfoRow
                 icon={Building2}
                 label="Business name"
-                value={user.space.settings?.businessName || null}
+                value={fullUser.space.settings?.businessName || null}
               />
               <div className="flex items-start gap-3 py-2.5">
                 <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -241,15 +253,15 @@ export default async function AdminUserDetailPage({
                   <p className="text-xs text-muted-foreground">Stats</p>
                   <div className="flex flex-wrap gap-3 mt-1">
                     <span className="text-sm">
-                      <strong>{user.space._count.contacts}</strong>{' '}
+                      <strong>{fullUser.space._count.contacts}</strong>{' '}
                       <span className="text-muted-foreground">contacts</span>
                     </span>
                     <span className="text-sm">
-                      <strong>{user.space._count.deals}</strong>{' '}
+                      <strong>{fullUser.space._count.deals}</strong>{' '}
                       <span className="text-muted-foreground">deals</span>
                     </span>
                     <span className="text-sm">
-                      <strong>{user.space._count.stages}</strong>{' '}
+                      <strong>{fullUser.space._count.stages}</strong>{' '}
                       <span className="text-muted-foreground">stages</span>
                     </span>
                     {failedLeads > 0 && (
@@ -280,7 +292,7 @@ export default async function AdminUserDetailPage({
       </div>
 
       {/* Recent leads */}
-      {user.space && (
+      {fullUser.space && (
         <div>
           <p className="text-sm font-semibold mb-3">Recent leads</p>
           {recentLeads.length === 0 ? (
@@ -344,9 +356,9 @@ export default async function AdminUserDetailPage({
 
       {/* Admin actions */}
       <UserActions
-        userId={user.id}
-        clerkId={user.clerkId}
-        email={user.email}
+        userId={fullUser.id}
+        clerkId={fullUser.clerkId}
+        email={fullUser.email}
         isOnboarded={onboarding.isOnboarded}
         hasSpace={onboarding.hasSpace}
         intakeUrl={intakeUrl}

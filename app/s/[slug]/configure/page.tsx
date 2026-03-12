@@ -1,8 +1,8 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { ConfigureAccountForm } from './configure-account-form';
-import type { User, Space, SpaceSetting } from '@prisma/client';
+import type { User, Space, SpaceSetting } from '@/lib/types';
 
 export const metadata = { title: 'Configure your account — Chippi' };
 
@@ -23,10 +23,30 @@ export default async function ConfigurePage({
 
   let dbUser: DbUser | null = null;
   try {
-    dbUser = await db.user.findUnique({
-      where: { clerkId: userId },
-      include: { space: { include: { settings: true } } },
-    });
+    const userRows = await sql`
+      SELECT * FROM "User" WHERE "clerkId" = ${userId}
+    `;
+    if (userRows[0]) {
+      const u = userRows[0] as User;
+      const spaceRows = await sql`
+        SELECT *, "subdomain" AS "slug" FROM "Space" WHERE "ownerId" = ${u.id} LIMIT 1
+      `;
+      if (spaceRows[0]) {
+        const s = spaceRows[0] as Space;
+        const settingsRows = await sql`
+          SELECT * FROM "SpaceSetting" WHERE "spaceId" = ${s.id}
+        `;
+        dbUser = {
+          ...u,
+          space: {
+            ...s,
+            settings: (settingsRows[0] as SpaceSetting) ?? null,
+          },
+        };
+      } else {
+        dbUser = { ...u, space: null };
+      }
+    }
   } catch (err) {
     console.error('[configure] DB query failed', { clerkId: userId, error: err });
     return (

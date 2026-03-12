@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { redis } from '@/lib/redis';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -20,42 +20,40 @@ export async function PATCH(req: NextRequest) {
     anthropicApiKey
   } = await req.json();
 
-  const space = await db.space.findUnique({ where: { slug } });
-  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const spaceRows = await sql`
+    SELECT "id", "subdomain" AS "slug", "name", "emoji", "createdAt", "ownerId"
+    FROM "Space"
+    WHERE "subdomain" = ${slug}
+  `;
+  if (!spaceRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const space = spaceRows[0];
 
   const userSpace = await getSpaceForUser(userId);
   if (!userSpace || space.id !== userSpace.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const updated = await db.space.update({
-    where: { slug },
-    data: {
-      name,
-      ...(emoji !== undefined ? { emoji } : {})
-    }
-  });
+  const updatedRows = await sql`
+    UPDATE "Space"
+    SET
+      "name" = ${name}
+      ${emoji !== undefined ? sql`, "emoji" = ${emoji}` : sql``}
+    WHERE "subdomain" = ${slug}
+    RETURNING "id", "subdomain" AS "slug", "name", "emoji", "createdAt", "ownerId"
+  `;
 
-  await db.spaceSetting.upsert({
-    where: { spaceId: space.id },
-    update: {
-      notifications,
-      phoneNumber,
-      myConnections,
-      aiPersonalization,
-      billingSettings,
-      anthropicApiKey: anthropicApiKey || null
-    } as any,
-    create: {
-      spaceId: space.id,
-      notifications,
-      phoneNumber,
-      myConnections,
-      aiPersonalization,
-      billingSettings,
-      anthropicApiKey: anthropicApiKey || null
-    } as any
-  });
+  await sql`
+    INSERT INTO "SpaceSetting" ("id", "spaceId", "notifications", "phoneNumber", "myConnections", "aiPersonalization", "billingSettings", "anthropicApiKey")
+    VALUES (${crypto.randomUUID()}, ${space.id}, ${notifications}, ${phoneNumber}, ${myConnections}, ${aiPersonalization}, ${billingSettings}, ${anthropicApiKey || null})
+    ON CONFLICT ("spaceId") DO UPDATE SET
+      "notifications" = ${notifications},
+      "phoneNumber" = ${phoneNumber},
+      "myConnections" = ${myConnections},
+      "aiPersonalization" = ${aiPersonalization},
+      "billingSettings" = ${billingSettings},
+      "anthropicApiKey" = ${anthropicApiKey || null}
+  `;
 
   // Update Redis emoji
   const existing = await redis.get<any>(`slug:${slug}`).catch(() => null);
@@ -65,7 +63,7 @@ export async function PATCH(req: NextRequest) {
       .catch(() => null);
   }
 
-  return NextResponse.json(updated);
+  return NextResponse.json(updatedRows[0]);
 }
 
 export async function DELETE(req: NextRequest) {
@@ -74,8 +72,14 @@ export async function DELETE(req: NextRequest) {
 
   const { slug } = await req.json();
 
-  const space = await db.space.findUnique({ where: { slug } });
-  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const spaceRows = await sql`
+    SELECT "id", "subdomain" AS "slug", "name", "emoji", "createdAt", "ownerId"
+    FROM "Space"
+    WHERE "subdomain" = ${slug}
+  `;
+  if (!spaceRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const space = spaceRows[0];
 
   const userSpace = await getSpaceForUser(userId);
   if (!userSpace || space.id !== userSpace.id) {
@@ -83,7 +87,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   await redis.del(`slug:${slug}`).catch(() => null);
-  await db.space.delete({ where: { slug } });
+  await sql`DELETE FROM "Space" WHERE "subdomain" = ${slug}`;
 
   return NextResponse.json({ success: true });
 }

@@ -7,6 +7,8 @@
  *   `user.onboard` trustworthy over time.
  * - All guards must call `getOnboardingStatus()` and check `.isOnboarded`.
  */
+import { sql } from '@/lib/db';
+
 type OnboardingUser = {
   id?: string;
   onboard?: boolean | null;
@@ -39,15 +41,11 @@ export function shouldBackfillOnboardFromSpace(user: OnboardingUser) {
  * onboarding status for routing decisions.
  */
 export async function ensureOnboardingBackfill(
-  user: OnboardingUser,
-  db: { user: { update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<unknown> } }
+  user: OnboardingUser
 ): Promise<boolean> {
   if (!shouldBackfillOnboardFromSpace(user)) return false;
 
-  await db.user.update({
-    where: { id: user!.id! },
-    data: { onboard: true, onboardingCompletedAt: new Date(), onboardingCurrentStep: 7 },
-  });
+  await sql`UPDATE "User" SET "onboard" = true, "onboardingCompletedAt" = NOW(), "onboardingCurrentStep" = 7 WHERE id = ${user!.id!}`;
 
   // Mutate in-place so the caller's reference is up-to-date
   if (user) {

@@ -1,8 +1,9 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { syncContact } from '@/lib/vectorize';
+import type { Contact } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
@@ -22,21 +23,49 @@ export async function GET(req: NextRequest) {
   const search = req.nextUrl.searchParams.get('search') ?? '';
   const type = req.nextUrl.searchParams.get('type');
 
-  const contacts = await db.contact.findMany({
-    where: {
-      spaceId: space.id,
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { email: { contains: search, mode: 'insensitive' } },
-          { phone: { contains: search, mode: 'insensitive' } },
-          { preferences: { contains: search, mode: 'insensitive' } }
-        ]
-      }),
-      ...(type && type !== 'ALL' && { type: type as any })
-    },
-    orderBy: { createdAt: 'desc' }
-  });
+  let contacts: Contact[];
+
+  if (search && type && type !== 'ALL') {
+    const pattern = `%${search}%`;
+    contacts = await sql`
+      SELECT * FROM "Contact"
+      WHERE "spaceId" = ${space.id}
+        AND "type" = ${type}
+        AND (
+          "name" ILIKE ${pattern}
+          OR "email" ILIKE ${pattern}
+          OR "phone" ILIKE ${pattern}
+          OR "preferences" ILIKE ${pattern}
+        )
+      ORDER BY "createdAt" DESC
+    ` as Contact[];
+  } else if (search) {
+    const pattern = `%${search}%`;
+    contacts = await sql`
+      SELECT * FROM "Contact"
+      WHERE "spaceId" = ${space.id}
+        AND (
+          "name" ILIKE ${pattern}
+          OR "email" ILIKE ${pattern}
+          OR "phone" ILIKE ${pattern}
+          OR "preferences" ILIKE ${pattern}
+        )
+      ORDER BY "createdAt" DESC
+    ` as Contact[];
+  } else if (type && type !== 'ALL') {
+    contacts = await sql`
+      SELECT * FROM "Contact"
+      WHERE "spaceId" = ${space.id}
+        AND "type" = ${type}
+      ORDER BY "createdAt" DESC
+    ` as Contact[];
+  } else {
+    contacts = await sql`
+      SELECT * FROM "Contact"
+      WHERE "spaceId" = ${space.id}
+      ORDER BY "createdAt" DESC
+    ` as Contact[];
+  }
 
   return NextResponse.json(contacts);
 }
@@ -56,21 +85,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const contact = await db.contact.create({
-    data: {
-      spaceId: space.id,
-      name,
-      email: email || null,
-      phone: phone || null,
-      address: address || null,
-      notes: notes || null,
-      type: type || 'QUALIFICATION',
-      budget: budget != null && budget !== '' ? parseFloat(budget) : null,
-      preferences: preferences || null,
-      properties: properties || [],
-      tags: tags || []
-    } as any
-  });
+  const id = crypto.randomUUID();
+  const budgetVal = budget != null && budget !== '' ? parseFloat(budget) : null;
+  const propsVal = properties || [];
+  const tagsVal = tags || [];
+
+  const rows = await sql`
+    INSERT INTO "Contact" ("id", "spaceId", "name", "email", "phone", "address", "notes", "type", "budget", "preferences", "properties", "tags")
+    VALUES (
+      ${id}, ${space.id}, ${name}, ${email || null}, ${phone || null},
+      ${address || null}, ${notes || null}, ${type || 'QUALIFICATION'},
+      ${budgetVal}, ${preferences || null}, ${propsVal}, ${tagsVal}
+    )
+    RETURNING *
+  `;
+
+  const contact = rows[0] as Contact;
 
   // Async vectorization — don't block the response
   syncContact(contact).catch(console.error);

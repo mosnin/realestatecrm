@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { embedText } from '@/lib/embeddings';
 import { searchVectors } from '@/lib/zilliz';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -55,14 +55,12 @@ export async function chatWithRAG(
     }
 
     if (contactIds.length) {
-      const contacts = await db.contact.findMany({
-        where: { id: { in: contactIds }, spaceId }
-      });
+      const contacts = await sql`SELECT * FROM "Contact" WHERE id = ANY(${contactIds}) AND "spaceId" = ${spaceId}`;
       contextBlocks.push(
         'Relevant Contacts:\n' +
           contacts
             .map(
-              (c) =>
+              (c: any) =>
                 `- ${c.name} (${c.type}) | ${c.email ?? ''} | ${c.phone ?? ''} | ${c.address ?? ''} | Notes: ${c.notes ?? ''}`
             )
             .join('\n')
@@ -70,16 +68,30 @@ export async function chatWithRAG(
     }
 
     if (dealIds.length) {
-      const deals = await db.deal.findMany({
-        where: { id: { in: dealIds }, spaceId },
-        include: { stage: true, dealContacts: { include: { contact: true } } }
-      });
+      const deals = await sql`
+        SELECT d.*, s.name AS "stageName"
+        FROM "Deal" d
+        LEFT JOIN "Stage" s ON s.id = d."stageId"
+        WHERE d.id = ANY(${dealIds}) AND d."spaceId" = ${spaceId}
+      `;
+      const dealContactRows = await sql`
+        SELECT dc."dealId", c.name
+        FROM "DealContact" dc
+        JOIN "Contact" c ON c.id = dc."contactId"
+        WHERE dc."dealId" = ANY(${dealIds})
+      `;
+      const contactsByDeal: Record<string, string[]> = {};
+      for (const row of dealContactRows) {
+        const r = row as any;
+        if (!contactsByDeal[r.dealId]) contactsByDeal[r.dealId] = [];
+        contactsByDeal[r.dealId].push(r.name);
+      }
       contextBlocks.push(
         'Relevant Deals:\n' +
           deals
             .map(
-              (d) =>
-                `- ${d.title} | Stage: ${d.stage.name} | Value: ${d.value != null ? `$${d.value}` : 'N/A'} | Priority: ${d.priority} | Address: ${d.address ?? ''} | Contacts: ${d.dealContacts.map((dc) => dc.contact.name).join(', ')}`
+              (d: any) =>
+                `- ${d.title} | Stage: ${d.stageName} | Value: ${d.value != null ? `$${d.value}` : 'N/A'} | Priority: ${d.priority} | Address: ${d.address ?? ''} | Contacts: ${(contactsByDeal[d.id] ?? []).join(', ')}`
             )
             .join('\n')
       );

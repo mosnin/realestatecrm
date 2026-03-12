@@ -1,25 +1,42 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
 import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
+import type { User, Space, SpaceSetting } from '@/lib/types';
 
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const user = await db.user.findUnique({
-      where: { clerkId: userId },
-      include: { space: { include: { settings: true } } }
-    });
+    const users = await sql`
+      SELECT * FROM "User" WHERE "clerkId" = ${userId}
+    ` as User[];
+
+    const user = users[0] ?? null;
 
     if (!user) {
       return NextResponse.json({ step: 1, completed: false, user: null, space: null });
     }
 
+    const spaces = await sql`
+      SELECT *, "subdomain" AS "slug" FROM "Space" WHERE "ownerId" = ${user.id}
+    ` as Space[];
+    const space = spaces[0] ?? null;
+
+    let settings: SpaceSetting | null = null;
+    if (space) {
+      const settingsRows = await sql`
+        SELECT * FROM "SpaceSetting" WHERE "spaceId" = ${space.id}
+      ` as SpaceSetting[];
+      settings = settingsRows[0] ?? null;
+    }
+
+    const userWithSpace = { ...user, space: space ? { ...space, settings } : null };
+
     try {
-      await ensureOnboardingBackfill(user, db);
+      await ensureOnboardingBackfill(userWithSpace);
     } catch (err) {
       console.error('[onboarding GET] backfill failed', err);
     }
@@ -35,12 +52,12 @@ export async function GET() {
         onboardingStartedAt: user.onboardingStartedAt,
         onboardingCompletedAt: user.onboardingCompletedAt
       },
-      space: user.space
+      space: space
         ? {
-            id: user.space.id,
-            slug: user.space.slug,
-            name: user.space.name,
-            settings: user.space.settings
+            id: space.id,
+            slug: space.slug,
+            name: space.name,
+            settings
           }
         : null
     });
@@ -65,46 +82,66 @@ export async function POST(req: NextRequest) {
 
   try {
     const clerkUser = await currentUser();
-    const user = await db.user.upsert({
-      where: { clerkId: userId },
-      update: {},
-      create: {
-        clerkId: userId,
-        email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
-        name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
-        onboardingStartedAt: new Date(),
-        onboard: false
-      },
-      include: { space: { include: { settings: true } } }
-    });
+
+    // Upsert user
+    const upsertedUsers = await sql`
+      INSERT INTO "User" ("id", "clerkId", "email", "name", "onboardingStartedAt", "onboard")
+      VALUES (
+        ${crypto.randomUUID()},
+        ${userId},
+        ${clerkUser?.emailAddresses?.[0]?.emailAddress ?? ''},
+        ${clerkUser?.fullName ?? clerkUser?.firstName ?? null},
+        ${new Date()},
+        ${false}
+      )
+      ON CONFLICT ("clerkId") DO UPDATE SET "updatedAt" = NOW()
+      RETURNING *
+    ` as User[];
+    const user = upsertedUsers[0];
+
+    // Get space + settings separately
+    const spaces = await sql`
+      SELECT *, "subdomain" AS "slug" FROM "Space" WHERE "ownerId" = ${user.id}
+    ` as Space[];
+    const space = spaces[0] ?? null;
+
+    let settings: SpaceSetting | null = null;
+    if (space) {
+      const settingsRows = await sql`
+        SELECT * FROM "SpaceSetting" WHERE "spaceId" = ${space.id}
+      ` as SpaceSetting[];
+      settings = settingsRows[0] ?? null;
+    }
+
+    const userWithSpace = { ...user, space: space ? { ...space, settings } : null };
 
     try {
-      await ensureOnboardingBackfill(user, db);
+      await ensureOnboardingBackfill(userWithSpace);
     } catch (err) {
       console.error('[onboarding POST] backfill failed', err);
     }
 
     if (action === 'start') {
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          onboard: false,
-          onboardingCurrentStep: 1,
-          onboardingStartedAt: user.onboardingStartedAt ?? new Date()
-        }
-      });
+      await sql`
+        UPDATE "User"
+        SET "onboard" = ${false},
+            "onboardingCurrentStep" = ${1},
+            "onboardingStartedAt" = ${user.onboardingStartedAt ?? new Date()},
+            "updatedAt" = NOW()
+        WHERE "id" = ${user.id}
+      `;
       return NextResponse.json({ success: true });
     }
 
     if (action === 'save_step') {
       const { step } = body as { step: number };
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          onboardingCurrentStep: step,
-          onboardingStartedAt: user.onboardingStartedAt ?? new Date()
-        }
-      });
+      await sql`
+        UPDATE "User"
+        SET "onboardingCurrentStep" = ${step},
+            "onboardingStartedAt" = ${user.onboardingStartedAt ?? new Date()},
+            "updatedAt" = NOW()
+        WHERE "id" = ${user.id}
+      `;
       return NextResponse.json({ success: true });
     }
 
@@ -117,14 +154,22 @@ export async function POST(req: NextRequest) {
       };
       const resolvedPhone = phone || phoneNumber || null;
 
-      await db.user.update({ where: { id: user.id }, data: { name: name || user.name } });
+      await sql`
+        UPDATE "User"
+        SET "name" = ${name || user.name},
+            "updatedAt" = NOW()
+        WHERE "id" = ${user.id}
+      `;
 
-      if (user.space) {
-        await db.spaceSetting.upsert({
-          where: { spaceId: user.space.id },
-          update: { phoneNumber: resolvedPhone, businessName },
-          create: { spaceId: user.space.id, phoneNumber: resolvedPhone, businessName }
-        });
+      if (space) {
+        await sql`
+          INSERT INTO "SpaceSetting" ("id", "spaceId", "phoneNumber", "businessName")
+          VALUES (${crypto.randomUUID()}, ${space.id}, ${resolvedPhone}, ${businessName})
+          ON CONFLICT ("spaceId") DO UPDATE
+          SET "phoneNumber" = ${resolvedPhone},
+              "businessName" = ${businessName},
+              "updatedAt" = NOW()
+        `;
       }
 
       return NextResponse.json({ success: true });
@@ -145,20 +190,28 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Only lowercase letters, numbers, and hyphens allowed' }, { status: 400 });
       }
 
-      if (user.space) {
-        await db.spaceSetting.upsert({
-          where: { spaceId: user.space.id },
-          update: { intakePageTitle, intakePageIntro, businessName },
-          create: { spaceId: user.space.id, intakePageTitle, intakePageIntro, businessName }
-        });
-        return NextResponse.json({ success: true, slug: user.space.slug });
+      if (space) {
+        await sql`
+          INSERT INTO "SpaceSetting" ("id", "spaceId", "intakePageTitle", "intakePageIntro", "businessName")
+          VALUES (${crypto.randomUUID()}, ${space.id}, ${intakePageTitle}, ${intakePageIntro}, ${businessName})
+          ON CONFLICT ("spaceId") DO UPDATE
+          SET "intakePageTitle" = ${intakePageTitle},
+              "intakePageIntro" = ${intakePageIntro},
+              "businessName" = ${businessName},
+              "updatedAt" = NOW()
+        `;
+        return NextResponse.json({ success: true, slug: space.slug });
       }
 
-      const existing = await db.space.findUnique({ where: { slug: sanitized }, select: { id: true } });
-      if (existing) return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
+      const existingSlug = await sql`
+        SELECT "id" FROM "Space" WHERE "subdomain" = ${sanitized} LIMIT 1
+      ` as { id: string }[];
+      if (existingSlug.length) return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
 
-      const existingOwnerSpace = await db.space.findUnique({ where: { ownerId: user.id }, select: { slug: true } });
-      if (existingOwnerSpace) return NextResponse.json({ success: true, slug: existingOwnerSpace.slug });
+      const existingOwnerSpace = await sql`
+        SELECT "subdomain" AS "slug" FROM "Space" WHERE "ownerId" = ${user.id} LIMIT 1
+      ` as { slug: string }[];
+      if (existingOwnerSpace.length) return NextResponse.json({ success: true, slug: existingOwnerSpace[0].slug });
 
       const DEFAULT_STAGES = [
         { name: 'New', color: '#94a3b8', position: 0 },
@@ -169,33 +222,49 @@ export async function POST(req: NextRequest) {
         { name: 'Declined', color: '#ef4444', position: 5 }
       ];
 
-      let space;
+      let newSpace: Space;
       try {
-        space = await db.space.create({
-          data: {
-            slug: sanitized,
-            name: businessName || sanitized,
-            emoji: '🏠',
-            ownerId: user.id,
-            settings: {
-              create: {
-                intakePageTitle: intakePageTitle || 'Rental Application',
-                intakePageIntro: intakePageIntro || "Share a few details so I can review your rental fit faster.",
-                businessName,
-                phoneNumber: null
-              }
-            },
-            stages: { create: DEFAULT_STAGES }
-          }
-        });
+        const spaceId = crypto.randomUUID();
+        const createdSpaces = await sql`
+          INSERT INTO "Space" ("id", "subdomain", "name", "emoji", "ownerId")
+          VALUES (${spaceId}, ${sanitized}, ${businessName || sanitized}, ${'🏠'}, ${user.id})
+          RETURNING *, "subdomain" AS "slug"
+        ` as Space[];
+        newSpace = createdSpaces[0];
+
+        await sql`
+          INSERT INTO "SpaceSetting" ("id", "spaceId", "intakePageTitle", "intakePageIntro", "businessName", "phoneNumber")
+          VALUES (
+            ${crypto.randomUUID()},
+            ${spaceId},
+            ${intakePageTitle || 'Rental Application'},
+            ${intakePageIntro || "Share a few details so I can review your rental fit faster."},
+            ${businessName},
+            ${null}
+          )
+        `;
+
+        for (const stage of DEFAULT_STAGES) {
+          await sql`
+            INSERT INTO "DealStage" ("id", "spaceId", "name", "color", "position")
+            VALUES (${crypto.randomUUID()}, ${spaceId}, ${stage.name}, ${stage.color}, ${stage.position})
+          `;
+        }
       } catch {
-        const ownerSpace = await db.space.findUnique({ where: { ownerId: user.id }, select: { slug: true } });
-        if (ownerSpace) return NextResponse.json({ success: true, slug: ownerSpace.slug });
+        const ownerSpace = await sql`
+          SELECT "subdomain" AS "slug" FROM "Space" WHERE "ownerId" = ${user.id} LIMIT 1
+        ` as { slug: string }[];
+        if (ownerSpace.length) return NextResponse.json({ success: true, slug: ownerSpace[0].slug });
         return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
       }
 
-      await db.user.update({ where: { id: user.id }, data: { onboardingCurrentStep: 4 } });
-      return NextResponse.json({ success: true, slug: space.slug });
+      await sql`
+        UPDATE "User"
+        SET "onboardingCurrentStep" = ${4},
+            "updatedAt" = NOW()
+        WHERE "id" = ${user.id}
+      `;
+      return NextResponse.json({ success: true, slug: newSpace.slug });
     }
 
     if (action === 'save_notifications') {
@@ -204,18 +273,22 @@ export async function POST(req: NextRequest) {
         defaultSubmissionStatus: string;
       };
 
-      if (!user.space) return NextResponse.json({ error: 'No space found' }, { status: 400 });
+      if (!space) return NextResponse.json({ error: 'No space found' }, { status: 400 });
 
-      await db.spaceSetting.upsert({
-        where: { spaceId: user.space.id },
-        update: { notifications: emailNotifications },
-        create: { spaceId: user.space.id, notifications: emailNotifications }
-      });
+      await sql`
+        INSERT INTO "SpaceSetting" ("id", "spaceId", "notifications")
+        VALUES (${crypto.randomUUID()}, ${space.id}, ${emailNotifications})
+        ON CONFLICT ("spaceId") DO UPDATE
+        SET "notifications" = ${emailNotifications},
+            "updatedAt" = NOW()
+      `;
 
-      await db.spaceSetting.update({
-        where: { spaceId: user.space.id },
-        data: { myConnections: JSON.stringify({ defaultSubmissionStatus: defaultSubmissionStatus || 'New' }) }
-      });
+      await sql`
+        UPDATE "SpaceSetting"
+        SET "myConnections" = ${JSON.stringify({ defaultSubmissionStatus: defaultSubmissionStatus || 'New' })},
+            "updatedAt" = NOW()
+        WHERE "spaceId" = ${space.id}
+      `;
 
       return NextResponse.json({ success: true });
     }
@@ -230,7 +303,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      if (!user.space) {
+      if (!space) {
         return NextResponse.json(
           { error: 'Cannot complete onboarding without a workspace. Please create your workspace first.' },
           { status: 409 }
@@ -238,14 +311,14 @@ export async function POST(req: NextRequest) {
       }
 
       const completedAt = new Date();
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          onboard: true,
-          onboardingCurrentStep: 7,
-          onboardingCompletedAt: completedAt
-        }
-      });
+      await sql`
+        UPDATE "User"
+        SET "onboard" = ${true},
+            "onboardingCurrentStep" = ${7},
+            "onboardingCompletedAt" = ${completedAt},
+            "updatedAt" = NOW()
+        WHERE "id" = ${user.id}
+      `;
       return NextResponse.json({ success: true, onboard: true, onboardingCompletedAt: completedAt.toISOString() });
     }
 
@@ -256,8 +329,10 @@ export async function POST(req: NextRequest) {
       if (!isValidSlug(slug) || sanitized !== slug) {
         return NextResponse.json({ available: false, reason: 'invalid' });
       }
-      const existing = await db.space.findUnique({ where: { slug: sanitized }, select: { id: true } });
-      return NextResponse.json({ available: !existing });
+      const existing = await sql`
+        SELECT "id" FROM "Space" WHERE "subdomain" = ${sanitized} LIMIT 1
+      ` as { id: string }[];
+      return NextResponse.json({ available: !existing.length });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClerkClient } from '@clerk/nextjs/server';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { requireAdmin, logAdminAction } from '@/lib/admin';
 import { shouldBackfillOnboardFromSpace } from '@/lib/onboarding';
+import type { User, Space } from '@/lib/types';
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY!,
@@ -77,39 +78,47 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'userId is required' }, { status: 400 });
       }
 
-      const user = await db.user.findUnique({
-        where: { id: userId },
-        include: { space: { select: { id: true, slug: true } } },
-      });
+      const users = await sql`
+        SELECT u.*, s."id" AS "spaceId", s."subdomain" AS "slug"
+        FROM "User" u
+        LEFT JOIN "Space" s ON s."ownerId" = u."id"
+        WHERE u."id" = ${userId}
+      ` as (User & { spaceId: string | null; slug: string | null })[];
 
-      if (!user) {
+      if (!users.length) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
+
+      const row = users[0];
+      const user = {
+        ...row,
+        space: row.spaceId ? { id: row.spaceId, slug: row.slug! } : null,
+      };
 
       let repairAction = 'none';
       let message = 'No repair needed. User state is healthy.';
 
       if (shouldBackfillOnboardFromSpace(user)) {
         // Has space but onboard=false → backfill
-        await db.user.update({
-          where: { id: user.id },
-          data: {
-            onboard: true,
-            onboardingCompletedAt: new Date(),
-            onboardingCurrentStep: 7,
-          },
-        });
+        await sql`
+          UPDATE "User"
+          SET "onboard" = true,
+              "onboardingCompletedAt" = NOW(),
+              "onboardingCurrentStep" = 7,
+              "updatedAt" = NOW()
+          WHERE "id" = ${user.id}
+        `;
         repairAction = 'backfill_onboard';
         message = 'Backfilled onboard=true because workspace exists.';
       } else if (user.onboard && !user.space) {
         // Onboarded but no space → reset to re-onboard
-        await db.user.update({
-          where: { id: user.id },
-          data: {
-            onboard: false,
-            onboardingCurrentStep: 1,
-          },
-        });
+        await sql`
+          UPDATE "User"
+          SET "onboard" = false,
+              "onboardingCurrentStep" = 1,
+              "updatedAt" = NOW()
+          WHERE "id" = ${user.id}
+        `;
         repairAction = 'reset_onboarding';
         message = 'Reset onboard=false and step=1 because workspace is missing.';
       }

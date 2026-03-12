@@ -5,7 +5,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { DealCard } from './deal-card';
 import { Button } from '@/components/ui/button';
 import { Plus, LayoutList } from 'lucide-react';
-import type { Deal, DealStage, Contact, DealContact } from '@prisma/client';
+import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 
 type DealWithRelations = Deal & {
   stage: DealStage;

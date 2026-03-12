@@ -1,28 +1,20 @@
-import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import pg from 'pg';
+import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
+let _sql: NeonQueryFunction<false, false>;
 
-function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL;
-  const needsSsl = connectionString?.includes('neon.tech') || connectionString?.includes('sslmode=require');
-  const pool = new pg.Pool({
-    connectionString,
-    ...(needsSsl ? { ssl: { rejectUnauthorized: false } } : {}),
-    max: 5,
-    connectionTimeoutMillis: 10000,
-    idleTimeoutMillis: 30000,
-  });
-  const adapter = new PrismaPg(pool);
-  return new PrismaClient({
-    adapter,
-    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error']
-  });
+export function getSql() {
+  if (!_sql) {
+    _sql = neon(process.env.DATABASE_URL!);
+  }
+  return _sql;
 }
 
-export const db = globalForPrisma.prisma ?? createPrismaClient();
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db;
+// Proxy that lazily initializes the neon connection on first use
+export const sql: NeonQueryFunction<false, false> = new Proxy(
+  (() => {}) as unknown as NeonQueryFunction<false, false>,
+  {
+    apply(_target, _thisArg, args) {
+      return getSql()(...(args as [TemplateStringsArray, ...unknown[]]));
+    },
+  }
+);

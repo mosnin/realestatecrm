@@ -1,8 +1,9 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { SettingsForm } from './settings-form';
+import type { SpaceSetting } from '@/lib/types';
 
 export default async function SettingsPage({
   params
@@ -16,11 +17,12 @@ export default async function SettingsPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  let settings = null;
+  let settings: SpaceSetting | null = null;
   try {
-    settings = await db.spaceSetting.findUnique({
-      where: { spaceId: space.id }
-    });
+    const rows = await sql`
+      SELECT * FROM "SpaceSetting" WHERE "spaceId" = ${space.id}
+    `;
+    settings = (rows[0] as SpaceSetting) ?? null;
   } catch {
     // fall back to null — form handles defaults
   }

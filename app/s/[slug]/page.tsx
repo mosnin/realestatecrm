@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getSpaceFromSlug } from '@/lib/space';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   PhoneIncoming,
@@ -53,28 +53,13 @@ export default async function DashboardPage({
   try {
     [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads] =
       await Promise.all([
-        db.contact.count({ where: { spaceId: space.id } }),
-        db.deal.count({ where: { spaceId: space.id } }),
-        db.deal.findMany({
-          where: { spaceId: space.id },
-          select: { value: true, stageId: true },
-        }),
-        db.dealStage.findMany({
-          where: { spaceId: space.id },
-          orderBy: { position: 'asc' },
-        }),
-        db.contact.findMany({
-          where: { spaceId: space.id, tags: { has: 'application-link' } },
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-          select: { id: true, name: true, phone: true, budget: true, preferences: true, createdAt: true, tags: true },
-        }),
-        db.contact.count({
-          where: { spaceId: space.id, tags: { has: 'new-lead' } },
-        }),
-        db.contact.count({
-          where: { spaceId: space.id, tags: { has: 'application-link' } },
-        }),
+        sql`SELECT COUNT(*)::int AS count FROM "Contact" WHERE "spaceId" = ${space.id}`.then(r => (r[0] as { count: number }).count),
+        sql`SELECT COUNT(*)::int AS count FROM "Deal" WHERE "spaceId" = ${space.id}`.then(r => (r[0] as { count: number }).count),
+        sql`SELECT value, "stageId" FROM "Deal" WHERE "spaceId" = ${space.id}`.then(r => r as { value: number | null; stageId: string }[]),
+        sql`SELECT * FROM "DealStage" WHERE "spaceId" = ${space.id} ORDER BY position ASC`.then(r => r as { id: string; name: string; color: string; position: number; spaceId: string }[]),
+        sql`SELECT id, name, phone, budget, preferences, "createdAt", tags FROM "Contact" WHERE "spaceId" = ${space.id} AND 'application-link' = ANY(tags) ORDER BY "createdAt" DESC LIMIT 5`.then(r => r as { id: string; name: string; phone: string | null; budget: number | null; preferences: string | null; createdAt: Date; tags: string[] }[]),
+        sql`SELECT COUNT(*)::int AS count FROM "Contact" WHERE "spaceId" = ${space.id} AND 'new-lead' = ANY(tags)`.then(r => (r[0] as { count: number }).count),
+        sql`SELECT COUNT(*)::int AS count FROM "Contact" WHERE "spaceId" = ${space.id} AND 'application-link' = ANY(tags)`.then(r => (r[0] as { count: number }).count),
       ]);
   } catch (err) {
     console.error('[space-home] DB queries failed', { slug, error: err });

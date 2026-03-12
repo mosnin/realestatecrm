@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 
 export default async function DashboardRedirectPage() {
@@ -12,10 +12,25 @@ export default async function DashboardRedirectPage() {
   // redirect loop by treating DB errors as "user not found").
   let user;
   try {
-    user = await db.user.findUnique({
-      where: { clerkId: userId },
-      include: { space: true },
-    });
+    const rows = await sql`
+      SELECT u.*, s."subdomain" AS "slug", s.id AS "spaceId", s.name AS "spaceName"
+      FROM "User" u
+      LEFT JOIN "Space" s ON s."ownerId" = u.id
+      WHERE u."clerkId" = ${userId}
+    `;
+    if (rows[0]) {
+      const row = rows[0] as Record<string, unknown>;
+      user = {
+        ...row,
+        space: row.spaceId ? { id: row.spaceId as string, slug: row.slug as string, name: row.spaceName as string } : null,
+      };
+      // Remove joined fields from top-level
+      delete (user as Record<string, unknown>).spaceId;
+      delete (user as Record<string, unknown>).slug;
+      delete (user as Record<string, unknown>).spaceName;
+    } else {
+      user = null;
+    }
   } catch (err) {
     console.error('[dashboard] DB query failed', { clerkId: userId, error: err });
     return (
@@ -38,7 +53,7 @@ export default async function DashboardRedirectPage() {
 
   // Best-effort backfill (bookkeeping only)
   try {
-    await ensureOnboardingBackfill(user, db);
+    await ensureOnboardingBackfill(user);
   } catch {
     // non-blocking
   }

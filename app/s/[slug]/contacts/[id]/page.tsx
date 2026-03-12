@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -13,6 +13,7 @@ import {
   Wallet,
   ExternalLink,
 } from 'lucide-react';
+import type { Contact } from '@/lib/types';
 
 const TYPE_META: Record<string, { label: string; className: string }> = {
   QUALIFICATION: {
@@ -40,16 +41,38 @@ export default async function ClientDetailPage({
 }) {
   const { slug, id } = await params;
 
-  let contact;
+  let contact: (Contact & { dealContacts: { deal: { id: string; title: string; address: string | null; value: number | null; stage: { name: string; color: string } } }[] }) | null = null;
   try {
-    contact = await db.contact.findUnique({
-      where: { id },
-      include: {
-        dealContacts: {
-          include: { deal: { include: { stage: true } } },
-        },
-      },
-    });
+    const contactRows = await sql`
+      SELECT * FROM "Contact" WHERE id = ${id}
+    `;
+    if (!contactRows[0]) {
+      contact = null;
+    } else {
+      const c = contactRows[0] as Contact;
+      const dealRows = await sql`
+        SELECT d.*, ds.name AS "stageName", ds.color AS "stageColor"
+        FROM "DealContact" dc
+        JOIN "Deal" d ON d.id = dc."dealId"
+        JOIN "DealStage" ds ON ds.id = d."stageId"
+        WHERE dc."contactId" = ${id}
+      `;
+      contact = {
+        ...c,
+        dealContacts: (dealRows as Record<string, unknown>[]).map((row) => ({
+          deal: {
+            id: row.id as string,
+            title: row.title as string,
+            address: row.address as string | null,
+            value: row.value as number | null,
+            stage: {
+              name: row.stageName as string,
+              color: row.stageColor as string,
+            },
+          },
+        })),
+      };
+    }
   } catch (err) {
     console.error('[contact-detail] DB query failed', { slug, id, error: err });
     return (

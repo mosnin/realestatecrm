@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { getSpaceForUser } from '@/lib/space';
 
 export async function PATCH(req: NextRequest) {
@@ -9,29 +9,34 @@ export async function PATCH(req: NextRequest) {
 
   const { dealId, newStageId, newPosition } = await req.json();
 
-  const deal = await db.deal.findUnique({ where: { id: dealId } });
-  if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const dealRows = await sql`SELECT * FROM "Deal" WHERE "id" = ${dealId}`;
+  if (!dealRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const deal = dealRows[0];
 
   const space = await getSpaceForUser(userId);
   if (!space || deal.spaceId !== space.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const stage = await db.dealStage.findUnique({ where: { id: newStageId } });
-  if (!stage || stage.spaceId !== space.id) {
+  const stageRows = await sql`SELECT * FROM "DealStage" WHERE "id" = ${newStageId}`;
+  if (!stageRows.length || stageRows[0].spaceId !== space.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   // Shift existing deals in target stage to make room
-  await db.deal.updateMany({
-    where: { stageId: newStageId, position: { gte: newPosition } },
-    data: { position: { increment: 1 } }
-  });
+  await sql`
+    UPDATE "Deal"
+    SET "position" = "position" + 1
+    WHERE "stageId" = ${newStageId} AND "position" >= ${newPosition}
+  `;
 
-  const updated = await db.deal.update({
-    where: { id: dealId },
-    data: { stageId: newStageId, position: newPosition }
-  });
+  const updatedRows = await sql`
+    UPDATE "Deal"
+    SET "stageId" = ${newStageId}, "position" = ${newPosition}, "updatedAt" = NOW()
+    WHERE "id" = ${dealId}
+    RETURNING *
+  `;
 
-  return NextResponse.json(updated);
+  return NextResponse.json(updatedRows[0]);
 }

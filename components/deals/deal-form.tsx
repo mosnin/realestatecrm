@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import type { DealStage, Contact } from '@prisma/client';
+import type { DealStage, Contact } from '@/lib/types';
 
 const schema = z.object({
   title: z.string().min(1, 'Title is required'),

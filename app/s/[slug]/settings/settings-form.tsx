@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import type { Space } from '@prisma/client';
+import type { Space } from '@/lib/types';
 
 type UserSettings = {
   notifications?: boolean;

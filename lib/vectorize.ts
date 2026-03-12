@@ -1,6 +1,6 @@
 import { embedText } from '@/lib/embeddings';
 import { upsertVector, deleteVector } from '@/lib/zilliz';
-import type { Deal } from '@prisma/client';
+import type { Deal } from '@/lib/types';
 
 type VectorContact = {
   id: string;

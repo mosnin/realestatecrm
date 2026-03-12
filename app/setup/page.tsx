@@ -1,6 +1,6 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { CreateWorkspaceForm } from './create-workspace-form';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 
@@ -16,10 +16,24 @@ export default async function SetupPage() {
   // form to users who already have one). NEVER throw (generic "Application error").
   let dbUser;
   try {
-    dbUser = await db.user.findUnique({
-      where: { clerkId: userId },
-      include: { space: true },
-    });
+    const rows = await sql`
+      SELECT u.*, s."subdomain" AS "slug", s.id AS "spaceId", s.name AS "spaceName"
+      FROM "User" u
+      LEFT JOIN "Space" s ON s."ownerId" = u.id
+      WHERE u."clerkId" = ${userId}
+    `;
+    if (rows[0]) {
+      const row = rows[0] as Record<string, unknown>;
+      dbUser = {
+        ...row,
+        space: row.spaceId ? { id: row.spaceId as string, slug: row.slug as string, name: row.spaceName as string } : null,
+      };
+      delete (dbUser as Record<string, unknown>).spaceId;
+      delete (dbUser as Record<string, unknown>).slug;
+      delete (dbUser as Record<string, unknown>).spaceName;
+    } else {
+      dbUser = null;
+    }
   } catch (err) {
     console.error('[setup] DB query failed', { clerkId: userId, error: err });
     return (
@@ -42,7 +56,7 @@ export default async function SetupPage() {
 
   // Best-effort backfill (bookkeeping only)
   try {
-    await ensureOnboardingBackfill(dbUser, db);
+    await ensureOnboardingBackfill(dbUser);
   } catch {
     // non-fatal
   }
@@ -58,18 +72,28 @@ export default async function SetupPage() {
   let resolvedUser = dbUser;
   if (!resolvedUser) {
     try {
-      resolvedUser = await db.user.upsert({
-        where: { clerkId: userId },
-        update: {},
-        create: {
-          clerkId: userId,
-          email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
-          name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
-          onboardingStartedAt: new Date(),
-          onboard: false,
-        },
-        include: { space: true },
-      });
+      const newId = crypto.randomUUID();
+      const email = clerkUser?.emailAddresses?.[0]?.emailAddress ?? '';
+      const name = clerkUser?.fullName ?? clerkUser?.firstName ?? null;
+      const now = new Date();
+
+      const upsertRows = await sql`
+        INSERT INTO "User" (id, "clerkId", email, name, "onboardingStartedAt", onboard, "createdAt")
+        VALUES (${newId}, ${userId}, ${email}, ${name}, ${now}, false, ${now})
+        ON CONFLICT ("clerkId") DO UPDATE SET "clerkId" = "User"."clerkId"
+        RETURNING *
+      `;
+      if (upsertRows[0]) {
+        const row = upsertRows[0] as Record<string, unknown>;
+        // Query space separately
+        const spaceRows = await sql`
+          SELECT *, "subdomain" AS "slug" FROM "Space" WHERE "ownerId" = ${row.id} LIMIT 1
+        `;
+        resolvedUser = {
+          ...row,
+          space: spaceRows[0] ? { id: (spaceRows[0] as Record<string, unknown>).id as string, slug: (spaceRows[0] as Record<string, unknown>).slug as string, name: (spaceRows[0] as Record<string, unknown>).name as string } : null,
+        };
+      }
     } catch (err) {
       console.error('[setup] user upsert failed', { clerkId: userId, error: err });
       return (

@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { getSpaceForUser } from '@/lib/space';
 
 export async function PATCH(
@@ -12,8 +12,10 @@ export async function PATCH(
 
   const { id } = await params;
 
-  const existing = await db.dealStage.findUnique({ where: { id } });
-  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const existingRows = await sql`SELECT * FROM "DealStage" WHERE "id" = ${id}`;
+  if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const existing = existingRows[0];
 
   const space = await getSpaceForUser(userId);
   if (!space || existing.spaceId !== space.id) {
@@ -21,15 +23,14 @@ export async function PATCH(
   }
 
   const body = await req.json();
-  const stage = await db.dealStage.update({
-    where: { id },
-    data: {
-      name: body.name,
-      color: body.color
-    }
-  });
+  const rows = await sql`
+    UPDATE "DealStage"
+    SET "name" = ${body.name}, "color" = ${body.color}
+    WHERE "id" = ${id}
+    RETURNING *
+  `;
 
-  return NextResponse.json(stage);
+  return NextResponse.json(rows[0]);
 }
 
 export async function DELETE(
@@ -41,14 +42,16 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const existing = await db.dealStage.findUnique({ where: { id } });
-  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const existingRows = await sql`SELECT * FROM "DealStage" WHERE "id" = ${id}`;
+  if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const existing = existingRows[0];
 
   const space = await getSpaceForUser(userId);
   if (!space || existing.spaceId !== space.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  await db.dealStage.delete({ where: { id } });
+  await sql`DELETE FROM "DealStage" WHERE "id" = ${id}`;
   return NextResponse.json({ success: true });
 }

@@ -17,7 +17,7 @@ import { KanbanColumn } from './kanban-column';
 import { DealForm } from './deal-form';
 import { Button } from '@/components/ui/button';
 import { Plus, GripVertical } from 'lucide-react';
-import type { Deal, DealStage, Contact, DealContact } from '@prisma/client';
+import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 
 type DealWithRelations = Deal & {
   stage: DealStage;

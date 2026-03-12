@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { redis } from '@/lib/redis';
 import { getSpaceFromSlug } from '@/lib/space';
 import { scoreLeadApplication } from '@/lib/lead-scoring';
 import type { LeadScoringResult } from '@/lib/lead-scoring';
+import type { Contact } from '@/lib/types';
 import {
   applicationFingerprintKey,
   normalizePhone,
@@ -48,17 +49,18 @@ export async function POST(req: NextRequest) {
     }
 
     const duplicateCutoff = new Date(Date.now() - 2 * 60 * 1000);
-    const existingRecentLead = await db.contact.findFirst({
-      where: {
-        spaceId: space.id,
-        name: payload.name,
-        tags: { has: 'application-link' },
-        createdAt: { gte: duplicateCutoff }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+    const existingRecentLeads = await sql`
+      SELECT * FROM "Contact"
+      WHERE "spaceId" = ${space.id}
+        AND "name" = ${payload.name}
+        AND 'application-link' = ANY("tags")
+        AND "createdAt" >= ${duplicateCutoff}
+      ORDER BY "createdAt" DESC
+      LIMIT 1
+    ` as Contact[];
 
-    if (existingRecentLead) {
+    if (existingRecentLeads.length) {
+      const existingRecentLead = existingRecentLeads[0];
       const existingNormalizedPhone = normalizePhone(existingRecentLead.phone ?? '');
       const normalizedPhone = normalizePhone(payload.phone);
       if (existingNormalizedPhone && existingNormalizedPhone === normalizedPhone) {
@@ -84,22 +86,26 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const contact = await db.contact.create({
-      data: {
-        spaceId: space.id,
-        name: payload.name,
-        email: payload.email ?? null,
-        phone: payload.phone,
-        budget: payload.budget ?? null,
-        preferences: payload.preferredAreas ?? null,
-        notes: payload.notes || payload.timeline ? `Timeline: ${payload.timeline ?? 'N/A'}\n${payload.notes ?? ''}`.trim() : null,
-        type: 'QUALIFICATION',
-        properties: [],
-        tags: ['application-link', 'new-lead'],
-        scoringStatus: 'pending',
-        scoreLabel: 'unscored',
-      },
-    });
+    const contacts = await sql`
+      INSERT INTO "Contact" ("id", "spaceId", "name", "email", "phone", "budget", "preferences", "notes", "type", "properties", "tags", "scoringStatus", "scoreLabel")
+      VALUES (
+        ${crypto.randomUUID()},
+        ${space.id},
+        ${payload.name},
+        ${payload.email ?? null},
+        ${payload.phone},
+        ${payload.budget ?? null},
+        ${payload.preferredAreas ?? null},
+        ${payload.notes || payload.timeline ? `Timeline: ${payload.timeline ?? 'N/A'}\n${payload.notes ?? ''}`.trim() : null},
+        ${'QUALIFICATION'},
+        ${[]},
+        ${['application-link', 'new-lead']},
+        ${'pending'},
+        ${'unscored'}
+      )
+      RETURNING *
+    ` as Contact[];
+    const contact = contacts[0];
 
     console.info('[apply] submission persisted', {
       contactId: contact.id,
@@ -126,15 +132,15 @@ export async function POST(req: NextRequest) {
         notes: payload.notes ?? null,
       });
 
-      await db.contact.update({
-        where: { id: contact.id },
-        data: {
-          scoringStatus: scoring.scoringStatus,
-          leadScore: scoring.leadScore,
-          scoreLabel: scoring.scoreLabel,
-          scoreSummary: scoring.scoreSummary,
-        },
-      });
+      await sql`
+        UPDATE "Contact"
+        SET "scoringStatus" = ${scoring.scoringStatus},
+            "leadScore" = ${scoring.leadScore},
+            "scoreLabel" = ${scoring.scoreLabel},
+            "scoreSummary" = ${scoring.scoreSummary},
+            "updatedAt" = NOW()
+        WHERE "id" = ${contact.id}
+      `;
 
       console.info('[apply] scoring state persisted', {
         contactId: contact.id,
@@ -146,22 +152,22 @@ export async function POST(req: NextRequest) {
         contactId: contact.id,
         error,
       });
-      await db.contact
-        .update({
-          where: { id: contact.id },
-          data: {
-            scoringStatus: 'failed',
-            leadScore: null,
-            scoreLabel: 'unscored',
-            scoreSummary: 'Scoring unavailable right now. Lead saved successfully.'
-          }
-        })
-        .catch((fallbackErr: unknown) =>
-          console.error('[apply] failed to persist fallback scoring state', {
-            contactId: contact.id,
-            fallbackErr
-          })
-        );
+      try {
+        await sql`
+          UPDATE "Contact"
+          SET "scoringStatus" = ${'failed'},
+              "leadScore" = ${null},
+              "scoreLabel" = ${'unscored'},
+              "scoreSummary" = ${'Scoring unavailable right now. Lead saved successfully.'},
+              "updatedAt" = NOW()
+          WHERE "id" = ${contact.id}
+        `;
+      } catch (fallbackErr: unknown) {
+        console.error('[apply] failed to persist fallback scoring state', {
+          contactId: contact.id,
+          fallbackErr
+        });
+      }
     }
 
     return NextResponse.json(
