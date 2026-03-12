@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSpaceFromSlug } from '@/lib/space';
+import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { syncContact } from '@/lib/vectorize';
 
 export async function GET(req: NextRequest) {
@@ -13,6 +13,11 @@ export async function GET(req: NextRequest) {
 
   const space = await getSpaceFromSlug(slug);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
+
+  const userSpace = await getSpaceForUser(userId);
+  if (!userSpace || space.id !== userSpace.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const search = req.nextUrl.searchParams.get('search') ?? '';
   const type = req.nextUrl.searchParams.get('type');
@@ -45,6 +50,11 @@ export async function POST(req: NextRequest) {
 
   const space = await getSpaceFromSlug(slug);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
+
+  const userSpace = await getSpaceForUser(userId);
+  if (!userSpace || space.id !== userSpace.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const contact = await db.contact.create({
     data: {

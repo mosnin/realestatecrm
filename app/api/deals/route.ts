@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSpaceFromSlug } from '@/lib/space';
+import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { syncDeal } from '@/lib/vectorize';
 
 export async function GET(req: NextRequest) {
@@ -13,6 +13,11 @@ export async function GET(req: NextRequest) {
 
   const space = await getSpaceFromSlug(slug);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const userSpace = await getSpaceForUser(userId);
+  if (!userSpace || space.id !== userSpace.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const deals = await db.deal.findMany({
     where: { spaceId: space.id },
@@ -35,6 +40,11 @@ export async function POST(req: NextRequest) {
 
   const space = await getSpaceFromSlug(slug);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const userSpace = await getSpaceForUser(userId);
+  if (!userSpace || space.id !== userSpace.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const lastDealInStage = await db.deal.findFirst({
     where: { stageId },
