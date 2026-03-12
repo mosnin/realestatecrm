@@ -24,7 +24,7 @@ export default async function ConfigurePage({
   const dbUser: DbUser | null = await db.user.findUnique({
     where: { clerkId: userId },
     include: { space: { include: { settings: true } } },
-  }).catch(() => null);
+  });
 
   const initialData = {
     name: dbUser?.name ?? clerkUser?.fullName ?? clerkUser?.firstName ?? '',

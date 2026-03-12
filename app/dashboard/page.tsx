@@ -7,10 +7,12 @@ export default async function DashboardRedirectPage() {
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
 
+  // IMPORTANT: Do NOT use .catch(() => null) — silently converting DB errors
+  // into "no user" sends existing users to /setup and shows "create workspace".
   const user = await db.user.findUnique({
     where: { clerkId: userId },
     include: { space: true },
-  }).catch(() => null);
+  });
 
   // Best-effort backfill (bookkeeping only)
   try {

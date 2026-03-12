@@ -5,7 +5,7 @@ import { Sidebar } from '@/components/dashboard/sidebar';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
 import { db } from '@/lib/db';
-import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
+import { ensureOnboardingBackfill } from '@/lib/onboarding';
 
 export default async function DashboardLayout({
   children,
@@ -24,10 +24,12 @@ export default async function DashboardLayout({
   // Gate: user must exist in our DB. If they have a space, always let them
   // through — having a workspace IS proof of setup. Never redirect workspace
   // owners away; the backfill fixes the `onboard` flag in the background.
+  // IMPORTANT: No .catch(() => null) — DB errors must not be silently
+  // converted to "user not found" which would redirect to /setup.
   const dbUser = await db.user.findUnique({
     where: { clerkId: userId },
     select: { id: true, onboard: true, space: { select: { id: true } } }
-  }).catch(() => null);
+  });
 
   if (!dbUser) {
     redirect('/setup');
