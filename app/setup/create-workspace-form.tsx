@@ -86,8 +86,15 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
       const spaceData = await spaceRes.json().catch(() => ({}));
       if (!spaceRes.ok) throw new Error(spaceData.error || 'Failed to create workspace.');
 
+      // Mark onboarding complete so user is never redirected back here
+      await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'complete' }),
+      });
+
       const resolvedSlug: string = spaceData.slug ?? slug;
-      router.push(`/s/${resolvedSlug}/configure`);
+      router.push(`/s/${resolvedSlug}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong.';
       setError(msg);

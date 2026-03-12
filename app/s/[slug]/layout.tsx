@@ -21,27 +21,24 @@ export default async function DashboardLayout({
     return null;
   }
 
-  let isOnboarded = false;
-  try {
-    const dbUser = await db.user.findUnique({
-      where: { clerkId: userId },
-      select: { id: true, onboard: true, space: { select: { id: true } } }
-    });
+  // Gate: user must exist in our DB. If they have a space, always let them
+  // through — having a workspace IS proof of setup. Never redirect workspace
+  // owners away; the backfill fixes the `onboard` flag in the background.
+  const dbUser = await db.user.findUnique({
+    where: { clerkId: userId },
+    select: { id: true, onboard: true, space: { select: { id: true } } }
+  }).catch(() => null);
 
-    try {
-      await ensureOnboardingBackfill(dbUser, db);
-    } catch (err) {
-      console.error('[onboarding-guard] /s layout backfill failed', { clerkId: userId, slug, error: err });
-    }
-
-    isOnboarded = getOnboardingStatus(dbUser).isOnboarded;
-  } catch (error) {
-    console.error('[onboarding-guard] /s layout read failed', { clerkId: userId, slug, error });
-    isOnboarded = false;
+  if (!dbUser) {
+    redirect('/setup');
   }
 
-  if (!isOnboarded) {
-    redirect('/setup');
+  // Best-effort backfill: set onboard=true if user has a space but flag is false.
+  // This is bookkeeping only — we do NOT redirect based on its result.
+  try {
+    await ensureOnboardingBackfill(dbUser, db);
+  } catch (err) {
+    console.error('[layout] backfill failed (non-blocking)', { clerkId: userId, slug, error: err });
   }
 
   const space = await getSpaceFromSlug(slug);

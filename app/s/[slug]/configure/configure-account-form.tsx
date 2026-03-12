@@ -115,6 +115,13 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
         throw new Error(d.error || 'Failed to save notification settings.');
       }
 
+      // Ensure onboard=true (idempotent — safe to call even if already true)
+      await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'complete' }),
+      });
+
       setSaved(true);
       toast.success('Account configured successfully.');
       setTimeout(() => setSaved(false), 3000);

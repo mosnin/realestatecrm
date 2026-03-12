@@ -35,14 +35,11 @@ const onboardingHelper = join(repoRoot, 'lib/onboarding.ts');
 expectContains(onboardingHelper, /isOnboarded:\s*!!user\?\.onboard/, 'onboarding helper must define isOnboarded from user.onboard');
 expectContains(join(repoRoot, 'prisma/schema.prisma'), /onboard\s+Boolean/, 'User model must include onboard boolean flag');
 
-// 2) Onboarding guards must use shared helper.
-for (const requiredFile of [
-  'app/dashboard/page.tsx',
-  'app/s/[slug]/layout.tsx',
-  'app/api/onboarding/route.ts',
-]) {
-  expectContains(join(repoRoot, requiredFile), /getOnboardingStatus/, 'must use getOnboardingStatus');
-}
+// 2) Onboarding API must use shared helper.
+expectContains(join(repoRoot, 'app/api/onboarding/route.ts'), /getOnboardingStatus/, 'must use getOnboardingStatus');
+// Dashboard and layout use ensureOnboardingBackfill (which depends on the same module)
+expectContains(join(repoRoot, 'app/dashboard/page.tsx'), /ensureOnboardingBackfill/, 'must use ensureOnboardingBackfill');
+expectContains(join(repoRoot, 'app/s/[slug]/layout.tsx'), /ensureOnboardingBackfill/, 'must use ensureOnboardingBackfill');
 
 // 3) Critical runtime files must not contain subdomain naming.
 for (const file of files) {

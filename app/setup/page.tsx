@@ -25,9 +25,9 @@ export default async function SetupPage() {
     // non-fatal
   }
 
-  // If they already have a workspace, send them straight to configure
+  // Already has a workspace — go straight to it. They can configure from the sidebar.
   if (dbUser?.space?.slug) {
-    redirect(`/s/${dbUser.space.slug}/configure`);
+    redirect(`/s/${dbUser.space.slug}`);
   }
 
   // Create user record if missing
@@ -45,7 +45,7 @@ export default async function SetupPage() {
         },
         include: { space: true },
       });
-      if (dbUser?.space?.slug) redirect(`/s/${dbUser.space.slug}/configure`);
+      if (dbUser?.space?.slug) redirect(`/s/${dbUser.space.slug}`);
     } catch {
       // DB may not be migrated yet
     }
