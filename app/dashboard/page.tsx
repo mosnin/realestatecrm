@@ -41,17 +41,23 @@ export default async function DashboardRedirectPage() {
           <p className="text-sm text-muted-foreground">
             We couldn&apos;t load your account. This is usually temporary.
           </p>
-          {process.env.NODE_ENV === 'development' && (
-            <pre className="text-xs text-left bg-red-950/50 text-red-300 p-3 rounded overflow-auto max-h-40">
-              {message}
-            </pre>
-          )}
-          <a
-            href="/dashboard"
-            className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            Try again
-          </a>
+          <pre className="text-xs text-left bg-red-950/50 text-red-300 p-3 rounded overflow-auto max-h-40">
+            {message}
+          </pre>
+          <div className="flex gap-2 justify-center">
+            <a
+              href="/dashboard"
+              className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              Try again
+            </a>
+            <a
+              href="/api/health"
+              className="inline-block px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-muted"
+            >
+              Check DB
+            </a>
+          </div>
         </div>
       </div>
     );
