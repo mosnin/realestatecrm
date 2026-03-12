@@ -2,32 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  LayoutDashboard,
-  Users,
-  Briefcase,
-  PhoneIncoming,
-  Bot,
-  User,
-  Settings,
-  SlidersHorizontal,
-} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
-
-const navItems = [
-  { href: '', label: 'Overview', icon: LayoutDashboard },
-  { href: '/leads', label: 'Leads', icon: PhoneIncoming },
-  { href: '/contacts', label: 'Clients', icon: Users },
-  { href: '/deals', label: 'Deals', icon: Briefcase },
-  { href: '/ai', label: 'AI Assistant', icon: Bot },
-];
-
-const secondaryNavItems = [
-  { href: '/profile', label: 'Profile', icon: User },
-  { href: '/configure', label: 'Configure your account', icon: SlidersHorizontal },
-  { href: '/settings', label: 'Settings', icon: Settings },
-];
+import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
 
 interface SidebarProps {
   slug: string;
@@ -60,7 +37,7 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount }: Sideba
         <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
           Workspace
         </p>
-        {navItems.map((item) => {
+        {primaryNavItems.map((item) => {
           const href = `${base}${item.href}`;
           const isActive =
             item.href === '' ? pathname === base : pathname.startsWith(`${base}${item.href}`);

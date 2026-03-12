@@ -5,15 +5,6 @@ import { Menu, Sun, Moon } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  LayoutDashboard,
-  Users,
-  PhoneIncoming,
-  Briefcase,
-  Bot,
-  User,
-  Settings
-} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Sheet,
@@ -25,16 +16,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
+import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
 
-const navItems = [
-  { href: '', label: 'Overview', icon: LayoutDashboard },
-  { href: '/leads', label: 'Leads', icon: PhoneIncoming },
-  { href: '/contacts', label: 'Clients', icon: Users },
-  { href: '/deals', label: 'Deals', icon: Briefcase },
-  { href: '/ai', label: 'AI Assistant', icon: Bot },
-  { href: '/profile', label: 'Profile', icon: User },
-  { href: '/settings', label: 'Settings', icon: Settings }
-];
+const allNavItems = [...primaryNavItems, ...secondaryNavItems];
 
 interface HeaderProps {
   slug: string;
@@ -64,7 +48,7 @@ export function Header({ slug, spaceName, title }: HeaderProps) {
               </SheetTitle>
             </SheetHeader>
             <nav className="px-3 py-4 space-y-0.5">
-              {navItems.map((item) => {
+              {allNavItems.map((item) => {
                 const href = `${base}${item.href}`;
                 const isActive =
                   item.href === ''

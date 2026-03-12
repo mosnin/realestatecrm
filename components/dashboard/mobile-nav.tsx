@@ -2,22 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  LayoutDashboard,
-  Users,
-  Briefcase,
-  PhoneIncoming,
-  Bot,
-} from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const navItems = [
-  { href: '', label: 'Home', icon: LayoutDashboard },
-  { href: '/leads', label: 'Leads', icon: PhoneIncoming },
-  { href: '/contacts', label: 'Clients', icon: Users },
-  { href: '/deals', label: 'Deals', icon: Briefcase },
-  { href: '/ai', label: 'AI', icon: Bot },
-];
+import { mobileNavItems } from '@/lib/nav-items';
 
 interface MobileNavProps {
   slug: string;
@@ -29,7 +15,7 @@ export function MobileNav({ slug }: MobileNavProps) {
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex safe-area-bottom">
-      {navItems.map((item) => {
+      {mobileNavItems.map((item) => {
         const href = `${base}${item.href}`;
         const isActive =
           item.href === '' ? pathname === base : pathname.startsWith(`${base}${item.href}`);
