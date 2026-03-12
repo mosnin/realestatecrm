@@ -32,14 +32,20 @@ export default async function DashboardRedirectPage() {
       user = null;
     }
   } catch (err) {
-    console.error('[dashboard] DB query failed', { clerkId: userId, error: err });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[dashboard] DB query failed', { clerkId: userId, error: message, stack: err instanceof Error ? err.stack : undefined });
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center space-y-4 p-8">
+        <div className="text-center space-y-4 p-8 max-w-md">
           <h1 className="text-xl font-semibold">Something went wrong</h1>
           <p className="text-sm text-muted-foreground">
             We couldn&apos;t load your account. This is usually temporary.
           </p>
+          {process.env.NODE_ENV === 'development' && (
+            <pre className="text-xs text-left bg-red-950/50 text-red-300 p-3 rounded overflow-auto max-h-40">
+              {message}
+            </pre>
+          )}
           <a
             href="/dashboard"
             className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
