@@ -81,23 +81,28 @@ export async function POST(req: NextRequest) {
   const { action } = body;
 
   try {
-    const clerkUser = await currentUser();
-
-    // Upsert user
-    const upsertedUsers = await sql`
-      INSERT INTO "User" ("id", "clerkId", "email", "name", "onboardingStartedAt", "onboard")
-      VALUES (
-        ${crypto.randomUUID()},
-        ${userId},
-        ${clerkUser?.emailAddresses?.[0]?.emailAddress ?? ''},
-        ${clerkUser?.fullName ?? clerkUser?.firstName ?? null},
-        ${new Date()},
-        ${false}
-      )
-      ON CONFLICT ("clerkId") DO UPDATE SET "clerkId" = "User"."clerkId"
-      RETURNING *
-    ` as User[];
-    const user = upsertedUsers[0];
+    // SELECT first — avoid calling currentUser() (a Clerk API round-trip) for existing users
+    let user: User;
+    const existing = await sql`SELECT * FROM "User" WHERE "clerkId" = ${userId}` as User[];
+    if (existing[0]) {
+      user = existing[0];
+    } else {
+      const clerkUser = await currentUser();
+      const inserted = await sql`
+        INSERT INTO "User" ("id", "clerkId", "email", "name", "onboardingStartedAt", "onboard")
+        VALUES (
+          ${crypto.randomUUID()},
+          ${userId},
+          ${clerkUser?.emailAddresses?.[0]?.emailAddress ?? ''},
+          ${clerkUser?.fullName ?? clerkUser?.firstName ?? null},
+          ${new Date()},
+          ${false}
+        )
+        ON CONFLICT ("clerkId") DO UPDATE SET "clerkId" = "User"."clerkId"
+        RETURNING *
+      ` as User[];
+      user = inserted[0];
+    }
 
     // Get space + settings separately
     const spaces = await sql`

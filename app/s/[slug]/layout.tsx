@@ -73,7 +73,28 @@ export default async function DashboardLayout({
     console.error('[layout] backfill failed (non-blocking)', { clerkId: userId, slug, error: err });
   }
 
-  const space = await getSpaceFromSlug(slug);
+  let space;
+  try {
+    space = await getSpaceFromSlug(slug);
+  } catch (err) {
+    console.error('[layout] getSpaceFromSlug failed', { slug, error: err });
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center space-y-4 p-8">
+          <h1 className="text-xl font-semibold">Something went wrong</h1>
+          <p className="text-sm text-muted-foreground">
+            We couldn&apos;t load your workspace. This is usually temporary.
+          </p>
+          <a
+            href={`/s/${slug}`}
+            className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            Try again
+          </a>
+        </div>
+      </div>
+    );
+  }
   if (!space) notFound();
 
   let unreadLeadCount = 0;
