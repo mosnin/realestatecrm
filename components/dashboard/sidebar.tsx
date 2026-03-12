@@ -10,6 +10,7 @@ import {
   Bot,
   User,
   Settings,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
@@ -24,6 +25,7 @@ const navItems = [
 
 const secondaryNavItems = [
   { href: '/profile', label: 'Profile', icon: User },
+  { href: '/configure', label: 'Configure your account', icon: SlidersHorizontal },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

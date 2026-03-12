@@ -1,15 +1,10 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import { ConfigureForm } from './configure-form';
-import type { User, Space, SpaceSetting } from '@prisma/client';
+import { CreateWorkspaceForm } from './create-workspace-form';
 import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
 
-export const metadata = { title: 'Configure your account — Chippi' };
-
-type DbUser = User & {
-  space: (Space & { settings: SpaceSetting | null }) | null;
-};
+export const metadata = { title: 'Create your workspace — Chippi' };
 
 export default async function SetupPage() {
   const { userId } = await auth();
@@ -17,31 +12,25 @@ export default async function SetupPage() {
 
   const clerkUser = await currentUser();
 
-  let dbUser: DbUser | null = null;
-
-  try {
-    dbUser = await db.user.findUnique({
+  let dbUser = await db.user
+    .findUnique({
       where: { clerkId: userId },
-      include: { space: { include: { settings: true } } },
-    });
-  } catch (err) {
-    console.error('[setup-page] DB read failed', { clerkId: userId, error: err });
-  }
+      include: { space: true },
+    })
+    .catch(() => null);
 
   try {
     await ensureOnboardingBackfill(dbUser, db);
-  } catch (err) {
-    console.error('[setup-page] backfill failed', { clerkId: userId, error: err });
+  } catch {
+    // non-fatal
   }
 
-  const onboarding = getOnboardingStatus(dbUser);
-
-  // Already fully set up — send them to their workspace
-  if (onboarding.isOnboarded && dbUser?.space?.slug) {
-    redirect(`/s/${dbUser.space.slug}`);
+  // If they already have a workspace, send them straight to configure
+  if (dbUser?.space?.slug) {
+    redirect(`/s/${dbUser.space.slug}/configure`);
   }
 
-  // Create the user record if it doesn't exist yet
+  // Create user record if missing
   if (!dbUser) {
     try {
       dbUser = await db.user.upsert({
@@ -52,36 +41,19 @@ export default async function SetupPage() {
           email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
           name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
           onboardingStartedAt: new Date(),
-          onboardingCurrentStep: 1,
           onboard: false,
         },
-        include: { space: { include: { settings: true } } },
+        include: { space: true },
       });
-
-      if (getOnboardingStatus(dbUser).isOnboarded && dbUser.space) {
-        redirect(`/s/${dbUser.space.slug}`);
-      }
+      if (dbUser?.space?.slug) redirect(`/s/${dbUser.space.slug}/configure`);
     } catch {
-      // DB may not be migrated yet — render form anyway
+      // DB may not be migrated yet
     }
-  } else if (!dbUser.onboardingStartedAt) {
-    await db.user
-      .update({ where: { id: dbUser.id }, data: { onboardingStartedAt: new Date() } })
-      .catch(() => null);
   }
 
-  const initialData = {
-    userId: dbUser?.id ?? '',
-    name: dbUser?.name ?? clerkUser?.fullName ?? clerkUser?.firstName ?? '',
-    email: dbUser?.email ?? clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
-    phone: dbUser?.space?.settings?.phoneNumber ?? '',
-    businessName: dbUser?.space?.settings?.businessName ?? '',
-    slug: dbUser?.space?.slug ?? '',
-    intakePageTitle: dbUser?.space?.settings?.intakePageTitle ?? '',
-    intakePageIntro: dbUser?.space?.settings?.intakePageIntro ?? '',
-    notifications: dbUser?.space?.settings?.notifications ?? true,
-    spaceExists: !!dbUser?.space,
-  };
-
-  return <ConfigureForm initialData={initialData} />;
+  return (
+    <CreateWorkspaceForm
+      defaultName={dbUser?.name ?? clerkUser?.fullName ?? clerkUser?.firstName ?? ''}
+    />
+  );
 }

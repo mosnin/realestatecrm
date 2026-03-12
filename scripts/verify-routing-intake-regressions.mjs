@@ -35,10 +35,9 @@ const onboardingHelper = join(repoRoot, 'lib/onboarding.ts');
 expectContains(onboardingHelper, /isOnboarded:\s*!!user\?\.onboard/, 'onboarding helper must define isOnboarded from user.onboard');
 expectContains(join(repoRoot, 'prisma/schema.prisma'), /onboard\s+Boolean/, 'User model must include onboard boolean flag');
 
-// 2) Onboarding guards/pages must use shared helper.
+// 2) Onboarding guards must use shared helper.
 for (const requiredFile of [
   'app/dashboard/page.tsx',
-  'app/setup/page.tsx',
   'app/s/[slug]/layout.tsx',
   'app/api/onboarding/route.ts',
 ]) {
@@ -72,7 +71,7 @@ expectContains(join(repoRoot, 'app/s/[slug]/layout.tsx'), /params:\s*Promise<\{\
 for (const requiredFile of [
   'app/s/[slug]/profile/page.tsx',
   'app/s/[slug]/page.tsx',
-  'app/setup/configure-form.tsx',
+  'app/s/[slug]/configure/configure-account-form.tsx',
 ]) {
   expectContains(join(repoRoot, requiredFile), /buildIntakeUrl|buildIntakePath/, 'must use canonical intake helper(s)');
 }
