@@ -46,23 +46,41 @@ export default async function LeadsPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) redirect('/');
 
-  const leads = await db.contact.findMany({
-    where: { spaceId: space.id, tags: { has: 'application-link' } },
-    orderBy: { createdAt: 'desc' },
-    take: 100,
-  });
+  let leads: Awaited<ReturnType<typeof db.contact.findMany>> = [];
+  try {
+    leads = await db.contact.findMany({
+      where: { spaceId: space.id, tags: { has: 'application-link' } },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+  } catch (err) {
+    console.error('[leads] DB query failed', { slug, error: err });
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="text-center space-y-4 p-8">
+          <h1 className="text-xl font-semibold">Something went wrong</h1>
+          <p className="text-sm text-muted-foreground">We couldn&apos;t load your leads. This is usually temporary.</p>
+          <a href={`/s/${slug}/leads`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Try again</a>
+        </div>
+      </div>
+    );
+  }
 
   const unreadLeads = leads.filter((lead) => lead.tags.includes('new-lead'));
 
   if (unreadLeads.length) {
-    await Promise.all(
-      unreadLeads.map((lead) =>
-        db.contact.update({
-          where: { id: lead.id },
-          data: { tags: lead.tags.filter((tag) => tag !== 'new-lead') },
-        })
-      )
-    );
+    try {
+      await Promise.all(
+        unreadLeads.map((lead) =>
+          db.contact.update({
+            where: { id: lead.id },
+            data: { tags: lead.tags.filter((tag) => tag !== 'new-lead') },
+          })
+        )
+      );
+    } catch {
+      // non-blocking: tags will be cleared on next visit
+    }
   }
 
   const newCount = unreadLeads.length;

@@ -16,9 +16,14 @@ export default async function SettingsPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  const settings = await db.spaceSetting.findUnique({
-    where: { spaceId: space.id }
-  });
+  let settings = null;
+  try {
+    settings = await db.spaceSetting.findUnique({
+      where: { spaceId: space.id }
+    });
+  } catch {
+    // fall back to null — form handles defaults
+  }
 
   return (
     <div className="space-y-6 max-w-xl">

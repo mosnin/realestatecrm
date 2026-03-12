@@ -11,32 +11,42 @@ import {
 import Link from 'next/link';
 
 export default async function AdminOverviewPage() {
-  const [
-    totalUsers,
-    onboardedUsers,
-    usersWithSpace,
-    totalContacts,
-    totalLeads,
-    recentUsers,
-  ] = await Promise.all([
-    db.user.count(),
-    db.user.count({ where: { onboard: true } }),
-    db.user.count({ where: { space: { isNot: null } } }),
-    db.contact.count(),
-    db.contact.count({ where: { tags: { has: 'application-link' } } }),
-    db.user.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        onboard: true,
-        createdAt: true,
-        space: { select: { slug: true } },
-      },
-    }),
-  ]);
+  let totalUsers = 0, onboardedUsers = 0, usersWithSpace = 0, totalContacts = 0, totalLeads = 0;
+  let recentUsers: { id: string; name: string | null; email: string; onboard: boolean; createdAt: Date; space: { slug: string } | null }[] = [];
+
+  try {
+    [totalUsers, onboardedUsers, usersWithSpace, totalContacts, totalLeads, recentUsers] =
+      await Promise.all([
+        db.user.count(),
+        db.user.count({ where: { onboard: true } }),
+        db.user.count({ where: { space: { isNot: null } } }),
+        db.contact.count(),
+        db.contact.count({ where: { tags: { has: 'application-link' } } }),
+        db.user.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            onboard: true,
+            createdAt: true,
+            space: { select: { slug: true } },
+          },
+        }),
+      ]);
+  } catch (err) {
+    console.error('[admin] DB queries failed', { error: err });
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="text-center space-y-4 p-8">
+          <h1 className="text-xl font-semibold">Something went wrong</h1>
+          <p className="text-sm text-muted-foreground">Couldn&apos;t load admin dashboard. This is usually temporary.</p>
+          <a href="/admin" className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Try again</a>
+        </div>
+      </div>
+    );
+  }
 
   const notOnboarded = totalUsers - onboardedUsers;
   const noSpace = totalUsers - usersWithSpace;

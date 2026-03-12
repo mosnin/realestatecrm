@@ -45,28 +45,49 @@ export default async function DashboardPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  const [contactCount, dealCount, deals, stages, recentLeads, newLeadCount] =
-    await Promise.all([
-      db.contact.count({ where: { spaceId: space.id } }),
-      db.deal.count({ where: { spaceId: space.id } }),
-      db.deal.findMany({
-        where: { spaceId: space.id },
-        select: { value: true, stageId: true },
-      }),
-      db.dealStage.findMany({
-        where: { spaceId: space.id },
-        orderBy: { position: 'asc' },
-      }),
-      db.contact.findMany({
-        where: { spaceId: space.id, tags: { has: 'application-link' } },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        select: { id: true, name: true, phone: true, budget: true, preferences: true, createdAt: true, tags: true },
-      }),
-      db.contact.count({
-        where: { spaceId: space.id, tags: { has: 'new-lead' } },
-      }),
-    ]);
+  let contactCount = 0, dealCount = 0, newLeadCount = 0, totalLeads = 0;
+  let deals: { value: number | null; stageId: string }[] = [];
+  let stages: { id: string; name: string; color: string; position: number; spaceId: string }[] = [];
+  let recentLeads: { id: string; name: string; phone: string | null; budget: number | null; preferences: string | null; createdAt: Date; tags: string[] }[] = [];
+
+  try {
+    [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads] =
+      await Promise.all([
+        db.contact.count({ where: { spaceId: space.id } }),
+        db.deal.count({ where: { spaceId: space.id } }),
+        db.deal.findMany({
+          where: { spaceId: space.id },
+          select: { value: true, stageId: true },
+        }),
+        db.dealStage.findMany({
+          where: { spaceId: space.id },
+          orderBy: { position: 'asc' },
+        }),
+        db.contact.findMany({
+          where: { spaceId: space.id, tags: { has: 'application-link' } },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          select: { id: true, name: true, phone: true, budget: true, preferences: true, createdAt: true, tags: true },
+        }),
+        db.contact.count({
+          where: { spaceId: space.id, tags: { has: 'new-lead' } },
+        }),
+        db.contact.count({
+          where: { spaceId: space.id, tags: { has: 'application-link' } },
+        }),
+      ]);
+  } catch (err) {
+    console.error('[space-home] DB queries failed', { slug, error: err });
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="text-center space-y-4 p-8">
+          <h1 className="text-xl font-semibold">Something went wrong</h1>
+          <p className="text-sm text-muted-foreground">We couldn&apos;t load your dashboard data. This is usually temporary.</p>
+          <a href={`/s/${slug}`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Try again</a>
+        </div>
+      </div>
+    );
+  }
 
   const totalValue = deals.reduce((s, d) => s + (d.value ?? 0), 0);
 
@@ -86,9 +107,6 @@ export default async function DashboardPage({
     }).format(n);
 
   const intakeUrl = buildIntakeUrl(space.slug);
-  const totalLeads = await db.contact.count({
-    where: { spaceId: space.id, tags: { has: 'application-link' } },
-  });
 
   return (
     <div className="space-y-6 max-w-4xl">

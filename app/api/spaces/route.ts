@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { redis } from '@/lib/redis';
+import { getSpaceForUser } from '@/lib/space';
 
 export async function PATCH(req: NextRequest) {
   const { userId } = await auth();
@@ -19,7 +20,15 @@ export async function PATCH(req: NextRequest) {
     anthropicApiKey
   } = await req.json();
 
-  const space = await db.space.update({
+  const space = await db.space.findUnique({ where: { slug } });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const userSpace = await getSpaceForUser(userId);
+  if (!userSpace || space.id !== userSpace.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const updated = await db.space.update({
     where: { slug },
     data: {
       name,
@@ -56,7 +65,7 @@ export async function PATCH(req: NextRequest) {
       .catch(() => null);
   }
 
-  return NextResponse.json(space);
+  return NextResponse.json(updated);
 }
 
 export async function DELETE(req: NextRequest) {
@@ -65,8 +74,16 @@ export async function DELETE(req: NextRequest) {
 
   const { slug } = await req.json();
 
+  const space = await db.space.findUnique({ where: { slug } });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const userSpace = await getSpaceForUser(userId);
+  if (!userSpace || space.id !== userSpace.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   await redis.del(`slug:${slug}`).catch(() => null);
-  await db.space.delete({ where: { slug } }).catch(() => null);
+  await db.space.delete({ where: { slug } });
 
   return NextResponse.json({ success: true });
 }

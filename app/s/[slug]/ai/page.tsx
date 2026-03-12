@@ -12,16 +12,20 @@ export default async function AIPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  const recentMessages = await db.message.findMany({
-    where: { spaceId: space.id },
-    orderBy: { createdAt: 'asc' },
-    take: 50
-  });
-
-  const messages = recentMessages.map((m) => ({
-    role: m.role as 'user' | 'assistant',
-    content: m.content
-  }));
+  let messages: { role: 'user' | 'assistant'; content: string }[] = [];
+  try {
+    const recentMessages = await db.message.findMany({
+      where: { spaceId: space.id },
+      orderBy: { createdAt: 'asc' },
+      take: 50
+    });
+    messages = recentMessages.map((m) => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content
+    }));
+  } catch {
+    // fall back to empty history
+  }
 
   return (
     <div className="space-y-4 h-full">

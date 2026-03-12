@@ -40,14 +40,28 @@ export default async function ClientDetailPage({
 }) {
   const { slug, id } = await params;
 
-  const contact = await db.contact.findUnique({
-    where: { id },
-    include: {
-      dealContacts: {
-        include: { deal: { include: { stage: true } } },
+  let contact;
+  try {
+    contact = await db.contact.findUnique({
+      where: { id },
+      include: {
+        dealContacts: {
+          include: { deal: { include: { stage: true } } },
+        },
       },
-    },
-  });
+    });
+  } catch (err) {
+    console.error('[contact-detail] DB query failed', { slug, id, error: err });
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="text-center space-y-4 p-8">
+          <h1 className="text-xl font-semibold">Something went wrong</h1>
+          <p className="text-sm text-muted-foreground">We couldn&apos;t load this contact. This is usually temporary.</p>
+          <a href={`/s/${slug}/contacts`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Back to clients</a>
+        </div>
+      </div>
+    );
+  }
 
   if (!contact) notFound();
 
