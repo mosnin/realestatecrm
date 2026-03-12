@@ -21,9 +21,9 @@ export default async function DashboardLayout({
     return null;
   }
 
-  // Gate: user must exist in our DB. If they have a space, always let them
-  // through — having a workspace IS proof of setup. Never redirect workspace
-  // owners away; the backfill fixes the `onboard` flag in the background.
+  // Gate: user must exist in our DB. On DB error, render error UI
+  // (NOT .catch(() => null) which caused redirect loops, NOT throw which
+  // shows the generic "Application error" page).
   let dbUser;
   try {
     dbUser = await db.user.findUnique({
@@ -31,9 +31,23 @@ export default async function DashboardLayout({
       select: { id: true, onboard: true, space: { select: { id: true } } }
     });
   } catch (err) {
-    // DB error — show error page, NEVER redirect to /setup
     console.error('[layout] DB query failed', { clerkId: userId, slug, error: err });
-    throw new Error('Unable to load your account. Please refresh the page.');
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center space-y-4 p-8">
+          <h1 className="text-xl font-semibold">Something went wrong</h1>
+          <p className="text-sm text-muted-foreground">
+            We couldn&apos;t load your workspace. This is usually temporary.
+          </p>
+          <a
+            href={`/s/${slug}`}
+            className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            Try again
+          </a>
+        </div>
+      </div>
+    );
   }
 
   if (!dbUser) {
@@ -41,7 +55,6 @@ export default async function DashboardLayout({
   }
 
   // Best-effort backfill: set onboard=true if user has a space but flag is false.
-  // This is bookkeeping only — we do NOT redirect based on its result.
   try {
     await ensureOnboardingBackfill(dbUser, db);
   } catch (err) {

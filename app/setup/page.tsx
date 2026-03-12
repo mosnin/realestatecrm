@@ -12,8 +12,8 @@ export default async function SetupPage() {
 
   const clerkUser = await currentUser();
 
-  // On DB error, throw a real error (shows error page) — NEVER show the
-  // "create workspace" form to a user who might already have one.
+  // On DB error: render error UI. NEVER .catch(() => null) (shows create-workspace
+  // form to users who already have one). NEVER throw (generic "Application error").
   let dbUser;
   try {
     dbUser = await db.user.findUnique({
@@ -22,7 +22,22 @@ export default async function SetupPage() {
     });
   } catch (err) {
     console.error('[setup] DB query failed', { clerkId: userId, error: err });
-    throw new Error('Unable to load your account. Please refresh the page.');
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center space-y-4 p-8">
+          <h1 className="text-xl font-semibold">Something went wrong</h1>
+          <p className="text-sm text-muted-foreground">
+            We couldn&apos;t load your account. This is usually temporary.
+          </p>
+          <a
+            href="/setup"
+            className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            Try again
+          </a>
+        </div>
+      </div>
+    );
   }
 
   // Best-effort backfill (bookkeeping only)
@@ -42,18 +57,38 @@ export default async function SetupPage() {
   // throws a special NEXT_REDIRECT error that catch blocks would swallow.
   let resolvedUser = dbUser;
   if (!resolvedUser) {
-    resolvedUser = await db.user.upsert({
-      where: { clerkId: userId },
-      update: {},
-      create: {
-        clerkId: userId,
-        email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
-        name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
-        onboardingStartedAt: new Date(),
-        onboard: false,
-      },
-      include: { space: true },
-    });
+    try {
+      resolvedUser = await db.user.upsert({
+        where: { clerkId: userId },
+        update: {},
+        create: {
+          clerkId: userId,
+          email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
+          name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
+          onboardingStartedAt: new Date(),
+          onboard: false,
+        },
+        include: { space: true },
+      });
+    } catch (err) {
+      console.error('[setup] user upsert failed', { clerkId: userId, error: err });
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <div className="text-center space-y-4 p-8">
+            <h1 className="text-xl font-semibold">Something went wrong</h1>
+            <p className="text-sm text-muted-foreground">
+              We couldn&apos;t create your account. This is usually temporary.
+            </p>
+            <a
+              href="/setup"
+              className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              Try again
+            </a>
+          </div>
+        </div>
+      );
+    }
   }
 
   // Check again after upsert — user may already have a space
