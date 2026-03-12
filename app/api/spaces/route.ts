@@ -21,9 +21,9 @@ export async function PATCH(req: NextRequest) {
   } = await req.json();
 
   const spaceRows = await sql`
-    SELECT "id", "subdomain" AS "slug", "name", "emoji", "createdAt", "ownerId"
+    SELECT "id", "slug", "name", "emoji", "createdAt", "ownerId"
     FROM "Space"
-    WHERE "subdomain" = ${slug}
+    WHERE "slug" = ${slug}
   `;
   if (!spaceRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -39,8 +39,8 @@ export async function PATCH(req: NextRequest) {
     SET
       "name" = ${name}
       ${emoji !== undefined ? sql`, "emoji" = ${emoji}` : sql``}
-    WHERE "subdomain" = ${slug}
-    RETURNING "id", "subdomain" AS "slug", "name", "emoji", "createdAt", "ownerId"
+    WHERE "slug" = ${slug}
+    RETURNING "id", "slug", "name", "emoji", "createdAt", "ownerId"
   `;
 
   await sql`
@@ -73,9 +73,9 @@ export async function DELETE(req: NextRequest) {
   const { slug } = await req.json();
 
   const spaceRows = await sql`
-    SELECT "id", "subdomain" AS "slug", "name", "emoji", "createdAt", "ownerId"
+    SELECT "id", "slug", "name", "emoji", "createdAt", "ownerId"
     FROM "Space"
-    WHERE "subdomain" = ${slug}
+    WHERE "slug" = ${slug}
   `;
   if (!spaceRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -87,7 +87,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   await redis.del(`slug:${slug}`).catch(() => null);
-  await sql`DELETE FROM "Space" WHERE "subdomain" = ${slug}`;
+  await sql`DELETE FROM "Space" WHERE "slug" = ${slug}`;
 
   return NextResponse.json({ success: true });
 }

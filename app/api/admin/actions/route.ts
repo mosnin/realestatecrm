@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       }
 
       const users = await sql`
-        SELECT u.*, s."id" AS "spaceId", s."subdomain" AS "slug"
+        SELECT u.*, s."id" AS "spaceId", s."slug"
         FROM "User" u
         LEFT JOIN "Space" s ON s."ownerId" = u."id"
         WHERE u."id" = ${userId}

@@ -29,7 +29,7 @@ export default async function ConfigurePage({
     if (userRows[0]) {
       const u = userRows[0] as User;
       const spaceRows = await sql`
-        SELECT *, "subdomain" AS "slug" FROM "Space" WHERE "ownerId" = ${u.id} LIMIT 1
+        SELECT * FROM "Space" WHERE "ownerId" = ${u.id} LIMIT 1
       `;
       if (spaceRows[0]) {
         const s = spaceRows[0] as Space;

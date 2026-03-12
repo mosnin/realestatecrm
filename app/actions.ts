@@ -15,14 +15,14 @@ export async function deleteSlugAction(
 
   const slug = formData.get('slug') as string;
 
-  const [space] = await sql`SELECT *, "subdomain" AS "slug" FROM "Space" WHERE "subdomain" = ${slug} LIMIT 1`;
+  const [space] = await sql`SELECT * FROM "Space" WHERE "slug" = ${slug} LIMIT 1`;
   if (!space) return { error: 'Space not found' };
 
   const userSpace = await getSpaceForUser(userId);
   if (!userSpace || space.id !== userSpace.id) return { error: 'Forbidden' };
 
   await redis.del(`slug:${slug}`).catch(() => null);
-  await sql`DELETE FROM "Space" WHERE "subdomain" = ${slug}`;
+  await sql`DELETE FROM "Space" WHERE "slug" = ${slug}`;
   revalidatePath('/admin');
   return { success: 'Space deleted successfully' };
 }

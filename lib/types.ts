@@ -16,7 +16,7 @@ export type User = {
 
 export type Space = {
   id: string;
-  slug: string; // DB column is "subdomain", aliased as "slug"
+  slug: string;
   name: string;
   emoji: string;
   createdAt: Date;

@@ -17,7 +17,7 @@ export default async function AdminUsersPage({
   const values: unknown[] = [];
 
   if (query) {
-    conditions.push(`(u.name ILIKE $1 OR u.email ILIKE $1 OR s."subdomain" ILIKE $1)`);
+    conditions.push(`(u.name ILIKE $1 OR u.email ILIKE $1 OR s."slug" ILIKE $1)`);
     values.push(`%${query}%`);
   }
 
@@ -40,50 +40,50 @@ export default async function AdminUsersPage({
     if (filter === 'onboarded') {
       rows = await sql`
         SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
-               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+               s."slug" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
         FROM "User" u
         LEFT JOIN "Space" s ON s."ownerId" = u.id
-        WHERE u.onboard = true AND (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."subdomain" ILIKE ${searchPattern})
+        WHERE u.onboard = true AND (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."slug" ILIKE ${searchPattern})
         ORDER BY u."createdAt" DESC
         LIMIT 200
       ` as Record<string, unknown>[];
     } else if (filter === 'not-onboarded') {
       rows = await sql`
         SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
-               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+               s."slug" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
         FROM "User" u
         LEFT JOIN "Space" s ON s."ownerId" = u.id
-        WHERE u.onboard = false AND (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."subdomain" ILIKE ${searchPattern})
+        WHERE u.onboard = false AND (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."slug" ILIKE ${searchPattern})
         ORDER BY u."createdAt" DESC
         LIMIT 200
       ` as Record<string, unknown>[];
     } else if (filter === 'has-space') {
       rows = await sql`
         SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
-               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+               s."slug" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
         FROM "User" u
         LEFT JOIN "Space" s ON s."ownerId" = u.id
-        WHERE s.id IS NOT NULL AND (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."subdomain" ILIKE ${searchPattern})
+        WHERE s.id IS NOT NULL AND (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."slug" ILIKE ${searchPattern})
         ORDER BY u."createdAt" DESC
         LIMIT 200
       ` as Record<string, unknown>[];
     } else if (filter === 'no-space') {
       rows = await sql`
         SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
-               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+               s."slug" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
         FROM "User" u
         LEFT JOIN "Space" s ON s."ownerId" = u.id
-        WHERE s.id IS NULL AND (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."subdomain" ILIKE ${searchPattern})
+        WHERE s.id IS NULL AND (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."slug" ILIKE ${searchPattern})
         ORDER BY u."createdAt" DESC
         LIMIT 200
       ` as Record<string, unknown>[];
     } else {
       rows = await sql`
         SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
-               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+               s."slug" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
         FROM "User" u
         LEFT JOIN "Space" s ON s."ownerId" = u.id
-        WHERE (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."subdomain" ILIKE ${searchPattern})
+        WHERE (u.name ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern} OR s."slug" ILIKE ${searchPattern})
         ORDER BY u."createdAt" DESC
         LIMIT 200
       ` as Record<string, unknown>[];
@@ -103,7 +103,7 @@ export default async function AdminUsersPage({
     if (filter === 'onboarded') {
       rows = await sql`
         SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
-               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+               s."slug" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
         FROM "User" u
         LEFT JOIN "Space" s ON s."ownerId" = u.id
         WHERE u.onboard = true
@@ -113,7 +113,7 @@ export default async function AdminUsersPage({
     } else if (filter === 'not-onboarded') {
       rows = await sql`
         SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
-               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+               s."slug" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
         FROM "User" u
         LEFT JOIN "Space" s ON s."ownerId" = u.id
         WHERE u.onboard = false
@@ -123,7 +123,7 @@ export default async function AdminUsersPage({
     } else if (filter === 'has-space') {
       rows = await sql`
         SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
-               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+               s."slug" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
         FROM "User" u
         LEFT JOIN "Space" s ON s."ownerId" = u.id
         WHERE s.id IS NOT NULL
@@ -133,7 +133,7 @@ export default async function AdminUsersPage({
     } else if (filter === 'no-space') {
       rows = await sql`
         SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
-               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+               s."slug" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
         FROM "User" u
         LEFT JOIN "Space" s ON s."ownerId" = u.id
         WHERE s.id IS NULL
@@ -143,7 +143,7 @@ export default async function AdminUsersPage({
     } else {
       rows = await sql`
         SELECT u.id, u.name, u.email, u.onboard, u."createdAt", u."onboardingCurrentStep",
-               s."subdomain" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
+               s."slug" AS "spaceSlug", s.name AS "spaceName", s.emoji AS "spaceEmoji"
         FROM "User" u
         LEFT JOIN "Space" s ON s."ownerId" = u.id
         ORDER BY u."createdAt" DESC

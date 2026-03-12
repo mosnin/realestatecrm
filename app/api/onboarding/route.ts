@@ -21,7 +21,7 @@ export async function GET() {
     }
 
     const spaces = await sql`
-      SELECT *, "subdomain" AS "slug" FROM "Space" WHERE "ownerId" = ${user.id}
+      SELECT * FROM "Space" WHERE "ownerId" = ${user.id}
     ` as Space[];
     const space = spaces[0] ?? null;
 
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
 
     // Get space + settings separately
     const spaces = await sql`
-      SELECT *, "subdomain" AS "slug" FROM "Space" WHERE "ownerId" = ${user.id}
+      SELECT * FROM "Space" WHERE "ownerId" = ${user.id}
     ` as Space[];
     const space = spaces[0] ?? null;
 
@@ -204,12 +204,12 @@ export async function POST(req: NextRequest) {
       }
 
       const existingSlug = await sql`
-        SELECT "id" FROM "Space" WHERE "subdomain" = ${sanitized} LIMIT 1
+        SELECT "id" FROM "Space" WHERE "slug" = ${sanitized} LIMIT 1
       ` as { id: string }[];
       if (existingSlug.length) return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
 
       const existingOwnerSpace = await sql`
-        SELECT "subdomain" AS "slug" FROM "Space" WHERE "ownerId" = ${user.id} LIMIT 1
+        SELECT "slug" FROM "Space" WHERE "ownerId" = ${user.id} LIMIT 1
       ` as { slug: string }[];
       if (existingOwnerSpace.length) return NextResponse.json({ success: true, slug: existingOwnerSpace[0].slug });
 
@@ -226,9 +226,9 @@ export async function POST(req: NextRequest) {
       try {
         const spaceId = crypto.randomUUID();
         const createdSpaces = await sql`
-          INSERT INTO "Space" ("id", "subdomain", "name", "emoji", "ownerId")
+          INSERT INTO "Space" ("id", "slug", "name", "emoji", "ownerId")
           VALUES (${spaceId}, ${sanitized}, ${businessName || sanitized}, ${'🏠'}, ${user.id})
-          RETURNING *, "subdomain" AS "slug"
+          RETURNING *
         ` as Space[];
         newSpace = createdSpaces[0];
 
@@ -252,7 +252,7 @@ export async function POST(req: NextRequest) {
         }
       } catch {
         const ownerSpace = await sql`
-          SELECT "subdomain" AS "slug" FROM "Space" WHERE "ownerId" = ${user.id} LIMIT 1
+          SELECT "slug" FROM "Space" WHERE "ownerId" = ${user.id} LIMIT 1
         ` as { slug: string }[];
         if (ownerSpace.length) return NextResponse.json({ success: true, slug: ownerSpace[0].slug });
         return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
@@ -326,7 +326,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ available: false, reason: 'invalid' });
       }
       const existing = await sql`
-        SELECT "id" FROM "Space" WHERE "subdomain" = ${sanitized} LIMIT 1
+        SELECT "id" FROM "Space" WHERE "slug" = ${sanitized} LIMIT 1
       ` as { id: string }[];
       return NextResponse.json({ available: !existing.length });
     }

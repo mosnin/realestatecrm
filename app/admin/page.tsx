@@ -23,7 +23,7 @@ export default async function AdminOverviewPage() {
         sql`SELECT COUNT(*)::int AS count FROM "Contact"`.then(r => (r[0] as { count: number }).count),
         sql`SELECT COUNT(*)::int AS count FROM "Contact" WHERE 'application-link' = ANY(tags)`.then(r => (r[0] as { count: number }).count),
         sql`
-          SELECT u.id, u.name, u.email, u.onboard, u."createdAt", s."subdomain" AS "spaceSlug"
+          SELECT u.id, u.name, u.email, u.onboard, u."createdAt", s."slug" AS "spaceSlug"
           FROM "User" u
           LEFT JOIN "Space" s ON s."ownerId" = u.id
           ORDER BY u."createdAt" DESC

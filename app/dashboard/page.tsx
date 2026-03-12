@@ -13,7 +13,7 @@ export default async function DashboardRedirectPage() {
   let user;
   try {
     const rows = await sql`
-      SELECT u.*, s."subdomain" AS "slug", s.id AS "spaceId", s.name AS "spaceName"
+      SELECT u.*, s."slug", s.id AS "spaceId", s.name AS "spaceName"
       FROM "User" u
       LEFT JOIN "Space" s ON s."ownerId" = u.id
       WHERE u."clerkId" = ${userId}

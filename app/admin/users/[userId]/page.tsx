@@ -91,7 +91,7 @@ export default async function AdminUserDetailPage({
 
   // Fetch space
   const spaceRows = await sql`
-    SELECT *, "subdomain" AS "slug" FROM "Space" WHERE "ownerId" = ${user.id} LIMIT 1
+    SELECT * FROM "Space" WHERE "ownerId" = ${user.id} LIMIT 1
   `;
   const spaceRow = spaceRows[0] as (Space & Record<string, unknown>) | undefined;
 

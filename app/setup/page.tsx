@@ -15,7 +15,7 @@ export default async function SetupPage() {
   let dbUser;
   try {
     const rows = await sql`
-      SELECT u.*, s."subdomain" AS "slug", s.id AS "spaceId", s.name AS "spaceName"
+      SELECT u.*, s."slug", s.id AS "spaceId", s.name AS "spaceName"
       FROM "User" u
       LEFT JOIN "Space" s ON s."ownerId" = u.id
       WHERE u."clerkId" = ${userId}
@@ -86,7 +86,7 @@ export default async function SetupPage() {
         const row = upsertRows[0] as Record<string, unknown>;
         // Query space separately
         const spaceRows = await sql`
-          SELECT *, "subdomain" AS "slug" FROM "Space" WHERE "ownerId" = ${row.id} LIMIT 1
+          SELECT * FROM "Space" WHERE "ownerId" = ${row.id} LIMIT 1
         `;
         resolvedUser = {
           ...row,
