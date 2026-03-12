@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
         ${new Date()},
         ${false}
       )
-      ON CONFLICT ("clerkId") DO UPDATE SET "updatedAt" = NOW()
+      ON CONFLICT ("clerkId") DO UPDATE SET "clerkId" = "User"."clerkId"
       RETURNING *
     ` as User[];
     const user = upsertedUsers[0];
@@ -126,8 +126,7 @@ export async function POST(req: NextRequest) {
         UPDATE "User"
         SET "onboard" = ${false},
             "onboardingCurrentStep" = ${1},
-            "onboardingStartedAt" = ${user.onboardingStartedAt ?? new Date()},
-            "updatedAt" = NOW()
+            "onboardingStartedAt" = ${user.onboardingStartedAt ?? new Date()}
         WHERE "id" = ${user.id}
       `;
       return NextResponse.json({ success: true });
@@ -138,8 +137,7 @@ export async function POST(req: NextRequest) {
       await sql`
         UPDATE "User"
         SET "onboardingCurrentStep" = ${step},
-            "onboardingStartedAt" = ${user.onboardingStartedAt ?? new Date()},
-            "updatedAt" = NOW()
+            "onboardingStartedAt" = ${user.onboardingStartedAt ?? new Date()}
         WHERE "id" = ${user.id}
       `;
       return NextResponse.json({ success: true });
@@ -156,8 +154,7 @@ export async function POST(req: NextRequest) {
 
       await sql`
         UPDATE "User"
-        SET "name" = ${name || user.name},
-            "updatedAt" = NOW()
+        SET "name" = ${name || user.name}
         WHERE "id" = ${user.id}
       `;
 
@@ -167,8 +164,7 @@ export async function POST(req: NextRequest) {
           VALUES (${crypto.randomUUID()}, ${space.id}, ${resolvedPhone}, ${businessName})
           ON CONFLICT ("spaceId") DO UPDATE
           SET "phoneNumber" = ${resolvedPhone},
-              "businessName" = ${businessName},
-              "updatedAt" = NOW()
+              "businessName" = ${businessName}
         `;
       }
 
@@ -197,8 +193,7 @@ export async function POST(req: NextRequest) {
           ON CONFLICT ("spaceId") DO UPDATE
           SET "intakePageTitle" = ${intakePageTitle},
               "intakePageIntro" = ${intakePageIntro},
-              "businessName" = ${businessName},
-              "updatedAt" = NOW()
+              "businessName" = ${businessName}
         `;
         return NextResponse.json({ success: true, slug: space.slug });
       }
@@ -260,8 +255,7 @@ export async function POST(req: NextRequest) {
 
       await sql`
         UPDATE "User"
-        SET "onboardingCurrentStep" = ${4},
-            "updatedAt" = NOW()
+        SET "onboardingCurrentStep" = ${4}
         WHERE "id" = ${user.id}
       `;
       return NextResponse.json({ success: true, slug: newSpace.slug });
@@ -279,14 +273,12 @@ export async function POST(req: NextRequest) {
         INSERT INTO "SpaceSetting" ("id", "spaceId", "notifications")
         VALUES (${crypto.randomUUID()}, ${space.id}, ${emailNotifications})
         ON CONFLICT ("spaceId") DO UPDATE
-        SET "notifications" = ${emailNotifications},
-            "updatedAt" = NOW()
+        SET "notifications" = ${emailNotifications}
       `;
 
       await sql`
         UPDATE "SpaceSetting"
-        SET "myConnections" = ${JSON.stringify({ defaultSubmissionStatus: defaultSubmissionStatus || 'New' })},
-            "updatedAt" = NOW()
+        SET "myConnections" = ${JSON.stringify({ defaultSubmissionStatus: defaultSubmissionStatus || 'New' })}
         WHERE "spaceId" = ${space.id}
       `;
 
@@ -315,8 +307,7 @@ export async function POST(req: NextRequest) {
         UPDATE "User"
         SET "onboard" = ${true},
             "onboardingCurrentStep" = ${7},
-            "onboardingCompletedAt" = ${completedAt},
-            "updatedAt" = NOW()
+            "onboardingCompletedAt" = ${completedAt}
         WHERE "id" = ${user.id}
       `;
       return NextResponse.json({ success: true, onboard: true, onboardingCompletedAt: completedAt.toISOString() });

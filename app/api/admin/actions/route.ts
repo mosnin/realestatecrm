@@ -104,8 +104,7 @@ export async function POST(req: NextRequest) {
           UPDATE "User"
           SET "onboard" = true,
               "onboardingCompletedAt" = NOW(),
-              "onboardingCurrentStep" = 7,
-              "updatedAt" = NOW()
+              "onboardingCurrentStep" = 7
           WHERE "id" = ${user.id}
         `;
         repairAction = 'backfill_onboard';
@@ -115,8 +114,7 @@ export async function POST(req: NextRequest) {
         await sql`
           UPDATE "User"
           SET "onboard" = false,
-              "onboardingCurrentStep" = 1,
-              "updatedAt" = NOW()
+              "onboardingCurrentStep" = 1
           WHERE "id" = ${user.id}
         `;
         repairAction = 'reset_onboarding';
