@@ -19,6 +19,9 @@ All variables found or inferable from code usage:
 | `KV_REST_API_URL` | `lib/redis.ts` | Upstash Redis endpoint | **Medium** | Legacy admin path and slug metadata fail |
 | `KV_REST_API_TOKEN` | `lib/redis.ts` | Upstash Redis authentication | **Medium** | Same as `KV_REST_API_URL` |
 | `NEXT_PUBLIC_ROOT_DOMAIN` | `lib/utils.ts` | Public URL/domain construction for intake links | **Medium** | Falls back to `workflowrouting.com` (prod) or `localhost:3000` (dev); intake link URLs may be wrong if not set correctly |
+| `NEXT_PUBLIC_APP_URL` | `lib/email.ts` | Base URL for links in notification emails (e.g. `https://app.yourdomain.com`) | **Medium** | Email links fall back to `https://app.yourdomain.com` placeholder |
+| `RESEND_API_KEY` | `lib/email.ts` | Resend API key for sending lead notification emails | **Medium** | Email notifications silently skipped; leads still saved normally |
+| `RESEND_FROM_EMAIL` | `lib/email.ts` | Sender address for notification emails (must be verified in Resend) | **Medium** | Falls back to `notifications@updates.yourdomain.com`; must be set to a verified domain |
 | `NODE_ENV` | `lib/utils.ts` | Protocol selection (http vs https) | **Auto-set** | Set automatically by Next.js; do not override manually |
 
 ### Clerk-specific variables
@@ -45,6 +48,7 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 | **OpenAI** | Lead scoring (gpt-4o-mini), text embeddings (text-embedding-3-small), AI assistant primary provider | `lib/lead-scoring.ts`, `lib/embeddings.ts`, `lib/ai.ts` |
 | **Anthropic** | AI assistant fallback provider. Per-workspace key support via SpaceSetting. | `lib/ai.ts` |
 | **Supabase pgvector** | Vector storage and similarity search for RAG-enriched AI assistant context, scoped per workspace | `lib/zilliz.ts`, `lib/vectorize.ts`, `supabase/schema.sql` (`DocumentEmbedding` table + `match_documents` RPC) |
+| **Resend** | Transactional email — sends lead notification emails to workspace owners when a new application is submitted (if notifications enabled in SpaceSetting) | `lib/email.ts`, `app/api/public/apply/route.ts` |
 | **Upstash Redis** | Legacy slug metadata storage, admin dashboard data | `lib/redis.ts`, `lib/slugs.ts`, `app/actions.ts` |
 | **Vercel** | Deployment target, analytics, speed insights | `@vercel/analytics`, `@vercel/speed-insights` packages |
 
@@ -74,6 +78,8 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 | `ANTHROPIC_API_KEY` | Assistant fallback. Not needed if OpenAI key is set. |
 | `KV_REST_API_URL` + `KV_REST_API_TOKEN` | Legacy admin path. Core CRM works without it. |
 | `NEXT_PUBLIC_ROOT_DOMAIN` | Falls back to defaults. Set for correct intake link URLs. |
+| `NEXT_PUBLIC_APP_URL` | For correct contact links in notification emails. |
+| `RESEND_API_KEY` + `RESEND_FROM_EMAIL` | Required for lead notification emails. Notifications are silently skipped if unset. |
 
 ---
 
@@ -103,6 +109,7 @@ All `.env*` files are gitignored. Create a `.env.local` file locally with the re
 | Supabase pgvector | Yes (via Supabase) | Built into `@supabase/supabase-js` | Vector search for AI RAG context, optional |
 | Upstash Redis | Yes | `@upstash/redis@^1.34.9` | Legacy metadata path |
 | Vercel | Yes (packages) | `@vercel/analytics@^1.5.0`, `@vercel/speed-insights@^1.2.0` | Deployment target |
+| Resend | Yes | `resend@^4.8.0` | Lead notification emails, fully integrated |
 | Stripe | **Not confirmed** | Not in dependencies | Billing field exists in DB schema but no Stripe integration |
 
 ---

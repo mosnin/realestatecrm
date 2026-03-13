@@ -11,6 +11,7 @@ import {
   normalizePhone,
   publicApplicationSchema,
 } from '@/lib/public-application';
+import { sendNewLeadNotification } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
   let requestBody: unknown;
@@ -188,6 +189,33 @@ export async function POST(req: NextRequest) {
         });
       }
     }
+
+    // ── Non-blocking email notification ──────────────────────────────────────
+    void (async () => {
+      try {
+        const [{ data: settingsRow }, { data: ownerRow }] = await Promise.all([
+          supabase.from('SpaceSetting').select('notifications').eq('spaceId', space.id).maybeSingle(),
+          supabase.from('User').select('email').eq('id', space.ownerId).maybeSingle(),
+        ]);
+        if (settingsRow?.notifications && ownerRow?.email) {
+          await sendNewLeadNotification({
+            toEmail: ownerRow.email,
+            spaceName: space.name,
+            spaceSlug: space.slug,
+            contactId: contact.id,
+            name: payload.legalName,
+            phone: payload.phone,
+            email: payload.email,
+            leadScore: scoring.leadScore,
+            scoreLabel: scoring.scoreLabel,
+            scoreSummary: scoring.scoreSummary,
+            applicationData,
+          });
+        }
+      } catch (err) {
+        console.error('[apply] email notification failed', { contactId: contact.id, err });
+      }
+    })();
 
     return NextResponse.json(
       {
