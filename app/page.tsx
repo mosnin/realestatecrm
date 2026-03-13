@@ -20,6 +20,7 @@ import AnimatedFooter from '@/components/ui/animated-footer';
 import { AnimatedCard, CardVisual, CardBody, CardTitle, CardDescription, Visual3 } from '@/components/ui/animated-card-chart';
 import { AnimatedCard as AnimatedCard2, CardVisual as CardVisual2, CardBody as CardBody2, CardTitle as CardTitle2, CardDescription as CardDescription2, Visual2 } from '@/components/ui/animated-card-diagram';
 import { AnimatedCard as AnimatedCard3, CardVisual as CardVisual3, CardBody as CardBody3, CardTitle as CardTitle3, CardDescription as CardDescription3, Visual1 } from '@/components/ui/animated-card-line';
+import { Stats } from '@/components/ui/statistics-card';
 
 const pillNav = [
   { id: 'problem', label: 'Problem' },
@@ -318,28 +319,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Problem */}
-      <section id="problem" className="py-20 px-6 border-t border-border">
-        <div className="max-w-5xl mx-auto">
-          <div className="rounded-2xl border border-border bg-card p-8 md:p-10 shadow-[0_2px_12px_rgba(0,0,0,0.06)] grid md:grid-cols-2 gap-8 items-start">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-primary">The problem</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight leading-tight">
-                Leasing inquiries move fast.<br />Most workflows don&apos;t.
-              </h2>
-            </div>
-            <div className="space-y-3 text-muted-foreground leading-relaxed text-sm">
-              <p>
-                Leads arrive through DMs, listing sites, texts, and forms. Important context gets lost,
-                follow-up order gets fuzzy, and every day starts with cleanup.
-              </p>
-              <p>
-                Chippi gives you one clean intake path and one command center so you can act faster with less manual chaos.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      <Stats />
 
       {/* Solution */}
       <section id="solution" className="py-20 px-6">
