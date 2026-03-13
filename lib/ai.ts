@@ -40,78 +40,98 @@ export async function chatWithRAG(
   const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
   const queryText = lastUserMessage?.content ?? '';
 
-  // Retrieve relevant context from Zilliz
-  let contextBlocks: string[] = [];
-  try {
-    const queryVector = await embedText(queryText);
-    const results = await searchVectors(spaceId, queryVector, 5);
-
-    const contactIds: string[] = [];
-    const dealIds: string[] = [];
-
-    for (const r of results) {
-      if (r.entity_type === 'contact') contactIds.push(r.entity_id);
-      else if (r.entity_type === 'deal') dealIds.push(r.entity_id);
-    }
-
-    if (contactIds.length) {
-      const { data: contacts } = await supabase
+  // ── Step 1: always load the user's full CRM data for this space ──────────
+  // This guarantees the AI has context even when vectors haven't been populated yet.
+  const [{ data: allContacts }, { data: allDeals }, { data: allDealContactRows }] =
+    await Promise.all([
+      supabase
         .from('Contact')
         .select('*')
-        .in('id', contactIds)
-        .eq('spaceId', spaceId);
-      if (contacts?.length) {
-        contextBlocks.push(
-          'Relevant Contacts:\n' +
-            contacts
-              .map(
-                (c: any) =>
-                  `- ${c.name} (${c.type}) | ${c.email ?? ''} | ${c.phone ?? ''} | ${c.address ?? ''} | Notes: ${c.notes ?? ''}`
-              )
-              .join('\n')
-        );
-      }
-    }
-
-    if (dealIds.length) {
-      const { data: deals } = await supabase
+        .eq('spaceId', spaceId)
+        .order('createdAt', { ascending: false })
+        .limit(100),
+      supabase
         .from('Deal')
         .select('*, DealStage(name)')
-        .in('id', dealIds)
-        .eq('spaceId', spaceId);
-      const { data: dealContactRows } = await supabase
+        .eq('spaceId', spaceId)
+        .order('createdAt', { ascending: false })
+        .limit(50),
+      supabase
         .from('DealContact')
         .select('dealId, Contact(name)')
-        .in('dealId', dealIds);
-      const contactsByDeal: Record<string, string[]> = {};
-      for (const row of (dealContactRows ?? []) as any[]) {
-        if (!contactsByDeal[row.dealId]) contactsByDeal[row.dealId] = [];
-        contactsByDeal[row.dealId].push(row.Contact?.name ?? '');
-      }
-      if (deals?.length) {
-        contextBlocks.push(
-          'Relevant Deals:\n' +
-            deals
-              .map(
-                (d: any) =>
-                  `- ${d.title} | Stage: ${d.DealStage?.name ?? 'N/A'} | Value: ${d.value != null ? `$${d.value}` : 'N/A'} | Priority: ${d.priority} | Address: ${d.address ?? ''} | Contacts: ${(contactsByDeal[d.id] ?? []).join(', ')}`
-              )
-              .join('\n')
-        );
-      }
+        .eq('Contact.spaceId' as any, spaceId),
+    ]);
+
+  // ── Step 2: try vector search to promote the most relevant records ────────
+  // If vectors aren't populated yet this will return an empty list (not an error).
+  let priorityContactIds = new Set<string>();
+  let priorityDealIds = new Set<string>();
+  try {
+    const queryVector = await embedText(queryText);
+    const results = await searchVectors(spaceId, queryVector, 8);
+    for (const r of results) {
+      if (r.entity_type === 'contact') priorityContactIds.add(r.entity_id);
+      else if (r.entity_type === 'deal') priorityDealIds.add(r.entity_id);
     }
   } catch {
-    // Embeddings or Zilliz may not be configured — proceed without RAG context
+    // Vector search unavailable — fall back to full dataset loaded above
+  }
+
+  // ── Step 3: build context blocks, prioritising vector-matched records ─────
+  const contextBlocks: string[] = [];
+
+  const contacts = (allContacts ?? []) as any[];
+  const deals = (allDeals ?? []) as any[];
+
+  // Sort so vector-matched contacts appear first
+  const sortedContacts = [
+    ...contacts.filter((c) => priorityContactIds.has(c.id)),
+    ...contacts.filter((c) => !priorityContactIds.has(c.id)),
+  ];
+
+  if (sortedContacts.length) {
+    contextBlocks.push(
+      'Contacts:\n' +
+        sortedContacts
+          .map(
+            (c) =>
+              `- ${c.name} (${c.type})${priorityContactIds.has(c.id) ? ' ★' : ''} | Score: ${c.leadScore ?? 'N/A'} (${c.scoreLabel ?? 'unscored'}) | ${c.email ?? ''} | ${c.phone ?? ''} | Budget: ${c.budget != null ? `$${c.budget}` : 'N/A'} | ${c.address ?? ''} | Tags: ${(c.tags ?? []).join(', ')} | Notes: ${c.notes ?? ''}`
+          )
+          .join('\n')
+    );
+  }
+
+  const contactsByDeal: Record<string, string[]> = {};
+  for (const row of (allDealContactRows ?? []) as any[]) {
+    if (!contactsByDeal[row.dealId]) contactsByDeal[row.dealId] = [];
+    if (row.Contact?.name) contactsByDeal[row.dealId].push(row.Contact.name);
+  }
+
+  const sortedDeals = [
+    ...deals.filter((d) => priorityDealIds.has(d.id)),
+    ...deals.filter((d) => !priorityDealIds.has(d.id)),
+  ];
+
+  if (sortedDeals.length) {
+    contextBlocks.push(
+      'Deals:\n' +
+        sortedDeals
+          .map(
+            (d) =>
+              `- ${d.title}${priorityDealIds.has(d.id) ? ' ★' : ''} | Stage: ${d.DealStage?.name ?? 'N/A'} | Value: ${d.value != null ? `$${d.value}` : 'N/A'} | Priority: ${d.priority} | Address: ${d.address ?? ''} | Contacts: ${(contactsByDeal[d.id] ?? []).join(', ')}`
+          )
+          .join('\n')
+    );
   }
 
   const systemPrompt = [
-    `You are an intelligent real estate CRM assistant for the space "${spaceName}".`,
-    `You help with managing clients through qualification, tour, and application stages, plus real estate deals.`,
+    `You are an intelligent real estate CRM assistant for the workspace "${spaceName}".`,
+    `You help the agent manage clients through qualification, tour, and application stages, plus real estate deals.`,
+    `Only reference data that appears in the CRM context below. Never fabricate client names, deal values, or contact details.`,
     contextBlocks.length
-      ? `\nHere is relevant CRM data for this query:\n\n${contextBlocks.join('\n\n')}`
-      : ''
+      ? `\nCRM Data (★ = most relevant to this query):\n\n${contextBlocks.join('\n\n')}`
+      : `\nNo CRM data found for this workspace yet.`
   ]
-    .filter(Boolean)
     .join('\n');
 
   // Prefer OpenAI when available, because embeddings already rely on it in this app

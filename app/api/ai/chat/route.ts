@@ -15,6 +15,15 @@ export async function POST(req: NextRequest) {
     const space = await getSpaceFromSlug(slug);
     if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
 
+    // Verify the authenticated user owns this space
+    const { data: owner } = await supabase
+      .from('User')
+      .select('id')
+      .eq('clerkId', userId)
+      .eq('id', space.ownerId)
+      .maybeSingle();
+    if (!owner) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
     // Save user message to DB
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === 'user');
     if (lastUserMsg) {
