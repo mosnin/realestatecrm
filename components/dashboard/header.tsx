@@ -18,8 +18,6 @@ import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
 
-const allNavItems = [...primaryNavItems, ...secondaryNavItems];
-
 interface HeaderProps {
   slug: string;
   spaceName: string;
@@ -47,8 +45,11 @@ export function Header({ slug, spaceName, title }: HeaderProps) {
                 <span className="text-sm font-semibold">{spaceName}</span>
               </SheetTitle>
             </SheetHeader>
-            <nav className="px-3 py-4 space-y-0.5">
-              {allNavItems.map((item) => {
+            <nav className="flex-1 px-3 pt-4 pb-2 space-y-0.5">
+              <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                Workspace
+              </p>
+              {primaryNavItems.map((item) => {
                 const href = `${base}${item.href}`;
                 const isActive =
                   item.href === ''
@@ -62,16 +63,41 @@ export function Header({ slug, spaceName, title }: HeaderProps) {
                     className={cn(
                       'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
                       isActive
-                        ? 'bg-primary text-primary-foreground'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
                         : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                     )}
                   >
-                    <item.icon size={16} className={cn('flex-shrink-0', !isActive && 'opacity-55')} />
+                    <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
                     {item.label}
                   </Link>
                 );
               })}
             </nav>
+            <div className="px-3 pb-4 space-y-0.5 border-t border-sidebar-border pt-3">
+              {secondaryNavItems.map((item) => {
+                const href = `${base}${item.href}`;
+                const isActive = pathname.startsWith(href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={href}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                      isActive
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                    )}
+                  >
+                    <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+              <div className="flex items-center gap-2 px-3 pt-3">
+                <BrandLogo className="h-4" alt="Chippi" />
+              </div>
+            </div>
           </SheetContent>
         </Sheet>
 
