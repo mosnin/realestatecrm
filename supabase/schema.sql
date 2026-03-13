@@ -60,6 +60,8 @@ CREATE TABLE IF NOT EXISTS "Contact" (
   "scoreLabel"    text,
   "scoreSummary"  text,
   "scoringStatus" text NOT NULL DEFAULT 'pending',
+  "scoreDetails"  jsonb,
+  "applicationData" jsonb,
   "createdAt"     timestamptz NOT NULL DEFAULT now(),
   "updatedAt"     timestamptz NOT NULL DEFAULT now()
 );

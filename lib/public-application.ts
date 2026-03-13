@@ -1,13 +1,50 @@
 import { z } from 'zod';
 import { normalizeSlug } from '@/lib/intake';
 
+// ── Helpers ──
+const optStr = z
+  .string()
+  .trim()
+  .max(500)
+  .optional()
+  .or(z.literal(''))
+  .transform((v) => (v ? v : undefined));
+
+const optNum = z
+  .union([z.number(), z.string(), z.null(), z.undefined()])
+  .transform((v) => {
+    if (v == null || v === '') return undefined;
+    if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
+    const p = Number.parseFloat(String(v));
+    return Number.isFinite(p) ? p : undefined;
+  });
+
+const optBool = z
+  .union([z.boolean(), z.string(), z.null(), z.undefined()])
+  .transform((v) => {
+    if (v == null || v === '') return undefined;
+    if (typeof v === 'boolean') return v;
+    return v === 'true' || v === '1' ? true : v === 'false' || v === '0' ? false : undefined;
+  });
+
+// ── Full multi-step application schema ──
 export const publicApplicationSchema = z.object({
   slug: z
     .string()
     .min(1)
     .transform((value) => normalizeSlug(value))
     .refine((value) => value.length >= 3, { message: 'Invalid slug' }),
-  name: z.string().trim().min(1, 'Name is required').max(120),
+
+  // Step 1: Property Selection
+  propertyAddress: optStr,
+  unitType: optStr,
+  targetMoveInDate: optStr,
+  monthlyRent: optNum,
+  leaseTermPreference: optStr,
+  numberOfOccupants: optNum,
+
+  // Step 2: Applicant Basics (name + phone required)
+  legalName: z.string().trim().min(1, 'Full name is required').max(120),
   email: z
     .string()
     .trim()
@@ -15,37 +52,71 @@ export const publicApplicationSchema = z.object({
     .max(255)
     .optional()
     .or(z.literal(''))
-    .transform((value) => (value ? value : undefined)),
+    .transform((v) => (v ? v : undefined)),
   phone: z.string().trim().min(1, 'Phone is required').max(40),
-  budget: z
-    .union([z.number(), z.string(), z.null(), z.undefined()])
-    .transform((value) => {
-      if (value == null || value === '') return undefined;
-      if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
-      const parsed = Number.parseFloat(value);
-      return Number.isFinite(parsed) ? parsed : undefined;
-    }),
-  timeline: z
-    .string()
-    .trim()
-    .max(120)
+  dateOfBirth: optStr,
+
+  // Step 3: Current Living Situation
+  currentAddress: optStr,
+  currentHousingStatus: z
+    .enum(['own', 'rent', 'rent-free', ''])
     .optional()
-    .or(z.literal(''))
-    .transform((value) => (value ? value : undefined)),
-  preferredAreas: z
-    .string()
-    .trim()
-    .max(500)
+    .transform((v) => (v === '' ? undefined : v)),
+  currentMonthlyPayment: optNum,
+  lengthOfResidence: optStr,
+  reasonForMoving: optStr,
+
+  // Step 4: Household
+  adultsOnApplication: optNum,
+  childrenOrDependents: optNum,
+  coRenters: optStr,
+  emergencyContactName: optStr,
+  emergencyContactPhone: optStr,
+
+  // Step 5: Income
+  employmentStatus: z
+    .enum(['employed', 'self-employed', 'unemployed', 'retired', 'student', ''])
     .optional()
-    .or(z.literal(''))
-    .transform((value) => (value ? value : undefined)),
-  notes: z
+    .transform((v) => (v === '' ? undefined : v)),
+  employerOrSource: optStr,
+  monthlyGrossIncome: optNum,
+  additionalIncome: optNum,
+
+  // Step 6: Rental History
+  currentLandlordName: optStr,
+  currentLandlordPhone: optStr,
+  previousLandlordName: optStr,
+  previousLandlordPhone: optStr,
+  currentRentPaid: optNum,
+  latePayments: optBool,
+  leaseViolations: optBool,
+  permissionToContactReferences: optBool,
+
+  // Step 7: Screening
+  priorEvictions: optBool,
+  outstandingBalances: optBool,
+  bankruptcy: optBool,
+  backgroundAcknowledgment: optBool,
+  smoking: optBool,
+  hasPets: optBool,
+  petDetails: optStr,
+
+  // Step 8: Additional notes
+  additionalNotes: z
     .string()
     .trim()
     .max(4000)
     .optional()
     .or(z.literal(''))
-    .transform((value) => (value ? value : undefined)),
+    .transform((v) => (v ? v : undefined)),
+
+  // Step 9: Consents
+  consentToScreening: optBool,
+  truthfulnessCertification: optBool,
+  electronicSignature: optStr,
+
+  // Meta
+  completedSteps: z.array(z.number()).optional(),
 });
 
 export type PublicApplicationInput = z.infer<typeof publicApplicationSchema>;
@@ -54,8 +125,59 @@ export function normalizePhone(input: string) {
   return input.replace(/\D/g, '');
 }
 
-export function applicationFingerprintKey(input: Pick<PublicApplicationInput, 'slug' | 'name' | 'phone'>) {
-  const normalizedName = input.name.trim().toLowerCase();
+export function applicationFingerprintKey(input: Pick<PublicApplicationInput, 'slug' | 'legalName' | 'phone'>) {
+  const normalizedName = input.legalName.trim().toLowerCase();
   const normalizedPhone = normalizePhone(input.phone);
   return `${input.slug}:${normalizedName}:${normalizedPhone}`;
+}
+
+/** Build the structured applicationData JSON from the validated input */
+export function buildApplicationData(input: PublicApplicationInput) {
+  return {
+    propertyAddress: input.propertyAddress,
+    unitType: input.unitType,
+    targetMoveInDate: input.targetMoveInDate,
+    monthlyRent: input.monthlyRent,
+    leaseTermPreference: input.leaseTermPreference,
+    numberOfOccupants: input.numberOfOccupants,
+    legalName: input.legalName,
+    email: input.email,
+    phone: input.phone,
+    dateOfBirth: input.dateOfBirth,
+    currentAddress: input.currentAddress,
+    currentHousingStatus: input.currentHousingStatus,
+    currentMonthlyPayment: input.currentMonthlyPayment,
+    lengthOfResidence: input.lengthOfResidence,
+    reasonForMoving: input.reasonForMoving,
+    adultsOnApplication: input.adultsOnApplication,
+    childrenOrDependents: input.childrenOrDependents,
+    coRenters: input.coRenters,
+    emergencyContactName: input.emergencyContactName,
+    emergencyContactPhone: input.emergencyContactPhone,
+    employmentStatus: input.employmentStatus,
+    employerOrSource: input.employerOrSource,
+    monthlyGrossIncome: input.monthlyGrossIncome,
+    additionalIncome: input.additionalIncome,
+    currentLandlordName: input.currentLandlordName,
+    currentLandlordPhone: input.currentLandlordPhone,
+    previousLandlordName: input.previousLandlordName,
+    previousLandlordPhone: input.previousLandlordPhone,
+    currentRentPaid: input.currentRentPaid,
+    latePayments: input.latePayments,
+    leaseViolations: input.leaseViolations,
+    permissionToContactReferences: input.permissionToContactReferences,
+    priorEvictions: input.priorEvictions,
+    outstandingBalances: input.outstandingBalances,
+    bankruptcy: input.bankruptcy,
+    backgroundAcknowledgment: input.backgroundAcknowledgment,
+    smoking: input.smoking,
+    hasPets: input.hasPets,
+    petDetails: input.petDetails,
+    additionalNotes: input.additionalNotes,
+    consentToScreening: input.consentToScreening,
+    truthfulnessCertification: input.truthfulnessCertification,
+    electronicSignature: input.electronicSignature,
+    submittedAt: new Date().toISOString(),
+    completedSteps: input.completedSteps,
+  };
 }

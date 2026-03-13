@@ -7,6 +7,7 @@ import type { LeadScoringResult } from '@/lib/lead-scoring';
 import type { Contact } from '@/lib/types';
 import {
   applicationFingerprintKey,
+  buildApplicationData,
   normalizePhone,
   publicApplicationSchema,
 } from '@/lib/public-application';
@@ -39,7 +40,6 @@ export async function POST(req: NextRequest) {
     }
 
     // First line of defense against duplicate creates from retries/double-click.
-    // If Redis is unavailable we continue and rely on DB duplicate check below.
     let idempotencyLockAcquired = false;
     try {
       const lockResult = await redis.set(idempotencyKey, '1', { nx: true, ex: 120 });
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       .from('Contact')
       .select('*')
       .eq('spaceId', space.id)
-      .eq('name', payload.name)
+      .eq('name', payload.legalName)
       .contains('tags', ['application-link'])
       .gte('createdAt', duplicateCutoff)
       .order('createdAt', { ascending: false })
@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
             leadScore: existingRecentLead.leadScore,
             scoreLabel: existingRecentLead.scoreLabel,
             scoreSummary: existingRecentLead.scoreSummary,
+            scoreDetails: existingRecentLead.scoreDetails,
           },
           { status: 200 }
         );
@@ -87,22 +88,35 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Build structured application data
+    const applicationData = buildApplicationData(payload);
+
+    // Build notes for backwards compat with existing lead cards
+    const noteParts: string[] = [];
+    if (payload.targetMoveInDate) noteParts.push(`Timeline: ${payload.targetMoveInDate}`);
+    if (payload.propertyAddress) noteParts.push(`Property: ${payload.propertyAddress}`);
+    if (payload.employmentStatus) noteParts.push(`Employment: ${payload.employmentStatus}`);
+    if (payload.monthlyGrossIncome != null) noteParts.push(`Income: $${payload.monthlyGrossIncome}/mo`);
+    if (payload.additionalNotes) noteParts.push(payload.additionalNotes);
+
     const { data: contacts, error: insertError } = await supabase
       .from('Contact')
       .insert({
         id: crypto.randomUUID(),
         spaceId: space.id,
-        name: payload.name,
+        name: payload.legalName,
         email: payload.email ?? null,
         phone: payload.phone,
-        budget: payload.budget ?? null,
-        preferences: payload.preferredAreas ?? null,
-        notes: payload.notes || payload.timeline ? `Timeline: ${payload.timeline ?? 'N/A'}\n${payload.notes ?? ''}`.trim() : null,
+        budget: payload.monthlyRent ?? payload.monthlyGrossIncome ?? null,
+        preferences: payload.propertyAddress ?? null,
+        address: payload.currentAddress ?? null,
+        notes: noteParts.length > 0 ? noteParts.join('\n') : null,
         type: 'QUALIFICATION',
         properties: [],
         tags: ['application-link', 'new-lead'],
         scoringStatus: 'pending',
         scoreLabel: 'unscored',
+        applicationData,
       })
       .select();
     if (insertError) throw insertError;
@@ -118,19 +132,18 @@ export async function POST(req: NextRequest) {
       scoringStatus: 'failed',
       leadScore: null,
       scoreLabel: 'unscored',
-      scoreSummary: 'Scoring unavailable right now. Lead saved successfully.'
+      scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
+      scoreDetails: null,
     };
 
     try {
       scoring = await scoreLeadApplication({
         contactId: contact.id,
-        name: payload.name,
+        name: payload.legalName,
         email: payload.email ?? null,
         phone: payload.phone,
-        budget: payload.budget ?? null,
-        timeline: payload.timeline ?? null,
-        preferredAreas: payload.preferredAreas ?? null,
-        notes: payload.notes ?? null,
+        budget: payload.monthlyRent ?? null,
+        applicationData,
       });
 
       const { error: scoreUpdateError } = await supabase
@@ -140,12 +153,13 @@ export async function POST(req: NextRequest) {
           leadScore: scoring.leadScore,
           scoreLabel: scoring.scoreLabel,
           scoreSummary: scoring.scoreSummary,
+          scoreDetails: scoring.scoreDetails,
           updatedAt: new Date().toISOString(),
         })
         .eq('id', contact.id);
       if (scoreUpdateError) throw scoreUpdateError;
 
-      console.info('[apply] scoring state persisted', {
+      console.info('[apply] scoring persisted', {
         contactId: contact.id,
         scoringStatus: scoring.scoringStatus,
         scoreLabel: scoring.scoreLabel,
@@ -170,7 +184,7 @@ export async function POST(req: NextRequest) {
       } catch (fallbackErr: unknown) {
         console.error('[apply] failed to persist fallback scoring state', {
           contactId: contact.id,
-          fallbackErr
+          fallbackErr,
         });
       }
     }
@@ -183,6 +197,7 @@ export async function POST(req: NextRequest) {
         leadScore: scoring.leadScore,
         scoreLabel: scoring.scoreLabel,
         scoreSummary: scoring.scoreSummary,
+        scoreDetails: scoring.scoreDetails,
       },
       { status: 201 }
     );

@@ -55,8 +55,84 @@ export type Contact = {
   scoreLabel: string | null;
   scoreSummary: string | null;
   scoringStatus: string;
+  scoreDetails: LeadScoreDetails | null;
+  applicationData: ApplicationData | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type ApplicationData = {
+  // Step 1: Property Selection
+  propertyAddress?: string;
+  unitType?: string;
+  targetMoveInDate?: string;
+  monthlyRent?: number;
+  leaseTermPreference?: string;
+  numberOfOccupants?: number;
+  // Step 2: Applicant Basics
+  legalName: string;
+  email?: string;
+  phone: string;
+  dateOfBirth?: string;
+  // Step 3: Current Living Situation
+  currentAddress?: string;
+  currentHousingStatus?: 'own' | 'rent' | 'rent-free' | '';
+  currentMonthlyPayment?: number;
+  lengthOfResidence?: string;
+  reasonForMoving?: string;
+  // Step 4: Household
+  adultsOnApplication?: number;
+  childrenOrDependents?: number;
+  coRenters?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  // Step 5: Income
+  employmentStatus?: 'employed' | 'self-employed' | 'unemployed' | 'retired' | 'student' | '';
+  employerOrSource?: string;
+  monthlyGrossIncome?: number;
+  additionalIncome?: number;
+  // Step 6: Rental History
+  currentLandlordName?: string;
+  currentLandlordPhone?: string;
+  previousLandlordName?: string;
+  previousLandlordPhone?: string;
+  currentRentPaid?: number;
+  latePayments?: boolean;
+  leaseViolations?: boolean;
+  permissionToContactReferences?: boolean;
+  // Step 7: Screening
+  priorEvictions?: boolean;
+  outstandingBalances?: boolean;
+  bankruptcy?: boolean;
+  backgroundAcknowledgment?: boolean;
+  smoking?: boolean;
+  hasPets?: boolean;
+  petDetails?: string;
+  // Step 8: Additional notes
+  additionalNotes?: string;
+  // Step 9: Consents
+  consentToScreening?: boolean;
+  truthfulnessCertification?: boolean;
+  electronicSignature?: string;
+  submittedAt?: string;
+  completionPercentage?: number;
+  completedSteps?: number[];
+};
+
+export type LeadScoreDetails = {
+  score: number;
+  priorityTier: 'hot' | 'warm' | 'cold' | 'unqualified';
+  qualificationStatus: string;
+  readinessStatus: string;
+  confidence: number;
+  summary: string;
+  explanationTags: string[];
+  strengths: string[];
+  weaknesses: string[];
+  riskFlags: string[];
+  missingInformation: string[];
+  recommendedNextAction: string;
+  leadState: string;
 };
 
 export type ClientType = 'QUALIFICATION' | 'TOUR' | 'APPLICATION';

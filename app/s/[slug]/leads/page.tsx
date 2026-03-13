@@ -2,9 +2,22 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
-import { Phone, Mail, MapPin, Clock, DollarSign, FileText } from 'lucide-react';
+import {
+  Phone,
+  Mail,
+  MapPin,
+  Clock,
+  DollarSign,
+  FileText,
+  Briefcase,
+  Users,
+  PawPrint,
+  AlertTriangle,
+  ArrowRight,
+  Sparkles,
+} from 'lucide-react';
 import Link from 'next/link';
-import type { Contact } from '@/lib/types';
+import type { Contact, ApplicationData, LeadScoreDetails } from '@/lib/types';
 
 function timeAgo(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -33,6 +46,12 @@ function getInitials(name: string) {
     .join('')
     .toUpperCase()
     .slice(0, 2);
+}
+
+function tierBadgeClasses(label: string | null) {
+  if (label === 'hot') return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400';
+  if (label === 'warm') return 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400';
+  return 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400';
 }
 
 export default async function LeadsPage({
@@ -76,7 +95,7 @@ export default async function LeadsPage({
         })
       );
     } catch {
-      // non-blocking: tags will be cleared on next visit
+      // non-blocking
     }
   }
 
@@ -133,46 +152,39 @@ export default async function LeadsPage({
       ) : (
         <div className="space-y-3">
           {leads.map((lead) => {
-            const isNew = unreadLeads.some((u) => u.id === lead.id) ||
-              // If we just cleared them, they were new when page loaded
-              // Show the left accent for recent leads (< 24h) as a freshness signal
-              (Date.now() - new Date(lead.createdAt).getTime() < 86400000 && lead.tags.includes('application-link') && !lead.tags.includes('new-lead'));
+            const isNew = unreadLeads.some((u) => u.id === lead.id);
+            const app = lead.applicationData as ApplicationData | null;
+            const details = lead.scoreDetails as LeadScoreDetails | null;
 
-            // Parse timeline + notes from the notes field (formatted as "Timeline: X\nnotes")
-            let timeline = '';
-            let notes = '';
-            if (lead.notes) {
+            // Parse timeline from notes (legacy) or app data
+            let timeline = app?.targetMoveInDate ?? '';
+            if (!timeline && lead.notes) {
               const lines = lead.notes.split('\n');
               const timelineLine = lines.find((l) => l.startsWith('Timeline:'));
-              if (timelineLine) {
-                timeline = timelineLine.replace('Timeline:', '').trim();
-                notes = lines.filter((l) => !l.startsWith('Timeline:')).join('\n').trim();
-              } else {
-                notes = lead.notes;
-              }
+              if (timelineLine) timeline = timelineLine.replace('Timeline:', '').trim();
             }
 
             return (
-              <div
+              <Link
                 key={lead.id}
-                className="group rounded-xl border border-border bg-card overflow-hidden transition-all duration-150 hover:shadow-md hover:-translate-y-px"
+                href={`/s/${slug}/contacts/${lead.id}`}
+                className="group block rounded-xl border border-border bg-card overflow-hidden transition-all duration-150 hover:shadow-md hover:-translate-y-px"
               >
-                {/* Card top: name, status, time */}
+                {/* Card top: name, score, time */}
                 <div className="px-5 pt-4 pb-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0">
-                      {/* Avatar */}
                       <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary flex-shrink-0">
                         {getInitials(lead.name)}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-semibold text-[15px] leading-tight">{lead.name}</p>
-                          {newCount > 0 && unreadLeads.some((u) => u.id === lead.id) ? (
+                          {isNew && (
                             <span className="inline-flex text-[10px] font-bold text-primary bg-primary/10 rounded-full px-2 py-0.5 flex-shrink-0">
                               NEW
                             </span>
-                          ) : null}
+                          )}
                         </div>
                         <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground">
                           <Clock size={11} />
@@ -182,84 +194,112 @@ export default async function LeadsPage({
                         </div>
                       </div>
                     </div>
+
+                    {/* Score badge (right side) */}
+                    {lead.scoringStatus === 'scored' && lead.leadScore != null && (
+                      <div className={`flex items-center gap-1.5 text-xs rounded-lg px-2.5 py-1.5 font-semibold flex-shrink-0 ${tierBadgeClasses(lead.scoreLabel)}`}>
+                        <Sparkles size={11} />
+                        <span>{Math.round(lead.leadScore)}</span>
+                        <span className="uppercase text-[10px]">{lead.scoreLabel}</span>
+                      </div>
+                    )}
+                    {lead.scoringStatus === 'pending' && (
+                      <div className="flex items-center gap-1.5 text-xs bg-amber-50 rounded-lg px-2.5 py-1.5 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400 flex-shrink-0">
+                        <span>Scoring...</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Info chips */}
-                <div className="px-5 pb-3 flex flex-wrap gap-2">
+                <div className="px-5 pb-3 flex flex-wrap gap-1.5">
                   {lead.phone && (
-                    <div className="inline-flex items-center gap-1.5 text-xs bg-muted rounded-md px-2.5 py-1.5 text-muted-foreground">
-                      <Phone size={11} />
-                      <span>{lead.phone}</span>
-                    </div>
+                    <Chip icon={Phone}>{lead.phone}</Chip>
                   )}
                   {lead.email && (
-                    <div className="inline-flex items-center gap-1.5 text-xs bg-muted rounded-md px-2.5 py-1.5 text-muted-foreground">
-                      <Mail size={11} />
-                      <span className="max-w-[160px] truncate">{lead.email}</span>
-                    </div>
+                    <Chip icon={Mail}><span className="max-w-[140px] truncate">{lead.email}</span></Chip>
                   )}
-                  {lead.budget != null && (
-                    <div className="inline-flex items-center gap-1.5 text-xs bg-primary/8 rounded-md px-2.5 py-1.5 text-primary font-medium">
-                      <DollarSign size={11} />
-                      <span>{formatBudget(lead.budget)}/mo</span>
-                    </div>
-                  )}
-                  {lead.scoringStatus === 'scored' && lead.leadScore != null && (
-                    <div className={`inline-flex items-center gap-1.5 text-xs rounded-md px-2.5 py-1.5 font-medium ${
-                      lead.scoreLabel === 'hot'
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
-                        : lead.scoreLabel === 'warm'
-                          ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-                          : 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400'
-                    }`}>
-                      <span>Score {Math.round(lead.leadScore)}</span>
-                      <span className="uppercase">{lead.scoreLabel}</span>
-                    </div>
-                  )}
-                  {lead.scoringStatus === 'failed' && (
-                    <div className="inline-flex items-center gap-1.5 text-xs bg-muted rounded-md px-2.5 py-1.5 text-muted-foreground">
-                      <span>Unscored</span>
-                    </div>
-                  )}
-                  {lead.scoringStatus === 'pending' && (
-                    <div className="inline-flex items-center gap-1.5 text-xs bg-amber-50 rounded-md px-2.5 py-1.5 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
-                      <span>Scoring pending</span>
-                    </div>
+                  {(app?.monthlyRent != null || lead.budget != null) && (
+                    <Chip icon={DollarSign} highlight>
+                      {formatBudget((app?.monthlyRent ?? lead.budget)!)}/mo
+                    </Chip>
                   )}
                   {timeline && (
-                    <div className="inline-flex items-center gap-1.5 text-xs bg-muted rounded-md px-2.5 py-1.5 text-muted-foreground">
-                      <Clock size={11} />
-                      <span>Move-in: {timeline}</span>
-                    </div>
+                    <Chip icon={Clock}>Move-in: {timeline}</Chip>
+                  )}
+                  {app?.employmentStatus && (
+                    <Chip icon={Briefcase}>{app.employmentStatus}</Chip>
+                  )}
+                  {app?.monthlyGrossIncome != null && (
+                    <Chip icon={DollarSign}>Income: {formatBudget(app.monthlyGrossIncome)}/mo</Chip>
+                  )}
+                  {(app?.adultsOnApplication != null || app?.childrenOrDependents != null) && (
+                    <Chip icon={Users}>
+                      {app?.adultsOnApplication ?? '?'} adult{(app?.adultsOnApplication ?? 0) !== 1 ? 's' : ''}
+                      {(app?.childrenOrDependents ?? 0) > 0 ? `, ${app!.childrenOrDependents} child${app!.childrenOrDependents !== 1 ? 'ren' : ''}` : ''}
+                    </Chip>
+                  )}
+                  {app?.hasPets === true && (
+                    <Chip icon={PawPrint}>{app.petDetails ?? 'Has pets'}</Chip>
                   )}
                   {lead.preferences && (
-                    <div className="inline-flex items-center gap-1.5 text-xs bg-muted rounded-md px-2.5 py-1.5 text-muted-foreground">
-                      <MapPin size={11} />
-                      <span className="max-w-[160px] truncate">{lead.preferences}</span>
-                    </div>
+                    <Chip icon={MapPin}><span className="max-w-[140px] truncate">{lead.preferences}</span></Chip>
                   )}
                 </div>
 
-                {/* Notes */}
-                {notes && (
-                  <div className="px-5 pb-4 border-t border-border/60 pt-3">
-                    <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                      <FileText size={12} className="mt-0.5 flex-shrink-0" />
-                      <p className="leading-relaxed line-clamp-3">{notes}</p>
-                    </div>
+                {/* Explanation tags from scoring */}
+                {details?.explanationTags && details.explanationTags.length > 0 && (
+                  <div className="px-5 pb-3 flex flex-wrap gap-1">
+                    {details.explanationTags.slice(0, 4).map((tag) => (
+                      <span key={tag} className="inline-flex items-center text-[10px] font-medium rounded-full px-2 py-0.5 bg-primary/5 text-primary">
+                        {tag}
+                      </span>
+                    ))}
                   </div>
                 )}
+
+                {/* Risk flags */}
+                {details?.riskFlags && details.riskFlags.length > 0 && details.riskFlags[0] !== 'none' && (
+                  <div className="px-5 pb-3 flex flex-wrap gap-1">
+                    {details.riskFlags.slice(0, 3).map((flag) => (
+                      <span key={flag} className="inline-flex items-center gap-1 text-[10px] font-medium rounded-full px-2 py-0.5 bg-destructive/10 text-destructive">
+                        <AlertTriangle size={9} />
+                        {flag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Score summary + next action */}
                 {lead.scoreSummary && (
-                  <div className="px-5 pb-4 border-t border-border/60 pt-3">
-                    <p className="text-xs text-muted-foreground">Scoring note: {lead.scoreSummary}</p>
+                  <div className="px-5 pb-3 border-t border-border/60 pt-3">
+                    <p className="text-xs text-muted-foreground leading-relaxed">{lead.scoreSummary}</p>
+                    {details?.recommendedNextAction && (
+                      <p className="text-xs text-primary font-medium mt-1 flex items-center gap-1">
+                        <ArrowRight size={10} />
+                        {details.recommendedNextAction}
+                      </p>
+                    )}
                   </div>
                 )}
-              </div>
+              </Link>
             );
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function Chip({ icon: Icon, children, highlight }: { icon: React.ComponentType<{ size: number }>; children: React.ReactNode; highlight?: boolean }) {
+  return (
+    <div className={`inline-flex items-center gap-1.5 text-xs rounded-md px-2.5 py-1.5 ${
+      highlight
+        ? 'bg-primary/8 text-primary font-medium'
+        : 'bg-muted text-muted-foreground'
+    }`}>
+      <Icon size={11} />
+      {children}
     </div>
   );
 }
