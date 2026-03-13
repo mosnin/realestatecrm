@@ -104,6 +104,23 @@ CREATE TABLE IF NOT EXISTS "Message" (
 );
 
 -- ============================================================
+-- Vector search (pgvector)
+-- ============================================================
+
+-- Enable the pgvector extension (Supabase enables this in Dashboard → Extensions)
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE IF NOT EXISTS "Document" (
+  id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "spaceId"       text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  "entityType"    text NOT NULL,          -- 'contact' | 'deal'
+  "entityId"      text NOT NULL,
+  content         text NOT NULL,
+  embedding       vector(1536),           -- text-embedding-3-small dimension
+  "createdAt"     timestamptz NOT NULL DEFAULT now()
+);
+
+-- ============================================================
 -- Indexes (for common query patterns)
 -- ============================================================
 
@@ -119,3 +136,42 @@ CREATE INDEX IF NOT EXISTS idx_dealstage_space_id ON "DealStage"("spaceId");
 CREATE INDEX IF NOT EXISTS idx_dealcontact_deal   ON "DealContact"("dealId");
 CREATE INDEX IF NOT EXISTS idx_dealcontact_contact ON "DealContact"("contactId");
 CREATE INDEX IF NOT EXISTS idx_message_space_id   ON "Message"("spaceId");
+CREATE INDEX IF NOT EXISTS idx_document_space_id  ON "Document"("spaceId");
+CREATE INDEX IF NOT EXISTS idx_document_entity    ON "Document"("entityType", "entityId");
+
+-- ============================================================
+-- RPC function for vector similarity search
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION match_documents(
+  query_embedding vector(1536),
+  match_space_id text,
+  match_count int DEFAULT 5
+)
+RETURNS TABLE (
+  entity_type text,
+  entity_id text,
+  content text,
+  similarity float
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    d."entityType" AS entity_type,
+    d."entityId"   AS entity_id,
+    d.content,
+    1 - (d.embedding <=> query_embedding) AS similarity
+  FROM "Document" d
+  WHERE d."spaceId" = match_space_id
+  ORDER BY d.embedding <=> query_embedding
+  LIMIT match_count;
+END;
+$$;
+
+-- Vector similarity search index (IVFFlat is supported by Supabase pgvector)
+-- For small datasets (<10k rows), exact search (no index) is fine.
+-- Uncomment below once you have enough documents:
+-- CREATE INDEX IF NOT EXISTS idx_document_embedding ON "Document"
+--   USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);

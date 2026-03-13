@@ -1,6 +1,6 @@
 import { embedText } from '@/lib/embeddings';
 import { upsertVector, deleteVector } from '@/lib/zilliz';
-import type { Deal } from '@/lib/types';
+import type { Deal, ApplicationData } from '@/lib/types';
 
 type VectorContact = {
   id: string;
@@ -15,10 +15,16 @@ type VectorContact = {
   budget?: number | null;
   type: string;
   tags: string[];
+  applicationData?: ApplicationData | null;
+  leadScore?: number | null;
+  scoreLabel?: string | null;
+  scoreSummary?: string | null;
 };
 
 export async function syncContact(contact: VectorContact) {
-  const text = [
+  const app = contact.applicationData;
+
+  const parts = [
     contact.name,
     contact.email,
     contact.phone,
@@ -26,12 +32,35 @@ export async function syncContact(contact: VectorContact) {
     contact.notes,
     contact.preferences,
     (contact.properties ?? []).join(' '),
-    contact.budget != null ? `$${contact.budget}` : null,
+    contact.budget != null ? `Budget: $${contact.budget}` : null,
     contact.type,
-    contact.tags.join(' ')
-  ]
-    .filter(Boolean)
-    .join(' ');
+    contact.tags.join(' '),
+  ];
+
+  // Enrich with application data for better semantic search
+  if (app) {
+    if (app.propertyAddress) parts.push(`Property: ${app.propertyAddress}`);
+    if (app.unitType) parts.push(`Unit: ${app.unitType}`);
+    if (app.targetMoveInDate) parts.push(`Move-in: ${app.targetMoveInDate}`);
+    if (app.monthlyRent != null) parts.push(`Rent: $${app.monthlyRent}`);
+    if (app.employmentStatus) parts.push(`Employment: ${app.employmentStatus}`);
+    if (app.employerOrSource) parts.push(`Employer: ${app.employerOrSource}`);
+    if (app.monthlyGrossIncome != null) parts.push(`Income: $${app.monthlyGrossIncome}/mo`);
+    if (app.currentAddress) parts.push(`Current address: ${app.currentAddress}`);
+    if (app.currentHousingStatus) parts.push(`Housing: ${app.currentHousingStatus}`);
+    if (app.reasonForMoving) parts.push(`Reason: ${app.reasonForMoving}`);
+    if (app.adultsOnApplication != null) parts.push(`Adults: ${app.adultsOnApplication}`);
+    if (app.childrenOrDependents != null) parts.push(`Children: ${app.childrenOrDependents}`);
+    if (app.hasPets != null) parts.push(`Pets: ${app.hasPets ? (app.petDetails ?? 'Yes') : 'No'}`);
+    if (app.priorEvictions != null && app.priorEvictions) parts.push('Prior evictions');
+    if (app.smoking != null && app.smoking) parts.push('Smoker');
+  }
+
+  // Include score summary for semantic relevance
+  if (contact.scoreSummary) parts.push(`Score: ${contact.scoreSummary}`);
+  if (contact.scoreLabel) parts.push(`Priority: ${contact.scoreLabel}`);
+
+  const text = parts.filter(Boolean).join(' ');
 
   const vector = await embedText(text);
   await upsertVector(
@@ -44,7 +73,7 @@ export async function syncContact(contact: VectorContact) {
   );
 }
 
-export async function syncDeal(deal: Deal & { stage?: { name: string } }) {
+export async function syncDeal(deal: Deal & { stage?: { name: string } | null }) {
   const text = [
     deal.title,
     deal.description,

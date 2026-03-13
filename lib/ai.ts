@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { embedText } from '@/lib/embeddings';
 import { searchVectors } from '@/lib/zilliz';
 import { supabase } from '@/lib/supabase';
+import type { ApplicationData, LeadScoreDetails } from '@/lib/types';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -20,6 +21,10 @@ function textStream(message: string): ReadableStream {
 
 function looksLikeAnthropicKey(key?: string | null) {
   return !!key && key.startsWith('sk-ant-');
+}
+
+function formatCurrency(n: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 }
 
 export async function chatWithRAG(
@@ -40,11 +45,11 @@ export async function chatWithRAG(
   const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
   const queryText = lastUserMessage?.content ?? '';
 
-  // Retrieve relevant context from Zilliz
+  // Retrieve relevant context via Supabase pgvector similarity search
   let contextBlocks: string[] = [];
   try {
     const queryVector = await embedText(queryText);
-    const results = await searchVectors(spaceId, queryVector, 5);
+    const results = await searchVectors(spaceId, queryVector, 8);
 
     const contactIds: string[] = [];
     const dealIds: string[] = [];
@@ -54,6 +59,7 @@ export async function chatWithRAG(
       else if (r.entity_type === 'deal') dealIds.push(r.entity_id);
     }
 
+    // Fetch full contact records with application data and scoring
     if (contactIds.length) {
       const { data: contacts } = await supabase
         .from('Contact')
@@ -62,17 +68,57 @@ export async function chatWithRAG(
         .eq('spaceId', spaceId);
       if (contacts?.length) {
         contextBlocks.push(
-          'Relevant Contacts:\n' +
+          'Relevant Contacts/Leads:\n' +
             contacts
-              .map(
-                (c: any) =>
-                  `- ${c.name} (${c.type}) | ${c.email ?? ''} | ${c.phone ?? ''} | ${c.address ?? ''} | Notes: ${c.notes ?? ''}`
-              )
+              .map((c: Record<string, unknown>) => {
+                const app = c.applicationData as ApplicationData | null;
+                const score = c.scoreDetails as LeadScoreDetails | null;
+                const parts = [
+                  `- ${c.name} (${c.type})`,
+                  c.email ? `Email: ${c.email}` : null,
+                  c.phone ? `Phone: ${c.phone}` : null,
+                  c.address ? `Address: ${c.address}` : null,
+                ];
+
+                // Application data context
+                if (app) {
+                  if (app.propertyAddress) parts.push(`Property: ${app.propertyAddress}`);
+                  if (app.targetMoveInDate) parts.push(`Move-in: ${app.targetMoveInDate}`);
+                  if (app.monthlyRent != null) parts.push(`Rent: ${formatCurrency(app.monthlyRent)}`);
+                  if (app.employmentStatus) parts.push(`Employment: ${app.employmentStatus}`);
+                  if (app.employerOrSource) parts.push(`Employer: ${app.employerOrSource}`);
+                  if (app.monthlyGrossIncome != null) parts.push(`Income: ${formatCurrency(app.monthlyGrossIncome)}/mo`);
+                  if (app.adultsOnApplication != null) parts.push(`Adults: ${app.adultsOnApplication}`);
+                  if (app.childrenOrDependents != null) parts.push(`Children: ${app.childrenOrDependents}`);
+                  if (app.currentHousingStatus) parts.push(`Housing: ${app.currentHousingStatus}`);
+                  if (app.hasPets != null) parts.push(`Pets: ${app.hasPets ? (app.petDetails ?? 'Yes') : 'No'}`);
+                  if (app.priorEvictions != null) parts.push(`Evictions: ${app.priorEvictions ? 'Yes' : 'No'}`);
+                  if (app.reasonForMoving) parts.push(`Reason for moving: ${app.reasonForMoving}`);
+                } else {
+                  if (c.budget != null) parts.push(`Budget: ${formatCurrency(c.budget as number)}`);
+                  if (c.preferences) parts.push(`Preferences: ${c.preferences}`);
+                }
+
+                // Score context
+                if (score) {
+                  parts.push(`Lead Score: ${score.score} (${score.priorityTier})`);
+                  parts.push(`Status: ${score.qualificationStatus}`);
+                  if (score.summary) parts.push(`Summary: ${score.summary}`);
+                  if (score.recommendedNextAction) parts.push(`Next Action: ${score.recommendedNextAction}`);
+                  if (score.riskFlags?.length && score.riskFlags[0] !== 'none') parts.push(`Risks: ${score.riskFlags.join(', ')}`);
+                } else if (c.leadScore != null) {
+                  parts.push(`Lead Score: ${c.leadScore} (${c.scoreLabel})`);
+                }
+
+                if (c.notes) parts.push(`Notes: ${c.notes}`);
+                return parts.filter(Boolean).join(' | ');
+              })
               .join('\n')
         );
       }
     }
 
+    // Fetch full deal records with stage and contact associations
     if (dealIds.length) {
       const { data: deals } = await supabase
         .from('Deal')
@@ -84,29 +130,51 @@ export async function chatWithRAG(
         .select('dealId, Contact(name)')
         .in('dealId', dealIds);
       const contactsByDeal: Record<string, string[]> = {};
-      for (const row of (dealContactRows ?? []) as any[]) {
+      for (const row of (dealContactRows ?? []) as unknown as { dealId: string; Contact: { name: string }[] | null }[]) {
         if (!contactsByDeal[row.dealId]) contactsByDeal[row.dealId] = [];
-        contactsByDeal[row.dealId].push(row.Contact?.name ?? '');
+        if (row.Contact) {
+          for (const c of row.Contact) {
+            if (c.name) contactsByDeal[row.dealId].push(c.name);
+          }
+        }
       }
       if (deals?.length) {
         contextBlocks.push(
           'Relevant Deals:\n' +
             deals
               .map(
-                (d: any) =>
-                  `- ${d.title} | Stage: ${d.DealStage?.name ?? 'N/A'} | Value: ${d.value != null ? `$${d.value}` : 'N/A'} | Priority: ${d.priority} | Address: ${d.address ?? ''} | Contacts: ${(contactsByDeal[d.id] ?? []).join(', ')}`
+                (d: Record<string, unknown>) =>
+                  `- ${d.title} | Stage: ${(d.DealStage as { name: string } | null)?.name ?? 'N/A'} | Value: ${d.value != null ? formatCurrency(d.value as number) : 'N/A'} | Priority: ${d.priority} | Address: ${d.address ?? ''} | Contacts: ${(contactsByDeal[d.id as string] ?? []).join(', ')}`
               )
               .join('\n')
         );
       }
     }
+
+    // Also provide aggregate stats for broader questions
+    try {
+      const [contactCount, dealCount, hotLeads, warmLeads] = await Promise.all([
+        supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', spaceId),
+        supabase.from('Deal').select('*', { count: 'exact', head: true }).eq('spaceId', spaceId),
+        supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', spaceId).eq('scoreLabel', 'hot'),
+        supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', spaceId).eq('scoreLabel', 'warm'),
+      ]);
+      contextBlocks.push(
+        `Pipeline Overview: ${contactCount.count ?? 0} total contacts, ${dealCount.count ?? 0} deals, ${hotLeads.count ?? 0} hot leads, ${warmLeads.count ?? 0} warm leads`
+      );
+    } catch {
+      // non-blocking
+    }
   } catch {
-    // Embeddings or Zilliz may not be configured — proceed without RAG context
+    // Embeddings may not be configured — proceed without RAG context
   }
 
   const systemPrompt = [
-    `You are an intelligent real estate CRM assistant for the space "${spaceName}".`,
-    `You help with managing clients through qualification, tour, and application stages, plus real estate deals.`,
+    `You are an intelligent real estate CRM assistant for the workspace "${spaceName}".`,
+    `You help real estate agents manage renter leads, qualify applicants, track deals, and make data-driven leasing decisions.`,
+    `You have access to the agent's contacts, leads with AI scoring and full application data, and their deal pipeline.`,
+    `When answering about specific leads or contacts, reference their application details, score, and recommended actions.`,
+    `Be concise and actionable. Focus on what the agent should do next.`,
     contextBlocks.length
       ? `\nHere is relevant CRM data for this query:\n\n${contextBlocks.join('\n\n')}`
       : ''
@@ -114,8 +182,7 @@ export async function chatWithRAG(
     .filter(Boolean)
     .join('\n');
 
-  // Prefer OpenAI when available, because embeddings already rely on it in this app
-  // and users may accidentally save non-Anthropic keys in workspace settings.
+  // Prefer OpenAI when available
   if (openAIKey) {
     try {
       const openai = new OpenAI({ apiKey: openAIKey });

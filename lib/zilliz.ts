@@ -1,79 +1,11 @@
-import { MilvusClient, DataType } from '@zilliz/milvus2-sdk-node';
-
-const globalForMilvus = globalThis as unknown as {
-  milvus: MilvusClient | undefined;
-};
-
-function getMilvusClient() {
-  if (!process.env.ZILLIZ_URI || !process.env.ZILLIZ_TOKEN) {
-    throw new Error('ZILLIZ_URI and ZILLIZ_TOKEN must be set');
-  }
-
-  if (!globalForMilvus.milvus) {
-    globalForMilvus.milvus = new MilvusClient({
-      address: process.env.ZILLIZ_URI,
-      token: process.env.ZILLIZ_TOKEN
-    });
-  }
-
-  return globalForMilvus.milvus;
-}
-
-export function collectionName(spaceId: string) {
-  return `space_${spaceId.replace(/-/g, '_')}`;
-}
-
-const VECTOR_DIM = 1536; // text-embedding-3-small dimension
-
-export async function ensureCollection(spaceId: string) {
-  const client = getMilvusClient();
-  const name = collectionName(spaceId);
-
-  const exists = await client.hasCollection({ collection_name: name });
-  if (exists.value) return;
-
-  await client.createCollection({
-    collection_name: name,
-    fields: [
-      {
-        name: 'id',
-        data_type: DataType.VarChar,
-        max_length: 64,
-        is_primary_key: true,
-        autoID: false
-      },
-      {
-        name: 'entity_type',
-        data_type: DataType.VarChar,
-        max_length: 16
-      },
-      {
-        name: 'entity_id',
-        data_type: DataType.VarChar,
-        max_length: 64
-      },
-      {
-        name: 'text',
-        data_type: DataType.VarChar,
-        max_length: 4096
-      },
-      {
-        name: 'vector',
-        data_type: DataType.FloatVector,
-        dim: VECTOR_DIM
-      }
-    ]
-  });
-
-  await client.createIndex({
-    collection_name: name,
-    field_name: 'vector',
-    index_type: 'AUTOINDEX',
-    metric_type: 'COSINE'
-  });
-
-  await client.loadCollection({ collection_name: name });
-}
+/**
+ * Vector store operations — backed by Supabase pgvector.
+ *
+ * Replaces the previous Zilliz/Milvus implementation.
+ * The Document table stores embeddings per entity per space,
+ * and similarity search uses cosine distance via pgvector.
+ */
+import { supabase } from '@/lib/supabase';
 
 export async function upsertVector(
   spaceId: string,
@@ -83,43 +15,151 @@ export async function upsertVector(
   text: string,
   vector: number[]
 ) {
-  const client = getMilvusClient();
-  await ensureCollection(spaceId);
-  const name = collectionName(spaceId);
+  // Supabase pgvector expects the embedding as a string like '[0.1, 0.2, ...]'
+  const embeddingStr = `[${vector.join(',')}]`;
 
-  await client.upsert({
-    collection_name: name,
-    data: [{ id, entity_type: entityType, entity_id: entityId, text, vector }]
-  });
+  const { error } = await supabase.from('Document').upsert(
+    {
+      id,
+      spaceId,
+      entityType,
+      entityId,
+      content: text.slice(0, 4000),
+      embedding: embeddingStr,
+    },
+    { onConflict: 'id' }
+  );
+
+  if (error) {
+    console.error('[vector] upsert failed', { id, entityType, entityId, error });
+    throw error;
+  }
 }
 
 export async function deleteVector(spaceId: string, id: string) {
-  const client = getMilvusClient();
-  const name = collectionName(spaceId);
-  const exists = await client.hasCollection({ collection_name: name });
-  if (!exists.value) return;
+  const { error } = await supabase
+    .from('Document')
+    .delete()
+    .eq('id', id)
+    .eq('spaceId', spaceId);
 
-  await client.delete({
-    collection_name: name,
-    filter: `id == "${id}"`
-  });
+  if (error) {
+    console.error('[vector] delete failed', { id, spaceId, error });
+  }
 }
 
+export type VectorSearchResult = {
+  entity_type: string;
+  entity_id: string;
+  content: string;
+  similarity: number;
+};
+
+/**
+ * Semantic search using pgvector cosine similarity.
+ *
+ * This calls a Supabase RPC function `match_documents` which must exist in the DB.
+ * If RPC is not available, falls back to fetching all documents for the space
+ * and computing similarity client-side (works for small datasets).
+ */
 export async function searchVectors(
   spaceId: string,
   queryVector: number[],
   topK = 5
-) {
-  const client = getMilvusClient();
-  await ensureCollection(spaceId);
-  const name = collectionName(spaceId);
+): Promise<VectorSearchResult[]> {
+  const embeddingStr = `[${queryVector.join(',')}]`;
 
-  const results = await client.search({
-    collection_name: name,
-    data: [queryVector],
-    limit: topK,
-    output_fields: ['entity_type', 'entity_id', 'text']
-  });
+  // Try RPC first (fastest — similarity computed in Postgres)
+  try {
+    const { data, error } = await supabase.rpc('match_documents', {
+      query_embedding: embeddingStr,
+      match_space_id: spaceId,
+      match_count: topK,
+    });
 
-  return results.results ?? [];
+    if (!error && data) {
+      return (data as { entity_type: string; entity_id: string; content: string; similarity: number }[]).map((row) => ({
+        entity_type: row.entity_type,
+        entity_id: row.entity_id,
+        content: row.content,
+        similarity: row.similarity,
+      }));
+    }
+
+    // If RPC doesn't exist yet, fall through to client-side fallback
+    if (error) {
+      console.warn('[vector] RPC match_documents not available, using client-side fallback', { error: error.message });
+    }
+  } catch (err) {
+    console.warn('[vector] RPC call failed, using client-side fallback', { err });
+  }
+
+  // Fallback: fetch all documents for the space and compute similarity in JS
+  // This works fine for small datasets (<1000 documents per space)
+  const { data: docs, error: fetchError } = await supabase
+    .from('Document')
+    .select('id, "entityType", "entityId", content, embedding')
+    .eq('spaceId', spaceId);
+
+  if (fetchError) {
+    console.error('[vector] fallback fetch failed', { spaceId, error: fetchError });
+    return [];
+  }
+
+  if (!docs?.length) return [];
+
+  // Compute cosine similarity client-side
+  const results = docs
+    .map((doc: { id: string; entityType: string; entityId: string; content: string; embedding: string }) => {
+      const docVector = parseEmbedding(doc.embedding);
+      if (!docVector) return null;
+      const sim = cosineSimilarity(queryVector, docVector);
+      return {
+        entity_type: doc.entityType,
+        entity_id: doc.entityId,
+        content: doc.content,
+        similarity: sim,
+      };
+    })
+    .filter((r): r is VectorSearchResult => r !== null)
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, topK);
+
+  return results;
+}
+
+function parseEmbedding(raw: unknown): number[] | null {
+  if (!raw) return null;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (Array.isArray(raw)) return raw;
+  return null;
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length) return 0;
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 0 : dotProduct / denom;
+}
+
+// Legacy export kept for backwards compatibility with existing imports
+export function collectionName(_spaceId: string) {
+  return 'Document';
+}
+
+export async function ensureCollection(_spaceId: string) {
+  // No-op — table is created via schema.sql migration
 }
