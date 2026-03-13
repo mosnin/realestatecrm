@@ -4,8 +4,10 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { BrandLogo } from '@/components/brand-logo';
 import Link from 'next/link';
+import { ChevronLeft } from 'lucide-react';
+import { Waves } from '@/components/ui/waves';
 
-// ── Floating paths decoration (left panel) ───────────────────────────────────
+// ── Floating paths decoration ─────────────────────────────────────────────────
 
 function FloatingPaths({ position }: { position: number }) {
   const paths = Array.from({ length: 30 }, (_, i) => ({
@@ -22,12 +24,7 @@ function FloatingPaths({ position }: { position: number }) {
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <svg
-        className="h-full w-full"
-        viewBox="0 0 696 316"
-        fill="none"
-        aria-hidden
-      >
+      <svg className="h-full w-full" viewBox="0 0 696 316" fill="none" aria-hidden>
         {paths.map((path) => (
           <motion.path
             key={path.id}
@@ -57,9 +54,7 @@ function FloatingPaths({ position }: { position: number }) {
 
 interface AuthPageLayoutProps {
   children: React.ReactNode;
-  /** Heading shown above the Clerk widget */
   heading: string;
-  /** Subheading shown below the heading */
   subheading: string;
 }
 
@@ -70,13 +65,13 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
       {/* ── Left decorative panel ── */}
       <div className="relative hidden lg:flex flex-col h-full bg-sidebar border-r border-sidebar-border p-10 overflow-hidden">
 
-        {/* Animated path background — uses primary color so it adapts to theme */}
+        {/* Animated paths — teal-tinted, adapts via text-primary */}
         <div className="absolute inset-0 text-primary/20">
           <FloatingPaths position={1} />
           <FloatingPaths position={-1} />
         </div>
 
-        {/* Subtle radial glow */}
+        {/* Radial glow */}
         <div
           aria-hidden
           className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_80%_60%_at_40%_50%,hsl(var(--primary)/0.08)_0%,transparent_70%)]"
@@ -103,13 +98,29 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
       </div>
 
       {/* ── Right auth panel ── */}
-      <div className="relative flex min-h-screen lg:min-h-0 flex-col items-center justify-center px-6 py-12 bg-background">
+      <div className="relative flex min-h-screen lg:min-h-0 flex-col items-center justify-center px-6 py-12 bg-background overflow-hidden">
 
-        {/* Subtle background glow */}
+        {/* Waves animation on right panel — interactive, theme-aware */}
+        <div className="absolute inset-0 text-foreground/[0.12] dark:text-foreground/[0.18]">
+          <Waves backgroundColor="transparent" strokeColor="currentColor" />
+        </div>
+
+        {/* Radial glow — teal tint from top-right */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_60%_50%_at_55%_35%,hsl(var(--primary)/0.06)_0%,transparent_70%)]"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_70%_20%,hsl(var(--primary)/0.07)_0%,transparent_70%)]"
         />
+
+        {/* Go back home — top-left corner */}
+        <div className="absolute top-5 left-5">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronLeft size={15} />
+            Home
+          </Link>
+        </div>
 
         {/* Mobile logo */}
         <div className="mb-8 lg:hidden">
@@ -117,18 +128,18 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
         </div>
 
         {/* Heading */}
-        <div className="w-full max-w-sm mb-6 space-y-1">
+        <div className="relative z-10 w-full max-w-sm mb-6 space-y-1">
           <h1 className="text-2xl font-bold tracking-tight text-foreground">{heading}</h1>
           <p className="text-sm text-muted-foreground">{subheading}</p>
         </div>
 
         {/* Clerk widget slot */}
-        <div className="w-full max-w-sm flex justify-center">
+        <div className="relative z-10 w-full max-w-sm flex justify-center">
           {children}
         </div>
 
         {/* ToS / Privacy */}
-        <p className="mt-8 max-w-sm text-center text-xs text-muted-foreground/70 leading-relaxed">
+        <p className="relative z-10 mt-8 max-w-sm text-center text-xs text-muted-foreground/70 leading-relaxed">
           By continuing, you agree to our{' '}
           <Link href="/terms" className="underline underline-offset-4 hover:text-foreground transition-colors">
             Terms of Service
