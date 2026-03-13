@@ -65,10 +65,9 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
       {/* ── Left decorative panel ── */}
       <div className="relative hidden lg:flex flex-col h-full bg-sidebar border-r border-sidebar-border p-10 overflow-hidden">
 
-        {/* Animated paths — teal-tinted, adapts via text-primary */}
-        <div className="absolute inset-0 text-primary/20">
-          <FloatingPaths position={1} />
-          <FloatingPaths position={-1} />
+        {/* Waves animation — interactive, teal-tinted */}
+        <div className="absolute inset-0 text-primary/25">
+          <Waves backgroundColor="transparent" strokeColor="currentColor" />
         </div>
 
         {/* Radial glow */}
@@ -100,9 +99,10 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
       {/* ── Right auth panel ── */}
       <div className="relative flex min-h-screen lg:min-h-0 flex-col items-center justify-center px-6 py-12 bg-background overflow-hidden">
 
-        {/* Waves animation on right panel — interactive, theme-aware */}
-        <div className="absolute inset-0 text-foreground/[0.12] dark:text-foreground/[0.18]">
-          <Waves backgroundColor="transparent" strokeColor="currentColor" />
+        {/* Subtle floating paths on right panel — keeps focus on the form */}
+        <div className="pointer-events-none absolute inset-0 text-foreground/[0.04] dark:text-foreground/[0.06]">
+          <FloatingPaths position={1} />
+          <FloatingPaths position={-1} />
         </div>
 
         {/* Radial glow — teal tint from top-right */}
