@@ -21,6 +21,7 @@ export function ChatInterface({ slug, initialMessages }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const inFlightRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,7 +30,8 @@ export function ChatInterface({ slug, initialMessages }: ChatInterfaceProps) {
 
   async function handleSend() {
     const text = input.trim();
-    if (!text || isStreaming) return;
+    if (!text || inFlightRef.current) return;
+    inFlightRef.current = true;
 
     const newMessages: Message[] = [...messages, { role: 'user', content: text }];
     setMessages(newMessages);
@@ -75,6 +77,7 @@ export function ChatInterface({ slug, initialMessages }: ChatInterfaceProps) {
         }
       ]);
     } finally {
+      inFlightRef.current = false;
       setIsStreaming(false);
     }
   }
@@ -87,7 +90,7 @@ export function ChatInterface({ slug, initialMessages }: ChatInterfaceProps) {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-10rem)] md:h-[calc(100vh-8rem)]">
+    <div className="flex flex-col h-full min-h-0">
       {messages.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 text-muted-foreground p-8">
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">

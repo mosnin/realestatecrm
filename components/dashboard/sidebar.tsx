@@ -18,7 +18,7 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount }: Sideba
   const base = `/s/${slug}`;
 
   return (
-    <aside className="hidden md:flex flex-col w-60 min-h-screen bg-sidebar border-r border-sidebar-border shrink-0">
+    <aside className="hidden md:flex flex-col w-60 h-full bg-sidebar border-r border-sidebar-border shrink-0">
       {/* Workspace header */}
       <div className="px-4 py-5 border-b border-sidebar-border">
         <div className="flex items-center gap-2.5">

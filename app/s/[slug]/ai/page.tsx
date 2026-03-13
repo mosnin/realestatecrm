@@ -25,14 +25,16 @@ export default async function AIPage({
   }
 
   return (
-    <div className="space-y-4 h-full">
-      <div>
+    <div className="flex flex-col h-full gap-4">
+      <div className="flex-shrink-0">
         <h2 className="text-2xl font-bold tracking-tight">AI Assistant</h2>
         <p className="text-muted-foreground text-sm">
           Ask about your leads, clients, or pipeline — get instant answers from your leasing data
         </p>
       </div>
-      <ChatInterface slug={slug} initialMessages={messages} />
+      <div className="flex-1 min-h-0">
+        <ChatInterface slug={slug} initialMessages={messages} />
+      </div>
     </div>
   );
 }
