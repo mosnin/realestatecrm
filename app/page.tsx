@@ -19,6 +19,7 @@ import { Navbar } from '@/components/navbar';
 import AnimatedFooter from '@/components/ui/animated-footer';
 import { AnimatedCard, CardVisual, CardBody, CardTitle, CardDescription, Visual3 } from '@/components/ui/animated-card-chart';
 import { AnimatedCard as AnimatedCard2, CardVisual as CardVisual2, CardBody as CardBody2, CardTitle as CardTitle2, CardDescription as CardDescription2, Visual2 } from '@/components/ui/animated-card-diagram';
+import { AnimatedCard as AnimatedCard3, CardVisual as CardVisual3, CardBody as CardBody3, CardTitle as CardTitle3, CardDescription as CardDescription3, Visual1 } from '@/components/ui/animated-card-line';
 
 const pillNav = [
   { id: 'problem', label: 'Problem' },
@@ -409,6 +410,52 @@ export default function HomePage() {
                 <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{card.description}</p>
               </div>
             ))}
+          </div>
+
+          {/* Animated line chart feature — full-width row: visual left, text right */}
+          <div className="mt-4 rounded-xl border border-border bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div className="grid md:grid-cols-2">
+              {/* Left — animated line + bar chart card */}
+              <AnimatedCard3 className="rounded-none border-0 border-r border-border shadow-none">
+                <CardVisual3>
+                  <Visual1 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                </CardVisual3>
+                <CardBody3>
+                  <CardTitle3>Intake pipeline over time</CardTitle3>
+                  <CardDescription3>
+                    Hover to see weekly qualification volume.
+                  </CardDescription3>
+                </CardBody3>
+              </AnimatedCard3>
+
+              {/* Right — context text */}
+              <div className="flex flex-col justify-center px-6 py-8 md:px-8">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary w-fit">
+                  Pipeline
+                </div>
+                <h3 className="mt-4 text-xl font-semibold tracking-tight">
+                  One link captures every inquiry, automatically
+                </h3>
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                  Share a single intake link in your bio, listing replies, or email
+                  signature. Every renter fills out the same structured form so your
+                  pipeline stays clean and consistent — no chasing scattered DMs
+                  or sticky notes.
+                </p>
+                <ul className="mt-5 space-y-2.5">
+                  {[
+                    'Structured form captures budget, dates & household details',
+                    'Every submission lands as a clean lead record',
+                    'No duplicate data entry or manual logging',
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CheckCircle2 size={14} className="text-primary flex-shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </div>
 
           {/* Animated diagram feature — full-width row: text left, visual right */}
