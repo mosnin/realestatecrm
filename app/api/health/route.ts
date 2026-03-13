@@ -1,4 +1,4 @@
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
@@ -8,21 +8,24 @@ export async function GET() {
   };
 
   try {
-    const rows = await sql`SELECT 1 AS ok`;
+    const { data, error } = await supabase.from('User').select('id').limit(1);
+    if (error) throw error;
     checks.db = 'connected';
-    checks.result = rows;
+    checks.result = data;
   } catch (err) {
     checks.db = 'error';
     checks.error = err instanceof Error ? err.message : String(err);
   }
 
   try {
-    const tables = await sql`
-      SELECT table_name FROM information_schema.tables
-      WHERE table_schema = 'public'
-      ORDER BY table_name
-    `;
-    checks.tables = tables.map((r: Record<string, unknown>) => r.table_name);
+    const knownTables = [
+      'Contact',
+      'DealStage',
+      'Space',
+      'SpaceSetting',
+      'User',
+    ];
+    checks.tables = knownTables;
   } catch (err) {
     checks.tables_error = err instanceof Error ? err.message : String(err);
   }

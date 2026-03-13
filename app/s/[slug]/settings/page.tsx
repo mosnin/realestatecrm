@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { SettingsForm } from './settings-form';
 import type { SpaceSetting } from '@/lib/types';
 
@@ -19,10 +19,9 @@ export default async function SettingsPage({
 
   let settings: SpaceSetting | null = null;
   try {
-    const rows = await sql`
-      SELECT * FROM "SpaceSetting" WHERE "spaceId" = ${space.id}
-    `;
-    settings = (rows[0] as SpaceSetting) ?? null;
+    const { data, error } = await supabase.from('SpaceSetting').select('*').eq('spaceId', space.id).maybeSingle();
+    if (error) throw error;
+    settings = (data as SpaceSetting) ?? null;
   } catch {
     // fall back to null — form handles defaults
   }

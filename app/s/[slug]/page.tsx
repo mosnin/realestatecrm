@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getSpaceFromSlug } from '@/lib/space';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   PhoneIncoming,
@@ -53,13 +53,13 @@ export default async function DashboardPage({
   try {
     [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads] =
       await Promise.all([
-        sql`SELECT COUNT(*)::int AS count FROM "Contact" WHERE "spaceId" = ${space.id}`.then(r => (r[0] as { count: number }).count),
-        sql`SELECT COUNT(*)::int AS count FROM "Deal" WHERE "spaceId" = ${space.id}`.then(r => (r[0] as { count: number }).count),
-        sql`SELECT value, "stageId" FROM "Deal" WHERE "spaceId" = ${space.id}`.then(r => r as { value: number | null; stageId: string }[]),
-        sql`SELECT * FROM "DealStage" WHERE "spaceId" = ${space.id} ORDER BY position ASC`.then(r => r as { id: string; name: string; color: string; position: number; spaceId: string }[]),
-        sql`SELECT id, name, phone, budget, preferences, "createdAt", tags FROM "Contact" WHERE "spaceId" = ${space.id} AND 'application-link' = ANY(tags) ORDER BY "createdAt" DESC LIMIT 5`.then(r => r as { id: string; name: string; phone: string | null; budget: number | null; preferences: string | null; createdAt: Date; tags: string[] }[]),
-        sql`SELECT COUNT(*)::int AS count FROM "Contact" WHERE "spaceId" = ${space.id} AND 'new-lead' = ANY(tags)`.then(r => (r[0] as { count: number }).count),
-        sql`SELECT COUNT(*)::int AS count FROM "Contact" WHERE "spaceId" = ${space.id} AND 'application-link' = ANY(tags)`.then(r => (r[0] as { count: number }).count),
+        supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
+        supabase.from('Deal').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
+        supabase.from('Deal').select('value, stageId').eq('spaceId', space.id).then(r => { if (r.error) throw r.error; return r.data as { value: number | null; stageId: string }[]; }),
+        supabase.from('DealStage').select('*').eq('spaceId', space.id).order('position', { ascending: true }).then(r => { if (r.error) throw r.error; return r.data as { id: string; name: string; color: string; position: number; spaceId: string }[]; }),
+        supabase.from('Contact').select('id, name, phone, budget, preferences, createdAt, tags').eq('spaceId', space.id).contains('tags', ['application-link']).order('createdAt', { ascending: false }).limit(5).then(r => { if (r.error) throw r.error; return r.data as { id: string; name: string; phone: string | null; budget: number | null; preferences: string | null; createdAt: Date; tags: string[] }[]; }),
+        supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).contains('tags', ['new-lead']).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
+        supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).contains('tags', ['application-link']).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
       ]);
   } catch (err) {
     console.error('[space-home] DB queries failed', { slug, error: err });

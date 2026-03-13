@@ -1,6 +1,6 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
 import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
 import type { User, Space, SpaceSetting } from '@/lib/types';
@@ -10,27 +10,36 @@ export async function GET() {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const users = await sql`
-      SELECT * FROM "User" WHERE "clerkId" = ${userId}
-    ` as User[];
+    const { data: userData, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('clerkId', userId)
+      .maybeSingle();
+    if (userError) throw userError;
 
-    const user = users[0] ?? null;
+    const user = userData as User | null;
 
     if (!user) {
       return NextResponse.json({ step: 1, completed: false, user: null, space: null });
     }
 
-    const spaces = await sql`
-      SELECT * FROM "Space" WHERE "ownerId" = ${user.id}
-    ` as Space[];
-    const space = spaces[0] ?? null;
+    const { data: spaceData, error: spaceError } = await supabase
+      .from('Space')
+      .select('*')
+      .eq('ownerId', user.id)
+      .maybeSingle();
+    if (spaceError) throw spaceError;
+    const space = spaceData as Space | null;
 
     let settings: SpaceSetting | null = null;
     if (space) {
-      const settingsRows = await sql`
-        SELECT * FROM "SpaceSetting" WHERE "spaceId" = ${space.id}
-      ` as SpaceSetting[];
-      settings = settingsRows[0] ?? null;
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('SpaceSetting')
+        .select('*')
+        .eq('spaceId', space.id)
+        .maybeSingle();
+      if (settingsError) throw settingsError;
+      settings = settingsData as SpaceSetting | null;
     }
 
     const userWithSpace = { ...user, space: space ? { ...space, settings } : null };
@@ -83,39 +92,54 @@ export async function POST(req: NextRequest) {
   try {
     // SELECT first — avoid calling currentUser() (a Clerk API round-trip) for existing users
     let user: User;
-    const existing = await sql`SELECT * FROM "User" WHERE "clerkId" = ${userId}` as User[];
-    if (existing[0]) {
-      user = existing[0];
+    const { data: existingData, error: existingError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('clerkId', userId)
+      .maybeSingle();
+    if (existingError) throw existingError;
+
+    if (existingData) {
+      user = existingData as User;
     } else {
       const clerkUser = await currentUser();
-      const inserted = await sql`
-        INSERT INTO "User" ("id", "clerkId", "email", "name", "onboardingStartedAt", "onboard")
-        VALUES (
-          ${crypto.randomUUID()},
-          ${userId},
-          ${clerkUser?.emailAddresses?.[0]?.emailAddress ?? ''},
-          ${clerkUser?.fullName ?? clerkUser?.firstName ?? null},
-          ${new Date()},
-          ${false}
+      const { data: insertedData, error: insertError } = await supabase
+        .from('User')
+        .upsert(
+          {
+            id: crypto.randomUUID(),
+            clerkId: userId,
+            email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
+            name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
+            onboardingStartedAt: new Date().toISOString(),
+            onboard: false,
+          },
+          { onConflict: 'clerkId' }
         )
-        ON CONFLICT ("clerkId") DO UPDATE SET "clerkId" = "User"."clerkId"
-        RETURNING *
-      ` as User[];
-      user = inserted[0];
+        .select()
+        .single();
+      if (insertError) throw insertError;
+      user = insertedData as User;
     }
 
     // Get space + settings separately
-    const spaces = await sql`
-      SELECT * FROM "Space" WHERE "ownerId" = ${user.id}
-    ` as Space[];
-    const space = spaces[0] ?? null;
+    const { data: spaceData, error: spaceError } = await supabase
+      .from('Space')
+      .select('*')
+      .eq('ownerId', user.id)
+      .maybeSingle();
+    if (spaceError) throw spaceError;
+    const space = spaceData as Space | null;
 
     let settings: SpaceSetting | null = null;
     if (space) {
-      const settingsRows = await sql`
-        SELECT * FROM "SpaceSetting" WHERE "spaceId" = ${space.id}
-      ` as SpaceSetting[];
-      settings = settingsRows[0] ?? null;
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('SpaceSetting')
+        .select('*')
+        .eq('spaceId', space.id)
+        .maybeSingle();
+      if (settingsError) throw settingsError;
+      settings = settingsData as SpaceSetting | null;
     }
 
     const userWithSpace = { ...user, space: space ? { ...space, settings } : null };
@@ -127,24 +151,28 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'start') {
-      await sql`
-        UPDATE "User"
-        SET "onboard" = ${false},
-            "onboardingCurrentStep" = ${1},
-            "onboardingStartedAt" = ${user.onboardingStartedAt ?? new Date()}
-        WHERE "id" = ${user.id}
-      `;
+      const { error } = await supabase
+        .from('User')
+        .update({
+          onboard: false,
+          onboardingCurrentStep: 1,
+          onboardingStartedAt: user.onboardingStartedAt ?? new Date().toISOString(),
+        })
+        .eq('id', user.id);
+      if (error) throw error;
       return NextResponse.json({ success: true });
     }
 
     if (action === 'save_step') {
       const { step } = body as { step: number };
-      await sql`
-        UPDATE "User"
-        SET "onboardingCurrentStep" = ${step},
-            "onboardingStartedAt" = ${user.onboardingStartedAt ?? new Date()}
-        WHERE "id" = ${user.id}
-      `;
+      const { error } = await supabase
+        .from('User')
+        .update({
+          onboardingCurrentStep: step,
+          onboardingStartedAt: user.onboardingStartedAt ?? new Date().toISOString(),
+        })
+        .eq('id', user.id);
+      if (error) throw error;
       return NextResponse.json({ success: true });
     }
 
@@ -157,20 +185,26 @@ export async function POST(req: NextRequest) {
       };
       const resolvedPhone = phone || phoneNumber || null;
 
-      await sql`
-        UPDATE "User"
-        SET "name" = ${name || user.name}
-        WHERE "id" = ${user.id}
-      `;
+      const { error: updateError } = await supabase
+        .from('User')
+        .update({ name: name || user.name })
+        .eq('id', user.id);
+      if (updateError) throw updateError;
 
       if (space) {
-        await sql`
-          INSERT INTO "SpaceSetting" ("id", "spaceId", "phoneNumber", "businessName")
-          VALUES (${crypto.randomUUID()}, ${space.id}, ${resolvedPhone}, ${businessName})
-          ON CONFLICT ("spaceId") DO UPDATE
-          SET "phoneNumber" = ${resolvedPhone},
-              "businessName" = ${businessName}
-        `;
+        const { error: settingsError } = await supabase
+          .from('SpaceSetting')
+          .upsert(
+            {
+              id: crypto.randomUUID(),
+              spaceId: space.id,
+              phoneNumber: resolvedPhone,
+              businessName,
+            },
+            { onConflict: 'spaceId' }
+          )
+          .select();
+        if (settingsError) throw settingsError;
       }
 
       return NextResponse.json({ success: true });
@@ -192,26 +226,38 @@ export async function POST(req: NextRequest) {
       }
 
       if (space) {
-        await sql`
-          INSERT INTO "SpaceSetting" ("id", "spaceId", "intakePageTitle", "intakePageIntro", "businessName")
-          VALUES (${crypto.randomUUID()}, ${space.id}, ${intakePageTitle}, ${intakePageIntro}, ${businessName})
-          ON CONFLICT ("spaceId") DO UPDATE
-          SET "intakePageTitle" = ${intakePageTitle},
-              "intakePageIntro" = ${intakePageIntro},
-              "businessName" = ${businessName}
-        `;
+        const { error: settingsError } = await supabase
+          .from('SpaceSetting')
+          .upsert(
+            {
+              id: crypto.randomUUID(),
+              spaceId: space.id,
+              intakePageTitle,
+              intakePageIntro,
+              businessName,
+            },
+            { onConflict: 'spaceId' }
+          )
+          .select();
+        if (settingsError) throw settingsError;
         return NextResponse.json({ success: true, slug: space.slug });
       }
 
-      const existingSlug = await sql`
-        SELECT "id" FROM "Space" WHERE "slug" = ${sanitized} LIMIT 1
-      ` as { id: string }[];
-      if (existingSlug.length) return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
+      const { data: existingSlug, error: slugError } = await supabase
+        .from('Space')
+        .select('id')
+        .eq('slug', sanitized)
+        .maybeSingle();
+      if (slugError) throw slugError;
+      if (existingSlug) return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
 
-      const existingOwnerSpace = await sql`
-        SELECT "slug" FROM "Space" WHERE "ownerId" = ${user.id} LIMIT 1
-      ` as { slug: string }[];
-      if (existingOwnerSpace.length) return NextResponse.json({ success: true, slug: existingOwnerSpace[0].slug });
+      const { data: existingOwnerSpace, error: ownerError } = await supabase
+        .from('Space')
+        .select('slug')
+        .eq('ownerId', user.id)
+        .maybeSingle();
+      if (ownerError) throw ownerError;
+      if (existingOwnerSpace) return NextResponse.json({ success: true, slug: existingOwnerSpace.slug });
 
       const DEFAULT_STAGES = [
         { name: 'New', color: '#94a3b8', position: 0 },
@@ -225,44 +271,58 @@ export async function POST(req: NextRequest) {
       let newSpace: Space;
       try {
         const spaceId = crypto.randomUUID();
-        const createdSpaces = await sql`
-          INSERT INTO "Space" ("id", "slug", "name", "emoji", "ownerId")
-          VALUES (${spaceId}, ${sanitized}, ${businessName || sanitized}, ${'🏠'}, ${user.id})
-          RETURNING *
-        ` as Space[];
-        newSpace = createdSpaces[0];
+        const { data: createdSpace, error: createError } = await supabase
+          .from('Space')
+          .insert({
+            id: spaceId,
+            slug: sanitized,
+            name: businessName || sanitized,
+            emoji: '\u{1F3E0}',
+            ownerId: user.id,
+          })
+          .select()
+          .single();
+        if (createError) throw createError;
+        newSpace = createdSpace as Space;
 
-        await sql`
-          INSERT INTO "SpaceSetting" ("id", "spaceId", "intakePageTitle", "intakePageIntro", "businessName", "phoneNumber")
-          VALUES (
-            ${crypto.randomUUID()},
-            ${spaceId},
-            ${intakePageTitle || 'Rental Application'},
-            ${intakePageIntro || "Share a few details so I can review your rental fit faster."},
-            ${businessName},
-            ${null}
-          )
-        `;
+        const { error: settingsInsertError } = await supabase
+          .from('SpaceSetting')
+          .insert({
+            id: crypto.randomUUID(),
+            spaceId: spaceId,
+            intakePageTitle: intakePageTitle || 'Rental Application',
+            intakePageIntro: intakePageIntro || "Share a few details so I can review your rental fit faster.",
+            businessName,
+            phoneNumber: null,
+          });
+        if (settingsInsertError) throw settingsInsertError;
 
-        for (const stage of DEFAULT_STAGES) {
-          await sql`
-            INSERT INTO "DealStage" ("id", "spaceId", "name", "color", "position")
-            VALUES (${crypto.randomUUID()}, ${spaceId}, ${stage.name}, ${stage.color}, ${stage.position})
-          `;
-        }
+        const stageRows = DEFAULT_STAGES.map((stage) => ({
+          id: crypto.randomUUID(),
+          spaceId: spaceId,
+          name: stage.name,
+          color: stage.color,
+          position: stage.position,
+        }));
+        const { error: stagesError } = await supabase
+          .from('DealStage')
+          .insert(stageRows);
+        if (stagesError) throw stagesError;
       } catch {
-        const ownerSpace = await sql`
-          SELECT "slug" FROM "Space" WHERE "ownerId" = ${user.id} LIMIT 1
-        ` as { slug: string }[];
-        if (ownerSpace.length) return NextResponse.json({ success: true, slug: ownerSpace[0].slug });
+        const { data: ownerSpace, error: ownerSpaceError } = await supabase
+          .from('Space')
+          .select('slug')
+          .eq('ownerId', user.id)
+          .maybeSingle();
+        if (!ownerSpaceError && ownerSpace) return NextResponse.json({ success: true, slug: ownerSpace.slug });
         return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
       }
 
-      await sql`
-        UPDATE "User"
-        SET "onboardingCurrentStep" = ${4}
-        WHERE "id" = ${user.id}
-      `;
+      const { error: stepError } = await supabase
+        .from('User')
+        .update({ onboardingCurrentStep: 4 })
+        .eq('id', user.id);
+      if (stepError) throw stepError;
       return NextResponse.json({ success: true, slug: newSpace.slug });
     }
 
@@ -274,18 +334,26 @@ export async function POST(req: NextRequest) {
 
       if (!space) return NextResponse.json({ error: 'No space found' }, { status: 400 });
 
-      await sql`
-        INSERT INTO "SpaceSetting" ("id", "spaceId", "notifications")
-        VALUES (${crypto.randomUUID()}, ${space.id}, ${emailNotifications})
-        ON CONFLICT ("spaceId") DO UPDATE
-        SET "notifications" = ${emailNotifications}
-      `;
+      const { error: notifError } = await supabase
+        .from('SpaceSetting')
+        .upsert(
+          {
+            id: crypto.randomUUID(),
+            spaceId: space.id,
+            notifications: emailNotifications,
+          },
+          { onConflict: 'spaceId' }
+        )
+        .select();
+      if (notifError) throw notifError;
 
-      await sql`
-        UPDATE "SpaceSetting"
-        SET "myConnections" = ${JSON.stringify({ defaultSubmissionStatus: defaultSubmissionStatus || 'New' })}
-        WHERE "spaceId" = ${space.id}
-      `;
+      const { error: connError } = await supabase
+        .from('SpaceSetting')
+        .update({
+          myConnections: JSON.stringify({ defaultSubmissionStatus: defaultSubmissionStatus || 'New' }),
+        })
+        .eq('spaceId', space.id);
+      if (connError) throw connError;
 
       return NextResponse.json({ success: true });
     }
@@ -296,7 +364,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           success: true,
           onboard: true,
-          onboardingCompletedAt: user.onboardingCompletedAt?.toISOString() ?? new Date().toISOString()
+          onboardingCompletedAt: user.onboardingCompletedAt?.toISOString?.() ?? user.onboardingCompletedAt ?? new Date().toISOString()
         });
       }
 
@@ -308,13 +376,15 @@ export async function POST(req: NextRequest) {
       }
 
       const completedAt = new Date();
-      await sql`
-        UPDATE "User"
-        SET "onboard" = ${true},
-            "onboardingCurrentStep" = ${7},
-            "onboardingCompletedAt" = ${completedAt}
-        WHERE "id" = ${user.id}
-      `;
+      const { error } = await supabase
+        .from('User')
+        .update({
+          onboard: true,
+          onboardingCurrentStep: 7,
+          onboardingCompletedAt: completedAt.toISOString(),
+        })
+        .eq('id', user.id);
+      if (error) throw error;
       return NextResponse.json({ success: true, onboard: true, onboardingCompletedAt: completedAt.toISOString() });
     }
 
@@ -325,10 +395,13 @@ export async function POST(req: NextRequest) {
       if (!isValidSlug(slug) || sanitized !== slug) {
         return NextResponse.json({ available: false, reason: 'invalid' });
       }
-      const existing = await sql`
-        SELECT "id" FROM "Space" WHERE "slug" = ${sanitized} LIMIT 1
-      ` as { id: string }[];
-      return NextResponse.json({ available: !existing.length });
+      const { data: existingSlug, error: slugError } = await supabase
+        .from('Space')
+        .select('id')
+        .eq('slug', sanitized)
+        .maybeSingle();
+      if (slugError) throw slugError;
+      return NextResponse.json({ available: !existingSlug });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

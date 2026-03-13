@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { syncContact, syncDeal } from '@/lib/vectorize';
 import type { Contact, Deal, DealStage } from '@/lib/types';
@@ -13,24 +13,28 @@ export async function POST(req: NextRequest) {
   const space = await getSpaceFromSlug(slug);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
 
-  const [contacts, dealRows] = await Promise.all([
-    sql`SELECT * FROM "Contact" WHERE "spaceId" = ${space.id}` as Promise<Contact[]>,
-    sql`
-      SELECT d.*, ds."name" AS "stageName", ds."color" AS "stageColor", ds."position" AS "stagePosition"
-      FROM "Deal" d
-      LEFT JOIN "DealStage" ds ON ds."id" = d."stageId"
-      WHERE d."spaceId" = ${space.id}
-    ` as Promise<(Deal & { stageName: string; stageColor: string; stagePosition: number })[]>
+  const [contactsResult, dealsResult] = await Promise.all([
+    supabase.from('Contact').select('*').eq('spaceId', space.id),
+    supabase.from('Deal').select('*, DealStage(name, color, position)').eq('spaceId', space.id),
   ]);
+
+  if (contactsResult.error) throw contactsResult.error;
+  if (dealsResult.error) throw dealsResult.error;
+
+  const contacts = contactsResult.data as Contact[];
+  const dealRows = dealsResult.data as (Deal & { DealStage: { name: string; color: string; position: number } | null })[];
 
   const deals = dealRows.map((row) => ({
     ...row,
+    stageName: row.DealStage?.name,
+    stageColor: row.DealStage?.color,
+    stagePosition: row.DealStage?.position,
     stage: {
       id: row.stageId,
       spaceId: row.spaceId,
-      name: row.stageName,
-      color: row.stageColor,
-      position: row.stagePosition,
+      name: row.DealStage?.name,
+      color: row.DealStage?.color,
+      position: row.DealStage?.position,
     } as DealStage,
   }));
 

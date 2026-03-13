@@ -76,7 +76,7 @@ The dashboard error page previously hid the actual SQL error in production (`NOD
 
 ## Database reference
 
-Uses `@neondatabase/serverless` via `lib/db.ts`. Connection string from `DATABASE_URL` env var.
+Uses `@supabase/supabase-js` via `lib/supabase.ts`. Requires `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` env vars. Auth is still handled by Clerk — Supabase is used only for database storage (service role key, no RLS).
 
 ### Space table columns
 

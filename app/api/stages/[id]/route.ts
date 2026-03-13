@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 
 export async function PATCH(
@@ -12,7 +12,11 @@ export async function PATCH(
 
   const { id } = await params;
 
-  const existingRows = await sql`SELECT * FROM "DealStage" WHERE "id" = ${id}`;
+  const { data: existingRows, error: existingError } = await supabase
+    .from('DealStage')
+    .select('*')
+    .eq('id', id);
+  if (existingError) throw existingError;
   if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const existing = existingRows[0];
@@ -23,14 +27,15 @@ export async function PATCH(
   }
 
   const body = await req.json();
-  const rows = await sql`
-    UPDATE "DealStage"
-    SET "name" = ${body.name}, "color" = ${body.color}
-    WHERE "id" = ${id}
-    RETURNING *
-  `;
+  const { data: stage, error: updateError } = await supabase
+    .from('DealStage')
+    .update({ name: body.name, color: body.color })
+    .eq('id', id)
+    .select()
+    .single();
+  if (updateError) throw updateError;
 
-  return NextResponse.json(rows[0]);
+  return NextResponse.json(stage);
 }
 
 export async function DELETE(
@@ -42,7 +47,11 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const existingRows = await sql`SELECT * FROM "DealStage" WHERE "id" = ${id}`;
+  const { data: existingRows, error: existingError } = await supabase
+    .from('DealStage')
+    .select('*')
+    .eq('id', id);
+  if (existingError) throw existingError;
   if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const existing = existingRows[0];
@@ -52,6 +61,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  await sql`DELETE FROM "DealStage" WHERE "id" = ${id}`;
+  const { error: deleteError } = await supabase.from('DealStage').delete().eq('id', id);
+  if (deleteError) throw deleteError;
   return NextResponse.json({ success: true });
 }

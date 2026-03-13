@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { syncDeal, deleteDealVector } from '@/lib/vectorize';
 import { getSpaceForUser } from '@/lib/space';
 import type { Deal, DealStage } from '@/lib/types';
@@ -14,7 +14,11 @@ export async function PATCH(
 
   const { id } = await params;
 
-  const existingRows = await sql`SELECT * FROM "Deal" WHERE "id" = ${id}`;
+  const { data: existingRows, error: existingError } = await supabase
+    .from('Deal')
+    .select('*')
+    .eq('id', id);
+  if (existingError) throw existingError;
   if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const existing = existingRows[0];
@@ -26,43 +30,48 @@ export async function PATCH(
 
   const body = await req.json();
   const valueVal = body.value != null ? parseFloat(body.value) : null;
-  const closeDateVal = body.closeDate ? new Date(body.closeDate) : null;
+  const closeDateVal = body.closeDate ? new Date(body.closeDate).toISOString() : null;
 
   // Handle dealContacts replacement
   if (body.contactIds) {
-    await sql`DELETE FROM "DealContact" WHERE "dealId" = ${id}`;
-    for (const cId of body.contactIds) {
-      await sql`
-        INSERT INTO "DealContact" ("dealId", "contactId")
-        VALUES (${id}, ${cId})
-      `;
+    const { error: delError } = await supabase.from('DealContact').delete().eq('dealId', id);
+    if (delError) throw delError;
+    if (body.contactIds.length > 0) {
+      const dcInserts = body.contactIds.map((cId: string) => ({ dealId: id, contactId: cId }));
+      const { error: insertError } = await supabase.from('DealContact').insert(dcInserts);
+      if (insertError) throw insertError;
     }
   }
 
-  const dealRows = await sql`
-    UPDATE "Deal"
-    SET
-      "title" = ${body.title},
-      "description" = ${body.description ?? null},
-      "value" = ${valueVal},
-      "address" = ${body.address ?? null},
-      "priority" = ${body.priority},
-      "closeDate" = ${closeDateVal},
-      "stageId" = ${body.stageId},
-      "position" = ${body.position},
-      "updatedAt" = NOW()
-    WHERE "id" = ${id}
-    RETURNING *
-  `;
+  const { data: dealRow, error: updateError } = await supabase
+    .from('Deal')
+    .update({
+      title: body.title,
+      description: body.description ?? null,
+      value: valueVal,
+      address: body.address ?? null,
+      priority: body.priority,
+      closeDate: closeDateVal,
+      stageId: body.stageId,
+      position: body.position,
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+  if (updateError) throw updateError;
 
   // Get stage for the include
-  const stageRows = await sql`
-    SELECT * FROM "DealStage" WHERE "id" = ${body.stageId}
-  `;
+  const { data: stageRow, error: stageError } = await supabase
+    .from('DealStage')
+    .select('*')
+    .eq('id', body.stageId)
+    .single();
+  if (stageError && stageError.code !== 'PGRST116') throw stageError;
 
   const deal = {
-    ...dealRows[0],
-    stage: stageRows[0] || null
+    ...dealRow,
+    stage: stageRow || null
   } as Deal & { stage: DealStage | null };
 
   syncDeal(deal).catch(console.error);
@@ -78,7 +87,11 @@ export async function DELETE(
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { id } = await params;
-  const dealRows = await sql`SELECT * FROM "Deal" WHERE "id" = ${id}`;
+  const { data: dealRows, error: dealError } = await supabase
+    .from('Deal')
+    .select('*')
+    .eq('id', id);
+  if (dealError) throw dealError;
   if (!dealRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const deal = dealRows[0];
@@ -88,7 +101,8 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  await sql`DELETE FROM "Deal" WHERE "id" = ${id}`;
+  const { error: deleteError } = await supabase.from('Deal').delete().eq('id', id);
+  if (deleteError) throw deleteError;
   deleteDealVector(deal.spaceId, id).catch(console.error);
 
   return NextResponse.json({ success: true });

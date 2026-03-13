@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 
 export default async function DashboardRedirectPage() {
@@ -12,22 +12,18 @@ export default async function DashboardRedirectPage() {
   // redirect loop by treating DB errors as "user not found").
   let user;
   try {
-    const rows = await sql`
-      SELECT u.*, s."slug", s.id AS "spaceId", s.name AS "spaceName"
-      FROM "User" u
-      LEFT JOIN "Space" s ON s."ownerId" = u.id
-      WHERE u."clerkId" = ${userId}
-    `;
-    if (rows[0]) {
-      const row = rows[0] as Record<string, unknown>;
+    const { data: row, error } = await supabase
+      .from('User')
+      .select('*, Space(slug, id, name)')
+      .eq('clerkId', userId)
+      .maybeSingle();
+    if (error) throw error;
+    if (row) {
+      const { Space, ...rest } = row;
       user = {
-        ...row,
-        space: row.spaceId ? { id: row.spaceId as string, slug: row.slug as string, name: row.spaceName as string } : null,
+        ...rest,
+        space: Space ? { id: Space.id as string, slug: Space.slug as string, name: Space.name as string } : null,
       };
-      // Remove joined fields from top-level
-      delete (user as Record<string, unknown>).spaceId;
-      delete (user as Record<string, unknown>).slug;
-      delete (user as Record<string, unknown>).spaceName;
     } else {
       user = null;
     }

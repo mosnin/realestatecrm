@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { syncContact } from '@/lib/vectorize';
 import type { Contact } from '@/lib/types';
@@ -23,51 +23,21 @@ export async function GET(req: NextRequest) {
   const search = req.nextUrl.searchParams.get('search') ?? '';
   const type = req.nextUrl.searchParams.get('type');
 
-  let contacts: Contact[];
+  let query = supabase.from('Contact').select('*').eq('spaceId', space.id);
 
-  if (search && type && type !== 'ALL') {
+  if (search) {
     const pattern = `%${search}%`;
-    contacts = await sql`
-      SELECT * FROM "Contact"
-      WHERE "spaceId" = ${space.id}
-        AND "type" = ${type}
-        AND (
-          "name" ILIKE ${pattern}
-          OR "email" ILIKE ${pattern}
-          OR "phone" ILIKE ${pattern}
-          OR "preferences" ILIKE ${pattern}
-        )
-      ORDER BY "createdAt" DESC
-    ` as Contact[];
-  } else if (search) {
-    const pattern = `%${search}%`;
-    contacts = await sql`
-      SELECT * FROM "Contact"
-      WHERE "spaceId" = ${space.id}
-        AND (
-          "name" ILIKE ${pattern}
-          OR "email" ILIKE ${pattern}
-          OR "phone" ILIKE ${pattern}
-          OR "preferences" ILIKE ${pattern}
-        )
-      ORDER BY "createdAt" DESC
-    ` as Contact[];
-  } else if (type && type !== 'ALL') {
-    contacts = await sql`
-      SELECT * FROM "Contact"
-      WHERE "spaceId" = ${space.id}
-        AND "type" = ${type}
-      ORDER BY "createdAt" DESC
-    ` as Contact[];
-  } else {
-    contacts = await sql`
-      SELECT * FROM "Contact"
-      WHERE "spaceId" = ${space.id}
-      ORDER BY "createdAt" DESC
-    ` as Contact[];
+    query = query.or(`name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},preferences.ilike.${pattern}`);
   }
 
-  return NextResponse.json(contacts);
+  if (type && type !== 'ALL') {
+    query = query.eq('type', type);
+  }
+
+  const { data: contacts, error } = await query.order('createdAt', { ascending: false });
+  if (error) throw error;
+
+  return NextResponse.json(contacts as Contact[]);
 }
 
 export async function POST(req: NextRequest) {
@@ -90,20 +60,24 @@ export async function POST(req: NextRequest) {
   const propsVal = properties || [];
   const tagsVal = tags || [];
 
-  const rows = await sql`
-    INSERT INTO "Contact" ("id", "spaceId", "name", "email", "phone", "address", "notes", "type", "budget", "preferences", "properties", "tags")
-    VALUES (
-      ${id}, ${space.id}, ${name}, ${email || null}, ${phone || null},
-      ${address || null}, ${notes || null}, ${type || 'QUALIFICATION'},
-      ${budgetVal}, ${preferences || null}, ${propsVal}, ${tagsVal}
-    )
-    RETURNING *
-  `;
-
-  const contact = rows[0] as Contact;
+  const { data: contact, error } = await supabase.from('Contact').insert({
+    id,
+    spaceId: space.id,
+    name,
+    email: email || null,
+    phone: phone || null,
+    address: address || null,
+    notes: notes || null,
+    type: type || 'QUALIFICATION',
+    budget: budgetVal,
+    preferences: preferences || null,
+    properties: propsVal,
+    tags: tagsVal,
+  }).select().single();
+  if (error) throw error;
 
   // Async vectorization — don't block the response
-  syncContact(contact).catch(console.error);
+  syncContact(contact as Contact).catch(console.error);
 
   return NextResponse.json(contact, { status: 201 });
 }

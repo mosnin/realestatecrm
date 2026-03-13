@@ -2,7 +2,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { redis } from '@/lib/redis';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -15,14 +15,20 @@ export async function deleteSlugAction(
 
   const slug = formData.get('slug') as string;
 
-  const [space] = await sql`SELECT * FROM "Space" WHERE "slug" = ${slug} LIMIT 1`;
+  const { data: space, error } = await supabase
+    .from('Space')
+    .select('*')
+    .eq('slug', slug)
+    .maybeSingle();
+  if (error) return { error: 'Database error' };
   if (!space) return { error: 'Space not found' };
 
   const userSpace = await getSpaceForUser(userId);
   if (!userSpace || space.id !== userSpace.id) return { error: 'Forbidden' };
 
   await redis.del(`slug:${slug}`).catch(() => null);
-  await sql`DELETE FROM "Space" WHERE "slug" = ${slug}`;
+  const { error: deleteError } = await supabase.from('Space').delete().eq('slug', slug);
+  if (deleteError) return { error: 'Failed to delete space' };
   revalidatePath('/admin');
   return { success: 'Space deleted successfully' };
 }

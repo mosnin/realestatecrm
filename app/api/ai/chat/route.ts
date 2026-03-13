@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { chatWithRAG } from '@/lib/ai';
 import { getSpaceFromSlug } from '@/lib/space';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import type { SpaceSetting } from '@/lib/types';
 
 export async function POST(req: NextRequest) {
@@ -18,17 +18,20 @@ export async function POST(req: NextRequest) {
     // Save user message to DB
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === 'user');
     if (lastUserMsg) {
-      await sql`
-        INSERT INTO "Message" ("id", "spaceId", "role", "content")
-        VALUES (${crypto.randomUUID()}, ${space.id}, ${'user'}, ${lastUserMsg.content})
-      `;
+      const { error } = await supabase
+        .from('Message')
+        .insert({ id: crypto.randomUUID(), spaceId: space.id, role: 'user', content: lastUserMsg.content });
+      if (error) throw error;
     }
 
     // Use per-space API key if set, otherwise fall back to env var
-    const settingsRows = await sql`
-      SELECT * FROM "SpaceSetting" WHERE "spaceId" = ${space.id}
-    ` as SpaceSetting[];
-    const settings = settingsRows[0] ?? null;
+    const { data: settings, error: settingsError } = await supabase
+      .from('SpaceSetting')
+      .select('*')
+      .eq('spaceId', space.id)
+      .maybeSingle();
+    if (settingsError) throw settingsError;
+
     const stream = await chatWithRAG(messages, space.id, space.name, (settings as any)?.anthropicApiKey);
 
     // Collect the full response text to save to DB (non-blocking)
@@ -41,10 +44,10 @@ export async function POST(req: NextRequest) {
         if (done) break;
         fullText += new TextDecoder().decode(value);
       }
-      await sql`
-        INSERT INTO "Message" ("id", "spaceId", "role", "content")
-        VALUES (${crypto.randomUUID()}, ${space.id}, ${'assistant'}, ${fullText})
-      `.catch(console.error);
+      await supabase
+        .from('Message')
+        .insert({ id: crypto.randomUUID(), spaceId: space.id, role: 'assistant', content: fullText })
+        .then(({ error }) => { if (error) console.error(error); });
     })();
 
     return new NextResponse(streamForResponse, {

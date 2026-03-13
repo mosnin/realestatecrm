@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -20,12 +20,12 @@ export async function PATCH(req: NextRequest) {
     anthropicApiKey
   } = await req.json();
 
-  const spaceRows = await sql`
-    SELECT "id", "slug", "name", "emoji", "createdAt", "ownerId"
-    FROM "Space"
-    WHERE "slug" = ${slug}
-  `;
-  if (!spaceRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const { data: spaceRows, error: spaceError } = await supabase
+    .from('Space')
+    .select('id, slug, name, emoji, createdAt, ownerId')
+    .eq('slug', slug);
+  if (spaceError) throw spaceError;
+  if (!spaceRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const space = spaceRows[0];
 
@@ -34,26 +34,33 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const updatedRows = await sql`
-    UPDATE "Space"
-    SET
-      "name" = ${name}
-      ${emoji !== undefined ? sql`, "emoji" = ${emoji}` : sql``}
-    WHERE "slug" = ${slug}
-    RETURNING "id", "slug", "name", "emoji", "createdAt", "ownerId"
-  `;
+  const updateFields: Record<string, unknown> = { name };
+  if (emoji !== undefined) updateFields.emoji = emoji;
 
-  await sql`
-    INSERT INTO "SpaceSetting" ("id", "spaceId", "notifications", "phoneNumber", "myConnections", "aiPersonalization", "billingSettings", "anthropicApiKey")
-    VALUES (${crypto.randomUUID()}, ${space.id}, ${notifications}, ${phoneNumber}, ${myConnections}, ${aiPersonalization}, ${billingSettings}, ${anthropicApiKey || null})
-    ON CONFLICT ("spaceId") DO UPDATE SET
-      "notifications" = ${notifications},
-      "phoneNumber" = ${phoneNumber},
-      "myConnections" = ${myConnections},
-      "aiPersonalization" = ${aiPersonalization},
-      "billingSettings" = ${billingSettings},
-      "anthropicApiKey" = ${anthropicApiKey || null}
-  `;
+  const { data: updatedRows, error: updateError } = await supabase
+    .from('Space')
+    .update(updateFields)
+    .eq('slug', slug)
+    .select('id, slug, name, emoji, createdAt, ownerId');
+  if (updateError) throw updateError;
+
+  const { error: settingsError } = await supabase
+    .from('SpaceSetting')
+    .upsert(
+      {
+        id: crypto.randomUUID(),
+        spaceId: space.id,
+        notifications,
+        phoneNumber,
+        myConnections,
+        aiPersonalization,
+        billingSettings,
+        anthropicApiKey: anthropicApiKey || null,
+      },
+      { onConflict: 'spaceId' }
+    )
+    .select();
+  if (settingsError) throw settingsError;
 
   // Update Redis emoji
   const existing = await redis.get<any>(`slug:${slug}`).catch(() => null);
@@ -63,7 +70,7 @@ export async function PATCH(req: NextRequest) {
       .catch(() => null);
   }
 
-  return NextResponse.json(updatedRows[0]);
+  return NextResponse.json(updatedRows![0]);
 }
 
 export async function DELETE(req: NextRequest) {
@@ -72,12 +79,12 @@ export async function DELETE(req: NextRequest) {
 
   const { slug } = await req.json();
 
-  const spaceRows = await sql`
-    SELECT "id", "slug", "name", "emoji", "createdAt", "ownerId"
-    FROM "Space"
-    WHERE "slug" = ${slug}
-  `;
-  if (!spaceRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const { data: spaceRows, error: spaceError } = await supabase
+    .from('Space')
+    .select('id, slug, name, emoji, createdAt, ownerId')
+    .eq('slug', slug);
+  if (spaceError) throw spaceError;
+  if (!spaceRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const space = spaceRows[0];
 
@@ -87,7 +94,12 @@ export async function DELETE(req: NextRequest) {
   }
 
   await redis.del(`slug:${slug}`).catch(() => null);
-  await sql`DELETE FROM "Space" WHERE "slug" = ${slug}`;
+
+  const { error: deleteError } = await supabase
+    .from('Space')
+    .delete()
+    .eq('slug', slug);
+  if (deleteError) throw deleteError;
 
   return NextResponse.json({ success: true });
 }

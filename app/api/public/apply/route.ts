@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { getSpaceFromSlug } from '@/lib/space';
 import { scoreLeadApplication } from '@/lib/lead-scoring';
@@ -48,19 +48,20 @@ export async function POST(req: NextRequest) {
       console.warn('[apply] idempotency lock unavailable; using DB fallback', { error, spaceId: space.id });
     }
 
-    const duplicateCutoff = new Date(Date.now() - 2 * 60 * 1000);
-    const existingRecentLeads = await sql`
-      SELECT * FROM "Contact"
-      WHERE "spaceId" = ${space.id}
-        AND "name" = ${payload.name}
-        AND 'application-link' = ANY("tags")
-        AND "createdAt" >= ${duplicateCutoff}
-      ORDER BY "createdAt" DESC
-      LIMIT 1
-    ` as Contact[];
+    const duplicateCutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const { data: existingRecentLeads, error: dupError } = await supabase
+      .from('Contact')
+      .select('*')
+      .eq('spaceId', space.id)
+      .eq('name', payload.name)
+      .contains('tags', ['application-link'])
+      .gte('createdAt', duplicateCutoff)
+      .order('createdAt', { ascending: false })
+      .limit(1);
+    if (dupError) throw dupError;
 
-    if (existingRecentLeads.length) {
-      const existingRecentLead = existingRecentLeads[0];
+    if (existingRecentLeads?.length) {
+      const existingRecentLead = existingRecentLeads[0] as Contact;
       const existingNormalizedPhone = normalizePhone(existingRecentLead.phone ?? '');
       const normalizedPhone = normalizePhone(payload.phone);
       if (existingNormalizedPhone && existingNormalizedPhone === normalizedPhone) {
@@ -86,26 +87,26 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const contacts = await sql`
-      INSERT INTO "Contact" ("id", "spaceId", "name", "email", "phone", "budget", "preferences", "notes", "type", "properties", "tags", "scoringStatus", "scoreLabel")
-      VALUES (
-        ${crypto.randomUUID()},
-        ${space.id},
-        ${payload.name},
-        ${payload.email ?? null},
-        ${payload.phone},
-        ${payload.budget ?? null},
-        ${payload.preferredAreas ?? null},
-        ${payload.notes || payload.timeline ? `Timeline: ${payload.timeline ?? 'N/A'}\n${payload.notes ?? ''}`.trim() : null},
-        ${'QUALIFICATION'},
-        ${[]},
-        ${['application-link', 'new-lead']},
-        ${'pending'},
-        ${'unscored'}
-      )
-      RETURNING *
-    ` as Contact[];
-    const contact = contacts[0];
+    const { data: contacts, error: insertError } = await supabase
+      .from('Contact')
+      .insert({
+        id: crypto.randomUUID(),
+        spaceId: space.id,
+        name: payload.name,
+        email: payload.email ?? null,
+        phone: payload.phone,
+        budget: payload.budget ?? null,
+        preferences: payload.preferredAreas ?? null,
+        notes: payload.notes || payload.timeline ? `Timeline: ${payload.timeline ?? 'N/A'}\n${payload.notes ?? ''}`.trim() : null,
+        type: 'QUALIFICATION',
+        properties: [],
+        tags: ['application-link', 'new-lead'],
+        scoringStatus: 'pending',
+        scoreLabel: 'unscored',
+      })
+      .select();
+    if (insertError) throw insertError;
+    const contact = contacts![0] as Contact;
 
     console.info('[apply] submission persisted', {
       contactId: contact.id,
@@ -132,15 +133,17 @@ export async function POST(req: NextRequest) {
         notes: payload.notes ?? null,
       });
 
-      await sql`
-        UPDATE "Contact"
-        SET "scoringStatus" = ${scoring.scoringStatus},
-            "leadScore" = ${scoring.leadScore},
-            "scoreLabel" = ${scoring.scoreLabel},
-            "scoreSummary" = ${scoring.scoreSummary},
-            "updatedAt" = NOW()
-        WHERE "id" = ${contact.id}
-      `;
+      const { error: scoreUpdateError } = await supabase
+        .from('Contact')
+        .update({
+          scoringStatus: scoring.scoringStatus,
+          leadScore: scoring.leadScore,
+          scoreLabel: scoring.scoreLabel,
+          scoreSummary: scoring.scoreSummary,
+          updatedAt: new Date().toISOString(),
+        })
+        .eq('id', contact.id);
+      if (scoreUpdateError) throw scoreUpdateError;
 
       console.info('[apply] scoring state persisted', {
         contactId: contact.id,
@@ -153,15 +156,17 @@ export async function POST(req: NextRequest) {
         error,
       });
       try {
-        await sql`
-          UPDATE "Contact"
-          SET "scoringStatus" = ${'failed'},
-              "leadScore" = ${null},
-              "scoreLabel" = ${'unscored'},
-              "scoreSummary" = ${'Scoring unavailable right now. Lead saved successfully.'},
-              "updatedAt" = NOW()
-          WHERE "id" = ${contact.id}
-        `;
+        const { error: fallbackUpdateError } = await supabase
+          .from('Contact')
+          .update({
+            scoringStatus: 'failed',
+            leadScore: null,
+            scoreLabel: 'unscored',
+            scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
+            updatedAt: new Date().toISOString(),
+          })
+          .eq('id', contact.id);
+        if (fallbackUpdateError) throw fallbackUpdateError;
       } catch (fallbackErr: unknown) {
         console.error('[apply] failed to persist fallback scoring state', {
           contactId: contact.id,

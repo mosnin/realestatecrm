@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { embedText } from '@/lib/embeddings';
 import { searchVectors } from '@/lib/zilliz';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -55,46 +55,50 @@ export async function chatWithRAG(
     }
 
     if (contactIds.length) {
-      const contacts = await sql`SELECT * FROM "Contact" WHERE id = ANY(${contactIds}) AND "spaceId" = ${spaceId}`;
-      contextBlocks.push(
-        'Relevant Contacts:\n' +
-          contacts
-            .map(
-              (c: any) =>
-                `- ${c.name} (${c.type}) | ${c.email ?? ''} | ${c.phone ?? ''} | ${c.address ?? ''} | Notes: ${c.notes ?? ''}`
-            )
-            .join('\n')
-      );
+      const { data: contacts } = await supabase
+        .from('Contact')
+        .select('*')
+        .in('id', contactIds)
+        .eq('spaceId', spaceId);
+      if (contacts?.length) {
+        contextBlocks.push(
+          'Relevant Contacts:\n' +
+            contacts
+              .map(
+                (c: any) =>
+                  `- ${c.name} (${c.type}) | ${c.email ?? ''} | ${c.phone ?? ''} | ${c.address ?? ''} | Notes: ${c.notes ?? ''}`
+              )
+              .join('\n')
+        );
+      }
     }
 
     if (dealIds.length) {
-      const deals = await sql`
-        SELECT d.*, s.name AS "stageName"
-        FROM "Deal" d
-        LEFT JOIN "Stage" s ON s.id = d."stageId"
-        WHERE d.id = ANY(${dealIds}) AND d."spaceId" = ${spaceId}
-      `;
-      const dealContactRows = await sql`
-        SELECT dc."dealId", c.name
-        FROM "DealContact" dc
-        JOIN "Contact" c ON c.id = dc."contactId"
-        WHERE dc."dealId" = ANY(${dealIds})
-      `;
+      const { data: deals } = await supabase
+        .from('Deal')
+        .select('*, DealStage(name)')
+        .in('id', dealIds)
+        .eq('spaceId', spaceId);
+      const { data: dealContactRows } = await supabase
+        .from('DealContact')
+        .select('dealId, Contact(name)')
+        .in('dealId', dealIds);
       const contactsByDeal: Record<string, string[]> = {};
-      for (const row of dealContactRows) {
-        const r = row as any;
-        if (!contactsByDeal[r.dealId]) contactsByDeal[r.dealId] = [];
-        contactsByDeal[r.dealId].push(r.name);
+      for (const row of (dealContactRows ?? []) as any[]) {
+        if (!contactsByDeal[row.dealId]) contactsByDeal[row.dealId] = [];
+        contactsByDeal[row.dealId].push(row.Contact?.name ?? '');
       }
-      contextBlocks.push(
-        'Relevant Deals:\n' +
-          deals
-            .map(
-              (d: any) =>
-                `- ${d.title} | Stage: ${d.stageName} | Value: ${d.value != null ? `$${d.value}` : 'N/A'} | Priority: ${d.priority} | Address: ${d.address ?? ''} | Contacts: ${(contactsByDeal[d.id] ?? []).join(', ')}`
-            )
-            .join('\n')
-      );
+      if (deals?.length) {
+        contextBlocks.push(
+          'Relevant Deals:\n' +
+            deals
+              .map(
+                (d: any) =>
+                  `- ${d.title} | Stage: ${d.DealStage?.name ?? 'N/A'} | Value: ${d.value != null ? `$${d.value}` : 'N/A'} | Priority: ${d.priority} | Address: ${d.address ?? ''} | Contacts: ${(contactsByDeal[d.id] ?? []).join(', ')}`
+              )
+              .join('\n')
+        );
+      }
     }
   } catch {
     // Embeddings or Zilliz may not be configured — proceed without RAG context

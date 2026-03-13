@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { syncDeal } from '@/lib/vectorize';
 import type { Deal, DealStage } from '@/lib/types';
@@ -21,35 +21,24 @@ export async function GET(req: NextRequest) {
   }
 
   // Get deals with stage
-  const dealRows = await sql`
-    SELECT
-      d.*,
-      s."id" AS "stage_id",
-      s."spaceId" AS "stage_spaceId",
-      s."name" AS "stage_name",
-      s."color" AS "stage_color",
-      s."position" AS "stage_position"
-    FROM "Deal" d
-    LEFT JOIN "DealStage" s ON s."id" = d."stageId"
-    WHERE d."spaceId" = ${space.id}
-    ORDER BY d."position" ASC
-  `;
+  const { data: dealRows, error: dealError } = await supabase
+    .from('Deal')
+    .select('*, DealStage(id, spaceId, name, color, position)')
+    .eq('spaceId', space.id)
+    .order('position', { ascending: true });
+  if (dealError) throw dealError;
 
   const dealIds = dealRows.map((r: any) => r.id);
 
   // Get dealContacts with contact info
   let dealContactRows: any[] = [];
   if (dealIds.length > 0) {
-    dealContactRows = await sql`
-      SELECT
-        dc."dealId",
-        dc."contactId",
-        c."id" AS "contact_id",
-        c."name" AS "contact_name"
-      FROM "DealContact" dc
-      JOIN "Contact" c ON c."id" = dc."contactId"
-      WHERE dc."dealId" = ANY(${dealIds})
-    `;
+    const { data, error: dcError } = await supabase
+      .from('DealContact')
+      .select('dealId, contactId, Contact(id, name)')
+      .in('dealId', dealIds);
+    if (dcError) throw dcError;
+    dealContactRows = data || [];
   }
 
   // Group dealContacts by dealId
@@ -59,7 +48,7 @@ export async function GET(req: NextRequest) {
     arr.push({
       dealId: dc.dealId,
       contactId: dc.contactId,
-      contact: { id: dc.contact_id, name: dc.contact_name }
+      contact: dc.Contact ? { id: dc.Contact.id, name: dc.Contact.name } : null
     });
     dcByDeal.set(dc.dealId, arr);
   }
@@ -77,13 +66,13 @@ export async function GET(req: NextRequest) {
     position: row.position,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    stage: row.stage_id
+    stage: row.DealStage
       ? {
-          id: row.stage_id,
-          spaceId: row.stage_spaceId,
-          name: row.stage_name,
-          color: row.stage_color,
-          position: row.stage_position
+          id: row.DealStage.id,
+          spaceId: row.DealStage.spaceId,
+          name: row.DealStage.name,
+          color: row.DealStage.color,
+          position: row.DealStage.position
         }
       : null,
     dealContacts: dcByDeal.get(row.id) || []
@@ -107,46 +96,51 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const lastDealRows = await sql`
-    SELECT "position" FROM "Deal"
-    WHERE "stageId" = ${stageId}
-    ORDER BY "position" DESC
-    LIMIT 1
-  `;
+  const { data: lastDealRows, error: lastDealError } = await supabase
+    .from('Deal')
+    .select('position')
+    .eq('stageId', stageId)
+    .order('position', { ascending: false })
+    .limit(1);
+  if (lastDealError) throw lastDealError;
   const lastPosition = lastDealRows.length > 0 ? lastDealRows[0].position : -1;
 
   const dealId = crypto.randomUUID();
   const valueVal = value ? parseFloat(value) : null;
-  const closeDateVal = closeDate ? new Date(closeDate) : null;
+  const closeDateVal = closeDate ? new Date(closeDate).toISOString() : null;
 
-  const dealRows = await sql`
-    INSERT INTO "Deal" ("id", "spaceId", "title", "description", "value", "address", "priority", "closeDate", "stageId", "position")
-    VALUES (
-      ${dealId}, ${space.id}, ${title}, ${description || null},
-      ${valueVal}, ${address || null}, ${priority || 'MEDIUM'},
-      ${closeDateVal}, ${stageId}, ${lastPosition + 1}
-    )
-    RETURNING *
-  `;
+  const { data: dealRow, error: dealError } = await supabase.from('Deal').insert({
+    id: dealId,
+    spaceId: space.id,
+    title,
+    description: description || null,
+    value: valueVal,
+    address: address || null,
+    priority: priority || 'MEDIUM',
+    closeDate: closeDateVal,
+    stageId,
+    position: lastPosition + 1,
+  }).select().single();
+  if (dealError) throw dealError;
 
   // Insert dealContacts
   if (contactIds?.length) {
-    for (const cId of contactIds) {
-      await sql`
-        INSERT INTO "DealContact" ("dealId", "contactId")
-        VALUES (${dealId}, ${cId})
-      `;
-    }
+    const dcInserts = contactIds.map((cId: string) => ({ dealId, contactId: cId }));
+    const { error: dcError } = await supabase.from('DealContact').insert(dcInserts);
+    if (dcError) throw dcError;
   }
 
   // Get stage for the include
-  const stageRows = await sql`
-    SELECT * FROM "DealStage" WHERE "id" = ${stageId}
-  `;
+  const { data: stageRow, error: stageError } = await supabase
+    .from('DealStage')
+    .select('*')
+    .eq('id', stageId)
+    .single();
+  if (stageError && stageError.code !== 'PGRST116') throw stageError;
 
   const deal = {
-    ...dealRows[0],
-    stage: stageRows[0] || null
+    ...dealRow,
+    stage: stageRow || null
   } as Deal & { stage: DealStage | null };
 
   syncDeal(deal).catch(console.error);

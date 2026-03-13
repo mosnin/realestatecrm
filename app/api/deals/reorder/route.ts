@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 
 export async function PATCH(req: NextRequest) {
@@ -9,7 +9,11 @@ export async function PATCH(req: NextRequest) {
 
   const { dealId, newStageId, newPosition } = await req.json();
 
-  const dealRows = await sql`SELECT * FROM "Deal" WHERE "id" = ${dealId}`;
+  const { data: dealRows, error: dealError } = await supabase
+    .from('Deal')
+    .select('*')
+    .eq('id', dealId);
+  if (dealError) throw dealError;
   if (!dealRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const deal = dealRows[0];
@@ -19,24 +23,42 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const stageRows = await sql`SELECT * FROM "DealStage" WHERE "id" = ${newStageId}`;
+  const { data: stageRows, error: stageError } = await supabase
+    .from('DealStage')
+    .select('*')
+    .eq('id', newStageId);
+  if (stageError) throw stageError;
   if (!stageRows.length || stageRows[0].spaceId !== space.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   // Shift existing deals in target stage to make room
-  await sql`
-    UPDATE "Deal"
-    SET "position" = "position" + 1
-    WHERE "stageId" = ${newStageId} AND "position" >= ${newPosition}
-  `;
+  const { data: dealsToShift, error: shiftReadError } = await supabase
+    .from('Deal')
+    .select('id, position')
+    .eq('stageId', newStageId)
+    .gte('position', newPosition);
+  if (shiftReadError) throw shiftReadError;
 
-  const updatedRows = await sql`
-    UPDATE "Deal"
-    SET "stageId" = ${newStageId}, "position" = ${newPosition}, "updatedAt" = NOW()
-    WHERE "id" = ${dealId}
-    RETURNING *
-  `;
+  if (dealsToShift && dealsToShift.length > 0) {
+    await Promise.all(
+      dealsToShift.map(d =>
+        supabase.from('Deal').update({ position: d.position + 1 }).eq('id', d.id)
+      )
+    );
+  }
 
-  return NextResponse.json(updatedRows[0]);
+  const { data: updatedDeal, error: updateError } = await supabase
+    .from('Deal')
+    .update({
+      stageId: newStageId,
+      position: newPosition,
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', dealId)
+    .select()
+    .single();
+  if (updateError) throw updateError;
+
+  return NextResponse.json(updatedDeal);
 }

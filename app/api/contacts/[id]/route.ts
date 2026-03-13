@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { syncContact, deleteContactVector } from '@/lib/vectorize';
 import { getSpaceForUser } from '@/lib/space';
 import type { Contact } from '@/lib/types';
@@ -13,9 +13,11 @@ export async function GET(
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { id } = await params;
-  const contactRows = await sql`
-    SELECT * FROM "Contact" WHERE "id" = ${id}
-  `;
+  const { data: contactRows, error: contactError } = await supabase
+    .from('Contact')
+    .select('*')
+    .eq('id', id);
+  if (contactError) throw contactError;
 
   if (!contactRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -27,59 +29,40 @@ export async function GET(
   }
 
   // Get dealContacts with deal and stage info
-  const dealContactRows = await sql`
-    SELECT
-      dc."dealId",
-      dc."contactId",
-      d."id" AS "deal_id",
-      d."spaceId" AS "deal_spaceId",
-      d."title" AS "deal_title",
-      d."description" AS "deal_description",
-      d."value" AS "deal_value",
-      d."address" AS "deal_address",
-      d."priority" AS "deal_priority",
-      d."closeDate" AS "deal_closeDate",
-      d."stageId" AS "deal_stageId",
-      d."position" AS "deal_position",
-      d."createdAt" AS "deal_createdAt",
-      d."updatedAt" AS "deal_updatedAt",
-      s."id" AS "stage_id",
-      s."spaceId" AS "stage_spaceId",
-      s."name" AS "stage_name",
-      s."color" AS "stage_color",
-      s."position" AS "stage_position"
-    FROM "DealContact" dc
-    JOIN "Deal" d ON d."id" = dc."dealId"
-    LEFT JOIN "DealStage" s ON s."id" = d."stageId"
-    WHERE dc."contactId" = ${id}
-  `;
+  const { data: dealContactRows, error: dcError } = await supabase
+    .from('DealContact')
+    .select('dealId, contactId, Deal(id, spaceId, title, description, value, address, priority, closeDate, stageId, position, createdAt, updatedAt, DealStage(id, spaceId, name, color, position))')
+    .eq('contactId', id);
+  if (dcError) throw dcError;
 
-  contact.dealContacts = dealContactRows.map((row: any) => ({
+  contact.dealContacts = (dealContactRows || []).map((row: any) => ({
     dealId: row.dealId,
     contactId: row.contactId,
-    deal: {
-      id: row.deal_id,
-      spaceId: row.deal_spaceId,
-      title: row.deal_title,
-      description: row.deal_description,
-      value: row.deal_value,
-      address: row.deal_address,
-      priority: row.deal_priority,
-      closeDate: row.deal_closeDate,
-      stageId: row.deal_stageId,
-      position: row.deal_position,
-      createdAt: row.deal_createdAt,
-      updatedAt: row.deal_updatedAt,
-      stage: row.stage_id
-        ? {
-            id: row.stage_id,
-            spaceId: row.stage_spaceId,
-            name: row.stage_name,
-            color: row.stage_color,
-            position: row.stage_position
-          }
-        : null
-    }
+    deal: row.Deal
+      ? {
+          id: row.Deal.id,
+          spaceId: row.Deal.spaceId,
+          title: row.Deal.title,
+          description: row.Deal.description,
+          value: row.Deal.value,
+          address: row.Deal.address,
+          priority: row.Deal.priority,
+          closeDate: row.Deal.closeDate,
+          stageId: row.Deal.stageId,
+          position: row.Deal.position,
+          createdAt: row.Deal.createdAt,
+          updatedAt: row.Deal.updatedAt,
+          stage: row.Deal.DealStage
+            ? {
+                id: row.Deal.DealStage.id,
+                spaceId: row.Deal.DealStage.spaceId,
+                name: row.Deal.DealStage.name,
+                color: row.Deal.DealStage.color,
+                position: row.Deal.DealStage.position
+              }
+            : null
+        }
+      : null
   }));
 
   return NextResponse.json(contact);
@@ -94,7 +77,11 @@ export async function PATCH(
 
   const { id } = await params;
 
-  const existingRows = await sql`SELECT * FROM "Contact" WHERE "id" = ${id}`;
+  const { data: existingRows, error: existingError } = await supabase
+    .from('Contact')
+    .select('*')
+    .eq('id', id);
+  if (existingError) throw existingError;
   if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const existing = existingRows[0];
@@ -109,27 +96,27 @@ export async function PATCH(
   const propsVal = body.properties ?? [];
   const tagsVal = body.tags ?? [];
 
-  const rows = await sql`
-    UPDATE "Contact"
-    SET
-      "name" = ${body.name},
-      "email" = ${body.email ?? null},
-      "phone" = ${body.phone ?? null},
-      "budget" = ${budgetVal},
-      "preferences" = ${body.preferences ?? null},
-      "properties" = ${propsVal},
-      "address" = ${body.address ?? null},
-      "notes" = ${body.notes ?? null},
-      "type" = ${body.type},
-      "tags" = ${tagsVal},
-      "updatedAt" = NOW()
-    WHERE "id" = ${id}
-    RETURNING *
-  `;
+  const { data: contact, error: updateError } = await supabase
+    .from('Contact')
+    .update({
+      name: body.name,
+      email: body.email ?? null,
+      phone: body.phone ?? null,
+      budget: budgetVal,
+      preferences: body.preferences ?? null,
+      properties: propsVal,
+      address: body.address ?? null,
+      notes: body.notes ?? null,
+      type: body.type,
+      tags: tagsVal,
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+  if (updateError) throw updateError;
 
-  const contact = rows[0] as Contact;
-
-  syncContact(contact).catch(console.error);
+  syncContact(contact as Contact).catch(console.error);
 
   return NextResponse.json(contact);
 }
@@ -142,7 +129,11 @@ export async function DELETE(
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { id } = await params;
-  const contactRows = await sql`SELECT * FROM "Contact" WHERE "id" = ${id}`;
+  const { data: contactRows, error: contactError } = await supabase
+    .from('Contact')
+    .select('*')
+    .eq('id', id);
+  if (contactError) throw contactError;
   if (!contactRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const contact = contactRows[0];
@@ -152,7 +143,8 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  await sql`DELETE FROM "Contact" WHERE "id" = ${id}`;
+  const { error: deleteError } = await supabase.from('Contact').delete().eq('id', id);
+  if (deleteError) throw deleteError;
   deleteContactVector(contact.spaceId, id).catch(console.error);
 
   return NextResponse.json({ success: true });

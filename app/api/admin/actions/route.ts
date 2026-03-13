@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClerkClient } from '@clerk/nextjs/server';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { requireAdmin, logAdminAction } from '@/lib/admin';
 import { shouldBackfillOnboardFromSpace } from '@/lib/onboarding';
 import type { User, Space } from '@/lib/types';
@@ -78,21 +78,24 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'userId is required' }, { status: 400 });
       }
 
-      const users = await sql`
-        SELECT u.*, s."id" AS "spaceId", s."slug"
-        FROM "User" u
-        LEFT JOIN "Space" s ON s."ownerId" = u."id"
-        WHERE u."id" = ${userId}
-      ` as (User & { spaceId: string | null; slug: string | null })[];
+      const { data: userRow, error: userError } = await supabase
+        .from('User')
+        .select('*, Space(id, slug)')
+        .eq('id', userId)
+        .maybeSingle();
 
-      if (!users.length) {
+      if (userError) throw userError;
+
+      if (!userRow) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
 
-      const row = users[0];
+      const row = userRow as User & { Space: { id: string; slug: string } | null };
       const user = {
         ...row,
-        space: row.spaceId ? { id: row.spaceId, slug: row.slug! } : null,
+        spaceId: row.Space?.id ?? null,
+        slug: row.Space?.slug ?? null,
+        space: row.Space ? { id: row.Space.id, slug: row.Space.slug } : null,
       };
 
       let repairAction = 'none';
@@ -100,23 +103,27 @@ export async function POST(req: NextRequest) {
 
       if (shouldBackfillOnboardFromSpace(user)) {
         // Has space but onboard=false → backfill
-        await sql`
-          UPDATE "User"
-          SET "onboard" = true,
-              "onboardingCompletedAt" = NOW(),
-              "onboardingCurrentStep" = 7
-          WHERE "id" = ${user.id}
-        `;
+        const { error } = await supabase
+          .from('User')
+          .update({
+            onboard: true,
+            onboardingCompletedAt: new Date().toISOString(),
+            onboardingCurrentStep: 7,
+          })
+          .eq('id', user.id);
+        if (error) throw error;
         repairAction = 'backfill_onboard';
         message = 'Backfilled onboard=true because workspace exists.';
       } else if (user.onboard && !user.space) {
         // Onboarded but no space → reset to re-onboard
-        await sql`
-          UPDATE "User"
-          SET "onboard" = false,
-              "onboardingCurrentStep" = 1
-          WHERE "id" = ${user.id}
-        `;
+        const { error } = await supabase
+          .from('User')
+          .update({
+            onboard: false,
+            onboardingCurrentStep: 1,
+          })
+          .eq('id', user.id);
+        if (error) throw error;
         repairAction = 'reset_onboarding';
         message = 'Reset onboard=false and step=1 because workspace is missing.';
       }

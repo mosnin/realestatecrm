@@ -1,6 +1,6 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { CreateWorkspaceForm } from './create-workspace-form';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 
@@ -14,21 +14,18 @@ export default async function SetupPage() {
   // form to users who already have one). NEVER throw (generic "Application error").
   let dbUser;
   try {
-    const rows = await sql`
-      SELECT u.*, s."slug", s.id AS "spaceId", s.name AS "spaceName"
-      FROM "User" u
-      LEFT JOIN "Space" s ON s."ownerId" = u.id
-      WHERE u."clerkId" = ${userId}
-    `;
-    if (rows[0]) {
-      const row = rows[0] as Record<string, unknown>;
+    const { data: row, error } = await supabase
+      .from('User')
+      .select('*, Space(slug, id, name)')
+      .eq('clerkId', userId)
+      .maybeSingle();
+    if (error) throw error;
+    if (row) {
+      const { Space, ...rest } = row;
       dbUser = {
-        ...row,
-        space: row.spaceId ? { id: row.spaceId as string, slug: row.slug as string, name: row.spaceName as string } : null,
+        ...rest,
+        space: Space ? { id: Space.id as string, slug: Space.slug as string, name: Space.name as string } : null,
       };
-      delete (dbUser as Record<string, unknown>).spaceId;
-      delete (dbUser as Record<string, unknown>).slug;
-      delete (dbUser as Record<string, unknown>).spaceName;
     } else {
       dbUser = null;
     }
@@ -76,21 +73,33 @@ export default async function SetupPage() {
       const name = clerkUser?.fullName ?? clerkUser?.firstName ?? null;
       const now = new Date();
 
-      const upsertRows = await sql`
-        INSERT INTO "User" (id, "clerkId", email, name, "onboardingStartedAt", onboard, "createdAt")
-        VALUES (${newId}, ${userId}, ${email}, ${name}, ${now}, false, ${now})
-        ON CONFLICT ("clerkId") DO UPDATE SET "clerkId" = "User"."clerkId"
-        RETURNING *
-      `;
-      if (upsertRows[0]) {
-        const row = upsertRows[0] as Record<string, unknown>;
+      const { data: upsertedRow, error: upsertError } = await supabase
+        .from('User')
+        .upsert(
+          {
+            id: newId,
+            clerkId: userId,
+            email,
+            name,
+            onboardingStartedAt: now.toISOString(),
+            onboard: false,
+            createdAt: now.toISOString(),
+          },
+          { onConflict: 'clerkId' }
+        )
+        .select()
+        .single();
+      if (upsertError) throw upsertError;
+      if (upsertedRow) {
         // Query space separately
-        const spaceRows = await sql`
-          SELECT * FROM "Space" WHERE "ownerId" = ${row.id} LIMIT 1
-        `;
+        const { data: spaceRow } = await supabase
+          .from('Space')
+          .select('*')
+          .eq('ownerId', upsertedRow.id)
+          .maybeSingle();
         resolvedUser = {
-          ...row,
-          space: spaceRows[0] ? { id: (spaceRows[0] as Record<string, unknown>).id as string, slug: (spaceRows[0] as Record<string, unknown>).slug as string, name: (spaceRows[0] as Record<string, unknown>).name as string } : null,
+          ...upsertedRow,
+          space: spaceRow ? { id: spaceRow.id as string, slug: spaceRow.slug as string, name: spaceRow.name as string } : null,
         };
       }
     } catch (err) {

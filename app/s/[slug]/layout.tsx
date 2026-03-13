@@ -4,7 +4,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 
 export default async function DashboardLayout({
@@ -26,18 +26,17 @@ export default async function DashboardLayout({
   // shows the generic "Application error" page).
   let dbUser;
   try {
-    const rows = await sql`
-      SELECT u.id, u.onboard, s.id AS "spaceId"
-      FROM "User" u
-      LEFT JOIN "Space" s ON s."ownerId" = u.id
-      WHERE u."clerkId" = ${userId}
-    `;
-    if (rows[0]) {
-      const row = rows[0] as Record<string, unknown>;
+    const { data: row, error } = await supabase
+      .from('User')
+      .select('id, onboard, Space(id)')
+      .eq('clerkId', userId)
+      .maybeSingle();
+    if (error) throw error;
+    if (row) {
       dbUser = {
         id: row.id as string,
         onboard: row.onboard as boolean,
-        space: row.spaceId ? { id: row.spaceId as string } : null,
+        space: row.Space ? { id: row.Space.id as string } : null,
       };
     } else {
       dbUser = null;
@@ -99,11 +98,13 @@ export default async function DashboardLayout({
 
   let unreadLeadCount = 0;
   try {
-    const countRows = await sql`
-      SELECT COUNT(*)::int AS count FROM "Contact"
-      WHERE "spaceId" = ${space.id} AND 'new-lead' = ANY(tags)
-    `;
-    unreadLeadCount = (countRows[0] as { count: number })?.count ?? 0;
+    const { count, error: countError } = await supabase
+      .from('Contact')
+      .select('*', { count: 'exact', head: true })
+      .eq('spaceId', space.id)
+      .contains('tags', ['new-lead']);
+    if (countError) throw countError;
+    unreadLeadCount = count ?? 0;
   } catch {
     unreadLeadCount = 0;
   }

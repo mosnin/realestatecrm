@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { Phone, Mail, MapPin, Clock, DollarSign, FileText } from 'lucide-react';
 import Link from 'next/link';
@@ -49,13 +49,9 @@ export default async function LeadsPage({
 
   let leads: Contact[] = [];
   try {
-    const rows = await sql`
-      SELECT * FROM "Contact"
-      WHERE "spaceId" = ${space.id} AND 'application-link' = ANY(tags)
-      ORDER BY "createdAt" DESC
-      LIMIT 100
-    `;
-    leads = rows as Contact[];
+    const { data, error } = await supabase.from('Contact').select('*').eq('spaceId', space.id).contains('tags', ['application-link']).order('createdAt', { ascending: false }).limit(100);
+    if (error) throw error;
+    leads = (data ?? []) as Contact[];
   } catch (err) {
     console.error('[leads] DB query failed', { slug, error: err });
     return (
@@ -74,9 +70,10 @@ export default async function LeadsPage({
   if (unreadLeads.length) {
     try {
       await Promise.all(
-        unreadLeads.map((lead) =>
-          sql`UPDATE "Contact" SET tags = array_remove(tags, 'new-lead'), "updatedAt" = NOW() WHERE id = ${lead.id}`
-        )
+        unreadLeads.map(async (lead) => {
+          const newTags = (lead.tags ?? []).filter((t: string) => t !== 'new-lead');
+          await supabase.from('Contact').update({ tags: newTags, updatedAt: new Date().toISOString() }).eq('id', lead.id);
+        })
       );
     } catch {
       // non-blocking: tags will be cleared on next visit

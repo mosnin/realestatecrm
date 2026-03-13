@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { buildIntakeUrl } from '@/lib/intake';
 import { getOnboardingStatus } from '@/lib/onboarding';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,10 +27,13 @@ export async function generateMetadata({
   params: Promise<{ userId: string }>;
 }) {
   const { userId } = await params;
-  const rows = await sql`
-    SELECT name, email FROM "User" WHERE id = ${userId}
-  `;
-  const user = rows[0] as { name: string | null; email: string } | undefined;
+  const { data: rows, error: metaError } = await supabase
+    .from('User')
+    .select('name, email')
+    .eq('id', userId)
+    .maybeSingle();
+  if (metaError) throw metaError;
+  const user = rows as { name: string | null; email: string } | null;
   return {
     title: `${user?.name || user?.email || 'User'} — Admin — Chippi`,
   };
@@ -85,30 +88,43 @@ export default async function AdminUserDetailPage({
   const { userId } = await params;
 
   // Fetch user
-  const userRows = await sql`SELECT * FROM "User" WHERE id = ${userId}`;
-  if (!userRows[0]) notFound();
-  const user = userRows[0] as User;
+  const { data: userRow, error: userError } = await supabase
+    .from('User')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+  if (userError) throw userError;
+  if (!userRow) notFound();
+  const user = userRow as User;
 
   // Fetch space
-  const spaceRows = await sql`
-    SELECT * FROM "Space" WHERE "ownerId" = ${user.id} LIMIT 1
-  `;
-  const spaceRow = spaceRows[0] as (Space & Record<string, unknown>) | undefined;
+  const { data: spaceData, error: spaceError } = await supabase
+    .from('Space')
+    .select('*')
+    .eq('ownerId', user.id)
+    .limit(1)
+    .maybeSingle();
+  if (spaceError) throw spaceError;
+  const spaceRow = spaceData as (Space & Record<string, unknown>) | null;
 
   // Fetch settings + counts if space exists
   let settings: SpaceSetting | null = null;
   let contactCount = 0, dealCount = 0, stageCount = 0;
   if (spaceRow) {
-    const [settingsRows, contactCountRows, dealCountRows, stageCountRows] = await Promise.all([
-      sql`SELECT * FROM "SpaceSetting" WHERE "spaceId" = ${spaceRow.id}`,
-      sql`SELECT COUNT(*)::int AS count FROM "Contact" WHERE "spaceId" = ${spaceRow.id}`,
-      sql`SELECT COUNT(*)::int AS count FROM "Deal" WHERE "spaceId" = ${spaceRow.id}`,
-      sql`SELECT COUNT(*)::int AS count FROM "DealStage" WHERE "spaceId" = ${spaceRow.id}`,
+    const [settingsRes, contactCountRes, dealCountRes, stageCountRes] = await Promise.all([
+      supabase.from('SpaceSetting').select('*').eq('spaceId', spaceRow.id).maybeSingle(),
+      supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', spaceRow.id),
+      supabase.from('Deal').select('*', { count: 'exact', head: true }).eq('spaceId', spaceRow.id),
+      supabase.from('DealStage').select('*', { count: 'exact', head: true }).eq('spaceId', spaceRow.id),
     ]);
-    settings = (settingsRows[0] as SpaceSetting) ?? null;
-    contactCount = (contactCountRows[0] as { count: number }).count;
-    dealCount = (dealCountRows[0] as { count: number }).count;
-    stageCount = (stageCountRows[0] as { count: number }).count;
+    if (settingsRes.error) throw settingsRes.error;
+    if (contactCountRes.error) throw contactCountRes.error;
+    if (dealCountRes.error) throw dealCountRes.error;
+    if (stageCountRes.error) throw stageCountRes.error;
+    settings = (settingsRes.data as SpaceSetting) ?? null;
+    contactCount = contactCountRes.count ?? 0;
+    dealCount = dealCountRes.count ?? 0;
+    stageCount = stageCountRes.count ?? 0;
   }
 
   // Assemble the full user object matching what JSX expects
@@ -128,23 +144,26 @@ export default async function AdminUserDetailPage({
   // Get recent leads for this user's space
   let recentLeads: { id: string; name: string; phone: string | null; createdAt: Date; scoringStatus: string; scoreLabel: string | null }[] = [];
   if (fullUser.space) {
-    const leadRows = await sql`
-      SELECT id, name, phone, "createdAt", "scoringStatus", "scoreLabel"
-      FROM "Contact"
-      WHERE "spaceId" = ${fullUser.space.id} AND 'application-link' = ANY(tags)
-      ORDER BY "createdAt" DESC
-      LIMIT 5
-    `;
-    recentLeads = leadRows as typeof recentLeads;
+    const { data: leadRows, error: leadError } = await supabase
+      .from('Contact')
+      .select('id, name, phone, createdAt, scoringStatus, scoreLabel')
+      .eq('spaceId', fullUser.space.id)
+      .contains('tags', ['application-link'])
+      .order('createdAt', { ascending: false })
+      .limit(5);
+    if (leadError) throw leadError;
+    recentLeads = (leadRows ?? []) as typeof recentLeads;
   }
 
   let failedLeads = 0;
   if (fullUser.space) {
-    const failedRows = await sql`
-      SELECT COUNT(*)::int AS count FROM "Contact"
-      WHERE "spaceId" = ${fullUser.space.id} AND "scoringStatus" = 'failed'
-    `;
-    failedLeads = (failedRows[0] as { count: number }).count;
+    const { count: failedCount, error: failedError } = await supabase
+      .from('Contact')
+      .select('*', { count: 'exact', head: true })
+      .eq('spaceId', fullUser.space.id)
+      .eq('scoringStatus', 'failed');
+    if (failedError) throw failedError;
+    failedLeads = failedCount ?? 0;
   }
 
   return (

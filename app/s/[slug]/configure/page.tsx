@@ -1,6 +1,6 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { ConfigureAccountForm } from './configure-account-form';
 import type { User, Space, SpaceSetting } from '@/lib/types';
 
@@ -23,24 +23,21 @@ export default async function ConfigurePage({
 
   let dbUser: DbUser | null = null;
   try {
-    const userRows = await sql`
-      SELECT * FROM "User" WHERE "clerkId" = ${userId}
-    `;
-    if (userRows[0]) {
-      const u = userRows[0] as User;
-      const spaceRows = await sql`
-        SELECT * FROM "Space" WHERE "ownerId" = ${u.id} LIMIT 1
-      `;
-      if (spaceRows[0]) {
-        const s = spaceRows[0] as Space;
-        const settingsRows = await sql`
-          SELECT * FROM "SpaceSetting" WHERE "spaceId" = ${s.id}
-        `;
+    const { data: userData, error: userError } = await supabase.from('User').select('*').eq('clerkId', userId).maybeSingle();
+    if (userError) throw userError;
+    if (userData) {
+      const u = userData as User;
+      const { data: spaceData, error: spaceError } = await supabase.from('Space').select('*').eq('ownerId', u.id).limit(1).maybeSingle();
+      if (spaceError) throw spaceError;
+      if (spaceData) {
+        const s = spaceData as Space;
+        const { data: settingsData, error: settingsError } = await supabase.from('SpaceSetting').select('*').eq('spaceId', s.id).maybeSingle();
+        if (settingsError) throw settingsError;
         dbUser = {
           ...u,
           space: {
             ...s,
-            settings: (settingsRows[0] as SpaceSetting) ?? null,
+            settings: (settingsData as SpaceSetting) ?? null,
           },
         };
       } else {

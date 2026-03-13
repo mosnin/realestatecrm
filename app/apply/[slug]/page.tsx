@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { ApplicationForm } from './application-form';
 import { Clock, Users, FileText, ArrowRight } from 'lucide-react';
@@ -13,12 +13,8 @@ export default async function PublicApplyPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  const rows = await sql`
-    SELECT "intakePageTitle", "intakePageIntro", "businessName"
-    FROM "SpaceSetting"
-    WHERE "spaceId" = ${space.id}
-  `;
-  const settings = rows[0] as { intakePageTitle: string | null; intakePageIntro: string | null; businessName: string | null } | undefined;
+  const { data: settingsData } = await supabase.from('SpaceSetting').select('intakePageTitle, intakePageIntro, businessName').eq('spaceId', space.id).maybeSingle();
+  const settings = settingsData as { intakePageTitle: string | null; intakePageIntro: string | null; businessName: string | null } | null;
 
   const pageTitle = settings?.intakePageTitle || `Apply with ${space.name}`;
   const pageIntro =

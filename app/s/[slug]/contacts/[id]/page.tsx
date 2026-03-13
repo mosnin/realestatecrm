@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -43,31 +43,26 @@ export default async function ClientDetailPage({
 
   let contact: (Contact & { dealContacts: { deal: { id: string; title: string; address: string | null; value: number | null; stage: { name: string; color: string } } }[] }) | null = null;
   try {
-    const contactRows = await sql`
-      SELECT * FROM "Contact" WHERE id = ${id}
-    `;
-    if (!contactRows[0]) {
+    const { data: contactData, error: contactError } = await supabase.from('Contact').select('*').eq('id', id).single();
+    if (contactError && contactError.code === 'PGRST116') {
       contact = null;
+    } else if (contactError) {
+      throw contactError;
     } else {
-      const c = contactRows[0] as Contact;
-      const dealRows = await sql`
-        SELECT d.*, ds.name AS "stageName", ds.color AS "stageColor"
-        FROM "DealContact" dc
-        JOIN "Deal" d ON d.id = dc."dealId"
-        JOIN "DealStage" ds ON ds.id = d."stageId"
-        WHERE dc."contactId" = ${id}
-      `;
+      const c = contactData as Contact;
+      const { data: dealRows, error: dealError } = await supabase.from('DealContact').select('Deal(id, title, address, value, DealStage(name, color))').eq('contactId', id);
+      if (dealError) throw dealError;
       contact = {
         ...c,
-        dealContacts: (dealRows as Record<string, unknown>[]).map((row) => ({
+        dealContacts: ((dealRows ?? []) as { Deal: { id: string; title: string; address: string | null; value: number | null; DealStage: { name: string; color: string } } }[]).map((row) => ({
           deal: {
-            id: row.id as string,
-            title: row.title as string,
-            address: row.address as string | null,
-            value: row.value as number | null,
+            id: row.Deal.id,
+            title: row.Deal.title,
+            address: row.Deal.address,
+            value: row.Deal.value,
             stage: {
-              name: row.stageName as string,
-              color: row.stageColor as string,
+              name: row.Deal.DealStage.name,
+              color: row.Deal.DealStage.color,
             },
           },
         })),

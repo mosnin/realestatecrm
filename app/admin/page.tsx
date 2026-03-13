@@ -1,4 +1,4 @@
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Users,
@@ -15,28 +15,36 @@ export default async function AdminOverviewPage() {
   let recentUsers: { id: string; name: string | null; email: string; onboard: boolean; createdAt: Date; space: { slug: string } | null }[] = [];
 
   try {
-    [totalUsers, onboardedUsers, usersWithSpace, totalContacts, totalLeads, recentUsers] =
+    const [totalRes, onboardedRes, withSpaceRes, contactsRes, leadsRes, recentRes] =
       await Promise.all([
-        sql`SELECT COUNT(*)::int AS count FROM "User"`.then(r => (r[0] as { count: number }).count),
-        sql`SELECT COUNT(*)::int AS count FROM "User" WHERE onboard = true`.then(r => (r[0] as { count: number }).count),
-        sql`SELECT COUNT(*)::int AS count FROM "User" u WHERE EXISTS (SELECT 1 FROM "Space" s WHERE s."ownerId" = u.id)`.then(r => (r[0] as { count: number }).count),
-        sql`SELECT COUNT(*)::int AS count FROM "Contact"`.then(r => (r[0] as { count: number }).count),
-        sql`SELECT COUNT(*)::int AS count FROM "Contact" WHERE 'application-link' = ANY(tags)`.then(r => (r[0] as { count: number }).count),
-        sql`
-          SELECT u.id, u.name, u.email, u.onboard, u."createdAt", s."slug" AS "spaceSlug"
-          FROM "User" u
-          LEFT JOIN "Space" s ON s."ownerId" = u.id
-          ORDER BY u."createdAt" DESC
-          LIMIT 5
-        `.then(rows => (rows as Record<string, unknown>[]).map(row => ({
-          id: row.id as string,
-          name: row.name as string | null,
-          email: row.email as string,
-          onboard: row.onboard as boolean,
-          createdAt: row.createdAt as Date,
-          space: row.spaceSlug ? { slug: row.spaceSlug as string } : null,
-        }))),
+        supabase.from('User').select('*', { count: 'exact', head: true }),
+        supabase.from('User').select('*', { count: 'exact', head: true }).eq('onboard', true),
+        supabase.from('User').select('*, Space!inner(id)', { count: 'exact', head: true }),
+        supabase.from('Contact').select('*', { count: 'exact', head: true }),
+        supabase.from('Contact').select('*', { count: 'exact', head: true }).contains('tags', ['application-link']),
+        supabase.from('User').select('id, name, email, onboard, createdAt, Space(slug)').order('createdAt', { ascending: false }).limit(5),
       ]);
+
+    if (totalRes.error) throw totalRes.error;
+    if (onboardedRes.error) throw onboardedRes.error;
+    if (withSpaceRes.error) throw withSpaceRes.error;
+    if (contactsRes.error) throw contactsRes.error;
+    if (leadsRes.error) throw leadsRes.error;
+    if (recentRes.error) throw recentRes.error;
+
+    totalUsers = totalRes.count ?? 0;
+    onboardedUsers = onboardedRes.count ?? 0;
+    usersWithSpace = withSpaceRes.count ?? 0;
+    totalContacts = contactsRes.count ?? 0;
+    totalLeads = leadsRes.count ?? 0;
+    recentUsers = (recentRes.data ?? []).map((row: any) => ({
+      id: row.id as string,
+      name: row.name as string | null,
+      email: row.email as string,
+      onboard: row.onboard as boolean,
+      createdAt: row.createdAt as Date,
+      space: row.Space?.slug ? { slug: row.Space.slug as string } : null,
+    }));
   } catch (err) {
     console.error('[admin] DB queries failed', { error: err });
     return (

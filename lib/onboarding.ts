@@ -7,7 +7,7 @@
  *   `user.onboard` trustworthy over time.
  * - All guards must call `getOnboardingStatus()` and check `.isOnboarded`.
  */
-import { sql } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 
 type OnboardingUser = {
   id?: string;
@@ -45,7 +45,16 @@ export async function ensureOnboardingBackfill(
 ): Promise<boolean> {
   if (!shouldBackfillOnboardFromSpace(user)) return false;
 
-  await sql`UPDATE "User" SET "onboard" = true, "onboardingCompletedAt" = NOW(), "onboardingCurrentStep" = 7 WHERE id = ${user!.id!}`;
+  const { error } = await supabase
+    .from('User')
+    .update({
+      onboard: true,
+      onboardingCompletedAt: new Date().toISOString(),
+      onboardingCurrentStep: 7,
+    })
+    .eq('id', user!.id!);
+
+  if (error) throw error;
 
   // Mutate in-place so the caller's reference is up-to-date
   if (user) {
