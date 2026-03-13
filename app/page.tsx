@@ -17,6 +17,7 @@ import Testimonials from '@/components/ui/testimonials-columns-1';
 import ScrollFAQAccordion from '@/components/ui/scroll-faqaccordion';
 import { Navbar } from '@/components/navbar';
 import AnimatedFooter from '@/components/ui/animated-footer';
+import { AnimatedCard, CardVisual, CardBody, CardTitle, CardDescription, Visual3 } from '@/components/ui/animated-card-chart';
 
 const pillNav = [
   { id: 'problem', label: 'Problem' },
@@ -407,6 +408,51 @@ export default function HomePage() {
                 <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{card.description}</p>
               </div>
             ))}
+          </div>
+
+          {/* Animated chart feature — full-width row: visual left, text right */}
+          <div className="mt-4 rounded-xl border border-border bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div className="grid md:grid-cols-2">
+              {/* Left — animated chart card */}
+              <AnimatedCard className="rounded-none border-0 border-r border-border shadow-none">
+                <CardVisual>
+                  <Visual3 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                </CardVisual>
+                <CardBody>
+                  <CardTitle>Lead performance at a glance</CardTitle>
+                  <CardDescription>
+                    Hover to explore conversion trends.
+                  </CardDescription>
+                </CardBody>
+              </AnimatedCard>
+
+              {/* Right — context text */}
+              <div className="flex flex-col justify-center px-6 py-8 md:px-8">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary w-fit">
+                  Analytics
+                </div>
+                <h3 className="mt-4 text-xl font-semibold tracking-tight">
+                  See exactly where your pipeline stands
+                </h3>
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                  Track qualification rates, lead velocity, and conversion performance
+                  in one view — no spreadsheet juggling required. Hover the chart to
+                  reveal real shifts in your pipeline health over time.
+                </p>
+                <ul className="mt-5 space-y-2.5">
+                  {[
+                    'Qualified vs. disqualified lead ratio',
+                    'Weekly intake volume trends',
+                    'Average time-to-follow-up',
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CheckCircle2 size={14} className="text-primary flex-shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       </section>
