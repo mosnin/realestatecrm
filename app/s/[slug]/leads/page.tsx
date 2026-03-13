@@ -86,7 +86,7 @@ export default async function LeadsPage({
   const newCount = unreadLeads.length;
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5">
       {/* Page header */}
       <div className="flex items-start justify-between gap-4">
         <div>

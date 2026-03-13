@@ -98,7 +98,7 @@ export default async function ClientDetailPage({
     }).format(n);
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-4xl space-y-5">
       {/* Back nav */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-muted-foreground">

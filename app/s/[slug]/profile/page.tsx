@@ -24,7 +24,7 @@ export default function ProfilePage() {
 
   if (!isLoaded) {
     return (
-      <div className="space-y-4 max-w-xl animate-pulse">
+      <div className="space-y-4 max-w-3xl animate-pulse">
         <div className="h-8 bg-muted rounded-lg w-32" />
         <div className="h-40 bg-muted rounded-xl" />
         <div className="h-64 bg-muted rounded-xl" />
@@ -58,7 +58,7 @@ export default function ProfilePage() {
   const applicationUrl = slug ? buildIntakeUrl(slug) : '';
 
   return (
-    <div className="space-y-5 max-w-xl">
+    <div className="space-y-5 max-w-3xl">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Profile</h2>
         <p className="text-muted-foreground text-sm">Manage your personal information and intake link</p>

@@ -12,7 +12,7 @@ export default async function ClientsPage({
   if (!space) notFound();
 
   return (
-    <div className="space-y-5 max-w-5xl">
+    <div className="space-y-5">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Clients</h1>
         <p className="text-sm text-muted-foreground mt-0.5">

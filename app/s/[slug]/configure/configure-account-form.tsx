@@ -135,7 +135,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-3xl">
       <div className="mb-6">
         <h1 className="text-xl font-bold tracking-tight">Configure your account</h1>
         <p className="text-sm text-muted-foreground mt-1">
