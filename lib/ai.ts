@@ -42,25 +42,29 @@ export async function chatWithRAG(
 
   // ── Step 1: always load the user's full CRM data for this space ──────────
   // This guarantees the AI has context even when vectors haven't been populated yet.
-  const [{ data: allContacts }, { data: allDeals }, { data: allDealContactRows }] =
-    await Promise.all([
-      supabase
-        .from('Contact')
-        .select('*')
-        .eq('spaceId', spaceId)
-        .order('createdAt', { ascending: false })
-        .limit(100),
-      supabase
-        .from('Deal')
-        .select('*, DealStage(name)')
-        .eq('spaceId', spaceId)
-        .order('createdAt', { ascending: false })
-        .limit(50),
-      supabase
+  const [{ data: allContacts }, { data: allDeals }] = await Promise.all([
+    supabase
+      .from('Contact')
+      .select('*')
+      .eq('spaceId', spaceId)
+      .order('createdAt', { ascending: false })
+      .limit(100),
+    supabase
+      .from('Deal')
+      .select('*, DealStage(name)')
+      .eq('spaceId', spaceId)
+      .order('createdAt', { ascending: false })
+      .limit(50),
+  ]);
+
+  // Fetch deal↔contact links scoped to this space's deal IDs only
+  const dealIds = (allDeals ?? []).map((d: any) => d.id);
+  const { data: allDealContactRows } = dealIds.length
+    ? await supabase
         .from('DealContact')
         .select('dealId, Contact(name)')
-        .eq('Contact.spaceId' as any, spaceId),
-    ]);
+        .in('dealId', dealIds)
+    : { data: [] };
 
   // ── Step 2: try vector search to promote the most relevant records ────────
   // If vectors aren't populated yet this will return an empty list (not an error).
