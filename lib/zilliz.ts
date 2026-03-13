@@ -1,80 +1,22 @@
-import { MilvusClient, DataType } from '@zilliz/milvus2-sdk-node';
+// Vector storage backed by Supabase pgvector.
+// Replaces the previous Zilliz/Milvus integration — same exported interface so
+// lib/vectorize.ts and lib/ai.ts require no import changes.
 
-const globalForMilvus = globalThis as unknown as {
-  milvus: MilvusClient | undefined;
-};
+import { supabase } from '@/lib/supabase';
 
-function getMilvusClient() {
-  if (!process.env.ZILLIZ_URI || !process.env.ZILLIZ_TOKEN) {
-    throw new Error('ZILLIZ_URI and ZILLIZ_TOKEN must be set');
-  }
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
-  if (!globalForMilvus.milvus) {
-    globalForMilvus.milvus = new MilvusClient({
-      address: process.env.ZILLIZ_URI,
-      token: process.env.ZILLIZ_TOKEN
-    });
-  }
-
-  return globalForMilvus.milvus;
+/** Format a number[] into the Postgres vector literal expected by pgvector. */
+function toVectorLiteral(vector: number[]): string {
+  return `[${vector.join(',')}]`;
 }
 
-export function collectionName(spaceId: string) {
-  return `space_${spaceId.replace(/-/g, '_')}`;
-}
+// ─── public API ───────────────────────────────────────────────────────────────
 
-const VECTOR_DIM = 1536; // text-embedding-3-small dimension
-
-export async function ensureCollection(spaceId: string) {
-  const client = getMilvusClient();
-  const name = collectionName(spaceId);
-
-  const exists = await client.hasCollection({ collection_name: name });
-  if (exists.value) return;
-
-  await client.createCollection({
-    collection_name: name,
-    fields: [
-      {
-        name: 'id',
-        data_type: DataType.VarChar,
-        max_length: 64,
-        is_primary_key: true,
-        autoID: false
-      },
-      {
-        name: 'entity_type',
-        data_type: DataType.VarChar,
-        max_length: 16
-      },
-      {
-        name: 'entity_id',
-        data_type: DataType.VarChar,
-        max_length: 64
-      },
-      {
-        name: 'text',
-        data_type: DataType.VarChar,
-        max_length: 4096
-      },
-      {
-        name: 'vector',
-        data_type: DataType.FloatVector,
-        dim: VECTOR_DIM
-      }
-    ]
-  });
-
-  await client.createIndex({
-    collection_name: name,
-    field_name: 'vector',
-    index_type: 'AUTOINDEX',
-    metric_type: 'COSINE'
-  });
-
-  await client.loadCollection({ collection_name: name });
-}
-
+/**
+ * Upsert (insert or replace) a single embedding row.
+ * The `id` is a stable composite key like `contact_<uuid>` or `deal_<uuid>`.
+ */
 export async function upsertVector(
   spaceId: string,
   id: string,
@@ -82,44 +24,62 @@ export async function upsertVector(
   entityId: string,
   text: string,
   vector: number[]
-) {
-  const client = getMilvusClient();
-  await ensureCollection(spaceId);
-  const name = collectionName(spaceId);
+): Promise<void> {
+  const { error } = await supabase.from('DocumentEmbedding').upsert(
+    {
+      id,
+      spaceId,
+      entityType,
+      entityId,
+      content: text,
+      embedding: toVectorLiteral(vector),
+    },
+    { onConflict: 'id' }
+  );
 
-  await client.upsert({
-    collection_name: name,
-    data: [{ id, entity_type: entityType, entity_id: entityId, text, vector }]
-  });
+  if (error) throw error;
 }
 
-export async function deleteVector(spaceId: string, id: string) {
-  const client = getMilvusClient();
-  const name = collectionName(spaceId);
-  const exists = await client.hasCollection({ collection_name: name });
-  if (!exists.value) return;
+/**
+ * Delete the embedding row for a given composite id.
+ * The spaceId guard ensures a user can only delete their own vectors.
+ */
+export async function deleteVector(spaceId: string, id: string): Promise<void> {
+  const { error } = await supabase
+    .from('DocumentEmbedding')
+    .delete()
+    .eq('id', id)
+    .eq('spaceId', spaceId);
 
-  await client.delete({
-    collection_name: name,
-    filter: `id == "${id}"`
-  });
+  if (error) throw error;
 }
 
+/**
+ * Return the topK most similar documents for the given query vector,
+ * scoped strictly to the caller's spaceId so users never see each other's data.
+ */
 export async function searchVectors(
   spaceId: string,
   queryVector: number[],
   topK = 5
-) {
-  const client = getMilvusClient();
-  await ensureCollection(spaceId);
-  const name = collectionName(spaceId);
-
-  const results = await client.search({
-    collection_name: name,
-    data: [queryVector],
-    limit: topK,
-    output_fields: ['entity_type', 'entity_id', 'text']
+): Promise<Array<{ entity_type: string; entity_id: string; text: string; score: number }>> {
+  const { data, error } = await supabase.rpc('match_documents', {
+    query_embedding: toVectorLiteral(queryVector),
+    match_space_id: spaceId,
+    match_count: topK,
   });
 
-  return results.results ?? [];
+  if (error) throw error;
+
+  return (data ?? []).map((row: {
+    entity_type: string;
+    entity_id: string;
+    content: string;
+    similarity: number;
+  }) => ({
+    entity_type: row.entity_type,
+    entity_id: row.entity_id,
+    text: row.content,
+    score: row.similarity,
+  }));
 }

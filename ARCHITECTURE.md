@@ -10,7 +10,7 @@ System map for Chippi. Based on actual repository contents.
 1. **Slug-only identity**: Workspace identity is slug-only in runtime (`/s/:slug`, `/apply/:slug`). Never derive workspace identity from host/hostname/header parsing.
 2. **Canonical onboarding completion**: Onboarding completion is determined only by `User.onboard`, via `lib/onboarding.ts` helpers.
 3. **Canonical intake submission pipeline**: Public intake submissions must go through `app/api/public/apply/route.ts` with `publicApplicationSchema` validation and idempotency safeguards.
-4. **DB naming safety**: Runtime field is `Space.slug`, mapped to DB column `subdomain` via Prisma `@map` for deploy safety; do not perform destructive column renames without an explicit expand/contract plan.
+4. **DB naming safety**: Runtime field is `Space.slug` maps directly to the `slug` column in Supabase; do not perform destructive column renames without an explicit expand/contract plan.
 
 ---
 
@@ -22,11 +22,11 @@ System map for Chippi. Based on actual repository contents.
 | Language | TypeScript 5.8 | Build errors currently ignored via `next.config.ts` |
 | UI | React 19, Tailwind 4, Radix/shadcn-style components | framer-motion + GSAP for animations |
 | Auth | Clerk (`@clerk/nextjs@^7.0.1`) | Middleware-based route protection |
-| Database | PostgreSQL via Prisma 7 (`@prisma/client`, `@prisma/adapter-pg`) | `pg` pool adapter |
+| Database | Supabase PostgreSQL (`@supabase/supabase-js@^2.99.1`) | Service-role key, server-side only |
 | AI - scoring | OpenAI (`openai@^6.26.0`) | `gpt-4o-mini`, structured JSON output |
 | AI - assistant | OpenAI (preferred) + Anthropic SDK (`@anthropic-ai/sdk@^0.78.0`) fallback | `gpt-4o-mini` / `claude-sonnet-4-6` |
 | AI - embeddings | OpenAI `text-embedding-3-small` | 1536-dim vectors |
-| Vector DB | Zilliz/Milvus (`@zilliz/milvus2-sdk-node@^2.6.10`) | Per-space collections, COSINE metric |
+| Vector DB | Supabase pgvector (`DocumentEmbedding` table) | Per-space rows, HNSW index, COSINE metric via `match_documents` RPC |
 | Cache/legacy | Upstash Redis (`@upstash/redis@^1.34.9`) | Slug metadata, admin path |
 | Forms | react-hook-form + zod validation | |
 | Charts | recharts | |
@@ -75,22 +75,20 @@ realestatecrm/
 │   └── ui/                     # shadcn-style primitives
 ├── lib/
 │   ├── ai.ts                   # AI assistant logic (provider routing, RAG, streaming)
-│   ├── db.ts                   # Prisma client singleton
 │   ├── embeddings.ts           # OpenAI text-embedding-3-small
 │   ├── lead-scoring.ts         # Lead scoring (OpenAI gpt-4o-mini, structured JSON)
 │   ├── nav-links.ts            # Landing page nav config
 │   ├── redis.ts                # Upstash Redis client
 │   ├── space.ts                # Space lookup helpers
-│   ├── slugs.ts           # Legacy slug helpers (Redis-based)
+│   ├── slugs.ts                # Legacy slug helpers (Redis-based)
+│   ├── supabase.ts             # Supabase client singleton (service-role)
+│   ├── types.ts                # TypeScript model types (replaces Prisma generated)
 │   ├── utils.ts                # cn(), protocol, rootDomain
 │   ├── vectorize.ts            # Contact/deal → vector sync
-│   └── zilliz.ts               # Milvus client, collection CRUD, search
-├── prisma/
-│   ├── schema.prisma           # Data model
-│   └── migrations/             # SQL migration history
+│   └── zilliz.ts               # Vector storage (Supabase pgvector, interface unchanged)
+├── supabase/
+│   └── schema.sql              # Full database schema (tables + pgvector + RPC)
 ├── scripts/
-│   ├── ensure-prisma-client-shim.cjs   # Build helper
-│   └── resolve-failed-migrations.cjs   # Migration recovery helper
 ├── middleware.ts               # Clerk auth middleware + route protection
 ├── next.config.ts              # Next.js config (TS/ESLint errors ignored)
 ├── prisma.config.ts            # Prisma config
@@ -113,9 +111,9 @@ realestatecrm/
 | Contacts API | `app/api/contacts/route.ts`, `[id]/route.ts` | CRUD with search/filter, async vector sync on create |
 | Deals API | `app/api/deals/route.ts`, `[id]/route.ts`, `reorder/route.ts` | CRUD with stage association, position ordering, async vector sync |
 | Stages API | `app/api/stages/route.ts`, `[id]/route.ts` | Deal stage CRUD |
-| AI assistant | `app/api/ai/chat/route.ts`, `lib/ai.ts` | Streaming chat with RAG context from Zilliz, message persistence |
-| Vector system | `lib/embeddings.ts`, `lib/zilliz.ts`, `lib/vectorize.ts`, `app/api/vectorize/sync/route.ts` | OpenAI embeddings → Zilliz per-space collections |
-| Data model | `prisma/schema.prisma` | User, Space, SpaceSetting, Contact, Deal, DealStage, DealContact, Message |
+| AI assistant | `app/api/ai/chat/route.ts`, `lib/ai.ts` | Streaming chat with RAG context from Supabase pgvector, message persistence |
+| Vector system | `lib/embeddings.ts`, `lib/zilliz.ts`, `lib/vectorize.ts`, `app/api/vectorize/sync/route.ts` | OpenAI embeddings → Supabase `DocumentEmbedding` table, `match_documents` RPC |
+| Data model | `supabase/schema.sql` | User, Space, SpaceSetting, Contact, Deal, DealStage, DealContact, Message, DocumentEmbedding |
 | Dashboard gate | `app/dashboard/page.tsx` | Redirects to workspace if onboarding complete, or to `/onboarding` |
 | Admin (legacy) | `app/admin/*` | Redis-based admin dashboard, legacy path |
 | Server actions (legacy) | `app/actions.ts` | `createSlugAction`, `deleteSlugAction` — older space creation path using Redis |
@@ -145,7 +143,7 @@ realestatecrm/
    → Deals page: kanban with stages and drag/reorder
 6. AI assistant:
    → Streams response via OpenAI (preferred) or Anthropic (fallback)
-   → Optionally enriches with vector context from Zilliz
+   → Enriches with vector context from Supabase pgvector (scoped to caller's spaceId)
    → Persists messages to Message table
 ```
 
@@ -231,9 +229,8 @@ Completion sets `onboardingCurrentStep = 7` and `onboardingCompletedAt = now()`.
 
 ## 11. Deployment notes
 
-- **Build command**: `node scripts/resolve-failed-migrations.cjs && prisma migrate deploy && node scripts/ensure-prisma-client-shim.cjs && next build`
+- **Build command**: `next build`
 - **`next.config.ts`**: ignores TypeScript and ESLint build errors (`ignoreBuildErrors: true`, `ignoreDuringBuilds: true`)
-- **Server external packages**: `@zilliz/milvus2-sdk-node` (for Node.js native modules)
 - **Vercel packages**: `@vercel/analytics`, `@vercel/speed-insights` present
 - **Domain handling**: `NEXT_PUBLIC_ROOT_DOMAIN` env var, falls back to `workflowrouting.com` (prod) or `localhost:3000` (dev). Protocol derived from `NODE_ENV`.
 - **Postinstall**: runs `ensure-prisma-client-shim.cjs`
@@ -242,10 +239,11 @@ Completion sets `onboardingCurrentStep = 7` and `onboardingCompletedAt = now()`.
 
 ## 12. Known risks, coupling points, unclear areas
 
-1. **Legacy Redis path**: `app/actions.ts` and `lib/slugs.ts` use Upstash Redis for slug metadata. This coexists with the Prisma-first workspace model. The admin dashboard relies on Redis. Potential for state divergence.
+1. **Legacy Redis path**: `app/actions.ts` and `lib/slugs.ts` use Upstash Redis for slug metadata. The admin dashboard also relies on Redis. Potential for state divergence with Supabase as source of truth.
 2. **Build error suppression**: TypeScript and ESLint errors are ignored during build. Type and lint issues can accumulate silently.
 3. **Billing not implemented**: Field and UI exist but no payment processing. Enabling billing will require Stripe integration and careful boundary work.
-4. **Tenant isolation**: API routes check auth but workspace ownership verification varies. Sensitive area for security review.
+4. **Tenant isolation**: API routes check auth and all vector queries are scoped by `spaceId`, but workspace ownership verification in other routes varies. Sensitive area for security review.
 5. **Onboarding auto-heal**: Both `/dashboard` and `/s/[slug]/layout.tsx` contain onboarding completion auto-heal logic for legacy accounts. Duplicated logic.
-6. **Two space creation paths**: `app/api/onboarding/route.ts` (create_space action) and `app/actions.ts` (createSlugAction) both create spaces with different default stage names (New/Reviewing/Showing/Applied/Approved/Declined vs Lead/Qualified/Proposal/Negotiation/Closed Won/Closed Lost).
-7. **Vector dependency optional**: Zilliz/embeddings failures are silently caught — assistant works without RAG. But scoring requires OpenAI.
+6. **Two space creation paths**: `app/api/onboarding/route.ts` (create_space action) and `app/actions.ts` (createSlugAction) both create spaces with different default stage names.
+7. **Vector dependency optional**: pgvector/embeddings failures are silently caught — assistant works without RAG. But scoring requires OpenAI.
+8. **pgvector setup**: The `vector` extension and `DocumentEmbedding` table must be created in Supabase before vector sync works. Run the additions in `supabase/schema.sql` via the Supabase SQL Editor.

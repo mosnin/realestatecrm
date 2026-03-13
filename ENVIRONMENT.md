@@ -10,17 +10,16 @@ All variables found or inferable from code usage:
 
 | Variable | Used by | What it powers | Criticality | Failure symptom if missing |
 |---|---|---|---|---|
-| `DATABASE_URL` | `lib/db.ts` (pg pool + Prisma adapter) | PostgreSQL connection for all app data | **Critical** | All DB operations fail; app crashes on any data access |
+| `NEXT_PUBLIC_SUPABASE_URL` | `lib/supabase.ts` | Supabase project endpoint for all DB operations | **Critical** | All DB operations fail; app crashes on any data access |
+| `SUPABASE_SERVICE_ROLE_KEY` | `lib/supabase.ts` | Server-side Supabase service role (bypasses RLS) | **Critical** | All DB operations fail |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk SDK (client-side) | Auth UI components (sign-in, sign-up) | **Critical** | Auth pages fail to render; sign-in/sign-up broken |
 | `CLERK_SECRET_KEY` | Clerk SDK (server-side) | Server-side auth verification, middleware | **Critical** | All protected routes fail; API auth returns errors |
-| `OPENAI_API_KEY` | `lib/lead-scoring.ts`, `lib/embeddings.ts`, `lib/ai.ts` | Lead scoring, text embeddings, AI assistant (primary) | **High** | Scoring fails (fallback to unscored); embeddings fail; assistant may fall back to Anthropic |
-| `ANTHROPIC_API_KEY` | `lib/ai.ts` | AI assistant (fallback provider) | **Medium** | Assistant falls back to OpenAI if available; if neither key set, assistant returns error message |
-| `ZILLIZ_URI` | `lib/zilliz.ts` | Milvus/Zilliz vector DB endpoint | **Optional** | Vector sync and RAG context fail silently; assistant works without RAG |
-| `ZILLIZ_TOKEN` | `lib/zilliz.ts` | Milvus/Zilliz authentication | **Optional** | Same as `ZILLIZ_URI` |
+| `OPENAI_API_KEY` | `lib/lead-scoring.ts`, `lib/embeddings.ts`, `lib/ai.ts` | Lead scoring, text embeddings, AI assistant (primary) | **High** | Scoring fails (fallback to unscored); embeddings and vector sync fail; assistant may fall back to Anthropic |
+| `ANTHROPIC_API_KEY` | `lib/ai.ts` | AI assistant fallback provider | **Medium** | Assistant falls back to OpenAI if available; if neither key is set, assistant returns error message |
 | `KV_REST_API_URL` | `lib/redis.ts` | Upstash Redis endpoint | **Medium** | Legacy admin path and slug metadata fail |
 | `KV_REST_API_TOKEN` | `lib/redis.ts` | Upstash Redis authentication | **Medium** | Same as `KV_REST_API_URL` |
 | `NEXT_PUBLIC_ROOT_DOMAIN` | `lib/utils.ts` | Public URL/domain construction for intake links | **Medium** | Falls back to `workflowrouting.com` (prod) or `localhost:3000` (dev); intake link URLs may be wrong if not set correctly |
-| `NODE_ENV` | `lib/utils.ts`, `lib/db.ts` | Protocol selection (http vs https), Prisma logging level | **Auto-set** | Set automatically by Next.js; do not override manually |
+| `NODE_ENV` | `lib/utils.ts` | Protocol selection (http vs https) | **Auto-set** | Set automatically by Next.js; do not override manually |
 
 ### Clerk-specific variables
 
@@ -42,10 +41,10 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 | Service | Role in Chippi | Key integration files |
 |---|---|---|
 | **Clerk** | Authentication, session management, route protection | `middleware.ts`, `app/(auth)/*`, all API routes using `auth()` |
-| **PostgreSQL** | Source-of-truth for all app data (users, spaces, contacts, deals, stages, messages, settings) | `lib/db.ts`, `prisma/schema.prisma` |
+| **Supabase** | Source-of-truth for all app data (users, spaces, contacts, deals, stages, messages, embeddings) | `lib/supabase.ts`, `supabase/schema.sql` |
 | **OpenAI** | Lead scoring (gpt-4o-mini), text embeddings (text-embedding-3-small), AI assistant primary provider | `lib/lead-scoring.ts`, `lib/embeddings.ts`, `lib/ai.ts` |
 | **Anthropic** | AI assistant fallback provider. Per-workspace key support via SpaceSetting. | `lib/ai.ts` |
-| **Zilliz/Milvus** | Vector storage and similarity search for RAG-enriched AI assistant context | `lib/zilliz.ts`, `lib/embeddings.ts`, `lib/vectorize.ts` |
+| **Supabase pgvector** | Vector storage and similarity search for RAG-enriched AI assistant context, scoped per workspace | `lib/zilliz.ts`, `lib/vectorize.ts`, `supabase/schema.sql` (`DocumentEmbedding` table + `match_documents` RPC) |
 | **Upstash Redis** | Legacy slug metadata storage, admin dashboard data | `lib/redis.ts`, `lib/slugs.ts`, `app/actions.ts` |
 | **Vercel** | Deployment target, analytics, speed insights | `@vercel/analytics`, `@vercel/speed-insights` packages |
 
@@ -57,7 +56,8 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 
 | Variable | Why |
 |---|---|
-| `DATABASE_URL` | No data access without it |
+| `NEXT_PUBLIC_SUPABASE_URL` | No data access without it |
+| `SUPABASE_SERVICE_ROLE_KEY` | No data access without it |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Auth UI won't render |
 | `CLERK_SECRET_KEY` | Server auth fails |
 
@@ -65,14 +65,13 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 
 | Variable | Why |
 |---|---|
-| `OPENAI_API_KEY` | Lead scoring and embeddings require it. Assistant can fall back to Anthropic but scoring cannot. |
+| `OPENAI_API_KEY` | Lead scoring and embeddings require it. Assistant can fall back to Anthropic but scoring cannot. Vector sync requires embeddings. |
 
 ### Nice to have / optional
 
 | Variable | Why |
 |---|---|
 | `ANTHROPIC_API_KEY` | Assistant fallback. Not needed if OpenAI key is set. |
-| `ZILLIZ_URI` + `ZILLIZ_TOKEN` | RAG context enrichment. Assistant works without it. |
 | `KV_REST_API_URL` + `KV_REST_API_TOKEN` | Legacy admin path. Core CRM works without it. |
 | `NEXT_PUBLIC_ROOT_DOMAIN` | Falls back to defaults. Set for correct intake link URLs. |
 
@@ -84,9 +83,7 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 |---|---|---|
 | Protocol | `http` (derived from `NODE_ENV`) | `https` |
 | Default domain | `localhost:3000` | `workflowrouting.com` |
-| Prisma logging | `['error', 'warn']` | `['error']` |
-| Prisma client | Singleton cached on `globalThis` | Fresh per cold start |
-| Build pipeline | `pnpm dev` (Turbopack) | `pnpm build` (migrations + prisma shim + next build) |
+| Build pipeline | `pnpm dev` (Turbopack) | `pnpm build` (`next build`) |
 | TS/ESLint errors | Visible in dev | Ignored during build (`next.config.ts`) |
 
 ### `.env` files
@@ -100,14 +97,13 @@ All `.env*` files are gitignored. Create a `.env.local` file locally with the re
 | Service | Present in code | Package | Status |
 |---|---|---|---|
 | Clerk | Yes | `@clerk/nextjs@^7.0.1` | Core auth, fully integrated |
-| PostgreSQL (Neon-compatible) | Yes | `@prisma/client@^7.4.2`, `pg@^8.20.0` | Core database, fully integrated |
+| Supabase | Yes | `@supabase/supabase-js@^2.99.1` | Core database, fully integrated |
 | OpenAI | Yes | `openai@^6.26.0` | Scoring + embeddings + assistant, fully integrated |
 | Anthropic | Yes | `@anthropic-ai/sdk@^0.78.0` | Assistant fallback, fully integrated |
-| Zilliz/Milvus | Yes | `@zilliz/milvus2-sdk-node@^2.6.10` | Vector search, optional |
+| Supabase pgvector | Yes (via Supabase) | Built into `@supabase/supabase-js` | Vector search for AI RAG context, optional |
 | Upstash Redis | Yes | `@upstash/redis@^1.34.9` | Legacy metadata path |
 | Vercel | Yes (packages) | `@vercel/analytics@^1.5.0`, `@vercel/speed-insights@^1.2.0` | Deployment target |
 | Stripe | **Not confirmed** | Not in dependencies | Billing field exists in DB schema but no Stripe integration |
-| Neon | **Not explicit** | No Neon-specific package | PostgreSQL connection via `DATABASE_URL`; Neon is likely the hosted provider but not confirmed in code |
 
 ---
 
@@ -126,3 +122,14 @@ The `SpaceSetting` model stores per-workspace configuration:
 | `intakePageIntro` | Intro text on public intake form |
 | `notifications` | Email notification preference (boolean) |
 | `myConnections` | Partner connections / default submission status (JSON string) |
+
+---
+
+## 7. Supabase setup checklist
+
+Before the vector search features work, run the following in the Supabase SQL Editor:
+
+1. **Enable pgvector extension**: Dashboard → Database → Extensions → search "vector" → enable
+2. **Run `supabase/schema.sql`**: Creates all tables including `DocumentEmbedding`, the HNSW index, and the `match_documents` RPC function
+3. The AI assistant will automatically embed and index contacts/deals as they are created or updated
+4. Use `POST /api/vectorize/sync` (with `{ slug }` payload) to back-fill existing records

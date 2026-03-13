@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   const checks: Record<string, unknown> = {
-    DATABASE_URL_SET: !!process.env.DATABASE_URL,
-    DATABASE_URL_PREFIX: process.env.DATABASE_URL?.substring(0, 30) + '...',
+    SUPABASE_URL_SET: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+    SUPABASE_KEY_SET: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
   };
 
   try {

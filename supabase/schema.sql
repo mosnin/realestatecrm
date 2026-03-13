@@ -119,3 +119,61 @@ CREATE INDEX IF NOT EXISTS idx_dealstage_space_id ON "DealStage"("spaceId");
 CREATE INDEX IF NOT EXISTS idx_dealcontact_deal   ON "DealContact"("dealId");
 CREATE INDEX IF NOT EXISTS idx_dealcontact_contact ON "DealContact"("contactId");
 CREATE INDEX IF NOT EXISTS idx_message_space_id   ON "Message"("spaceId");
+
+-- ============================================================
+-- pgvector: Vector embeddings for AI-powered search
+-- Run AFTER enabling the vector extension in Supabase:
+--   Dashboard → Database → Extensions → enable "vector"
+-- ============================================================
+
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE IF NOT EXISTS "DocumentEmbedding" (
+  id            text PRIMARY KEY,
+  "spaceId"     text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  "entityType"  text NOT NULL,   -- 'contact' | 'deal'
+  "entityId"    text NOT NULL,
+  content       text NOT NULL,   -- plain text used to generate the embedding
+  embedding     vector(1536)     -- OpenAI text-embedding-3-small output
+);
+
+CREATE INDEX IF NOT EXISTS idx_doc_embedding_space  ON "DocumentEmbedding"("spaceId");
+CREATE INDEX IF NOT EXISTS idx_doc_embedding_entity ON "DocumentEmbedding"("entityId");
+-- HNSW index for fast approximate nearest-neighbour search with cosine distance
+CREATE INDEX IF NOT EXISTS idx_doc_embedding_hnsw
+  ON "DocumentEmbedding" USING hnsw (embedding vector_cosine_ops);
+
+-- ============================================================
+-- match_documents: similarity search RPC used by the AI assistant
+-- Called via supabase.rpc('match_documents', { ... })
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION match_documents(
+  query_embedding vector(1536),
+  match_space_id  text,
+  match_count     int DEFAULT 5
+)
+RETURNS TABLE (
+  id          text,
+  entity_type text,
+  entity_id   text,
+  content     text,
+  similarity  float
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    de.id,
+    de."entityType"  AS entity_type,
+    de."entityId"    AS entity_id,
+    de.content,
+    1 - (de.embedding <=> query_embedding) AS similarity
+  FROM "DocumentEmbedding" de
+  WHERE de."spaceId" = match_space_id
+    AND de.embedding IS NOT NULL
+  ORDER BY de.embedding <=> query_embedding
+  LIMIT match_count;
+END;
+$$;

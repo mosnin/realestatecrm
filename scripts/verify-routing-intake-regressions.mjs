@@ -33,7 +33,8 @@ function expectNotContains(file, regex, message) {
 // 1) Canonical onboarding helper must define onboarding from user.onboard.
 const onboardingHelper = join(repoRoot, 'lib/onboarding.ts');
 expectContains(onboardingHelper, /isOnboarded:\s*!!user\?\.onboard/, 'onboarding helper must define isOnboarded from user.onboard');
-expectContains(join(repoRoot, 'prisma/schema.prisma'), /onboard\s+Boolean/, 'User model must include onboard boolean flag');
+// Supabase schema (not Prisma) is the source of truth — check the SQL file instead.
+expectContains(join(repoRoot, 'supabase/schema.sql'), /onboard\s+boolean/, 'User table must include onboard boolean column');
 
 // 2) Onboarding API must use shared helper.
 expectContains(join(repoRoot, 'app/api/onboarding/route.ts'), /getOnboardingStatus/, 'must use getOnboardingStatus');
