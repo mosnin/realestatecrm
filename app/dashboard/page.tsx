@@ -12,17 +12,23 @@ export default async function DashboardRedirectPage() {
   // redirect loop by treating DB errors as "user not found").
   let user;
   try {
+    // Two separate queries instead of a join — more robust with PostgREST
     const { data: row, error } = await supabase
       .from('User')
-      .select('*, Space(slug, id, name)')
+      .select('*')
       .eq('clerkId', userId)
       .maybeSingle();
     if (error) throw error;
+
     if (row) {
-      const { Space, ...rest } = row;
+      const { data: spaceRow } = await supabase
+        .from('Space')
+        .select('id, slug, name')
+        .eq('ownerId', row.id)
+        .maybeSingle();
       user = {
-        ...rest,
-        space: Space ? { id: Space.id as string, slug: Space.slug as string, name: Space.name as string } : null,
+        ...row,
+        space: spaceRow ? { id: spaceRow.id as string, slug: spaceRow.slug as string, name: spaceRow.name as string } : null,
       };
     } else {
       user = null;

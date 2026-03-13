@@ -28,15 +28,20 @@ export default async function DashboardLayout({
   try {
     const { data: row, error } = await supabase
       .from('User')
-      .select('id, onboard, Space(id)')
+      .select('id, onboard')
       .eq('clerkId', userId)
       .maybeSingle();
     if (error) throw error;
     if (row) {
+      const { data: spaceRow } = await supabase
+        .from('Space')
+        .select('id')
+        .eq('ownerId', row.id)
+        .maybeSingle();
       dbUser = {
         id: row.id as string,
         onboard: row.onboard as boolean,
-        space: row.Space ? { id: row.Space.id as string } : null,
+        space: spaceRow ? { id: spaceRow.id as string } : null,
       };
     } else {
       dbUser = null;
