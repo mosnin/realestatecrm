@@ -4,11 +4,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,7 +18,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from '@/components/ui/select';
 import type { DealStage, Contact } from '@/lib/types';
 
@@ -30,7 +30,7 @@ const schema = z.object({
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']),
   closeDate: z.string().optional(),
   stageId: z.string().min(1, 'Stage is required'),
-  contactIds: z.array(z.string()).optional()
+  contactIds: z.array(z.string()).optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -52,7 +52,7 @@ export function DealForm({
   stages,
   contacts,
   defaultValues,
-  title = 'Add Deal'
+  title = 'Add Deal',
 }: DealFormProps) {
   const {
     register,
@@ -60,14 +60,10 @@ export function DealForm({
     setValue,
     watch,
     reset,
-    formState: { errors, isSubmitting }
+    formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      priority: 'MEDIUM',
-      contactIds: [],
-      ...defaultValues
-    }
+    defaultValues: { priority: 'MEDIUM', contactIds: [], ...defaultValues },
   });
 
   const selectedContactIds = watch('contactIds') ?? [];
@@ -78,7 +74,7 @@ export function DealForm({
     const current = watch('contactIds') ?? [];
     setValue(
       'contactIds',
-      current.includes(id) ? current.filter((c) => c !== id) : [...current, id]
+      current.includes(id) ? current.filter((c) => c !== id) : [...current, id],
     );
   }
 
@@ -89,12 +85,12 @@ export function DealForm({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{title}</SheetTitle>
-        </SheetHeader>
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 mt-6">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 mt-2">
           <div className="space-y-1">
             <Label htmlFor="title">Title *</Label>
             <Input id="title" {...register('title')} />
@@ -127,7 +123,10 @@ export function DealForm({
 
           <div className="space-y-1">
             <Label>Priority</Label>
-            <Select value={priority} onValueChange={(v) => setValue('priority', v as any)}>
+            <Select
+              value={priority}
+              onValueChange={(v) => setValue('priority', v as FormData['priority'])}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -185,7 +184,7 @@ export function DealForm({
             {isSubmitting ? 'Saving...' : 'Save Deal'}
           </Button>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

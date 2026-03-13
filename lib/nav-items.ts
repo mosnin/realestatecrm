@@ -7,6 +7,7 @@ import {
   User,
   Settings,
   SlidersHorizontal,
+  BarChart2,
 } from 'lucide-react';
 
 export const primaryNavItems = [
@@ -14,6 +15,7 @@ export const primaryNavItems = [
   { href: '/leads', label: 'Leads', icon: PhoneIncoming },
   { href: '/contacts', label: 'Clients', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
+  { href: '/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/ai', label: 'AI Assistant', icon: Bot },
 ] as const;
 
@@ -29,5 +31,5 @@ export const mobileNavItems = [
   { href: '/leads', label: 'Leads', icon: PhoneIncoming },
   { href: '/contacts', label: 'Clients', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
-  { href: '/ai', label: 'AI', icon: Bot },
+  { href: '/analytics', label: 'Analytics', icon: BarChart2 },
 ] as const;

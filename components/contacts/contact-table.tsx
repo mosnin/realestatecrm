@@ -11,7 +11,18 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ContactForm } from './contact-form';
-import { Plus, Search, Trash2, Pencil, Phone, Mail, Wallet, MapPin } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  Trash2,
+  Pencil,
+  Phone,
+  Mail,
+  Wallet,
+  MapPin,
+  LayoutGrid,
+  List,
+} from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
@@ -59,7 +70,12 @@ function formatCurrency(value: number | null) {
 }
 
 function getInitials(name: string) {
-  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 export function ContactTable({ slug }: ContactTableProps) {
@@ -69,6 +85,7 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [editContact, setEditContact] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<'card' | 'list'>('card');
 
   const fetchContacts = useCallback(async () => {
     const params = new URLSearchParams({ slug, search, type: typeFilter });
@@ -135,6 +152,35 @@ export function ContactTable({ slug }: ContactTableProps) {
               <SelectItem value="APPLICATION">Applied</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* View toggle */}
+          <div className="flex rounded-md border border-border overflow-hidden bg-card">
+            <button
+              type="button"
+              onClick={() => setView('card')}
+              className={cn(
+                'px-2.5 flex items-center justify-center transition-colors',
+                view === 'card'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+              )}
+            >
+              <LayoutGrid size={15} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('list')}
+              className={cn(
+                'px-2.5 flex items-center justify-center transition-colors',
+                view === 'list'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+              )}
+            >
+              <List size={15} />
+            </button>
+          </div>
+
           <Button onClick={() => setAddOpen(true)} className="gap-2 flex-shrink-0">
             <Plus size={15} />
             Add client
@@ -150,11 +196,14 @@ export function ContactTable({ slug }: ContactTableProps) {
         </p>
       )}
 
-      {/* Card grid */}
+      {/* Content */}
       {loading ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="rounded-xl border border-border bg-card px-5 py-4 animate-pulse">
+            <div
+              key={i}
+              className="rounded-xl border border-border bg-card px-5 py-4 animate-pulse"
+            >
               <div className="flex gap-3">
                 <div className="w-9 h-9 rounded-full bg-muted flex-shrink-0" />
                 <div className="flex-1 space-y-2 pt-1">
@@ -172,9 +221,7 @@ export function ContactTable({ slug }: ContactTableProps) {
           </div>
           <p className="font-semibold text-foreground mb-1">No clients found</p>
           <p className="text-sm text-muted-foreground">
-            {search
-              ? `No clients match "${search}".`
-              : 'Add your first client to get started.'}
+            {search ? `No clients match "${search}".` : 'Add your first client to get started.'}
           </p>
           {!search && (
             <Button onClick={() => setAddOpen(true)} className="mt-4 gap-2" size="sm">
@@ -182,7 +229,8 @@ export function ContactTable({ slug }: ContactTableProps) {
             </Button>
           )}
         </div>
-      ) : (
+      ) : view === 'card' ? (
+        /* ── Card grid ── */
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {contacts.map((contact) => {
             const meta = TYPE_META[contact.type];
@@ -205,12 +253,16 @@ export function ContactTable({ slug }: ContactTableProps) {
                         >
                           {contact.name}
                         </Link>
-                        <span className={cn('inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 mt-1', meta.className)}>
+                        <span
+                          className={cn(
+                            'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 mt-1',
+                            meta.className,
+                          )}
+                        >
                           {meta.label}
                         </span>
                       </div>
                     </div>
-                    {/* Actions – visible on hover */}
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                       <button
                         type="button"
@@ -260,6 +312,105 @@ export function ContactTable({ slug }: ContactTableProps) {
               </div>
             );
           })}
+        </div>
+      ) : (
+        /* ── List table ── */
+        <div className="rounded-xl border border-border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/40">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Name
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Stage
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">
+                    Contact
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">
+                    Budget
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">
+                    Preferences
+                  </th>
+                  <th className="px-4 py-3 w-20" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-card">
+                {contacts.map((contact) => {
+                  const meta = TYPE_META[contact.type];
+                  return (
+                    <tr
+                      key={contact.id}
+                      className="group hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
+                            {getInitials(contact.name)}
+                          </div>
+                          <Link
+                            href={`/s/${slug}/contacts/${contact.id}`}
+                            className="font-medium hover:text-primary transition-colors"
+                          >
+                            {contact.name}
+                          </Link>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={cn(
+                            'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5',
+                            meta.className,
+                          )}
+                        >
+                          {meta.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 hidden sm:table-cell">
+                        <div className="space-y-0.5">
+                          {contact.email && (
+                            <p className="text-xs text-muted-foreground truncate max-w-[180px]">
+                              {contact.email}
+                            </p>
+                          )}
+                          {contact.phone && (
+                            <p className="text-xs text-muted-foreground">{contact.phone}</p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">
+                        {contact.budget != null ? `${formatCurrency(contact.budget)}/mo` : '—'}
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground max-w-[200px] truncate">
+                        {contact.preferences ?? '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setEditContact(contact)}
+                            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(contact.id)}
+                            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

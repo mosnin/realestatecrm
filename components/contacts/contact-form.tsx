@@ -4,11 +4,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,7 +17,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -31,7 +31,7 @@ const schema = z.object({
   address: z.string().optional(),
   notes: z.string().optional(),
   type: z.enum(['QUALIFICATION', 'TOUR', 'APPLICATION']),
-  tags: z.string().optional()
+  tags: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -53,15 +53,25 @@ interface ContactFormProps {
 function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">{label}</p>
-      <div className="space-y-3">
-        {children}
-      </div>
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">
+        {label}
+      </p>
+      <div className="space-y-3">{children}</div>
     </div>
   );
 }
 
-function Field({ id, label, error, children }: { id?: string; label: string; error?: string; children: React.ReactNode }) {
+function Field({
+  id,
+  label,
+  error,
+  children,
+}: {
+  id?: string;
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>{label}</Label>
@@ -76,7 +86,7 @@ export function ContactForm({
   onOpenChange,
   onSubmit,
   defaultValues,
-  title = 'Add Client'
+  title = 'Add Client',
 }: ContactFormProps) {
   const {
     register,
@@ -84,13 +94,10 @@ export function ContactForm({
     setValue,
     watch,
     reset,
-    formState: { errors, isSubmitting }
+    formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      type: 'QUALIFICATION',
-      ...defaultValues
-    }
+    defaultValues: { type: 'QUALIFICATION', ...defaultValues },
   });
 
   const type = watch('type');
@@ -110,12 +117,12 @@ export function ContactForm({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="overflow-y-auto">
-        <SheetHeader className="pb-2">
-          <SheetTitle>{title}</SheetTitle>
-        </SheetHeader>
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6 mt-5">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6 mt-2">
           <FieldGroup label="Identity">
             <Field id="name" label="Name *" error={errors.name?.message}>
               <Input id="name" {...register('name')} />
@@ -152,13 +159,28 @@ export function ContactForm({
 
           <FieldGroup label="Qualification">
             <Field id="budget" label="Monthly budget">
-              <Input id="budget" type="number" step="0.01" placeholder="e.g. 2500" {...register('budget')} />
+              <Input
+                id="budget"
+                type="number"
+                step="0.01"
+                placeholder="e.g. 2500"
+                {...register('budget')}
+              />
             </Field>
             <Field id="preferences" label="Preferences & requirements">
-              <Textarea id="preferences" rows={3} placeholder="Neighborhoods, bedrooms, pet-friendly…" {...register('preferences')} />
+              <Textarea
+                id="preferences"
+                rows={3}
+                placeholder="Neighborhoods, bedrooms, pet-friendly…"
+                {...register('preferences')}
+              />
             </Field>
             <Field id="properties" label="Properties of interest (comma-separated)">
-              <Input id="properties" placeholder="123 Main St, Sunset Villas #12" {...register('properties')} />
+              <Input
+                id="properties"
+                placeholder="123 Main St, Sunset Villas #12"
+                {...register('properties')}
+              />
             </Field>
           </FieldGroup>
 
@@ -169,7 +191,11 @@ export function ContactForm({
               <Input id="address" {...register('address')} />
             </Field>
             <Field id="tags" label="Tags (comma-separated)">
-              <Input id="tags" placeholder="first-time renter, referral, urgent" {...register('tags')} />
+              <Input
+                id="tags"
+                placeholder="first-time renter, referral, urgent"
+                {...register('tags')}
+              />
             </Field>
             <Field id="notes" label="Notes">
               <Textarea id="notes" rows={3} {...register('notes')} />
@@ -180,7 +206,7 @@ export function ContactForm({
             {isSubmitting ? 'Saving...' : 'Save client'}
           </Button>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
