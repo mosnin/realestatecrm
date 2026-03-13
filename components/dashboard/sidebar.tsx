@@ -81,6 +81,9 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount }: Sideba
 
       {/* Secondary nav + branding */}
       <div className="px-3 pb-4 space-y-0.5 border-t border-sidebar-border pt-3">
+        <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+          Account
+        </p>
         {secondaryNavItems.map((item) => {
           const href = `${base}${item.href}`;
           const isActive = pathname.startsWith(href);

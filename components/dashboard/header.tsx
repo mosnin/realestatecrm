@@ -74,6 +74,9 @@ export function Header({ slug, spaceName, title }: HeaderProps) {
               })}
             </nav>
             <div className="px-3 pb-4 space-y-0.5 border-t border-sidebar-border pt-3">
+              <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                Account
+              </p>
               {secondaryNavItems.map((item) => {
                 const href = `${base}${item.href}`;
                 const isActive = pathname.startsWith(href);
@@ -105,9 +108,23 @@ export function Header({ slug, spaceName, title }: HeaderProps) {
           <BrandLogo className="h-5" alt="Chippi" />
         </span>
 
-        {/* Desktop: page title breadcrumb */}
-        <div className="hidden md:flex items-center gap-2 text-sm">
-          <span className="font-medium text-foreground">{title}</span>
+        {/* Desktop: breadcrumb */}
+        <div className="hidden md:flex items-center gap-1.5 text-sm">
+          <span className="text-muted-foreground">{title}</span>
+          {(() => {
+            const allItems = [...primaryNavItems, ...secondaryNavItems];
+            const match = allItems
+              .filter((item) => item.href !== '')
+              .find((item) => pathname.startsWith(`${base}${item.href}`));
+            return match ? (
+              <>
+                <span className="text-muted-foreground/40">/</span>
+                <span className="font-medium text-foreground">{match.label}</span>
+              </>
+            ) : (
+              <><span className="text-muted-foreground/40">/</span><span className="font-medium text-foreground">Overview</span></>
+            );
+          })()}
         </div>
       </div>
 
