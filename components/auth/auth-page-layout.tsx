@@ -68,10 +68,10 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
     <main className="relative min-h-screen lg:grid lg:grid-cols-2 lg:overflow-hidden lg:h-screen">
 
       {/* ── Left decorative panel ── */}
-      <div className="relative hidden lg:flex flex-col h-full bg-[#0a1628] border-r border-white/5 p-10 overflow-hidden text-white">
+      <div className="relative hidden lg:flex flex-col h-full bg-sidebar border-r border-sidebar-border p-10 overflow-hidden">
 
-        {/* Animated path background */}
-        <div className="absolute inset-0 text-teal-400/30">
+        {/* Animated path background — uses primary color so it adapts to theme */}
+        <div className="absolute inset-0 text-primary/20">
           <FloatingPaths position={1} />
           <FloatingPaths position={-1} />
         </div>
@@ -79,11 +79,7 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
         {/* Subtle radial glow */}
         <div
           aria-hidden
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              'radial-gradient(ellipse 80% 60% at 40% 50%, rgba(13,148,136,0.12) 0%, transparent 70%)',
-          }}
+          className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_80%_60%_at_40%_50%,hsl(var(--primary)/0.08)_0%,transparent_70%)]"
         />
 
         {/* Logo */}
@@ -94,12 +90,12 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
         {/* Testimonial */}
         <div className="relative z-10 mt-auto">
           <blockquote className="space-y-3">
-            <p className="text-lg leading-relaxed text-white/90">
+            <p className="text-lg leading-relaxed text-sidebar-foreground/85">
               &ldquo;Chippi transformed how I manage leads. I can see every
               applicant&rsquo;s full profile, score, and next step in seconds —
               it&rsquo;s the CRM I always wanted.&rdquo;
             </p>
-            <footer className="text-sm font-semibold text-teal-400 font-mono">
+            <footer className="text-sm font-semibold text-primary font-mono">
               ~ Jordan M., Independent Realtor
             </footer>
           </blockquote>
@@ -112,11 +108,7 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
         {/* Subtle background glow */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 -z-10 opacity-50"
-          style={{
-            background:
-              'radial-gradient(ellipse 60% 50% at 55% 35%, rgba(13,148,136,0.06) 0%, transparent 70%)',
-          }}
+          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_60%_50%_at_55%_35%,hsl(var(--primary)/0.06)_0%,transparent_70%)]"
         />
 
         {/* Mobile logo */}
