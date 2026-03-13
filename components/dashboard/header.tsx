@@ -1,7 +1,8 @@
 'use client';
 
 import { UserButton } from '@clerk/nextjs';
-import { Menu, Sun, Moon } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
+import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -36,7 +37,7 @@ export function Header({ slug, spaceName, title }: HeaderProps) {
         {/* Mobile menu trigger */}
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger className="md:hidden">
-            <Menu size={20} className="text-muted-foreground" />
+            <MenuToggleIcon open={open} className="size-5 text-muted-foreground" duration={400} />
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
             <SheetHeader className="px-4 py-5 border-b border-sidebar-border">

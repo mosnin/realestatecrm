@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Menu, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
 import { AnimatePresence, motion, useScroll } from 'motion/react';
 
 import { cn } from '@/lib/utils';
@@ -128,8 +129,9 @@ export function Navbar() {
               <button
                 className="border-border flex size-8 cursor-pointer items-center justify-center rounded-md border md:hidden"
                 onClick={toggleDrawer}
+                aria-label={isDrawerOpen ? 'Close menu' : 'Open menu'}
               >
-                {isDrawerOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+                <MenuToggleIcon open={isDrawerOpen} className="size-5" duration={400} />
               </button>
             </div>
           </div>
