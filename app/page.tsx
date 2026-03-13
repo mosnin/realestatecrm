@@ -18,6 +18,7 @@ import ScrollFAQAccordion from '@/components/ui/scroll-faqaccordion';
 import { Navbar } from '@/components/navbar';
 import AnimatedFooter from '@/components/ui/animated-footer';
 import { AnimatedCard, CardVisual, CardBody, CardTitle, CardDescription, Visual3 } from '@/components/ui/animated-card-chart';
+import { AnimatedCard as AnimatedCard2, CardVisual as CardVisual2, CardBody as CardBody2, CardTitle as CardTitle2, CardDescription as CardDescription2, Visual2 } from '@/components/ui/animated-card-diagram';
 
 const pillNav = [
   { id: 'problem', label: 'Problem' },
@@ -408,6 +409,52 @@ export default function HomePage() {
                 <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{card.description}</p>
               </div>
             ))}
+          </div>
+
+          {/* Animated diagram feature — full-width row: text left, visual right */}
+          <div className="mt-4 rounded-xl border border-border bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div className="grid md:grid-cols-2">
+              {/* Left — context text */}
+              <div className="flex flex-col justify-center px-6 py-8 md:px-8">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary w-fit">
+                  AI Scoring
+                </div>
+                <h3 className="mt-4 text-xl font-semibold tracking-tight">
+                  Know who to call before you pick up the phone
+                </h3>
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                  Every submission is scored across budget fit, move-in timeline,
+                  neighborhood match, and household criteria — so you always have
+                  context before reaching out. Hover the diagram to see the
+                  qualification signals in action.
+                </p>
+                <ul className="mt-5 space-y-2.5">
+                  {[
+                    'Multi-signal lead scoring on every intake',
+                    'Context attached — not just a number',
+                    'Instant priority ranking across all leads',
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CheckCircle2 size={14} className="text-primary flex-shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Right — animated diagram card */}
+              <AnimatedCard2 className="rounded-none border-0 border-l border-border shadow-none">
+                <CardVisual2>
+                  <Visual2 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                </CardVisual2>
+                <CardBody2>
+                  <CardTitle2>AI qualification breakdown</CardTitle2>
+                  <CardDescription2>
+                    Hover to reveal scoring signals.
+                  </CardDescription2>
+                </CardBody2>
+              </AnimatedCard2>
+            </div>
           </div>
 
           {/* Animated chart feature — full-width row: visual left, text right */}
