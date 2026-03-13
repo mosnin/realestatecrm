@@ -21,6 +21,8 @@ import {
   ArrowRight,
   Sparkles,
   Info,
+  User,
+  Calendar,
 } from 'lucide-react';
 import type { Contact, ApplicationData, LeadScoreDetails } from '@/lib/types';
 
@@ -306,10 +308,32 @@ export default async function ClientDetailPage({
       {/* ── Application Details (rich structured data) ── */}
       {app ? (
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
-          <div className="px-6 py-4 border-b border-border">
+          <div className="px-6 py-4 border-b border-border flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold">Application details</h2>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {app.submittedAt && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Calendar size={11} />
+                  {new Date(app.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              )}
+              {app.completedSteps && (
+                <span className="text-xs font-medium bg-primary/8 text-primary rounded-full px-2.5 py-0.5">
+                  {app.completedSteps.length}/9 steps
+                </span>
+              )}
+            </div>
           </div>
           <div className="px-6 py-4 space-y-6">
+            {/* Applicant basics — fields not shown in the profile header */}
+            {app.dateOfBirth && (
+              <Section icon={User} title="Applicant">
+                <DetailGrid>
+                  <Detail label="Date of birth" value={app.dateOfBirth} />
+                </DetailGrid>
+              </Section>
+            )}
+
             {/* Property */}
             {(app.propertyAddress || app.unitType || app.targetMoveInDate || app.monthlyRent != null || app.leaseTermPreference || app.numberOfOccupants != null) && (
               <Section icon={Home} title="Property">
