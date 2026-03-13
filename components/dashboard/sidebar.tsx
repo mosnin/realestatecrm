@@ -19,8 +19,13 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount }: Sideba
 
   return (
     <aside className="hidden md:flex flex-col w-60 h-full bg-sidebar border-r border-sidebar-border shrink-0">
+      {/* Logo */}
+      <div className="px-4 pt-5 pb-4">
+        <BrandLogo className="h-4" alt="Chippi" />
+      </div>
+
       {/* Workspace header */}
-      <div className="px-4 py-5 border-b border-sidebar-border">
+      <div className="px-4 pb-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-base flex-shrink-0">
             {spaceEmoji}
@@ -98,9 +103,6 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount }: Sideba
             </Link>
           );
         })}
-        <div className="flex items-center gap-2 px-3 pt-3">
-          <BrandLogo className="h-4" alt="Chippi" />
-        </div>
       </div>
     </aside>
   );
