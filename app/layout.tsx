@@ -3,6 +3,7 @@ import { GeistSans } from 'geist/font/sans';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { ThemeProvider } from '@/components/theme-provider';
+import { AmplitudeProvider } from '@/components/amplitude-provider';
 import { Toaster } from 'sonner';
 import './globals.css';
 
@@ -28,7 +29,9 @@ export default function RootLayout({
         </head>
         <body className={`${GeistSans.variable} antialiased bg-background text-foreground`}>
           <ThemeProvider>
-            {children}
+            <AmplitudeProvider>
+              {children}
+            </AmplitudeProvider>
           </ThemeProvider>
           <Toaster richColors position="top-right" />
           <SpeedInsights />
