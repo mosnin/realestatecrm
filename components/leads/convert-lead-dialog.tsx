@@ -32,13 +32,32 @@ export function ConvertLeadDialog({
   async function handleConvert() {
     setLoading(true);
     try {
-      const newTags = currentTags.filter(
-        (t) => t !== 'application-link' && t !== 'new-lead',
+      // Fetch the full contact first so we can send all fields back intact.
+      // Sending only { tags } would wipe every other field to null because
+      // the PATCH handler does a full-row update.
+      const getRes = await fetch(`/api/contacts/${leadId}`);
+      if (!getRes.ok) return;
+      const contact = await getRes.json();
+
+      const newTags = (contact.tags ?? currentTags).filter(
+        (t: string) => t !== 'application-link' && t !== 'new-lead',
       );
+
       const res = await fetch(`/api/contacts/${leadId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tags: newTags }),
+        body: JSON.stringify({
+          name: contact.name,
+          email: contact.email ?? '',
+          phone: contact.phone ?? '',
+          budget: contact.budget ?? '',
+          preferences: contact.preferences ?? '',
+          properties: contact.properties ?? [],
+          address: contact.address ?? '',
+          notes: contact.notes ?? '',
+          type: contact.type ?? 'QUALIFICATION',
+          tags: newTags,
+        }),
       });
       if (res.ok) {
         onConverted(leadId);
