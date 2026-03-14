@@ -8,6 +8,7 @@ import {
   Settings,
   SlidersHorizontal,
   BarChart2,
+  CreditCard,
 } from 'lucide-react';
 
 export const primaryNavItems = [
@@ -22,6 +23,7 @@ export const primaryNavItems = [
 export const secondaryNavItems = [
   { href: '/profile', label: 'Profile', icon: User },
   { href: '/configure', label: 'Configure', icon: SlidersHorizontal },
+  { href: '/billing', label: 'Billing', icon: CreditCard },
   { href: '/settings', label: 'Settings', icon: Settings },
 ] as const;
 
