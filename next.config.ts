@@ -21,30 +21,10 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
   // Force HTTPS for 2 years (only active when served over TLS)
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
-  // Content Security Policy
-  // 'unsafe-inline' on script-src is required by Next.js inline scripts and Clerk.
-  // 'unsafe-eval' is required by Clerk and some animation libraries in dev.
-  // Tighten further once a nonce-based approach is viable.
-  {
-    key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      // Clerk loads its component JS from *.clerk.accounts.dev AND *.clerk.com (prod).
-      // Cloudflare Turnstile (bot protection used by Clerk) loads from challenges.cloudflare.com.
-      // *.lcl.dev covers Clerk's local tunnel for dev environments.
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.clerk.accounts.dev https://clerk.accounts.dev https://*.clerk.com https://clerk.com https://challenges.cloudflare.com https://*.lcl.dev",
-      "style-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.com",
-      "img-src 'self' blob: data: https://*.clerk.accounts.dev https://*.clerk.com https://img.clerk.com https://*.gravatar.com https://images.unsplash.com https://blogger.googleusercontent.com",
-      "font-src 'self' data: https://*.clerk.accounts.dev https://*.clerk.com",
-      // Clerk makes API calls to its own domain; Supabase for DB; Vercel for analytics.
-      "connect-src 'self' https://*.supabase.co https://*.clerk.accounts.dev https://clerk.accounts.dev https://*.clerk.com https://clerk.com https://api.clerk.com https://*.lcl.dev https://vitals.vercel-insights.com https://*.vercel-scripts.com",
-      // Clerk renders its hosted UI in an iframe; Cloudflare Turnstile also uses an iframe.
-      "frame-src 'self' https://*.clerk.accounts.dev https://clerk.accounts.dev https://*.clerk.com https://clerk.com https://challenges.cloudflare.com https://*.lcl.dev",
-      "worker-src 'self' blob:",
-      "form-action 'self'",
-      "base-uri 'self'",
-    ].join('; '),
-  },
+  // CSP intentionally omitted — Clerk's hosted component requires a large and
+  // environment-specific allowlist (clerk.com, lcl.dev, Cloudflare Turnstile, etc.)
+  // that must be validated against the live deployment before being enforced.
+  // Add a CSP once the full domain list is confirmed via browser console testing.
 ];
 
 const nextConfig: NextConfig = {
