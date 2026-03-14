@@ -181,6 +181,7 @@ export function PulseFitHero({
                       src={avatar}
                       alt={`User ${index + 1}`}
                       className="rounded-full border-2 border-background w-10 h-10 object-cover"
+                      style={{ zIndex: socialProof.avatars.length - index }}
                     />
                   ))}
                 </div>
