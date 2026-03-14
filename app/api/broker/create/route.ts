@@ -57,7 +57,9 @@ export async function POST(req: Request) {
     .insert({ brokerageId: brokerage.id, userId: user.id, role: 'broker_owner' });
   if (memberErr) {
     console.error('[broker/create] membership insert failed', memberErr);
-    // Brokerage was created — don't block, but log
+    // Rollback: delete the brokerage so the user can try again
+    await supabase.from('Brokerage').delete().eq('id', brokerage.id);
+    return NextResponse.json({ error: 'Failed to create brokerage membership. Please try again.' }, { status: 500 });
   }
 
   return NextResponse.json({ brokerage }, { status: 201 });

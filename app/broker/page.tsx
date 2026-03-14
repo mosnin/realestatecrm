@@ -6,7 +6,7 @@ import { Users, PhoneIncoming, FileText, Mail, CheckCircle2, AlertCircle } from 
 
 export default async function BrokerOverviewPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/dashboard');
+  if (!ctx) redirect('/');
 
   const { brokerage } = ctx;
 
