@@ -87,7 +87,7 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
           Account
         </p>
         {/* Broker dashboard link — only shown if user owns/manages a brokerage */}
-        {isBroker && (
+        {isBroker ? (
           <Link
             href="/broker"
             className="group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -97,6 +97,17 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
               className="flex-shrink-0 opacity-55 group-hover:opacity-80"
             />
             Brokerage
+          </Link>
+        ) : (
+          <Link
+            href={`${base}/configure`}
+            className="group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            <Building2
+              size={16}
+              className="flex-shrink-0 opacity-55 group-hover:opacity-80"
+            />
+            Create Brokerage
           </Link>
         )}
         {secondaryNavItems.map((item) => {

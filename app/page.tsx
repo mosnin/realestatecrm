@@ -611,7 +611,8 @@ export default function HomePage() {
         leftLinks={[
           { href: '#solution', label: 'Product' },
           { href: '#pricing', label: 'Pricing' },
-          { href: '#faq', label: 'FAQ' }
+          { href: '#faq', label: 'FAQ' },
+          { href: '/sign-up', label: 'Become a Broker' }
         ]}
         rightLinks={[
           { href: '/legal/privacy', label: 'Privacy' },
