@@ -16,16 +16,29 @@ CREATE TABLE IF NOT EXISTS "User" (
   "onboardingCurrentStep" integer NOT NULL DEFAULT 0,
   "onboardingStartedAt"   timestamptz,
   "onboardingCompletedAt" timestamptz,
-  onboard                 boolean NOT NULL DEFAULT false
+  onboard                 boolean NOT NULL DEFAULT false,
+  "platformRole"          text NOT NULL DEFAULT 'user' CHECK ("platformRole" IN ('user', 'admin'))
+);
+
+-- Brokerage must be created before Space (Space has FK to Brokerage)
+CREATE TABLE IF NOT EXISTS "Brokerage" (
+  id            text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  name          text NOT NULL,
+  "ownerId"     text NOT NULL REFERENCES "User"(id) ON DELETE RESTRICT,
+  status        text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
+  "websiteUrl"  text,
+  "logoUrl"     text,
+  "createdAt"   timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS "Space" (
-  id          text PRIMARY KEY,
-  slug        text UNIQUE NOT NULL,
-  name        text NOT NULL,
-  emoji       text NOT NULL DEFAULT '🏠',
-  "createdAt" timestamptz NOT NULL DEFAULT now(),
-  "ownerId"   text UNIQUE NOT NULL REFERENCES "User"(id) ON DELETE CASCADE
+  id            text PRIMARY KEY,
+  slug          text UNIQUE NOT NULL,
+  name          text NOT NULL,
+  emoji         text NOT NULL DEFAULT '🏠',
+  "createdAt"   timestamptz NOT NULL DEFAULT now(),
+  "ownerId"     text UNIQUE NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
+  "brokerageId" text REFERENCES "Brokerage"(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS "SpaceSetting" (
@@ -103,6 +116,29 @@ CREATE TABLE IF NOT EXISTS "Message" (
   "createdAt" timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS "BrokerageMembership" (
+  id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "brokerageId"   text NOT NULL REFERENCES "Brokerage"(id) ON DELETE CASCADE,
+  "userId"        text NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
+  role            text NOT NULL CHECK (role IN ('broker_owner', 'broker_manager', 'realtor_member')),
+  "invitedById"   text REFERENCES "User"(id) ON DELETE SET NULL,
+  "createdAt"     timestamptz NOT NULL DEFAULT now(),
+  UNIQUE ("brokerageId", "userId")
+);
+
+CREATE TABLE IF NOT EXISTS "Invitation" (
+  id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "brokerageId"   text NOT NULL REFERENCES "Brokerage"(id) ON DELETE CASCADE,
+  email           text NOT NULL,
+  "roleToAssign"  text NOT NULL CHECK ("roleToAssign" IN ('broker_manager', 'realtor_member')),
+  token           text UNIQUE NOT NULL DEFAULT encode(gen_random_bytes(32), 'hex'),
+  status          text NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'accepted', 'expired', 'cancelled')),
+  "expiresAt"     timestamptz NOT NULL DEFAULT (now() + interval '7 days'),
+  "invitedById"   text REFERENCES "User"(id) ON DELETE SET NULL,
+  "createdAt"     timestamptz NOT NULL DEFAULT now()
+);
+
 -- ============================================================
 -- Indexes (for common query patterns)
 -- ============================================================
@@ -119,6 +155,15 @@ CREATE INDEX IF NOT EXISTS idx_dealstage_space_id ON "DealStage"("spaceId");
 CREATE INDEX IF NOT EXISTS idx_dealcontact_deal   ON "DealContact"("dealId");
 CREATE INDEX IF NOT EXISTS idx_dealcontact_contact ON "DealContact"("contactId");
 CREATE INDEX IF NOT EXISTS idx_message_space_id   ON "Message"("spaceId");
+CREATE UNIQUE INDEX IF NOT EXISTS idx_brokerage_owner       ON "Brokerage"("ownerId");
+CREATE INDEX       IF NOT EXISTS idx_brokerage_status       ON "Brokerage"(status);
+CREATE INDEX IF NOT EXISTS idx_membership_brokerage         ON "BrokerageMembership"("brokerageId");
+CREATE INDEX IF NOT EXISTS idx_membership_user              ON "BrokerageMembership"("userId");
+CREATE INDEX IF NOT EXISTS idx_space_brokerage              ON "Space"("brokerageId");
+CREATE INDEX IF NOT EXISTS idx_invitation_brokerage         ON "Invitation"("brokerageId");
+CREATE INDEX IF NOT EXISTS idx_invitation_email             ON "Invitation"(email);
+CREATE INDEX IF NOT EXISTS idx_invitation_token             ON "Invitation"(token);
+CREATE INDEX IF NOT EXISTS idx_invitation_status            ON "Invitation"(status);
 
 -- ============================================================
 -- pgvector: Vector embeddings for AI-powered search

@@ -1,5 +1,9 @@
 // Database model types — replaces Prisma generated types
 
+export type PlatformRole = 'user' | 'admin';
+export type MembershipRole = 'broker_owner' | 'broker_manager' | 'realtor_member';
+export type InvitationStatus = 'pending' | 'accepted' | 'expired' | 'cancelled';
+
 export type User = {
   id: string;
   clerkId: string;
@@ -12,6 +16,38 @@ export type User = {
   onboardingStartedAt: Date | null;
   onboardingCompletedAt: Date | null;
   onboard: boolean;
+  platformRole: PlatformRole;
+};
+
+export type Brokerage = {
+  id: string;
+  name: string;
+  ownerId: string;
+  status: 'active' | 'suspended';
+  websiteUrl: string | null;
+  logoUrl: string | null;
+  createdAt: Date;
+};
+
+export type BrokerageMembership = {
+  id: string;
+  brokerageId: string;
+  userId: string;
+  role: MembershipRole;
+  invitedById: string | null;
+  createdAt: Date;
+};
+
+export type Invitation = {
+  id: string;
+  brokerageId: string;
+  email: string;
+  roleToAssign: 'broker_manager' | 'realtor_member';
+  token: string;
+  status: InvitationStatus;
+  expiresAt: Date;
+  invitedById: string | null;
+  createdAt: Date;
 };
 
 export type Space = {

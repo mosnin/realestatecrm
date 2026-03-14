@@ -5,15 +5,17 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
 import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
+import { Building2 } from 'lucide-react';
 
 interface SidebarProps {
   slug: string;
   spaceName: string;
   spaceEmoji: string;
   unreadLeadCount: number;
+  isBroker?: boolean;
 }
 
-export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount }: SidebarProps) {
+export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker = false }: SidebarProps) {
   const pathname = usePathname();
   const base = `/s/${slug}`;
 
@@ -84,6 +86,19 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount }: Sideba
         <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
           Account
         </p>
+        {/* Broker dashboard link — only shown if user owns/manages a brokerage */}
+        {isBroker && (
+          <Link
+            href="/broker"
+            className="group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            <Building2
+              size={16}
+              className="flex-shrink-0 opacity-55 group-hover:opacity-80"
+            />
+            Brokerage
+          </Link>
+        )}
         {secondaryNavItems.map((item) => {
           const href = `${base}${item.href}`;
           const isActive = pathname.startsWith(href);

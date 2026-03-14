@@ -2,6 +2,8 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { ConfigureAccountForm } from './configure-account-form';
+import { CreateBrokerageCard } from '@/components/broker/create-brokerage-card';
+import { getBrokerContext } from '@/lib/permissions';
 import type { User, Space, SpaceSetting } from '@/lib/types';
 
 export const metadata = { title: 'Configure your account — Chippi' };
@@ -75,5 +77,27 @@ export default async function ConfigurePage({
     notifications: dbUser?.space?.settings?.notifications ?? true,
   };
 
-  return <ConfigureAccountForm initialData={initialData} slug={slug} />;
+  // Check broker status to show create/access brokerage card
+  let existingBrokerageName: string | null = null;
+  try {
+    const brokerCtx = await getBrokerContext();
+    existingBrokerageName = brokerCtx?.brokerage.name ?? null;
+  } catch {
+    // non-blocking
+  }
+
+  return (
+    <div className="space-y-6">
+      <ConfigureAccountForm initialData={initialData} slug={slug} />
+      <div className="max-w-3xl space-y-3">
+        <div>
+          <p className="text-sm font-semibold">Brokerage</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Create or access your brokerage dashboard to invite realtors and get team visibility.
+          </p>
+        </div>
+        <CreateBrokerageCard existingBrokerageName={existingBrokerageName} />
+      </div>
+    </div>
+  );
 }

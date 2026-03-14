@@ -7,6 +7,7 @@ import { Header } from '@/components/dashboard/header';
 import { DashboardFooter } from '@/components/dashboard/footer';
 import { supabase } from '@/lib/supabase';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
+import { getBrokerContext } from '@/lib/permissions';
 
 export default async function DashboardLayout({
   children,
@@ -115,9 +116,18 @@ export default async function DashboardLayout({
     unreadLeadCount = 0;
   }
 
+  // Check if user is a broker so the sidebar can show the Brokerage link
+  let isBroker = false;
+  try {
+    const ctx = await getBrokerContext();
+    isBroker = ctx !== null;
+  } catch {
+    isBroker = false;
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      <Sidebar slug={slug} spaceName={space.name} spaceEmoji={space.emoji} unreadLeadCount={unreadLeadCount} />
+      <Sidebar slug={slug} spaceName={space.name} spaceEmoji={space.emoji} unreadLeadCount={unreadLeadCount} isBroker={isBroker} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header slug={slug} spaceName={space.name} title={space.name} />
         <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7">

@@ -6,12 +6,11 @@ import { UserButton } from '@clerk/nextjs';
 import {
   LayoutDashboard,
   Users,
-  Building2,
   Mail,
+  Building2,
   Menu,
   Sun,
   Moon,
-  Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -27,10 +26,9 @@ import { BrandLogo } from '@/components/brand-logo';
 import { useState } from 'react';
 
 const navItems = [
-  { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
-  { href: '/admin/users', label: 'Users', icon: Users, exact: false },
-  { href: '/admin/brokerages', label: 'Brokerages', icon: Building2, exact: false },
-  { href: '/admin/invitations', label: 'Invitations', icon: Mail, exact: false },
+  { href: '/broker', label: 'Overview', icon: LayoutDashboard, exact: true },
+  { href: '/broker/members', label: 'Members', icon: Users, exact: false },
+  { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
 ];
 
 function NavLink({
@@ -42,10 +40,7 @@ function NavLink({
   pathname: string;
   onClick?: () => void;
 }) {
-  const isActive = item.exact
-    ? pathname === item.href
-    : pathname.startsWith(item.href);
-
+  const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
   return (
     <Link
       href={item.href}
@@ -54,65 +49,65 @@ function NavLink({
         'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
         isActive
           ? 'bg-primary text-primary-foreground shadow-sm'
-          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
       )}
     >
       <item.icon
         size={16}
-        className={cn(
-          'flex-shrink-0',
-          isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80'
-        )}
+        className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')}
       />
       <span className="truncate">{item.label}</span>
     </Link>
   );
 }
 
-export function AdminShell({ children }: { children: React.ReactNode }) {
+interface BrokerShellProps {
+  children: React.ReactNode;
+  brokerageName: string;
+  realtorSlug: string; // link back to the realtor's workspace
+}
+
+export function BrokerShell({ children, brokerageName, realtorSlug }: BrokerShellProps) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const [open, setOpen] = useState(false);
+
+  const sidebar = (
+    <nav className="flex-1 px-3 pt-4 pb-2 space-y-0.5">
+      <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+        Brokerage
+      </p>
+      {navItems.map((item) => (
+        <NavLink key={item.href} item={item} pathname={pathname} onClick={() => setOpen(false)} />
+      ))}
+    </nav>
+  );
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-60 min-h-screen bg-sidebar border-r border-sidebar-border shrink-0">
-        {/* Admin header */}
         <div className="px-4 py-5 border-b border-sidebar-border">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-base flex-shrink-0">
-              <Shield size={16} className="text-primary" />
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Building2 size={16} className="text-primary" />
             </div>
             <div className="min-w-0">
               <p className="font-semibold text-sm leading-tight truncate text-sidebar-foreground">
-                Admin
+                {brokerageName}
               </p>
-              <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                Chippi Internal
-              </p>
+              <p className="text-[11px] text-muted-foreground truncate mt-0.5">Broker Dashboard</p>
             </div>
           </div>
         </div>
-
-        {/* Nav */}
-        <nav className="flex-1 px-3 pt-4 pb-2 space-y-0.5">
-          <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-            Management
-          </p>
-          {navItems.map((item) => (
-            <NavLink key={item.href} item={item} pathname={pathname} />
-          ))}
-        </nav>
-
-        {/* Footer */}
+        {sidebar}
         <div className="px-3 pb-4 border-t border-sidebar-border pt-3">
           <Link
-            href="/"
+            href={`/s/${realtorSlug}`}
             className="group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-150"
           >
             <span className="opacity-55 group-hover:opacity-80">←</span>
-            Back to app
+            My workspace
           </Link>
           <div className="flex items-center gap-2 px-3 pt-3">
             <BrandLogo className="h-4" alt="Chippi" />
@@ -120,60 +115,42 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main content */}
+      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <header className="h-14 border-b border-border flex items-center justify-between px-4 md:px-6 bg-card sticky top-0 z-40 shadow-[0_1px_0_0_var(--border)]">
           <div className="flex items-center gap-3">
-            {/* Mobile menu */}
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger className="md:hidden">
                 <Menu size={20} className="text-muted-foreground" />
               </SheetTrigger>
-              <SheetContent
-                side="left"
-                className="w-64 p-0 bg-sidebar border-sidebar-border"
-              >
+              <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
                 <SheetHeader className="px-4 py-5 border-b border-sidebar-border">
                   <SheetTitle className="flex items-center gap-2.5 text-sidebar-foreground">
-                    <Shield size={16} className="text-primary" />
-                    <span className="text-sm font-semibold">
-                      Admin
-                    </span>
+                    <Building2 size={16} className="text-primary" />
+                    <span className="text-sm font-semibold truncate">{brokerageName}</span>
                   </SheetTitle>
                 </SheetHeader>
-                <nav className="px-3 py-4 space-y-0.5">
-                  {navItems.map((item) => (
-                    <NavLink
-                      key={item.href}
-                      item={item}
-                      pathname={pathname}
-                      onClick={() => setOpen(false)}
-                    />
-                  ))}
-                  <div className="border-t border-sidebar-border mt-3 pt-3">
-                    <Link
-                      href="/"
-                      onClick={() => setOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent"
-                    >
-                      ← Back to app
-                    </Link>
-                  </div>
-                </nav>
+                {sidebar}
+                <div className="border-t border-sidebar-border px-3 py-3">
+                  <Link
+                    href={`/s/${realtorSlug}`}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent"
+                  >
+                    ← My workspace
+                  </Link>
+                </div>
               </SheetContent>
             </Sheet>
-
             <span className="font-semibold text-sm md:hidden flex items-center gap-2">
-              <Shield size={14} className="text-primary" />
-              Admin
+              <Building2 size={14} className="text-primary" />
+              {brokerageName}
             </span>
-
-            <div className="hidden md:flex items-center gap-2 text-sm">
-              <span className="font-medium text-foreground">Admin Dashboard</span>
-            </div>
+            <span className="hidden md:block font-medium text-sm text-foreground">
+              Broker Dashboard
+            </span>
           </div>
-
           <div className="flex items-center gap-1.5">
             <Button
               variant="ghost"
@@ -187,31 +164,26 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 px-4 py-5 md:px-8 md:py-7 pb-20 md:pb-7">
-          {children}
-        </main>
+        <main className="flex-1 px-4 py-5 md:px-8 md:py-7 pb-20 md:pb-7">{children}</main>
       </div>
 
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex safe-area-bottom">
         {navItems.map((item) => {
-          const isActive = item.exact
-            ? pathname === item.href
-            : pathname.startsWith(item.href);
+          const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
                 'flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors',
-                isActive ? 'text-primary' : 'text-muted-foreground'
+                isActive ? 'text-primary' : 'text-muted-foreground',
               )}
             >
               <div
                 className={cn(
                   'w-9 h-6 rounded-full flex items-center justify-center transition-colors',
-                  isActive ? 'bg-primary/10' : ''
+                  isActive ? 'bg-primary/10' : '',
                 )}
               >
                 <item.icon size={18} />

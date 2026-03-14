@@ -5,7 +5,9 @@ const isProtectedRoute = createRouteMatcher([
   '/dashboard(.*)',
   '/s/(.*)',
   '/setup(.*)',
-  '/admin(.*)'
+  '/admin(.*)',
+  '/broker(.*)',
+  '/invite/(.*)',
 ]);
 
 const isPublicRoute = createRouteMatcher([
