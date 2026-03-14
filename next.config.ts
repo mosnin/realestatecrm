@@ -29,12 +29,17 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.clerk.accounts.dev https://clerk.accounts.dev",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' blob: data: https://*.clerk.accounts.dev https://*.gravatar.com https://img.clerk.com https://images.unsplash.com https://blogger.googleusercontent.com",
-      "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co https://*.clerk.accounts.dev https://clerk.accounts.dev https://vitals.vercel-insights.com https://*.vercel-scripts.com",
-      "frame-src 'self' https://*.clerk.accounts.dev https://clerk.accounts.dev",
+      // Clerk loads its component JS from *.clerk.accounts.dev AND *.clerk.com (prod).
+      // Cloudflare Turnstile (bot protection used by Clerk) loads from challenges.cloudflare.com.
+      // *.lcl.dev covers Clerk's local tunnel for dev environments.
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.clerk.accounts.dev https://clerk.accounts.dev https://*.clerk.com https://clerk.com https://challenges.cloudflare.com https://*.lcl.dev",
+      "style-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.com",
+      "img-src 'self' blob: data: https://*.clerk.accounts.dev https://*.clerk.com https://img.clerk.com https://*.gravatar.com https://images.unsplash.com https://blogger.googleusercontent.com",
+      "font-src 'self' data: https://*.clerk.accounts.dev https://*.clerk.com",
+      // Clerk makes API calls to its own domain; Supabase for DB; Vercel for analytics.
+      "connect-src 'self' https://*.supabase.co https://*.clerk.accounts.dev https://clerk.accounts.dev https://*.clerk.com https://clerk.com https://api.clerk.com https://*.lcl.dev https://vitals.vercel-insights.com https://*.vercel-scripts.com",
+      // Clerk renders its hosted UI in an iframe; Cloudflare Turnstile also uses an iframe.
+      "frame-src 'self' https://*.clerk.accounts.dev https://clerk.accounts.dev https://*.clerk.com https://clerk.com https://challenges.cloudflare.com https://*.lcl.dev",
       "worker-src 'self' blob:",
       "form-action 'self'",
       "base-uri 'self'",
