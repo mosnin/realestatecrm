@@ -23,7 +23,11 @@ export async function GET(req: NextRequest) {
   const search = req.nextUrl.searchParams.get('search') ?? '';
   const type = req.nextUrl.searchParams.get('type');
 
-  let query = supabase.from('Contact').select('*').eq('spaceId', space.id);
+  let query = supabase
+    .from('Contact')
+    .select('*')
+    .eq('spaceId', space.id)
+    .not('tags', 'cs', '["application-link"]');
 
   if (search) {
     const pattern = `%${search}%`;

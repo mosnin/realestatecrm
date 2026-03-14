@@ -1,0 +1,85 @@
+'use client';
+
+import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { UserCheck } from 'lucide-react';
+
+interface ConvertLeadDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  leadName: string;
+  leadId: string;
+  currentTags: string[];
+  onConverted: (leadId: string) => void;
+}
+
+export function ConvertLeadDialog({
+  open,
+  onOpenChange,
+  leadName,
+  leadId,
+  currentTags,
+  onConverted,
+}: ConvertLeadDialogProps) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleConvert() {
+    setLoading(true);
+    try {
+      const newTags = currentTags.filter(
+        (t) => t !== 'application-link' && t !== 'new-lead',
+      );
+      const res = await fetch(`/api/contacts/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: newTags }),
+      });
+      if (res.ok) {
+        onConverted(leadId);
+        onOpenChange(false);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <UserCheck size={18} className="text-primary" />
+            Convert to client
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 mt-1">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Move{' '}
+            <span className="font-semibold text-foreground">{leadName}</span> to
+            your Clients pipeline? They'll be removed from the Leads inbox and
+            you can track them through Qualifying → Tour → Applied.
+          </p>
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleConvert} disabled={loading}>
+              {loading ? 'Moving...' : 'Convert to client'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
