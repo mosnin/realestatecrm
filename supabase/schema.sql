@@ -171,6 +171,56 @@ CREATE INDEX IF NOT EXISTS idx_invitation_token             ON "Invitation"(toke
 CREATE INDEX IF NOT EXISTS idx_invitation_status            ON "Invitation"(status);
 
 -- ============================================================
+-- AuditLog: immutable event log for compliance and security review
+-- Written by lib/audit.ts on all critical Create/Update/Delete operations.
+-- Uses service-role key; never directly readable by client keys.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS "AuditLog" (
+  id            text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "clerkId"     text,
+  "ipAddress"   text,
+  action        text NOT NULL,
+  resource      text NOT NULL,
+  "resourceId"  text,
+  "spaceId"     text,
+  metadata      jsonb,
+  "createdAt"   timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_clerk_id    ON "AuditLog"("clerkId");
+CREATE INDEX IF NOT EXISTS idx_audit_resource    ON "AuditLog"(resource, "resourceId");
+CREATE INDEX IF NOT EXISTS idx_audit_space_id    ON "AuditLog"("spaceId");
+CREATE INDEX IF NOT EXISTS idx_audit_created_at  ON "AuditLog"("createdAt");
+
+-- ============================================================
+-- Row-Level Security
+-- All tables have RLS enabled. The application exclusively uses the
+-- Supabase service_role key, which bypasses RLS — so application
+-- behaviour is unaffected. RLS protects against accidental exposure
+-- of the anon/authenticated keys, which would otherwise grant
+-- unrestricted table access.
+-- ============================================================
+
+ALTER TABLE "User"                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Brokerage"           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Space"               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SpaceSetting"        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Contact"             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "DealStage"           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Deal"                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "DealContact"         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Message"             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "BrokerageMembership" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Invitation"          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "AuditLog"            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "DocumentEmbedding"   ENABLE ROW LEVEL SECURITY;
+
+-- No policies are defined here intentionally. With RLS enabled and no
+-- permissive policies, the default is DENY ALL for anon and authenticated
+-- roles. The service_role key bypasses these restrictions.
+
+-- ============================================================
 -- reorder_deal: atomically shift positions and move a deal
 -- Runs inside a single transaction, preventing race conditions
 -- from concurrent Kanban drag-and-drop reorders.

@@ -75,13 +75,17 @@ export async function getBrokerContext(): Promise<BrokerContext | null> {
     .maybeSingle();
   if (!user) return null;
 
-  const { data: membership } = await supabase
+  // Fetch all broker-level memberships. A user may own one brokerage and
+  // manage another — prefer broker_owner so they always land on their own brokerage.
+  const { data: memberships } = await supabase
     .from('BrokerageMembership')
     .select('*')
     .eq('userId', user.id)
-    .in('role', ['broker_owner', 'broker_manager'])
-    .maybeSingle();
-  if (!membership) return null;
+    .in('role', ['broker_owner', 'broker_manager']);
+  if (!memberships?.length) return null;
+
+  const membership =
+    memberships.find((m) => m.role === 'broker_owner') ?? memberships[0];
 
   const { data: brokerage } = await supabase
     .from('Brokerage')

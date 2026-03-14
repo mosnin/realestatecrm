@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { sendBrokerageInvitation } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { audit } from '@/lib/audit';
 
 /**
  * POST /api/broker/invite
@@ -11,6 +13,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
  * creating a duplicate or sending another email.
  */
 export async function POST(req: Request) {
+  const { userId: clerkId } = await auth();
   let ctx;
   try {
     ctx = await requireBroker();
@@ -39,6 +42,19 @@ export async function POST(req: Request) {
   if (!allowed) return NextResponse.json({ error: 'Too many invitations sent. Try again in an hour.' }, { status: 429 });
 
   const { brokerage, dbUserId } = ctx;
+
+  // Cap: max 100 pending invitations per brokerage
+  const { count: pendingCount } = await supabase
+    .from('Invitation')
+    .select('*', { count: 'exact', head: true })
+    .eq('brokerageId', brokerage.id)
+    .eq('status', 'pending');
+  if ((pendingCount ?? 0) >= 100) {
+    return NextResponse.json(
+      { error: 'Too many pending invitations. Cancel some before sending more.' },
+      { status: 429 }
+    );
+  }
 
   // Idempotency: return existing pending invite for this email
   const { data: existing } = await supabase
@@ -84,6 +100,8 @@ export async function POST(req: Request) {
     roleToAssign: roleToAssign as 'broker_manager' | 'realtor_member',
     token: invitation.token,
   }).catch((err) => console.error('[broker/invite] email send failed', err));
+
+  void audit({ actorClerkId: clerkId ?? null, action: 'CREATE', resource: 'Invitation', resourceId: invitation.id, metadata: { email: trimmedEmail, roleToAssign, brokerageId: brokerage.id } });
 
   return NextResponse.json({ invitation }, { status: 201 });
 }

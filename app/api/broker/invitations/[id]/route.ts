@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
+import { audit } from '@/lib/audit';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -9,6 +11,7 @@ type Params = { params: Promise<{ id: string }> };
  * Cancel a pending invitation. Available to broker_owner and broker_manager.
  */
 export async function PATCH(_req: Request, { params }: Params) {
+  const { userId: clerkId } = await auth();
   let ctx;
   try {
     ctx = await requireBroker();
@@ -42,6 +45,8 @@ export async function PATCH(_req: Request, { params }: Params) {
     console.error('[broker/invitations/cancel] update failed', error);
     return NextResponse.json({ error: 'Failed to cancel invitation' }, { status: 500 });
   }
+
+  void audit({ actorClerkId: clerkId ?? null, action: 'UPDATE', resource: 'Invitation', resourceId: invitationId, metadata: { status: 'cancelled', brokerageId: ctx.brokerage.id } });
 
   return NextResponse.json({ success: true });
 }

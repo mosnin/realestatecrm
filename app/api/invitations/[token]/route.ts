@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
+import { audit } from '@/lib/audit';
 
 /**
  * GET /api/invitations/[token]
@@ -122,6 +123,8 @@ export async function POST(_req: Request, { params }: Params) {
 
   // Mark invitation accepted
   await supabase.from('Invitation').update({ status: 'accepted' }).eq('id', inv.id);
+
+  void audit({ actorClerkId: clerkId, action: 'CREATE', resource: 'BrokerageMembership', metadata: { brokerageId: inv.brokerageId, role: inv.roleToAssign, method: 'email_invitation', invitationId: inv.id } });
 
   return NextResponse.json({ message: 'Joined brokerage successfully' }, { status: 200 });
 }

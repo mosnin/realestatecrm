@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { audit } from '@/lib/audit';
 
 /**
  * POST /api/broker/join
@@ -83,6 +84,8 @@ export async function POST(req: Request) {
   if (space) {
     await supabase.from('Space').update({ brokerageId: brokerage.id }).eq('id', space.id);
   }
+
+  void audit({ actorClerkId: clerkId, action: 'CREATE', resource: 'BrokerageMembership', metadata: { brokerageId: brokerage.id, role: 'realtor_member', method: 'join_code' } });
 
   return NextResponse.json({ brokerageName: brokerage.name }, { status: 201 });
 }

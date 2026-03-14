@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
+import { audit } from '@/lib/audit';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -10,6 +12,7 @@ type Params = { params: Promise<{ id: string }> };
  * The owner cannot remove themselves.
  */
 export async function DELETE(_req: Request, { params }: Params) {
+  const { userId: clerkId } = await auth();
   let ctx;
   try {
     ctx = await requireBroker();
@@ -56,6 +59,8 @@ export async function DELETE(_req: Request, { params }: Params) {
     .update({ brokerageId: null })
     .eq('ownerId', membership.userId)
     .eq('brokerageId', ctx.brokerage.id);
+
+  void audit({ actorClerkId: clerkId ?? null, action: 'DELETE', resource: 'BrokerageMembership', resourceId: membershipId, metadata: { brokerageId: ctx.brokerage.id, removedUserId: membership.userId, role: membership.role } });
 
   return NextResponse.json({ success: true });
 }

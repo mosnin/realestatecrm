@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { audit } from '@/lib/audit';
 
 /**
  * POST /api/broker/create
@@ -66,6 +67,8 @@ export async function POST(req: Request) {
     await supabase.from('Brokerage').delete().eq('id', brokerage.id);
     return NextResponse.json({ error: 'Failed to create brokerage membership. Please try again.' }, { status: 500 });
   }
+
+  void audit({ actorClerkId: clerkId, action: 'CREATE', resource: 'Brokerage', resourceId: brokerage.id, metadata: { name: trimmedName } });
 
   return NextResponse.json({ brokerage }, { status: 201 });
 }

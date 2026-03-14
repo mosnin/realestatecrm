@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
+import { audit } from '@/lib/audit';
 
 /** Generate a readable 8-char invite code like ABCD-EF23 */
 function generateJoinCode(): string {
@@ -36,6 +38,7 @@ export async function GET() {
  * Only broker_owner can regenerate the code.
  */
 export async function POST() {
+  const { userId: clerkId } = await auth();
   let ctx;
   try {
     ctx = await requireBroker();
@@ -75,6 +78,8 @@ export async function POST() {
     console.error('[broker/join-code] update failed', error);
     return NextResponse.json({ error: 'Failed to save join code' }, { status: 500 });
   }
+
+  void audit({ actorClerkId: clerkId ?? null, action: 'UPDATE', resource: 'Brokerage', resourceId: ctx.brokerage.id, metadata: { field: 'joinCode' } });
 
   return NextResponse.json({ joinCode });
 }
