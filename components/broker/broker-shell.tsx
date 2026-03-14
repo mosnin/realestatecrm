@@ -6,6 +6,7 @@ import { UserButton } from '@clerk/nextjs';
 import {
   LayoutDashboard,
   Users,
+  UserCircle,
   Mail,
   Building2,
   Menu,
@@ -27,6 +28,7 @@ import { useState } from 'react';
 
 const navItems = [
   { href: '/broker', label: 'Overview', icon: LayoutDashboard, exact: true },
+  { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
   { href: '/broker/members', label: 'Members', icon: Users, exact: false },
   { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
 ];
