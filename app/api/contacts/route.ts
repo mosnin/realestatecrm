@@ -68,6 +68,9 @@ export async function POST(req: NextRequest) {
   const propsVal = properties || [];
   const tagsVal = tags || [];
 
+  const VALID_TYPES = ['QUALIFICATION', 'TOUR', 'APPLICATION'] as const;
+  const contactType = VALID_TYPES.includes(type) ? type : 'QUALIFICATION';
+
   const { data: contact, error } = await supabase.from('Contact').insert({
     id,
     spaceId: space.id,
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest) {
     phone: phone || null,
     address: address || null,
     notes: notes || null,
-    type: type || 'QUALIFICATION',
+    type: contactType,
     budget: budgetVal,
     preferences: preferences || null,
     properties: propsVal,

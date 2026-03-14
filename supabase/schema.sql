@@ -171,6 +171,38 @@ CREATE INDEX IF NOT EXISTS idx_invitation_token             ON "Invitation"(toke
 CREATE INDEX IF NOT EXISTS idx_invitation_status            ON "Invitation"(status);
 
 -- ============================================================
+-- reorder_deal: atomically shift positions and move a deal
+-- Runs inside a single transaction, preventing race conditions
+-- from concurrent Kanban drag-and-drop reorders.
+-- Called via supabase.rpc('reorder_deal', { ... })
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION reorder_deal(
+  p_deal_id      text,
+  p_new_stage_id text,
+  p_new_position integer
+)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- Shift deals at or after the target position up by one to make room
+  UPDATE "Deal"
+  SET position = position + 1
+  WHERE "stageId" = p_new_stage_id
+    AND position >= p_new_position
+    AND id != p_deal_id;
+
+  -- Place the deal at its new stage and position
+  UPDATE "Deal"
+  SET "stageId"  = p_new_stage_id,
+      position   = p_new_position,
+      "updatedAt" = now()
+  WHERE id = p_deal_id;
+END;
+$$;
+
+-- ============================================================
 -- pgvector: Vector embeddings for AI-powered search
 -- Run AFTER enabling the vector extension in Supabase:
 --   Dashboard → Database → Extensions → enable "vector"

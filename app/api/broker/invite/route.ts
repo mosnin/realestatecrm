@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { sendBrokerageInvitation } from '@/lib/email';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 /**
  * POST /api/broker/invite
@@ -32,6 +33,10 @@ export async function POST(req: Request) {
   if (!['broker_manager', 'realtor_member'].includes(roleToAssign)) {
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
   }
+
+  // 20 invitations per broker per hour
+  const { allowed } = await checkRateLimit(`broker:invite:${ctx.dbUserId}`, 20, 3600);
+  if (!allowed) return NextResponse.json({ error: 'Too many invitations sent. Try again in an hour.' }, { status: 429 });
 
   const { brokerage, dbUserId } = ctx;
 

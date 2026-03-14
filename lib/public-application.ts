@@ -125,10 +125,11 @@ export function normalizePhone(input: string) {
   return input.replace(/\D/g, '');
 }
 
-export function applicationFingerprintKey(input: Pick<PublicApplicationInput, 'slug' | 'legalName' | 'phone'>) {
+export function applicationFingerprintKey(input: Pick<PublicApplicationInput, 'slug' | 'legalName' | 'phone'> & { email?: string | null }) {
   const normalizedName = input.legalName.trim().toLowerCase();
   const normalizedPhone = normalizePhone(input.phone);
-  return `${input.slug}:${normalizedName}:${normalizedPhone}`;
+  const normalizedEmail = (input.email ?? '').trim().toLowerCase();
+  return `${input.slug}:${normalizedName}:${normalizedPhone}:${normalizedEmail}`;
 }
 
 /** Build the structured applicationData JSON from the validated input */

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 /**
  * POST /api/broker/join
@@ -10,6 +11,10 @@ import { supabase } from '@/lib/supabase';
 export async function POST(req: Request) {
   const { userId: clerkId } = await auth();
   if (!clerkId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // 10 join attempts per user per hour (prevents code enumeration)
+  const { allowed } = await checkRateLimit(`broker:join:${clerkId}`, 10, 3600);
+  if (!allowed) return NextResponse.json({ error: 'Too many attempts. Try again later.' }, { status: 429 });
 
   let code: string;
   try {

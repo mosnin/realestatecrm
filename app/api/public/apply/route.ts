@@ -68,7 +68,8 @@ export async function POST(req: NextRequest) {
       console.warn('[apply] idempotency lock unavailable; using DB fallback', { error, spaceId: space.id });
     }
 
-    const duplicateCutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    // Expanded window: 5 minutes (was 2 minutes)
+    const duplicateCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const { data: existingRecentLeads, error: dupError } = await supabase
       .from('Contact')
       .select('*')
@@ -77,23 +78,33 @@ export async function POST(req: NextRequest) {
       .contains('tags', ['application-link'])
       .gte('createdAt', duplicateCutoff)
       .order('createdAt', { ascending: false })
-      .limit(1);
+      .limit(5);
     if (dupError) throw dupError;
 
     if (existingRecentLeads?.length) {
-      const existingRecentLead = existingRecentLeads[0] as Contact;
-      const existingNormalizedPhone = normalizePhone(existingRecentLead.phone ?? '');
       const normalizedPhone = normalizePhone(payload.phone);
-      if (existingNormalizedPhone && existingNormalizedPhone === normalizedPhone) {
+      const normalizedEmail = (payload.email ?? '').trim().toLowerCase();
+
+      const duplicate = (existingRecentLeads as Contact[]).find((lead) => {
+        const phoneMatch =
+          normalizePhone(lead.phone ?? '') !== '' &&
+          normalizePhone(lead.phone ?? '') === normalizedPhone;
+        const emailMatch =
+          normalizedEmail !== '' &&
+          (lead.email ?? '').trim().toLowerCase() === normalizedEmail;
+        return phoneMatch || emailMatch;
+      });
+
+      if (duplicate) {
         return NextResponse.json(
           {
             success: true,
-            id: existingRecentLead.id,
-            scoringStatus: existingRecentLead.scoringStatus,
-            leadScore: existingRecentLead.leadScore,
-            scoreLabel: existingRecentLead.scoreLabel,
-            scoreSummary: existingRecentLead.scoreSummary,
-            scoreDetails: existingRecentLead.scoreDetails,
+            id: duplicate.id,
+            scoringStatus: duplicate.scoringStatus,
+            leadScore: duplicate.leadScore,
+            scoreLabel: duplicate.scoreLabel,
+            scoreSummary: duplicate.scoreSummary,
+            scoreDetails: duplicate.scoreDetails,
           },
           { status: 200 }
         );

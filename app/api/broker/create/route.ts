@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 /**
  * POST /api/broker/create
@@ -11,6 +12,10 @@ export async function POST(req: Request) {
   const { userId: clerkId } = await auth();
   if (!clerkId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // 3 attempts per user per day
+  const { allowed } = await checkRateLimit(`broker:create:${clerkId}`, 3, 86400);
+  if (!allowed) return NextResponse.json({ error: 'Too many attempts. Try again tomorrow.' }, { status: 429 });
+
   let name: string;
   try {
     ({ name } = await req.json());
@@ -18,7 +23,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const trimmedName = (name ?? '').trim();
+  const trimmedName = (typeof name === 'string' ? name : '').trim();
   if (!trimmedName || trimmedName.length > 120) {
     return NextResponse.json({ error: 'Brokerage name required (max 120 chars)' }, { status: 400 });
   }

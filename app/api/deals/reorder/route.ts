@@ -9,56 +9,51 @@ export async function PATCH(req: NextRequest) {
 
   const { dealId, newStageId, newPosition } = await req.json();
 
-  const { data: dealRows, error: dealError } = await supabase
+  // Verify the deal exists and belongs to this user's space
+  const { data: deal, error: dealError } = await supabase
     .from('Deal')
-    .select('*')
-    .eq('id', dealId);
+    .select('id, spaceId, stageId, position')
+    .eq('id', dealId)
+    .maybeSingle();
   if (dealError) throw dealError;
-  if (!dealRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  const deal = dealRows[0];
+  if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const space = await getSpaceForUser(userId);
   if (!space || deal.spaceId !== space.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { data: stageRows, error: stageError } = await supabase
+  // Verify the target stage belongs to the same space
+  const { data: stage, error: stageError } = await supabase
     .from('DealStage')
-    .select('*')
-    .eq('id', newStageId);
+    .select('id, spaceId')
+    .eq('id', newStageId)
+    .maybeSingle();
   if (stageError) throw stageError;
-  if (!stageRows.length || stageRows[0].spaceId !== space.id) {
+  if (!stage || stage.spaceId !== space.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  // Shift existing deals in target stage to make room
-  const { data: dealsToShift, error: shiftReadError } = await supabase
-    .from('Deal')
-    .select('id, position')
-    .eq('stageId', newStageId)
-    .gte('position', newPosition);
-  if (shiftReadError) throw shiftReadError;
-
-  if (dealsToShift && dealsToShift.length > 0) {
-    await Promise.all(
-      dealsToShift.map(d =>
-        supabase.from('Deal').update({ position: d.position + 1 }).eq('id', d.id)
-      )
-    );
+  // Atomically shift affected deals and move the deal via a DB function.
+  // This replaces the previous N individual updates which had a race condition
+  // under concurrent drag-and-drop: two requests could both read the same
+  // positions and double-increment them.
+  const { error: rpcError } = await supabase.rpc('reorder_deal', {
+    p_deal_id: dealId,
+    p_new_stage_id: newStageId,
+    p_new_position: newPosition,
+  });
+  if (rpcError) {
+    console.error('[deals/reorder] rpc failed', rpcError);
+    throw rpcError;
   }
 
-  const { data: updatedDeal, error: updateError } = await supabase
+  const { data: updated, error: fetchError } = await supabase
     .from('Deal')
-    .update({
-      stageId: newStageId,
-      position: newPosition,
-      updatedAt: new Date().toISOString(),
-    })
+    .select('*')
     .eq('id', dealId)
-    .select()
     .single();
-  if (updateError) throw updateError;
+  if (fetchError) throw fetchError;
 
-  return NextResponse.json(updatedDeal);
+  return NextResponse.json(updated);
 }
