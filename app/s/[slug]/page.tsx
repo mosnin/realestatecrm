@@ -48,7 +48,7 @@ export default async function DashboardPage({
   let contactCount = 0, dealCount = 0, newLeadCount = 0, totalLeads = 0;
   let deals: { value: number | null; stageId: string }[] = [];
   let stages: { id: string; name: string; color: string; position: number; spaceId: string }[] = [];
-  let recentLeads: { id: string; name: string; phone: string | null; budget: number | null; preferences: string | null; createdAt: Date; tags: string[] }[] = [];
+  let recentLeads: { id: string; name: string; phone: string | null; budget: number | null; preferences: string | null; createdAt: Date; tags: string[]; leadScore: number | null; scoreLabel: string | null; scoringStatus: string | null }[] = [];
 
   try {
     [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads] =
@@ -57,7 +57,7 @@ export default async function DashboardPage({
         supabase.from('Deal').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
         supabase.from('Deal').select('value, stageId').eq('spaceId', space.id).then(r => { if (r.error) throw r.error; return r.data as { value: number | null; stageId: string }[]; }),
         supabase.from('DealStage').select('*').eq('spaceId', space.id).order('position', { ascending: true }).then(r => { if (r.error) throw r.error; return r.data as { id: string; name: string; color: string; position: number; spaceId: string }[]; }),
-        supabase.from('Contact').select('id, name, phone, budget, preferences, createdAt, tags').eq('spaceId', space.id).contains('tags', ['application-link']).order('createdAt', { ascending: false }).limit(5).then(r => { if (r.error) throw r.error; return r.data as { id: string; name: string; phone: string | null; budget: number | null; preferences: string | null; createdAt: Date; tags: string[] }[]; }),
+        supabase.from('Contact').select('id, name, phone, budget, preferences, createdAt, tags, leadScore, scoreLabel, scoringStatus').eq('spaceId', space.id).contains('tags', ['application-link']).order('createdAt', { ascending: false }).limit(5).then(r => { if (r.error) throw r.error; return r.data as { id: string; name: string; phone: string | null; budget: number | null; preferences: string | null; createdAt: Date; tags: string[]; leadScore: number | null; scoreLabel: string | null; scoringStatus: string | null }[]; }),
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).contains('tags', ['new-lead']).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).contains('tags', ['application-link']).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
       ]);
@@ -237,6 +237,11 @@ export default async function DashboardPage({
             <div className="space-y-2">
               {recentLeads.map((lead) => {
                 const isNew = lead.tags.includes('new-lead');
+                const scoreBadge =
+                  lead.scoreLabel === 'hot'  ? { label: 'Hot',  cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' } :
+                  lead.scoreLabel === 'warm' ? { label: 'Warm', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' } :
+                  lead.scoreLabel === 'cold' ? { label: 'Cold', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-400' } :
+                  null;
                 return (
                   <Link key={lead.id} href={`/s/${slug}/leads`}>
                     <div className={`rounded-xl border bg-card px-4 py-3 hover:shadow-sm transition-all duration-150 ${isNew ? 'border-primary/30' : 'border-border'}`}>
@@ -271,10 +276,20 @@ export default async function DashboardPage({
                             </div>
                           </div>
                         </div>
-                        <span className="text-xs text-muted-foreground flex items-center gap-1 flex-shrink-0">
-                          <Clock size={11} />
-                          {timeAgo(new Date(lead.createdAt))}
-                        </span>
+                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                          {lead.scoringStatus === 'scored' && lead.leadScore != null && scoreBadge ? (
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2 py-0.5 ${scoreBadge.cls}`}>
+                              {Math.round(lead.leadScore)}
+                              <span className="font-medium opacity-80">{scoreBadge.label}</span>
+                            </span>
+                          ) : lead.scoringStatus === 'pending' ? (
+                            <span className="text-[11px] text-muted-foreground/60 italic">scoring…</span>
+                          ) : null}
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock size={11} />
+                            {timeAgo(new Date(lead.createdAt))}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </Link>
