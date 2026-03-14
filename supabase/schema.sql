@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS "Brokerage" (
   status        text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
   "websiteUrl"  text,
   "logoUrl"     text,
+  "joinCode"    text UNIQUE,
   "createdAt"   timestamptz NOT NULL DEFAULT now()
 );
 
@@ -157,6 +158,10 @@ CREATE INDEX IF NOT EXISTS idx_dealcontact_contact ON "DealContact"("contactId")
 CREATE INDEX IF NOT EXISTS idx_message_space_id   ON "Message"("spaceId");
 CREATE UNIQUE INDEX IF NOT EXISTS idx_brokerage_owner       ON "Brokerage"("ownerId");
 CREATE INDEX       IF NOT EXISTS idx_brokerage_status       ON "Brokerage"(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_brokerage_join_code   ON "Brokerage"("joinCode");
+
+-- Migration for existing databases (run if upgrading from a version without joinCode):
+-- ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "joinCode" text UNIQUE;
 CREATE INDEX IF NOT EXISTS idx_membership_brokerage         ON "BrokerageMembership"("brokerageId");
 CREATE INDEX IF NOT EXISTS idx_membership_user              ON "BrokerageMembership"("userId");
 CREATE INDEX IF NOT EXISTS idx_space_brokerage              ON "Space"("brokerageId");

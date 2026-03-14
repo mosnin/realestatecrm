@@ -8,6 +8,7 @@ const isProtectedRoute = createRouteMatcher([
   '/admin(.*)',
   '/broker(.*)',
   '/invite/(.*)',
+  '/join/(.*)',
 ]);
 
 const isPublicRoute = createRouteMatcher([

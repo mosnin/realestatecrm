@@ -26,6 +26,7 @@ export type Brokerage = {
   status: 'active' | 'suspended';
   websiteUrl: string | null;
   logoUrl: string | null;
+  joinCode: string | null;
   createdAt: Date;
 };
 

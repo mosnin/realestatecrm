@@ -47,12 +47,14 @@ export function InviteForm() {
         placeholder="colleague@email.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="flex-1 h-9 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        disabled={loading}
+        className="flex-1 h-9 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
       />
       <select
         value={role}
         onChange={(e) => setRole(e.target.value as typeof role)}
-        className="h-9 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        disabled={loading}
+        className="h-9 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
       >
         <option value="realtor_member">Realtor</option>
         <option value="broker_manager">Manager</option>

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { ConfigureAccountForm } from './configure-account-form';
 import { CreateBrokerageCard } from '@/components/broker/create-brokerage-card';
+import { JoinWithCodeCard } from '@/components/broker/join-with-code-card';
 import { getBrokerContext } from '@/lib/permissions';
 import type { User, Space, SpaceSetting } from '@/lib/types';
 
@@ -93,10 +94,11 @@ export default async function ConfigurePage({
         <div>
           <p className="text-sm font-semibold">Brokerage</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Create or access your brokerage dashboard to invite realtors and get team visibility.
+            Create your own brokerage, or join one with an invite code from your broker.
           </p>
         </div>
         <CreateBrokerageCard existingBrokerageName={existingBrokerageName} />
+        {!existingBrokerageName && <JoinWithCodeCard />}
       </div>
     </div>
   );

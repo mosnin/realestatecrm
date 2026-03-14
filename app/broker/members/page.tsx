@@ -3,10 +3,11 @@ import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { RemoveMemberButton } from '@/components/broker/remove-member-button';
 
 export default async function BrokerMembersPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/dashboard');
+  if (!ctx) redirect('/');
 
   const { data: memberships } = await supabase
     .from('BrokerageMembership')
@@ -37,11 +38,17 @@ export default async function BrokerMembersPage() {
 
       {members.length === 0 ? (
         <Card>
-          <CardContent className="px-5 py-8 text-center">
+          <CardContent className="px-5 py-8 text-center space-y-2">
             <p className="text-sm text-muted-foreground">No members yet.</p>
-            <a href="/broker/invitations" className="text-xs text-primary font-medium hover:underline underline-offset-2 mt-2 inline-block">
-              Invite realtors →
-            </a>
+            <div className="flex items-center justify-center gap-3">
+              <a href="/broker/invitations" className="text-xs text-primary font-medium hover:underline underline-offset-2">
+                Send an email invite →
+              </a>
+              <span className="text-xs text-muted-foreground">or</span>
+              <a href="/broker/invitations" className="text-xs text-primary font-medium hover:underline underline-offset-2">
+                Share an invite code →
+              </a>
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -80,6 +87,12 @@ export default async function BrokerMembersPage() {
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
                         <AlertCircle size={10} /> Pending
                       </span>
+                    )}
+                    {m.role !== 'broker_owner' && ctx.membership.role === 'broker_owner' && (
+                      <RemoveMemberButton
+                        membershipId={m.id}
+                        memberName={user?.name ?? user?.email ?? 'this member'}
+                      />
                     )}
                   </div>
                 </div>

@@ -1,9 +1,14 @@
+import { redirect } from 'next/navigation';
+import { isPlatformAdmin } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Building2, Users, CheckCircle2, XCircle } from 'lucide-react';
 import { BrokerageStatusToggle } from './brokerage-status-toggle';
 
 export default async function AdminBrokeragesPage() {
+  const isAdmin = await isPlatformAdmin();
+  if (!isAdmin) redirect('/');
+
   // Fetch all brokerages with owner info
   const { data: brokerages, error } = await supabase
     .from('Brokerage')

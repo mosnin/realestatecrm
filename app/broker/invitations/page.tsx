@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { InviteForm } from '@/components/broker/invite-form';
+import { InviteCodeCard } from '@/components/broker/invite-code-card';
+import { RevokeInviteButton } from '@/components/broker/revoke-invite-button';
 
 const statusBadge = (status: string) => {
   switch (status) {
@@ -17,7 +19,7 @@ const statusBadge = (status: string) => {
 
 export default async function BrokerInvitationsPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/dashboard');
+  if (!ctx) redirect('/');
 
   const { data: invitations } = await supabase
     .from('Invitation')
@@ -45,9 +47,11 @@ export default async function BrokerInvitationsPage() {
         </p>
       </div>
 
+      <InviteCodeCard />
+
       <Card>
         <CardContent className="px-5 py-4 space-y-3">
-          <p className="text-sm font-medium">Send an invitation</p>
+          <p className="text-sm font-medium">Send an email invitation</p>
           <InviteForm />
         </CardContent>
       </Card>
@@ -84,6 +88,9 @@ export default async function BrokerInvitationsPage() {
                     >
                       {inv.status}
                     </span>
+                    {inv.status === 'pending' && (
+                      <RevokeInviteButton invitationId={inv.id} />
+                    )}
                   </div>
                 </div>
               );

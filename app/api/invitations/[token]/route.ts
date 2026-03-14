@@ -67,10 +67,18 @@ export async function POST(_req: Request, { params }: Params) {
   // Resolve current user
   const { data: user } = await supabase
     .from('User')
-    .select('id')
+    .select('id, email')
     .eq('clerkId', clerkId)
     .maybeSingle();
   if (!user) return NextResponse.json({ error: 'User not found — complete sign-up first' }, { status: 404 });
+
+  // Verify this invitation was meant for the signed-in user's email
+  if (user.email.toLowerCase() !== inv.email.toLowerCase()) {
+    return NextResponse.json(
+      { error: `This invitation was sent to ${inv.email}. Please sign in with that email to accept.` },
+      { status: 403 }
+    );
+  }
 
   // Idempotent: already a member?
   const { data: existingMembership } = await supabase
