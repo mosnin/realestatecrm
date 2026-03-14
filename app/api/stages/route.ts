@@ -93,6 +93,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  // Validate color is a safe 6-digit hex code to prevent CSS injection
+  const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+  const safeColor = typeof color === 'string' && HEX_COLOR.test(color) ? color : '#6366f1';
+
   const { data: lastStageRows, error: lastStageError } = await supabase
     .from('DealStage')
     .select('position')
@@ -107,7 +111,7 @@ export async function POST(req: NextRequest) {
     id,
     spaceId: space.id,
     name,
-    color: color ?? '#6366f1',
+    color: safeColor,
     position: lastPosition + 1,
   }).select().single();
   if (insertError) throw insertError;

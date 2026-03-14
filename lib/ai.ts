@@ -163,15 +163,16 @@ export async function chatWithRAG(
         }
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown OpenAI error';
+      // Log full error server-side; never return internal details (API key snippets, rate limit info) to the client
+      console.error('[ai] OpenAI provider error', error);
       if (!looksLikeAnthropicKey(anthropicKey)) {
-        return textStream(`AI provider error: ${message}`);
+        return textStream('AI provider is temporarily unavailable. Please try again in a moment.');
       }
     }
   }
 
   if (!looksLikeAnthropicKey(anthropicKey)) {
-    return textStream('AI provider error: Anthropic key is missing or invalid.');
+    return textStream('AI provider error: no valid API key configured. Add one in Settings → AI.');
   }
 
   try {
@@ -198,7 +199,7 @@ export async function chatWithRAG(
       }
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown Anthropic error';
-    return textStream(`AI provider error: ${message}`);
+    console.error('[ai] Anthropic provider error', error);
+    return textStream('AI provider is temporarily unavailable. Please try again in a moment.');
   }
 }

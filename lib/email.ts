@@ -1,14 +1,25 @@
 import { Resend } from 'resend';
 import type { ApplicationData } from '@/lib/types';
 
+/** Escape characters that have special meaning in HTML to prevent XSS. */
+function esc(value: string | null | undefined): string {
+  if (!value) return '';
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 function fmt(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 }
 
 function row(label: string, value: string | number | boolean | null | undefined) {
   if (value == null || value === '') return '';
-  const display = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value);
-  return `<tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:13px;white-space:nowrap">${label}</td><td style="padding:4px 0;font-size:13px;color:#111827">${display}</td></tr>`;
+  const display = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : esc(String(value));
+  return `<tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:13px;white-space:nowrap">${esc(label)}</td><td style="padding:4px 0;font-size:13px;color:#111827">${display}</td></tr>`;
 }
 
 export interface NewLeadEmailParams {
@@ -62,7 +73,7 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
         <!-- Header -->
         <tr><td style="background:#0f172a;padding:20px 28px">
-          <p style="margin:0;color:#94a3b8;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.05em">${spaceName}</p>
+          <p style="margin:0;color:#94a3b8;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.05em">${esc(spaceName)}</p>
           <p style="margin:4px 0 0;color:#ffffff;font-size:20px;font-weight:700">New lead application</p>
         </td></tr>
         <!-- Body -->
@@ -70,11 +81,11 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
           <!-- Name + score -->
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
-              <td><p style="margin:0;font-size:18px;font-weight:700;color:#111827">${name}</p></td>
+              <td><p style="margin:0;font-size:18px;font-weight:700;color:#111827">${esc(name)}</p></td>
               ${scoreHtml ? `<td align="right" style="vertical-align:middle">${scoreHtml}</td>` : ''}
             </tr>
           </table>
-          ${scoreSummary ? `<p style="margin:10px 0 0;font-size:13px;color:#4b5563;line-height:1.5">${scoreSummary}</p>` : ''}
+          ${scoreSummary ? `<p style="margin:10px 0 0;font-size:13px;color:#4b5563;line-height:1.5">${esc(scoreSummary)}</p>` : ''}
           <!-- Details table -->
           ${detailRows ? `<table cellpadding="0" cellspacing="0" style="margin-top:18px;width:100%">${detailRows}</table>` : ''}
           <!-- CTA -->
@@ -86,7 +97,7 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
         </td></tr>
         <!-- Footer -->
         <tr><td style="padding:16px 28px;border-top:1px solid #f1f5f9">
-          <p style="margin:0;font-size:11px;color:#9ca3af">You're receiving this because notifications are enabled for <strong>${spaceName}</strong>. Manage your settings in the workspace dashboard.</p>
+          <p style="margin:0;font-size:11px;color:#9ca3af">You're receiving this because notifications are enabled for <strong>${esc(spaceName)}</strong>. Manage your settings in the workspace dashboard.</p>
         </td></tr>
       </table>
     </td></tr>
@@ -94,10 +105,15 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
 </body>
 </html>`;
 
+  // Strip control characters (newlines, carriage returns) from subject-line values
+  // to prevent email header injection
+  const safeSubjectName = name.replace(/[\r\n\t]/g, ' ').slice(0, 200);
+  const safeScoreLabel = (scoreLabel ?? '').replace(/[\r\n\t]/g, ' ');
+
   await resend.emails.send({
     from: FROM,
     to: toEmail,
-    subject: `New lead: ${name}${leadScore != null ? ` · ${Math.round(leadScore)} ${scoreLabel ?? ''}` : ''}`,
+    subject: `New lead: ${safeSubjectName}${leadScore != null ? ` · ${Math.round(leadScore)} ${safeScoreLabel}` : ''}`,
     html,
   });
 }

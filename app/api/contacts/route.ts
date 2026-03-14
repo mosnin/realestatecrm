@@ -30,8 +30,10 @@ export async function GET(req: NextRequest) {
     .not('tags', 'cs', '["application-link"]');
 
   if (search) {
+    // Cap length to prevent expensive full-table-scan patterns
+    const limitedSearch = search.slice(0, 100);
     // Escape PostgreSQL ILIKE special characters before wrapping in wildcards
-    const escaped = search.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+    const escaped = limitedSearch.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
     const pattern = `%${escaped}%`;
     query = query.or(`name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},preferences.ilike.${pattern}`);
   }

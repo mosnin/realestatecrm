@@ -27,9 +27,14 @@ export async function PATCH(
   }
 
   const body = await req.json();
+  // Validate color is a safe 6-digit hex code
+  const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+  const safeColor = typeof body.color === 'string' && HEX_COLOR.test(body.color)
+    ? body.color
+    : existing.color; // keep existing color if invalid value supplied
   const { data: stage, error: updateError } = await supabase
     .from('DealStage')
-    .update({ name: body.name, color: body.color })
+    .update({ name: body.name, color: safeColor })
     .eq('id', id)
     .select()
     .single();
