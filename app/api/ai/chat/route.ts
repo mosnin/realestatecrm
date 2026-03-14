@@ -66,8 +66,9 @@ export async function POST(req: NextRequest) {
       }
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown server error';
-    return new NextResponse(`AI chat error: ${message}`, {
+    // Log full error server-side; never return internal details to the client
+    console.error('[chat] unhandled error', error);
+    return new NextResponse('AI service error', {
       status: 500,
       headers: { 'Content-Type': 'text/plain; charset=utf-8' }
     });

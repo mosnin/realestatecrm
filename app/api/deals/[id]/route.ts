@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { syncDeal, deleteDealVector } from '@/lib/vectorize';
 import { getSpaceForUser } from '@/lib/space';
+import { audit } from '@/lib/audit';
 import type { Deal, DealStage } from '@/lib/types';
 
 export async function PATCH(
@@ -75,6 +76,7 @@ export async function PATCH(
   } as Deal & { stage: DealStage | null };
 
   syncDeal(deal).catch(console.error);
+  void audit({ actorClerkId: userId, action: 'UPDATE', resource: 'Deal', resourceId: id, spaceId: space.id, req });
 
   return NextResponse.json(deal);
 }
@@ -104,6 +106,15 @@ export async function DELETE(
   const { error: deleteError } = await supabase.from('Deal').delete().eq('id', id);
   if (deleteError) throw deleteError;
   deleteDealVector(deal.spaceId, id).catch(console.error);
+  void audit({
+    actorClerkId: userId,
+    action: 'DELETE',
+    resource: 'Deal',
+    resourceId: id,
+    spaceId: space.id,
+    req: _req,
+    metadata: { title: deal.title },
+  });
 
   return NextResponse.json({ success: true });
 }

@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { getSpaceFromSlug } from '@/lib/space';
+import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { syncContact, syncDeal } from '@/lib/vectorize';
 import type { Contact, Deal, DealStage } from '@/lib/types';
 
@@ -12,6 +12,12 @@ export async function POST(req: NextRequest) {
   const { slug } = await req.json();
   const space = await getSpaceFromSlug(slug);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
+
+  // Verify the authenticated user owns this space
+  const userSpace = await getSpaceForUser(userId);
+  if (!userSpace || userSpace.id !== space.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const [contactsResult, dealsResult] = await Promise.all([
     supabase.from('Contact').select('*').eq('spaceId', space.id),

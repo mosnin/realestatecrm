@@ -14,6 +14,25 @@ import {
 import { sendNewLeadNotification } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
+  // ── IP-based rate limiting (10 submissions / IP / hour) ──────────────────
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown';
+  const rateLimitKey = `apply:rl:${ip}`;
+  try {
+    const count = await redis.incr(rateLimitKey);
+    if (count === 1) await redis.expire(rateLimitKey, 3600);
+    if (count > 10) {
+      return NextResponse.json(
+        { error: 'Too many submissions. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': '3600' } }
+      );
+    }
+  } catch {
+    // Redis unavailable — fail open to preserve availability; submission proceeds
+  }
+
   let requestBody: unknown;
   try {
     requestBody = await req.json();
