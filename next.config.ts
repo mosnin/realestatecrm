@@ -31,7 +31,7 @@ const securityHeaders = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.clerk.accounts.dev https://clerk.accounts.dev",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' blob: data: https://*.clerk.accounts.dev https://*.gravatar.com https://img.clerk.com",
+      "img-src 'self' blob: data: https://*.clerk.accounts.dev https://*.gravatar.com https://img.clerk.com https://images.unsplash.com https://blogger.googleusercontent.com",
       "font-src 'self' data:",
       "connect-src 'self' https://*.supabase.co https://*.clerk.accounts.dev https://clerk.accounts.dev https://vitals.vercel-insights.com https://*.vercel-scripts.com",
       "frame-src 'self' https://*.clerk.accounts.dev https://clerk.accounts.dev",
