@@ -13,14 +13,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { formatCompact as formatCurrency } from '@/lib/formatting';
 
 export const metadata: Metadata = { title: 'Realtors — Broker Dashboard' };
-
-function formatCurrency(v: number) {
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}K`;
-  return `$${v.toFixed(0)}`;
-}
 
 export default async function BrokerRealtorsPage() {
   const ctx = await getBrokerContext();

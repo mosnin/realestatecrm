@@ -17,6 +17,7 @@ import {
 import type { Metadata } from 'next';
 import { buildIntakeUrl } from '@/lib/intake';
 import { CopyLinkButton } from './copy-link-button';
+import { timeAgo, formatCurrency } from '@/lib/formatting';
 
 export async function generateMetadata({
   params,
@@ -25,16 +26,6 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   return { title: `${slug} — Chippi` };
-}
-
-function timeAgo(date: Date): string {
-  const diff = Date.now() - date.getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
 }
 
 export default async function DashboardPage({
@@ -85,13 +76,6 @@ export default async function DashboardPage({
       value: deals.filter((d) => d.stageId === stage.id).reduce((s, d) => s + (d.value ?? 0), 0),
     }))
     .filter((s) => s.count > 0);
-
-  const formatCurrency = (n: number) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(n);
 
   const intakeUrl = buildIntakeUrl(space.slug);
 

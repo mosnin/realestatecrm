@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Phone, Mail, Calendar, FileText, MessageSquare, Plus, Clock } from 'lucide-react';
+import { Plus, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { timeAgo } from '@/lib/formatting';
+import { ACTIVITY_META } from '@/lib/constants';
 
 type ActivityType = 'note' | 'call' | 'email' | 'meeting' | 'follow_up';
 
@@ -15,27 +17,9 @@ type Activity = {
   createdAt: string;
 };
 
-const TYPE_META: Record<ActivityType, { label: string; icon: React.ComponentType<{ size: number; className?: string }>; color: string }> = {
-  note:      { label: 'Note',      icon: FileText,      color: 'text-muted-foreground bg-muted' },
-  call:      { label: 'Call',      icon: Phone,         color: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/10' },
-  email:     { label: 'Email',     icon: Mail,          color: 'text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-500/10' },
-  meeting:   { label: 'Meeting',   icon: Calendar,      color: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10' },
-  follow_up: { label: 'Follow-up', icon: MessageSquare, color: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10' },
-};
+const TYPE_META = ACTIVITY_META;
 
 const ACTIVITY_TYPES: ActivityType[] = ['note', 'call', 'email', 'meeting', 'follow_up'];
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 export function ContactActivityTab({ contactId }: { contactId: string }) {
   const [activities, setActivities] = useState<Activity[]>([]);

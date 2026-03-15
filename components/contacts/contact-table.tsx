@@ -32,6 +32,8 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { downloadCSV } from '@/lib/csv';
 import type { SavedView } from '@/lib/types';
+import { formatCurrency as _formatCurrency, getInitials } from '@/lib/formatting';
+import { CONTACT_STAGES } from '@/lib/constants';
 
 type Client = {
   id: string;
@@ -48,47 +50,11 @@ type Client = {
   tags: string[];
 };
 
-const STAGES = [
-  {
-    key: 'QUALIFICATION' as const,
-    label: 'Qualifying',
-    description: 'Initial review',
-    className: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
-    dotColor: 'bg-blue-400',
-    border: 'border-blue-200/60 dark:border-blue-800/40',
-    headerBg: 'bg-blue-50/60 dark:bg-blue-500/5',
-  },
-  {
-    key: 'TOUR' as const,
-    label: 'Tour',
-    description: 'Showing scheduled',
-    className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
-    dotColor: 'bg-amber-400',
-    border: 'border-amber-200/60 dark:border-amber-800/40',
-    headerBg: 'bg-amber-50/60 dark:bg-amber-500/5',
-  },
-  {
-    key: 'APPLICATION' as const,
-    label: 'Applied',
-    description: 'Application submitted',
-    className: 'bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-400',
-    dotColor: 'bg-green-400',
-    border: 'border-green-200/60 dark:border-green-800/40',
-    headerBg: 'bg-green-50/60 dark:bg-green-500/5',
-  },
-];
+const STAGES = CONTACT_STAGES;
 
 function formatCurrency(value: number | null) {
   if (value == null) return null;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function getInitials(name: string) {
-  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+  return _formatCurrency(value);
 }
 
 interface ContactTableProps {

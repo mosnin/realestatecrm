@@ -17,6 +17,7 @@ import {
   Legend,
 } from 'recharts';
 import { cn } from '@/lib/utils';
+import { formatCompact as formatCurrency } from '@/lib/formatting';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -81,14 +82,6 @@ export interface AnalyticsData {
   // conversion funnel
   contactFunnel: { label: string; count: number; rate: number }[];
   dealWinRate: number;
-}
-
-// ─── Helpers ───────────────────────────────────────────────────────────────
-
-function formatCurrency(n: number) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
-  return `$${n}`;
 }
 
 const TABS = ['Overview', 'Leads', 'Qualification', 'Deals', 'Contacts'] as const;

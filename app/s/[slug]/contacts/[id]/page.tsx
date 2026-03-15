@@ -27,6 +27,7 @@ import {
 import type { Contact, ApplicationData, LeadScoreDetails } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
 import { ComposeEmailDialog } from '@/components/contacts/compose-email-dialog';
+import { getInitials, formatCurrency } from '@/lib/formatting';
 
 const TYPE_META: Record<string, { label: string; className: string }> = {
   QUALIFICATION: {
@@ -42,18 +43,6 @@ const TYPE_META: Record<string, { label: string; className: string }> = {
     className: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-500/15 dark:text-green-400 dark:border-green-500/30',
   },
 };
-
-function getInitials(name: string) {
-  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
-}
-
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(n);
-}
 
 function tierBadgeClasses(label: string) {
   if (label === 'hot') return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400';

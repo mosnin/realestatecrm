@@ -1,32 +1,14 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { getSpaceForUser } from '@/lib/space';
-
-async function resolveContactSpace(contactId: string, userId: string) {
-  const { data: rows, error } = await supabase
-    .from('Contact')
-    .select('spaceId')
-    .eq('id', contactId)
-    .limit(1);
-  if (error) throw error;
-  if (!rows?.length) return null;
-
-  const space = await getSpaceForUser(userId);
-  if (!space || rows[0].spaceId !== space.id) return null;
-  return space;
-}
+import { requireContactAccess } from '@/lib/api-auth';
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const { id } = await params;
-  const space = await resolveContactSpace(id, userId);
-  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const auth = await requireContactAccess(id);
+  if (auth instanceof NextResponse) return auth;
 
   const { data, error } = await supabase
     .from('ContactActivity')
@@ -42,12 +24,10 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const { id } = await params;
-  const space = await resolveContactSpace(id, userId);
-  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const auth = await requireContactAccess(id);
+  if (auth instanceof NextResponse) return auth;
+  const { space } = auth;
 
   const body = await req.json();
   const { type, content, metadata } = body;

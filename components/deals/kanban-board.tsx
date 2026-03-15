@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
+import { formatCurrency as _formatCurrency } from '@/lib/formatting';
 
 type DealWithRelations = Deal & {
   stage: DealStage;
@@ -45,11 +46,7 @@ const PRIORITY_META: Record<string, { label: string; className: string }> = {
 
 function formatCurrency(n: number | null) {
   if (n == null) return null;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(n);
+  return _formatCurrency(n);
 }
 
 interface KanbanBoardProps {

@@ -33,75 +33,10 @@ import { cn } from '@/lib/utils';
 import { ConvertLeadDialog } from './convert-lead-dialog';
 import type { Contact, ApplicationData, LeadScoreDetails, SavedView } from '@/lib/types';
 import { downloadCSV } from '@/lib/csv';
+import { timeAgo, formatMoney, getInitials, formatFollowUpDate, toDateInputValue } from '@/lib/formatting';
+import { LEAD_TIERS, type TierKey } from '@/lib/constants';
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function timeAgo(date: Date): string {
-  const diff = Date.now() - date.getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function formatMoney(n: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(n);
-}
-
-function getInitials(name: string) {
-  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
-}
-
-// ── Tier config ─────────────────────────────────────────────────────────────
-
-const TIERS = {
-  hot: {
-    label: 'Hot',
-    icon: Flame,
-    ring: 'ring-emerald-400/60',
-    bg: 'bg-emerald-50 dark:bg-emerald-500/10',
-    text: 'text-emerald-700 dark:text-emerald-400',
-    pill: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
-    scoreBg: 'bg-emerald-500',
-  },
-  warm: {
-    label: 'Warm',
-    icon: Thermometer,
-    ring: 'ring-amber-400/60',
-    bg: 'bg-amber-50 dark:bg-amber-500/10',
-    text: 'text-amber-700 dark:text-amber-400',
-    pill: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
-    scoreBg: 'bg-amber-500',
-  },
-  cold: {
-    label: 'Cold',
-    icon: Snowflake,
-    ring: 'ring-blue-400/60',
-    bg: 'bg-blue-50 dark:bg-blue-500/10',
-    text: 'text-blue-700 dark:text-blue-400',
-    pill: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
-    scoreBg: 'bg-blue-400',
-  },
-  unscored: {
-    label: 'Unscored',
-    icon: HelpCircle,
-    ring: 'ring-border',
-    bg: 'bg-muted',
-    text: 'text-muted-foreground',
-    pill: 'bg-muted text-muted-foreground',
-    scoreBg: 'bg-muted-foreground/30',
-  },
-} as const;
-
-type TierKey = keyof typeof TIERS;
+const TIERS = LEAD_TIERS;
 
 function getTierKey(lead: Contact): TierKey {
   if (lead.scoringStatus !== 'scored' || !lead.scoreLabel) return 'unscored';
@@ -330,26 +265,6 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
         Submitted: new Date(l.createdAt).toLocaleDateString('en-US'),
       };
     }));
-  }
-
-  function formatFollowUpDate(dateVal: Date | string | null): string {
-    if (!dateVal) return '';
-    const d = new Date(dateVal);
-    const today = new Date();
-    const diffDays = Math.ceil((d.getTime() - new Date(today.toDateString()).getTime()) / 86_400_000);
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Tomorrow';
-    if (diffDays === -1) return 'Yesterday';
-    if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`;
-    if (diffDays <= 7) return `In ${diffDays}d`;
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
-
-  function toDateInputValue(dateVal: Date | string | null): string {
-    if (!dateVal) return '';
-    const d = new Date(dateVal);
-    if (isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 10);
   }
 
   const leadViews = savedViews.filter((v) => v.page === 'leads');

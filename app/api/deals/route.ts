@@ -1,24 +1,16 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
+import { requireSpaceOwner } from '@/lib/api-auth';
 import { syncDeal } from '@/lib/vectorize';
 import type { Deal, DealStage } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const slug = req.nextUrl.searchParams.get('slug');
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
-  const space = await getSpaceFromSlug(slug);
-  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  const userSpace = await getSpaceForUser(userId);
-  if (!userSpace || space.id !== userSpace.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const auth = await requireSpaceOwner(slug);
+  if (auth instanceof NextResponse) return auth;
+  const { space } = auth;
 
   // Get deals with stage
   const { data: dealRows, error: dealError } = await supabase
@@ -82,19 +74,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const body = await req.json();
   const { slug, title, description, value, address, priority, closeDate, stageId, contactIds } = body;
 
-  const space = await getSpaceFromSlug(slug);
-  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  const userSpace = await getSpaceForUser(userId);
-  if (!userSpace || space.id !== userSpace.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const auth = await requireSpaceOwner(slug);
+  if (auth instanceof NextResponse) return auth;
+  const { space } = auth;
 
   const { data: lastDealRows, error: lastDealError } = await supabase
     .from('Deal')

@@ -1,29 +1,32 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
+import { requireAuth } from '@/lib/api-auth';
+
+async function resolveDealSpace(dealId: string, userId: string) {
+  const { data: dealRows, error } = await supabase
+    .from('Deal')
+    .select('spaceId')
+    .eq('id', dealId)
+    .limit(1);
+  if (error) throw error;
+  if (!dealRows?.length) return null;
+  const space = await getSpaceForUser(userId);
+  if (!space || dealRows[0].spaceId !== space.id) return null;
+  return space;
+}
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+  const { userId } = authResult;
 
   const { id } = await params;
-
-  const { data: dealRows, error: dealError } = await supabase
-    .from('Deal')
-    .select('spaceId')
-    .eq('id', id)
-    .limit(1);
-  if (dealError) throw dealError;
-  if (!dealRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  const space = await getSpaceForUser(userId);
-  if (!space || dealRows[0].spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const space = await resolveDealSpace(id, userId);
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { data, error } = await supabase
     .from('DealActivity')
@@ -39,23 +42,13 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+  const { userId } = authResult;
 
   const { id } = await params;
-
-  const { data: dealRows, error: dealError } = await supabase
-    .from('Deal')
-    .select('spaceId')
-    .eq('id', id)
-    .limit(1);
-  if (dealError) throw dealError;
-  if (!dealRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  const space = await getSpaceForUser(userId);
-  if (!space || dealRows[0].spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const space = await resolveDealSpace(id, userId);
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const body = await req.json();
   const { type, content, metadata } = body;
