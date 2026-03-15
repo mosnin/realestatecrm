@@ -56,7 +56,7 @@ export default async function AnalyticsPage({
       .eq('spaceId', space.id),
     supabase
       .from('Deal')
-      .select('id, value, stageId, priority, createdAt')
+      .select('id, value, stageId, priority, createdAt, status')
       .eq('spaceId', space.id),
     supabase
       .from('DealStage')
@@ -82,6 +82,7 @@ export default async function AnalyticsPage({
     stageId: string;
     priority: string;
     createdAt: string;
+    status: string;
   }[];
 
   const stages = (stagesRes.data ?? []) as {
@@ -255,6 +256,21 @@ export default async function AnalyticsPage({
       : null,
   }));
 
+  // ── Conversion funnel ────────────────────────────────────────────────────
+
+  const qualCount = contacts.filter((c) => c.type === 'QUALIFICATION').length;
+  const tourCount = contacts.filter((c) => c.type === 'TOUR').length;
+  const appCount  = contacts.filter((c) => c.type === 'APPLICATION').length;
+
+  const contactFunnel = [
+    { label: 'Qualifying', count: qualCount, rate: 100 },
+    { label: 'Tour', count: tourCount, rate: qualCount > 0 ? Math.round((tourCount / qualCount) * 100) : 0 },
+    { label: 'Applied', count: appCount, rate: tourCount > 0 ? Math.round((appCount / tourCount) * 100) : 0 },
+  ];
+
+  const wonDeals = deals.filter((d) => d.status === 'won').length;
+  const dealWinRate = deals.length > 0 ? Math.round((wonDeals / deals.length) * 100) : 0;
+
   const data: AnalyticsData = {
     totalLeads: leads.length,
     totalContacts: contacts.length,
@@ -274,6 +290,9 @@ export default async function AnalyticsPage({
     leadStateDistribution,
     topRiskFlags,
     avgScoreByMonth,
+    // conversion funnel
+    contactFunnel,
+    dealWinRate,
   };
 
   return (

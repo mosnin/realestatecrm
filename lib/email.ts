@@ -118,6 +118,124 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
   });
 }
 
+export interface FollowUpDigestParams {
+  toEmail: string;
+  spaceName: string;
+  spaceSlug: string;
+  contacts: { name: string; phone: string | null; followUpAt: string | null }[];
+}
+
+export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<void> {
+  if (!process.env.RESEND_API_KEY) return;
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
+
+  const { toEmail, spaceName, spaceSlug, contacts } = params;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.yourdomain.com';
+  const leadsUrl = `${appUrl}/s/${spaceSlug}/leads`;
+
+  const contactRows = contacts
+    .map((c) => {
+      const dateStr = c.followUpAt ? new Date(c.followUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      return `<tr>
+        <td style="padding:6px 12px 6px 0;font-size:13px;color:#111827;font-weight:500">${esc(c.name)}</td>
+        <td style="padding:6px 12px 6px 0;font-size:13px;color:#6b7280">${c.phone ? esc(c.phone) : '—'}</td>
+        <td style="padding:6px 0;font-size:13px;color:#d97706;font-weight:500">${dateStr}</td>
+      </tr>`;
+    })
+    .join('');
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
+        <tr><td style="background:#0f172a;padding:20px 28px">
+          <p style="margin:0;color:#94a3b8;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.05em">${esc(spaceName)}</p>
+          <p style="margin:4px 0 0;color:#ffffff;font-size:20px;font-weight:700">Follow-up reminders</p>
+        </td></tr>
+        <tr><td style="padding:24px 28px">
+          <p style="margin:0 0 16px;font-size:14px;color:#374151">You have <strong>${contacts.length}</strong> follow-up${contacts.length !== 1 ? 's' : ''} due today:</p>
+          <table cellpadding="0" cellspacing="0" style="width:100%;border-top:1px solid #f1f5f9">
+            <thead>
+              <tr>
+                <th style="padding:8px 12px 8px 0;text-align:left;font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Name</th>
+                <th style="padding:8px 12px 8px 0;text-align:left;font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Phone</th>
+                <th style="padding:8px 0;text-align:left;font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Due</th>
+              </tr>
+            </thead>
+            <tbody>${contactRows}</tbody>
+          </table>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px">
+            <tr><td>
+              <a href="${leadsUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 22px;border-radius:8px">View leads →</a>
+            </td></tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding:16px 28px;border-top:1px solid #f1f5f9">
+          <p style="margin:0;font-size:11px;color:#9ca3af">You're receiving this because notifications are enabled for <strong>${esc(spaceName)}</strong>.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const safeSpaceName = spaceName.replace(/[\r\n\t]/g, ' ').slice(0, 100);
+  await resend.emails.send({
+    from: FROM,
+    to: toEmail,
+    subject: `${contacts.length} follow-up${contacts.length !== 1 ? 's' : ''} due today — ${safeSpaceName}`,
+    html,
+  });
+}
+
+export interface SendEmailFromCRMParams {
+  toEmail: string;
+  fromName: string;
+  replyTo?: string;
+  subject: string;
+  body: string;
+}
+
+export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<void> {
+  if (!process.env.RESEND_API_KEY) return;
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
+
+  const { toEmail, fromName, replyTo, subject, body } = params;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
+        <tr><td style="padding:28px 32px">
+          <p style="margin:0;font-size:15px;color:#111827;line-height:1.7;white-space:pre-wrap">${esc(body)}</p>
+        </td></tr>
+        <tr><td style="padding:16px 32px;border-top:1px solid #f1f5f9">
+          <p style="margin:0;font-size:12px;color:#9ca3af">Sent by ${esc(fromName)} via your property management system.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const safeSubject = subject.replace(/[\r\n\t]/g, ' ').slice(0, 200);
+  await resend.emails.send({
+    from: `${fromName.replace(/[\r\n\t]/g, ' ').slice(0, 100)} <${FROM}>`,
+    to: toEmail,
+    replyTo: replyTo ?? undefined,
+    subject: safeSubject,
+    html,
+  });
+}
+
 export interface BrokerageInvitationEmailParams {
   toEmail: string;
   brokerageName: string;

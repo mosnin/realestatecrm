@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -23,9 +23,15 @@ import {
   LayoutGrid,
   List,
   ArrowRight,
+  Download,
+  Bookmark,
+  X,
+  CheckSquare,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { downloadCSV } from '@/lib/csv';
+import type { SavedView } from '@/lib/types';
 
 type Client = {
   id: string;
@@ -97,6 +103,46 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [editContact, setEditContact] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'card' | 'list'>('card');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
+  const [saveViewName, setSaveViewName] = useState('');
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const saveInputRef = useRef<HTMLInputElement>(null);
+
+  // Load saved views from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(`saved-views-contacts-${slug}`);
+      if (stored) setSavedViews(JSON.parse(stored));
+    } catch { /* ignore */ }
+  }, [slug]);
+
+  function persistSavedViews(views: SavedView[]) {
+    setSavedViews(views);
+    localStorage.setItem(`saved-views-contacts-${slug}`, JSON.stringify(views));
+  }
+
+  function handleSaveView() {
+    if (!saveViewName.trim()) return;
+    const newView: SavedView = {
+      id: crypto.randomUUID(),
+      name: saveViewName.trim(),
+      page: 'contacts',
+      filters: { typeFilter },
+    };
+    persistSavedViews([...savedViews, newView]);
+    setSaveViewName('');
+    setShowSaveInput(false);
+  }
+
+  function applyView(view: SavedView) {
+    const f = view.filters as { typeFilter?: string };
+    if (f.typeFilter) setTypeFilter(f.typeFilter);
+  }
+
+  function deleteView(id: string) {
+    persistSavedViews(savedViews.filter((v) => v.id !== id));
+  }
 
   const fetchContacts = useCallback(async () => {
     const params = new URLSearchParams({ slug, search, type: typeFilter });
@@ -108,6 +154,20 @@ export function ContactTable({ slug }: ContactTableProps) {
   useEffect(() => {
     fetchContacts();
   }, [fetchContacts]);
+
+  // Clear selection when contacts change
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [contacts]);
+
+  // Escape to clear selection
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setSelectedIds(new Set());
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   async function handleAdd(data: any) {
     await fetch('/api/contacts', {
@@ -135,6 +195,70 @@ export function ContactTable({ slug }: ContactTableProps) {
     fetchContacts();
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === contacts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(contacts.map((c) => c.id)));
+    }
+  }
+
+  async function handleBulkDelete() {
+    const ids = [...selectedIds];
+    if (!confirm(`Delete ${ids.length} client${ids.length !== 1 ? 's' : ''}?`)) return;
+    await Promise.all(ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })));
+    setSelectedIds(new Set());
+    fetchContacts();
+  }
+
+  async function handleBulkChangeType(newType: Client['type']) {
+    const ids = [...selectedIds];
+    await Promise.all(
+      ids.map((id) =>
+        fetch(`/api/contacts/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: newType }),
+        }),
+      ),
+    );
+    setSelectedIds(new Set());
+    fetchContacts();
+  }
+
+  function handleExportSelected() {
+    const toExport = contacts.filter((c) => selectedIds.has(c.id));
+    exportContactsCSV(toExport);
+  }
+
+  function handleExportAll() {
+    exportContactsCSV(contacts);
+  }
+
+  function exportContactsCSV(items: Client[]) {
+    downloadCSV('contacts.csv', items.map((c) => ({
+      Name: c.name,
+      Stage: c.type,
+      Phone: c.phone ?? '',
+      Email: c.email ?? '',
+      'Budget ($/mo)': c.budget ?? '',
+      Address: c.address ?? '',
+      Preferences: c.preferences ?? '',
+      Notes: c.notes ?? '',
+      Tags: c.tags.join('; '),
+      'Added': new Date(c.createdAt).toLocaleDateString('en-US'),
+    })));
+  }
+
   // Stage totals for pipeline bar
   const stageCounts = {
     QUALIFICATION: contacts.filter((c) => c.type === 'QUALIFICATION').length,
@@ -142,8 +266,31 @@ export function ContactTable({ slug }: ContactTableProps) {
     APPLICATION: contacts.filter((c) => c.type === 'APPLICATION').length,
   };
 
+  const contactViews = savedViews.filter((v) => v.page === 'contacts');
+
   return (
     <div className="space-y-4">
+      {/* Saved view chips */}
+      {contactViews.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span className="text-xs text-muted-foreground mr-1">Saved:</span>
+          {contactViews.map((v) => (
+            <span key={v.id} className="inline-flex items-center gap-1 text-xs font-medium bg-muted rounded-full pl-2.5 pr-1 py-1">
+              <button type="button" onClick={() => applyView(v)} className="hover:text-foreground transition-colors">
+                {v.name}
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteView(v.id)}
+                className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <X size={9} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Pipeline mini bar (card view only, non-empty) */}
       {!loading && contacts.length > 0 && view === 'card' && (
         <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3">
@@ -179,7 +326,7 @@ export function ContactTable({ slug }: ContactTableProps) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {/* Stage filter — list view only or when searching */}
           {(view === 'list' || search) && (
             <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -194,6 +341,52 @@ export function ContactTable({ slug }: ContactTableProps) {
               </SelectContent>
             </Select>
           )}
+
+          {/* Save current view */}
+          {showSaveInput ? (
+            <div className="flex gap-1">
+              <input
+                ref={saveInputRef}
+                type="text"
+                value={saveViewName}
+                onChange={(e) => setSaveViewName(e.target.value)}
+                placeholder="View name…"
+                className="text-xs rounded-md border border-input bg-card px-2 py-1 w-28 focus:outline-none focus:ring-2 focus:ring-ring"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveView();
+                  if (e.key === 'Escape') setShowSaveInput(false);
+                }}
+                autoFocus
+              />
+              <Button size="sm" variant="outline" onClick={handleSaveView} className="text-xs h-8 px-2">Save</Button>
+              <Button size="sm" variant="ghost" onClick={() => setShowSaveInput(false)} className="h-8 px-2">
+                <X size={13} />
+              </Button>
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowSaveInput(true)}
+              className="gap-1.5 text-xs h-9"
+              title="Save current filter as a view"
+            >
+              <Bookmark size={12} />
+              Save view
+            </Button>
+          )}
+
+          {/* Export CSV */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleExportAll}
+            className="gap-1.5 text-xs h-9"
+            disabled={contacts.length === 0}
+          >
+            <Download size={12} />
+            Export
+          </Button>
 
           {/* View toggle */}
           <div className="flex rounded-md border border-border overflow-hidden bg-card">
@@ -298,6 +491,8 @@ export function ContactTable({ slug }: ContactTableProps) {
                     onEdit={() => setEditContact(contact)}
                     onDelete={() => handleDelete(contact.id)}
                     stageClassName={stage.className}
+                    selected={selectedIds.has(contact.id)}
+                    onToggleSelect={() => toggleSelect(contact.id)}
                   />
                 ))}
               </div>
@@ -313,6 +508,14 @@ export function ContactTable({ slug }: ContactTableProps) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
+                  <th className="px-4 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.size === contacts.length && contacts.length > 0}
+                      onChange={toggleSelectAll}
+                      className="rounded border-border cursor-pointer"
+                    />
+                  </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Stage</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Contact</th>
@@ -324,8 +527,23 @@ export function ContactTable({ slug }: ContactTableProps) {
               <tbody className="divide-y divide-border bg-card">
                 {contacts.map((contact) => {
                   const stage = STAGES.find((s) => s.key === contact.type)!;
+                  const isSelected = selectedIds.has(contact.id);
                   return (
-                    <tr key={contact.id} className="group hover:bg-muted/30 transition-colors">
+                    <tr
+                      key={contact.id}
+                      className={cn(
+                        'group hover:bg-muted/30 transition-colors',
+                        isSelected && 'bg-primary/5',
+                      )}
+                    >
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(contact.id)}
+                          className="rounded border-border cursor-pointer"
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
@@ -343,8 +561,18 @@ export function ContactTable({ slug }: ContactTableProps) {
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
                         <div className="space-y-0.5">
-                          {contact.email && <p className="text-xs text-muted-foreground truncate max-w-[180px]">{contact.email}</p>}
-                          {contact.phone && <p className="text-xs text-muted-foreground">{contact.phone}</p>}
+                          {contact.email && (
+                            <a href={`mailto:${contact.email}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors truncate max-w-[180px]">
+                              <Mail size={10} className="flex-shrink-0" />
+                              {contact.email}
+                            </a>
+                          )}
+                          {contact.phone && (
+                            <a href={`tel:${contact.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                              <Phone size={10} className="flex-shrink-0" />
+                              {contact.phone}
+                            </a>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">
@@ -369,6 +597,39 @@ export function ContactTable({ slug }: ContactTableProps) {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-border bg-card shadow-lg px-4 py-3">
+          <CheckSquare size={14} className="text-primary" />
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <div className="h-4 w-px bg-border mx-1" />
+          <Select onValueChange={(v) => handleBulkChangeType(v as Client['type'])}>
+            <SelectTrigger className="h-8 text-xs w-36 bg-muted border-0">
+              <SelectValue placeholder="Move to stage…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="QUALIFICATION">Qualifying</SelectItem>
+              <SelectItem value="TOUR">Tour</SelectItem>
+              <SelectItem value="APPLICATION">Applied</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button size="sm" variant="outline" onClick={handleExportSelected} className="h-8 gap-1.5 text-xs">
+            <Download size={12} />
+            Export
+          </Button>
+          <Button size="sm" variant="destructive" onClick={handleBulkDelete} className="h-8 text-xs">
+            Delete
+          </Button>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ml-1"
+          >
+            <X size={13} />
+          </button>
         </div>
       )}
 
@@ -407,19 +668,35 @@ function ContactCard({
   onEdit,
   onDelete,
   stageClassName,
+  selected,
+  onToggleSelect,
 }: {
   contact: Client;
   slug: string;
   onEdit: () => void;
   onDelete: () => void;
   stageClassName: string;
+  selected: boolean;
+  onToggleSelect: () => void;
 }) {
   return (
-    <div className="group rounded-xl border border-border bg-card overflow-hidden transition-all duration-150 hover:shadow-md hover:-translate-y-px">
+    <div className={cn(
+      'group rounded-xl border bg-card overflow-hidden transition-all duration-150 hover:shadow-md hover:-translate-y-px',
+      selected ? 'border-primary/40 bg-primary/5' : 'border-border',
+    )}>
       <div className="px-4 py-3">
         {/* Header */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-start gap-2.5 min-w-0">
+            {/* Checkbox */}
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={onToggleSelect}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded border-border cursor-pointer flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity data-[checked=true]:opacity-100"
+              data-checked={selected}
+            />
             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
               {getInitials(contact.name)}
             </div>
@@ -447,13 +724,17 @@ function ContactCard({
           {contact.phone && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Phone size={10} className="flex-shrink-0" />
-              <span className="truncate">{contact.phone}</span>
+              <a href={`tel:${contact.phone}`} className="truncate hover:text-foreground transition-colors">
+                {contact.phone}
+              </a>
             </div>
           )}
           {contact.email && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Mail size={10} className="flex-shrink-0" />
-              <span className="truncate">{contact.email}</span>
+              <a href={`mailto:${contact.email}`} className="truncate hover:text-foreground transition-colors">
+                {contact.email}
+              </a>
             </div>
           )}
           {contact.budget != null && (

@@ -77,6 +77,10 @@ export interface AnalyticsData {
   leadStateDistribution: LabelCount[];
   topRiskFlags: LabelCount[];
   avgScoreByMonth: AvgScoreMonth[];
+
+  // conversion funnel
+  contactFunnel: { label: string; count: number; rate: number }[];
+  dealWinRate: number;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -521,7 +525,7 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
       {/* ── Deals ── */}
       {tab === 'Deals' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Total deals" value={data.totalDeals} />
             <StatCard
               label="Pipeline value"
@@ -534,6 +538,11 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                   ? formatCurrency(Math.round(data.totalPipelineValue / data.totalDeals))
                   : '—'
               }
+            />
+            <StatCard
+              label="Win rate"
+              value={data.totalDeals > 0 ? `${data.dealWinRate}%` : '—'}
+              sub="deals closed as won"
             />
           </div>
 
@@ -575,6 +584,50 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
               </ResponsiveContainer>
             </ChartSection>
           </div>
+
+          {/* Client pipeline conversion funnel */}
+          <ChartSection title="Client pipeline funnel" sub="Conversion rates across your renter pipeline">
+            <div className="flex flex-col sm:flex-row gap-4 items-center justify-center py-2">
+              {data.contactFunnel.map((stage, i) => {
+                const colors = ['#3b82f6', '#f59e0b', '#10b981'];
+                const color = colors[i] ?? '#94a3b8';
+                const maxCount = data.contactFunnel[0]?.count ?? 1;
+                const widthPct = maxCount > 0 ? Math.max(30, Math.round((stage.count / maxCount) * 100)) : 30;
+                return (
+                  <div key={stage.label} className="flex flex-col items-center gap-2 flex-1">
+                    {i > 0 && (
+                      <div className="hidden sm:flex items-center text-muted-foreground/40 self-center absolute">
+                        →
+                      </div>
+                    )}
+                    <div
+                      className="rounded-xl flex items-center justify-center text-white font-bold text-lg tabular-nums transition-all"
+                      style={{ backgroundColor: color, width: `${widthPct}%`, minWidth: 80, height: 64 }}
+                    >
+                      {stage.count}
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">{stage.label}</p>
+                    {i > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {stage.rate}% conversion
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-center gap-6 mt-3 text-xs text-muted-foreground">
+              {data.contactFunnel.map((stage, i) => {
+                const colors = ['#3b82f6', '#f59e0b', '#10b981'];
+                return (
+                  <div key={stage.label} className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: colors[i] ?? '#94a3b8' }} />
+                    {stage.label} ({stage.count})
+                  </div>
+                );
+              })}
+            </div>
+          </ChartSection>
         </div>
       )}
 

@@ -220,6 +220,23 @@ export type DealContact = {
   contactId: string;
 };
 
+export type ContactActivity = {
+  id: string;
+  contactId: string;
+  spaceId: string;
+  type: 'note' | 'call' | 'email' | 'meeting' | 'follow_up';
+  content: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: Date;
+};
+
+export type SavedView = {
+  id: string;
+  name: string;
+  page: 'contacts' | 'leads';
+  filters: Record<string, unknown>;
+};
+
 export type Message = {
   id: string;
   spaceId: string;

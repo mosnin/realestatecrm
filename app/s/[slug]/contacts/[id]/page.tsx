@@ -25,6 +25,8 @@ import {
   Calendar,
 } from 'lucide-react';
 import type { Contact, ApplicationData, LeadScoreDetails } from '@/lib/types';
+import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
+import { ComposeEmailDialog } from '@/components/contacts/compose-email-dialog';
 
 const TYPE_META: Record<string, { label: string; className: string }> = {
   QUALIFICATION: {
@@ -171,6 +173,13 @@ export default async function ClientDetailPage({
                 <Mail size={14} className="text-muted-foreground" />
                 {contact.email}
               </a>
+            )}
+            {contact.email && (
+              <ComposeEmailDialog
+                contactId={contact.id}
+                contactName={contact.name}
+                contactEmail={contact.email}
+              />
             )}
           </div>
         )}
@@ -516,6 +525,9 @@ export default async function ClientDetailPage({
           </div>
         </div>
       )}
+
+      {/* Activity log */}
+      <ContactActivityTab contactId={contact.id} />
 
       {/* Associated deals */}
       <div className="rounded-2xl border border-border bg-card overflow-hidden">
