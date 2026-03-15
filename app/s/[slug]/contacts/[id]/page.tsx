@@ -28,6 +28,7 @@ import type { Contact, ApplicationData, LeadScoreDetails } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
 import { ComposeEmailDialog } from '@/components/contacts/compose-email-dialog';
 import { getInitials, formatCurrency } from '@/lib/formatting';
+import { getSpaceFromSlug } from '@/lib/space';
 
 const TYPE_META: Record<string, { label: string; className: string }> = {
   QUALIFICATION: {
@@ -57,6 +58,9 @@ export default async function ClientDetailPage({
 }) {
   const { slug, id } = await params;
 
+  const space = await getSpaceFromSlug(slug);
+  if (!space) notFound();
+
   let contact: (Contact & { dealContacts: { deal: { id: string; title: string; address: string | null; value: number | null; stage: { name: string; color: string } } }[] }) | null = null;
   try {
     const { data: contactData, error: contactError } = await supabase.from('Contact').select('*').eq('id', id).single();
@@ -66,6 +70,8 @@ export default async function ClientDetailPage({
       throw contactError;
     } else {
       const c = contactData as Contact;
+      // Defence-in-depth: verify contact belongs to this workspace
+      if (c.spaceId !== space.id) notFound();
       const { data: dealRows, error: dealError } = await supabase.from('DealContact').select('Deal(id, title, address, value, DealStage(name, color))').eq('contactId', id);
       if (dealError) throw dealError;
       contact = {

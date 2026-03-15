@@ -61,7 +61,7 @@ export async function requireContactAccess(
     .maybeSingle();
 
   if (error) throw error;
-  if (!rows) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!rows || !rows.spaceId) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const space = await getSpaceForUser(userId);
   if (!space || rows.spaceId !== space.id) {

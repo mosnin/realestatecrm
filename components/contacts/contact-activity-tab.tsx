@@ -27,6 +27,7 @@ export function ContactActivityTab({ contactId }: { contactId: string }) {
   const [type, setType] = useState<ActivityType>('note');
   const [content, setContent] = useState('');
   const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
 
   const fetchActivities = useCallback(async () => {
     const res = await fetch(`/api/contacts/${contactId}/activity`);
@@ -41,15 +42,22 @@ export function ContactActivityTab({ contactId }: { contactId: string }) {
   async function handlePost() {
     if (!content.trim()) return;
     setPosting(true);
-    const res = await fetch(`/api/contacts/${contactId}/activity`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, content: content.trim() }),
-    });
-    if (res.ok) {
-      const newActivity = await res.json();
-      setActivities((prev) => [newActivity, ...prev]);
-      setContent('');
+    setPostError(null);
+    try {
+      const res = await fetch(`/api/contacts/${contactId}/activity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, content: content.trim() }),
+      });
+      if (res.ok) {
+        const newActivity = await res.json();
+        setActivities((prev) => [newActivity, ...prev]);
+        setContent('');
+      } else {
+        setPostError('Failed to save. Please try again.');
+      }
+    } catch {
+      setPostError('Network error. Please try again.');
     }
     setPosting(false);
   }
@@ -97,7 +105,12 @@ export function ContactActivityTab({ contactId }: { contactId: string }) {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handlePost();
           }}
         />
-        <div className="flex justify-end mt-2">
+        <div className="flex items-center justify-between mt-2">
+          {postError ? (
+            <p className="text-xs text-destructive">{postError}</p>
+          ) : (
+            <span />
+          )}
           <Button size="sm" onClick={handlePost} disabled={posting || !content.trim()} className="gap-1.5">
             <Plus size={13} />
             {posting ? 'Posting…' : 'Post'}

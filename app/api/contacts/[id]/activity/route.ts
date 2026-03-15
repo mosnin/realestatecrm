@@ -37,6 +37,8 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid activity type' }, { status: 400 });
   }
 
+  const safeContent = typeof content === 'string' ? content.slice(0, 5000) : null;
+
   const { data, error } = await supabase
     .from('ContactActivity')
     .insert({
@@ -44,7 +46,7 @@ export async function POST(
       contactId: id,
       spaceId: space.id,
       type,
-      content: content ?? null,
+      content: safeContent,
       metadata: metadata ?? null,
     })
     .select()

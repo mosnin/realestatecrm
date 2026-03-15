@@ -31,9 +31,29 @@ export async function PATCH(
   }
 
   const body = await req.json();
-  const valueVal = body.value != null ? parseFloat(body.value) : null;
-  const closeDateVal = body.closeDate ? new Date(body.closeDate).toISOString() : null;
-  const followUpAtVal = body.followUpAt !== undefined ? (body.followUpAt ? new Date(body.followUpAt).toISOString() : null) : undefined;
+
+  const valueVal = body.value != null && body.value !== '' ? parseFloat(body.value) : null;
+  if (valueVal !== null && isNaN(valueVal)) {
+    return NextResponse.json({ error: 'Invalid value' }, { status: 400 });
+  }
+
+  let closeDateVal: string | null = null;
+  if (body.closeDate) {
+    const d = new Date(body.closeDate);
+    if (isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid closeDate' }, { status: 400 });
+    closeDateVal = d.toISOString();
+  }
+
+  let followUpAtVal: string | null | undefined = undefined;
+  if (body.followUpAt !== undefined) {
+    if (!body.followUpAt) {
+      followUpAtVal = null;
+    } else {
+      const d = new Date(body.followUpAt);
+      if (isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid followUpAt' }, { status: 400 });
+      followUpAtVal = d.toISOString();
+    }
+  }
 
   const stageChanged = body.stageId && body.stageId !== existing.stageId;
   const statusChanged = body.status && body.status !== existing.status;

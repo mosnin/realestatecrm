@@ -81,6 +81,16 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
+  // Verify the target stage belongs to this space (prevents cross-space stage injection)
+  const { data: stageCheck, error: stageCheckErr } = await supabase
+    .from('DealStage')
+    .select('id')
+    .eq('id', stageId)
+    .eq('spaceId', space.id)
+    .maybeSingle();
+  if (stageCheckErr) throw stageCheckErr;
+  if (!stageCheck) return NextResponse.json({ error: 'Invalid stage' }, { status: 400 });
+
   const { data: lastDealRows, error: lastDealError } = await supabase
     .from('Deal')
     .select('position')
@@ -91,8 +101,16 @@ export async function POST(req: NextRequest) {
   const lastPosition = lastDealRows.length > 0 ? lastDealRows[0].position : -1;
 
   const dealId = crypto.randomUUID();
-  const valueVal = value ? parseFloat(value) : null;
-  const closeDateVal = closeDate ? new Date(closeDate).toISOString() : null;
+  const valueVal = value != null && value !== '' ? parseFloat(value) : null;
+  if (valueVal !== null && isNaN(valueVal)) {
+    return NextResponse.json({ error: 'Invalid value' }, { status: 400 });
+  }
+  let closeDateVal: string | null = null;
+  if (closeDate) {
+    const d = new Date(closeDate);
+    if (isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid closeDate' }, { status: 400 });
+    closeDateVal = d.toISOString();
+  }
 
   const { data: dealRow, error: dealError } = await supabase.from('Deal').insert({
     id: dealId,

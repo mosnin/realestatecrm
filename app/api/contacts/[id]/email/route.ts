@@ -53,8 +53,8 @@ export async function POST(
     body: emailBody.trim().slice(0, 10000),
   });
 
-  // Log as ContactActivity
-  await supabase.from('ContactActivity').insert({
+  // Log as ContactActivity — non-blocking; email already sent
+  const { error: activityError } = await supabase.from('ContactActivity').insert({
     id: crypto.randomUUID(),
     contactId: id,
     spaceId: space.id,
@@ -62,6 +62,7 @@ export async function POST(
     content: subject.trim().slice(0, 200),
     metadata: { body: emailBody.trim().slice(0, 2000), to: contact.email },
   });
+  if (activityError) console.error('[email/route] failed to log ContactActivity', activityError);
 
   return NextResponse.json({ success: true });
 }

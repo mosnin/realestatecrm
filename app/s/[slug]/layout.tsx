@@ -103,6 +103,10 @@ export default async function DashboardLayout({
   }
   if (!space) notFound();
 
+  // Security: ensure the authenticated user actually owns this workspace.
+  // Without this check any logged-in user could visit /s/<other-user-slug>.
+  if (!dbUser.space || dbUser.space.id !== space.id) notFound();
+
   let unreadLeadCount = 0;
   try {
     const { count, error: countError } = await supabase

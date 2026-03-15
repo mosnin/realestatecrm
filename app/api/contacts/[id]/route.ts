@@ -96,6 +96,9 @@ export async function PATCH(
 
   const body = await req.json();
   const budgetVal = body.budget != null && body.budget !== '' ? parseFloat(body.budget) : null;
+  if (budgetVal !== null && isNaN(budgetVal)) {
+    return NextResponse.json({ error: 'Invalid budget' }, { status: 400 });
+  }
   const propsVal = body.properties ?? [];
   const tagsVal = body.tags ?? [];
   const typeChanged = body.type && body.type !== existing.type;
