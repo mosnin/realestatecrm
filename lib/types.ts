@@ -94,6 +94,10 @@ export type Contact = {
   scoringStatus: string;
   scoreDetails: LeadScoreDetails | null;
   applicationData: ApplicationData | null;
+  followUpAt: Date | null;
+  lastContactedAt: Date | null;
+  sourceLabel: string | null;
+  stageChangedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };

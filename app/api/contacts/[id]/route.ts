@@ -96,6 +96,7 @@ export async function PATCH(
   const budgetVal = body.budget != null && body.budget !== '' ? parseFloat(body.budget) : null;
   const propsVal = body.properties ?? [];
   const tagsVal = body.tags ?? [];
+  const typeChanged = body.type && body.type !== existing.type;
 
   const { data: contact, error: updateError } = await supabase
     .from('Contact')
@@ -110,6 +111,10 @@ export async function PATCH(
       notes: body.notes ?? null,
       type: body.type,
       tags: tagsVal,
+      ...(body.followUpAt !== undefined && { followUpAt: body.followUpAt }),
+      ...(body.lastContactedAt !== undefined && { lastContactedAt: body.lastContactedAt }),
+      ...(body.sourceLabel !== undefined && { sourceLabel: body.sourceLabel }),
+      ...(typeChanged && { stageChangedAt: new Date().toISOString() }),
       updatedAt: new Date().toISOString(),
     })
     .eq('id', id)

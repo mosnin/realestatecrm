@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Phone,
   Mail,
@@ -20,6 +20,9 @@ import {
   Thermometer,
   Snowflake,
   HelpCircle,
+  CalendarDays,
+  CheckCircle2,
+  Tag,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -179,7 +182,7 @@ interface LeadsViewProps {
 export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewProps) {
   const [leads, setLeads] = useState<Contact[]>(initialLeads);
   const [tierFilter, setTierFilter] = useState<TierFilter>('all');
-  const [sort, setSort] = useState<'newest' | 'score'>('newest');
+  const [sort, setSort] = useState<'newest' | 'score' | 'followup'>('newest');
   const [view, setView] = useState<'card' | 'list'>('card');
   const [convertTarget, setConvertTarget] = useState<Contact | null>(null);
 
@@ -187,12 +190,49 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
     let list = tierFilter === 'all' ? leads : leads.filter((l) => getTierKey(l) === tierFilter);
     if (sort === 'score') {
       list = [...list].sort((a, b) => (b.leadScore ?? -1) - (a.leadScore ?? -1));
+    } else if (sort === 'followup') {
+      list = [...list].sort((a, b) => {
+        const aTime = a.followUpAt ? new Date(a.followUpAt).getTime() : Infinity;
+        const bTime = b.followUpAt ? new Date(b.followUpAt).getTime() : Infinity;
+        return aTime - bTime;
+      });
     }
     return list;
   }, [leads, tierFilter, sort]);
 
   function handleConverted(leadId: string) {
     setLeads((prev) => prev.filter((l) => l.id !== leadId));
+  }
+
+  const patchLead = useCallback(async (id: string, patch: Record<string, unknown>) => {
+    const res = await fetch(`/api/contacts/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) return;
+    const updated = await res.json();
+    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...updated } : l)));
+  }, []);
+
+  function formatFollowUpDate(dateVal: Date | string | null): string {
+    if (!dateVal) return '';
+    const d = new Date(dateVal);
+    const today = new Date();
+    const diffDays = Math.ceil((d.getTime() - new Date(today.toDateString()).getTime()) / 86_400_000);
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays === -1) return 'Yesterday';
+    if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`;
+    if (diffDays <= 7) return `In ${diffDays}d`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  function toDateInputValue(dateVal: Date | string | null): string {
+    if (!dateVal) return '';
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10);
   }
 
   return (
@@ -250,6 +290,17 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
             >
               <Sparkles size={11} />
               Top score
+            </button>
+            <button
+              type="button"
+              onClick={() => setSort('followup')}
+              className={cn(
+                'px-2.5 py-1.5 flex items-center gap-1 transition-colors',
+                sort === 'followup' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+              )}
+            >
+              <CalendarDays size={11} />
+              Follow-up
             </button>
           </div>
 
@@ -331,11 +382,27 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground flex-wrap">
                         <Clock size={11} />
                         {timeAgo(new Date(lead.createdAt))}
-                        <span className="opacity-40">·</span>
-                        <span>via intake link</span>
+                        {lead.sourceLabel && (
+                          <>
+                            <span className="opacity-40">·</span>
+                            <span className="inline-flex items-center gap-1">
+                              <Tag size={10} />
+                              {lead.sourceLabel === 'intake-form' ? 'Intake form' : lead.sourceLabel}
+                            </span>
+                          </>
+                        )}
+                        {lead.lastContactedAt && (
+                          <>
+                            <span className="opacity-40">·</span>
+                            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 size={10} />
+                              Contacted {timeAgo(new Date(lead.lastContactedAt))}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -395,15 +462,54 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                   </div>
                 )}
 
-                {/* Recommended action */}
-                {details?.recommendedNextAction && (
-                  <div className="px-4 pb-4 border-t border-border/60 pt-3">
-                    <p className="text-xs text-primary font-medium flex items-center gap-1.5">
-                      <ArrowRight size={11} />
-                      {details.recommendedNextAction}
+                {/* Recommended action + follow-up row */}
+                <div className="px-4 pb-4 border-t border-border/60 pt-3 flex items-center justify-between gap-3 flex-wrap">
+                  {details?.recommendedNextAction ? (
+                    <p className="text-xs text-primary font-medium flex items-center gap-1.5 min-w-0 flex-1">
+                      <ArrowRight size={11} className="flex-shrink-0" />
+                      <span className="truncate">{details.recommendedNextAction}</span>
                     </p>
+                  ) : (
+                    <span />
+                  )}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Follow-up date */}
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer group/fu">
+                      <CalendarDays size={11} className={cn(lead.followUpAt ? 'text-primary' : 'text-muted-foreground')} />
+                      {lead.followUpAt ? (
+                        <span className={cn(
+                          'font-medium',
+                          new Date(lead.followUpAt) < new Date() ? 'text-destructive' : 'text-primary',
+                        )}>
+                          {formatFollowUpDate(lead.followUpAt)}
+                        </span>
+                      ) : (
+                        <span className="group-hover/fu:text-foreground transition-colors">Follow-up</span>
+                      )}
+                      <input
+                        type="date"
+                        className="sr-only"
+                        value={toDateInputValue(lead.followUpAt)}
+                        onChange={(e) => patchLead(lead.id, { followUpAt: e.target.value || null })}
+                      />
+                    </label>
+                    {/* Mark contacted */}
+                    <button
+                      type="button"
+                      onClick={() => patchLead(lead.id, { lastContactedAt: new Date().toISOString() })}
+                      className={cn(
+                        'inline-flex items-center gap-1 text-xs font-medium rounded-md px-2 py-1 transition-colors',
+                        lead.lastContactedAt
+                          ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100'
+                          : 'text-muted-foreground bg-muted hover:text-foreground hover:bg-muted/80',
+                      )}
+                      title="Mark as contacted now"
+                    >
+                      <CheckCircle2 size={11} />
+                      {lead.lastContactedAt ? 'Contacted' : 'Mark contacted'}
+                    </button>
                   </div>
-                )}
+                </div>
               </div>
             );
           })}
@@ -422,6 +528,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Contact</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Budget</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Submitted</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden xl:table-cell">Follow-up</th>
                   <th className="px-4 py-3 w-24" />
                 </tr>
               </thead>
@@ -467,6 +574,24 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
                         {timeAgo(new Date(lead.createdAt))}
+                      </td>
+                      <td className="px-4 py-3 hidden xl:table-cell">
+                        <label className="flex items-center gap-1 text-xs cursor-pointer">
+                          <CalendarDays size={10} className={lead.followUpAt ? 'text-primary' : 'text-muted-foreground'} />
+                          <span className={cn(
+                            lead.followUpAt
+                              ? new Date(lead.followUpAt) < new Date() ? 'text-destructive font-medium' : 'text-primary font-medium'
+                              : 'text-muted-foreground',
+                          )}>
+                            {lead.followUpAt ? formatFollowUpDate(lead.followUpAt) : '—'}
+                          </span>
+                          <input
+                            type="date"
+                            className="sr-only"
+                            value={toDateInputValue(lead.followUpAt)}
+                            onChange={(e) => patchLead(lead.id, { followUpAt: e.target.value || null })}
+                          />
+                        </label>
                       </td>
                       <td className="px-4 py-3">
                         <button

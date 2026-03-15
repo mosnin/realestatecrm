@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Clock,
   TrendingUp,
+  CalendarDays,
 } from 'lucide-react';
 import type { Metadata } from 'next';
 import { buildIntakeUrl } from '@/lib/intake';
@@ -45,13 +46,13 @@ export default async function DashboardPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  let contactCount = 0, dealCount = 0, newLeadCount = 0, totalLeads = 0;
+  let contactCount = 0, dealCount = 0, newLeadCount = 0, totalLeads = 0, followUpDue = 0;
   let deals: { value: number | null; stageId: string }[] = [];
   let stages: { id: string; name: string; color: string; position: number; spaceId: string }[] = [];
   let recentLeads: { id: string; name: string; phone: string | null; budget: number | null; preferences: string | null; createdAt: Date; tags: string[]; leadScore: number | null; scoreLabel: string | null; scoringStatus: string | null }[] = [];
 
   try {
-    [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads] =
+    [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads, followUpDue] =
       await Promise.all([
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
         supabase.from('Deal').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
@@ -60,6 +61,7 @@ export default async function DashboardPage({
         supabase.from('Contact').select('id, name, phone, budget, preferences, createdAt, tags, leadScore, scoreLabel, scoringStatus').eq('spaceId', space.id).contains('tags', ['application-link']).order('createdAt', { ascending: false }).limit(5).then(r => { if (r.error) throw r.error; return r.data as { id: string; name: string; phone: string | null; budget: number | null; preferences: string | null; createdAt: Date; tags: string[]; leadScore: number | null; scoreLabel: string | null; scoringStatus: string | null }[]; }),
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).contains('tags', ['new-lead']).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).contains('tags', ['application-link']).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
+        supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).lte('followUpAt', new Date().toISOString()).then(r => { return r.count ?? 0; }),
       ]);
   } catch (err) {
     console.error('[space-home] DB queries failed', { slug, error: err });
@@ -114,7 +116,7 @@ export default async function DashboardPage({
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
           {
             label: 'New applications',
@@ -143,6 +145,13 @@ export default async function DashboardPage({
             sub: formatCurrency(totalValue),
             icon: null,
             accent: false,
+          },
+          {
+            label: 'Follow-ups due',
+            value: followUpDue,
+            sub: followUpDue > 0 ? 'need attention' : 'all clear',
+            icon: CalendarDays,
+            accent: followUpDue > 0,
           },
         ].map(({ label, value, sub, icon: Icon, accent }) => (
           <Card

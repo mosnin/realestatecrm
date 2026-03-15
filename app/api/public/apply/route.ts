@@ -147,6 +147,7 @@ export async function POST(req: NextRequest) {
         tags: ['application-link', 'new-lead'],
         scoringStatus: 'pending',
         scoreLabel: 'unscored',
+        sourceLabel: 'intake-form',
         applicationData,
       })
       .select();

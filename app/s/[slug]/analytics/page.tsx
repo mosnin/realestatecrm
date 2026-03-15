@@ -3,6 +3,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard';
 import type { AnalyticsData } from '@/components/analytics/analytics-dashboard';
+import type { ApplicationData, LeadScoreDetails } from '@/lib/types';
 
 function monthKey(date: Date): string {
   return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
@@ -28,6 +29,16 @@ function last6Months(): string[] {
   return months;
 }
 
+function daysUntil(dateStr: string): number | null {
+  try {
+    const target = new Date(dateStr);
+    if (isNaN(target.getTime())) return null;
+    return Math.ceil((target.getTime() - Date.now()) / 86_400_000);
+  } catch {
+    return null;
+  }
+}
+
 export default async function AnalyticsPage({
   params,
 }: {
@@ -37,11 +48,11 @@ export default async function AnalyticsPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  // Fetch raw data
+  // Fetch raw data — include applicationData & scoreDetails for qualification analytics
   const [contactsRes, dealsRes, stagesRes] = await Promise.all([
     supabase
       .from('Contact')
-      .select('id, type, tags, leadScore, scoreLabel, scoringStatus, createdAt')
+      .select('id, type, tags, leadScore, scoreLabel, scoringStatus, createdAt, applicationData, scoreDetails')
       .eq('spaceId', space.id),
     supabase
       .from('Deal')
@@ -61,6 +72,8 @@ export default async function AnalyticsPage({
     scoreLabel: string | null;
     scoringStatus: string | null;
     createdAt: string;
+    applicationData: ApplicationData | null;
+    scoreDetails: LeadScoreDetails | null;
   }[];
 
   const deals = (dealsRes.data ?? []) as {
@@ -128,6 +141,120 @@ export default async function AnalyticsPage({
     { label: 'Applied', count: contacts.filter((c) => c.type === 'APPLICATION').length },
   ];
 
+  // ── Qualification analytics ────────────────────────────────────────────────
+
+  const leadsWithApp = leads.filter((l) => l.applicationData != null);
+
+  // Employment breakdown
+  const employmentCounts: Record<string, number> = {};
+  for (const l of leadsWithApp) {
+    const status = l.applicationData?.employmentStatus ?? '';
+    const label =
+      status === 'employed' ? 'Employed' :
+      status === 'self-employed' ? 'Self-employed' :
+      status === 'unemployed' ? 'Unemployed' :
+      status === 'retired' ? 'Retired' :
+      status === 'student' ? 'Student' :
+      'Not provided';
+    employmentCounts[label] = (employmentCounts[label] ?? 0) + 1;
+  }
+  const employmentBreakdown = Object.entries(employmentCounts)
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // Affordability: income >= 3× monthly rent
+  const affordabilityLeads = leadsWithApp.filter(
+    (l) => l.applicationData?.monthlyGrossIncome != null && l.applicationData?.monthlyRent != null,
+  );
+  const affordabilityPasses = affordabilityLeads.filter(
+    (l) => (l.applicationData!.monthlyGrossIncome ?? 0) >= (l.applicationData!.monthlyRent ?? 0) * 3,
+  ).length;
+  const affordabilityBuckets = affordabilityLeads.length > 0
+    ? [
+        { label: 'Passes 3× rule', count: affordabilityPasses },
+        { label: 'Below 3× rule', count: affordabilityLeads.length - affordabilityPasses },
+      ]
+    : [];
+
+  // Screening flags
+  const screeningFlags = [
+    { label: 'Prior evictions', count: leadsWithApp.filter((l) => l.applicationData?.priorEvictions === true).length },
+    { label: 'Outstanding balances', count: leadsWithApp.filter((l) => l.applicationData?.outstandingBalances === true).length },
+    { label: 'Bankruptcy', count: leadsWithApp.filter((l) => l.applicationData?.bankruptcy === true).length },
+    { label: 'Has pets', count: leadsWithApp.filter((l) => l.applicationData?.hasPets === true).length },
+    { label: 'Late payments', count: leadsWithApp.filter((l) => l.applicationData?.latePayments === true).length },
+    { label: 'Lease violations', count: leadsWithApp.filter((l) => l.applicationData?.leaseViolations === true).length },
+  ].filter((f) => f.count > 0);
+
+  // Move-in urgency buckets
+  const urgencyBuckets: Record<string, number> = {
+    '≤ 30 days': 0,
+    '31–60 days': 0,
+    '61–90 days': 0,
+    '90+ days': 0,
+    'Not provided': 0,
+  };
+  for (const l of leadsWithApp) {
+    const date = l.applicationData?.targetMoveInDate;
+    if (!date) { urgencyBuckets['Not provided']++; continue; }
+    const d = daysUntil(date);
+    if (d == null) { urgencyBuckets['Not provided']++; continue; }
+    if (d <= 30) urgencyBuckets['≤ 30 days']++;
+    else if (d <= 60) urgencyBuckets['31–60 days']++;
+    else if (d <= 90) urgencyBuckets['61–90 days']++;
+    else urgencyBuckets['90+ days']++;
+  }
+  const moveInUrgency = Object.entries(urgencyBuckets)
+    .filter(([, count]) => count > 0)
+    .map(([label, count]) => ({ label, count }));
+
+  // Lead state distribution (from AI scoring)
+  const leadStateCounts: Record<string, number> = {};
+  for (const l of leads) {
+    if (!l.scoreDetails?.leadState) continue;
+    const raw = l.scoreDetails.leadState;
+    const label =
+      raw === 'high_priority_qualified_renter' ? 'High priority' :
+      raw === 'qualified_low_urgency' ? 'Qualified, low urgency' :
+      raw === 'incomplete_application' ? 'Incomplete application' :
+      raw === 'needs_additional_info' ? 'Needs more info' :
+      raw === 'likely_unqualified' ? 'Likely unqualified' :
+      raw;
+    leadStateCounts[label] = (leadStateCounts[label] ?? 0) + 1;
+  }
+  const leadStateDistribution = Object.entries(leadStateCounts)
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // Top risk flags aggregated from AI scoring
+  const riskFlagCounts: Record<string, number> = {};
+  for (const l of leads) {
+    for (const flag of l.scoreDetails?.riskFlags ?? []) {
+      if (flag) riskFlagCounts[flag] = (riskFlagCounts[flag] ?? 0) + 1;
+    }
+  }
+  const topRiskFlags = Object.entries(riskFlagCounts)
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  // Avg lead score by month
+  const scoreByMonth: Record<string, { total: number; count: number }> = {};
+  for (const m of months) scoreByMonth[m] = { total: 0, count: 0 };
+  for (const l of scoredLeads) {
+    const key = monthKey(new Date(l.createdAt));
+    if (key in scoreByMonth) {
+      scoreByMonth[key].total += l.leadScore ?? 0;
+      scoreByMonth[key].count += 1;
+    }
+  }
+  const avgScoreByMonth = months.map((m) => ({
+    month: m,
+    avg: scoreByMonth[m].count > 0
+      ? Math.round(scoreByMonth[m].total / scoreByMonth[m].count)
+      : null,
+  }));
+
   const data: AnalyticsData = {
     totalLeads: leads.length,
     totalContacts: contacts.length,
@@ -139,6 +266,14 @@ export default async function AnalyticsPage({
     dealsByStage,
     leadScoreBuckets,
     contactsByStage,
+    // qualification analytics
+    employmentBreakdown,
+    affordabilityBuckets,
+    screeningFlags,
+    moveInUrgency,
+    leadStateDistribution,
+    topRiskFlags,
+    avgScoreByMonth,
   };
 
   return (

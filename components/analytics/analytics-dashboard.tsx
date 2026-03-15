@@ -42,6 +42,16 @@ interface ContactStageBucket {
   count: number;
 }
 
+interface LabelCount {
+  label: string;
+  count: number;
+}
+
+interface AvgScoreMonth {
+  month: string;
+  avg: number | null;
+}
+
 export interface AnalyticsData {
   // summary
   totalLeads: number;
@@ -58,6 +68,15 @@ export interface AnalyticsData {
   dealsByStage: StageBar[];
   leadScoreBuckets: ScoreBucket[];
   contactsByStage: ContactStageBucket[];
+
+  // qualification analytics (from applicationData + scoreDetails JSONB)
+  employmentBreakdown: LabelCount[];
+  affordabilityBuckets: LabelCount[];
+  screeningFlags: LabelCount[];
+  moveInUrgency: LabelCount[];
+  leadStateDistribution: LabelCount[];
+  topRiskFlags: LabelCount[];
+  avgScoreByMonth: AvgScoreMonth[];
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -68,7 +87,7 @@ function formatCurrency(n: number) {
   return `$${n}`;
 }
 
-const TABS = ['Overview', 'Leads', 'Deals', 'Contacts'] as const;
+const TABS = ['Overview', 'Leads', 'Qualification', 'Deals', 'Contacts'] as const;
 type Tab = (typeof TABS)[number];
 
 // ─── Stat card ─────────────────────────────────────────────────────────────
@@ -285,6 +304,217 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
               </ResponsiveContainer>
             </ChartSection>
           </div>
+        </div>
+      )}
+
+      {/* ── Qualification ── */}
+      {tab === 'Qualification' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard label="Total leads" value={data.totalLeads} />
+            <StatCard
+              label="Pass affordability"
+              value={
+                data.affordabilityBuckets.length > 0
+                  ? `${Math.round(
+                      ((data.affordabilityBuckets.find((b) => b.label === 'Passes 3× rule')?.count ?? 0) /
+                        data.affordabilityBuckets.reduce((s, b) => s + b.count, 0)) *
+                        100,
+                    )}%`
+                  : '—'
+              }
+              sub="pass 3× rent rule"
+            />
+            <StatCard
+              label="Screening flags"
+              value={data.screeningFlags.reduce((s, f) => s + f.count, 0)}
+              sub="across all leads"
+            />
+            <StatCard
+              label="Moving ≤ 30 days"
+              value={data.moveInUrgency.find((b) => b.label === '≤ 30 days')?.count ?? 0}
+              sub="high urgency"
+            />
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            {/* Employment breakdown */}
+            {data.employmentBreakdown.length > 0 && (
+              <ChartSection title="Employment status" sub="How leads are currently employed">
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart
+                    data={data.employmentBreakdown}
+                    layout="vertical"
+                    barSize={14}
+                    margin={{ left: 8 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis type="category" dataKey="label" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={100} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="hsl(var(--primary))" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartSection>
+            )}
+
+            {/* Affordability donut */}
+            {data.affordabilityBuckets.length > 0 && (
+              <ChartSection title="Income affordability" sub="Leads who meet the 3× monthly rent rule">
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={data.affordabilityBuckets}
+                      dataKey="count"
+                      nameKey="label"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={85}
+                      paddingAngle={3}
+                    >
+                      {data.affordabilityBuckets.map((entry, i) => (
+                        <Cell
+                          key={entry.label}
+                          fill={i === 0 ? '#10b981' : '#f87171'}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<ChartTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartSection>
+            )}
+
+            {/* Move-in urgency */}
+            {data.moveInUrgency.length > 0 && (
+              <ChartSection title="Move-in urgency" sub="How soon leads want to move in">
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={data.moveInUrgency} barSize={28}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={28} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Bar dataKey="count" name="Leads" radius={[4, 4, 0, 0]}>
+                      {data.moveInUrgency.map((entry) => {
+                        const colorMap: Record<string, string> = {
+                          '≤ 30 days': '#10b981',
+                          '31–60 days': '#f59e0b',
+                          '61–90 days': '#94a3b8',
+                          '90+ days': '#cbd5e1',
+                          'Not provided': '#e2e8f0',
+                        };
+                        return <Cell key={entry.label} fill={colorMap[entry.label] ?? '#94a3b8'} />;
+                      })}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartSection>
+            )}
+
+            {/* Screening flags */}
+            {data.screeningFlags.length > 0 && (
+              <ChartSection title="Screening flags" sub="Leads with disclosed issues">
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart
+                    data={data.screeningFlags}
+                    layout="vertical"
+                    barSize={14}
+                    margin={{ left: 8 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis type="category" dataKey="label" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={130} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="#f87171" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartSection>
+            )}
+
+            {/* Lead state distribution */}
+            {data.leadStateDistribution.length > 0 && (
+              <ChartSection title="AI lead state" sub="How the AI has categorized your leads">
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={data.leadStateDistribution}
+                      dataKey="count"
+                      nameKey="label"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                    >
+                      {data.leadStateDistribution.map((entry, i) => {
+                        const colors = ['#10b981', '#3b82f6', '#f59e0b', '#94a3b8', '#f87171'];
+                        return <Cell key={entry.label} fill={colors[i % colors.length]} />;
+                      })}
+                    </Pie>
+                    <Tooltip content={<ChartTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartSection>
+            )}
+
+            {/* Top risk flags */}
+            {data.topRiskFlags.length > 0 && (
+              <ChartSection title="Top AI risk flags" sub="Most common risks flagged across leads">
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart
+                    data={data.topRiskFlags}
+                    layout="vertical"
+                    barSize={12}
+                    margin={{ left: 8 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis type="category" dataKey="label" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" width={160} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="#f59e0b" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartSection>
+            )}
+
+            {/* Avg score by month */}
+            {data.avgScoreByMonth.some((m) => m.avg != null) && (
+              <ChartSection title="Avg lead score over time" sub="Monthly average AI qualification score">
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={data.avgScoreByMonth} barSize={22}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={28} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Bar dataKey="avg" name="Avg score" radius={[4, 4, 0, 0]}>
+                      {data.avgScoreByMonth.map((entry) => (
+                        <Cell
+                          key={entry.month}
+                          fill={
+                            entry.avg == null ? '#e2e8f0' :
+                            entry.avg >= 75 ? '#10b981' :
+                            entry.avg >= 45 ? '#f59e0b' :
+                            '#94a3b8'
+                          }
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartSection>
+            )}
+          </div>
+
+          {data.leadStateDistribution.length === 0 && data.employmentBreakdown.length === 0 && (
+            <div className="rounded-xl border border-border bg-card px-6 py-12 text-center">
+              <p className="text-sm text-muted-foreground">
+                Qualification data will appear here once leads submit applications with full details.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
