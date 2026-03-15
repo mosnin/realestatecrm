@@ -32,6 +32,10 @@ export async function PATCH(
   const body = await req.json();
   const valueVal = body.value != null ? parseFloat(body.value) : null;
   const closeDateVal = body.closeDate ? new Date(body.closeDate).toISOString() : null;
+  const followUpAtVal = body.followUpAt !== undefined ? (body.followUpAt ? new Date(body.followUpAt).toISOString() : null) : undefined;
+
+  const stageChanged = body.stageId && body.stageId !== existing.stageId;
+  const statusChanged = body.status && body.status !== existing.status;
 
   // Handle dealContacts replacement
   if (body.contactIds) {
@@ -47,14 +51,16 @@ export async function PATCH(
   const { data: dealRow, error: updateError } = await supabase
     .from('Deal')
     .update({
-      title: body.title,
-      description: body.description ?? null,
-      value: valueVal,
-      address: body.address ?? null,
-      priority: body.priority,
-      closeDate: closeDateVal,
-      stageId: body.stageId,
-      position: body.position,
+      ...(body.title !== undefined && { title: body.title }),
+      ...(body.description !== undefined && { description: body.description ?? null }),
+      ...(body.value !== undefined && { value: valueVal }),
+      ...(body.address !== undefined && { address: body.address ?? null }),
+      ...(body.priority !== undefined && { priority: body.priority }),
+      ...(body.closeDate !== undefined && { closeDate: closeDateVal }),
+      ...(body.stageId !== undefined && { stageId: body.stageId }),
+      ...(body.position !== undefined && { position: body.position }),
+      ...(body.status !== undefined && { status: body.status }),
+      ...(followUpAtVal !== undefined && { followUpAt: followUpAtVal }),
       updatedAt: new Date().toISOString(),
     })
     .eq('id', id)
@@ -62,11 +68,41 @@ export async function PATCH(
     .single();
   if (updateError) throw updateError;
 
+  // Auto-log stage_change and status_change activities
+  const activityInserts: Array<{ id: string; dealId: string; spaceId: string; type: string; content: string; metadata: Record<string, unknown> }> = [];
+  if (stageChanged) {
+    const { data: newStageRow } = await supabase.from('DealStage').select('name').eq('id', body.stageId).maybeSingle();
+    const { data: oldStageRow } = await supabase.from('DealStage').select('name').eq('id', existing.stageId).maybeSingle();
+    activityInserts.push({
+      id: crypto.randomUUID(),
+      dealId: id,
+      spaceId: existing.spaceId,
+      type: 'stage_change',
+      content: `Moved from "${oldStageRow?.name ?? 'Unknown'}" to "${newStageRow?.name ?? 'Unknown'}"`,
+      metadata: { fromStageId: existing.stageId, toStageId: body.stageId },
+    });
+  }
+  if (statusChanged) {
+    const labelMap: Record<string, string> = { active: 'Active', won: 'Won', lost: 'Lost', on_hold: 'On Hold' };
+    activityInserts.push({
+      id: crypto.randomUUID(),
+      dealId: id,
+      spaceId: existing.spaceId,
+      type: 'status_change',
+      content: `Marked as ${labelMap[body.status] ?? body.status}`,
+      metadata: { fromStatus: existing.status, toStatus: body.status },
+    });
+  }
+  if (activityInserts.length > 0) {
+    await supabase.from('DealActivity').insert(activityInserts);
+  }
+
   // Get stage for the include
+  const stageIdToFetch = body.stageId ?? existing.stageId;
   const { data: stageRow, error: stageError } = await supabase
     .from('DealStage')
     .select('*')
-    .eq('id', body.stageId)
+    .eq('id', stageIdToFetch)
     .single();
   if (stageError && stageError.code !== 'PGRST116') throw stageError;
 

@@ -18,6 +18,7 @@ interface KanbanColumnProps {
   onAddDeal: (stageId: string) => void;
   onEditDeal: (deal: DealWithRelations) => void;
   onDeleteDeal: (id: string) => void;
+  onOpenPanel: (deal: DealWithRelations) => void;
 }
 
 export function KanbanColumn({
@@ -25,7 +26,8 @@ export function KanbanColumn({
   deals,
   onAddDeal,
   onEditDeal,
-  onDeleteDeal
+  onDeleteDeal,
+  onOpenPanel,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
 
@@ -71,6 +73,7 @@ export function KanbanColumn({
               deal={deal}
               onEdit={onEditDeal}
               onDelete={onDeleteDeal}
+              onOpenPanel={onOpenPanel}
             />
           ))}
           {deals.length === 0 && !isOver && (

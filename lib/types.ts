@@ -189,8 +189,20 @@ export type Deal = {
   closeDate: Date | null;
   stageId: string;
   position: number;
+  status: 'active' | 'won' | 'lost' | 'on_hold';
+  followUpAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type DealActivity = {
+  id: string;
+  dealId: string;
+  spaceId: string;
+  type: 'note' | 'call' | 'email' | 'meeting' | 'follow_up' | 'stage_change' | 'status_change';
+  content: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: Date;
 };
 
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -211,7 +223,16 @@ export type DealContact = {
 export type Message = {
   id: string;
   spaceId: string;
+  conversationId: string | null;
   role: string;
   content: string;
   createdAt: Date;
+};
+
+export type Conversation = {
+  id: string;
+  spaceId: string;
+  title: string;
+  createdAt: Date;
+  updatedAt: Date;
 };

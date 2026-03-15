@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { messages, slug } = await req.json();
+    const { messages, slug, conversationId } = await req.json();
 
     const space = await getSpaceFromSlug(slug);
     if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
@@ -24,13 +24,52 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
     if (!owner) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+    // Validate conversation ownership if provided
+    if (conversationId) {
+      const { data: conv } = await supabase
+        .from('Conversation')
+        .select('id, spaceId')
+        .eq('id', conversationId)
+        .maybeSingle();
+      if (!conv || conv.spaceId !== space.id) {
+        return NextResponse.json({ error: 'Invalid conversation' }, { status: 400 });
+      }
+    }
+
     // Save user message to DB
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === 'user');
     if (lastUserMsg) {
       const { error } = await supabase
         .from('Message')
-        .insert({ id: crypto.randomUUID(), spaceId: space.id, role: 'user', content: lastUserMsg.content });
+        .insert({
+          id: crypto.randomUUID(),
+          spaceId: space.id,
+          conversationId: conversationId ?? null,
+          role: 'user',
+          content: lastUserMsg.content,
+        });
       if (error) throw error;
+
+      // Auto-title conversation on first user message
+      if (conversationId) {
+        const { data: conv } = await supabase
+          .from('Conversation')
+          .select('title')
+          .eq('id', conversationId)
+          .maybeSingle();
+        if (conv?.title === 'New conversation') {
+          const autoTitle = lastUserMsg.content.trim().slice(0, 60);
+          await supabase
+            .from('Conversation')
+            .update({ title: autoTitle, updatedAt: new Date().toISOString() })
+            .eq('id', conversationId);
+        } else {
+          await supabase
+            .from('Conversation')
+            .update({ updatedAt: new Date().toISOString() })
+            .eq('id', conversationId);
+        }
+      }
     }
 
     // Use per-space API key if set, otherwise fall back to env var
@@ -55,8 +94,21 @@ export async function POST(req: NextRequest) {
       }
       await supabase
         .from('Message')
-        .insert({ id: crypto.randomUUID(), spaceId: space.id, role: 'assistant', content: fullText })
+        .insert({
+          id: crypto.randomUUID(),
+          spaceId: space.id,
+          conversationId: conversationId ?? null,
+          role: 'assistant',
+          content: fullText,
+        })
         .then(({ error }) => { if (error) console.error(error); });
+
+      if (conversationId) {
+        await supabase
+          .from('Conversation')
+          .update({ updatedAt: new Date().toISOString() })
+          .eq('id', conversationId);
+      }
     })();
 
     return new NextResponse(streamForResponse, {

@@ -15,6 +15,7 @@ import {
 import { arrayMove } from '@dnd-kit/sortable';
 import { KanbanColumn } from './kanban-column';
 import { DealForm } from './deal-form';
+import { DealPanel } from './deal-panel';
 import { Button } from '@/components/ui/button';
 import {
   Plus,
@@ -60,6 +61,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
   const [contacts, setContacts] = useState<Pick<Contact, 'id' | 'name'>[]>([]);
   const [addDealOpen, setAddDealOpen] = useState(false);
   const [editDeal, setEditDeal] = useState<DealWithRelations | null>(null);
+  const [panelDeal, setPanelDeal] = useState<DealWithRelations | null>(null);
   const [defaultStageId, setDefaultStageId] = useState<string>('');
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
   const [view, setView] = useState<'kanban' | 'list'>('kanban');
@@ -159,7 +161,19 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
   async function handleDeleteDeal(id: string) {
     if (!confirm('Delete this deal?')) return;
     await fetch(`/api/deals/${id}`, { method: 'DELETE' });
+    if (panelDeal?.id === id) setPanelDeal(null);
     fetchData();
+  }
+
+  async function handlePanelUpdate(id: string, updates: Partial<Deal>) {
+    await fetch(`/api/deals/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    fetchData();
+    // Optimistically update panel deal
+    setPanelDeal((prev) => prev && prev.id === id ? { ...prev, ...updates } : prev);
   }
 
   function openAddDeal(stageId: string) {
@@ -239,6 +253,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
                   onAddDeal={openAddDeal}
                   onEditDeal={(deal) => setEditDeal(deal)}
                   onDeleteDeal={handleDeleteDeal}
+                  onOpenPanel={(deal) => setPanelDeal(deal)}
                 />
               ))}
             </div>
@@ -291,7 +306,11 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
                     const priorityMeta = PRIORITY_META[deal.priority] ?? PRIORITY_META.MEDIUM;
                     const stage = stages.find((s) => s.id === deal.stageId);
                     return (
-                      <tr key={deal.id} className="group hover:bg-muted/30 transition-colors">
+                      <tr
+                        key={deal.id}
+                        className="group hover:bg-muted/30 transition-colors cursor-pointer"
+                        onClick={() => setPanelDeal(deal)}
+                      >
                         <td className="px-4 py-3">
                           <div>
                             <p className="font-medium">{deal.title}</p>
@@ -342,14 +361,14 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
                             <button
                               type="button"
-                              onClick={() => setEditDeal(deal)}
+                              onClick={(e) => { e.stopPropagation(); setEditDeal(deal); }}
                               className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                             >
                               <Pencil size={13} />
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDeleteDeal(deal.id)}
+                              onClick={(e) => { e.stopPropagation(); handleDeleteDeal(deal.id); }}
                               className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
                             >
                               <Trash2 size={13} />
@@ -397,6 +416,14 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
           title="Edit Deal"
         />
       )}
+
+      <DealPanel
+        deal={panelDeal}
+        open={!!panelDeal}
+        onClose={() => setPanelDeal(null)}
+        onEdit={(deal) => { setPanelDeal(null); setEditDeal(deal); }}
+        onUpdate={handlePanelUpdate}
+      />
     </div>
   );
 }

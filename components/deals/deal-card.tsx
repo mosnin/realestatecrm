@@ -3,7 +3,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Badge } from '@/components/ui/badge';
-import { GripVertical, Pencil, Trash2, DollarSign } from 'lucide-react';
+import { GripVertical, Pencil, Trash2, DollarSign, Calendar, Trophy, XCircle, PauseCircle } from 'lucide-react';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -27,13 +27,20 @@ const PRIORITY_META: Record<string, { label: string; className: string }> = {
   },
 };
 
+const STATUS_BADGE: Record<string, { label: string; icon: React.ElementType; className: string }> = {
+  won: { label: 'Won', icon: Trophy, className: 'bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-400' },
+  lost: { label: 'Lost', icon: XCircle, className: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
+  on_hold: { label: 'On Hold', icon: PauseCircle, className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' },
+};
+
 interface DealCardProps {
   deal: DealWithRelations;
   onEdit: (deal: DealWithRelations) => void;
   onDelete: (id: string) => void;
+  onOpenPanel: (deal: DealWithRelations) => void;
 }
 
-export function DealCard({ deal, onEdit, onDelete }: DealCardProps) {
+export function DealCard({ deal, onEdit, onDelete, onOpenPanel }: DealCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: deal.id,
   });
@@ -45,23 +52,36 @@ export function DealCard({ deal, onEdit, onDelete }: DealCardProps) {
   };
 
   const priority = PRIORITY_META[deal.priority];
+  const statusBadge = deal.status && deal.status !== 'active' ? STATUS_BADGE[deal.status] : null;
+  const followUpDate = deal.followUpAt ? new Date(deal.followUpAt) : null;
+  const followUpOverdue = followUpDate && followUpDate < new Date();
 
   return (
     <div ref={setNodeRef} style={style} className="mb-2">
-      <div className="group rounded-xl border border-border bg-card px-3.5 py-3 transition-all duration-150 hover:shadow-md hover:-translate-y-px">
+      <div
+        className={cn(
+          'group rounded-xl border border-border bg-card px-3.5 py-3 transition-all duration-150 hover:shadow-md hover:-translate-y-px cursor-pointer',
+          deal.status === 'won' && 'border-green-200 dark:border-green-800',
+          deal.status === 'lost' && 'opacity-60',
+        )}
+        onClick={() => onOpenPanel(deal)}
+      >
         <div className="flex items-start gap-2">
-          {/* Drag handle */}
+          {/* Drag handle — stops propagation so clicking it doesn't open the panel */}
           <button
             {...attributes}
             {...listeners}
             className="mt-1 text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing flex-shrink-0 transition-colors"
+            onClick={(e) => e.stopPropagation()}
           >
             <GripVertical size={15} />
           </button>
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm leading-tight truncate">{deal.title}</p>
+            <p className={cn('font-semibold text-sm leading-tight truncate', deal.status === 'lost' && 'line-through text-muted-foreground')}>
+              {deal.title}
+            </p>
             {deal.address && (
               <p className="text-xs text-muted-foreground truncate mt-0.5">{deal.address}</p>
             )}
@@ -81,6 +101,23 @@ export function DealCard({ deal, onEdit, onDelete }: DealCardProps) {
               >
                 {priority.label}
               </span>
+              {statusBadge && (
+                <span className={cn('inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold', statusBadge.className)}>
+                  <statusBadge.icon size={9} />
+                  {statusBadge.label}
+                </span>
+              )}
+              {followUpDate && (
+                <span className={cn(
+                  'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold',
+                  followUpOverdue
+                    ? 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+                    : 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                )}>
+                  <Calendar size={9} />
+                  {followUpDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              )}
             </div>
 
             {deal.dealContacts.length > 0 && (
@@ -108,14 +145,14 @@ export function DealCard({ deal, onEdit, onDelete }: DealCardProps) {
             <button
               type="button"
               className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              onClick={() => onEdit(deal)}
+              onClick={(e) => { e.stopPropagation(); onEdit(deal); }}
             >
               <Pencil size={12} />
             </button>
             <button
               type="button"
               className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-              onClick={() => onDelete(deal.id)}
+              onClick={(e) => { e.stopPropagation(); onDelete(deal.id); }}
             >
               <Trash2 size={12} />
             </button>
