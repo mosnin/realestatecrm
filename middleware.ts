@@ -9,12 +9,14 @@ const isProtectedRoute = createRouteMatcher([
   '/broker(.*)',
   '/invite/(.*)',
   '/join/(.*)',
+  '/auth/(.*)',
 ]);
 
 const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
   '/sign-up(.*)',
+  '/login/(.*)',
 ]);
 
 const isAdminRoute = createRouteMatcher([

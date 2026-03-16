@@ -56,9 +56,25 @@ interface AuthPageLayoutProps {
   children: React.ReactNode;
   heading: string;
   subheading: string;
+  /** Controls the left-panel quote/testimonial */
+  variant?: 'realtor' | 'broker';
 }
 
-export function AuthPageLayout({ children, heading, subheading }: AuthPageLayoutProps) {
+const PANEL_CONTENT = {
+  realtor: {
+    quote:
+      'Chippi transformed how I manage leads. I can see every applicant\'s full profile, score, and next step in seconds — it\'s the CRM I always wanted.',
+    author: 'Jordan M., Independent Realtor',
+  },
+  broker: {
+    quote:
+      'With Chippi I can see every realtor\'s pipeline at a glance, spot who needs help, and keep our whole team moving — all from one dashboard.',
+    author: 'Sarah K., Broker Owner',
+  },
+};
+
+export function AuthPageLayout({ children, heading, subheading, variant = 'realtor' }: AuthPageLayoutProps) {
+  const panel = PANEL_CONTENT[variant];
   return (
     <main className="relative min-h-screen lg:grid lg:grid-cols-2 lg:overflow-hidden lg:h-screen">
 
@@ -85,12 +101,10 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
         <div className="relative z-10 mt-auto">
           <blockquote className="space-y-3">
             <p className="text-lg leading-relaxed text-sidebar-foreground/85">
-              &ldquo;Chippi transformed how I manage leads. I can see every
-              applicant&rsquo;s full profile, score, and next step in seconds —
-              it&rsquo;s the CRM I always wanted.&rdquo;
+              &ldquo;{panel.quote}&rdquo;
             </p>
             <footer className="text-sm font-semibold text-primary font-mono">
-              ~ Jordan M., Independent Realtor
+              ~ {panel.author}
             </footer>
           </blockquote>
         </div>
