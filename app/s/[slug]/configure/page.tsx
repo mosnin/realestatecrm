@@ -1,10 +1,10 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { ConfigureAccountForm } from './configure-account-form';
-import { CreateBrokerageCard } from '@/components/broker/create-brokerage-card';
-import { JoinWithCodeCard } from '@/components/broker/join-with-code-card';
 import { getBrokerContext } from '@/lib/permissions';
+import { Building2, ExternalLink, ArrowRight } from 'lucide-react';
 import type { User, Space, SpaceSetting } from '@/lib/types';
 
 export const metadata = { title: 'Configure your account — Chippi' };
@@ -78,7 +78,7 @@ export default async function ConfigurePage({
     notifications: dbUser?.space?.settings?.notifications ?? true,
   };
 
-  // Check broker status to show create/access brokerage card
+  // Check broker status for the brokerage section
   let existingBrokerageName: string | null = null;
   try {
     const brokerCtx = await getBrokerContext();
@@ -90,16 +90,58 @@ export default async function ConfigurePage({
   return (
     <div className="space-y-6">
       <ConfigureAccountForm initialData={initialData} slug={slug} />
-      <div className="max-w-3xl space-y-3">
-        <div>
+
+      {/* Brokerage section — links to dedicated page */}
+      <div className="max-w-3xl">
+        <div className="mb-3">
           <p className="text-sm font-semibold">Brokerage</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Create your own brokerage, or join one with an invite code from your broker.
+            {existingBrokerageName
+              ? 'Manage your brokerage or view the broker dashboard.'
+              : 'Create your own brokerage or join one with an invite code.'}
           </p>
         </div>
-        <CreateBrokerageCard existingBrokerageName={existingBrokerageName} />
-        {!existingBrokerageName && <JoinWithCodeCard />}
+
+        {existingBrokerageName ? (
+          <div className="rounded-xl border border-border bg-card px-5 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Building2 size={15} className="text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">{existingBrokerageName}</p>
+                  <p className="text-xs text-muted-foreground">Your brokerage</p>
+                </div>
+              </div>
+              <Link href="/broker">
+                <button className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border bg-background text-sm font-medium hover:bg-muted transition-colors flex-shrink-0">
+                  <ExternalLink size={13} />
+                  Broker dashboard
+                </button>
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <Link href="/brokerage">
+            <div className="rounded-xl border border-border bg-card px-5 py-4 hover:border-primary/40 transition-colors cursor-pointer group">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Building2 size={15} className="text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Set up a brokerage</p>
+                    <p className="text-xs text-muted-foreground">Create a brokerage or join with a code</p>
+                  </div>
+                </div>
+                <ArrowRight size={15} className="text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+              </div>
+            </div>
+          </Link>
+        )}
       </div>
     </div>
   );
 }
+
