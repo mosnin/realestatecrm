@@ -2,14 +2,13 @@ import { redirect } from 'next/navigation';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
-import { Building2, Users, CheckCircle2, XCircle } from 'lucide-react';
-import { BrokerageStatusToggle } from './brokerage-status-toggle';
+import { Building2, Users, CheckCircle2, XCircle, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 
 export default async function AdminBrokeragesPage() {
   const isAdmin = await isPlatformAdmin();
   if (!isAdmin) redirect('/');
 
-  // Fetch all brokerages with owner info
   const { data: brokerages, error } = await supabase
     .from('Brokerage')
     .select('*, User!Brokerage_ownerId_fkey(id, name, email)')
@@ -18,7 +17,7 @@ export default async function AdminBrokeragesPage() {
   if (error) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
+        <div className="text-center space-y-2 p-8">
           <p className="text-sm text-muted-foreground">Couldn't load brokerages.</p>
           <a href="/admin/brokerages" className="text-xs text-primary hover:underline">Retry</a>
         </div>
@@ -36,32 +35,41 @@ export default async function AdminBrokeragesPage() {
     countMap[m.brokerageId] = (countMap[m.brokerageId] ?? 0) + 1;
   }
 
+  const active    = (brokerages ?? []).filter((b) => b.status === 'active').length;
+  const suspended = (brokerages ?? []).filter((b) => b.status === 'suspended').length;
+
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Brokerages</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {brokerages?.length ?? 0} brokerage{(brokerages?.length ?? 0) !== 1 ? 's' : ''} on the platform
-        </p>
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Brokerages</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {brokerages?.length ?? 0} total · {active} active · {suspended} suspended
+          </p>
+        </div>
       </div>
 
       {!brokerages || brokerages.length === 0 ? (
         <Card>
-          <CardContent className="px-5 py-8 text-center">
+          <CardContent className="px-5 py-10 text-center">
             <p className="text-sm text-muted-foreground">No brokerages yet.</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
-          {brokerages.map((b) => {
-            const owner = b.User as { id: string; name: string | null; email: string } | null;
-            const memberCount = countMap[b.id] ?? 0;
-            const createdAt = new Date(b.createdAt).toLocaleDateString('en-US', {
-              month: 'short', day: 'numeric', year: 'numeric',
-            });
-            return (
-              <div key={b.id} className="rounded-xl border border-border bg-card px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
+        <Card>
+          <div className="divide-y divide-border">
+            {brokerages.map((b) => {
+              const owner = b.User as { id: string; name: string | null; email: string } | null;
+              const memberCount = countMap[b.id] ?? 0;
+              const createdAt = new Date(b.createdAt).toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric', year: 'numeric',
+              });
+              return (
+                <Link
+                  key={b.id}
+                  href={`/admin/brokerages/${b.id}`}
+                  className="flex items-center justify-between gap-3 px-5 py-4 hover:bg-muted/40 transition-colors"
+                >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                       <Building2 size={16} className="text-primary" />
@@ -79,18 +87,18 @@ export default async function AdminBrokeragesPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Owner: {owner?.name ?? owner?.email ?? 'Unknown'} · {memberCount}{' '}
-                        <Users size={10} className="inline" /> · Created {createdAt}
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {owner?.name ?? owner?.email ?? 'Unknown owner'} ·{' '}
+                        <Users size={10} className="inline" /> {memberCount} members · Created {createdAt}
                       </p>
                     </div>
                   </div>
-                  <BrokerageStatusToggle brokerageId={b.id} currentStatus={b.status} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                  <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
+                </Link>
+              );
+            })}
+          </div>
+        </Card>
       )}
     </div>
   );
