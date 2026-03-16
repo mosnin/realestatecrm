@@ -6,8 +6,7 @@ type Params = { params: Promise<{ id: string }> };
 
 /**
  * DELETE /api/admin/brokerages/[id]
- * Removes all memberships (which unlinks spaces via the membership DELETE route logic),
- * then deletes the brokerage itself. Cascades handle invitations automatically.
+ * Removes all memberships, unlinks spaces, then deletes the brokerage.
  */
 export async function DELETE(_req: Request, { params }: Params) {
   try {
@@ -27,7 +26,10 @@ export async function DELETE(_req: Request, { params }: Params) {
   // Delete all memberships
   await supabase.from('BrokerageMembership').delete().eq('brokerageId', id);
 
-  // Delete the brokerage (invitations cascade via FK)
+  // Delete invitations
+  await supabase.from('Invitation').delete().eq('brokerageId', id);
+
+  // Delete the brokerage
   const { error } = await supabase.from('Brokerage').delete().eq('id', id);
   if (error) {
     console.error('[admin/brokerages] delete failed', error);
