@@ -3,17 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 
 // ── Toggle suspend/reactivate ────────────────────────────────────────────────
 
@@ -116,6 +105,7 @@ function RemoveMember({
   const [loading, setLoading] = useState(false);
 
   async function remove() {
+    if (!confirm(`Remove ${label} from this brokerage?`)) return;
     setLoading(true);
     try {
       await fetch(`/api/admin/memberships/${membershipId}`, { method: 'DELETE' });
@@ -126,27 +116,15 @@ function RemoveMember({
   }
 
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="sm" disabled={loading} className="text-xs text-destructive hover:text-destructive h-7 px-2">
-          {loading ? '…' : 'Remove'}
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Remove member?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This will remove <strong>{label}</strong> from the brokerage and unlink their workspace. This cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={remove} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-            Remove
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={remove}
+      disabled={loading}
+      className="text-xs text-destructive hover:text-destructive h-7 px-2"
+    >
+      {loading ? '…' : 'Remove'}
+    </Button>
   );
 }
 
@@ -158,6 +136,7 @@ function RevokeInvite({
   const [loading, setLoading] = useState(false);
 
   async function revoke() {
+    if (!confirm(`Revoke invitation to ${label}?`)) return;
     setLoading(true);
     try {
       await fetch(`/api/admin/invitations/${invitationId}`, {
@@ -172,27 +151,15 @@ function RevokeInvite({
   }
 
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="sm" disabled={loading} className="text-xs text-destructive hover:text-destructive h-7 px-2">
-          {loading ? '…' : 'Revoke'}
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Revoke invitation?</AlertDialogTitle>
-          <AlertDialogDescription>
-            The invitation to <strong>{label}</strong> will be cancelled and can no longer be used to join.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={revoke} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-            Revoke
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={revoke}
+      disabled={loading}
+      className="text-xs text-destructive hover:text-destructive h-7 px-2"
+    >
+      {loading ? '…' : 'Revoke'}
+    </Button>
   );
 }
 
@@ -201,6 +168,12 @@ function DeleteBrokerage({ brokerageId, brokerageName }: DeleteProps) {
   const [loading, setLoading] = useState(false);
 
   async function deleteBrokerage() {
+    if (
+      !confirm(
+        `Delete "${brokerageName}"?\n\nThis permanently removes all memberships and unlinks workspaces. This cannot be undone.`
+      )
+    )
+      return;
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/brokerages/${brokerageId}`, { method: 'DELETE' });
@@ -214,34 +187,14 @@ function DeleteBrokerage({ brokerageId, brokerageName }: DeleteProps) {
   }
 
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={loading}
-          className="w-full text-xs justify-start border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
-        >
-          {loading ? '…' : 'Delete brokerage'}
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete &quot;{brokerageName}&quot;?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This permanently deletes the brokerage, removes all memberships, and unlinks all member workspaces. This action cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={deleteBrokerage}
-            className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-          >
-            Delete permanently
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={deleteBrokerage}
+      disabled={loading}
+      className="w-full text-xs justify-start border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+    >
+      {loading ? '…' : 'Delete brokerage'}
+    </Button>
   );
 }
