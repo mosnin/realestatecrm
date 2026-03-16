@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { X } from 'lucide-react';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
 import { AnimatePresence, motion, useScroll } from 'motion/react';
@@ -55,29 +56,12 @@ export function Navbar() {
   const { scrollY } = useScroll();
   const [hasScrolled, setHasScrolled] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState('hero');
+  const pathname = usePathname();
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const sections = navLinks.map((item) => item.href.substring(1));
-
-      for (const section of sections) {
-        const element = document.getElementById(section);
-        if (element) {
-          const rect = element.getBoundingClientRect();
-          if (rect.top <= 150 && rect.bottom >= 150) {
-            setActiveSection(section);
-            break;
-          }
-        }
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    handleScroll();
-
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const activeHref = navLinks.find((n) => {
+    if (n.href === '/') return pathname === '/';
+    return pathname.startsWith(n.href);
+  })?.href ?? '/';
 
   useEffect(() => {
     const unsubscribe = scrollY.on('change', (latest) => {
@@ -182,22 +166,17 @@ export function Navbar() {
                         className="border-border border-b p-2.5 last:border-b-0"
                         variants={drawerMenuVariants}
                       >
-                        <a
+                        <Link
                           href={item.href}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            const element = document.getElementById(item.href.substring(1));
-                            element?.scrollIntoView({ behavior: 'smooth' });
-                            setIsDrawerOpen(false);
-                          }}
+                          onClick={() => setIsDrawerOpen(false)}
                           className={`hover:text-primary/80 underline-offset-4 transition-colors ${
-                            activeSection === item.href.substring(1)
+                            activeHref === item.href
                               ? 'text-primary font-medium'
                               : 'text-primary/60'
                           }`}
                         >
                           {item.name}
-                        </a>
+                        </Link>
                       </motion.li>
                     ))}
                   </AnimatePresence>
