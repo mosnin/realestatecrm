@@ -85,6 +85,10 @@ CREATE TABLE IF NOT EXISTS "Contact" (
   "scoringStatus"   text        NOT NULL DEFAULT 'pending',
   "scoreDetails"    jsonb,
   "applicationData" jsonb,
+  "followUpAt"      timestamptz,
+  "lastContactedAt" timestamptz,
+  "sourceLabel"     text,
+  "stageChangedAt"  timestamptz,
   "createdAt"       timestamptz NOT NULL DEFAULT now(),
   "updatedAt"       timestamptz NOT NULL DEFAULT now()
 );
@@ -116,17 +120,31 @@ CREATE TABLE IF NOT EXISTS "Deal" (
   value       double precision,
   address     text,
   priority    text             NOT NULL DEFAULT 'MEDIUM',
-  "closeDate" timestamptz,
-  "stageId"   text             NOT NULL REFERENCES "DealStage"(id) ON DELETE CASCADE,
-  position    integer          NOT NULL DEFAULT 0,
-  "createdAt" timestamptz      NOT NULL DEFAULT now(),
-  "updatedAt" timestamptz      NOT NULL DEFAULT now()
+  "closeDate"  timestamptz,
+  "stageId"    text             NOT NULL REFERENCES "DealStage"(id) ON DELETE CASCADE,
+  position     integer          NOT NULL DEFAULT 0,
+  status       text             NOT NULL DEFAULT 'active'
+                                  CHECK (status IN ('active', 'won', 'lost', 'on_hold')),
+  "followUpAt" timestamptz,
+  "createdAt"  timestamptz      NOT NULL DEFAULT now(),
+  "updatedAt"  timestamptz      NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS "DealContact" (
   "dealId"    text NOT NULL REFERENCES "Deal"(id) ON DELETE CASCADE,
   "contactId" text NOT NULL REFERENCES "Contact"(id) ON DELETE CASCADE,
   PRIMARY KEY ("dealId", "contactId")
+);
+
+CREATE TABLE IF NOT EXISTS "DealActivity" (
+  id          text        PRIMARY KEY,
+  "dealId"    text        NOT NULL REFERENCES "Deal"(id) ON DELETE CASCADE,
+  "spaceId"   text        NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  type        text        NOT NULL
+                CHECK (type IN ('note', 'call', 'email', 'meeting', 'follow_up', 'stage_change', 'status_change')),
+  content     text,
+  metadata    jsonb,
+  "createdAt" timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS "Message" (
@@ -211,6 +229,14 @@ CREATE INDEX IF NOT EXISTS idx_dealcontact_deal      ON "DealContact"("dealId");
 CREATE INDEX IF NOT EXISTS idx_dealcontact_contact   ON "DealContact"("contactId");
 CREATE INDEX IF NOT EXISTS deal_contact_contact_idx  ON "DealContact"("contactId");
 
+CREATE INDEX IF NOT EXISTS idx_deal_activity_deal    ON "DealActivity"("dealId");
+CREATE INDEX IF NOT EXISTS idx_deal_activity_space   ON "DealActivity"("spaceId");
+CREATE INDEX IF NOT EXISTS idx_deal_activity_type    ON "DealActivity"(type);
+
+CREATE INDEX IF NOT EXISTS contact_follow_up_idx     ON "Contact"("spaceId", "followUpAt" DESC);
+CREATE INDEX IF NOT EXISTS deal_follow_up_idx        ON "Deal"("spaceId", "followUpAt" DESC);
+CREATE INDEX IF NOT EXISTS deal_status_idx           ON "Deal"("spaceId", status);
+
 CREATE INDEX IF NOT EXISTS idx_message_space_id      ON "Message"("spaceId");
 CREATE INDEX IF NOT EXISTS message_space_created_idx ON "Message"("spaceId", "createdAt" ASC);
 
@@ -253,6 +279,7 @@ ALTER TABLE "ContactActivity"     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "DealStage"           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Deal"                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "DealContact"         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "DealActivity"        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Message"             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "BrokerageMembership" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Invitation"          ENABLE ROW LEVEL SECURITY;

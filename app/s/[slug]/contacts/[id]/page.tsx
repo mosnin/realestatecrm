@@ -27,6 +27,7 @@ import {
 import type { Contact, ApplicationData, LeadScoreDetails } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
 import { ComposeEmailDialog } from '@/components/contacts/compose-email-dialog';
+import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-field';
 import { getInitials, formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug } from '@/lib/space';
 
@@ -178,6 +179,15 @@ export default async function ClientDetailPage({
             )}
           </div>
         )}
+
+        {/* Follow-up / mark contacted */}
+        <div className="mt-4 pt-4 border-t border-border">
+          <ContactFollowUpField
+            contactId={contact.id}
+            followUpAt={contact.followUpAt ? String(contact.followUpAt) : null}
+            lastContactedAt={contact.lastContactedAt ? String(contact.lastContactedAt) : null}
+          />
+        </div>
       </div>
 
       {/* ── AI Lead Score Card ── */}
