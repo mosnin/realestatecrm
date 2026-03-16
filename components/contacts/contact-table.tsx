@@ -65,6 +65,7 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [contacts, setContacts] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
+  const [tagFilter, setTagFilter] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [editContact, setEditContact] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
@@ -171,10 +172,10 @@ export function ContactTable({ slug }: ContactTableProps) {
   }
 
   function toggleSelectAll() {
-    if (selectedIds.size === contacts.length) {
+    if (selectedIds.size === visibleContacts.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(contacts.map((c) => c.id)));
+      setSelectedIds(new Set(visibleContacts.map((c) => c.id)));
     }
   }
 
@@ -202,12 +203,12 @@ export function ContactTable({ slug }: ContactTableProps) {
   }
 
   function handleExportSelected() {
-    const toExport = contacts.filter((c) => selectedIds.has(c.id));
+    const toExport = visibleContacts.filter((c) => selectedIds.has(c.id));
     exportContactsCSV(toExport);
   }
 
   function handleExportAll() {
-    exportContactsCSV(contacts);
+    exportContactsCSV(visibleContacts);
   }
 
   function exportContactsCSV(items: Client[]) {
@@ -231,6 +232,17 @@ export function ContactTable({ slug }: ContactTableProps) {
     TOUR: contacts.filter((c) => c.type === 'TOUR').length,
     APPLICATION: contacts.filter((c) => c.type === 'APPLICATION').length,
   };
+
+  // Unique user-defined tags (exclude system tags)
+  const SYSTEM_TAGS = new Set(['application-link', 'new-lead']);
+  const allTags = Array.from(
+    new Set(contacts.flatMap((c) => c.tags.filter((t) => !SYSTEM_TAGS.has(t))))
+  ).sort();
+
+  // Apply tag filter client-side
+  const visibleContacts = tagFilter
+    ? contacts.filter((c) => c.tags.includes(tagFilter))
+    : contacts;
 
   const contactViews = savedViews.filter((v) => v.page === 'contacts');
 
@@ -276,8 +288,39 @@ export function ContactTable({ slug }: ContactTableProps) {
             );
           })}
           <div className="ml-auto text-xs text-muted-foreground">
-            {contacts.length} total
+            {tagFilter ? `${visibleContacts.length} of ` : ''}{contacts.length} total
           </div>
+        </div>
+      )}
+
+      {/* Tag filter strip */}
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 items-center">
+          {tagFilter && (
+            <button
+              type="button"
+              onClick={() => setTagFilter('')}
+              className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 py-1 bg-primary text-primary-foreground"
+            >
+              <X size={10} />
+              Clear tag
+            </button>
+          )}
+          {allTags.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
+              className={cn(
+                'inline-flex items-center text-xs font-medium rounded-full px-2.5 py-1 border transition-colors',
+                tagFilter === tag
+                  ? 'bg-primary/10 text-primary border-primary/30'
+                  : 'bg-muted text-muted-foreground border-transparent hover:text-foreground hover:bg-accent',
+              )}
+            >
+              {tag}
+            </button>
+          ))}
         </div>
       )}
 
@@ -407,16 +450,21 @@ export function ContactTable({ slug }: ContactTableProps) {
       )}
 
       {/* Empty state */}
-      {!loading && contacts.length === 0 && (
+      {!loading && visibleContacts.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border bg-card py-16 text-center px-6">
           <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
             <Search size={20} className="text-muted-foreground" />
           </div>
           <p className="font-semibold text-foreground mb-1">No clients found</p>
           <p className="text-sm text-muted-foreground">
-            {search ? `No clients match "${search}".` : 'Add your first client to get started.'}
+            {tagFilter ? `No clients tagged "${tagFilter}".` : search ? `No clients match "${search}".` : 'Add your first client to get started.'}
           </p>
-          {!search && (
+          {tagFilter && (
+            <Button onClick={() => setTagFilter('')} className="mt-4 gap-2" size="sm" variant="outline">
+              <X size={14} /> Clear filter
+            </Button>
+          )}
+          {!search && !tagFilter && (
             <Button onClick={() => setAddOpen(true)} className="mt-4 gap-2" size="sm">
               <Plus size={14} /> Add client
             </Button>
@@ -425,11 +473,11 @@ export function ContactTable({ slug }: ContactTableProps) {
       )}
 
       {/* ── Card view — stage-grouped ── */}
-      {!loading && contacts.length > 0 && view === 'card' && (
+      {!loading && visibleContacts.length > 0 && view === 'card' && (
         <div className="grid gap-5 sm:grid-cols-3">
           {STAGES.map((stage) => {
-            const stageContacts = contacts.filter((c) => c.type === stage.key);
-            if (stageContacts.length === 0 && !search) return (
+            const stageContacts = visibleContacts.filter((c) => c.type === stage.key);
+            if (stageContacts.length === 0 && !search && !tagFilter) return (
               <div key={stage.key} className={cn('rounded-xl border-2 border-dashed p-4 flex flex-col items-center justify-center min-h-[120px] text-center gap-2', stage.border)}>
                 <span className={cn('w-2 h-2 rounded-full', stage.dotColor)} />
                 <p className="text-xs font-semibold text-muted-foreground">{stage.label}</p>
@@ -468,7 +516,7 @@ export function ContactTable({ slug }: ContactTableProps) {
       )}
 
       {/* ── List view ── */}
-      {!loading && contacts.length > 0 && view === 'list' && (
+      {!loading && visibleContacts.length > 0 && view === 'list' && (
         <div className="rounded-xl border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -477,7 +525,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                   <th className="px-4 py-3 w-8">
                     <input
                       type="checkbox"
-                      checked={selectedIds.size === contacts.length && contacts.length > 0}
+                      checked={selectedIds.size === visibleContacts.length && visibleContacts.length > 0}
                       onChange={toggleSelectAll}
                       className="rounded border-border cursor-pointer"
                     />
@@ -491,7 +539,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border bg-card">
-                {contacts.map((contact) => {
+                {visibleContacts.map((contact) => {
                   const stage = STAGES.find((s) => s.key === contact.type)!;
                   const isSelected = selectedIds.has(contact.id);
                   return (

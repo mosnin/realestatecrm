@@ -28,6 +28,7 @@ import type { Contact, ApplicationData, LeadScoreDetails } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
 import { ComposeEmailDialog } from '@/components/contacts/compose-email-dialog';
 import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-field';
+import { RescoreButton } from '@/components/contacts/rescore-button';
 import { getInitials, formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug } from '@/lib/space';
 
@@ -193,9 +194,12 @@ export default async function ClientDetailPage({
       {/* ── AI Lead Score Card ── */}
       {contact.scoringStatus === 'scored' && contact.leadScore != null && (
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
-          <div className="px-6 py-4 border-b border-border flex items-center gap-2">
-            <Sparkles size={14} className="text-primary" />
-            <h2 className="text-sm font-semibold">AI Lead Score</h2>
+          <div className="px-6 py-4 border-b border-border flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Sparkles size={14} className="text-primary" />
+              <h2 className="text-sm font-semibold">AI Lead Score</h2>
+            </div>
+            <RescoreButton contactId={contact.id} />
           </div>
           <div className="px-6 py-5">
             {/* Score + tier + confidence */}
@@ -316,6 +320,22 @@ export default async function ClientDetailPage({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── Unscored / failed — show score prompt ── */}
+      {(contact.scoringStatus === 'failed' || contact.scoringStatus === 'unscored' || (contact.scoringStatus !== 'scored' && contact.scoringStatus !== 'pending')) && (
+        <div className="rounded-2xl border border-border bg-card px-6 py-5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Sparkles size={16} className="text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">AI Lead Score</p>
+              <p className="text-xs text-muted-foreground">
+                {contact.scoringStatus === 'failed' ? 'Previous score attempt failed.' : 'This contact has not been scored yet.'}
+              </p>
+            </div>
+          </div>
+          <RescoreButton contactId={contact.id} />
         </div>
       )}
 

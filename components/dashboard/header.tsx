@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
+import { GlobalSearch } from './global-search';
 
 interface HeaderProps {
   slug: string;
@@ -130,6 +131,7 @@ export function Header({ slug, spaceName, title }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-1.5">
+        <GlobalSearch slug={slug} />
         <Button
           variant="ghost"
           size="icon"

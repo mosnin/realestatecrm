@@ -33,7 +33,9 @@ import {
   Activity,
   Clock,
   Send,
+  ExternalLink,
 } from 'lucide-react';
+import Link from 'next/link';
 import type { Deal, DealStage, Contact, DealContact, DealActivity } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { timeAgo as relativeTime } from '@/lib/formatting';
@@ -49,6 +51,7 @@ interface DealPanelProps {
   onClose: () => void;
   onEdit: (deal: DealWithRelations) => void;
   onUpdate: (id: string, updates: Partial<Deal>) => void;
+  slug: string;
 }
 
 const STATUS_META = {
@@ -68,7 +71,7 @@ const ACTIVITY_META = {
   status_change: { label: 'Status change', icon: CheckCircle2, color: 'text-green-500' },
 };
 
-export function DealPanel({ deal, open, onClose, onEdit, onUpdate }: DealPanelProps) {
+export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealPanelProps) {
   const [tab, setTab] = useState<'overview' | 'activity'>('overview');
   const [activities, setActivities] = useState<DealActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
@@ -146,13 +149,22 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate }: DealPanelPr
         <SheetHeader className="px-6 pt-6 pb-4 border-b">
           <div className="flex items-start justify-between gap-2">
             <SheetTitle className="text-lg font-bold leading-tight pr-2">{deal.title}</SheetTitle>
-            <button
-              type="button"
-              onClick={() => onEdit(deal)}
-              className="flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
-              <Pencil size={14} />
-            </button>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <Link
+                href={`/s/${slug}/deals/${deal.id}`}
+                className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                title="Open full page"
+              >
+                <ExternalLink size={14} />
+              </Link>
+              <button
+                type="button"
+                onClick={() => onEdit(deal)}
+                className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <Pencil size={14} />
+              </button>
+            </div>
           </div>
           {/* Status badge row */}
           <div className="flex flex-wrap gap-2 mt-1">

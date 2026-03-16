@@ -420,6 +420,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
         onClose={() => setPanelDeal(null)}
         onEdit={(deal) => { setPanelDeal(null); setEditDeal(deal); }}
         onUpdate={handlePanelUpdate}
+        slug={slug}
       />
     </div>
   );

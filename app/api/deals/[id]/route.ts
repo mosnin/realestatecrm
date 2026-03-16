@@ -6,6 +6,52 @@ import { requireAuth } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
 import type { Deal, DealStage } from '@/lib/types';
 
+async function resolveDealAndSpace(userId: string, dealId: string) {
+  const { data: rows, error } = await supabase.from('Deal').select('*').eq('id', dealId);
+  if (error) throw error;
+  if (!rows.length) return null;
+  const deal = rows[0];
+  const space = await getSpaceForUser(userId);
+  if (!space || deal.spaceId !== space.id) return null;
+  return { deal, space };
+}
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+  const { userId } = authResult;
+
+  const { id } = await params;
+  const ctx = await resolveDealAndSpace(userId, id);
+  if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const { deal } = ctx;
+
+  const [stageResult, dcResult, activityResult] = await Promise.all([
+    supabase.from('DealStage').select('*').eq('id', deal.stageId).maybeSingle(),
+    supabase.from('DealContact').select('dealId, contactId, Contact(id, name, type)').eq('dealId', id),
+    supabase.from('DealActivity').select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(50),
+  ]);
+
+  if (stageResult.error && stageResult.error.code !== 'PGRST116') throw stageResult.error;
+  if (dcResult.error) throw dcResult.error;
+
+  const dealContacts = (dcResult.data ?? []).map((row: any) => ({
+    dealId: row.dealId,
+    contactId: row.contactId,
+    contact: row.Contact ? { id: row.Contact.id, name: row.Contact.name, type: row.Contact.type } : null,
+  }));
+
+  return NextResponse.json({
+    ...deal,
+    stage: stageResult.data ?? null,
+    dealContacts,
+    activities: activityResult.data ?? [],
+  });
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
