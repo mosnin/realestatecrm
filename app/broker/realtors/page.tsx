@@ -97,7 +97,7 @@ export default async function BrokerRealtorsPage() {
   const totalPipeline = Object.values(dealsBySpace).reduce((a, b) => a + b.value, 0);
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Realtors</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
