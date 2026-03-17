@@ -18,6 +18,7 @@ import type { Metadata } from 'next';
 import { buildIntakeUrl } from '@/lib/intake';
 import { CopyLinkButton } from './copy-link-button';
 import { timeAgo, formatCurrency } from '@/lib/formatting';
+import { FollowUpWidget, type FollowUpContact } from '@/components/dashboard/follow-up-widget';
 
 export async function generateMetadata({
   params,
@@ -41,9 +42,10 @@ export default async function DashboardPage({
   let deals: { value: number | null; stageId: string }[] = [];
   let stages: { id: string; name: string; color: string; position: number; spaceId: string }[] = [];
   let recentLeads: { id: string; name: string; phone: string | null; budget: number | null; preferences: string | null; createdAt: Date; tags: string[]; leadScore: number | null; scoreLabel: string | null; scoringStatus: string | null }[] = [];
+  let followUpContacts: FollowUpContact[] = [];
 
   try {
-    [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads, followUpDue] =
+    [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads, followUpDue, followUpContacts] =
       await Promise.all([
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
         supabase.from('Deal').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
@@ -53,6 +55,7 @@ export default async function DashboardPage({
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).contains('tags', ['new-lead']).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).contains('tags', ['application-link']).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).lte('followUpAt', new Date().toISOString()).then(r => { return r.count ?? 0; }),
+        supabase.from('Contact').select('id, name, phone, email, type, followUpAt').eq('spaceId', space.id).not('followUpAt', 'is', null).lte('followUpAt', new Date().toISOString()).order('followUpAt', { ascending: true }).limit(8).then(r => { return (r.data ?? []) as FollowUpContact[]; }),
       ]);
   } catch (err) {
     console.error('[space-home] DB queries failed', { slug, error: err });
@@ -200,6 +203,9 @@ export default async function DashboardPage({
           </div>
         </CardContent>
       </Card>
+
+      {/* Follow-up widget */}
+      <FollowUpWidget slug={slug} contacts={followUpContacts} />
 
       {/* Recent applications + pipeline side by side on larger screens */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">

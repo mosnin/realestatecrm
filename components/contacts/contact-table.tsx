@@ -24,6 +24,7 @@ import {
   List,
   ArrowRight,
   Download,
+  Upload,
   Bookmark,
   X,
   CheckSquare,
@@ -34,6 +35,7 @@ import { downloadCSV } from '@/lib/csv';
 import type { SavedView } from '@/lib/types';
 import { formatCurrency as _formatCurrency, getInitials } from '@/lib/formatting';
 import { CONTACT_STAGES } from '@/lib/constants';
+import { CsvImportModal } from './csv-import-modal';
 
 type Client = {
   id: string;
@@ -66,6 +68,7 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [tagFilter, setTagFilter] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editContact, setEditContact] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
@@ -385,6 +388,17 @@ export function ContactTable({ slug }: ContactTableProps) {
             </Button>
           )}
 
+          {/* Import CSV */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setImportOpen(true)}
+            className="gap-1.5 text-xs h-9"
+          >
+            <Upload size={12} />
+            Import
+          </Button>
+
           {/* Export CSV */}
           <Button
             size="sm"
@@ -670,6 +684,17 @@ export function ContactTable({ slug }: ContactTableProps) {
             : undefined
         }
       />
+
+      {importOpen && (
+        <CsvImportModal
+          slug={slug}
+          onClose={() => setImportOpen(false)}
+          onImported={(count) => {
+            setImportOpen(false);
+            if (count > 0) fetchContacts();
+          }}
+        />
+      )}
     </div>
   );
 }
