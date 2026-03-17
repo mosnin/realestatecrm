@@ -74,17 +74,17 @@ export default function PricingPage() {
     <div className="min-h-svh w-full bg-background text-foreground">
       <Navbar />
       <main className="relative overflow-x-hidden">
-        {/* Hero glow */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[400px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(20,184,166,0.1),transparent_70%)]" />
+        {/* Animated gradient hero glow */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[500px] animated-gradient-warm opacity-60" />
 
         {/* Page hero */}
-        <section className="px-6 pt-36 pb-16 text-center">
+        <section className="px-6 pt-36 pb-16 text-center relative">
           <div className="mx-auto max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-4 py-1.5 text-xs font-semibold text-primary mb-6">
+            <span className="pill-badge">
               <Zap size={12} />
               Simple, honest pricing
-            </div>
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
+            </span>
+            <h1 className="mt-6 text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
               One plan.<br /> Everything included.
             </h1>
             <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
@@ -94,12 +94,12 @@ export default function PricingPage() {
         </section>
 
         {/* Pricing card */}
-        <section className="px-6 pb-20">
+        <section className="px-6 pb-20 relative">
           <div className="max-w-5xl mx-auto">
             <div className="grid md:grid-cols-[1fr_1.2fr] gap-6">
               {/* Price */}
-              <div className="rounded-2xl border border-primary/20 bg-card shadow-[0_4px_24px_-8px_rgba(13,148,136,0.3)] p-8 md:p-10 flex flex-col">
-                <p className="text-xs font-semibold uppercase tracking-widest text-primary">Chippi Pro</p>
+              <div className="rounded-3xl border border-primary/20 bg-card shadow-lg p-8 md:p-10 flex flex-col animated-gradient-card">
+                <span className="pill-badge w-fit">Chippi Pro</span>
                 <div className="mt-4 flex items-end gap-1">
                   <span className="text-6xl font-bold tracking-tight">$97</span>
                   <span className="text-muted-foreground text-xl mb-2">/ mo</span>
@@ -110,7 +110,7 @@ export default function PricingPage() {
                 <div className="mt-8 space-y-1">
                   <Link
                     href="/sign-up"
-                    className="flex w-full items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-full font-semibold hover:opacity-90 transition-opacity"
+                    className="flex w-full items-center justify-center gap-2 bg-foreground text-background px-6 py-3 rounded-full font-semibold hover:opacity-90 transition-opacity"
                   >
                     Start 7-day free trial <Sparkles size={15} />
                   </Link>
@@ -122,7 +122,7 @@ export default function PricingPage() {
                   </Link>
                 </div>
 
-                <div className="mt-8 pt-6 border-t border-border">
+                <div className="mt-8 pt-6 border-t border-border/40">
                   <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">What you get</p>
                   <ul className="space-y-2">
                     {['Custom intake link', 'AI scoring on every lead', 'Full CRM & pipeline', 'Analytics dashboard', 'Unlimited leads'].map((f) => (
@@ -136,12 +136,12 @@ export default function PricingPage() {
               </div>
 
               {/* Feature list */}
-              <div className="rounded-2xl border border-border bg-card p-8 md:p-10">
+              <div className="rounded-3xl border border-border/60 bg-card p-8 md:p-10">
                 <p className="text-sm font-semibold text-foreground mb-6">All features included:</p>
                 <div className="space-y-4">
                   {planFeatures.map((f) => (
                     <div key={f.label} className="flex items-start gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/8 text-primary flex-shrink-0 mt-0.5">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-primary flex-shrink-0 mt-0.5">
                         <f.icon size={15} />
                       </div>
                       <div>
@@ -157,17 +157,17 @@ export default function PricingPage() {
         </section>
 
         {/* Comparison table */}
-        <section className="px-6 py-20 border-t border-border">
+        <section className="px-6 py-20">
           <div className="max-w-5xl mx-auto">
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-3">How we compare</p>
-            <h2 className="text-3xl font-semibold tracking-tight mb-10">
+            <span className="pill-badge">How we compare</span>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight mb-10">
               Built for the way leasing actually works.
             </h2>
 
-            <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
+            <div className="rounded-3xl border border-border/60 bg-card overflow-hidden shadow-sm">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border">
+                  <tr className="border-b border-border/60">
                     <th className="px-6 py-4 text-left font-semibold text-foreground">Feature</th>
                     <th className="px-4 py-4 text-center font-semibold text-primary">Chippi</th>
                     <th className="px-4 py-4 text-center font-medium text-muted-foreground">Spreadsheet</th>
@@ -176,7 +176,7 @@ export default function PricingPage() {
                 </thead>
                 <tbody>
                   {comparison.map((row, idx) => (
-                    <tr key={row.feature} className={`border-b border-border last:border-0 ${idx % 2 === 0 ? '' : 'bg-muted/30'}`}>
+                    <tr key={row.feature} className={`border-b border-border/40 last:border-0 ${idx % 2 === 0 ? '' : 'bg-muted/30'}`}>
                       <td className="px-6 py-4 text-muted-foreground">{row.feature}</td>
                       <td className="px-4 py-4 text-center">
                         <ComparisonCell value={row.chippi} />
@@ -196,13 +196,13 @@ export default function PricingPage() {
         </section>
 
         {/* Pricing FAQ */}
-        <section className="px-6 py-20 border-t border-border">
+        <section className="px-6 py-20">
           <div className="max-w-3xl mx-auto">
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-3">Common questions</p>
-            <h2 className="text-3xl font-semibold tracking-tight mb-10">Pricing questions, answered.</h2>
+            <span className="pill-badge">Common questions</span>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight mb-10">Pricing questions, answered.</h2>
             <div className="space-y-4">
               {faqs.map((faq) => (
-                <div key={faq.q} className="rounded-xl border border-border bg-card px-6 py-5">
+                <div key={faq.q} className="rounded-2xl border border-border/60 bg-card px-6 py-5">
                   <p className="font-medium text-foreground">{faq.q}</p>
                   <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
                 </div>
@@ -211,14 +211,14 @@ export default function PricingPage() {
             <p className="mt-8 text-sm text-muted-foreground text-center">
               More questions?{' '}
               <Link href="/faq" className="text-primary hover:opacity-80 transition-opacity">
-                See our full FAQ →
+                See our full FAQ
               </Link>
             </p>
           </div>
         </section>
 
         {/* CTA */}
-        <section className="py-24 px-6 border-t border-border">
+        <section className="py-24 px-6">
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight leading-tight">
               Try Chippi free for 7 days.
@@ -229,7 +229,7 @@ export default function PricingPage() {
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
                 href="/sign-up"
-                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-full font-semibold hover:opacity-90 transition-opacity shadow-sm"
+                className="inline-flex items-center gap-2 bg-foreground text-background px-8 py-3.5 rounded-full font-semibold hover:opacity-90 transition-opacity shadow-sm"
               >
                 Start free trial <ArrowRight size={16} />
               </Link>

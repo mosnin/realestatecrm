@@ -195,7 +195,7 @@ export function ChatInterface({
   const atLimit = messages.length >= MESSAGE_LIMIT;
 
   return (
-    <div className="flex h-full min-h-0 border border-border rounded-xl overflow-hidden">
+    <div className="flex h-full min-h-0 border border-border/60 rounded-2xl overflow-hidden">
       {/* Sidebar — desktop always visible, mobile drawer */}
       <div className={cn(
         'flex-shrink-0 border-r border-border bg-muted/20 transition-all duration-200',
@@ -298,7 +298,7 @@ export function ChatInterface({
                 <button
                   key={suggestion}
                   onClick={() => setInput(suggestion)}
-                  className="text-xs text-left p-3 rounded-lg border hover:bg-accent/50 transition-colors"
+                  className="text-xs text-left p-3 rounded-xl border border-border/60 hover:bg-accent/50 transition-colors"
                 >
                   {suggestion}
                 </button>
@@ -330,7 +330,7 @@ export function ChatInterface({
         {/* Input area / limit banner */}
         <div className="border-t border-border px-4 pt-3 pb-4 flex-shrink-0">
           {atLimit ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
               <div className="flex justify-center mb-2">
                 <AlertCircle size={20} className="text-amber-600 dark:text-amber-400" />
               </div>

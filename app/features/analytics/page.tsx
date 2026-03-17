@@ -102,7 +102,7 @@ export default function AnalyticsPage() {
     <div className="min-h-svh w-full bg-background text-foreground">
       <Navbar />
       <main className="relative overflow-x-hidden">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[400px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(20,184,166,0.1),transparent_70%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[400px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(194,154,90,0.10),transparent_70%)]" />
 
         {/* Hero */}
         <section className="px-6 pt-36 pb-16">
@@ -116,10 +116,10 @@ export default function AnalyticsPage() {
 
             <div className="grid md:grid-cols-2 gap-12 items-center">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary mb-5">
+                <span className="pill-badge mb-5">
                   <BarChart3 size={11} />
                   Analytics
-                </div>
+                </span>
                 <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-[1.08]">
                   See the full picture of your leasing workflow.
                 </h1>
@@ -144,7 +144,7 @@ export default function AnalyticsPage() {
 
               <AnimatedCard className="h-full min-h-[280px]">
                 <CardVisual>
-                  <Visual3 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                  <Visual3 mainColor="#C29A5A" secondaryColor="#A68244" />
                 </CardVisual>
                 <CardBody>
                   <CardTitle>Lead performance at a glance</CardTitle>
@@ -169,7 +169,7 @@ export default function AnalyticsPage() {
                   className="rounded-xl border border-border bg-card px-5 py-5 shadow-[0_1px_4px_rgba(0,0,0,0.05)]"
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/8 text-primary">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                       <m.icon size={15} />
                     </div>
                     <span
@@ -241,7 +241,7 @@ export default function AnalyticsPage() {
         {/* No spreadsheet needed */}
         <section className="px-6 py-20 border-t border-border">
           <div className="max-w-5xl mx-auto">
-            <div className="rounded-2xl border border-primary/20 bg-card p-8 md:p-10 shadow-[0_4px_24px_-8px_rgba(13,148,136,0.2)]">
+            <div className="rounded-2xl border border-primary/20 bg-card p-8 md:p-10 shadow-[0_4px_24px_-8px_rgba(194,154,90,0.15)]">
               <div className="grid md:grid-cols-2 gap-8 items-center">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-3">Zero setup</p>
@@ -282,7 +282,7 @@ export default function AnalyticsPage() {
                   href={f.href}
                   className="group flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 hover:-translate-y-px transition-transform shadow-[0_1px_4px_rgba(0,0,0,0.05)]"
                 >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/8 text-primary flex-shrink-0 group-hover:bg-primary/15 transition-colors">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0 group-hover:bg-primary/15 transition-colors">
                     <f.icon size={16} />
                   </div>
                   <div>
@@ -299,10 +299,10 @@ export default function AnalyticsPage() {
         {/* CTA */}
         <section className="py-24 px-6 border-t border-border">
           <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-4 py-1.5 text-xs font-semibold text-primary mb-6">
+            <span className="pill-badge mb-6">
               <Zap size={12} />
               7-day free trial — no card required
-            </div>
+            </span>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
               Know your numbers from day one.
             </h2>

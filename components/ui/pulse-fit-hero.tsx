@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
 
@@ -47,13 +47,7 @@ interface PulseFitHeroProps {
 
 export function PulseFitHero({
   logo = 'Chippi',
-  navigation = [
-    { label: 'Problem' },
-    { label: 'Solution' },
-    { label: 'How it works' },
-    { label: 'Pricing' },
-    { label: 'FAQ' }
-  ],
+  navigation = [],
   ctaButton,
   title,
   subtitle,
@@ -68,48 +62,53 @@ export function PulseFitHero({
 }: PulseFitHeroProps) {
   return (
     <section
-      className={cn('relative w-full min-h-screen flex flex-col overflow-hidden', className)}
-      style={{
-        background:
-          'linear-gradient(180deg, hsl(var(--primary)/0.09) 0%, hsl(var(--background)) 58%, hsl(var(--background)) 100%)'
-      }}
+      className={cn(
+        'relative w-full min-h-screen flex flex-col overflow-hidden',
+        className
+      )}
       role="banner"
       aria-label="Hero section"
     >
+      {/* Animated gradient background */}
+      <div className="absolute inset-0 animated-gradient-warm" />
+
+      {/* Floating gradient orbs */}
+      <div className="gradient-orb gradient-orb-1" />
+      <div className="gradient-orb gradient-orb-2" />
+      <div className="gradient-orb gradient-orb-3" />
+
       {showHeader && (
-      <motion.header
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="relative z-20 flex flex-row justify-between items-center px-6 lg:px-10 py-8"
-      >
-        <div className="flex items-center" aria-label={logo}>
-          <BrandLogo className="h-7" alt="Chippi" />
-        </div>
+        <motion.header
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="relative z-20 flex flex-row justify-between items-center px-6 lg:px-10 py-8"
+        >
+          <div className="flex items-center" aria-label={logo}>
+            <BrandLogo className="h-7" alt="Chippi" />
+          </div>
 
-        <nav className="hidden lg:flex flex-row items-center gap-7" aria-label="Main navigation">
-          {navigation.map((item, index) => (
+          <nav className="hidden lg:flex flex-row items-center gap-7" aria-label="Main navigation">
+            {navigation.map((item, index) => (
+              <button
+                key={index}
+                onClick={item.onClick}
+                className="text-sm text-foreground/60 hover:text-foreground transition-colors tracking-wide"
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
+          {ctaButton && (
             <button
-              key={index}
-              onClick={item.onClick}
-              className="flex flex-row items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              onClick={ctaButton.onClick}
+              className="rainbow-outline-btn px-5 py-2.5 rounded-full border border-border bg-background text-foreground text-sm font-semibold hover:bg-muted transition-colors"
             >
-              {item.label}
-              {item.hasDropdown && <ChevronDown size={15} />}
+              {ctaButton.label}
             </button>
-          ))}
-        </nav>
-
-        {ctaButton && (
-          <button
-            onClick={ctaButton.onClick}
-            className="rainbow-outline-btn px-5 py-2.5 rounded-full border border-border bg-background text-foreground text-sm font-semibold hover:bg-muted transition-colors"
-          >
-            {ctaButton.label}
-          </button>
-        )}
-      </motion.header>
-
+          )}
+        </motion.header>
       )}
 
       {children ? (
@@ -122,11 +121,24 @@ export function PulseFitHero({
             transition={{ duration: 0.8, delay: 0.2 }}
             className="flex flex-col items-center text-center max-w-4xl gap-8"
           >
-            <h1 className="font-bold text-4xl md:text-6xl tracking-tight leading-[1.05] text-foreground">
+            {/* Pill badge */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+            >
+              <span className="pill-badge">
+                The new standard for real estate
+              </span>
+            </motion.div>
+
+            <h1 className="font-bold text-5xl md:text-7xl tracking-tight leading-[1.02] text-foreground">
               {title}
             </h1>
 
-            <p className="text-lg md:text-xl leading-relaxed text-muted-foreground max-w-2xl">{subtitle}</p>
+            <p className="text-lg md:text-xl leading-relaxed text-muted-foreground max-w-2xl">
+              {subtitle}
+            </p>
 
             {(primaryAction || secondaryAction) && (
               <motion.div
@@ -138,17 +150,17 @@ export function PulseFitHero({
                 {primaryAction && (
                   <button
                     onClick={primaryAction.onClick}
-                    className="flex flex-row items-center gap-2 px-8 py-3.5 rounded-full bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+                    className="flex flex-row items-center gap-2 px-8 py-3.5 rounded-full bg-foreground text-background font-semibold hover:opacity-90 transition-opacity text-sm tracking-wide"
                   >
                     {primaryAction.label}
-                    <ArrowRight size={18} />
+                    <ArrowRight size={16} />
                   </button>
                 )}
 
                 {secondaryAction && (
                   <button
                     onClick={secondaryAction.onClick}
-                    className="px-8 py-3.5 rounded-full border border-border text-foreground font-medium hover:bg-card transition-colors"
+                    className="px-8 py-3.5 rounded-full border border-border text-foreground font-medium hover:bg-card/80 transition-colors text-sm tracking-wide"
                   >
                     {secondaryAction.label}
                   </button>
@@ -161,7 +173,7 @@ export function PulseFitHero({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.6, delay: 0.6 }}
-                className="text-xs text-muted-foreground italic"
+                className="text-xs text-muted-foreground/70 tracking-wide"
               >
                 {disclaimer}
               </motion.p>
@@ -199,8 +211,8 @@ export function PulseFitHero({
           transition={{ duration: 1, delay: 0.8 }}
           className="relative z-10 w-full overflow-hidden pt-14 pb-14"
         >
-          <div className="absolute left-0 top-0 bottom-0 z-10 pointer-events-none w-24 bg-gradient-to-r from-background to-transparent" />
-          <div className="absolute right-0 top-0 bottom-0 z-10 pointer-events-none w-24 bg-gradient-to-l from-background to-transparent" />
+          <div className="absolute left-0 top-0 bottom-0 z-10 pointer-events-none w-24 bg-gradient-to-r from-background/80 to-transparent" />
+          <div className="absolute right-0 top-0 bottom-0 z-10 pointer-events-none w-24 bg-gradient-to-l from-background/80 to-transparent" />
 
           <motion.div
             className="flex items-center gap-6 pl-6"
@@ -226,7 +238,7 @@ export function PulseFitHero({
                 style={{ width: '356px', height: '460px' }}
               >
                 <img src={program.image} alt={program.title} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/70" />
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70" />
                 <div className="absolute bottom-0 left-0 right-0 p-6 flex flex-col gap-2">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/80">
                     {program.category}

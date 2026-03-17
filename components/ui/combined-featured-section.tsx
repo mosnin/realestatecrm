@@ -189,31 +189,31 @@ const messages: Message[] = [
     title: 'Jordan Reyes',
     time: '1m ago',
     content: 'Submitted rental application • Score 92 • Move-in Aug 1',
-    color: 'from-teal-400 to-cyan-500'
+    color: 'from-amber-400 to-yellow-500'
   },
   {
     title: 'Maya Thompson',
     time: '3m ago',
     content: 'Submitted application • Score 81 • Budget $2,800',
-    color: 'from-blue-500 to-teal-500'
+    color: 'from-orange-400 to-amber-500'
   },
   {
     title: 'Ethan Cole',
     time: '6m ago',
     content: 'Submitted application • Score 76 • Prefers Midtown',
-    color: 'from-emerald-400 to-teal-500'
+    color: 'from-yellow-400 to-amber-500'
   },
   {
     title: 'Ava Martinez',
     time: '10m ago',
     content: 'Submitted application • Score 68 • Needs follow-up',
-    color: 'from-sky-400 to-blue-700'
+    color: 'from-stone-400 to-amber-600'
   },
   {
     title: 'Noah Bennett',
     time: '12m ago',
     content: 'Submitted application • Score 55 • Warm lead',
-    color: 'from-indigo-400 to-blue-500'
+    color: 'from-amber-300 to-orange-400'
   }
 ];
 

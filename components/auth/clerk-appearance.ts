@@ -1,16 +1,15 @@
 /**
  * Theme-aware Clerk appearance config.
- * Called at render time so it picks up the correct dark/light values.
+ * Warm cream & gold palette matching the Chippi design system.
  */
 export function clerkAuthAppearance(isDark: boolean) {
-  // Match globals.css token values exactly
-  const primary = isDark ? '#14b8a6' : '#0d9488';
-  const background = isDark ? '#121314' : '#f5f6f8';
-  const card = isDark ? '#1f2023' : '#ffffff';
-  const foreground = isDark ? '#f1f3f5' : '#0f1117';
-  const mutedFg = isDark ? '#9ca3af' : '#6b7280';
-  const border = isDark ? '#32353a' : '#e4e6ea';
-  const destructive = isDark ? '#ef4444' : '#dc2626';
+  const primary = isDark ? '#D4B87A' : '#B8963E';
+  const background = isDark ? '#1A1816' : '#F2EAE1';
+  const card = isDark ? '#2A2622' : '#FFFFFF';
+  const foreground = isDark ? '#F5F0EB' : '#1A1612';
+  const mutedFg = isDark ? '#A39889' : '#8C7E70';
+  const border = isDark ? '#3A3530' : '#DDD4C8';
+  const destructive = isDark ? '#E05050' : '#C94040';
 
   return {
     variables: {
@@ -21,7 +20,7 @@ export function clerkAuthAppearance(isDark: boolean) {
       colorTextSecondary: mutedFg,
       colorInputText: foreground,
       colorNeutral: foreground,
-      borderRadius: '0.5rem',
+      borderRadius: '0.75rem',
       fontFamily: 'var(--font-geist-sans)',
     },
     elements: {
@@ -30,29 +29,21 @@ export function clerkAuthAppearance(isDark: boolean) {
       headerTitle: 'hidden',
       headerSubtitle: 'hidden',
       header: 'hidden',
-      // Social buttons
       socialButtonsBlockButton: `border bg-transparent hover:opacity-80 transition-opacity font-medium`,
       socialButtonsBlockButton__google: `border-[${border}] text-[${foreground}]`,
       socialButtonsBlockButtonText: 'font-medium text-sm',
-      // Divider
       dividerLine: `bg-[${border}]`,
       dividerText: `text-[${mutedFg}] text-xs`,
-      // Form fields
       formFieldLabel: `text-sm font-medium text-[${foreground}]`,
       formFieldInput: `border-[${border}] bg-[${card}] text-[${foreground}] placeholder:text-[${mutedFg}] focus:ring-1 focus:ring-[${primary}]`,
-      // Buttons
-      formButtonPrimary: `bg-[${primary}] hover:opacity-90 transition-opacity text-white font-medium`,
-      // Footer
+      formButtonPrimary: `bg-[${primary}] hover:opacity-90 transition-opacity text-white font-medium rounded-full`,
       footerActionText: `text-[${mutedFg}] text-sm`,
       footerActionLink: `text-[${primary}] hover:opacity-80 font-medium`,
       footer: `bg-transparent`,
-      // Identity preview
       identityPreviewText: `text-[${foreground}]`,
       identityPreviewEditButton: `text-[${primary}]`,
-      // Error/alert
       formFieldErrorText: `text-[${destructive}] text-xs`,
       alertText: 'text-sm',
-      // Card background
       cardBox: `bg-[${background}]`,
     },
   } as const;

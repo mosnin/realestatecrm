@@ -99,7 +99,7 @@ function StatCard({
   sub?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card px-5 py-4">
+    <div className="rounded-2xl border border-border/60 bg-card px-5 py-4">
       <p className="text-xs text-muted-foreground font-medium">{label}</p>
       <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
       {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
@@ -112,7 +112,7 @@ function StatCard({
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-md text-xs">
+    <div className="rounded-xl border border-border/60 bg-card px-3 py-2 shadow-md text-xs">
       <p className="font-semibold text-foreground mb-1">{label}</p>
       {payload.map((p: any) => (
         <p key={p.dataKey} style={{ color: p.color ?? p.fill }}>
@@ -140,7 +140,7 @@ function ChartSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <div className="rounded-2xl border border-border/60 bg-card p-5">
       <p className="font-semibold text-sm">{title}</p>
       {sub && <p className="text-xs text-muted-foreground mt-0.5 mb-4">{sub}</p>}
       {!sub && <div className="mb-4" />}
@@ -157,7 +157,7 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
   return (
     <div className="space-y-5">
       {/* Tab bar */}
-      <div className="flex gap-1 p-1 rounded-lg bg-muted w-fit">
+      <div className="flex gap-1 p-1 rounded-xl bg-muted w-fit">
         {TABS.map((t) => (
           <button
             key={t}
@@ -506,7 +506,7 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
           </div>
 
           {data.leadStateDistribution.length === 0 && data.employmentBreakdown.length === 0 && (
-            <div className="rounded-xl border border-border bg-card px-6 py-12 text-center">
+            <div className="rounded-2xl border border-border/60 bg-card px-6 py-12 text-center">
               <p className="text-sm text-muted-foreground">
                 Qualification data will appear here once leads submit applications with full details.
               </p>
@@ -640,8 +640,8 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                 <AreaChart data={data.contactsOverTime}>
                   <defs>
                     <linearGradient id="contactsGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#B8963E" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#B8963E" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -652,10 +652,10 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                     type="monotone"
                     dataKey="count"
                     name="Contacts"
-                    stroke="#6366f1"
+                    stroke="#B8963E"
                     fill="url(#contactsGrad)"
                     strokeWidth={2}
-                    dot={{ r: 3, fill: '#6366f1' }}
+                    dot={{ r: 3, fill: '#B8963E' }}
                   />
                 </AreaChart>
               </ResponsiveContainer>

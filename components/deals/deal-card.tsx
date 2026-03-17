@@ -60,7 +60,7 @@ export function DealCard({ deal, onEdit, onDelete, onOpenPanel }: DealCardProps)
     <div ref={setNodeRef} style={style} className="mb-2">
       <div
         className={cn(
-          'group rounded-xl border border-border bg-card px-3.5 py-3 transition-all duration-150 hover:shadow-md hover:-translate-y-px cursor-pointer',
+          'group rounded-2xl border border-border/60 bg-card px-3.5 py-3 transition-all duration-150 hover:shadow-md hover:-translate-y-px cursor-pointer',
           deal.status === 'won' && 'border-green-200 dark:border-green-800',
           deal.status === 'lost' && 'opacity-60',
         )}

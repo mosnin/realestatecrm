@@ -100,7 +100,7 @@ export default function AIScoringPage() {
     <div className="min-h-svh w-full bg-background text-foreground">
       <Navbar />
       <main className="relative overflow-x-hidden">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[400px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(20,184,166,0.1),transparent_70%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[400px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(194,154,90,0.10),transparent_70%)]" />
 
         {/* Hero */}
         <section className="px-6 pt-36 pb-16">
@@ -114,10 +114,10 @@ export default function AIScoringPage() {
 
             <div className="grid md:grid-cols-2 gap-12 items-center">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary mb-5">
+                <span className="pill-badge mb-5">
                   <Bot size={11} />
                   AI Scoring
-                </div>
+                </span>
                 <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-[1.08]">
                   Know who to call before you pick up the phone.
                 </h1>
@@ -142,7 +142,7 @@ export default function AIScoringPage() {
 
               <AnimatedCard2 className="h-full min-h-[280px]">
                 <CardVisual2>
-                  <Visual2 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                  <Visual2 mainColor="#C29A5A" secondaryColor="#A68244" />
                 </CardVisual2>
                 <CardBody2>
                   <CardTitle2>AI qualification breakdown</CardTitle2>
@@ -191,7 +191,7 @@ export default function AIScoringPage() {
                 </p>
                 <div className="mt-6 rounded-xl border border-border bg-card p-5">
                   <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Example summary</p>
-                  <div className="rounded-lg bg-primary/8 border border-primary/20 p-4">
+                  <div className="rounded-lg bg-primary/10 border border-primary/20 p-4">
                     <p className="text-sm text-foreground leading-relaxed">
                       <span className="font-semibold text-primary">Warm lead.</span> Budget of $2,800 is slightly below the median for Midtown 2BRs. Move-in timeline is firm (Aug 1) which is a strong signal. No pets or parking requirements. Household of 2 adults qualifies. Recommend follow-up this week.
                     </p>
@@ -246,7 +246,7 @@ export default function AIScoringPage() {
                   href={f.href}
                   className="group flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 hover:-translate-y-px transition-transform shadow-[0_1px_4px_rgba(0,0,0,0.05)]"
                 >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/8 text-primary flex-shrink-0 group-hover:bg-primary/15 transition-colors">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0 group-hover:bg-primary/15 transition-colors">
                     <f.icon size={16} />
                   </div>
                   <div>
@@ -263,10 +263,10 @@ export default function AIScoringPage() {
         {/* CTA */}
         <section className="py-24 px-6 border-t border-border">
           <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-4 py-1.5 text-xs font-semibold text-primary mb-6">
+            <span className="pill-badge mb-6">
               <Zap size={12} />
               7-day free trial — no card required
-            </div>
+            </span>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
               Stop guessing which leads to call.
             </h2>

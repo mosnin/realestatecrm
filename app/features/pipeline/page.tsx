@@ -93,7 +93,7 @@ export default function PipelinePage() {
     <div className="min-h-svh w-full bg-background text-foreground">
       <Navbar />
       <main className="relative overflow-x-hidden">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[400px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(20,184,166,0.1),transparent_70%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[400px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(194,154,90,0.10),transparent_70%)]" />
 
         {/* Hero */}
         <section className="px-6 pt-36 pb-16">
@@ -106,10 +106,10 @@ export default function PipelinePage() {
             </Link>
 
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary mb-5">
+              <span className="pill-badge mb-5">
                 <TrendingUp size={11} />
                 Deal Pipeline
-              </div>
+              </span>
               <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-[1.08]">
                 A deal pipeline built for the way leasing works.
               </h1>
@@ -183,7 +183,7 @@ export default function PipelinePage() {
                   key={f.title}
                   className="rounded-xl border border-border bg-card px-5 py-5 shadow-[0_1px_4px_rgba(0,0,0,0.05)]"
                 >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/8 text-primary mb-4">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary mb-4">
                     <f.icon size={16} />
                   </div>
                   <h3 className="font-semibold text-sm mb-2">{f.title}</h3>
@@ -219,7 +219,7 @@ export default function PipelinePage() {
         {/* What you can track */}
         <section className="px-6 py-20 border-t border-border">
           <div className="max-w-5xl mx-auto">
-            <div className="rounded-2xl border border-primary/20 bg-card p-8 md:p-10 shadow-[0_4px_24px_-8px_rgba(13,148,136,0.2)]">
+            <div className="rounded-2xl border border-primary/20 bg-card p-8 md:p-10 shadow-[0_4px_24px_-8px_rgba(194,154,90,0.15)]">
               <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-3">What you can track</p>
               <h2 className="text-2xl font-semibold tracking-tight mb-8">The complete deal picture.</h2>
               <div className="grid sm:grid-cols-2 gap-3">
@@ -257,7 +257,7 @@ export default function PipelinePage() {
                   href={f.href}
                   className="group flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 hover:-translate-y-px transition-transform shadow-[0_1px_4px_rgba(0,0,0,0.05)]"
                 >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/8 text-primary flex-shrink-0 group-hover:bg-primary/15 transition-colors">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0 group-hover:bg-primary/15 transition-colors">
                     <f.icon size={16} />
                   </div>
                   <div>
@@ -274,10 +274,10 @@ export default function PipelinePage() {
         {/* CTA */}
         <section className="py-24 px-6 border-t border-border">
           <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-4 py-1.5 text-xs font-semibold text-primary mb-6">
+            <span className="pill-badge mb-6">
               <Zap size={12} />
               7-day free trial — no card required
-            </div>
+            </span>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
               Run a tighter leasing pipeline.
             </h2>

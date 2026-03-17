@@ -33,7 +33,7 @@ export function Header({ slug, spaceName, title }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <header className="h-14 border-b border-border flex items-center justify-between px-4 md:px-6 bg-card sticky top-0 z-40 shadow-[0_1px_0_0_var(--border)]">
+    <header className="h-14 border-b border-border/60 flex items-center justify-between px-4 md:px-6 bg-card/80 backdrop-blur-xl sticky top-0 z-40">
       <div className="flex items-center gap-3">
         {/* Mobile menu trigger */}
         <Sheet open={open} onOpenChange={setOpen}>
@@ -41,7 +41,7 @@ export function Header({ slug, spaceName, title }: HeaderProps) {
             <MenuToggleIcon open={open} className="size-5 text-muted-foreground" duration={400} />
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
-            <SheetHeader className="px-4 py-5 border-b border-sidebar-border">
+            <SheetHeader className="px-4 py-5 border-b border-sidebar-border/40">
               <SheetTitle className="flex items-center gap-2.5 text-sidebar-foreground">
                 <BrandLogo className="h-5" alt="Chippi" />
                 <span className="text-sm font-semibold">{spaceName}</span>
@@ -63,7 +63,7 @@ export function Header({ slug, spaceName, title }: HeaderProps) {
                     href={href}
                     onClick={() => setOpen(false)}
                     className={cn(
-                      'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                      'group flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200',
                       isActive
                         ? 'bg-primary text-primary-foreground shadow-sm'
                         : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
@@ -75,7 +75,7 @@ export function Header({ slug, spaceName, title }: HeaderProps) {
                 );
               })}
             </nav>
-            <div className="px-3 pb-4 space-y-0.5 border-t border-sidebar-border pt-3">
+            <div className="px-3 pb-4 space-y-0.5 border-t border-sidebar-border/40 pt-3">
               <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
                 Account
               </p>
@@ -88,7 +88,7 @@ export function Header({ slug, spaceName, title }: HeaderProps) {
                     href={href}
                     onClick={() => setOpen(false)}
                     className={cn(
-                      'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                      'group flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200',
                       isActive
                         ? 'bg-primary text-primary-foreground shadow-sm'
                         : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'

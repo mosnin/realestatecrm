@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, Dot } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
 
 interface LinkItem {
@@ -83,7 +83,7 @@ export default function AnimatedFooter({
   return (
     <footer
       ref={footerRef}
-      className="relative flex w-full select-none flex-col justify-between border-t border-border bg-card"
+      className="relative flex w-full select-none flex-col justify-between bg-foreground text-background"
     >
       <div className="mx-auto flex w-full max-w-6xl flex-col justify-between gap-6 px-6 pb-20 pt-10 md:flex-row">
         <div className="space-y-4">
@@ -96,26 +96,23 @@ export default function AnimatedFooter({
                     href={link.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    className="flex items-center gap-1 text-sm text-background/60 transition-colors hover:text-background"
                   >
                     {link.label}
+                    <ArrowUpRight className="size-3" />
                   </a>
                 ) : (
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    className="flex items-center gap-1 text-sm text-background/60 transition-colors hover:text-background"
                   >
                     {link.label}
+                    <ArrowUpRight className="size-3" />
                   </Link>
                 )}
               </li>
             ))}
           </ul>
-
-          <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-            <Dot className="size-3" />
-            {copyrightText}
-          </p>
         </div>
 
         <div className="space-y-4 md:text-right">
@@ -127,14 +124,14 @@ export default function AnimatedFooter({
                     href={link.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    className="text-sm text-background/60 transition-colors hover:text-background"
                   >
                     {link.label}
                   </a>
                 ) : (
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    className="text-sm text-background/60 transition-colors hover:text-background"
                   >
                     {link.label}
                   </Link>
@@ -145,14 +142,20 @@ export default function AnimatedFooter({
 
           <button
             onClick={scrollToTop}
-            className="inline-flex items-center gap-1 text-sm text-foreground transition-opacity hover:opacity-80"
+            className="inline-flex items-center gap-1 text-sm text-background/80 transition-opacity hover:opacity-70"
           >
             Back to top <ArrowUpRight className="size-4" />
           </button>
         </div>
       </div>
 
-      <div aria-hidden="true" style={{ overflow: 'hidden', height: 160 }}>
+      <div className="border-t border-background/10 px-6 py-4">
+        <p className="mx-auto max-w-6xl text-xs text-background/40">
+          {copyrightText}
+        </p>
+      </div>
+
+      <div aria-hidden="true" style={{ overflow: 'hidden', height: 120 }}>
         <div>
           {Array.from({ length: barCount }).map((_, index) => (
             <div
@@ -163,8 +166,8 @@ export default function AnimatedFooter({
               className="wave-segment"
               style={{
                 height: `${index + 1}px`,
-                backgroundColor: 'hsl(var(--foreground))',
-                opacity: 0.85,
+                backgroundColor: 'var(--primary)',
+                opacity: 0.25,
                 transition: 'transform 0.1s ease',
                 willChange: 'transform',
                 marginTop: '-2px'

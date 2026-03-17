@@ -8,7 +8,7 @@ import { Toaster } from 'sonner';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'WorkflowRouting — Close More Real Estate Deals',
+  title: 'Chippi — Close More Real Estate Deals',
   description: 'The CRM built for real estate agents. AI-powered pipeline management, deal tracking, and client workflows that help you close more deals faster.'
 };
 

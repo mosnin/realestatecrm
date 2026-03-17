@@ -274,7 +274,7 @@ export function ContactTable({ slug }: ContactTableProps) {
 
       {/* Pipeline mini bar (card view only, non-empty) */}
       {!loading && contacts.length > 0 && view === 'card' && (
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3">
+        <div className="flex items-center gap-2 rounded-2xl border border-border/60 bg-card px-4 py-3">
           {STAGES.map((stage, i) => {
             const count = stageCounts[stage.key];
             return (
@@ -412,7 +412,7 @@ export function ContactTable({ slug }: ContactTableProps) {
           </Button>
 
           {/* View toggle */}
-          <div className="flex rounded-md border border-border overflow-hidden bg-card">
+          <div className="flex rounded-lg border border-border/60 overflow-hidden bg-card">
             <button
               type="button"
               onClick={() => setView('card')}
@@ -450,7 +450,7 @@ export function ContactTable({ slug }: ContactTableProps) {
       {loading && (
         <div className="grid gap-3 sm:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="rounded-xl border border-border bg-card px-5 py-4 animate-pulse">
+            <div key={i} className="rounded-2xl border border-border/60 bg-card px-5 py-4 animate-pulse">
               <div className="flex gap-3">
                 <div className="w-9 h-9 rounded-full bg-muted flex-shrink-0" />
                 <div className="flex-1 space-y-2 pt-1">
@@ -492,7 +492,7 @@ export function ContactTable({ slug }: ContactTableProps) {
           {STAGES.map((stage) => {
             const stageContacts = visibleContacts.filter((c) => c.type === stage.key);
             if (stageContacts.length === 0 && !search && !tagFilter) return (
-              <div key={stage.key} className={cn('rounded-xl border-2 border-dashed p-4 flex flex-col items-center justify-center min-h-[120px] text-center gap-2', stage.border)}>
+              <div key={stage.key} className={cn('rounded-2xl border-2 border-dashed p-4 flex flex-col items-center justify-center min-h-[120px] text-center gap-2', stage.border)}>
                 <span className={cn('w-2 h-2 rounded-full', stage.dotColor)} />
                 <p className="text-xs font-semibold text-muted-foreground">{stage.label}</p>
                 <p className="text-[11px] text-muted-foreground/60">{stage.description}</p>
@@ -531,7 +531,7 @@ export function ContactTable({ slug }: ContactTableProps) {
 
       {/* ── List view ── */}
       {!loading && visibleContacts.length > 0 && view === 'list' && (
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className="rounded-2xl border border-border/60 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -630,7 +630,7 @@ export function ContactTable({ slug }: ContactTableProps) {
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-border bg-card shadow-lg px-4 py-3">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-2xl border border-border/60 bg-card/80 backdrop-blur-lg shadow-lg px-4 py-3">
           <CheckSquare size={14} className="text-primary" />
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="h-4 w-px bg-border mx-1" />
@@ -720,7 +720,7 @@ function ContactCard({
 }) {
   return (
     <div className={cn(
-      'group rounded-xl border bg-card overflow-hidden transition-all duration-150 hover:shadow-md hover:-translate-y-px',
+      'group rounded-2xl border bg-card overflow-hidden transition-all duration-150 hover:shadow-md hover:-translate-y-px',
       selected ? 'border-primary/40 bg-primary/5' : 'border-border',
     )}>
       <div className="px-4 py-3">

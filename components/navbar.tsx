@@ -98,7 +98,7 @@ export function Navbar() {
           className={cn(
             'mx-auto max-w-7xl rounded-2xl transition-all duration-300 xl:px-0',
             hasScrolled
-              ? 'border-border bg-background/75 border px-2 backdrop-blur-lg'
+              ? 'glass-card px-2'
               : 'px-7 shadow-none'
           )}
         >
@@ -112,7 +112,7 @@ export function Navbar() {
             <div className="flex shrink-0 flex-row items-center gap-1 md:gap-3">
               <div className="flex items-center space-x-2">
                 <Link
-                  className="rainbow-outline-btn hidden h-8 w-fit items-center justify-center rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground md:flex"
+                  className="hidden h-8 w-fit items-center justify-center rounded-full bg-foreground text-background px-4 text-sm font-semibold hover:opacity-90 transition-opacity md:flex"
                   href="/sign-in"
                 >
                   Log in
@@ -120,7 +120,7 @@ export function Navbar() {
               </div>
               <ThemeToggle />
               <button
-                className="border-border flex size-8 cursor-pointer items-center justify-center rounded-md border md:hidden"
+                className="border-border flex size-8 cursor-pointer items-center justify-center rounded-lg border md:hidden"
                 onClick={toggleDrawer}
                 aria-label={isDrawerOpen ? 'Close menu' : 'Open menu'}
               >
@@ -135,7 +135,7 @@ export function Navbar() {
         {isDrawerOpen && (
           <>
             <motion.div
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+              className="fixed inset-0 bg-foreground/30 backdrop-blur-sm"
               initial="hidden"
               animate="visible"
               exit="exit"
@@ -145,7 +145,7 @@ export function Navbar() {
             />
 
             <motion.div
-              className="bg-background border-border fixed inset-x-0 bottom-3 mx-auto w-[95%] rounded-xl border p-4 shadow-lg"
+              className="bg-card border-border fixed inset-x-0 bottom-3 mx-auto w-[95%] rounded-2xl border p-4 shadow-2xl"
               initial="hidden"
               animate="visible"
               exit="exit"
@@ -158,14 +158,14 @@ export function Navbar() {
                   </Link>
                   <button
                     onClick={toggleDrawer}
-                    className="border-border cursor-pointer rounded-md border p-1"
+                    className="border-border cursor-pointer rounded-lg border p-1"
                   >
                     <X className="size-5" />
                   </button>
                 </div>
 
                 <motion.ul
-                  className="border-border mb-4 flex flex-col rounded-md border text-sm"
+                  className="border-border mb-4 flex flex-col rounded-xl border text-sm overflow-hidden"
                   variants={drawerMenuContainerVariants}
                 >
                   <AnimatePresence>
@@ -183,8 +183,8 @@ export function Navbar() {
                                 onClick={() => setFeaturesExpanded((v) => !v)}
                                 className={`flex w-full items-center justify-between p-2.5 transition-colors ${
                                   pathname.startsWith('/features')
-                                    ? 'text-primary font-medium'
-                                    : 'text-primary/60'
+                                    ? 'text-foreground font-medium'
+                                    : 'text-muted-foreground'
                                 }`}
                               >
                                 <span>{item.name}</span>
@@ -210,7 +210,7 @@ export function Navbar() {
                                         onClick={() => setIsDrawerOpen(false)}
                                         className="block px-2.5 py-1.5 text-xs text-primary font-medium hover:opacity-80"
                                       >
-                                        Browse all features →
+                                        Browse all features
                                       </Link>
                                       {drawerFeatureLinks.map((f) => (
                                         <Link
@@ -236,10 +236,10 @@ export function Navbar() {
                             <Link
                               href={item.href}
                               onClick={() => setIsDrawerOpen(false)}
-                              className={`block p-2.5 hover:text-primary/80 underline-offset-4 transition-colors ${
+                              className={`block p-2.5 hover:text-foreground underline-offset-4 transition-colors ${
                                 activeHref === item.href
-                                  ? 'text-primary font-medium'
-                                  : 'text-primary/60'
+                                  ? 'text-foreground font-medium'
+                                  : 'text-muted-foreground'
                               }`}
                             >
                               {item.name}
@@ -254,7 +254,7 @@ export function Navbar() {
                 <div className="flex flex-col gap-2">
                   <Link
                     href="/sign-in"
-                    className="rainbow-outline-btn flex h-8 w-full items-center justify-center rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground transition-all ease-out active:scale-95"
+                    className="flex h-10 w-full items-center justify-center rounded-full bg-foreground text-background px-4 text-sm font-semibold transition-all ease-out active:scale-95"
                   >
                     Log in
                   </Link>

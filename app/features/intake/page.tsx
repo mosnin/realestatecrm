@@ -79,7 +79,7 @@ export default function IntakePage() {
     <div className="min-h-svh w-full bg-background text-foreground">
       <Navbar />
       <main className="relative overflow-x-hidden">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[400px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(20,184,166,0.1),transparent_70%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[400px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(194,154,90,0.10),transparent_70%)]" />
 
         {/* Hero */}
         <section className="px-6 pt-36 pb-16">
@@ -93,10 +93,10 @@ export default function IntakePage() {
 
             <div className="grid md:grid-cols-2 gap-12 items-center">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary mb-5">
+                <span className="pill-badge mb-5">
                   <Link2 size={11} />
                   Intake
-                </div>
+                </span>
                 <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-[1.08]">
                   One link captures every renter inquiry.
                 </h1>
@@ -121,7 +121,7 @@ export default function IntakePage() {
 
               <AnimatedCard3 className="h-full min-h-[280px]">
                 <CardVisual3>
-                  <Visual1 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                  <Visual1 mainColor="#C29A5A" secondaryColor="#A68244" />
                 </CardVisual3>
                 <CardBody3>
                   <CardTitle3>Intake pipeline over time</CardTitle3>
@@ -188,7 +188,7 @@ export default function IntakePage() {
             <div className="rounded-2xl border border-border bg-card p-8 md:p-10 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
               <div className="grid md:grid-cols-3 gap-8">
                 <div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/8 text-primary mb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4">
                     <Share2 size={18} />
                   </div>
                   <h3 className="font-semibold mb-2">Drop it anywhere</h3>
@@ -197,7 +197,7 @@ export default function IntakePage() {
                   </p>
                 </div>
                 <div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/8 text-primary mb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4">
                     <ClipboardList size={18} />
                   </div>
                   <h3 className="font-semibold mb-2">No login for renters</h3>
@@ -206,7 +206,7 @@ export default function IntakePage() {
                   </p>
                 </div>
                 <div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/8 text-primary mb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4">
                     <StickyNote size={18} />
                   </div>
                   <h3 className="font-semibold mb-2">Instant lead records</h3>
@@ -230,7 +230,7 @@ export default function IntakePage() {
                   href={f.href}
                   className="group flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 hover:-translate-y-px transition-transform shadow-[0_1px_4px_rgba(0,0,0,0.05)]"
                 >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/8 text-primary flex-shrink-0 group-hover:bg-primary/15 transition-colors">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0 group-hover:bg-primary/15 transition-colors">
                     <f.icon size={16} />
                   </div>
                   <div>
@@ -247,10 +247,10 @@ export default function IntakePage() {
         {/* CTA */}
         <section className="py-24 px-6 border-t border-border">
           <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-4 py-1.5 text-xs font-semibold text-primary mb-6">
+            <span className="pill-badge mb-6">
               <Zap size={12} />
               7-day free trial — no card required
-            </div>
+            </span>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
               Get your intake link live today.
             </h2>

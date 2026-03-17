@@ -57,11 +57,11 @@ export const LEAD_TIERS = {
   hot: {
     label: 'Hot',
     icon: Flame,
-    ring: 'ring-emerald-400/60',
-    bg: 'bg-emerald-50 dark:bg-emerald-500/10',
-    text: 'text-emerald-700 dark:text-emerald-400',
-    pill: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
-    scoreBg: 'bg-emerald-500',
+    ring: 'ring-red-400/60',
+    bg: 'bg-red-50 dark:bg-red-500/10',
+    text: 'text-red-700 dark:text-red-400',
+    pill: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400',
+    scoreBg: 'bg-red-500',
   },
   warm: {
     label: 'Warm',

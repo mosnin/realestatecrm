@@ -71,8 +71,8 @@ interface Visual2Props {
 }
 
 export function Visual2({
-  mainColor = "#14b8a6",
-  secondaryColor = "#0d9488",
+  mainColor = "#B8963E",
+  secondaryColor = "#D4A843",
   gridColor = "#80808015",
 }: Visual2Props) {
   const [hovered, setHovered] = useState(false);

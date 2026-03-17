@@ -193,7 +193,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
         </div>
         <div className="flex items-center gap-2">
           {/* View toggle */}
-          <div className="flex rounded-md border border-border overflow-hidden bg-card">
+          <div className="flex rounded-lg border border-border/60 overflow-hidden bg-card">
             <button
               type="button"
               onClick={() => setView('kanban')}
@@ -256,7 +256,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
             </div>
             <DragOverlay>
               {activeDeal && (
-                <div className="w-72 rounded-xl border border-primary/30 bg-card px-3.5 py-3 shadow-[0_8px_24px_-8px_rgba(13,148,136,0.35)] opacity-95 rotate-1">
+                <div className="w-72 rounded-2xl border border-primary/30 bg-card px-3.5 py-3 shadow-[0_8px_24px_-8px_rgba(184,150,62,0.35)] opacity-95 rotate-1">
                   <div className="flex items-center gap-2">
                     <GripVertical size={15} className="text-primary/50 flex-shrink-0" />
                     <p className="font-semibold text-sm truncate">{activeDeal.title}</p>
@@ -268,7 +268,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
         </div>
       ) : (
         /* ── List / table view ── */
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className="rounded-2xl border border-border/60 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import {
   ArrowRight,
-  Bot,
   CheckCircle2,
   ClipboardList,
   Gauge,
@@ -50,28 +49,28 @@ const leadFeedItems = [
     description: 'Jordan Reyes · Budget $2,800 · Midtown · Move-in Aug 1',
     time: 'just now',
     icon: '📝',
-    color: '#0d9488',
+    color: '#B8963E',
   },
   {
     name: 'Lead scored: warm',
     description: 'Ava Thompson · Score 68 · Strong timeline match',
     time: '2m ago',
     icon: '📊',
-    color: '#f59e0b',
+    color: '#D4A843',
   },
   {
     name: 'New renter inquiry',
     description: 'Carlos Mendez · 2BR · Pet friendly · Downtown',
     time: '4m ago',
     icon: '🏠',
-    color: '#3b82f6',
+    color: '#C9856A',
   },
   {
     name: 'Priority lead',
     description: 'Nina Patel · Score 82 · Ready to tour this week',
     time: '7m ago',
     icon: '⚡',
-    color: '#ef4444',
+    color: '#C94040',
   },
 ];
 
@@ -153,11 +152,11 @@ function LeadFeedItem({
   time: string;
 }) {
   return (
-    <figure className="mx-auto w-full rounded-2xl border border-border bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.06)] transition-transform duration-200 hover:scale-[1.02]">
+    <figure className="mx-auto w-full rounded-2xl border border-border/60 bg-card p-4 shadow-sm transition-transform duration-200 hover:scale-[1.02]">
       <div className="flex items-center gap-3">
         <div
           className="flex h-10 w-10 items-center justify-center rounded-2xl text-lg"
-          style={{ backgroundColor: color }}
+          style={{ backgroundColor: `${color}18` }}
         >
           <span>{icon}</span>
         </div>
@@ -183,9 +182,6 @@ export default function HomePage() {
     <div className="min-h-svh w-full bg-background text-foreground">
       <Navbar />
       <main className="flex-1 scroll-smooth relative overflow-x-hidden">
-        {/* Radial hero glow */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(20,184,166,0.12),transparent_70%)]" />
-
         {/* Hero */}
         <section id="hero">
           <PulseFitHero
@@ -204,10 +200,10 @@ export default function HomePage() {
                 window.location.href = '/sign-in';
               },
             }}
-            title="Qualify leasing leads without the chaos"
+            title="Get more done. Close more deals."
             subtitle="One intake link. Structured qualification. Practical AI scoring. Follow up faster from one clean workflow."
             primaryAction={{
-              label: 'Start free trial',
+              label: 'GET EARLY ACCESS',
               onClick: () => {
                 onTrack('hero_cta_click', { location: 'hero' });
                 window.location.href = '/sign-up';
@@ -220,7 +216,7 @@ export default function HomePage() {
                 window.location.href = '/features';
               },
             }}
-            disclaimer="*7-day free trial · No credit card required"
+            disclaimer="7-day free trial · No credit card required"
             socialProof={{
               avatars: [
                 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop',
@@ -276,11 +272,11 @@ export default function HomePage() {
         </section>
 
         {/* Live lead flow */}
-        <section className="px-6 py-16 border-t border-border">
+        <section className="px-6 py-20">
           <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1fr_1.1fr] lg:items-center">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-primary">Live workflow signal</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">
+              <span className="pill-badge">Live workflow signal</span>
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
                 See new applications and lead context arrive in real time.
               </h2>
               <p className="mt-4 max-w-lg text-sm leading-relaxed text-muted-foreground md:text-base">
@@ -288,20 +284,20 @@ export default function HomePage() {
               </p>
               <Link
                 href="/features"
-                className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-primary hover:opacity-80 transition-opacity"
+                className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-foreground hover:opacity-70 transition-opacity"
               >
                 See all features <ArrowRight size={14} />
               </Link>
             </div>
 
-            <div className="relative h-[460px] overflow-hidden rounded-2xl border border-border bg-surface/60 p-3">
+            <div className="relative h-[460px] overflow-hidden rounded-3xl border border-border/60 bg-card/80 backdrop-blur-sm p-3">
               <div className="lead-feed-scroll space-y-3">
                 {animatedLeadFeed.map((item, idx) => (
                   <LeadFeedItem key={`${item.name}-${idx}`} {...item} />
                 ))}
               </div>
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-background to-transparent" />
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background to-transparent" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-card to-transparent" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-card to-transparent" />
             </div>
           </div>
         </section>
@@ -310,18 +306,18 @@ export default function HomePage() {
         <Stats />
 
         {/* Features bento grid */}
-        <section className="py-20 px-6 border-t border-border">
+        <section className="py-20 px-6">
           <div className="max-w-5xl mx-auto">
             <div className="flex items-end justify-between gap-4 flex-wrap mb-10">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-primary">Everything you need</p>
-                <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+                <span className="pill-badge">Everything you need</span>
+                <h2 className="mt-4 text-3xl font-semibold tracking-tight">
                   A complete leasing lead system.
                 </h2>
               </div>
               <Link
                 href="/features"
-                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:opacity-80 transition-opacity"
+                className="inline-flex items-center gap-2 text-sm font-medium text-foreground hover:opacity-70 transition-opacity"
               >
                 View all features <ArrowRight size={14} />
               </Link>
@@ -331,9 +327,9 @@ export default function HomePage() {
               {featureHighlights.map((feature) => (
                 <div
                   key={feature.title}
-                  className="rounded-xl border border-border bg-card px-6 py-6 shadow-[0_1px_4px_rgba(0,0,0,0.05)] hover:-translate-y-px transition-transform"
+                  className="rounded-2xl border border-border/60 bg-card px-6 py-6 shadow-sm hover:-translate-y-px transition-transform"
                 >
-                  <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary/8 text-primary">
+                  <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-accent text-primary">
                     <feature.icon size={20} />
                   </div>
                   <h3 className="mt-4 font-semibold">{feature.title}</h3>
@@ -345,21 +341,21 @@ export default function HomePage() {
         </section>
 
         {/* How it works */}
-        <section className="py-20 px-6 border-t border-border">
+        <section className="py-20 px-6">
           <div className="max-w-5xl mx-auto">
             <div className="flex items-end justify-between gap-4 flex-wrap mb-10">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-primary">How it works</p>
-                <h2 className="mt-3 text-3xl font-semibold tracking-tight">From inquiry to action in four steps.</h2>
+                <span className="pill-badge">How it works</span>
+                <h2 className="mt-4 text-3xl font-semibold tracking-tight">From inquiry to action in four steps.</h2>
               </div>
             </div>
             <div className="grid md:grid-cols-4 gap-4">
               {howItWorks.map((item) => (
                 <div
                   key={item.step}
-                  className="rounded-xl border border-border bg-card px-5 py-5 hover:-translate-y-px transition-transform shadow-[0_1px_4px_rgba(0,0,0,0.05)]"
+                  className="rounded-2xl border border-border/60 bg-card px-5 py-5 hover:-translate-y-px transition-transform shadow-sm"
                 >
-                  <p className="text-2xl font-bold text-primary/20 tabular-nums">{item.step}</p>
+                  <p className="text-2xl font-bold text-primary/25 tabular-nums">{item.step}</p>
                   <p className="mt-3 font-semibold text-sm leading-snug">{item.title}</p>
                   <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{item.body}</p>
                 </div>
@@ -369,17 +365,17 @@ export default function HomePage() {
         </section>
 
         {/* Animated feature cards */}
-        <section className="py-20 px-6 border-t border-border">
+        <section className="py-20 px-6">
           <div className="max-w-5xl mx-auto">
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary">Product depth</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight mb-8">Built for clear intake and clear action.</h2>
+            <span className="pill-badge">Product depth</span>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight mb-8">Built for clear intake and clear action.</h2>
 
             {/* Pipeline card */}
-            <div className="rounded-xl border border-border bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] overflow-hidden mb-4">
+            <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden mb-4">
               <div className="grid md:grid-cols-2">
-                <AnimatedCard3 className="rounded-none border-0 border-r border-border shadow-none">
+                <AnimatedCard3 className="rounded-none border-0 border-r border-border/60 shadow-none">
                   <CardVisual3>
-                    <Visual1 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                    <Visual1 mainColor="#B8963E" secondaryColor="#D4A843" />
                   </CardVisual3>
                   <CardBody3>
                     <CardTitle3>Intake pipeline over time</CardTitle3>
@@ -387,9 +383,7 @@ export default function HomePage() {
                   </CardBody3>
                 </AnimatedCard3>
                 <div className="flex flex-col justify-center px-6 py-8 md:px-8">
-                  <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary w-fit">
-                    Pipeline
-                  </div>
+                  <span className="pill-badge w-fit">Pipeline</span>
                   <h3 className="mt-4 text-xl font-semibold tracking-tight">One link captures every inquiry, automatically</h3>
                   <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
                     Share a single intake link in your bio, listing replies, or email signature. Every renter fills out the same structured form so your pipeline stays clean and consistent.
@@ -411,12 +405,10 @@ export default function HomePage() {
             </div>
 
             {/* AI Scoring card */}
-            <div className="rounded-xl border border-border bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] overflow-hidden mb-4">
+            <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden mb-4">
               <div className="grid md:grid-cols-2">
                 <div className="flex flex-col justify-center px-6 py-8 md:px-8">
-                  <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary w-fit">
-                    AI Scoring
-                  </div>
+                  <span className="pill-badge w-fit">AI Scoring</span>
                   <h3 className="mt-4 text-xl font-semibold tracking-tight">Know who to call before you pick up the phone</h3>
                   <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
                     Every submission is scored across budget fit, move-in timeline, neighborhood match, and household criteria — so you always have context before reaching out.
@@ -434,9 +426,9 @@ export default function HomePage() {
                     ))}
                   </ul>
                 </div>
-                <AnimatedCard2 className="rounded-none border-0 border-l border-border shadow-none">
+                <AnimatedCard2 className="rounded-none border-0 border-l border-border/60 shadow-none">
                   <CardVisual2>
-                    <Visual2 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                    <Visual2 mainColor="#B8963E" secondaryColor="#D4A843" />
                   </CardVisual2>
                   <CardBody2>
                     <CardTitle2>AI qualification breakdown</CardTitle2>
@@ -447,11 +439,11 @@ export default function HomePage() {
             </div>
 
             {/* Analytics card */}
-            <div className="rounded-xl border border-border bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
               <div className="grid md:grid-cols-2">
-                <AnimatedCard className="rounded-none border-0 border-r border-border shadow-none">
+                <AnimatedCard className="rounded-none border-0 border-r border-border/60 shadow-none">
                   <CardVisual>
-                    <Visual3 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                    <Visual3 mainColor="#B8963E" secondaryColor="#D4A843" />
                   </CardVisual>
                   <CardBody>
                     <CardTitle>Lead performance at a glance</CardTitle>
@@ -459,9 +451,7 @@ export default function HomePage() {
                   </CardBody>
                 </AnimatedCard>
                 <div className="flex flex-col justify-center px-6 py-8 md:px-8">
-                  <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary w-fit">
-                    Analytics
-                  </div>
+                  <span className="pill-badge w-fit">Analytics</span>
                   <h3 className="mt-4 text-xl font-semibold tracking-tight">See exactly where your pipeline stands</h3>
                   <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
                     Track qualification rates, lead velocity, and conversion performance in one view — no spreadsheet juggling required.
@@ -486,7 +476,7 @@ export default function HomePage() {
               <Link
                 href="/features"
                 onClick={() => onTrack('features_cta_click', { location: 'proof_section' })}
-                className="inline-flex items-center gap-2 border border-border bg-card px-6 py-3 rounded-full text-sm font-medium hover:bg-muted transition-colors"
+                className="inline-flex items-center gap-2 border border-border/60 bg-card px-6 py-3 rounded-full text-sm font-medium hover:bg-accent transition-colors"
               >
                 Explore all features <ArrowRight size={14} />
               </Link>
@@ -495,13 +485,13 @@ export default function HomePage() {
         </section>
 
         {/* Pricing teaser */}
-        <section className="py-20 px-6 border-t border-border">
+        <section className="py-20 px-6">
           <div className="max-w-5xl mx-auto">
-            <div className="rounded-2xl border border-primary/20 bg-card shadow-[0_4px_24px_-8px_rgba(13,148,136,0.25)] overflow-hidden">
+            <div className="rounded-3xl border border-primary/20 bg-card shadow-lg overflow-hidden animated-gradient-card">
               <div className="grid md:grid-cols-2">
-                <div className="px-8 py-10 md:px-10 border-b md:border-b-0 md:border-r border-border">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-primary">Pricing</p>
-                  <h2 className="mt-3 text-3xl font-semibold tracking-tight">One simple plan, everything included.</h2>
+                <div className="px-8 py-10 md:px-10 border-b md:border-b-0 md:border-r border-border/40">
+                  <span className="pill-badge">Pricing</span>
+                  <h2 className="mt-4 text-3xl font-semibold tracking-tight">One simple plan, everything included.</h2>
                   <div className="mt-6 flex items-end gap-1">
                     <span className="text-5xl font-bold tracking-tight">$97</span>
                     <span className="text-muted-foreground text-lg mb-1">/ mo</span>
@@ -511,7 +501,7 @@ export default function HomePage() {
                     <Link
                       href="/sign-up"
                       onClick={() => onTrack('pricing_cta_click', { location: 'home_teaser' })}
-                      className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-full text-sm font-semibold hover:opacity-90 transition-opacity"
+                      className="inline-flex items-center gap-2 bg-foreground text-background px-6 py-2.5 rounded-full text-sm font-semibold hover:opacity-90 transition-opacity"
                     >
                       Start free trial <Sparkles size={14} />
                     </Link>
@@ -549,13 +539,13 @@ export default function HomePage() {
         </section>
 
         {/* Closing CTA */}
-        <section className="py-24 px-6 border-t border-border">
+        <section className="py-24 px-6">
           <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-4 py-1.5 text-xs font-semibold text-primary mb-6">
+            <span className="pill-badge">
               <Zap size={12} />
               7-day free trial — no card required
-            </div>
-            <h2 className="text-3xl md:text-5xl font-bold tracking-tight leading-tight">
+            </span>
+            <h2 className="mt-6 text-3xl md:text-5xl font-bold tracking-tight leading-tight">
               One link.<br className="hidden md:block" /> Clear leads. Fast action.
             </h2>
             <p className="mt-5 text-muted-foreground text-lg">
@@ -565,7 +555,7 @@ export default function HomePage() {
               <Link
                 href="/sign-up"
                 onClick={() => onTrack('footer_cta_click', { location: 'close_cta' })}
-                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-full font-semibold hover:opacity-90 transition-opacity shadow-sm"
+                className="inline-flex items-center gap-2 bg-foreground text-background px-8 py-3.5 rounded-full font-semibold hover:opacity-90 transition-opacity shadow-sm"
               >
                 Start free trial <ArrowRight size={16} />
               </Link>

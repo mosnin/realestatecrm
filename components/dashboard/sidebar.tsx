@@ -29,18 +29,18 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
   return (
     <aside className="hidden md:flex flex-col w-60 h-full bg-sidebar border-r border-sidebar-border shrink-0">
 
-      {/* ── Brand ── */}
+      {/* Brand */}
       <div className="px-5 pt-5 pb-4 flex items-center">
         <BrandLogo className="h-4" alt="Chippi" />
       </div>
 
-      {/* ── Workspace card ── */}
+      {/* Workspace card */}
       <div className="px-3 pb-3">
         <Link
           href={`${base}/settings`}
-          className="group flex items-center gap-3 rounded-xl px-3 py-2.5 bg-sidebar-accent/60 hover:bg-sidebar-accent border border-sidebar-border/60 transition-colors"
+          className="group flex items-center gap-3 rounded-2xl px-3 py-2.5 bg-accent/50 hover:bg-accent border border-border/40 transition-all duration-200"
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center text-lg flex-shrink-0 shadow-inner">
+          <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-lg flex-shrink-0">
             {spaceEmoji}
           </div>
           <div className="flex-1 min-w-0">
@@ -56,11 +56,11 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
         </Link>
       </div>
 
-      <div className="mx-4 border-t border-sidebar-border/50 mb-1" />
+      <div className="mx-4 border-t border-sidebar-border/40 mb-1" />
 
-      {/* ── Primary nav ── */}
+      {/* Primary nav */}
       <nav className="flex-1 px-3 pt-2 pb-2 space-y-0.5 overflow-y-auto">
-        <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/45">
+        <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
           Workspace
         </p>
         {primaryNavItems.map((item) => {
@@ -72,10 +72,10 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
               key={item.href}
               href={href}
               className={cn(
-                'group flex items-center gap-2.5 py-[7px] pr-3 rounded-lg text-sm font-medium transition-all duration-150 border-l-[3px] pl-[9px]',
+                'group flex items-center gap-2.5 py-[7px] pr-3 rounded-xl text-sm font-medium transition-all duration-200 pl-3',
                 isActive
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  ? 'bg-primary/10 text-primary shadow-sm'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               )}
             >
               <item.icon
@@ -87,7 +87,6 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
               />
               <span className="flex items-center gap-1.5 flex-1 min-w-0">
                 <span className="truncate">{item.label}</span>
-                {/* Unread leads badge */}
                 {item.href === '/leads' && unreadLeadCount > 0 && (
                   <span
                     className={cn(
@@ -100,9 +99,8 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
                     {unreadLeadCount > 99 ? '99+' : unreadLeadCount}
                   </span>
                 )}
-                {/* AI badge */}
                 {item.href === '/ai' && (
-                  <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold rounded-full px-1.5 py-0.5 bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400 flex-shrink-0 leading-none">
+                  <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold rounded-full px-1.5 py-0.5 bg-primary/10 text-primary flex-shrink-0 leading-none">
                     <Sparkles size={8} />
                     AI
                   </span>
@@ -113,16 +111,15 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
         })}
       </nav>
 
-      {/* ── Secondary nav ── */}
-      <div className="px-3 pb-2 border-t border-sidebar-border/50 pt-3 space-y-0.5">
-        <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/45">
+      {/* Secondary nav */}
+      <div className="px-3 pb-2 border-t border-sidebar-border/40 pt-3 space-y-0.5">
+        <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
           Account
         </p>
-        {/* Broker link */}
         {isBroker && (
           <Link
             href="/broker"
-            className="group flex items-center gap-2.5 py-[7px] pr-3 rounded-lg text-sm font-medium border-l-[3px] border-transparent pl-[9px] transition-all duration-150 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            className="group flex items-center gap-2.5 py-[7px] pr-3 rounded-xl text-sm font-medium pl-3 transition-all duration-200 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
             <Building2 size={15} className="flex-shrink-0 opacity-45 group-hover:opacity-75 transition-opacity" />
             Brokerage
@@ -136,10 +133,10 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
               key={item.href}
               href={href}
               className={cn(
-                'group flex items-center gap-2.5 py-[7px] pr-3 rounded-lg text-sm font-medium transition-all duration-150 border-l-[3px] pl-[9px]',
+                'group flex items-center gap-2.5 py-[7px] pr-3 rounded-xl text-sm font-medium transition-all duration-200 pl-3',
                 isActive
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  ? 'bg-primary/10 text-primary shadow-sm'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               )}
             >
               <item.icon
@@ -155,17 +152,17 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
         })}
       </div>
 
-      {/* ── User card ── */}
-      <div className="px-3 pb-4 pt-2 border-t border-sidebar-border/50">
+      {/* User card */}
+      <div className="px-3 pb-4 pt-2 border-t border-sidebar-border/40">
         <Link
           href={`${base}/profile`}
-          className="group flex items-center gap-2.5 rounded-xl px-3 py-2.5 hover:bg-sidebar-accent transition-colors"
+          className="group flex items-center gap-2.5 rounded-2xl px-3 py-2.5 hover:bg-sidebar-accent transition-colors"
         >
           {user?.imageUrl ? (
             <img
               src={user.imageUrl}
               alt={displayName}
-              className="w-8 h-8 rounded-full flex-shrink-0 object-cover ring-2 ring-sidebar-border"
+              className="w-8 h-8 rounded-full flex-shrink-0 object-cover ring-2 ring-sidebar-border/60"
             />
           ) : (
             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0">

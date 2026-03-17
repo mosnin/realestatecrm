@@ -143,7 +143,7 @@ export default async function DashboardPage({
         ].map(({ label, value, sub, icon: Icon, accent }) => (
           <Card
             key={label}
-            className={accent ? 'border-primary/30 bg-primary/5' : ''}
+            className={accent ? 'border-primary/25 bg-primary/5' : ''}
           >
             <CardContent className="px-4 py-4">
               <div className="flex items-start justify-between gap-2">
@@ -169,7 +169,7 @@ export default async function DashboardPage({
       <Card>
         <CardContent className="px-5 py-5">
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
               <Link2 size={14} className="text-primary" />
             </div>
             <div>
@@ -185,7 +185,7 @@ export default async function DashboardPage({
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2.5 break-all font-mono text-muted-foreground border border-border">
+            <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2.5 break-all font-mono text-muted-foreground border border-border/60">
               {intakeUrl}
             </code>
             <div className="flex gap-2 flex-shrink-0">
@@ -194,7 +194,7 @@ export default async function DashboardPage({
                 href={intakeUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-border/60 bg-card hover:bg-muted transition-colors"
               >
                 <ExternalLink size={13} />
                 Preview
@@ -223,7 +223,7 @@ export default async function DashboardPage({
           {recentLeads.length === 0 ? (
             <Card>
               <CardContent className="px-5 py-8 text-center">
-                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
+                <div className="w-10 h-10 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-3">
                   <PhoneIncoming size={18} className="text-muted-foreground" />
                 </div>
                 <p className="text-sm font-medium text-muted-foreground">No applications yet</p>
@@ -243,7 +243,7 @@ export default async function DashboardPage({
                   null;
                 return (
                   <Link key={lead.id} href={`/s/${slug}/leads`}>
-                    <div className={`rounded-xl border bg-card px-4 py-3 hover:shadow-sm transition-all duration-150 ${isNew ? 'border-primary/30' : 'border-border'}`}>
+                    <div className={`rounded-2xl border bg-card px-4 py-3 hover:shadow-sm transition-all duration-150 ${isNew ? 'border-primary/25' : 'border-border/60'}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 min-w-0">
                           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0 mt-0.5">
@@ -332,7 +332,7 @@ export default async function DashboardPage({
                       </span>
                     </div>
                   ))}
-                  <div className="border-t border-border pt-2 flex items-center justify-between">
+                  <div className="border-t border-border/60 pt-2 flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Total pipeline</span>
                     <span className="text-sm font-semibold tabular-nums">{formatCurrency(totalValue)}</span>
                   </div>

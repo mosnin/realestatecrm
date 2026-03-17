@@ -140,15 +140,15 @@ export default function FeaturesPage() {
       <Navbar />
       <main className="relative overflow-x-hidden">
         {/* Hero glow */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[400px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(20,184,166,0.1),transparent_70%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[400px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(194,154,90,0.10),transparent_70%)]" />
 
         {/* Page hero */}
         <section className="px-6 pt-36 pb-20 text-center">
           <div className="mx-auto max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-4 py-1.5 text-xs font-semibold text-primary mb-6">
+            <span className="pill-badge mb-6">
               <Sparkles size={12} />
               Built for solo realtors
-            </div>
+            </span>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
               Everything you need to run your leasing workflow.
             </h1>
@@ -202,7 +202,7 @@ export default function FeaturesPage() {
                       <>
                         <AnimatedCard3 className="rounded-none border-0 border-r border-border shadow-none">
                           <CardVisual3>
-                            <Visual1 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                            <Visual1 mainColor="#C29A5A" secondaryColor="#A68244" />
                           </CardVisual3>
                           <CardBody3>
                             <CardTitle3>Intake pipeline over time</CardTitle3>
@@ -210,9 +210,9 @@ export default function FeaturesPage() {
                           </CardBody3>
                         </AnimatedCard3>
                         <div className="flex flex-col justify-center px-6 py-8 md:px-8">
-                          <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary w-fit mb-4">
+                          <span className="pill-badge w-fit mb-4">
                             {section.tag}
-                          </div>
+                          </span>
                           <h2 className="text-2xl font-semibold tracking-tight">{section.title}</h2>
                           <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{section.description}</p>
                           <ul className="mt-5 space-y-2.5">
@@ -229,9 +229,9 @@ export default function FeaturesPage() {
                     {section.visual === 'diagram' && (
                       <>
                         <div className="flex flex-col justify-center px-6 py-8 md:px-8">
-                          <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary w-fit mb-4">
+                          <span className="pill-badge w-fit mb-4">
                             {section.tag}
-                          </div>
+                          </span>
                           <h2 className="text-2xl font-semibold tracking-tight">{section.title}</h2>
                           <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{section.description}</p>
                           <ul className="mt-5 space-y-2.5">
@@ -245,7 +245,7 @@ export default function FeaturesPage() {
                         </div>
                         <AnimatedCard2 className="rounded-none border-0 border-l border-border shadow-none">
                           <CardVisual2>
-                            <Visual2 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                            <Visual2 mainColor="#C29A5A" secondaryColor="#A68244" />
                           </CardVisual2>
                           <CardBody2>
                             <CardTitle2>AI qualification breakdown</CardTitle2>
@@ -258,7 +258,7 @@ export default function FeaturesPage() {
                       <>
                         <AnimatedCard className="rounded-none border-0 border-r border-border shadow-none">
                           <CardVisual>
-                            <Visual3 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                            <Visual3 mainColor="#C29A5A" secondaryColor="#A68244" />
                           </CardVisual>
                           <CardBody>
                             <CardTitle>Lead performance at a glance</CardTitle>
@@ -266,9 +266,9 @@ export default function FeaturesPage() {
                           </CardBody>
                         </AnimatedCard>
                         <div className="flex flex-col justify-center px-6 py-8 md:px-8">
-                          <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary w-fit mb-4">
+                          <span className="pill-badge w-fit mb-4">
                             {section.tag}
-                          </div>
+                          </span>
                           <h2 className="text-2xl font-semibold tracking-tight">{section.title}</h2>
                           <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{section.description}</p>
                           <ul className="mt-5 space-y-2.5">
@@ -287,9 +287,9 @@ export default function FeaturesPage() {
               ) : (
                 /* Text-only feature sections */
                 <div className="rounded-2xl border border-border bg-card p-8 md:p-10 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-                  <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary w-fit mb-4">
+                  <span className="pill-badge w-fit mb-4">
                     {section.tag}
-                  </div>
+                  </span>
                   <h2 className="text-2xl font-semibold tracking-tight">{section.title}</h2>
                   <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-2xl">{section.description}</p>
                   <div className="mt-8 grid sm:grid-cols-2 gap-3">
@@ -312,10 +312,10 @@ export default function FeaturesPage() {
         {/* CTA */}
         <section className="py-24 px-6 border-t border-border">
           <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-4 py-1.5 text-xs font-semibold text-primary mb-6">
+            <span className="pill-badge mb-6">
               <Zap size={12} />
               7-day free trial — no card required
-            </div>
+            </span>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight leading-tight">
               Ready to run a cleaner leasing workflow?
             </h2>

@@ -172,7 +172,7 @@ export function NavMenu() {
                         onClick={() => setIsMegaOpen(false)}
                         className="group flex items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-muted transition-colors"
                       >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/8 text-primary flex-shrink-0 group-hover:bg-primary/15 transition-colors">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0 group-hover:bg-primary/15 transition-colors">
                           <f.icon size={15} />
                         </div>
                         <div className="min-w-0">

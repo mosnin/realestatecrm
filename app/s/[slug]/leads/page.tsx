@@ -98,7 +98,7 @@ export default async function LeadsPage({
 
       {/* Tier summary bar */}
       {leads.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
             {leads.length} {leads.length === 1 ? 'application' : 'applications'}
           </span>
