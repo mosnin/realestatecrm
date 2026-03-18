@@ -1,6 +1,17 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
+const CSP_DIRECTIVES = [
+  "default-src 'self'",
+  "script-src 'self' https://challenges.cloudflare.com",
+  "connect-src 'self'",
+  "img-src 'self' https://img.clerk.com",
+  "style-src 'self' 'unsafe-inline'",
+  "frame-src https://challenges.cloudflare.com",
+  "worker-src 'self' blob:",
+  "font-src 'self'",
+].join('; ');
+
 const isProtectedRoute = createRouteMatcher([
   '/dashboard(.*)',
   '/s/(.*)',
@@ -42,7 +53,9 @@ export default clerkMiddleware(async (auth, request) => {
     }
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  response.headers.set('Content-Security-Policy', CSP_DIRECTIVES);
+  return response;
 });
 
 export const config = {

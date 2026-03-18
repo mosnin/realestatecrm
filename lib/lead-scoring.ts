@@ -11,7 +11,7 @@ export type LeadScoringResult = {
 };
 
 // ── Zod schema for the structured AI response ──
-const scoreDetailsSchema = z.object({
+export const scoreDetailsSchema = z.object({
   score: z.number(),
   priorityTier: z.enum(['hot', 'warm', 'cold', 'unqualified']),
   qualificationStatus: z.string(),
@@ -150,7 +150,7 @@ function buildScoringPrompt(input: {
   return lines.join('\n');
 }
 
-function tierToLabel(tier: string): 'hot' | 'warm' | 'cold' | 'unscored' {
+export function tierToLabel(tier: string): 'hot' | 'warm' | 'cold' | 'unscored' {
   if (tier === 'hot') return 'hot';
   if (tier === 'warm') return 'warm';
   if (tier === 'cold' || tier === 'unqualified') return 'cold';

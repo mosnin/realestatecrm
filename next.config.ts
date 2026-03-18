@@ -21,10 +21,9 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
   // Force HTTPS for 2 years (only active when served over TLS)
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
-  // CSP intentionally omitted — Clerk's hosted component requires a large and
-  // environment-specific allowlist (clerk.com, lcl.dev, Cloudflare Turnstile, etc.)
-  // that must be validated against the live deployment before being enforced.
-  // Add a CSP once the full domain list is confirmed via browser console testing.
+  // CSP is enforced via middleware.ts (Content-Security-Policy header).
+  // It is set there rather than here so Clerk's origin needs can be
+  // handled dynamically per-request if needed in the future.
 ];
 
 const nextConfig: NextConfig = {

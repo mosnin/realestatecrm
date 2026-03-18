@@ -1,7 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { redis } from '@/lib/redis';
 import { getSpaceForUser } from '@/lib/space';
 import { audit } from '@/lib/audit';
 
@@ -68,14 +67,6 @@ export async function PATCH(req: NextRequest) {
     .select();
   if (settingsError) throw settingsError;
 
-  // Update Redis emoji
-  const existing = await redis.get<any>(`slug:${slug}`).catch(() => null);
-  if (existing) {
-    await redis
-      .set(`slug:${slug}`, { ...existing, emoji })
-      .catch(() => null);
-  }
-
   void audit({ actorClerkId: userId, action: 'UPDATE', resource: 'Space', resourceId: space.id, spaceId: space.id, req });
 
   return NextResponse.json(updatedRows![0]);
@@ -100,8 +91,6 @@ export async function DELETE(req: NextRequest) {
   if (!userSpace || space.id !== userSpace.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
-
-  await redis.del(`slug:${slug}`).catch(() => null);
 
   // Audit BEFORE delete so we still have the spaceId in the log
   void audit({

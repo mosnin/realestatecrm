@@ -27,7 +27,7 @@ System map for Chippi. Based on actual repository contents.
 | AI - assistant | OpenAI (preferred) + Anthropic SDK (`@anthropic-ai/sdk@^0.78.0`) fallback | `gpt-4o-mini` / `claude-sonnet-4-6` |
 | AI - embeddings | OpenAI `text-embedding-3-small` | 1536-dim vectors |
 | Vector DB | Supabase pgvector (`DocumentEmbedding` table) | Per-space rows, HNSW index, COSINE metric via `match_documents` RPC |
-| Cache/legacy | Upstash Redis (`@upstash/redis@^1.34.9`) | Slug metadata, admin path |
+| Cache | Upstash Redis (`@upstash/redis@^1.34.9`) | Rate limiting, idempotency (public apply) |
 | Forms | react-hook-form + zod validation | |
 | Charts | recharts | |
 | Drag/drop | @dnd-kit | Deals kanban board |
@@ -64,7 +64,6 @@ realestatecrm/
 │   │   ├── leads/              # Intake leads list
 │   │   ├── profile/            # User profile
 │   │   └── settings/           # Workspace settings
-│   ├── actions.ts              # Server actions (legacy space creation/deletion)
 │   ├── layout.tsx              # Root layout (Clerk provider, theme, fonts)
 │   └── page.tsx                # Landing page
 ├── components/
@@ -80,7 +79,6 @@ realestatecrm/
 │   ├── nav-links.ts            # Landing page nav config
 │   ├── redis.ts                # Upstash Redis client
 │   ├── space.ts                # Space lookup helpers
-│   ├── slugs.ts                # Legacy slug helpers (Redis-based)
 │   ├── supabase.ts             # Supabase client singleton (service-role)
 │   ├── types.ts                # TypeScript model types (replaces Prisma generated)
 │   ├── utils.ts                # cn(), protocol, rootDomain
@@ -116,7 +114,6 @@ realestatecrm/
 | Data model | `supabase/schema.sql` | User, Space, SpaceSetting, Contact, Deal, DealStage, DealContact, Message, DocumentEmbedding |
 | Dashboard gate | `app/dashboard/page.tsx` | Redirects to workspace if onboarding complete, or to `/onboarding` |
 | Admin (legacy) | `app/admin/*` | Redis-based admin dashboard, legacy path |
-| Server actions (legacy) | `app/actions.ts` | `createSlugAction`, `deleteSlugAction` — older space creation path using Redis |
 
 ---
 
@@ -239,12 +236,12 @@ Completion sets `onboardingCurrentStep = 7` and `onboardingCompletedAt = now()`.
 
 ## 12. Known risks, coupling points, unclear areas
 
-1. **Legacy Redis path**: `app/actions.ts` and `lib/slugs.ts` use Upstash Redis for slug metadata. The admin dashboard also relies on Redis. Potential for state divergence with Supabase as source of truth.
+1. **Redis usage**: Redis is used only for rate limiting and idempotency locks (public apply endpoint, broker routes). Supabase is the sole source of truth for all persistent data.
 2. **Build error suppression**: TypeScript and ESLint errors are ignored during build. Type and lint issues can accumulate silently.
 3. **Billing not implemented**: Field and UI exist but no payment processing. Enabling billing will require Stripe integration and careful boundary work.
 4. **Tenant isolation**: API routes check auth and all vector queries are scoped by `spaceId`, but workspace ownership verification in other routes varies. Sensitive area for security review.
 5. **Onboarding auto-heal**: Both `/dashboard` and `/s/[slug]/layout.tsx` contain onboarding completion auto-heal logic for legacy accounts. Duplicated logic.
-6. **Two space creation paths**: `app/api/onboarding/route.ts` (create_space action) and `app/actions.ts` (createSlugAction) both create spaces with different default stage names.
+6. **Single space creation path**: Spaces are created exclusively through `app/api/onboarding/route.ts` (create_space action).
 7. **Vector dependency optional**: pgvector/embeddings failures are silently caught — assistant works without RAG. But scoring requires OpenAI.
 8. **pgvector setup**: The `vector` extension and `DocumentEmbedding` table must be created in Supabase before vector sync works. Run the additions in `supabase/schema.sql` via the Supabase SQL Editor.
 
