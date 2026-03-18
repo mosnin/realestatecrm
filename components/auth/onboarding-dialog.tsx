@@ -57,10 +57,14 @@ export function OnboardingFlow() {
         if (!res.ok) { setLoading(false); return; }
         const data = await res.json();
 
-        if (!data.space?.slug) {
-          setShow(true);
-        } else {
+        if (data.completed && data.space?.slug) {
+          // Already onboarded — skip straight to workspace
           router.push(`/s/${data.space.slug}`);
+        } else if (data.space?.slug) {
+          // Has space but onboarding not marked complete — still redirect
+          router.push(`/s/${data.space.slug}`);
+        } else {
+          setShow(true);
         }
       } catch {
         // Silent

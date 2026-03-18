@@ -54,36 +54,36 @@
   --radius: 0.75rem;
   --card-radius: 1rem;
 
-  /* Layered surface system: cream bg, pastel yellow surface, white cards */
-  --background: #fffbeb;
-  --surface: #fef3c7;
-  --foreground: #1c1917;
+  /* White, charcoal & pastel-orange palette */
+  --background: #ffffff;
+  --surface: #f7f7f8;
+  --foreground: #2b2b2b;
 
   --card: #ffffff;
-  --card-foreground: #1c1917;
+  --card-foreground: #2b2b2b;
 
   --popover: #ffffff;
-  --popover-foreground: #1c1917;
+  --popover-foreground: #2b2b2b;
 
-  --primary: #b45309;
+  --primary: #ff964f;
   --primary-foreground: #ffffff;
 
-  --secondary: #fef3c7;
-  --secondary-foreground: #78350f;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #2b2b2b;
 
-  --muted: #fef9c3;
-  --muted-foreground: #78716c;
+  --muted: #f5f5f5;
+  --muted-foreground: #6b6b6b;
 
-  --accent: #fffbeb;
-  --accent-foreground: #b45309;
+  --accent: #fff4eb;
+  --accent-foreground: #d4702a;
 
   --destructive: #dc2626;
 
-  --border: #fde68a;
-  --input: #fde68a;
-  --ring: #b45309;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #ff964f;
 
-  --chart-1: #d97706;
+  --chart-1: #ff964f;
   --chart-2: #3b82f6;
   --chart-3: #f59e0b;
   --chart-4: #dc2626;
@@ -94,13 +94,13 @@
   --lead-cold: #3b82f6;
 
   --sidebar: #ffffff;
-  --sidebar-foreground: #1c1917;
-  --sidebar-primary: #b45309;
+  --sidebar-foreground: #2b2b2b;
+  --sidebar-primary: #ff964f;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #fef3c7;
-  --sidebar-accent-foreground: #1c1917;
-  --sidebar-border: #fde68a;
-  --sidebar-ring: #b45309;
+  --sidebar-accent: #fff4eb;
+  --sidebar-accent-foreground: #2b2b2b;
+  --sidebar-border: #e5e5e5;
+  --sidebar-ring: #ff964f;
 }
 
 .dark {
@@ -291,8 +291,8 @@
   color: #1c1917 !important;
 }
 .cl-formFieldInput:focus {
-  border-color: #b45309 !important;
-  box-shadow: 0 0 0 2px rgba(180, 83, 9, 0.15) !important;
+  border-color: #ff964f !important;
+  box-shadow: 0 0 0 2px rgba(255, 150, 79, 0.15) !important;
 }
 .cl-formButtonPrimary {
   background: #1c1917 !important;
