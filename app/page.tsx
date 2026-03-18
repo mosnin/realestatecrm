@@ -1,33 +1,26 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
-import { ArrowRight, ArrowUpRight, Sparkles, Check } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Sparkles, Check, Link2, Gauge, Users, TrendingUp, BarChart3, MessageSquareMore } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { track } from '@vercel/analytics';
 import { Navbar } from '@/components/navbar';
 import { BrandLogo } from '@/components/brand-logo';
+import { ScoreRing } from '@/components/landing/score-ring';
+import { PipelineDiagram } from '@/components/landing/pipeline-diagram';
+import { IntakeFlow } from '@/components/landing/intake-flow';
+import { ActivityFeed } from '@/components/landing/activity-feed';
 
 function onTrack(name: string, props?: Record<string, string>) {
   track(name, props);
 }
 
-const fadeUp = (delay = 0) => ({
-  initial: { opacity: 0, y: 30 },
+const fade = (delay = 0) => ({
+  initial: { opacity: 0, y: 24 },
   whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: '-80px' },
+  viewport: { once: true, margin: '-60px' },
   transition: { duration: 0.6, delay, ease: [0.22, 1, 0.36, 1] },
 });
-
-/* Real product screenshots */
-const screenshots = {
-  intake: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhGMcGZtyL4M4bkN4ih0093zMY_rTFuC96zzFIKtfwmOWquEs3Sk-XRKpCOBGtRQ-B0Hs7Rxh5oIU2jDmnzroGPjanrMOnCJMUh-mvhVo4q41zDaWyJ2YAbRdZ5QvOb87XQCWPwWoseCUovKM4wfWAv8xMB0vJrHwEThu7hixCGPrl8Cp3wR4FlOaLqOg7J/s1600/image%20(9).webp',
-  scoring: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjvxm32eiKeYuMWzVrE8ceLPgtIYxarpuF7MEQ0x7GLvXHv0R3Imatn_HB7Dp0JKBmSj-OZV1Dh7YaLICwsJcvf0NGepCD8P57GplS_D6LvtH55equqXGab5FlQ3OeEREih8cJhxk3m6CM44jJWuqJaR4RaNA9KoNhyphenhyphen-kTPOFgTO3GUz3Vob52fX_yeXwKg/s1600/image%20(18).webp',
-  crm: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhngTR2PdwGNsbqWfcYeys1VueaJnXPMxAP_HddEbm9_0hovwbXHtcpvYFKTm6O5XyVkQA7CzwrprZnhw801GuxYa3rU00L-fvptf4Fz_RTVNClMkUtonP-02eE53c4qcX88_xux8oHXnTjh0RIDJ-6m1y6UOrxFxYhwDW0bZpaeePK-IA3pFFXWvrUIU8s/s1600/image%20(14).webp',
-  workflow: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhiZ1tFXPwDXluFGeBqEXACxplP1iQ_81eRUVIUZNQerUihAeSWaTbqR1NzLPIcSqzwY8Vx3UWSMzn81oISmradd83ibWnDpKcf3m0ucXTOqy1Nf5QrXQGMQ5oxDQye-GMbYA_egtdzlGCO7ZlbMg2Go0qwi0BPcZHpH7MS9Cd4XQfY8cNueudPbwD_wtyz/s1600/image%20(16).webp',
-  followup: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgLwJ0YL6WhcH21NDvTvwXf5QzFLnC9EswU6WJxsSkJIF-OwI0AmQOSJKdK7glFSkhj9EKVvYLnoioJYcV4Zk8pOTWiz5tnzjtokZbsg0NNLndICQYwkpC3YxNumbpb4lihz_TX1wPalludzUsnYUlVsbMlpewT7dGbidTVxejO_eOxy68KODvFyK0scsoA/s1600/image%20(19).webp',
-  qualification: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjD2O0IZ0h1I9vgmeVaPXnzI_jW-QQ5F2btwiicMK3w6VOFalshOQf1fMcTcp_JoZxLgBSldtUuuzgtiX5wtgUiveo61ZhHTbTXOh4QvdWt2hh26xU_TNtGNShy50mFfd_9dOrVz3Nb4mZ80Wme1dn9piIUfmAZSoBhHLeNxTouqIlTDeudwAdhOxQACp2R/s1600/image%20(20).webp',
-};
 
 export default function HomePage() {
   return (
@@ -36,58 +29,62 @@ export default function HomePage() {
 
       <main className="overflow-x-hidden">
 
-        {/* ──────────────── 1. HERO ──────────────── */}
-        <section className="section-dark relative min-h-[100svh] flex flex-col justify-center overflow-hidden">
-          <div className="hero-glow" style={{ width: 700, height: 700, left: '50%', top: '45%', transform: 'translate(-50%, -50%)' }} />
+        {/* ── HERO ──────────────────────────────────────────── */}
+        <section className="relative min-h-[100svh] flex flex-col justify-center overflow-hidden">
+          {/* Animated gradient bg (theme-aware: light + dark variants in CSS) */}
+          <div className="absolute inset-0 animated-gradient-warm" />
+          <div className="gradient-orb gradient-orb-1" />
+          <div className="gradient-orb gradient-orb-2" />
 
-          <div className="relative z-10 mx-auto w-full max-w-5xl px-6 md:px-12">
+          <div className="relative z-10 mx-auto w-full max-w-5xl px-6 md:px-12 pt-28 md:pt-0">
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
+              transition={{ duration: 0.5, delay: 0.15 }}
             >
-              <span className="pill-badge">Leasing CRM for modern realtors</span>
+              <span className="pill-badge">The leasing CRM for modern realtors</span>
             </motion.div>
 
             <motion.h1
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.9, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-              className="mt-6 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05]"
+              transition={{ duration: 0.9, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              className="mt-6 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.08]"
             >
-              Your pipeline,{' '}
-              <span className="gradient-text">finally</span>
-              <br className="hidden sm:block" />
-              under control.
+              Capture leads.
+              <br />
+              Score instantly.
+              <br />
+              Close faster.
             </motion.h1>
 
             <motion.p
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.55 }}
-              className="mt-6 text-base md:text-lg text-muted-foreground max-w-lg leading-relaxed"
+              transition={{ duration: 0.6, delay: 0.5 }}
+              className="mt-6 text-base md:text-lg text-muted-foreground max-w-md leading-relaxed"
             >
-              One intake link. AI lead scoring. A command center that keeps every
-              deal moving — so you close faster with less busywork.
+              One intake link. AI-powered lead scoring. A pipeline that
+              keeps every deal moving — from first inquiry to signed lease.
             </motion.p>
 
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.75 }}
-              className="mt-10 flex flex-col sm:flex-row items-start gap-3"
+              transition={{ duration: 0.5, delay: 0.7 }}
+              className="mt-8 flex flex-col sm:flex-row items-start gap-3"
             >
               <Link
                 href="/sign-up"
                 onClick={() => onTrack('hero_cta_click', { location: 'hero' })}
-                className="group inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+                className="group inline-flex items-center gap-2 px-6 py-3 rounded-full bg-foreground text-background text-sm font-semibold hover:opacity-90 transition-opacity"
               >
-                Get early access
+                Start free trial
                 <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
               </Link>
               <Link
                 href="/features"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 transition-colors"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-border text-sm font-medium text-foreground hover:bg-card/60 transition-colors"
               >
                 See how it works
               </Link>
@@ -96,8 +93,8 @@ export default function HomePage() {
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.4, delay: 0.95 }}
-              className="mt-4 text-xs text-muted-foreground/60 tracking-wide"
+              transition={{ duration: 0.4, delay: 0.9 }}
+              className="mt-4 text-xs text-muted-foreground/70 tracking-wide"
             >
               7-day free trial &middot; No credit card required
             </motion.p>
@@ -105,154 +102,174 @@ export default function HomePage() {
         </section>
 
 
-        {/* ──────────────── 2. PRODUCT ──────────────── */}
+        {/* ── FEATURE 1: INTAKE ──────────────────────────── */}
         <section className="bg-background px-6 md:px-12 py-24 md:py-36">
           <div className="mx-auto max-w-5xl">
-            <motion.div {...fadeUp()} className="text-center mb-14">
-              <span className="pill-badge">The product</span>
-              <h2 className="mt-5 text-3xl md:text-4xl font-bold tracking-tight">
-                See the whole picture. Act on what matters.
+            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+              <motion.div {...fade()}>
+                <span className="pill-badge">Smart Intake</span>
+                <h2 className="mt-5 text-3xl md:text-4xl font-bold tracking-tight leading-tight">
+                  One link replaces the chaos.
+                </h2>
+                <p className="mt-4 text-muted-foreground leading-relaxed">
+                  Share a single intake link in your bio, listing replies, or email
+                  signature. Every renter fills out the same structured form — budget,
+                  timeline, household details — so your pipeline starts clean.
+                </p>
+                <ul className="mt-6 space-y-2.5">
+                  {[
+                    'Captures budget, move-in date, and area preferences',
+                    'Replaces DM threads, emails, and scattered notes',
+                    'Professional experience your renters will trust',
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                      <Check size={15} className="text-primary mt-0.5 shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+
+              <motion.div {...fade(0.1)}>
+                <IntakeFlow />
+              </motion.div>
+            </div>
+          </div>
+        </section>
+
+
+        {/* ── FEATURE 2: AI SCORING ──────────────────────── */}
+        <section className="bg-surface px-6 md:px-12 py-24 md:py-36">
+          <div className="mx-auto max-w-5xl">
+            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+              {/* Visuals first on desktop */}
+              <motion.div {...fade()} className="order-2 lg:order-1 grid sm:grid-cols-2 gap-4">
+                <ScoreRing
+                  score={92}
+                  label="Jordan Reyes"
+                  tier="Hot"
+                  signals={[
+                    { label: 'Budget fit', value: 95 },
+                    { label: 'Timeline', value: 90 },
+                    { label: 'Area match', value: 88 },
+                  ]}
+                />
+                <ScoreRing
+                  score={64}
+                  label="Ava Thompson"
+                  tier="Warm"
+                  signals={[
+                    { label: 'Budget fit', value: 72 },
+                    { label: 'Timeline', value: 60 },
+                    { label: 'Area match', value: 55 },
+                  ]}
+                />
+              </motion.div>
+
+              <motion.div {...fade(0.1)} className="order-1 lg:order-2">
+                <span className="pill-badge">AI Lead Scoring</span>
+                <h2 className="mt-5 text-3xl md:text-4xl font-bold tracking-tight leading-tight">
+                  Know exactly who to call first.
+                </h2>
+                <p className="mt-4 text-muted-foreground leading-relaxed">
+                  Every submission is scored across budget fit, move-in timeline, and
+                  qualification signals. You get clear priorities with context — not
+                  just a number.
+                </p>
+                <ul className="mt-6 space-y-2.5">
+                  {[
+                    'Multi-signal scoring on every intake submission',
+                    'Context attached so you know why — not just the score',
+                    'Instant prioritization across your entire pipeline',
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                      <Check size={15} className="text-primary mt-0.5 shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            </div>
+          </div>
+        </section>
+
+
+        {/* ── FEATURE 3: PIPELINE + ACTIVITY ──────────────── */}
+        <section className="bg-background px-6 md:px-12 py-24 md:py-36">
+          <div className="mx-auto max-w-5xl">
+            <motion.div {...fade()} className="text-center max-w-2xl mx-auto mb-14">
+              <span className="pill-badge">Command Center</span>
+              <h2 className="mt-5 text-3xl md:text-4xl font-bold tracking-tight leading-tight">
+                Your entire workflow, one screen.
               </h2>
-              <p className="mt-4 text-muted-foreground max-w-md mx-auto">
-                From renter inquiry to signed lease — structured, scored, and tracked in one place.
+              <p className="mt-4 text-muted-foreground">
+                Track every lead from inquiry to lease. See pipeline health,
+                live activity, and next actions — no spreadsheet juggling.
               </p>
             </motion.div>
 
-            {/* Large hero screenshot */}
-            <motion.div
-              {...fadeUp(0.1)}
-              className="rounded-2xl overflow-hidden border border-border bg-card card-elevated"
-            >
-              <img
-                src={screenshots.workflow}
-                alt="Chippi command center — full pipeline view"
-                className="w-full h-auto"
-              />
-            </motion.div>
-
-            {/* Two supporting screenshots */}
-            <div className="grid md:grid-cols-2 gap-4 mt-4">
-              <motion.div
-                {...fadeUp(0.15)}
-                className="rounded-2xl overflow-hidden border border-border bg-card card-elevated"
-              >
-                <img
-                  src={screenshots.scoring}
-                  alt="AI lead scoring view"
-                  className="w-full h-auto"
-                />
+            <div className="grid md:grid-cols-2 gap-4">
+              <motion.div {...fade(0.05)}>
+                <PipelineDiagram />
               </motion.div>
-              <motion.div
-                {...fadeUp(0.2)}
-                className="rounded-2xl overflow-hidden border border-border bg-card card-elevated"
-              >
-                <img
-                  src={screenshots.crm}
-                  alt="Contact CRM view"
-                  className="w-full h-auto"
-                />
+              <motion.div {...fade(0.12)}>
+                <ActivityFeed />
               </motion.div>
             </div>
           </div>
         </section>
 
 
-        {/* ──────────────── 3. FEATURES ──────────────── */}
-        <section className="bg-background px-6 md:px-12 pb-24 md:pb-36">
+        {/* ── FEATURE GRID ────────────────────────────────── */}
+        <section className="bg-surface px-6 md:px-12 py-24 md:py-36">
           <div className="mx-auto max-w-5xl">
-            <motion.div {...fadeUp()} className="mb-14">
-              <span className="pill-badge">Features</span>
+            <motion.div {...fade()} className="mb-12">
+              <span className="pill-badge">Everything you need</span>
               <h2 className="mt-5 text-3xl md:text-4xl font-bold tracking-tight">
-                Three tools. One workflow.
+                Built for the full leasing workflow.
               </h2>
             </motion.div>
 
-            <div className="space-y-20">
-              {/* Feature 1: Intake */}
-              <motion.div {...fadeUp()} className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-                <div>
-                  <h3 className="text-2xl md:text-3xl font-bold tracking-tight leading-snug">
-                    One link captures every inquiry.
-                  </h3>
-                  <p className="mt-4 text-muted-foreground leading-relaxed">
-                    Share a single intake link in your bio, listing replies, or email signature.
-                    Every renter fills out the same structured form — budget, timeline, household
-                    details — so your pipeline starts clean and consistent.
-                  </p>
-                  <Link
-                    href="/features/intake"
-                    className="inline-flex items-center gap-1.5 mt-6 text-sm font-semibold text-primary hover:opacity-80 transition-opacity"
-                  >
-                    Learn more <ArrowRight size={14} />
-                  </Link>
-                </div>
-                <div className="rounded-2xl overflow-hidden border border-border bg-card card-elevated">
-                  <img src={screenshots.intake} alt="Intake link flow" className="w-full h-auto" />
-                </div>
-              </motion.div>
-
-              {/* Feature 2: AI Scoring */}
-              <motion.div {...fadeUp()} className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-                <div className="order-2 lg:order-1 rounded-2xl overflow-hidden border border-border bg-card card-elevated">
-                  <img src={screenshots.qualification} alt="AI qualification breakdown" className="w-full h-auto" />
-                </div>
-                <div className="order-1 lg:order-2">
-                  <h3 className="text-2xl md:text-3xl font-bold tracking-tight leading-snug">
-                    Know who to call first.
-                  </h3>
-                  <p className="mt-4 text-muted-foreground leading-relaxed">
-                    Every submission is scored across budget fit, move-in timeline, and qualification
-                    signals. You get clear priorities and context — not just a number.
-                  </p>
-                  <Link
-                    href="/features/ai-scoring"
-                    className="inline-flex items-center gap-1.5 mt-6 text-sm font-semibold text-primary hover:opacity-80 transition-opacity"
-                  >
-                    Learn more <ArrowRight size={14} />
-                  </Link>
-                </div>
-              </motion.div>
-
-              {/* Feature 3: Follow-up */}
-              <motion.div {...fadeUp()} className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-                <div>
-                  <h3 className="text-2xl md:text-3xl font-bold tracking-tight leading-snug">
-                    Follow up from one place.
-                  </h3>
-                  <p className="mt-4 text-muted-foreground leading-relaxed">
-                    Status, notes, contacts, and next steps — all in a single command center.
-                    No more bouncing between DMs, spreadsheets, and sticky notes.
-                  </p>
-                  <Link
-                    href="/features/pipeline"
-                    className="inline-flex items-center gap-1.5 mt-6 text-sm font-semibold text-primary hover:opacity-80 transition-opacity"
-                  >
-                    Learn more <ArrowRight size={14} />
-                  </Link>
-                </div>
-                <div className="rounded-2xl overflow-hidden border border-border bg-card card-elevated">
-                  <img src={screenshots.followup} alt="Follow-up command center" className="w-full h-auto" />
-                </div>
-              </motion.div>
+            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {[
+                { icon: Link2, title: 'One intake link', desc: 'A single clean link for every listing. Share it anywhere — renter data flows in structured.' },
+                { icon: Gauge, title: 'AI lead scoring', desc: 'Budget, timeline, and area match scored automatically. Context attached so you know why.' },
+                { icon: MessageSquareMore, title: 'Faster follow-up', desc: 'Review qualified leads in one view. Status, notes, and next actions — no scattered threads.' },
+                { icon: Users, title: 'Contact CRM', desc: 'Full profiles with activity logs, email history, deal tracking, and follow-up scheduling.' },
+                { icon: TrendingUp, title: 'Deal pipeline', desc: 'Visual pipeline from new lead to signed lease. Stages update as leads progress.' },
+                { icon: BarChart3, title: 'Analytics', desc: 'Qualification rates, lead velocity, and conversion trends in one dashboard.' },
+              ].map((feature, i) => (
+                <motion.div
+                  key={feature.title}
+                  {...fade(i * 0.05)}
+                  className="rounded-2xl border border-border bg-card p-6 hover:shadow-sm transition-shadow"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+                    <feature.icon size={18} className="text-primary" />
+                  </div>
+                  <h3 className="text-sm font-bold text-foreground">{feature.title}</h3>
+                  <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{feature.desc}</p>
+                </motion.div>
+              ))}
             </div>
           </div>
         </section>
 
 
-        {/* ──────────────── 4. STATS ──────────────── */}
-        <section className="section-dark py-20 md:py-28">
-          <div className="mx-auto max-w-4xl px-6 md:px-12">
-            <motion.div {...fadeUp()} className="grid grid-cols-3 gap-6 md:gap-12 text-center">
+        {/* ── STATS ───────────────────────────────────────── */}
+        <section className="bg-background px-6 md:px-12 py-20 md:py-28 border-y border-border">
+          <div className="mx-auto max-w-4xl">
+            <motion.div {...fade()} className="grid grid-cols-3 gap-6 md:gap-12 text-center">
               {[
-                { value: '< 2 min', label: 'to score a new lead' },
-                { value: '92%', label: 'faster follow-up' },
-                { value: '3x', label: 'more qualified conversations' },
+                { value: '< 2 min', label: 'To score a new lead' },
+                { value: '92%', label: 'Faster follow-up' },
+                { value: '3x', label: 'More qualified conversations' },
               ].map((stat, i) => (
-                <motion.div key={stat.label} {...fadeUp(i * 0.08)}>
-                  <p className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-primary">
+                <motion.div key={stat.label} {...fade(i * 0.06)}>
+                  <p className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-primary">
                     {stat.value}
                   </p>
-                  <p className="mt-2 text-xs md:text-sm text-muted-foreground leading-relaxed">
+                  <p className="mt-1.5 text-xs md:text-sm text-muted-foreground">
                     {stat.label}
                   </p>
                 </motion.div>
@@ -262,10 +279,10 @@ export default function HomePage() {
         </section>
 
 
-        {/* ──────────────── 5. PRICING ──────────────── */}
+        {/* ── PRICING ─────────────────────────────────────── */}
         <section className="bg-background px-6 md:px-12 py-24 md:py-36">
           <div className="mx-auto max-w-3xl">
-            <motion.div {...fadeUp()} className="text-center mb-12">
+            <motion.div {...fade()} className="text-center mb-12">
               <span className="pill-badge">Pricing</span>
               <h2 className="mt-5 text-3xl md:text-4xl font-bold tracking-tight">
                 One plan. Everything included.
@@ -273,11 +290,10 @@ export default function HomePage() {
             </motion.div>
 
             <motion.div
-              {...fadeUp(0.1)}
+              {...fade(0.08)}
               className="rounded-2xl border border-border bg-card card-elevated overflow-hidden"
             >
               <div className="grid md:grid-cols-2">
-                {/* Price */}
                 <div className="p-8 md:p-10 border-b md:border-b-0 md:border-r border-border">
                   <div className="flex items-end gap-1">
                     <span className="text-5xl font-black tracking-tight">$97</span>
@@ -297,12 +313,11 @@ export default function HomePage() {
                       href="/pricing"
                       className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-border text-sm font-medium hover:bg-accent transition-colors"
                     >
-                      See details <ArrowRight size={14} />
+                      Full pricing details <ArrowRight size={14} />
                     </Link>
                   </div>
                 </div>
 
-                {/* Features list */}
                 <div className="p-8 md:p-10">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-5">Includes</p>
                   <div className="space-y-3">
@@ -329,39 +344,38 @@ export default function HomePage() {
         </section>
 
 
-        {/* ──────────────── 6. CLOSING CTA ──────────────── */}
-        <section className="section-dark relative overflow-hidden">
-          <div className="hero-glow" style={{ width: 600, height: 600, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }} />
+        {/* ── CLOSING CTA ─────────────────────────────────── */}
+        <section className="relative overflow-hidden">
+          <div className="absolute inset-0 animated-gradient-warm" />
+          <div className="gradient-orb gradient-orb-2" />
 
           <div className="relative z-10 mx-auto max-w-3xl px-6 md:px-12 py-28 md:py-40 text-center">
             <motion.h2
-              {...fadeUp()}
-              className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight leading-[1.05]"
+              {...fade()}
+              className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight leading-tight"
             >
-              Close more deals.
-              <br />
-              Start today.
+              Your pipeline deserves better than a spreadsheet.
             </motion.h2>
             <motion.p
-              {...fadeUp(0.08)}
+              {...fade(0.06)}
               className="mt-5 text-muted-foreground max-w-sm mx-auto"
             >
-              Join the realtors who stopped juggling tools and started closing.
+              Start your free trial and feel the difference in your first week.
             </motion.p>
             <motion.div
-              {...fadeUp(0.16)}
+              {...fade(0.12)}
               className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3"
             >
               <Link
                 href="/sign-up"
                 onClick={() => onTrack('footer_cta_click', { location: 'close_cta' })}
-                className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+                className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-foreground text-background text-sm font-semibold hover:opacity-90 transition-opacity"
               >
                 Get early access <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
               </Link>
               <Link
                 href="/features"
-                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full border border-border text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full border border-border text-sm font-medium hover:bg-card/60 transition-colors"
               >
                 View features
               </Link>
@@ -370,12 +384,12 @@ export default function HomePage() {
         </section>
 
 
-        {/* ──────────────── 7. FOOTER ──────────────── */}
-        <footer className="section-dark border-t border-border">
+        {/* ── FOOTER ──────────────────────────────────────── */}
+        <footer className="bg-card border-t border-border">
           <div className="mx-auto max-w-5xl px-6 md:px-12">
             <div className="py-12 md:py-16 flex flex-col md:flex-row justify-between gap-8">
               <div>
-                <BrandLogo className="h-8" alt="Chippi" />
+                <BrandLogo className="h-7" alt="Chippi" />
                 <p className="mt-3 text-sm text-muted-foreground max-w-xs">
                   Leasing workflow clarity for modern realtors.
                 </p>
@@ -400,7 +414,7 @@ export default function HomePage() {
             </div>
 
             <div className="border-t border-border py-5 flex flex-col sm:flex-row justify-between gap-3">
-              <p className="text-xs text-muted-foreground/50">
+              <p className="text-xs text-muted-foreground/60">
                 &copy; {new Date().getFullYear()} Chippi. All rights reserved.
               </p>
               <div className="flex gap-5">
@@ -412,7 +426,7 @@ export default function HomePage() {
                   <Link
                     key={link.label}
                     href={link.href}
-                    className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                    className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
                   >
                     {link.label}
                   </Link>

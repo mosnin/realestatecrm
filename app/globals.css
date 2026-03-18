@@ -447,47 +447,6 @@
   animation: gradient-shift-slow 8s ease infinite;
 }
 
-/* ── Dark section — overrides theme vars so Tailwind classes just work ── */
-.section-dark {
-  --background: #0C0A09;
-  --foreground: #F2EAE1;
-  --card: #141210;
-  --card-foreground: #F2EAE1;
-  --muted: #1E1C1A;
-  --muted-foreground: #8A7E70;
-  --border: #1E1C1A;
-  --accent: #1E1C1A;
-  --accent-foreground: #D4B87A;
-  --primary: #D4B87A;
-  --primary-foreground: #0C0A09;
-  background-color: #0C0A09;
-  color: #F2EAE1;
-}
-
-/* Pill badge auto-adapts inside section-dark */
-.section-dark .pill-badge {
-  background: rgba(212, 184, 122, 0.12);
-  color: #D4B87A;
-}
-
-/* ── Hero ambient glow — used sparingly, hero only ── */
-@keyframes hero-glow {
-  0%, 100% { opacity: 0.25; }
-  50% { opacity: 0.45; }
-}
-
-.hero-glow {
-  position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(184, 150, 62, 0.12), transparent 70%);
-  filter: blur(100px);
-  animation: hero-glow 10s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.dark .hero-glow {
-  background: radial-gradient(circle, rgba(212, 184, 122, 0.08), transparent 70%);
-}
 
 /* ── Elevated card ── */
 .card-elevated {
