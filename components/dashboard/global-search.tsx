@@ -40,6 +40,7 @@ export function GlobalSearch({ slug }: Props) {
   const [contacts, setContacts] = useState<ContactResult[]>([]);
   const [deals, setDeals] = useState<DealResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [cursor, setCursor] = useState(0);
   const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -69,21 +70,30 @@ export function GlobalSearch({ slug }: Props) {
       setQuery('');
       setContacts([]);
       setDeals([]);
+      setError(null);
       setCursor(0);
     }
   }, [open]);
 
   const search = useCallback(async (q: string) => {
-    if (q.trim().length < 2) { setContacts([]); setDeals([]); return; }
+    if (q.trim().length < 2) { setContacts([]); setDeals([]); setError(null); return; }
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/search?slug=${slug}&q=${encodeURIComponent(q)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setContacts(data.contacts ?? []);
-        setDeals(data.deals ?? []);
-        setCursor(0);
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.error('[GlobalSearch] API error:', res.status, text);
+        setError(`Search failed (${res.status})`);
+        return;
       }
+      const data = await res.json();
+      setContacts(data.contacts ?? []);
+      setDeals(data.deals ?? []);
+      setCursor(0);
+    } catch (err) {
+      console.error('[GlobalSearch] fetch error:', err);
+      setError('Search unavailable');
     } finally {
       setLoading(false);
     }
@@ -142,10 +152,13 @@ export function GlobalSearch({ slug }: Props) {
           {loading && (
             <p className="text-center text-xs text-muted-foreground py-6">Searching…</p>
           )}
-          {!loading && query.length >= 2 && allResults.length === 0 && (
+          {!loading && error && (
+            <p className="text-center text-xs text-destructive py-6">{error}</p>
+          )}
+          {!loading && !error && query.length >= 2 && allResults.length === 0 && (
             <p className="text-center text-xs text-muted-foreground py-6">No results for &ldquo;{query}&rdquo;</p>
           )}
-          {!loading && query.length < 2 && (
+          {!loading && !error && query.length < 2 && (
             <p className="text-center text-xs text-muted-foreground py-6">Type at least 2 characters</p>
           )}
 

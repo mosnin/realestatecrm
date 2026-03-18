@@ -13,49 +13,61 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const term = `%${q}%`;
+  // Escape PostgreSQL ILIKE special characters before wrapping in wildcards
+  const escaped = q.slice(0, 100).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+  const term = `%${escaped}%`;
 
-  const [contactsResult, dealsResult] = await Promise.all([
-    supabase
-      .from('Contact')
-      .select('id, name, email, phone, type, leadScore, scoreLabel')
-      .eq('spaceId', space.id)
-      .or(`name.ilike.${term},email.ilike.${term},phone.ilike.${term}`)
-      .limit(8),
-    supabase
-      .from('Deal')
-      .select('id, title, address, value, status, stageId, DealStage(name, color)')
-      .eq('spaceId', space.id)
-      .or(`title.ilike.${term},address.ilike.${term}`)
-      .limit(8),
-  ]);
+  try {
+    const [contactsResult, dealsResult] = await Promise.all([
+      supabase
+        .from('Contact')
+        .select('id, name, email, phone, type, leadScore, scoreLabel')
+        .eq('spaceId', space.id)
+        .or(`name.ilike.${term},email.ilike.${term},phone.ilike.${term}`)
+        .limit(8),
+      supabase
+        .from('Deal')
+        .select('id, title, address, value, status, stageId, DealStage(name, color)')
+        .eq('spaceId', space.id)
+        .or(`title.ilike.${term},address.ilike.${term}`)
+        .limit(8),
+    ]);
 
-  if (contactsResult.error) throw contactsResult.error;
-  if (dealsResult.error) throw dealsResult.error;
+    if (contactsResult.error) {
+      console.error('[search] contacts query error:', contactsResult.error);
+      return NextResponse.json({ contacts: [], deals: [], error: 'Contact search failed' }, { status: 200 });
+    }
+    if (dealsResult.error) {
+      console.error('[search] deals query error:', dealsResult.error);
+      return NextResponse.json({ contacts: [], deals: [], error: 'Deal search failed' }, { status: 200 });
+    }
 
-  const contacts = (contactsResult.data ?? []).map((c: any) => ({
-    id: c.id,
-    name: c.name,
-    email: c.email ?? null,
-    phone: c.phone ?? null,
-    type: c.type,
-    leadScore: c.leadScore ?? null,
-    scoreLabel: c.scoreLabel ?? null,
-  }));
+    const contacts = (contactsResult.data ?? []).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      email: c.email ?? null,
+      phone: c.phone ?? null,
+      type: c.type,
+      leadScore: c.leadScore ?? null,
+      scoreLabel: c.scoreLabel ?? null,
+    }));
 
-  const deals = (dealsResult.data ?? []).map((d: any) => {
-    // DealStage may come back as a single object or array depending on Supabase FK config
-    const rawStage = d.DealStage;
-    const stage = Array.isArray(rawStage) ? rawStage[0] ?? null : rawStage ?? null;
-    return {
-      id: d.id,
-      title: d.title,
-      address: d.address ?? null,
-      value: d.value ?? null,
-      status: d.status ?? 'active',
-      stage: stage ? { name: stage.name, color: stage.color } : null,
-    };
-  });
+    const deals = (dealsResult.data ?? []).map((d: any) => {
+      const rawStage = d.DealStage;
+      const stage = Array.isArray(rawStage) ? rawStage[0] ?? null : rawStage ?? null;
+      return {
+        id: d.id,
+        title: d.title,
+        address: d.address ?? null,
+        value: d.value ?? null,
+        status: d.status ?? 'active',
+        stage: stage ? { name: stage.name, color: stage.color } : null,
+      };
+    });
 
-  return NextResponse.json({ contacts, deals });
+    return NextResponse.json({ contacts, deals });
+  } catch (err) {
+    console.error('[search] unexpected error:', err);
+    return NextResponse.json({ contacts: [], deals: [], error: 'Search failed' }, { status: 500 });
+  }
 }
