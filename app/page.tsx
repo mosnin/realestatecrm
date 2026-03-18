@@ -184,6 +184,43 @@ export default function HomePage() {
       {/* Hero (includes its own header/nav) */}
       <HeroSection />
 
+      {/* Metrics strip */}
+      <section className="w-full bg-surface py-20 px-6">
+        <div className="mx-auto max-w-5xl">
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
+            {[
+              {
+                stat: '< 5 min',
+                label: 'Time to go live',
+                body: 'From sign-up to a shareable intake link — no setup calls, no configuration headaches.',
+              },
+              {
+                stat: '3×',
+                label: 'Faster lead triage',
+                body: 'Stop piecing together DMs and notes. One workflow replaces the scattered back-and-forth.',
+              },
+              {
+                stat: '100%',
+                label: 'Of submissions scored',
+                body: 'Every renter application is automatically prioritized with context before you even open it.',
+              },
+            ].map(({ stat, label, body }) => (
+              <div key={label} className="flex flex-col items-center text-center px-8 py-10 sm:py-0 first:pt-0 last:pb-0 sm:first:pt-0 sm:last:pb-0">
+                <span className="text-6xl md:text-7xl font-bold text-primary tracking-tight" style={{ fontFamily: '"Times New Roman MT", "Times New Roman", Times, serif' }}>
+                  {stat}
+                </span>
+                <p className="mt-3 text-sm font-semibold text-foreground uppercase tracking-widest">
+                  {label}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground leading-relaxed max-w-[220px]">
+                  {body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Product demo video */}
       <section className="px-6 pb-20 pt-4">
         <div className="mx-auto max-w-5xl">
