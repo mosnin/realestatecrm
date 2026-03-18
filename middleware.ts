@@ -25,10 +25,16 @@ const isAdminRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
+  const session = await auth();
+
+  // Redirect authenticated users away from auth pages to dashboard
+  if (isPublicRoute(request) && session.userId) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
+
   if (isProtectedRoute(request) && !isPublicRoute(request)) {
-    const session = await auth();
     if (!session.userId) {
-      const signInUrl = new URL('/sign-in', request.url);
+      const signInUrl = new URL('/', request.url);
       signInUrl.searchParams.set('redirect_url', request.url);
       return NextResponse.redirect(signInUrl);
     }
@@ -37,7 +43,7 @@ export default clerkMiddleware(async (auth, request) => {
     if (isAdminRoute(request)) {
       const metadata = (session.sessionClaims?.publicMetadata ?? {}) as Record<string, unknown>;
       if (metadata.role !== 'admin') {
-        return NextResponse.redirect(new URL('/', request.url));
+        return NextResponse.redirect(new URL('/dashboard', request.url));
       }
     }
   }
