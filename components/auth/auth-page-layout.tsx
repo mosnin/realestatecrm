@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { BrandLogo } from '@/components/brand-logo';
+import { AnimatedGrid } from '@/components/ui/animated-grid';
 import Link from 'next/link';
 
 interface AuthPageLayoutProps {
@@ -60,40 +61,23 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
       {/* ── Right decorative panel ── */}
       <div className="hidden lg:block lg:flex-1 p-3 pl-0">
         <div className="relative h-full w-full overflow-hidden rounded-2xl">
-          {/* Gradient background */}
-          <div
-            aria-hidden
-            className="absolute inset-0 bg-gradient-to-br from-amber-600 via-orange-500 to-yellow-400"
-          />
-
-          {/* Abstract wave pattern overlay */}
-          <svg
-            aria-hidden
-            className="absolute inset-0 h-full w-full opacity-30"
-            viewBox="0 0 800 800"
-            preserveAspectRatio="xMidYMid slice"
-          >
-            {Array.from({ length: 24 }, (_, i) => (
-              <path
-                key={i}
-                d={`M${-100 + i * 40},${800 + i * 10} Q${200 + i * 30},${400 - i * 20} ${900 + i * 10},${-50 + i * 35}`}
-                stroke="white"
-                strokeWidth={1.5 + i * 0.15}
-                strokeOpacity={0.15 + i * 0.012}
-                fill="none"
-              />
-            ))}
-          </svg>
-
-          {/* Radial glow */}
-          <div
-            aria-hidden
-            className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,rgba(255,255,255,0.12)_0%,transparent_70%)]"
-          />
+          {/* Animated grid background — pastel yellows & oranges */}
+          <div aria-hidden className="absolute inset-0">
+            <AnimatedGrid
+              startColor={[255, 237, 180]}
+              endColor={[255, 200, 130]}
+              animationStartColor={[255, 223, 150]}
+              animationEndColor={[255, 183, 110]}
+              rows={10}
+              cols={12}
+              cellSize="1fr"
+              animationDuration="2.5s"
+            />
+          </div>
 
           {/* Centred logo watermark */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <BrandLogo className="h-12 opacity-90 brightness-0 invert" alt="" />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+            <BrandLogo className="h-12 opacity-90 brightness-0 invert drop-shadow-lg" alt="" />
           </div>
         </div>
       </div>
