@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { track } from '@vercel/analytics';
 import { HeroSection } from '@/components/ui/hero-section-1';
+import { VideoPlayer } from '@/components/ui/video-player';
 import AnimatedFooter from '@/components/ui/animated-footer';
 import {
   AnimatedCard,
@@ -182,6 +183,29 @@ export default function HomePage() {
     <div className="min-h-svh w-full bg-background text-foreground">
       {/* Hero (includes its own header/nav) */}
       <HeroSection />
+
+      {/* Product demo video */}
+      <section className="px-6 pb-20 pt-4">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-8 text-center">
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary">Product walkthrough</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+              See Chippi in action
+            </h2>
+            <p className="mt-3 text-sm text-muted-foreground max-w-xl mx-auto">
+              Watch how a solo realtor sets up their intake link, scores incoming leads, and follows up from one clean workflow — all in minutes.
+            </p>
+          </div>
+          <div className="mx-auto flex justify-center">
+            <VideoPlayer
+              src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+              poster="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1920&h=1080&fit=crop"
+              size="full"
+              className="rounded-2xl shadow-lg shadow-amber-900/10 border border-border"
+            />
+          </div>
+        </div>
+      </section>
 
         {/* Live lead flow */}
         <section className="px-6 py-16 border-t border-border">

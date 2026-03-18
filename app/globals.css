@@ -45,10 +45,12 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-card: var(--card-radius);
 }
 
 :root {
   --radius: 0.75rem;
+  --card-radius: 1rem;
 
   /* Layered surface system: cream bg, pastel yellow surface, white cards */
   --background: #fffbeb;
