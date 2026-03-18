@@ -2,6 +2,7 @@ import { liquidMetalFragmentShader, ShaderMount } from "@paper-design/shaders";
 import { Sparkles } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTheme } from "@/components/theme-provider";
 interface LiquidMetalButtonProps {
   label?: string;
   onClick?: () => void;
@@ -12,6 +13,8 @@ export function LiquidMetalButton({
   onClick,
   viewMode = "text",
 }: LiquidMetalButtonProps) {
+  const { theme } = useTheme();
+  const isLight = theme === "light";
   const [isHovered, setIsHovered] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
   const [ripples, setRipples] = useState<
@@ -184,8 +187,10 @@ export function LiquidMetalButton({
               <Sparkles
                 size={16}
                 style={{
-                  color: "#666666",
-                  filter: "drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.5))",
+                  color: isLight ? "#374151" : "#666666",
+                  filter: isLight
+                    ? "drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.15))"
+                    : "drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.5))",
                   transition: "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)",
                   transform: "scale(1)",
                 }}
@@ -195,9 +200,11 @@ export function LiquidMetalButton({
               <span
                 style={{
                   fontSize: "14px",
-                  color: "#666666",
-                  fontWeight: 400,
-                  textShadow: "0px 1px 2px rgba(0, 0, 0, 0.5)",
+                  color: isLight ? "#374151" : "#666666",
+                  fontWeight: isLight ? 500 : 400,
+                  textShadow: isLight
+                    ? "0px 1px 2px rgba(0, 0, 0, 0.1)"
+                    : "0px 1px 2px rgba(0, 0, 0, 0.5)",
                   transition: "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)",
                   transform: "scale(1)",
                   whiteSpace: "nowrap",
@@ -227,9 +234,13 @@ export function LiquidMetalButton({
                 height: `${dimensions.innerHeight}px`,
                 margin: "2px",
                 borderRadius: "100px",
-                background: "linear-gradient(180deg, #202020 0%, #000000 100%)",
+                background: isLight
+                  ? "linear-gradient(180deg, #ffffff 0%, #f3f4f6 100%)"
+                  : "linear-gradient(180deg, #202020 0%, #000000 100%)",
                 boxShadow: isPressed
-                  ? "inset 0px 2px 4px rgba(0, 0, 0, 0.4), inset 0px 1px 2px rgba(0, 0, 0, 0.3)"
+                  ? isLight
+                    ? "inset 0px 2px 4px rgba(0, 0, 0, 0.15), inset 0px 1px 2px rgba(0, 0, 0, 0.1)"
+                    : "inset 0px 2px 4px rgba(0, 0, 0, 0.4), inset 0px 1px 2px rgba(0, 0, 0, 0.3)"
                   : "none",
                 transition:
                   "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.4s ease, height 0.4s ease, box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
