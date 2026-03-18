@@ -3,7 +3,7 @@ import {
   Users,
   Briefcase,
   PhoneIncoming,
-  Bot,
+  Sparkles,
   User,
   Settings,
   SlidersHorizontal,
@@ -17,7 +17,7 @@ export const primaryNavItems = [
   { href: '/contacts', label: 'Clients', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
-  { href: '/ai', label: 'AI Assistant', icon: Bot },
+  { href: '/ai', label: 'Chip', icon: Sparkles },
 ] as const;
 
 export const secondaryNavItems = [

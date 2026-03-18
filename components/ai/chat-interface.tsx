@@ -3,9 +3,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageBubble } from './message-bubble';
 import { ConversationSidebar } from './conversation-sidebar';
+import { GradientAIChatInput, type MentionItem } from '@/components/ui/gradient-ai-chat-input';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Send, Bot, Menu, X, AlertCircle } from 'lucide-react';
+import { Menu, X, AlertCircle, Sparkles } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import type { Conversation } from '@/lib/types';
@@ -33,7 +33,6 @@ export function ChatInterface({
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(initialConversationId);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -99,7 +98,6 @@ export function ChatInterface({
     }
   }
 
-  // Update the title in sidebar after first message auto-titles
   function updateConversationTitle(id: string, firstUserMessage: string) {
     const autoTitle = firstUserMessage.trim().slice(0, 60);
     setConversations((prev) =>
@@ -107,11 +105,62 @@ export function ChatInterface({
     );
   }
 
-  async function handleSend() {
-    const text = input.trim();
+  // Search contacts and deals for @ mentions
+  const handleMentionSearch = useCallback(async (query: string): Promise<MentionItem[]> => {
+    const results: MentionItem[] = [];
+    try {
+      const [contactsRes, dealsRes] = await Promise.all([
+        fetch(`/api/contacts?slug=${encodeURIComponent(slug)}&search=${encodeURIComponent(query)}`),
+        fetch(`/api/deals?slug=${encodeURIComponent(slug)}`),
+      ]);
+
+      if (contactsRes.ok) {
+        const contacts = await contactsRes.json();
+        const filtered = contacts.slice(0, 10);
+        for (const c of filtered) {
+          results.push({
+            id: c.id,
+            type: 'contact',
+            label: c.name,
+            subtitle: c.email || c.phone || undefined,
+          });
+        }
+      }
+
+      if (dealsRes.ok) {
+        const deals = await dealsRes.json();
+        const lowerQuery = query.toLowerCase();
+        const filtered = lowerQuery
+          ? deals.filter((d: any) => d.title.toLowerCase().includes(lowerQuery))
+          : deals;
+        for (const d of filtered.slice(0, 10)) {
+          results.push({
+            id: d.id,
+            type: 'deal',
+            label: d.title,
+            subtitle: d.value ? `$${Number(d.value).toLocaleString()}` : d.address || undefined,
+          });
+        }
+      }
+    } catch {
+      // silently fail
+    }
+    return results;
+  }, [slug]);
+
+  async function handleSend(text: string, mentions: MentionItem[]) {
     if (!text || inFlightRef.current) return;
 
-    // Create a conversation if there isn't one
+    // Build context prefix from mentions
+    let contextPrefix = '';
+    if (mentions.length > 0) {
+      const mentionLabels = mentions.map(
+        (m) => `[${m.type === 'contact' ? 'Contact' : 'Deal'}: ${m.label}]`
+      );
+      contextPrefix = `(Referencing: ${mentionLabels.join(', ')})\n\n`;
+    }
+    const fullMessage = contextPrefix + text;
+
     let conversationId = activeConversationId;
     if (!conversationId) {
       const res = await fetch('/api/ai/conversations', {
@@ -129,9 +178,8 @@ export function ChatInterface({
     inFlightRef.current = true;
 
     const isFirstMessage = messages.length === 0;
-    const newMessages: Message[] = [...messages, { role: 'user', content: text }];
+    const newMessages: Message[] = [...messages, { role: 'user', content: fullMessage }];
     setMessages(newMessages);
-    setInput('');
     setIsStreaming(true);
 
     const assistantMessage: Message = { role: 'assistant', content: '' };
@@ -145,7 +193,7 @@ export function ChatInterface({
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages, slug, conversationId })
+        body: JSON.stringify({ messages: newMessages, slug, conversationId }),
       });
 
       if (!res.ok) {
@@ -168,7 +216,6 @@ export function ChatInterface({
         setMessages([...newMessages, { role: 'assistant', content: accumulated }]);
       }
 
-      // Bump the conversation to top of the list
       if (conversationId) {
         setConversations((prev) => {
           const conv = prev.find((c) => c.id === conversationId);
@@ -182,13 +229,6 @@ export function ChatInterface({
     } finally {
       inFlightRef.current = false;
       setIsStreaming(false);
-    }
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
     }
   }
 
@@ -257,7 +297,7 @@ export function ChatInterface({
             <p className="font-semibold text-sm truncate">
               {activeConversationId
                 ? conversations.find((c) => c.id === activeConversationId)?.title ?? 'Conversation'
-                : 'AI Assistant'}
+                : 'Chip'}
             </p>
           </div>
           {messages.length > 0 && (
@@ -275,17 +315,17 @@ export function ChatInterface({
         {/* Messages area */}
         {loadingMessages ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-            Loading…
+            Loading...
           </div>
         ) : messages.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 text-muted-foreground p-8">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <Bot size={32} className="text-primary" />
+              <Sparkles size={32} className="text-primary" />
             </div>
             <div>
-              <p className="font-semibold text-foreground">AI Assistant</p>
+              <p className="font-semibold text-foreground text-lg">Chip</p>
               <p className="text-sm mt-1">
-                Ask me about your clients, deals, or anything about your pipeline.
+                Your AI assistant for leads, deals, and pipeline insights. Use @ to pull in contacts or deals.
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-sm">
@@ -297,7 +337,7 @@ export function ChatInterface({
               ].map((suggestion) => (
                 <button
                   key={suggestion}
-                  onClick={() => setInput(suggestion)}
+                  onClick={() => handleSend(suggestion, [])}
                   className="text-xs text-left p-3 rounded-lg border hover:bg-accent/50 transition-colors"
                 >
                   {suggestion}
@@ -327,8 +367,8 @@ export function ChatInterface({
           </ScrollArea>
         )}
 
-        {/* Input area / limit banner */}
-        <div className="border-t border-border px-4 pt-3 pb-4 flex-shrink-0">
+        {/* Input area */}
+        <div className="px-4 pt-3 pb-4 flex-shrink-0">
           {atLimit ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
               <div className="flex justify-center mb-2">
@@ -341,29 +381,17 @@ export function ChatInterface({
                 Start a new conversation to continue chatting.
               </p>
               <Button size="sm" onClick={handleNewConversation} variant="outline" className="border-amber-400 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-800">
-                Start new conversation →
+                Start new conversation
               </Button>
             </div>
           ) : (
-            <div className="flex gap-2">
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask about your clients or deals… (Enter to send, Shift+Enter for newline)"
-                rows={2}
-                className="resize-none"
-                disabled={isStreaming}
-              />
-              <Button
-                onClick={handleSend}
-                disabled={!input.trim() || isStreaming}
-                size="icon"
-                className="h-auto"
-              >
-                <Send size={16} />
-              </Button>
-            </div>
+            <GradientAIChatInput
+              placeholder="Ask Chip about your clients, deals, or pipeline..."
+              onSend={handleSend}
+              onMentionSearch={handleMentionSearch}
+              disabled={isStreaming}
+              enableShadows={true}
+            />
           )}
         </div>
       </div>
