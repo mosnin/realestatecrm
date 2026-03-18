@@ -130,7 +130,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+    <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
       <Sidebar slug={slug} spaceName={space.name} spaceEmoji={space.emoji} unreadLeadCount={unreadLeadCount} isBroker={isBroker} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header slug={slug} spaceName={space.name} title={space.name} />

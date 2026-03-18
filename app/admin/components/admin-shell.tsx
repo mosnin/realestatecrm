@@ -75,7 +75,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="app-theme flex min-h-screen bg-background text-foreground">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-60 min-h-screen bg-sidebar border-r border-sidebar-border shrink-0">
         {/* Admin header */}

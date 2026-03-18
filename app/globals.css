@@ -150,6 +150,84 @@
   --sidebar-ring: #14b8a6;
 }
 
+/* ── App theme: white & charcoal grey for dashboard/app ──── */
+.app-theme {
+  --background: #f5f6f8;
+  --surface: #eef0f3;
+  --foreground: #0f1117;
+
+  --card: #ffffff;
+  --card-foreground: #0f1117;
+
+  --popover: #ffffff;
+  --popover-foreground: #0f1117;
+
+  --primary: #0f1117;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f0f1f3;
+  --secondary-foreground: #0f1117;
+
+  --muted: #f0f1f3;
+  --muted-foreground: #6b7280;
+
+  --accent: #f0f1f3;
+  --accent-foreground: #0f1117;
+
+  --destructive: #dc2626;
+
+  --border: #e4e6ea;
+  --input: #e4e6ea;
+  --ring: #0f1117;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f1117;
+  --sidebar-primary: #0f1117;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0f1f3;
+  --sidebar-accent-foreground: #0f1117;
+  --sidebar-border: #e4e6ea;
+  --sidebar-ring: #0f1117;
+}
+.app-theme.dark {
+  --background: #121314;
+  --surface: #1a1b1d;
+  --foreground: #f1f3f5;
+
+  --card: #1f2023;
+  --card-foreground: #f1f3f5;
+
+  --popover: #1f2023;
+  --popover-foreground: #f1f3f5;
+
+  --primary: #f1f3f5;
+  --primary-foreground: #121314;
+
+  --secondary: #24262a;
+  --secondary-foreground: #e5e7eb;
+
+  --muted: #24262a;
+  --muted-foreground: #9ca3af;
+
+  --accent: #24262a;
+  --accent-foreground: #f1f3f5;
+
+  --destructive: #ef4444;
+
+  --border: #32353a;
+  --input: #32353a;
+  --ring: #f1f3f5;
+
+  --sidebar: #1a1b1d;
+  --sidebar-foreground: #f1f3f5;
+  --sidebar-primary: #f1f3f5;
+  --sidebar-primary-foreground: #121314;
+  --sidebar-accent: #24262a;
+  --sidebar-accent-foreground: #f1f3f5;
+  --sidebar-border: #32353a;
+  --sidebar-ring: #f1f3f5;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

@@ -155,7 +155,7 @@ export function BrokerageSetupClient({
   // Already part of a brokerage
   if (existingBrokerageName) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="app-theme min-h-screen bg-background flex flex-col">
         <header className="px-6 py-5 border-b border-border">
           <Link href="/" aria-label="Chippi home">
             <BrandLogo className="h-6 w-auto" alt="Chippi" />
@@ -194,7 +194,7 @@ export function BrokerageSetupClient({
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="app-theme min-h-screen bg-background flex flex-col">
       <header className="px-6 py-5 border-b border-border flex items-center justify-between">
         <Link href="/" aria-label="Chippi home">
           <BrandLogo className="h-6 w-auto" alt="Chippi" />

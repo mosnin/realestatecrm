@@ -104,7 +104,7 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-start justify-center px-4 py-10">
+    <div className="app-theme min-h-screen bg-background flex items-start justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="flex justify-center mb-8">
           <BrandLogo className="h-7" alt="Chippi" />
