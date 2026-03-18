@@ -245,46 +245,45 @@ export default function HomePage() {
       </section>
 
       {/* ─── The Chippi Effect ─────────────────────────────── */}
-      <section className="relative bg-background py-24 px-6 overflow-hidden">
-        {/* Decorative sparkles */}
-        <span aria-hidden className="absolute top-14 left-10 text-primary/25 text-3xl select-none pointer-events-none">✦</span>
-        <span aria-hidden className="absolute top-24 right-14 text-primary/15 text-xl select-none pointer-events-none">✦</span>
-        <span aria-hidden className="absolute bottom-16 left-1/3 text-border text-2xl select-none pointer-events-none">✦</span>
-        <span aria-hidden className="absolute top-1/2 right-1/4 text-primary/10 text-lg select-none pointer-events-none">○</span>
-
-        <div className="mx-auto max-w-6xl">
-          {/* Heading */}
-          <div className="text-center mb-14">
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-4">Client Results</p>
-            <h2 className="text-5xl md:text-6xl font-bold tracking-tight">
-              The Chippi <em className="not-italic text-primary">effect</em>
-            </h2>
+      <section className="py-20 px-6 border-t border-border">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-end justify-between gap-4 flex-wrap mb-10">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-primary">Client results</p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+                The Chippi effect.
+              </h2>
+            </div>
+            <Link
+              href="/sign-up"
+              className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:opacity-80 transition-opacity"
+            >
+              Start free trial <ArrowRight size={14} />
+            </Link>
           </div>
 
-          {/* Bento grid */}
           <div className="grid md:grid-cols-2 gap-4">
-
-            {/* Card 1 — Intake pipeline (left, large) */}
-            <div className="rounded-2xl border border-border bg-card p-7 shadow-sm flex flex-col justify-between min-h-[280px]">
+            {/* Card 1 — Intake pipeline */}
+            <div className="rounded-xl border border-border bg-card px-6 py-6 shadow-[0_1px_4px_rgba(0,0,0,0.05)] flex flex-col justify-between">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-5">Intake pipeline</p>
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5">Intake pipeline</p>
                 <div className="flex items-end gap-2 mb-6">
-                  <span className="text-5xl font-bold text-foreground tracking-tight">82</span>
-                  <span className="text-muted-foreground mb-1 text-sm">applications this week</span>
+                  <span className="text-4xl font-semibold text-foreground tracking-tight">82</span>
+                  <span className="text-muted-foreground mb-0.5 text-sm">applications this week</span>
                 </div>
                 <div className="space-y-3.5">
                   {[
-                    { label: 'Hot leads', count: 18, pct: 22, bar: 'bg-red-400' },
+                    { label: 'Hot leads',  count: 18, pct: 22, bar: 'bg-red-400' },
                     { label: 'Warm leads', count: 41, pct: 50, bar: 'bg-amber-400' },
                     { label: 'Cold leads', count: 23, pct: 28, bar: 'bg-blue-400' },
                   ].map(({ label, count, pct, bar }) => (
                     <div key={label}>
                       <div className="flex justify-between text-sm mb-1.5">
                         <span className="text-muted-foreground">{label}</span>
-                        <span className="font-semibold text-foreground">{count}</span>
+                        <span className="font-medium text-foreground">{count}</span>
                       </div>
                       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${bar} transition-all`} style={{ width: `${pct}%` }} />
+                        <div className={`h-full rounded-full ${bar}`} style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   ))}
@@ -295,22 +294,21 @@ export default function HomePage() {
               </p>
             </div>
 
-            {/* Right column — two stacked cards */}
+            {/* Right column */}
             <div className="flex flex-col gap-4">
-
-              {/* Card 2 — AI scoring breakdown */}
-              <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-4">AI lead scoring</p>
+              {/* Card 2 — AI scoring */}
+              <div className="rounded-xl border border-border bg-card px-6 py-6 shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">AI lead scoring</p>
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { emoji: '🔥', label: 'Hot',  count: 18, delta: '+12', color: 'text-red-500' },
                     { emoji: '♨',  label: 'Warm', count: 41, delta: '+28', color: 'text-amber-500' },
                     { emoji: '❄',  label: 'Cold', count: 23, delta: '+8',  color: 'text-blue-500' },
                   ].map(({ emoji, label, count, delta, color }) => (
-                    <div key={label} className="rounded-xl bg-muted/60 p-3">
+                    <div key={label} className="rounded-lg bg-muted/40 px-3 py-3">
                       <p className="text-xs text-muted-foreground mb-1.5">{emoji} {label}</p>
-                      <p className={`text-2xl font-bold ${color} leading-none`}>{count}</p>
-                      <p className="text-xs text-emerald-600 font-semibold mt-1">{delta}</p>
+                      <p className={`text-2xl font-semibold ${color} leading-none`}>{count}</p>
+                      <p className="text-xs text-primary font-medium mt-1">{delta}</p>
                     </div>
                   ))}
                 </div>
@@ -319,24 +317,24 @@ export default function HomePage() {
                 </p>
               </div>
 
-              {/* Card 3 — Response time comparison */}
-              <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Response efficiency</p>
-                <div className="grid grid-cols-2 gap-4 mb-5">
+              {/* Card 3 — Response efficiency */}
+              <div className="rounded-xl border border-border bg-card px-6 py-6 shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">Response efficiency</p>
+                <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Before Chippi</p>
-                    <p className="text-3xl font-bold text-muted-foreground/50 tracking-tight">18 h</p>
+                    <p className="text-3xl font-semibold text-muted-foreground/40 tracking-tight">18 h</p>
                     <p className="text-xs text-muted-foreground mt-1">avg. first response</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">With Chippi</p>
-                    <p className="text-3xl font-bold text-primary tracking-tight">1.8 h</p>
-                    <p className="text-xs text-emerald-600 font-semibold mt-1">↓ 74% faster</p>
+                    <p className="text-3xl font-semibold text-primary tracking-tight">1.8 h</p>
+                    <p className="text-xs text-muted-foreground mt-1">↓ 74% faster</p>
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full w-full bg-muted-foreground/25 rounded-full" />
+                    <div className="h-full w-full bg-muted-foreground/20 rounded-full" />
                   </div>
                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                     <div className="h-full bg-primary rounded-full" style={{ width: '26%' }} />
@@ -345,43 +343,28 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-
-          {/* CTA */}
-          <div className="mt-14 text-center">
-            <Link
-              href="/sign-up"
-              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-full font-semibold hover:opacity-90 transition-opacity shadow-sm"
-            >
-              Start free trial <ArrowRight size={16} />
-            </Link>
-          </div>
         </div>
       </section>
 
       {/* ─── Your Problem / Our Solution ───────────────────── */}
-      <section className="bg-surface py-24 px-6">
-        <div className="mx-auto max-w-6xl">
-          {/* Heading */}
-          <div className="text-center mb-16">
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-4">Problems &amp; Solution</p>
-            <h2 className="text-5xl md:text-6xl font-bold tracking-tight leading-[1.1]">
-              Your problem<br />Our solution
-            </h2>
-          </div>
+      <section className="py-20 px-6 bg-surface">
+        <div className="max-w-5xl mx-auto">
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Problems &amp; solution</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight mb-10">
+            Your problem. Our solution.
+          </h2>
 
-          {/* 2-col layout */}
-          <div className="grid lg:grid-cols-2 gap-10 items-start">
-
+          <div className="grid lg:grid-cols-2 gap-8 items-start">
             {/* Left — problems */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               {[
                 {
                   avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop',
                   text: (
                     <>
                       Renter inquiries buried in{' '}
-                      <span className="text-destructive font-semibold">DMs, texts, and email</span>
-                      {' '}— no single place to see who's actually serious.
+                      <span className="font-semibold text-foreground">DMs, texts, and email</span>
+                      {' '}— no single place to see who&apos;s actually serious.
                     </>
                   ),
                 },
@@ -390,7 +373,7 @@ export default function HomePage() {
                   text: (
                     <>
                       Re-asking the same qualification questions every time —{' '}
-                      <span className="text-destructive font-semibold">losing hours on leads that were never going to close.</span>
+                      <span className="font-semibold text-foreground">losing hours on leads that were never going to close.</span>
                     </>
                   ),
                 },
@@ -398,39 +381,35 @@ export default function HomePage() {
                   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop',
                   text: (
                     <>
-                      <span className="text-destructive font-semibold">Following up without context</span>
+                      <span className="font-semibold text-foreground">Following up without context</span>
                       {' '}— forgetting details and losing deals you could have closed.
                     </>
                   ),
                 },
               ].map(({ avatar, text }, i) => (
-                <div key={i} className="flex items-start gap-4">
+                <div key={i} className="flex items-start gap-3">
                   <img
                     src={avatar}
                     alt=""
-                    className="w-10 h-10 rounded-full object-cover flex-shrink-0 mt-1 ring-2 ring-border"
+                    className="w-9 h-9 rounded-full object-cover flex-shrink-0 mt-0.5 ring-2 ring-border"
                   />
-                  <div className="rounded-2xl border border-border bg-card px-5 py-4 text-sm text-foreground leading-relaxed flex-1 shadow-sm">
+                  <div className="rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground leading-relaxed flex-1 shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
                     {text}
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Right — solution card */}
-            <div className="rounded-3xl bg-gradient-to-br from-amber-500 to-amber-800 p-7 shadow-xl shadow-amber-900/25">
-              {/* Brand mark */}
-              <div className="flex items-center gap-2.5 mb-6">
-                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
-                  <Sparkles size={15} className="text-white" />
+            {/* Right — solution card, matches pricing teaser style */}
+            <div className="rounded-xl border border-primary/20 bg-card shadow-[0_4px_24px_-8px_rgba(180,83,9,0.18)] overflow-hidden">
+              <div className="px-6 py-6">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary w-fit mb-4">
+                  <Sparkles size={10} />
+                  One platform
                 </div>
-                <span className="text-white font-bold text-lg tracking-tight">Chippi</span>
-              </div>
-
-              {/* Inner white card */}
-              <div className="rounded-2xl bg-white/95 p-5">
-                <p className="text-sm font-semibold text-foreground mb-4">
-                  One clean workflow replaces the chaos:
+                <p className="font-semibold text-foreground mb-1">One clean workflow replaces the chaos.</p>
+                <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
+                  Everything a solo realtor needs — from first inquiry to closed deal.
                 </p>
                 <ul className="space-y-2.5">
                   {[
@@ -440,20 +419,21 @@ export default function HomePage() {
                     'Contact CRM with full activity history',
                     'Deal pipeline & follow-up scheduling',
                   ].map((item) => (
-                    <li key={item} className="flex items-center gap-2.5 text-sm text-foreground">
-                      <CheckCircle2 size={14} className="text-amber-600 flex-shrink-0" />
+                    <li key={item} className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                      <CheckCircle2 size={14} className="text-primary flex-shrink-0" />
                       {item}
                     </li>
                   ))}
                 </ul>
+                <div className="mt-6 pt-5 border-t border-border">
+                  <Link
+                    href="/sign-up"
+                    className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-sm font-semibold hover:opacity-90 transition-opacity"
+                  >
+                    Start free trial <ArrowRight size={13} />
+                  </Link>
+                </div>
               </div>
-
-              <Link
-                href="/sign-up"
-                className="mt-5 flex items-center justify-center gap-2 bg-white text-amber-800 rounded-full py-2.5 text-sm font-semibold hover:bg-amber-50 transition-colors"
-              >
-                Start free trial <ArrowRight size={13} />
-              </Link>
             </div>
           </div>
         </div>
