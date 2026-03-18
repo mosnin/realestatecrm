@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { DateWheelPicker } from '@/components/ui/date-wheel-picker';
 import {
   CheckCircle2,
   Loader2,
@@ -457,9 +458,28 @@ export function ApplicationForm({
               description="Which property are you interested in?"
             />
             <Field id="propertyAddress" label="Property address or listing" value={get('propertyAddress')} onChange={(v) => set('propertyAddress', v)} placeholder="123 Main St, Apt 4B" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field id="unitType" label="Unit or bedroom type" value={get('unitType')} onChange={(v) => set('unitType', v)} placeholder="e.g. 2BR / 1BA" />
-              <Field id="targetMoveInDate" label="Target move-in date" value={get('targetMoveInDate')} onChange={(v) => set('targetMoveInDate', v)} placeholder="e.g. August 1" type="text" />
+            <Field id="unitType" label="Unit or bedroom type" value={get('unitType')} onChange={(v) => set('unitType', v)} placeholder="e.g. 2BR / 1BA" />
+            <div className="space-y-1.5">
+              <Label>Target move-in date</Label>
+              <div className="rounded-lg border border-input bg-background p-3">
+                <DateWheelPicker
+                  value={get('targetMoveInDate') ? new Date(get('targetMoveInDate')) : undefined}
+                  onChange={(date) =>
+                    set(
+                      'targetMoveInDate',
+                      date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+                    )
+                  }
+                  minYear={new Date().getFullYear()}
+                  maxYear={new Date().getFullYear() + 2}
+                  size="sm"
+                />
+              </div>
+              {get('targetMoveInDate') && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: {get('targetMoveInDate')}
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field id="monthlyRent" label="Monthly rent" value={get('monthlyRent')} onChange={(v) => set('monthlyRent', v)} placeholder="e.g. 2500" type="text" />
