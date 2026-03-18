@@ -18,8 +18,7 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('Contact')
     .select('*')
-    .eq('spaceId', space.id)
-    .not('tags', 'cs', '["application-link"]');
+    .eq('spaceId', space.id);
 
   if (search) {
     // Cap length to prevent expensive full-table-scan patterns
