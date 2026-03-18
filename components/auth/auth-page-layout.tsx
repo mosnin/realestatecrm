@@ -3,6 +3,30 @@
 import React from 'react';
 import { BrandLogo } from '@/components/brand-logo';
 import Link from 'next/link';
+import {
+  Visual1,
+  AnimatedCard as AnimatedCard1,
+  CardVisual as CardVisual1,
+  CardBody as CardBody1,
+  CardTitle as CardTitle1,
+  CardDescription as CardDescription1,
+} from '@/components/ui/animated-card-line';
+import {
+  Visual2,
+  AnimatedCard as AnimatedCard2,
+  CardVisual as CardVisual2,
+  CardBody as CardBody2,
+  CardTitle as CardTitle2,
+  CardDescription as CardDescription2,
+} from '@/components/ui/animated-card-diagram';
+import {
+  Visual3,
+  AnimatedCard as AnimatedCard3,
+  CardVisual as CardVisual3,
+  CardBody as CardBody3,
+  CardTitle as CardTitle3,
+  CardDescription as CardDescription3,
+} from '@/components/ui/animated-card-chart';
 
 interface AuthPageLayoutProps {
   children: React.ReactNode;
@@ -13,10 +37,10 @@ interface AuthPageLayoutProps {
 
 export function AuthPageLayout({ children, heading, subheading }: AuthPageLayoutProps) {
   return (
-    <main className="relative min-h-screen bg-muted/30 lg:flex lg:h-screen lg:overflow-hidden">
+    <main className="relative min-h-screen bg-background lg:flex lg:h-screen lg:overflow-hidden">
 
       {/* ── Left form panel ── */}
-      <div className="relative flex w-full flex-col bg-white px-6 py-8 sm:px-10 lg:w-1/2 lg:max-w-[640px] lg:py-10">
+      <div className="relative flex w-full flex-col bg-white px-6 py-8 sm:px-10 lg:w-[480px] lg:min-w-[480px] lg:py-10 lg:border-r lg:border-border">
 
         {/* Logo — top-left */}
         <div className="mb-auto">
@@ -24,8 +48,7 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
         </div>
 
         {/* Form — vertically centred */}
-        <div className="mx-auto w-full max-w-[400px] py-12 lg:py-0">
-          {/* Heading */}
+        <div className="mx-auto w-full max-w-[380px] py-12 lg:py-0">
           <div className="mb-8 space-y-2">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
               {heading}
@@ -33,14 +56,13 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
             <p className="text-sm text-muted-foreground">{subheading}</p>
           </div>
 
-          {/* Clerk widget slot */}
           <div className="w-full">
             {children}
           </div>
         </div>
 
         {/* ToS / Privacy — bottom */}
-        <p className="mt-auto pt-6 text-center text-xs text-muted-foreground/70 leading-relaxed lg:text-left">
+        <p className="mt-auto pt-6 text-xs text-muted-foreground/70 leading-relaxed lg:text-left">
           By continuing, you agree to our{' '}
           <Link href="/legal/terms" className="underline underline-offset-4 hover:text-foreground transition-colors">
             Terms of Service
@@ -53,43 +75,85 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
         </p>
       </div>
 
-      {/* ── Right decorative panel ── */}
-      <div className="hidden lg:block lg:flex-1 p-3 pl-0">
-        <div className="relative h-full w-full overflow-hidden rounded-2xl">
-          {/* Gradient background — amber/warm theme */}
-          <div
-            aria-hidden
-            className="absolute inset-0 bg-gradient-to-br from-amber-600 via-orange-500 to-yellow-400"
-          />
+      {/* ── Right decorative panel — animated feature diagrams ── */}
+      <div className="hidden lg:flex lg:flex-1 flex-col overflow-hidden bg-surface">
 
-          {/* Abstract wave pattern overlay */}
-          <svg
-            aria-hidden
-            className="absolute inset-0 h-full w-full opacity-30"
-            viewBox="0 0 800 800"
-            preserveAspectRatio="xMidYMid slice"
-          >
-            {Array.from({ length: 24 }, (_, i) => (
-              <path
-                key={i}
-                d={`M${-100 + i * 40},${800 + i * 10} Q${200 + i * 30},${400 - i * 20} ${900 + i * 10},${-50 + i * 35}`}
-                stroke="white"
-                strokeWidth={1.5 + i * 0.15}
-                strokeOpacity={0.15 + i * 0.012}
-                fill="none"
-              />
+        {/* Top gradient bar */}
+        <div className="h-1 bg-gradient-to-r from-amber-500 via-orange-400 to-yellow-400" />
+
+        <div className="flex flex-1 flex-col items-center justify-center px-10 py-10 gap-6 overflow-y-auto no-scrollbar">
+
+          {/* Section label */}
+          <div className="text-center mb-2">
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+              Built for solo realtors
+            </p>
+            <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">
+              Your leasing workflow, simplified.
+            </h2>
+          </div>
+
+          {/* Feature diagram cards — 2-col grid */}
+          <div className="w-full max-w-[560px] grid grid-cols-2 gap-4">
+
+            {/* Intake pipeline — spans full width */}
+            <div className="col-span-2">
+              <AnimatedCard1 className="bg-card border-border">
+                <CardVisual1>
+                  <Visual1 mainColor="#d97706" secondaryColor="#b45309" />
+                </CardVisual1>
+                <CardBody1>
+                  <CardTitle1 className="text-sm">Intake pipeline</CardTitle1>
+                  <CardDescription1 className="text-xs">
+                    Every renter inquiry captured and tracked in real time.
+                  </CardDescription1>
+                </CardBody1>
+              </AnimatedCard1>
+            </div>
+
+            {/* AI scoring */}
+            <AnimatedCard2 className="bg-card border-border">
+              <CardVisual2>
+                <Visual2 mainColor="#d97706" secondaryColor="#b45309" />
+              </CardVisual2>
+              <CardBody2>
+                <CardTitle2 className="text-sm">AI lead scoring</CardTitle2>
+                <CardDescription2 className="text-xs">
+                  Instant priority ranking.
+                </CardDescription2>
+              </CardBody2>
+            </AnimatedCard2>
+
+            {/* Analytics */}
+            <AnimatedCard3 className="bg-card border-border">
+              <CardVisual3>
+                <Visual3 mainColor="#d97706" secondaryColor="#b45309" />
+              </CardVisual3>
+              <CardBody3>
+                <CardTitle3 className="text-sm">Analytics</CardTitle3>
+                <CardDescription3 className="text-xs">
+                  Conversion trends at a glance.
+                </CardDescription3>
+              </CardBody3>
+            </AnimatedCard3>
+          </div>
+
+          {/* Feature pills */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+            {[
+              'One intake link',
+              'Structured capture',
+              'Contact CRM',
+              'Deal pipeline',
+              'Follow-up scheduling',
+            ].map((feature) => (
+              <span
+                key={feature}
+                className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground"
+              >
+                {feature}
+              </span>
             ))}
-          </svg>
-
-          {/* Radial glow */}
-          <div
-            aria-hidden
-            className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,rgba(255,255,255,0.12)_0%,transparent_70%)]"
-          />
-
-          {/* Centred logo watermark */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <BrandLogo className="h-12 opacity-90 brightness-0 invert" alt="" />
           </div>
         </div>
       </div>

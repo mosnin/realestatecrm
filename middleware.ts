@@ -27,9 +27,12 @@ const isAdminRoute = createRouteMatcher([
 export default clerkMiddleware(async (auth, request) => {
   const session = await auth();
 
-  // Redirect authenticated users away from auth pages to dashboard
-  if (isPublicRoute(request) && session.userId) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+  // Redirect authenticated users away from /sign-in and /sign-up to home.
+  // Home page (/) stays accessible — the OnboardingDialog handles routing
+  // to dashboard or showing the workspace creation popup.
+  const { pathname } = request.nextUrl;
+  if (session.userId && (pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up') || pathname.startsWith('/login'))) {
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   if (isProtectedRoute(request) && !isPublicRoute(request)) {
