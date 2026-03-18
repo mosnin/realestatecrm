@@ -15,8 +15,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { track } from '@vercel/analytics';
-import { PulseFitHero } from '@/components/ui/pulse-fit-hero';
-import { Navbar } from '@/components/navbar';
+import { HeroSection } from '@/components/ui/hero-section-1';
 import AnimatedFooter from '@/components/ui/animated-footer';
 import {
   AnimatedCard,
@@ -181,99 +180,8 @@ function onTrack(name: string, props?: Record<string, string>) {
 export default function HomePage() {
   return (
     <div className="min-h-svh w-full bg-background text-foreground">
-      <Navbar />
-      <main className="flex-1 scroll-smooth relative overflow-x-hidden">
-        {/* Radial hero glow */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(234,179,8,0.18),transparent_70%)]" />
-
-        {/* Hero */}
-        <section id="hero">
-          <PulseFitHero
-            className="pt-[116px] md:pt-[126px]"
-            showHeader={false}
-            logo="Chippi"
-            navigation={[
-              { label: 'Features', onClick: () => { onTrack('pill_nav_click', { section: 'features', source: 'hero_nav' }); window.location.href = '/features'; } },
-              { label: 'Pricing', onClick: () => { onTrack('pill_nav_click', { section: 'pricing', source: 'hero_nav' }); window.location.href = '/pricing'; } },
-              { label: 'FAQ', onClick: () => { onTrack('pill_nav_click', { section: 'faq', source: 'hero_nav' }); window.location.href = '/faq'; } },
-            ]}
-            ctaButton={{
-              label: 'Log in',
-              onClick: () => {
-                onTrack('hero_cta_click', { location: 'hero_nav_login' });
-                window.location.href = '/sign-in';
-              },
-            }}
-            title="Qualify leasing leads without the chaos"
-            subtitle="One intake link. Structured qualification. Practical AI scoring. Follow up faster from one clean workflow."
-            primaryAction={{
-              label: 'Start free trial',
-              onClick: () => {
-                onTrack('hero_cta_click', { location: 'hero' });
-                window.location.href = '/sign-up';
-              },
-            }}
-            secondaryAction={{
-              label: 'See how it works',
-              onClick: () => {
-                onTrack('pill_nav_click', { section: 'how-it-works', source: 'hero' });
-                window.location.href = '/features';
-              },
-            }}
-            disclaimer="*7-day free trial · No credit card required"
-            socialProof={{
-              avatars: [
-                'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop',
-                'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop',
-                'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop',
-                'https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?w=80&h=80&fit=crop',
-              ],
-              text: 'Built for modern solo realtors handling renter and leasing leads',
-            }}
-            programs={[
-              {
-                image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhGMcGZtyL4M4bkN4ih0093zMY_rTFuC96zzFIKtfwmOWquEs3Sk-XRKpCOBGtRQ-B0Hs7Rxh5oIU2jDmnzroGPjanrMOnCJMUh-mvhVo4q41zDaWyJ2YAbRdZ5QvOb87XQCWPwWoseCUovKM4wfWAv8xMB0vJrHwEThu7hixCGPrl8Cp3wR4FlOaLqOg7J/s320/image%20(9).webp',
-                category: 'INTAKE',
-                title: 'One clean renter application link',
-              },
-              {
-                image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjD2O0IZ0h1I9vgmeVaPXnzI_jW-QQ5F2btwiicMK3w6VOFalshOQf1fMcTcp_JoZxLgBSldtUuuzgtiX5wtgUiveo61ZhHTbTXOh4QvdWt2hh26xU_TNtGNShy50mFfd_9dOrVz3Nb4mZ80Wme1dn9piIUfmAZSoBhHLeNxTouqIlTDeudwAdhOxQACp2R/s320/image%20(20).webp',
-                category: 'QUALIFICATION',
-                title: 'Budget, timeline, and area details in one flow',
-              },
-              {
-                image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjvxm32eiKeYuMWzVrE8ceLPgtIYxarpuF7MEQ0x7GLvXHv0R3Imatn_HB7Dp0JKBmSj-OZV1Dh7YaLICwsJcvf0NGepCD8P57GplS_D6LvtH55equqXGab5FlQ3OeEREih8cJhxk3m6CM44jJWuqJaR4RaNA9KoNhyphenhyphen-kTPOFgTO3GUz3Vob52fX_yeXwKg/w376-h503/image%20(18).webp',
-                category: 'SCORING',
-                title: 'Practical lead scoring you can explain',
-              },
-              {
-                image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgLwJ0YL6WhcH21NDvTvwXf5QzFLnC9EswU6WJxsSkJIF-OwI0AmQOSJKdK7glFSkhj9EKVvYLnoioJYcV4Zk8pOTWiz5tnzjtokZbsg0NNLndICQYwkpC3YxNumbpb4lihz_TX1wPalludzUsnYUlVsbMlpewT7dGbidTVxejO_eOxy68KODvFyK0scsoA/w378-h506/image%20(19).webp',
-                category: 'FOLLOW-UP',
-                title: 'Triage faster from one lightweight command center',
-              },
-              {
-                image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhiZ1tFXPwDXluFGeBqEXACxplP1iQ_81eRUVIUZNQerUihAeSWaTbqR1NzLPIcSqzwY8Vx3UWSMzn81oISmradd83ibWnDpKcf3m0ucXTOqy1Nf5QrXQGMQ5oxDQye-GMbYA_egtdzlGCO7ZlbMg2Go0qwi0BPcZHpH7MS9Cd4XQfY8cNueudPbwD_wtyz/s320/image%20(16).webp',
-                category: 'WORKFLOW',
-                title: 'Stay organized from inquiry to follow-up',
-              },
-              {
-                image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhngTR2PdwGNsbqWfcYeys1VueaJnXPMxAP_HddEbm9_0hovwbXHtcpvYFKTm6O5XyVkQA7CzwrprZnhw801GuxYa3rU00L-fvptf4Fz_RTVNClMkUtonP-02eE53c4qcX88_xux8oHXnTjh0RIDJ-6m1y6UOrxFxYhwDW0bZpaeePK-IA3pFFXWvrUIU8s/s320/image%20(14).webp',
-                category: 'CRM',
-                title: 'All lead context in one command center',
-              },
-              {
-                image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEi3PfScU4mNCfuh2GZwML64cHH2FnC-YKJJWySY8JuKSxgM4nh5oRzYmBWmG99vw25ltzW6mM8TOTnc7jZEgYM0R2bPKcysD3SbTFKXmukopF5mmLOH5fMx8H-X_0ZMu5JejkHbrJMe9oDP1nWQ1zMMHhkX3xICg3erJjvwQQtloybCJQbiaftespj8mNYv/s320/image%20(10).webp',
-                category: 'SPEED',
-                title: 'Act faster with cleaner lead data',
-              },
-              {
-                image: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh-6yyH4q_xbd0MXJyqr5v-qlp9sTNJwWtuTGZqSM1g3NmyLuMGTshyphenhyphenOlGWsdZBn7sC4jK7-c2bLa_EniNXh9YDIPdEMXRDGPUzOqcozCUFEnWCtOndrTSzrkjG9Q0FoLhyIuH_RIKhDGi4zY4G0D45iYnQM3mz-2jGd3Zlu23YPnaxG6COSM-REkO2Kw3S/s320/image%20(12).webp',
-                category: 'CONSISTENCY',
-                title: 'Professional intake experience every time',
-              },
-            ]}
-          />
-        </section>
+      {/* Hero (includes its own header/nav) */}
+      <HeroSection />
 
         {/* Live lead flow */}
         <section className="px-6 py-16 border-t border-border">
@@ -595,7 +503,6 @@ export default function HomePage() {
           ]}
           copyrightText={`© ${new Date().getFullYear()} Chippi. Leasing workflow clarity for modern realtors.`}
         />
-      </main>
     </div>
   );
 }
