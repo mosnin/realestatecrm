@@ -50,7 +50,7 @@ const leadFeedItems = [
     description: 'Jordan Reyes · Budget $2,800 · Midtown · Move-in Aug 1',
     time: 'just now',
     icon: '📝',
-    color: '#0d9488',
+    color: '#d97706',
   },
   {
     name: 'Lead scored: warm',
@@ -184,7 +184,7 @@ export default function HomePage() {
       <Navbar />
       <main className="flex-1 scroll-smooth relative overflow-x-hidden">
         {/* Radial hero glow */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(20,184,166,0.12),transparent_70%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(234,179,8,0.18),transparent_70%)]" />
 
         {/* Hero */}
         <section id="hero">
@@ -379,7 +379,7 @@ export default function HomePage() {
               <div className="grid md:grid-cols-2">
                 <AnimatedCard3 className="rounded-none border-0 border-r border-border shadow-none">
                   <CardVisual3>
-                    <Visual1 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                    <Visual1 mainColor="#d97706" secondaryColor="#b45309" />
                   </CardVisual3>
                   <CardBody3>
                     <CardTitle3>Intake pipeline over time</CardTitle3>
@@ -436,7 +436,7 @@ export default function HomePage() {
                 </div>
                 <AnimatedCard2 className="rounded-none border-0 border-l border-border shadow-none">
                   <CardVisual2>
-                    <Visual2 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                    <Visual2 mainColor="#d97706" secondaryColor="#b45309" />
                   </CardVisual2>
                   <CardBody2>
                     <CardTitle2>AI qualification breakdown</CardTitle2>
@@ -451,7 +451,7 @@ export default function HomePage() {
               <div className="grid md:grid-cols-2">
                 <AnimatedCard className="rounded-none border-0 border-r border-border shadow-none">
                   <CardVisual>
-                    <Visual3 mainColor="#14b8a6" secondaryColor="#0d9488" />
+                    <Visual3 mainColor="#d97706" secondaryColor="#b45309" />
                   </CardVisual>
                   <CardBody>
                     <CardTitle>Lead performance at a glance</CardTitle>
@@ -497,7 +497,7 @@ export default function HomePage() {
         {/* Pricing teaser */}
         <section className="py-20 px-6 border-t border-border">
           <div className="max-w-5xl mx-auto">
-            <div className="rounded-2xl border border-primary/20 bg-card shadow-[0_4px_24px_-8px_rgba(13,148,136,0.25)] overflow-hidden">
+            <div className="rounded-2xl border border-primary/20 bg-card shadow-[0_4px_24px_-8px_rgba(180,83,9,0.18)] overflow-hidden">
               <div className="grid md:grid-cols-2">
                 <div className="px-8 py-10 md:px-10 border-b md:border-b-0 md:border-r border-border">
                   <p className="text-xs font-semibold uppercase tracking-widest text-primary">Pricing</p>
