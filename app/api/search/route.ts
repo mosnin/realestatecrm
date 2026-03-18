@@ -43,14 +43,19 @@ export async function GET(req: NextRequest) {
     scoreLabel: c.scoreLabel ?? null,
   }));
 
-  const deals = (dealsResult.data ?? []).map((d: any) => ({
-    id: d.id,
-    title: d.title,
-    address: d.address ?? null,
-    value: d.value ?? null,
-    status: d.status ?? 'active',
-    stage: d.DealStage ? { name: d.DealStage.name, color: d.DealStage.color } : null,
-  }));
+  const deals = (dealsResult.data ?? []).map((d: any) => {
+    // DealStage may come back as a single object or array depending on Supabase FK config
+    const rawStage = d.DealStage;
+    const stage = Array.isArray(rawStage) ? rawStage[0] ?? null : rawStage ?? null;
+    return {
+      id: d.id,
+      title: d.title,
+      address: d.address ?? null,
+      value: d.value ?? null,
+      status: d.status ?? 'active',
+      stage: stage ? { name: stage.name, color: stage.color } : null,
+    };
+  });
 
   return NextResponse.json({ contacts, deals });
 }
