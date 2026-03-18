@@ -3,30 +3,6 @@
 import React from 'react';
 import { BrandLogo } from '@/components/brand-logo';
 import Link from 'next/link';
-import {
-  Visual1,
-  AnimatedCard as AnimatedCard1,
-  CardVisual as CardVisual1,
-  CardBody as CardBody1,
-  CardTitle as CardTitle1,
-  CardDescription as CardDescription1,
-} from '@/components/ui/animated-card-line';
-import {
-  Visual2,
-  AnimatedCard as AnimatedCard2,
-  CardVisual as CardVisual2,
-  CardBody as CardBody2,
-  CardTitle as CardTitle2,
-  CardDescription as CardDescription2,
-} from '@/components/ui/animated-card-diagram';
-import {
-  Visual3,
-  AnimatedCard as AnimatedCard3,
-  CardVisual as CardVisual3,
-  CardBody as CardBody3,
-  CardTitle as CardTitle3,
-  CardDescription as CardDescription3,
-} from '@/components/ui/animated-card-chart';
 
 interface AuthPageLayoutProps {
   children: React.ReactNode;
@@ -47,10 +23,9 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
           <BrandLogo className="h-7" alt="Chippi" />
         </div>
 
-        {/* Form area — vertically centred, scrollable */}
+        {/* Form area — vertically centred */}
         <div className="flex flex-1 flex-col justify-center py-8 lg:py-0">
           <div className="mx-auto w-full max-w-[380px]">
-            {/* Heading — hidden when onboarding flow is active */}
             {heading && (
               <div className="mb-8 space-y-2">
                 <h1 className="text-2xl font-semibold tracking-tight text-foreground">
@@ -82,85 +57,43 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
         </p>
       </div>
 
-      {/* ── Right panel — animated feature diagrams ── */}
-      <div className="hidden lg:flex lg:flex-1 flex-col overflow-hidden bg-surface">
+      {/* ── Right decorative panel ── */}
+      <div className="hidden lg:block lg:flex-1 p-3 pl-0">
+        <div className="relative h-full w-full overflow-hidden rounded-2xl">
+          {/* Gradient background */}
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-gradient-to-br from-amber-600 via-orange-500 to-yellow-400"
+          />
 
-        {/* Top accent bar */}
-        <div className="h-1 shrink-0 bg-gradient-to-r from-amber-500 via-orange-400 to-yellow-400" />
-
-        <div className="flex flex-1 flex-col items-center justify-center px-8 xl:px-12 py-8 gap-5 overflow-y-auto no-scrollbar">
-
-          {/* Header */}
-          <div className="text-center shrink-0">
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary">
-              Built for solo realtors
-            </p>
-            <h2 className="mt-2 text-lg font-semibold tracking-tight text-foreground">
-              Your leasing workflow, simplified.
-            </h2>
-          </div>
-
-          {/* Feature diagram cards */}
-          <div className="w-full max-w-[520px] grid grid-cols-2 gap-3 shrink-0">
-
-            {/* Intake pipeline — full width */}
-            <div className="col-span-2">
-              <AnimatedCard1 className="bg-card border-border">
-                <CardVisual1>
-                  <Visual1 mainColor="#d97706" secondaryColor="#b45309" />
-                </CardVisual1>
-                <CardBody1>
-                  <CardTitle1 className="text-sm">Intake pipeline</CardTitle1>
-                  <CardDescription1 className="text-xs">
-                    Every renter inquiry captured and tracked in real time.
-                  </CardDescription1>
-                </CardBody1>
-              </AnimatedCard1>
-            </div>
-
-            {/* AI scoring */}
-            <AnimatedCard2 className="bg-card border-border">
-              <CardVisual2>
-                <Visual2 mainColor="#d97706" secondaryColor="#b45309" />
-              </CardVisual2>
-              <CardBody2>
-                <CardTitle2 className="text-sm">AI lead scoring</CardTitle2>
-                <CardDescription2 className="text-xs">
-                  Instant priority ranking.
-                </CardDescription2>
-              </CardBody2>
-            </AnimatedCard2>
-
-            {/* Analytics */}
-            <AnimatedCard3 className="bg-card border-border">
-              <CardVisual3>
-                <Visual3 mainColor="#d97706" secondaryColor="#b45309" />
-              </CardVisual3>
-              <CardBody3>
-                <CardTitle3 className="text-sm">Analytics</CardTitle3>
-                <CardDescription3 className="text-xs">
-                  Conversion trends at a glance.
-                </CardDescription3>
-              </CardBody3>
-            </AnimatedCard3>
-          </div>
-
-          {/* Feature pills */}
-          <div className="flex flex-wrap items-center justify-center gap-2 shrink-0">
-            {[
-              'One intake link',
-              'Structured capture',
-              'Contact CRM',
-              'Deal pipeline',
-              'Follow-up scheduling',
-            ].map((feature) => (
-              <span
-                key={feature}
-                className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground"
-              >
-                {feature}
-              </span>
+          {/* Abstract wave pattern overlay */}
+          <svg
+            aria-hidden
+            className="absolute inset-0 h-full w-full opacity-30"
+            viewBox="0 0 800 800"
+            preserveAspectRatio="xMidYMid slice"
+          >
+            {Array.from({ length: 24 }, (_, i) => (
+              <path
+                key={i}
+                d={`M${-100 + i * 40},${800 + i * 10} Q${200 + i * 30},${400 - i * 20} ${900 + i * 10},${-50 + i * 35}`}
+                stroke="white"
+                strokeWidth={1.5 + i * 0.15}
+                strokeOpacity={0.15 + i * 0.012}
+                fill="none"
+              />
             ))}
+          </svg>
+
+          {/* Radial glow */}
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,rgba(255,255,255,0.12)_0%,transparent_70%)]"
+          />
+
+          {/* Centred logo watermark */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <BrandLogo className="h-12 opacity-90 brightness-0 invert" alt="" />
           </div>
         </div>
       </div>
