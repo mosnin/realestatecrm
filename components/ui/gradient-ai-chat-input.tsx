@@ -244,7 +244,7 @@ export function GradientAIChatInput({
       <div className="relative">
         {/* Outer thin border */}
         <div
-          className="absolute inset-0 rounded-[20px] p-[0.5px]"
+          className="absolute inset-0 rounded-[20px] p-[0.5px] pointer-events-none"
           style={{
             background: `conic-gradient(from 0deg at 50% 50%,
               ${currentOuterGradient.topLeft} 0deg,
@@ -308,7 +308,7 @@ export function GradientAIChatInput({
         </div>
 
         {/* Content container */}
-        <div className="relative p-4">
+        <div className="relative z-10 p-4">
           {/* Top row: Text input + Send button */}
           <div className="flex items-start gap-3 mb-3">
             <div className="flex-1 relative">
