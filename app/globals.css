@@ -162,6 +162,157 @@
   }
 }
 
+/* ── Clerk component overrides ────────────────────── */
+.cl-rootBox {
+  width: 100%;
+}
+.cl-card,
+.cl-cardBox {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+  width: 100% !important;
+}
+.cl-header {
+  display: none !important;
+}
+.cl-socialButtonsBlockButton {
+  border: 1px solid #d4d4d4 !important;
+  background: transparent !important;
+  border-radius: 0.5rem !important;
+  box-shadow: none !important;
+  height: 2.75rem !important;
+  font-weight: 500 !important;
+  transition: background 0.15s ease !important;
+}
+.cl-socialButtonsBlockButton:hover {
+  background: #fafafa !important;
+}
+.cl-dividerLine {
+  background: #e5e5e5 !important;
+}
+.cl-dividerText {
+  color: #78716c !important;
+  font-size: 0.75rem !important;
+}
+.cl-formFieldLabel {
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  color: #1c1917 !important;
+}
+.cl-formFieldInput {
+  border: 1px solid #d4d4d4 !important;
+  background: transparent !important;
+  border-radius: 0.5rem !important;
+  box-shadow: none !important;
+  height: 2.75rem !important;
+  font-size: 0.875rem !important;
+  color: #1c1917 !important;
+}
+.cl-formFieldInput:focus {
+  border-color: #b45309 !important;
+  box-shadow: 0 0 0 2px rgba(180, 83, 9, 0.15) !important;
+}
+.cl-formButtonPrimary {
+  background: #1c1917 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 0.5rem !important;
+  box-shadow: none !important;
+  height: 2.75rem !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+  transition: opacity 0.15s ease !important;
+}
+.cl-formButtonPrimary:hover {
+  opacity: 0.9 !important;
+}
+.cl-footerAction {
+  background: transparent !important;
+}
+.cl-footerActionLink {
+  color: #1c1917 !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+  text-underline-offset: 4px !important;
+}
+.cl-footerActionText {
+  color: #78716c !important;
+  font-size: 0.875rem !important;
+}
+.cl-footer {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.cl-identityPreview {
+  border: 1px solid #d4d4d4 !important;
+  border-radius: 0.5rem !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.cl-alternativeMethodsBlockButton {
+  border: 1px solid #d4d4d4 !important;
+  border-radius: 0.5rem !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.cl-otpCodeFieldInput {
+  border: 1px solid #d4d4d4 !important;
+  border-radius: 0.5rem !important;
+  box-shadow: none !important;
+}
+.cl-formFieldErrorText {
+  color: #dc2626 !important;
+  font-size: 0.75rem !important;
+}
+.cl-alert {
+  border: 1px solid rgba(220, 38, 38, 0.2) !important;
+  background: rgba(220, 38, 38, 0.05) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: none !important;
+}
+/* Dark mode overrides */
+.dark .cl-socialButtonsBlockButton {
+  border-color: #32353a !important;
+}
+.dark .cl-socialButtonsBlockButton:hover {
+  background: #24262a !important;
+}
+.dark .cl-dividerLine {
+  background: #32353a !important;
+}
+.dark .cl-dividerText {
+  color: #9ca3af !important;
+}
+.dark .cl-formFieldLabel {
+  color: #f1f3f5 !important;
+}
+.dark .cl-formFieldInput {
+  border-color: #404348 !important;
+  color: #f1f3f5 !important;
+}
+.dark .cl-formFieldInput:focus {
+  border-color: #14b8a6 !important;
+  box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.15) !important;
+}
+.dark .cl-formButtonPrimary {
+  background: #f1f3f5 !important;
+  color: #121314 !important;
+}
+.dark .cl-footerActionLink {
+  color: #f1f3f5 !important;
+}
+.dark .cl-footerActionText {
+  color: #9ca3af !important;
+}
+.dark .cl-identityPreview,
+.dark .cl-alternativeMethodsBlockButton,
+.dark .cl-otpCodeFieldInput {
+  border-color: #32353a !important;
+}
+
 /* ── Card elevation system ─────────────────────────── */
 [data-slot="card"] {
   box-shadow: 0 1px 3px 0 rgba(0,0,0,0.04), 0 1px 2px -1px rgba(0,0,0,0.03);

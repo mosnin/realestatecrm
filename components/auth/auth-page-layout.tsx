@@ -43,26 +43,33 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
       <div className="relative flex w-full flex-col bg-white px-6 py-8 sm:px-10 lg:w-[480px] lg:min-w-[480px] lg:py-10 lg:border-r lg:border-border">
 
         {/* Logo — top-left */}
-        <div className="mb-auto">
+        <div className="shrink-0">
           <BrandLogo className="h-7" alt="Chippi" />
         </div>
 
-        {/* Form — vertically centred */}
-        <div className="mx-auto w-full max-w-[380px] py-12 lg:py-0">
-          <div className="mb-8 space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              {heading}
-            </h1>
-            <p className="text-sm text-muted-foreground">{subheading}</p>
-          </div>
+        {/* Form area — vertically centred, scrollable */}
+        <div className="flex flex-1 flex-col justify-center py-8 lg:py-0">
+          <div className="mx-auto w-full max-w-[380px]">
+            {/* Heading — hidden when onboarding flow is active */}
+            {heading && (
+              <div className="mb-8 space-y-2">
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                  {heading}
+                </h1>
+                {subheading && (
+                  <p className="text-sm text-muted-foreground">{subheading}</p>
+                )}
+              </div>
+            )}
 
-          <div className="w-full">
-            {children}
+            <div className="w-full">
+              {children}
+            </div>
           </div>
         </div>
 
         {/* ToS / Privacy — bottom */}
-        <p className="mt-auto pt-6 text-xs text-muted-foreground/70 leading-relaxed lg:text-left">
+        <p className="shrink-0 pt-4 text-xs text-muted-foreground/70 leading-relaxed lg:text-left">
           By continuing, you agree to our{' '}
           <Link href="/legal/terms" className="underline underline-offset-4 hover:text-foreground transition-colors">
             Terms of Service
@@ -75,28 +82,28 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
         </p>
       </div>
 
-      {/* ── Right decorative panel — animated feature diagrams ── */}
+      {/* ── Right panel — animated feature diagrams ── */}
       <div className="hidden lg:flex lg:flex-1 flex-col overflow-hidden bg-surface">
 
-        {/* Top gradient bar */}
-        <div className="h-1 bg-gradient-to-r from-amber-500 via-orange-400 to-yellow-400" />
+        {/* Top accent bar */}
+        <div className="h-1 shrink-0 bg-gradient-to-r from-amber-500 via-orange-400 to-yellow-400" />
 
-        <div className="flex flex-1 flex-col items-center justify-center px-10 py-10 gap-6 overflow-y-auto no-scrollbar">
+        <div className="flex flex-1 flex-col items-center justify-center px-8 xl:px-12 py-8 gap-5 overflow-y-auto no-scrollbar">
 
-          {/* Section label */}
-          <div className="text-center mb-2">
+          {/* Header */}
+          <div className="text-center shrink-0">
             <p className="text-xs font-semibold uppercase tracking-widest text-primary">
               Built for solo realtors
             </p>
-            <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">
+            <h2 className="mt-2 text-lg font-semibold tracking-tight text-foreground">
               Your leasing workflow, simplified.
             </h2>
           </div>
 
-          {/* Feature diagram cards — 2-col grid */}
-          <div className="w-full max-w-[560px] grid grid-cols-2 gap-4">
+          {/* Feature diagram cards */}
+          <div className="w-full max-w-[520px] grid grid-cols-2 gap-3 shrink-0">
 
-            {/* Intake pipeline — spans full width */}
+            {/* Intake pipeline — full width */}
             <div className="col-span-2">
               <AnimatedCard1 className="bg-card border-border">
                 <CardVisual1>
@@ -139,7 +146,7 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
           </div>
 
           {/* Feature pills */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+          <div className="flex flex-wrap items-center justify-center gap-2 shrink-0">
             {[
               'One intake link',
               'Structured capture',

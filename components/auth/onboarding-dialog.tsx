@@ -6,21 +6,37 @@ import { useUser } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CheckCircle2, Loader2, AlertCircle, Sparkles, X } from 'lucide-react';
+import {
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
+  ArrowRight,
+  ArrowLeft,
+  Building2,
+  Link2,
+  Sparkles,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
+const STEPS = [
+  { id: 'welcome', label: 'Welcome' },
+  { id: 'workspace', label: 'Workspace' },
+  { id: 'intake', label: 'Intake link' },
+] as const;
+
 /**
- * Floating dialog that appears after sign-in/sign-up if the user
- * doesn't have a workspace yet. Replaces the /setup page.
+ * Inline multi-step onboarding that replaces the Clerk form area
+ * after sign-in when the user has no workspace yet.
  */
-export function OnboardingDialog() {
+export function OnboardingFlow() {
   const router = useRouter();
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded, user: clerkUser } = useUser();
 
-  const [open, setOpen] = useState(false);
+  const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [step, setStep] = useState(0);
 
-  // Workspace form state
+  // Form state
   const [businessName, setBusinessName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
@@ -41,15 +57,13 @@ export function OnboardingDialog() {
         if (!res.ok) { setLoading(false); return; }
         const data = await res.json();
 
-        // If user has no space, show dialog
         if (!data.space?.slug) {
-          setOpen(true);
+          setShow(true);
         } else {
-          // User already has a workspace — redirect
           router.push(`/s/${data.space.slug}`);
         }
       } catch {
-        // Silent fail — user can still use sign-in
+        // Silent
       } finally {
         setLoading(false);
       }
@@ -58,9 +72,9 @@ export function OnboardingDialog() {
     checkOnboarding();
   }, [isLoaded, isSignedIn, router]);
 
-  // Auto-derive slug from business name
+  // Auto-derive slug
   useEffect(() => {
-    if (!businessName.trim()) return;
+    if (!businessName.trim()) { setSlug(''); return; }
     const derived = businessName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
@@ -85,16 +99,12 @@ export function OnboardingDialog() {
   }, []);
 
   useEffect(() => {
+    if (!slug) return;
     const timer = setTimeout(() => checkSlug(slug), 400);
     return () => clearTimeout(timer);
   }, [slug, checkSlug]);
 
-  const canSubmit =
-    businessName.trim() && slug.length >= 3 && slugAvailable === true && !saving;
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!canSubmit) return;
+  async function handleComplete() {
     setSaving(true);
     setError('');
 
@@ -104,7 +114,7 @@ export function OnboardingDialog() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'save_profile',
-          name: '',
+          name: clerkUser?.fullName ?? '',
           phone: '',
           businessName,
         }),
@@ -130,8 +140,7 @@ export function OnboardingDialog() {
         body: JSON.stringify({ action: 'complete' }),
       });
 
-      const resolvedSlug: string = spaceData.slug ?? slug;
-      router.push(`/s/${resolvedSlug}`);
+      router.push(`/s/${spaceData.slug ?? slug}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong.';
       setError(msg);
@@ -140,114 +149,211 @@ export function OnboardingDialog() {
     }
   }
 
-  if (!open || loading) return null;
+  if (!show || loading) return null;
+
+  const firstName = clerkUser?.firstName ?? 'there';
 
   return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
-
-      {/* Dialog */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="relative w-full max-w-md rounded-2xl border border-border bg-card shadow-2xl shadow-amber-900/10 overflow-hidden">
-
-          {/* Top accent */}
-          <div className="h-1 bg-gradient-to-r from-amber-500 via-orange-400 to-yellow-400" />
-
-          <div className="px-7 pt-6 pb-7">
-            {/* Header */}
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary mb-3">
-                  <Sparkles size={10} />
-                  Almost there
-                </div>
-                <h2 className="text-xl font-semibold tracking-tight text-foreground">
-                  Create your workspace
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Set up your business name and intake link to get started.
-                </p>
-              </div>
-              <button
-                onClick={() => setOpen(false)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <X size={16} />
-              </button>
+    <div className="w-full">
+      {/* Step indicator */}
+      <div className="flex items-center gap-2 mb-8">
+        {STEPS.map((s, i) => (
+          <div key={s.id} className="flex items-center gap-2">
+            <div
+              className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+                i < step
+                  ? 'bg-primary text-primary-foreground'
+                  : i === step
+                  ? 'bg-foreground text-white'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {i < step ? <CheckCircle2 size={14} /> : i + 1}
             </div>
+            <span
+              className={`text-xs font-medium hidden sm:inline ${
+                i === step ? 'text-foreground' : 'text-muted-foreground'
+              }`}
+            >
+              {s.label}
+            </span>
+            {i < STEPS.length - 1 && (
+              <div className={`h-px w-6 ${i < step ? 'bg-primary' : 'bg-border'}`} />
+            )}
+          </div>
+        ))}
+      </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="onb-businessName" className="text-sm font-medium">
-                  Business or brand name
-                </Label>
-                <Input
-                  id="onb-businessName"
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  placeholder="Preston Leasing"
-                  required
-                  autoFocus
-                />
-              </div>
+      {/* Step 0 — Welcome */}
+      {step === 0 && (
+        <div className="space-y-6">
+          <div>
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary mb-4">
+              <Sparkles size={10} />
+              Let&apos;s get started
+            </div>
+            <h2 className="text-xl font-semibold tracking-tight">
+              Hey {firstName}, welcome to Chippi!
+            </h2>
+            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+              We&apos;ll set up your workspace in a few quick steps. You&apos;ll get a custom intake
+              link to start capturing and qualifying renter leads right away.
+            </p>
+          </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="onb-slug" className="text-sm font-medium">
-                  Intake link slug
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="onb-slug"
-                    value={slug}
-                    onChange={(e) =>
-                      setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
-                    }
-                    placeholder="preston-leasing"
-                    className="pr-8"
-                    required
-                  />
-                  {slug.length >= 3 && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      {checking ? (
-                        <Loader2 size={14} className="animate-spin text-muted-foreground" />
-                      ) : slugAvailable === true ? (
-                        <CheckCircle2 size={14} className="text-green-500" />
-                      ) : slugAvailable === false ? (
-                        <span className="text-red-500 text-xs font-medium">taken</span>
-                      ) : null}
-                    </div>
-                  )}
+          <div className="space-y-3">
+            {[
+              { icon: Building2, text: 'Name your workspace' },
+              { icon: Link2, text: 'Create your intake link' },
+              { icon: Sparkles, text: 'Start managing leads' },
+            ].map(({ icon: Icon, text }) => (
+              <div key={text} className="flex items-center gap-3 text-sm text-muted-foreground">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                  <Icon size={15} className="text-foreground" />
                 </div>
-                {slug.length >= 3 && (
-                  <p className="text-xs text-muted-foreground break-all">
-                    chippi.com/apply/{slug}
-                  </p>
-                )}
+                {text}
               </div>
+            ))}
+          </div>
 
-              {error && (
-                <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5">
-                  <AlertCircle size={14} className="text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive">{error}</p>
-                </div>
-              )}
+          <Button
+            onClick={() => setStep(1)}
+            className="w-full"
+            size="lg"
+          >
+            Get started <ArrowRight size={15} className="ml-1" />
+          </Button>
+        </div>
+      )}
 
-              <Button type="submit" className="w-full" disabled={!canSubmit} size="lg">
-                {saving ? (
-                  <>
-                    <Loader2 size={16} className="mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  'Create workspace'
-                )}
-              </Button>
-            </form>
+      {/* Step 1 — Business name */}
+      {step === 1 && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">
+              What&apos;s your business called?
+            </h2>
+            <p className="text-sm text-muted-foreground mt-2">
+              This is how your workspace will appear to you and your clients.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="onb-name" className="text-sm font-medium">
+              Business or brand name
+            </Label>
+            <Input
+              id="onb-name"
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+              placeholder="Preston Leasing"
+              autoFocus
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setStep(0)}
+              size="lg"
+              className="flex-1"
+            >
+              <ArrowLeft size={15} className="mr-1" /> Back
+            </Button>
+            <Button
+              onClick={() => setStep(2)}
+              disabled={!businessName.trim()}
+              size="lg"
+              className="flex-1"
+            >
+              Continue <ArrowRight size={15} className="ml-1" />
+            </Button>
           </div>
         </div>
-      </div>
-    </>
+      )}
+
+      {/* Step 2 — Intake link */}
+      {step === 2 && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">
+              Create your intake link
+            </h2>
+            <p className="text-sm text-muted-foreground mt-2">
+              This is the link you&apos;ll share with renters. They&apos;ll use it to submit applications.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="onb-slug" className="text-sm font-medium">
+              Intake link slug
+            </Label>
+            <div className="relative">
+              <Input
+                id="onb-slug"
+                value={slug}
+                onChange={(e) =>
+                  setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
+                }
+                placeholder="preston-leasing"
+                className="pr-8"
+                autoFocus
+              />
+              {slug.length >= 3 && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {checking ? (
+                    <Loader2 size={14} className="animate-spin text-muted-foreground" />
+                  ) : slugAvailable === true ? (
+                    <CheckCircle2 size={14} className="text-green-500" />
+                  ) : slugAvailable === false ? (
+                    <span className="text-red-500 text-xs font-medium">taken</span>
+                  ) : null}
+                </div>
+              )}
+            </div>
+            {slug.length >= 3 && (
+              <p className="text-xs text-muted-foreground break-all mt-1">
+                chippi.com/apply/{slug}
+              </p>
+            )}
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+              <AlertCircle size={14} className="text-destructive flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-destructive">{error}</p>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setStep(1)}
+              size="lg"
+              className="flex-1"
+            >
+              <ArrowLeft size={15} className="mr-1" /> Back
+            </Button>
+            <Button
+              onClick={handleComplete}
+              disabled={!slug || slug.length < 3 || slugAvailable !== true || saving}
+              size="lg"
+              className="flex-1"
+            >
+              {saving ? (
+                <>
+                  <Loader2 size={15} className="mr-1 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  Create workspace <Sparkles size={14} className="ml-1" />
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
