@@ -84,7 +84,7 @@ export default function PricingPage() {
               <Zap size={12} />
               Simple, honest pricing
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
+            <h1 className="font-title text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
               One plan.<br /> Everything included.
             </h1>
             <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">

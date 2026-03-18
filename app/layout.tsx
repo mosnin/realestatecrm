@@ -1,5 +1,12 @@
 import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
+import { Open_Sans } from 'next/font/google';
+
+const openSans = Open_Sans({
+  subsets: ['latin'],
+  variable: '--font-open-sans',
+  display: 'swap',
+});
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -27,7 +34,7 @@ export default function RootLayout({
             }}
           />
         </head>
-        <body className={`${GeistSans.variable} antialiased bg-background text-foreground`}>
+        <body className={`${GeistSans.variable} ${openSans.variable} antialiased bg-background text-foreground`}>
           <ThemeProvider>
             <AmplitudeProvider>
               {children}

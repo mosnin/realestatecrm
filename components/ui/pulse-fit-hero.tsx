@@ -122,7 +122,7 @@ export function PulseFitHero({
             transition={{ duration: 0.8, delay: 0.2 }}
             className="flex flex-col items-center text-center max-w-4xl gap-8"
           >
-            <h1 className="font-bold text-4xl md:text-6xl tracking-tight leading-[1.05] text-foreground">
+            <h1 className="font-title font-bold text-4xl md:text-6xl tracking-tight leading-[1.05] text-foreground">
               {title}
             </h1>
 

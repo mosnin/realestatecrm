@@ -149,7 +149,7 @@ export default function FeaturesPage() {
               <Sparkles size={12} />
               Built for solo realtors
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
+            <h1 className="font-title text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
               Everything you need to run your leasing workflow.
             </h1>
             <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">

@@ -100,7 +100,7 @@ export default function CRMPage() {
                 <Users size={11} />
                 Contact CRM
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-[1.08]">
+              <h1 className="font-title text-4xl md:text-5xl font-bold tracking-tight leading-[1.08]">
                 Full contact management built for leasing.
               </h1>
               <p className="mt-5 text-lg text-muted-foreground leading-relaxed">

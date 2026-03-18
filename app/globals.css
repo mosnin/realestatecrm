@@ -12,6 +12,8 @@
   --color-lead-cold: var(--lead-cold);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-open-sans), "Open Sans", sans-serif;
+  --font-title: "Times New Roman MT", "Times New Roman", Times, serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -236,7 +238,7 @@
     @apply bg-background text-foreground;
   }
   h1, h2, h3, h4, h5, h6 {
-    font-family: "Times New Roman MT", "Times New Roman", Times, serif;
+    font-family: var(--font-heading);
   }
 }
 
