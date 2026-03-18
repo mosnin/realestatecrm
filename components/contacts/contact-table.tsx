@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { LiquidMetalButton } from '@/components/ui/liquid-metal-button';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -439,10 +440,10 @@ export function ContactTable({ slug }: ContactTableProps) {
             </button>
           </div>
 
-          <Button onClick={() => setAddOpen(true)} className="gap-2 flex-shrink-0">
-            <Plus size={15} />
-            Add client
-          </Button>
+          <LiquidMetalButton
+            label="Add client"
+            onClick={() => setAddOpen(true)}
+          />
         </div>
       </div>
 

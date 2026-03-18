@@ -17,6 +17,7 @@ import { KanbanColumn } from './kanban-column';
 import { DealForm } from './deal-form';
 import { DealPanel } from './deal-panel';
 import { Button } from '@/components/ui/button';
+import { LiquidMetalButton } from '@/components/ui/liquid-metal-button';
 import {
   Plus,
   GripVertical,
@@ -220,15 +221,13 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
             </button>
           </div>
 
-          <Button
+          <LiquidMetalButton
+            label="Add deal"
             onClick={() => {
               setDefaultStageId(stages[0]?.id ?? '');
               setAddDealOpen(true);
             }}
-          >
-            <Plus size={16} className="mr-1.5" />
-            Add deal
-          </Button>
+          />
         </div>
       </div>
 
