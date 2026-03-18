@@ -1,169 +1,97 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
 import { BrandLogo } from '@/components/brand-logo';
 import Link from 'next/link';
-import { ChevronLeft } from 'lucide-react';
-import { Waves } from '@/components/ui/waves';
-
-// ── Floating paths decoration ─────────────────────────────────────────────────
-
-function FloatingPaths({ position }: { position: number }) {
-  const paths = Array.from({ length: 30 }, (_, i) => ({
-    id: i,
-    d: `M-${380 - i * 5 * position} -${189 + i * 6}C-${
-      380 - i * 5 * position
-    } -${189 + i * 6} -${312 - i * 5 * position} ${216 - i * 6} ${
-      152 - i * 5 * position
-    } ${343 - i * 6}C${616 - i * 5 * position} ${470 - i * 6} ${
-      684 - i * 5 * position
-    } ${875 - i * 6} ${684 - i * 5 * position} ${875 - i * 6}`,
-    width: 0.4 + i * 0.025,
-  }));
-
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <svg className="h-full w-full" viewBox="0 0 696 316" fill="none" aria-hidden>
-        {paths.map((path) => (
-          <motion.path
-            key={path.id}
-            d={path.d}
-            stroke="currentColor"
-            strokeWidth={path.width}
-            strokeOpacity={0.08 + path.id * 0.02}
-            initial={{ pathLength: 0.3, opacity: 0.5 }}
-            animate={{
-              pathLength: 1,
-              opacity: [0.3, 0.55, 0.3],
-              pathOffset: [0, 1, 0],
-            }}
-            transition={{
-              duration: 20 + Math.random() * 12,
-              repeat: Infinity,
-              ease: 'linear',
-            }}
-          />
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-// ── Main layout ───────────────────────────────────────────────────────────────
 
 interface AuthPageLayoutProps {
   children: React.ReactNode;
   heading: string;
   subheading: string;
-  /** Controls the left-panel quote/testimonial */
   variant?: 'realtor' | 'broker';
 }
 
-const PANEL_CONTENT = {
-  realtor: {
-    quote:
-      'Chippi transformed how I manage leads. I can see every applicant\'s full profile, score, and next step in seconds — it\'s the CRM I always wanted.',
-    author: 'Jordan M., Independent Realtor',
-  },
-  broker: {
-    quote:
-      'With Chippi I can see every realtor\'s pipeline at a glance, spot who needs help, and keep our whole team moving — all from one dashboard.',
-    author: 'Sarah K., Broker Owner',
-  },
-};
-
-export function AuthPageLayout({ children, heading, subheading, variant = 'realtor' }: AuthPageLayoutProps) {
-  const panel = PANEL_CONTENT[variant];
+export function AuthPageLayout({ children, heading, subheading }: AuthPageLayoutProps) {
   return (
-    <main className="relative min-h-screen lg:grid lg:grid-cols-2 lg:overflow-hidden lg:h-screen">
+    <main className="relative min-h-screen bg-muted/30 lg:flex lg:h-screen lg:overflow-hidden">
 
-      {/* ── Left decorative panel ── */}
-      <div className="relative hidden lg:flex flex-col h-full bg-sidebar border-r border-sidebar-border p-10 overflow-hidden">
+      {/* ── Left form panel ── */}
+      <div className="relative flex w-full flex-col bg-white px-6 py-8 sm:px-10 lg:w-1/2 lg:max-w-[640px] lg:py-10">
 
-        {/* Waves animation — interactive, teal-tinted */}
-        <div className="absolute inset-0 text-primary/25">
-          <Waves backgroundColor="transparent" strokeColor="currentColor" />
-        </div>
-
-        {/* Radial glow */}
-        <div
-          aria-hidden
-          className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_80%_60%_at_40%_50%,hsl(var(--primary)/0.08)_0%,transparent_70%)]"
-        />
-
-        {/* Logo */}
-        <div className="relative z-10">
-          <BrandLogo className="h-6" alt="Chippi" />
-        </div>
-
-        {/* Testimonial */}
-        <div className="relative z-10 mt-auto">
-          <blockquote className="space-y-3">
-            <p className="text-lg leading-relaxed text-sidebar-foreground/85">
-              &ldquo;{panel.quote}&rdquo;
-            </p>
-            <footer className="text-sm font-semibold text-primary font-mono">
-              ~ {panel.author}
-            </footer>
-          </blockquote>
-        </div>
-      </div>
-
-      {/* ── Right auth panel ── */}
-      <div className="relative flex min-h-screen lg:min-h-0 flex-col items-center justify-center px-6 py-12 bg-background overflow-hidden">
-
-        {/* Subtle floating paths on right panel — keeps focus on the form */}
-        <div className="pointer-events-none absolute inset-0 text-foreground/[0.04] dark:text-foreground/[0.06]">
-          <FloatingPaths position={1} />
-          <FloatingPaths position={-1} />
-        </div>
-
-        {/* Radial glow — teal tint from top-right */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_70%_20%,hsl(var(--primary)/0.07)_0%,transparent_70%)]"
-        />
-
-        {/* Go back home — top-left corner */}
-        <div className="absolute top-5 left-5">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronLeft size={15} />
-            Home
-          </Link>
-        </div>
-
-        {/* Mobile logo */}
-        <div className="mb-8 lg:hidden">
+        {/* Logo — top-left */}
+        <div className="mb-auto">
           <BrandLogo className="h-7" alt="Chippi" />
         </div>
 
-        {/* Heading */}
-        <div className="relative z-10 w-full max-w-sm mb-6 space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">{heading}</h1>
-          <p className="text-sm text-muted-foreground">{subheading}</p>
+        {/* Form — vertically centred */}
+        <div className="mx-auto w-full max-w-[400px] py-12 lg:py-0">
+          {/* Heading */}
+          <div className="mb-8 space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              {heading}
+            </h1>
+            <p className="text-sm text-muted-foreground">{subheading}</p>
+          </div>
+
+          {/* Clerk widget slot */}
+          <div className="w-full">
+            {children}
+          </div>
         </div>
 
-        {/* Clerk widget slot */}
-        <div className="relative z-10 w-full max-w-sm flex justify-center">
-          {children}
-        </div>
-
-        {/* ToS / Privacy */}
-        <p className="relative z-10 mt-8 max-w-sm text-center text-xs text-muted-foreground/70 leading-relaxed">
+        {/* ToS / Privacy — bottom */}
+        <p className="mt-auto pt-6 text-center text-xs text-muted-foreground/70 leading-relaxed lg:text-left">
           By continuing, you agree to our{' '}
-          <Link href="/terms" className="underline underline-offset-4 hover:text-foreground transition-colors">
+          <Link href="/legal/terms" className="underline underline-offset-4 hover:text-foreground transition-colors">
             Terms of Service
           </Link>{' '}
           and{' '}
-          <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground transition-colors">
+          <Link href="/legal/privacy" className="underline underline-offset-4 hover:text-foreground transition-colors">
             Privacy Policy
           </Link>
           .
         </p>
+      </div>
+
+      {/* ── Right decorative panel ── */}
+      <div className="hidden lg:block lg:flex-1 p-3 pl-0">
+        <div className="relative h-full w-full overflow-hidden rounded-2xl">
+          {/* Gradient background — amber/warm theme */}
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-gradient-to-br from-amber-600 via-orange-500 to-yellow-400"
+          />
+
+          {/* Abstract wave pattern overlay */}
+          <svg
+            aria-hidden
+            className="absolute inset-0 h-full w-full opacity-30"
+            viewBox="0 0 800 800"
+            preserveAspectRatio="xMidYMid slice"
+          >
+            {Array.from({ length: 24 }, (_, i) => (
+              <path
+                key={i}
+                d={`M${-100 + i * 40},${800 + i * 10} Q${200 + i * 30},${400 - i * 20} ${900 + i * 10},${-50 + i * 35}`}
+                stroke="white"
+                strokeWidth={1.5 + i * 0.15}
+                strokeOpacity={0.15 + i * 0.012}
+                fill="none"
+              />
+            ))}
+          </svg>
+
+          {/* Radial glow */}
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,rgba(255,255,255,0.12)_0%,transparent_70%)]"
+          />
+
+          {/* Centred logo watermark */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <BrandLogo className="h-12 opacity-90 brightness-0 invert" alt="" />
+          </div>
+        </div>
       </div>
     </main>
   );

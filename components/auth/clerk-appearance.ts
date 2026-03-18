@@ -3,13 +3,12 @@
  * Called at render time so it picks up the correct dark/light values.
  */
 export function clerkAuthAppearance(isDark: boolean) {
-  // Match globals.css token values exactly
-  const primary = isDark ? '#14b8a6' : '#0d9488';
-  const background = isDark ? '#121314' : '#f5f6f8';
+  const primary = isDark ? '#14b8a6' : '#b45309';
+  const background = isDark ? '#121314' : '#ffffff';
   const card = isDark ? '#1f2023' : '#ffffff';
-  const foreground = isDark ? '#f1f3f5' : '#0f1117';
-  const mutedFg = isDark ? '#9ca3af' : '#6b7280';
-  const border = isDark ? '#32353a' : '#e4e6ea';
+  const foreground = isDark ? '#f1f3f5' : '#1c1917';
+  const mutedFg = isDark ? '#9ca3af' : '#78716c';
+  const border = isDark ? '#32353a' : '#e5e5e5';
   const destructive = isDark ? '#ef4444' : '#dc2626';
 
   return {
@@ -30,22 +29,21 @@ export function clerkAuthAppearance(isDark: boolean) {
       headerTitle: 'hidden',
       headerSubtitle: 'hidden',
       header: 'hidden',
-      // Social buttons
-      socialButtonsBlockButton: `border bg-transparent hover:opacity-80 transition-opacity font-medium`,
-      socialButtonsBlockButton__google: `border-[${border}] text-[${foreground}]`,
+      // Social buttons — clean outlined style
+      socialButtonsBlockButton: `border border-[${border}] bg-transparent hover:bg-neutral-50 transition-colors font-medium rounded-lg`,
       socialButtonsBlockButtonText: 'font-medium text-sm',
       // Divider
       dividerLine: `bg-[${border}]`,
       dividerText: `text-[${mutedFg}] text-xs`,
-      // Form fields
-      formFieldLabel: `text-sm font-medium text-[${foreground}]`,
-      formFieldInput: `border-[${border}] bg-[${card}] text-[${foreground}] placeholder:text-[${mutedFg}] focus:ring-1 focus:ring-[${primary}]`,
-      // Buttons
-      formButtonPrimary: `bg-[${primary}] hover:opacity-90 transition-opacity text-white font-medium`,
-      // Footer
+      // Form fields — bottom-border style to match screenshot
+      formFieldLabel: `text-sm font-medium text-[${mutedFg}]`,
+      formFieldInput: `border-[${border}] bg-transparent text-[${foreground}] placeholder:text-[${mutedFg}] focus:ring-1 focus:ring-[${primary}] rounded-lg`,
+      // Primary button — dark, full-width
+      formButtonPrimary: `bg-[${foreground}] hover:opacity-90 transition-opacity text-white font-medium rounded-lg`,
+      // Footer links
       footerActionText: `text-[${mutedFg}] text-sm`,
-      footerActionLink: `text-[${primary}] hover:opacity-80 font-medium`,
-      footer: `bg-transparent`,
+      footerActionLink: `text-[${foreground}] hover:opacity-80 font-semibold underline underline-offset-4`,
+      footer: 'bg-transparent',
       // Identity preview
       identityPreviewText: `text-[${foreground}]`,
       identityPreviewEditButton: `text-[${primary}]`,
