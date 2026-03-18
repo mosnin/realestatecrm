@@ -12,9 +12,6 @@ type UserSettings = {
   notifications?: boolean;
   phoneNumber?: string | null;
   myConnections?: string | null;
-  aiPersonalization?: string | null;
-  billingSettings?: string | null;
-  anthropicApiKey?: string | null;
 };
 
 interface SettingsFormProps {
@@ -44,15 +41,6 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
   );
   const [phoneNumber, setPhoneNumber] = useState(settings?.phoneNumber ?? '');
   const [myConnections, setMyConnections] = useState(settings?.myConnections ?? '');
-  const [aiPersonalization, setAiPersonalization] = useState(
-    settings?.aiPersonalization ?? ''
-  );
-  const [billingSettings, setBillingSettings] = useState(
-    settings?.billingSettings ?? ''
-  );
-  const [anthropicApiKey, setAnthropicApiKey] = useState(
-    settings?.anthropicApiKey ?? ''
-  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -70,9 +58,6 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
           notifications,
           phoneNumber,
           myConnections,
-          aiPersonalization,
-          billingSettings,
-          anthropicApiKey
         })
       });
       setSaved(true);
@@ -141,36 +126,6 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
             value={myConnections}
             onChange={(e) => setMyConnections(e.target.value)}
             placeholder="Brokerages, lenders, partners"
-          />
-        </div>
-      </SectionBlock>
-
-      {/* AI */}
-      <SectionBlock title="AI configuration" description="Keys and personalization for the AI assistant.">
-        <div className="rounded-lg border border-border/60 bg-muted/30 p-3.5 space-y-1">
-          <p className="text-xs font-medium">AI & Vector Keys</p>
-          <p className="text-xs text-muted-foreground">
-            Only an optional Anthropic key is stored here. OpenAI and Zilliz credentials are project-level environment variables — set <code className="font-mono">OPENAI_API_KEY</code>, <code className="font-mono">ZILLIZ_URI</code>, and <code className="font-mono">ZILLIZ_TOKEN</code> in Vercel.
-          </p>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="anthropicApiKey">Anthropic API key</Label>
-          <Input
-            id="anthropicApiKey"
-            type="password"
-            value={anthropicApiKey}
-            onChange={(e) => setAnthropicApiKey(e.target.value)}
-            placeholder="sk-ant-..."
-          />
-          <p className="text-xs text-muted-foreground">Required for the AI Assistant. Get your key at console.anthropic.com.</p>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="aiPersonalization">AI personalization</Label>
-          <Input
-            id="aiPersonalization"
-            value={aiPersonalization}
-            onChange={(e) => setAiPersonalization(e.target.value)}
-            placeholder="Tone, writing style, playbooks"
           />
         </div>
       </SectionBlock>
