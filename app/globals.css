@@ -114,8 +114,8 @@
   --popover: #1f2023;
   --popover-foreground: #f1f3f5;
 
-  --primary: #14b8a6;
-  --primary-foreground: #042f2e;
+  --primary: #ff964f;
+  --primary-foreground: #ffffff;
 
   --secondary: #24262a;
   --secondary-foreground: #e5e7eb;
@@ -123,16 +123,16 @@
   --muted: #24262a;
   --muted-foreground: #9ca3af;
 
-  --accent: #1f2a29;
-  --accent-foreground: #14b8a6;
+  --accent: #2a1f17;
+  --accent-foreground: #ff964f;
 
   --destructive: #ef4444;
 
   --border: #32353a;
   --input: #32353a;
-  --ring: #14b8a6;
+  --ring: #ff964f;
 
-  --chart-1: #14b8a6;
+  --chart-1: #ff964f;
   --chart-2: #94a3b8;
   --chart-3: #fbbf24;
   --chart-4: #f87171;
@@ -144,52 +144,52 @@
 
   --sidebar: #1a1b1d;
   --sidebar-foreground: #f1f3f5;
-  --sidebar-primary: #14b8a6;
-  --sidebar-primary-foreground: #042f2e;
+  --sidebar-primary: #ff964f;
+  --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #24262a;
   --sidebar-accent-foreground: #f1f3f5;
   --sidebar-border: #32353a;
-  --sidebar-ring: #14b8a6;
+  --sidebar-ring: #ff964f;
 }
 
-/* ── App theme: white & charcoal grey for dashboard/app ──── */
+/* ── App theme: white, charcoal & pastel-orange for dashboard/app ── */
 .app-theme {
   --background: #f5f6f8;
   --surface: #eef0f3;
-  --foreground: #0f1117;
+  --foreground: #2b2b2b;
 
   --card: #ffffff;
-  --card-foreground: #0f1117;
+  --card-foreground: #2b2b2b;
 
   --popover: #ffffff;
-  --popover-foreground: #0f1117;
+  --popover-foreground: #2b2b2b;
 
-  --primary: #0f1117;
+  --primary: #ff964f;
   --primary-foreground: #ffffff;
 
   --secondary: #f0f1f3;
-  --secondary-foreground: #0f1117;
+  --secondary-foreground: #2b2b2b;
 
   --muted: #f0f1f3;
   --muted-foreground: #6b7280;
 
-  --accent: #f0f1f3;
-  --accent-foreground: #0f1117;
+  --accent: #fff4eb;
+  --accent-foreground: #d4702a;
 
   --destructive: #dc2626;
 
   --border: #e4e6ea;
   --input: #e4e6ea;
-  --ring: #0f1117;
+  --ring: #ff964f;
 
   --sidebar: #ffffff;
-  --sidebar-foreground: #0f1117;
-  --sidebar-primary: #0f1117;
+  --sidebar-foreground: #2b2b2b;
+  --sidebar-primary: #ff964f;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f0f1f3;
-  --sidebar-accent-foreground: #0f1117;
+  --sidebar-accent: #fff4eb;
+  --sidebar-accent-foreground: #2b2b2b;
   --sidebar-border: #e4e6ea;
-  --sidebar-ring: #0f1117;
+  --sidebar-ring: #ff964f;
 }
 .app-theme.dark {
   --background: #121314;
@@ -202,8 +202,8 @@
   --popover: #1f2023;
   --popover-foreground: #f1f3f5;
 
-  --primary: #f1f3f5;
-  --primary-foreground: #121314;
+  --primary: #ff964f;
+  --primary-foreground: #ffffff;
 
   --secondary: #24262a;
   --secondary-foreground: #e5e7eb;
@@ -211,23 +211,23 @@
   --muted: #24262a;
   --muted-foreground: #9ca3af;
 
-  --accent: #24262a;
-  --accent-foreground: #f1f3f5;
+  --accent: #2a1f17;
+  --accent-foreground: #ff964f;
 
   --destructive: #ef4444;
 
   --border: #32353a;
   --input: #32353a;
-  --ring: #f1f3f5;
+  --ring: #ff964f;
 
   --sidebar: #1a1b1d;
   --sidebar-foreground: #f1f3f5;
-  --sidebar-primary: #f1f3f5;
-  --sidebar-primary-foreground: #121314;
+  --sidebar-primary: #ff964f;
+  --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #24262a;
   --sidebar-accent-foreground: #f1f3f5;
   --sidebar-border: #32353a;
-  --sidebar-ring: #f1f3f5;
+  --sidebar-ring: #ff964f;
 }
 
 @layer base {
@@ -374,8 +374,8 @@
   color: #f1f3f5 !important;
 }
 .dark .cl-formFieldInput:focus {
-  border-color: #14b8a6 !important;
-  box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.15) !important;
+  border-color: #ff964f !important;
+  box-shadow: 0 0 0 2px rgba(255, 150, 79, 0.15) !important;
 }
 .dark .cl-formButtonPrimary {
   background: #f1f3f5 !important;
