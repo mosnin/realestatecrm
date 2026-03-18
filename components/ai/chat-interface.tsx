@@ -5,7 +5,7 @@ import { MessageBubble } from './message-bubble';
 import { ConversationSidebar } from './conversation-sidebar';
 import { GradientAIChatInput, type MentionItem } from '@/components/ui/gradient-ai-chat-input';
 import { Button } from '@/components/ui/button';
-import { Menu, X, AlertCircle, Sparkles } from 'lucide-react';
+import { History, X, AlertCircle, Sparkles, Plus } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import type { Conversation } from '@/lib/types';
@@ -34,7 +34,7 @@ export function ChatInterface({
   const [activeConversationId, setActiveConversationId] = useState<string | null>(initialConversationId);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const inFlightRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -58,7 +58,7 @@ export function ChatInterface({
 
   async function handleSelectConversation(conv: Conversation) {
     setActiveConversationId(conv.id);
-    setSidebarOpen(false);
+    setDrawerOpen(false);
     await loadConversationMessages(conv.id);
   }
 
@@ -73,7 +73,7 @@ export function ChatInterface({
       setConversations((prev) => [conv, ...prev]);
       setActiveConversationId(conv.id);
       setMessages([]);
-      setSidebarOpen(false);
+      setDrawerOpen(false);
     }
   }
 
@@ -105,7 +105,6 @@ export function ChatInterface({
     );
   }
 
-  // Search contacts and deals for @ mentions
   const handleMentionSearch = useCallback(async (query: string): Promise<MentionItem[]> => {
     const results: MentionItem[] = [];
     try {
@@ -116,8 +115,7 @@ export function ChatInterface({
 
       if (contactsRes.ok) {
         const contacts = await contactsRes.json();
-        const filtered = contacts.slice(0, 10);
-        for (const c of filtered) {
+        for (const c of contacts.slice(0, 10)) {
           results.push({
             id: c.id,
             type: 'contact',
@@ -151,7 +149,6 @@ export function ChatInterface({
   async function handleSend(text: string, mentions: MentionItem[]) {
     if (!text || inFlightRef.current) return;
 
-    // Build context prefix from mentions
     let contextPrefix = '';
     if (mentions.length > 0) {
       const mentionLabels = mentions.map(
@@ -235,32 +232,55 @@ export function ChatInterface({
   const atLimit = messages.length >= MESSAGE_LIMIT;
 
   return (
-    <div className="flex h-full min-h-0 border border-border rounded-xl overflow-hidden">
-      {/* Sidebar — desktop always visible, mobile drawer */}
-      <div className={cn(
-        'flex-shrink-0 border-r border-border bg-muted/20 transition-all duration-200',
-        'hidden md:block w-64',
-      )}>
-        <ConversationSidebar
-          slug={slug}
-          conversations={conversations}
-          activeId={activeConversationId}
-          onSelect={handleSelectConversation}
-          onNew={handleNewConversation}
-          onDelete={handleDeleteConversation}
-          onRename={handleRenameConversation}
-        />
+    <div className="flex flex-col h-full min-h-0">
+      {/* Minimal top bar */}
+      <div className="flex items-center justify-between px-2 py-2 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+            title="Conversation history"
+          >
+            <History size={16} />
+          </button>
+          {activeConversationId && (
+            <span className="text-xs text-muted-foreground truncate max-w-[200px] hidden sm:inline">
+              {conversations.find((c) => c.id === activeConversationId)?.title}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {messages.length > 0 && (
+            <span className={cn(
+              'text-xs tabular-nums',
+              messages.length >= MESSAGE_LIMIT * 0.8
+                ? 'text-amber-600 dark:text-amber-400 font-semibold'
+                : 'text-muted-foreground'
+            )}>
+              {messages.length}/{MESSAGE_LIMIT}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleNewConversation}
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+            title="New conversation"
+          >
+            <Plus size={16} />
+          </button>
+        </div>
       </div>
 
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
-          <div className="w-72 bg-background border-r border-border flex flex-col">
-            <div className="flex items-center justify-between p-3 border-b">
-              <span className="font-semibold text-sm">Conversations</span>
+      {/* Conversation history drawer */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="w-80 max-w-[85vw] bg-background border-r border-border flex flex-col shadow-xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <span className="font-semibold text-sm">History</span>
               <button
                 type="button"
-                onClick={() => setSidebarOpen(false)}
+                onClick={() => setDrawerOpen(false)}
                 className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
               >
                 <X size={15} />
@@ -278,57 +298,28 @@ export function ChatInterface({
               />
             </div>
           </div>
-          <div className="flex-1 bg-black/40" onClick={() => setSidebarOpen(false)} />
+          <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
         </div>
       )}
 
-      {/* Chat area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Chat header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card/50 flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="md:hidden w-8 h-8 flex items-center justify-center rounded-md hover:bg-muted transition-colors text-muted-foreground"
-          >
-            <Menu size={16} />
-          </button>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm truncate">
-              {activeConversationId
-                ? conversations.find((c) => c.id === activeConversationId)?.title ?? 'Conversation'
-                : 'Chip'}
-            </p>
-          </div>
-          {messages.length > 0 && (
-            <span className={cn(
-              'text-xs tabular-nums flex-shrink-0',
-              messages.length >= MESSAGE_LIMIT * 0.8
-                ? 'text-amber-600 dark:text-amber-400 font-semibold'
-                : 'text-muted-foreground'
-            )}>
-              {messages.length} / {MESSAGE_LIMIT}
-            </span>
-          )}
-        </div>
-
-        {/* Messages area */}
+      {/* Messages area — centered, breathable */}
+      <div className="flex-1 min-h-0 overflow-hidden">
         {loadingMessages ? (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
             Loading...
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 text-muted-foreground p-8">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <Sparkles size={32} className="text-primary" />
+          <div className="h-full flex flex-col items-center justify-center text-center gap-6 text-muted-foreground px-6">
+            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+              <Sparkles size={36} className="text-primary" />
             </div>
-            <div>
-              <p className="font-semibold text-foreground text-lg">Chip</p>
-              <p className="text-sm mt-1">
-                Your AI assistant for leads, deals, and pipeline insights. Use @ to pull in contacts or deals.
+            <div className="space-y-2">
+              <p className="font-semibold text-foreground text-xl">Chip</p>
+              <p className="text-sm max-w-md">
+                Your AI assistant for leads, deals, and pipeline insights. Use <span className="font-medium text-foreground">@</span> to pull in contacts or deals.
               </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-md">
               {[
                 'Show me my highest value deals',
                 'Which clients are in tour stage?',
@@ -338,7 +329,7 @@ export function ChatInterface({
                 <button
                   key={suggestion}
                   onClick={() => handleSend(suggestion, [])}
-                  className="text-xs text-left p-3 rounded-lg border hover:bg-accent/50 transition-colors"
+                  className="text-xs text-left p-3 rounded-xl border border-border/60 hover:bg-accent/50 hover:border-border transition-all"
                 >
                   {suggestion}
                 </button>
@@ -346,8 +337,8 @@ export function ChatInterface({
             </div>
           </div>
         ) : (
-          <ScrollArea className="flex-1 pr-2">
-            <div className="space-y-4 p-4">
+          <ScrollArea className="h-full">
+            <div className="max-w-3xl mx-auto space-y-4 px-4 sm:px-6 py-6">
               {messages.map((msg, i) => (
                 <MessageBubble key={i} role={msg.role} content={msg.content} />
               ))}
@@ -366,34 +357,34 @@ export function ChatInterface({
             </div>
           </ScrollArea>
         )}
+      </div>
 
-        {/* Input area */}
-        <div className="px-4 pt-3 pb-4 flex-shrink-0">
-          {atLimit ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
-              <div className="flex justify-center mb-2">
-                <AlertCircle size={20} className="text-amber-600 dark:text-amber-400" />
-              </div>
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-                You&apos;ve reached the 50-message limit for this conversation.
-              </p>
-              <p className="text-xs text-amber-700 dark:text-amber-300 mb-3">
-                Start a new conversation to continue chatting.
-              </p>
-              <Button size="sm" onClick={handleNewConversation} variant="outline" className="border-amber-400 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-800">
-                Start new conversation
-              </Button>
+      {/* Input — pinned bottom, centered */}
+      <div className="flex-shrink-0 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-2 pb-4">
+        {atLimit ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
+            <div className="flex justify-center mb-2">
+              <AlertCircle size={20} className="text-amber-600 dark:text-amber-400" />
             </div>
-          ) : (
-            <GradientAIChatInput
-              placeholder="Ask Chip about your clients, deals, or pipeline..."
-              onSend={handleSend}
-              onMentionSearch={handleMentionSearch}
-              disabled={isStreaming}
-              enableShadows={true}
-            />
-          )}
-        </div>
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
+              You&apos;ve reached the 50-message limit for this conversation.
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-300 mb-3">
+              Start a new conversation to continue chatting.
+            </p>
+            <Button size="sm" onClick={handleNewConversation} variant="outline" className="border-amber-400 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-800">
+              Start new conversation
+            </Button>
+          </div>
+        ) : (
+          <GradientAIChatInput
+            placeholder="Ask Chip about your clients, deals, or pipeline..."
+            onSend={handleSend}
+            onMentionSearch={handleMentionSearch}
+            disabled={isStreaming}
+            enableShadows={true}
+          />
+        )}
       </div>
     </div>
   );
