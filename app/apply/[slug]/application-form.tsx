@@ -69,6 +69,12 @@ function clearDraft(slug: string) {
   } catch {}
 }
 
+function safeParseDate(raw: string): Date | undefined {
+  if (!raw) return undefined;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? undefined : d;
+}
+
 // ── Select component (inline, lightweight) ──
 function SelectField({
   id,
@@ -463,7 +469,7 @@ export function ApplicationForm({
               <Label>Target move-in date</Label>
               <div className="rounded-lg border border-input bg-background p-3">
                 <DateWheelPicker
-                  value={get('targetMoveInDate') ? new Date(get('targetMoveInDate')) : undefined}
+                  value={safeParseDate(get('targetMoveInDate'))}
                   onChange={(date) =>
                     set(
                       'targetMoveInDate',
