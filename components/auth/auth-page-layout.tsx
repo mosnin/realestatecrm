@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { BrandLogo } from '@/components/brand-logo';
-import { AnimatedGrid } from '@/components/ui/animated-grid';
 import Link from 'next/link';
 
 interface AuthPageLayoutProps {
@@ -61,19 +60,13 @@ export function AuthPageLayout({ children, heading, subheading }: AuthPageLayout
       {/* ── Right decorative panel ── */}
       <div className="hidden lg:block lg:flex-1 p-3 pl-0">
         <div className="relative h-full w-full overflow-hidden rounded-2xl">
-          {/* Animated grid background — pastel yellows & oranges */}
-          <div aria-hidden className="absolute inset-0">
-            <AnimatedGrid
-              startColor={[255, 237, 180]}
-              endColor={[255, 200, 130]}
-              animationStartColor={[255, 223, 150]}
-              animationEndColor={[255, 183, 110]}
-              rows={10}
-              cols={12}
-              cellSize="1fr"
-              animationDuration="2.5s"
-            />
-          </div>
+          {/* Background image */}
+          <img
+            aria-hidden
+            src="https://images.pexels.com/photos/18541706/pexels-photo-18541706.jpeg"
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+          />
 
           {/* Centred logo watermark */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
