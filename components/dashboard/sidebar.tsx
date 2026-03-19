@@ -6,7 +6,7 @@ import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
 import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
-import { Building2, Settings, ChevronRight, Sparkles, Users, UserCircle, Mail, LayoutDashboard } from 'lucide-react';
+import { Building2, Settings, ChevronRight, Sparkles, Users, UserCircle, Mail, LayoutDashboard, SlidersHorizontal } from 'lucide-react';
 
 interface SidebarProps {
   slug: string;
@@ -23,6 +23,7 @@ const brokerTeamNavItems = [
   { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
   { href: '/broker/members', label: 'Members', icon: Users, exact: false },
   { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
+  { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false },
 ];
 
 export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker = false, brokerageName = null, brokerageRole = null }: SidebarProps) {

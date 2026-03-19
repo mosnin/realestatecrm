@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { InviteForm } from '@/components/broker/invite-form';
 import { InviteCodeCard } from '@/components/broker/invite-code-card';
 import { RevokeInviteButton } from '@/components/broker/revoke-invite-button';
+import { BulkInviteForm } from '@/components/broker/bulk-invite-form';
 
 const statusBadge = (status: string) => {
   switch (status) {
@@ -47,7 +48,7 @@ export default async function BrokerInvitationsPage() {
         </p>
       </div>
 
-      <InviteCodeCard />
+      <InviteCodeCard isOwner={ctx.membership.role === 'broker_owner'} />
 
       <Card>
         <CardContent className="px-5 py-4 space-y-3">
@@ -55,6 +56,8 @@ export default async function BrokerInvitationsPage() {
           <InviteForm />
         </CardContent>
       </Card>
+
+      <BulkInviteForm />
 
       <div>
         <p className="text-sm font-semibold mb-3">Sent invitations</p>

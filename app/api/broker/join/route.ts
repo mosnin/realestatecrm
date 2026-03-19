@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { audit } from '@/lib/audit';
+import { notifyBroker } from '@/lib/broker-notify';
 
 /**
  * POST /api/broker/join
@@ -86,6 +87,16 @@ export async function POST(req: Request) {
   }
 
   void audit({ actorClerkId: clerkId, action: 'CREATE', resource: 'BrokerageMembership', metadata: { brokerageId: brokerage.id, role: 'realtor_member', method: 'join_code' } });
+
+  // Resolve user email for notification
+  const { data: userData } = await supabase.from('User').select('email').eq('id', user.id).maybeSingle();
+  void notifyBroker({
+    brokerageId: brokerage.id,
+    type: 'member_joined',
+    title: `${userData?.email ?? 'A new member'} joined via invite code`,
+    body: 'Assigned role: Realtor',
+    metadata: { userId: user.id, method: 'join_code' },
+  });
 
   return NextResponse.json({ brokerageName: brokerage.name }, { status: 201 });
 }

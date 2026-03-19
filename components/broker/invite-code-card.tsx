@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Copy, Check, RefreshCw, Hash } from 'lucide-react';
 
-export function InviteCodeCard() {
+export function InviteCodeCard({ isOwner = true }: { isOwner?: boolean }) {
   const [code, setCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -65,21 +65,25 @@ export function InviteCodeCard() {
               {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
               {copied ? 'Copied!' : 'Copy link'}
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9 w-9 p-0 text-muted-foreground"
-              onClick={handleGenerate}
-              disabled={generating}
-              title="Regenerate code (old code will stop working)"
-            >
-              <RefreshCw size={13} className={generating ? 'animate-spin' : ''} />
-            </Button>
+            {isOwner && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 p-0 text-muted-foreground"
+                onClick={handleGenerate}
+                disabled={generating}
+                title="Regenerate code (old code will stop working)"
+              >
+                <RefreshCw size={13} className={generating ? 'animate-spin' : ''} />
+              </Button>
+            )}
           </div>
-        ) : (
+        ) : isOwner ? (
           <Button size="sm" onClick={handleGenerate} disabled={generating}>
             {generating ? 'Generating…' : 'Generate invite code'}
           </Button>
+        ) : (
+          <p className="text-xs text-muted-foreground">No invite code set. Ask the brokerage owner to generate one.</p>
         )}
 
         {code && (

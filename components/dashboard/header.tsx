@@ -21,6 +21,7 @@ import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
 import { Building2, LayoutDashboard, UserCircle, Users, Mail } from 'lucide-react';
 import { GlobalSearch } from './global-search';
 import { NotificationCenter } from './notification-center';
+import { NotificationBell } from '@/components/broker/notification-bell';
 
 const brokerMobileNavItems = [
   { href: '/broker', label: 'Team Overview', icon: LayoutDashboard, exact: true },
@@ -172,6 +173,7 @@ export function Header({ slug, spaceName, title, isBroker = false, brokerageName
       <div className="flex items-center gap-1.5">
         <GlobalSearch slug={slug} />
         <NotificationCenter slug={slug} />
+        {isBroker && <NotificationBell />}
         <Button
           variant="ghost"
           size="icon"

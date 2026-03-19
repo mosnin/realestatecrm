@@ -12,6 +12,7 @@ interface InvitationDetail {
   roleToAssign: string;
   expiresAt: string;
   brokerageName: string;
+  logoUrl: string | null;
 }
 
 const roleLabel = (role: string) =>
@@ -54,7 +55,11 @@ export default async function AcceptInvitationPage({ params }: Params) {
           {/* Header */}
           <div className="bg-foreground px-6 py-5">
             <div className="flex items-center gap-2.5">
-              <Building2 size={20} className="text-background/70" />
+              {inv?.logoUrl ? (
+                <img src={inv.logoUrl} alt="" className="h-6 max-w-[80px] object-contain rounded" />
+              ) : (
+                <Building2 size={20} className="text-background/70" />
+              )}
               <p className="text-background font-semibold text-base">
                 {inv?.brokerageName ?? 'Chippi'}
               </p>

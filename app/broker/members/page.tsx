@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { RemoveMemberButton } from '@/components/broker/remove-member-button';
+import { ChangeRoleButton } from '@/components/broker/change-role-button';
 
 export default async function BrokerMembersPage() {
   const ctx = await getBrokerContext();
@@ -89,10 +90,17 @@ export default async function BrokerMembersPage() {
                       </span>
                     )}
                     {m.role !== 'broker_owner' && ctx.membership.role === 'broker_owner' && (
-                      <RemoveMemberButton
-                        membershipId={m.id}
-                        memberName={user?.name ?? user?.email ?? 'this member'}
-                      />
+                      <>
+                        <ChangeRoleButton
+                          membershipId={m.id}
+                          currentRole={m.role}
+                          memberName={user?.name ?? user?.email ?? 'this member'}
+                        />
+                        <RemoveMemberButton
+                          membershipId={m.id}
+                          memberName={user?.name ?? user?.email ?? 'this member'}
+                        />
+                      </>
                     )}
                   </div>
                 </div>

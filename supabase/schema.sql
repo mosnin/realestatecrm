@@ -231,6 +231,27 @@ CREATE INDEX IF NOT EXISTS idx_invitation_token             ON "Invitation"(toke
 CREATE INDEX IF NOT EXISTS idx_invitation_status            ON "Invitation"(status);
 
 -- ============================================================
+-- BrokerNotification: in-app notifications for broker dashboard
+-- Written by lib/broker-notify.ts on key events (member joins, deals, etc.)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS "BrokerNotification" (
+  id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "brokerageId"   text NOT NULL REFERENCES "Brokerage"(id) ON DELETE CASCADE,
+  type            text NOT NULL,
+  title           text NOT NULL,
+  body            text,
+  metadata        jsonb,
+  read            boolean NOT NULL DEFAULT false,
+  "createdAt"     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_broker_notif_brokerage ON "BrokerNotification"("brokerageId", "createdAt" DESC);
+CREATE INDEX IF NOT EXISTS idx_broker_notif_unread    ON "BrokerNotification"("brokerageId", read) WHERE read = false;
+
+ALTER TABLE "BrokerNotification" ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================
 -- AuditLog: immutable event log for compliance and security review
 -- Written by lib/audit.ts on all critical Create/Update/Delete operations.
 -- Uses service-role key; never directly readable by client keys.

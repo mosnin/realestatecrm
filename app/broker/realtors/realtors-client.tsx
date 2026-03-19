@@ -295,16 +295,12 @@ function RealtorCard({ row, rank, sortKey }: { row: RealtorRow; rank: number; so
         {/* Footer */}
         <div className="flex items-center justify-between mt-auto pt-1 border-t border-border">
           <p className="text-[11px] text-muted-foreground">Joined {joinedAt}</p>
-          {row.spaceSlug ? (
-            <Link
-              href={`/s/${row.spaceSlug}`}
-              className="inline-flex items-center gap-1 text-[11px] text-primary font-medium hover:underline underline-offset-2"
-            >
-              View workspace <ExternalLink size={10} />
-            </Link>
-          ) : (
-            <span className="text-[11px] text-muted-foreground italic">No workspace yet</span>
-          )}
+          <Link
+            href={`/broker/realtors/${row.userId}`}
+            className="inline-flex items-center gap-1 text-[11px] text-primary font-medium hover:underline underline-offset-2"
+          >
+            View details <ExternalLink size={10} />
+          </Link>
         </div>
       </CardContent>
     </Card>

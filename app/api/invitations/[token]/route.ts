@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
+import { notifyBroker } from '@/lib/broker-notify';
 
 /**
  * GET /api/invitations/[token]
@@ -22,19 +23,21 @@ export async function GET(_req: Request, { params }: Params) {
 
   const { data: inv } = await supabase
     .from('Invitation')
-    .select('id, status, email, roleToAssign, expiresAt, brokerageId, Brokerage(name)')
+    .select('id, status, email, roleToAssign, expiresAt, brokerageId, Brokerage(name, logoUrl)')
     .eq('token', token)
     .maybeSingle();
 
   if (!inv) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
 
+  const brokerage = inv.Brokerage as unknown as { name: string; logoUrl: string | null } | null;
   return NextResponse.json({
     id: inv.id,
     status: inv.status,
     email: inv.email,
     roleToAssign: inv.roleToAssign,
     expiresAt: inv.expiresAt,
-    brokerageName: (inv.Brokerage as { name: string } | null)?.name ?? '',
+    brokerageName: brokerage?.name ?? '',
+    logoUrl: brokerage?.logoUrl ?? null,
   });
 }
 
@@ -125,6 +128,14 @@ export async function POST(_req: Request, { params }: Params) {
   await supabase.from('Invitation').update({ status: 'accepted' }).eq('id', inv.id);
 
   void audit({ actorClerkId: clerkId, action: 'CREATE', resource: 'BrokerageMembership', metadata: { brokerageId: inv.brokerageId, role: inv.roleToAssign, method: 'email_invitation', invitationId: inv.id } });
+
+  void notifyBroker({
+    brokerageId: inv.brokerageId,
+    type: 'member_joined',
+    title: `${user.email} joined via invitation`,
+    body: `Assigned role: ${inv.roleToAssign === 'broker_manager' ? 'Manager' : 'Realtor'}`,
+    metadata: { userId: user.id, method: 'email_invitation' },
+  });
 
   return NextResponse.json({ message: 'Joined brokerage successfully' }, { status: 200 });
 }

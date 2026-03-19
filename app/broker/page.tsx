@@ -13,9 +13,11 @@ import {
   TrendingUp,
   UserCheck,
   Plus,
+  Download,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
+import { TrendsChart } from '@/components/broker/trends-chart';
 
 export default async function BrokerOverviewPage() {
   const ctx = await getBrokerContext();
@@ -116,12 +118,20 @@ export default async function BrokerOverviewPage() {
             Brokerage overview · {members.length} {members.length === 1 ? 'member' : 'members'}
           </p>
         </div>
-        <Link
-          href="/broker/invitations"
-          className="inline-flex items-center gap-1.5 text-xs font-medium bg-primary text-primary-foreground px-3 py-2 rounded-lg hover:bg-primary/90 transition-colors flex-shrink-0"
-        >
-          <Plus size={13} /> Invite Realtor
-        </Link>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <a
+            href="/api/broker/export"
+            className="inline-flex items-center gap-1.5 text-xs font-medium border border-border text-foreground px-3 py-2 rounded-lg hover:bg-muted transition-colors"
+          >
+            <Download size={13} /> Export CSV
+          </a>
+          <Link
+            href="/broker/invitations"
+            className="inline-flex items-center gap-1.5 text-xs font-medium bg-primary text-primary-foreground px-3 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            <Plus size={13} /> Invite Realtor
+          </Link>
+        </div>
       </div>
 
       {/* Stats — 2 cols mobile, 3 tablet, 6 desktop */}
@@ -142,6 +152,9 @@ export default async function BrokerOverviewPage() {
           </Card>
         ))}
       </div>
+
+      {/* Weekly trends */}
+      <TrendsChart />
 
       {/* Team performance table + pending invitations */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
