@@ -21,7 +21,8 @@ export function JoinCodeAcceptButton({ code }: { code: string }) {
       const data = await res.json();
       if (res.ok) {
         setDone(true);
-        setTimeout(() => (window.location.href = '/broker'), 1500);
+        // Redirect to setup which routes brokers to /broker and realtors to /s/slug
+        setTimeout(() => (window.location.href = '/setup'), 1500);
       } else {
         setError(data.error ?? 'Something went wrong.');
       }

@@ -21,8 +21,8 @@ export function AcceptButton({ token }: AcceptButtonProps) {
       const data = await res.json();
       if (res.ok) {
         setDone(true);
-        // Redirect to broker dashboard after a beat
-        setTimeout(() => (window.location.href = '/broker'), 1500);
+        // Redirect to setup which routes brokers to /broker and realtors to /s/slug
+        setTimeout(() => (window.location.href = '/setup'), 1500);
       } else {
         setError(data.error ?? 'Something went wrong.');
       }

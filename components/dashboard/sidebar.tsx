@@ -167,6 +167,22 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
         )}
       </nav>
 
+      {/* ── Join a team (realtors without a brokerage) ── */}
+      {!isMemberOfBrokerage && (
+        <div className="px-3 pb-1">
+          <Link
+            href="/brokerage"
+            className="group flex items-center gap-2.5 py-[7px] pr-3 rounded-lg text-sm font-medium transition-all duration-150 border-l-[3px] border-transparent pl-[9px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            <Building2
+              size={15}
+              className="flex-shrink-0 opacity-45 group-hover:opacity-75 transition-opacity"
+            />
+            <span className="truncate">Join a team</span>
+          </Link>
+        </div>
+      )}
+
       {/* ── Secondary nav ── */}
       <div className="px-3 pb-2 border-t border-sidebar-border/50 pt-3 space-y-0.5">
         <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/45">

@@ -162,7 +162,7 @@ export default async function DashboardLayout({
           <DashboardFooter />
         </main>
       </div>
-      <MobileNav slug={slug} />
+      <MobileNav slug={slug} isBroker={isBroker} />
     </div>
   );
 }

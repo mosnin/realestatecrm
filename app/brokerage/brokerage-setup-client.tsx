@@ -11,7 +11,6 @@ import {
   Users,
   BarChart3,
   Mail,
-  ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BrandLogo } from '@/components/brand-logo';
@@ -98,7 +97,7 @@ function JoinForm() {
       const data = await res.json();
       if (res.ok) {
         setJoined(data.brokerageName);
-        setTimeout(() => (window.location.href = '/broker'), 1500);
+        setTimeout(() => (window.location.href = '/setup'), 1500);
       } else {
         setError(data.error ?? 'Failed to join brokerage.');
       }
@@ -174,14 +173,8 @@ export function BrokerageSetupClient({
             </p>
 
             <div className="mt-8 flex flex-col gap-3">
-              <Link href="/broker">
-                <Button className="w-full gap-2">
-                  <ExternalLink size={15} />
-                  Go to broker dashboard
-                </Button>
-              </Link>
               <Link href={`/s/${spaceSlug}`}>
-                <Button variant="outline" className="w-full gap-2">
+                <Button className="w-full gap-2">
                   <ArrowLeft size={15} />
                   Back to my workspace
                 </Button>

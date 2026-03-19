@@ -4,13 +4,18 @@ import { supabase } from '@/lib/supabase';
 import { getBrokerContext } from '@/lib/permissions';
 import { BrokerageSetupClient } from './brokerage-setup-client';
 
-export const metadata = { title: 'Brokerage Setup — Chippi' };
+export const metadata = { title: 'Brokerage — Chippi' };
 
+/**
+ * /brokerage setup page.
+ * - If already a broker: redirect to /broker
+ * - If not onboarded: redirect to /setup
+ * - Otherwise: show create/join options
+ */
 export default async function BrokeragePage() {
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
 
-  // Get user + space
   const { data: user } = await supabase
     .from('User')
     .select('id, onboard')
@@ -28,7 +33,7 @@ export default async function BrokeragePage() {
 
   if (!space) redirect('/setup');
 
-  // Check existing broker membership
+  // Already a broker? Go straight to the broker dashboard
   let existingBrokerageName: string | null = null;
   let existingBrokerageId: string | null = null;
   try {
@@ -39,6 +44,25 @@ export default async function BrokeragePage() {
     }
   } catch {
     // non-blocking
+  }
+
+  // Already a realtor_member? Also redirect
+  if (!existingBrokerageName) {
+    const { data: membership } = await supabase
+      .from('BrokerageMembership')
+      .select('brokerageId')
+      .eq('userId', user.id)
+      .eq('role', 'realtor_member')
+      .maybeSingle();
+    if (membership) {
+      const { data: brokerage } = await supabase
+        .from('Brokerage')
+        .select('name')
+        .eq('id', membership.brokerageId)
+        .maybeSingle();
+      existingBrokerageName = brokerage?.name ?? 'Your brokerage';
+      existingBrokerageId = membership.brokerageId;
+    }
   }
 
   return (
