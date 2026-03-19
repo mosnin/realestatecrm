@@ -17,7 +17,8 @@ export async function GET(req: NextRequest) {
     .from('Deal')
     .select('*, DealStage(id, spaceId, name, color, position)')
     .eq('spaceId', space.id)
-    .order('position', { ascending: true });
+    .order('position', { ascending: true })
+    .limit(1000);
   if (dealError) throw dealError;
 
   const dealIds = dealRows.map((r: any) => r.id);

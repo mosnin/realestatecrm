@@ -9,6 +9,10 @@ export async function PATCH(req: NextRequest) {
 
   const { dealId, newStageId, newPosition } = await req.json();
 
+  if (typeof newPosition !== 'number' || !Number.isInteger(newPosition) || newPosition < 0) {
+    return NextResponse.json({ error: 'newPosition must be a non-negative integer' }, { status: 400 });
+  }
+
   // Verify the deal exists and belongs to this user's space
   const { data: deal, error: dealError } = await supabase
     .from('Deal')

@@ -25,7 +25,9 @@ export async function GET(req: NextRequest) {
     const limitedSearch = search.slice(0, 100);
     // Escape PostgreSQL ILIKE special characters before wrapping in wildcards
     const escaped = limitedSearch.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
-    const pattern = `%${escaped}%`;
+    // Strip PostgREST filter-breaking characters (commas, parens)
+    const sanitized = escaped.replace(/[,()]/g, '');
+    const pattern = `%${sanitized}%`;
     query = query.or(`name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},preferences.ilike.${pattern}`);
   }
 
@@ -33,7 +35,15 @@ export async function GET(req: NextRequest) {
     query = query.eq('type', type);
   }
 
-  const { data: contacts, error } = await query.order('createdAt', { ascending: false });
+  // Pagination: default 500, max 1000
+  const limitParam = parseInt(req.nextUrl.searchParams.get('limit') ?? '500', 10);
+  const offsetParam = parseInt(req.nextUrl.searchParams.get('offset') ?? '0', 10);
+  const limit = Math.min(Math.max(1, limitParam || 500), 1000);
+  const offset = Math.max(0, offsetParam || 0);
+
+  const { data: contacts, error } = await query
+    .order('createdAt', { ascending: false })
+    .range(offset, offset + limit - 1);
   if (error) throw error;
 
   return NextResponse.json(contacts as Contact[]);

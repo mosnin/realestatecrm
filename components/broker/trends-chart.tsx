@@ -28,11 +28,13 @@ export function TrendsChart() {
   const [metric, setMetric] = useState<Metric>('leads');
 
   useEffect(() => {
-    fetch('/api/broker/trends')
+    const controller = new AbortController();
+    fetch('/api/broker/trends', { signal: controller.signal })
       .then((r) => r.json())
       .then((d) => setWeeks(d.weeks ?? []))
-      .catch(() => setWeeks([]))
-      .finally(() => setLoading(false));
+      .catch((err) => { if (err.name !== 'AbortError') setWeeks([]); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, []);
 
   if (loading) {

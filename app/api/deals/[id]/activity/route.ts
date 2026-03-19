@@ -65,7 +65,7 @@ export async function POST(
       dealId: id,
       spaceId: space.id,
       type,
-      content: content ?? null,
+      content: typeof content === 'string' ? content.slice(0, 5000) : null,
       metadata: metadata ?? null,
     })
     .select()

@@ -95,10 +95,13 @@ export async function POST(req: NextRequest) {
   // Generate a unique manage token for guest self-service
   const manageToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 16);
 
+  // Atomic insert — re-check for conflicts after insert and rollback if found.
+  // This closes the race window between the conflict check above and the insert.
+  const tourId = crypto.randomUUID();
   const { data: tour, error } = await supabase
     .from('Tour')
     .insert({
-      id: crypto.randomUUID(),
+      id: tourId,
       spaceId: space.id,
       contactId,
       guestName: guestName.trim(),
@@ -114,6 +117,23 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
   if (error) throw error;
+
+  // Post-insert conflict check: if another tour was inserted concurrently
+  // for the same slot, delete ours and return 409.
+  const { data: postConflicts } = await supabase
+    .from('Tour')
+    .select('id')
+    .eq('spaceId', space.id)
+    .in('status', ['scheduled', 'confirmed'])
+    .lt('startsAt', end.toISOString())
+    .gt('endsAt', start.toISOString())
+    .neq('id', tourId);
+
+  if (postConflicts && postConflicts.length > 0) {
+    // Rollback: delete the tour we just created
+    await supabase.from('Tour').delete().eq('id', tourId);
+    return NextResponse.json({ error: 'This time slot was just booked. Please choose another.' }, { status: 409 });
+  }
 
   // Send confirmation email (non-blocking)
   const { data: settingsFull } = await supabase

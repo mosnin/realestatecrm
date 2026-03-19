@@ -79,7 +79,7 @@ export async function POST(_req: Request, { params }: Params) {
   // Verify this invitation was meant for the signed-in user's email
   if (user.email.toLowerCase() !== inv.email.toLowerCase()) {
     return NextResponse.json(
-      { error: `This invitation was sent to ${inv.email}. Please sign in with that email to accept.` },
+      { error: 'This invitation was sent to a different email address. Please sign in with the correct email to accept.' },
       { status: 403 }
     );
   }

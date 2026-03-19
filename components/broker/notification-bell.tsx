@@ -30,11 +30,13 @@ export function NotificationBell() {
   const unread = notifications.filter((n) => !n.read).length;
 
   useEffect(() => {
-    fetch('/api/broker/notifications')
+    const controller = new AbortController();
+    fetch('/api/broker/notifications', { signal: controller.signal })
       .then((r) => r.json())
       .then((d) => setNotifications(d.notifications ?? []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch((err) => { if (err.name !== 'AbortError') setNotifications([]); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, []);
 
   // Close on outside click

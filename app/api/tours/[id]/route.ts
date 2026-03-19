@@ -112,7 +112,7 @@ export async function PATCH(
       .select('businessName')
       .eq('spaceId', ctx.space.id)
       .maybeSingle();
-    const { data: spaceRow } = await supabase.from('Space').select('name').eq('id', ctx.space.id).maybeSingle();
+    const { data: spaceRow } = await supabase.from('Space').select('name, slug').eq('id', ctx.space.id).maybeSingle();
     const emailData: TourEmailData = {
       guestName: data.guestName,
       guestEmail: data.guestEmail,
@@ -122,7 +122,7 @@ export async function PATCH(
       endsAt: data.endsAt,
       businessName: settings?.businessName || spaceRow?.name || '',
       tourId: data.id,
-      slug: '',
+      slug: spaceRow?.slug ?? '',
     };
     sendTourFollowUp(emailData).catch(console.error);
   }
