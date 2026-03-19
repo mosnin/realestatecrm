@@ -152,21 +152,37 @@ export function Header({ slug, spaceName, title, isBroker = false, brokerageName
 
         {/* Desktop: breadcrumb */}
         <div className="hidden md:flex items-center gap-1.5 text-sm">
-          <span className="text-muted-foreground">{title}</span>
-          {(() => {
-            const allItems = [...primaryNavItems, ...secondaryNavItems];
-            const match = allItems
-              .filter((item) => item.href !== '')
-              .find((item) => pathname.startsWith(`${base}${item.href}`));
-            return match ? (
-              <>
-                <span className="text-muted-foreground/40">/</span>
-                <span className="font-medium text-foreground">{match.label}</span>
-              </>
-            ) : (
-              <><span className="text-muted-foreground/40">/</span><span className="font-medium text-foreground">Overview</span></>
-            );
-          })()}
+          {pathname.startsWith('/broker') && brokerageName ? (
+            <>
+              <span className="text-muted-foreground">{brokerageName}</span>
+              <span className="text-muted-foreground/40">/</span>
+              <span className="font-medium text-foreground">
+                {pathname === '/broker' ? 'Overview' :
+                 pathname.startsWith('/broker/realtors') ? 'Realtors' :
+                 pathname.startsWith('/broker/members') ? 'Members' :
+                 pathname.startsWith('/broker/invitations') ? 'Invitations' :
+                 pathname.startsWith('/broker/settings') ? 'Settings' : 'Team'}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-muted-foreground">{title}</span>
+              {(() => {
+                const allItems = [...primaryNavItems, ...secondaryNavItems];
+                const match = allItems
+                  .filter((item) => item.href !== '')
+                  .find((item) => pathname.startsWith(`${base}${item.href}`));
+                return match ? (
+                  <>
+                    <span className="text-muted-foreground/40">/</span>
+                    <span className="font-medium text-foreground">{match.label}</span>
+                  </>
+                ) : (
+                  <><span className="text-muted-foreground/40">/</span><span className="font-medium text-foreground">Overview</span></>
+                );
+              })()}
+            </>
+          )}
         </div>
       </div>
 

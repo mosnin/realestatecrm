@@ -6,7 +6,7 @@ import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
 import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
-import { Building2, Settings, ChevronRight, Sparkles, Users, UserCircle, Mail, LayoutDashboard, SlidersHorizontal } from 'lucide-react';
+import { Building2, Settings, ChevronRight, Sparkles, Users, UserCircle, Mail, LayoutDashboard, SlidersHorizontal, Briefcase, ArrowLeftRight } from 'lucide-react';
 
 interface SidebarProps {
   slug: string;
@@ -37,7 +37,132 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
   const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
 
   const isMemberOfBrokerage = !!brokerageName;
+  const isOnBrokerPage = pathname.startsWith('/broker');
 
+  // ── Broker-focused sidebar (when on /broker/* pages) ──
+  if (isBroker && isOnBrokerPage) {
+    return (
+      <aside className="hidden md:flex flex-col w-60 h-full bg-sidebar border-r border-sidebar-border shrink-0">
+        {/* ── Brand ── */}
+        <div className="px-5 pt-5 pb-4 flex items-center">
+          <BrandLogo className="h-4" alt="Chippi" />
+        </div>
+
+        {/* ── Brokerage context card ── */}
+        <div className="px-3 pb-3">
+          <Link
+            href="/broker/settings"
+            className="group flex items-center gap-3 rounded-xl px-3 py-2.5 bg-primary/5 hover:bg-primary/10 border border-primary/15 transition-colors"
+          >
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center flex-shrink-0">
+              <Building2 size={16} className="text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm leading-tight truncate text-sidebar-foreground">
+                {brokerageName}
+              </p>
+              <p className="text-[11px] text-primary/60 truncate mt-0.5">
+                Brokerage · {brokerageRole === 'broker_owner' ? 'Owner' : 'Manager'}
+              </p>
+            </div>
+            <Settings
+              size={13}
+              className="text-muted-foreground/40 flex-shrink-0 group-hover:text-muted-foreground/70 transition-colors"
+            />
+          </Link>
+        </div>
+
+        <div className="mx-4 border-t border-sidebar-border/50 mb-1" />
+
+        {/* ── Team nav (primary when on broker pages) ── */}
+        <nav className="flex-1 px-3 pt-2 pb-2 space-y-0.5 overflow-y-auto">
+          <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/45">
+            Team
+          </p>
+          {brokerTeamNavItems.map((item) => {
+            const isActive = item.exact
+              ? pathname === item.href
+              : pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'group flex items-center gap-2.5 py-[7px] pr-3 rounded-lg text-sm font-medium transition-all duration-150 border-l-[3px] pl-[9px]',
+                  isActive
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                )}
+              >
+                <item.icon
+                  size={15}
+                  className={cn(
+                    'flex-shrink-0 transition-opacity',
+                    isActive ? 'opacity-100' : 'opacity-45 group-hover:opacity-75'
+                  )}
+                />
+                <span className="truncate">{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* ── Switch to workspace ── */}
+        <div className="px-3 pb-2 border-t border-sidebar-border/50 pt-3">
+          <Link
+            href={base}
+            className="group flex items-center gap-2.5 rounded-xl px-3 py-2.5 hover:bg-sidebar-accent border border-sidebar-border/40 transition-colors"
+          >
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-sm flex-shrink-0">
+              {spaceEmoji}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-sidebar-foreground truncate">{spaceName}</p>
+              <p className="text-[10px] text-muted-foreground/50">My workspace</p>
+            </div>
+            <ArrowLeftRight
+              size={11}
+              className="text-muted-foreground/35 flex-shrink-0 group-hover:text-muted-foreground/65 transition-colors"
+            />
+          </Link>
+        </div>
+
+        {/* ── User card ── */}
+        <div className="px-3 pb-4 pt-2 border-t border-sidebar-border/50">
+          <Link
+            href={`${base}/profile`}
+            className="group flex items-center gap-2.5 rounded-xl px-3 py-2.5 hover:bg-sidebar-accent transition-colors"
+          >
+            {user?.imageUrl ? (
+              <img
+                src={user.imageUrl}
+                alt={displayName}
+                className="w-8 h-8 rounded-full flex-shrink-0 object-cover ring-2 ring-sidebar-border"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0">
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-sidebar-foreground leading-tight truncate">
+                {displayName}
+              </p>
+              {email && (
+                <p className="text-[11px] text-muted-foreground/55 truncate mt-0.5">{email}</p>
+              )}
+            </div>
+            <ChevronRight
+              size={13}
+              className="text-muted-foreground/35 flex-shrink-0 group-hover:text-muted-foreground/65 transition-colors"
+            />
+          </Link>
+        </div>
+      </aside>
+    );
+  }
+
+  // ── Standard workspace sidebar ──
   return (
     <aside className="hidden md:flex flex-col w-60 h-full bg-sidebar border-r border-sidebar-border shrink-0">
 
@@ -131,39 +256,26 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
           );
         })}
 
-        {/* ── Team section (broker only) ── */}
+        {/* ── Team section (broker only — compact link to switch to broker dashboard) ── */}
         {isBroker && (
           <>
             <div className="mx-1 my-2 border-t border-sidebar-border/50" />
-            <p className="px-3 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/45">
-              Team
-            </p>
-            {brokerTeamNavItems.map((item) => {
-              const isActive = item.exact
-                ? pathname === item.href
-                : pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    'group flex items-center gap-2.5 py-[7px] pr-3 rounded-lg text-sm font-medium transition-all duration-150 border-l-[3px] pl-[9px]',
-                    isActive
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                  )}
-                >
-                  <item.icon
-                    size={15}
-                    className={cn(
-                      'flex-shrink-0 transition-opacity',
-                      isActive ? 'opacity-100' : 'opacity-45 group-hover:opacity-75'
-                    )}
-                  />
-                  <span className="truncate">{item.label}</span>
-                </Link>
-              );
-            })}
+            <Link
+              href="/broker"
+              className="group flex items-center gap-2.5 rounded-xl px-3 py-2.5 hover:bg-sidebar-accent border border-sidebar-border/40 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center flex-shrink-0">
+                <Building2 size={14} className="text-primary/70" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-sidebar-foreground truncate">{brokerageName}</p>
+                <p className="text-[10px] text-muted-foreground/50">Team dashboard</p>
+              </div>
+              <ArrowLeftRight
+                size={11}
+                className="text-muted-foreground/35 flex-shrink-0 group-hover:text-muted-foreground/65 transition-colors"
+              />
+            </Link>
           </>
         )}
       </nav>
