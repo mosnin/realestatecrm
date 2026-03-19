@@ -109,13 +109,28 @@ CREATE TABLE IF NOT EXISTS "DealContact" (
   PRIMARY KEY ("dealId", "contactId")
 );
 
-CREATE TABLE IF NOT EXISTS "Message" (
+CREATE TABLE IF NOT EXISTS "Conversation" (
   id          text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   "spaceId"   text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
-  role        text NOT NULL,
-  content     text NOT NULL,
-  "createdAt" timestamptz NOT NULL DEFAULT now()
+  title       text NOT NULL DEFAULT 'New conversation',
+  "createdAt" timestamptz NOT NULL DEFAULT now(),
+  "updatedAt" timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS idx_conversation_space_updated
+  ON "Conversation" ("spaceId", "updatedAt" DESC);
+
+CREATE TABLE IF NOT EXISTS "Message" (
+  id               text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "spaceId"        text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  "conversationId" text REFERENCES "Conversation"(id) ON DELETE CASCADE,
+  role             text NOT NULL,
+  content          text NOT NULL,
+  "createdAt"      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_message_conversation_created
+  ON "Message" ("conversationId", "createdAt" ASC);
 
 CREATE TABLE IF NOT EXISTS "BrokerageMembership" (
   id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
