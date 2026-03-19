@@ -16,13 +16,27 @@ export default async function ToursPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  // Fetch tours
-  const { data: tours } = await supabase
+  // Fetch tours with linked deal info
+  const { data: toursRaw } = await supabase
     .from('Tour')
     .select('*, Contact(id, name, email, phone)')
     .eq('spaceId', space.id)
     .order('startsAt', { ascending: false })
     .limit(200);
+
+  // Fetch deals that came from tours to show the link
+  const tourIds = (toursRaw ?? []).map((t: any) => t.id);
+  const { data: dealLinks } = tourIds.length
+    ? await supabase
+        .from('Deal')
+        .select('id, sourceTourId')
+        .in('sourceTourId', tourIds)
+    : { data: [] };
+  const dealByTour = new Map((dealLinks ?? []).map((d: any) => [d.sourceTourId, d.id]));
+  const tours = (toursRaw ?? []).map((t: any) => ({
+    ...t,
+    sourceDealId: dealByTour.get(t.id) ?? null,
+  }));
 
   // Check Google Calendar status
   const { data: gcalToken } = await supabase

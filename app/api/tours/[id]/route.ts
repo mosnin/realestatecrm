@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { sendTourFollowUp, type TourEmailData } from '@/lib/tour-emails';
 
 async function resolveTour(userId: string, tourId: string) {
   const { data: rows, error } = await supabase.from('Tour').select('*').eq('id', tourId);
@@ -73,6 +74,28 @@ export async function PATCH(
     .select()
     .single();
   if (error) throw error;
+
+  // Send follow-up email when marked completed
+  if (body.status === 'completed' && ctx.tour.status !== 'completed') {
+    const { data: settings } = await supabase
+      .from('SpaceSetting')
+      .select('businessName')
+      .eq('spaceId', ctx.space.id)
+      .maybeSingle();
+    const { data: spaceRow } = await supabase.from('Space').select('name').eq('id', ctx.space.id).maybeSingle();
+    const emailData: TourEmailData = {
+      guestName: data.guestName,
+      guestEmail: data.guestEmail,
+      guestPhone: data.guestPhone,
+      propertyAddress: data.propertyAddress,
+      startsAt: data.startsAt,
+      endsAt: data.endsAt,
+      businessName: settings?.businessName || spaceRow?.name || '',
+      tourId: data.id,
+      slug: '',
+    };
+    sendTourFollowUp(emailData).catch(console.error);
+  }
 
   return NextResponse.json(data);
 }

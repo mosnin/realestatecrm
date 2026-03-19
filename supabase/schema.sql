@@ -54,7 +54,15 @@ CREATE TABLE IF NOT EXISTS "SpaceSetting" (
   "anthropicApiKey"   text,
   "businessName"      text,
   "intakePageTitle"   text,
-  "intakePageIntro"   text
+  "intakePageIntro"   text,
+  "tourDuration"         integer NOT NULL DEFAULT 30,
+  "tourStartHour"        integer NOT NULL DEFAULT 9,
+  "tourEndHour"          integer NOT NULL DEFAULT 17,
+  "tourDaysAvailable"    integer[] NOT NULL DEFAULT '{1,2,3,4,5}',
+  "tourBookingPageTitle" text,
+  "tourBookingPageIntro" text,
+  "tourBufferMinutes"    integer NOT NULL DEFAULT 0,
+  "tourBlockedDates"     text[] NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE IF NOT EXISTS "Contact" (
@@ -99,6 +107,7 @@ CREATE TABLE IF NOT EXISTS "Deal" (
   "closeDate" timestamptz,
   "stageId"   text NOT NULL REFERENCES "DealStage"(id) ON DELETE CASCADE,
   position    integer NOT NULL DEFAULT 0,
+  "sourceTourId" text REFERENCES "Tour"(id) ON DELETE SET NULL,
   "createdAt" timestamptz NOT NULL DEFAULT now(),
   "updatedAt" timestamptz NOT NULL DEFAULT now()
 );

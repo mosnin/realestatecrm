@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
+import { sendTourConfirmation, sendAgentNotification, type TourEmailData } from '@/lib/tour-emails';
 
 /** Public endpoint — guests book a tour without authentication. */
 export async function POST(req: NextRequest) {
@@ -76,6 +77,35 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
   if (error) throw error;
+
+  // Send confirmation email (non-blocking)
+  const { data: settingsFull } = await supabase
+    .from('SpaceSetting')
+    .select('businessName')
+    .eq('spaceId', space.id)
+    .maybeSingle();
+  const emailData: TourEmailData = {
+    guestName: tour.guestName,
+    guestEmail: tour.guestEmail,
+    guestPhone: tour.guestPhone,
+    propertyAddress: tour.propertyAddress,
+    startsAt: tour.startsAt,
+    endsAt: tour.endsAt,
+    businessName: settingsFull?.businessName || space.name,
+    tourId: tour.id,
+    slug,
+  };
+  sendTourConfirmation(emailData).catch(console.error);
+
+  // Notify the space owner
+  const { data: ownerRow } = await supabase
+    .from('User')
+    .select('email')
+    .eq('id', space.ownerId)
+    .maybeSingle();
+  if (ownerRow?.email) {
+    sendAgentNotification(ownerRow.email, emailData).catch(console.error);
+  }
 
   return NextResponse.json(tour, { status: 201 });
 }

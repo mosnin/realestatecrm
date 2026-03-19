@@ -15,7 +15,9 @@ import {
   MoreHorizontal,
   CalendarPlus,
   Loader2,
+  Briefcase,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,6 +35,7 @@ interface Tour {
   endsAt: string;
   status: TourStatus;
   googleEventId: string | null;
+  sourceDealId: string | null;
   Contact: { id: string; name: string; email: string | null; phone: string | null } | null;
 }
 
@@ -59,6 +62,8 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl 
   const [copied, setCopied] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+  const [convertingId, setConvertingId] = useState<string | null>(null);
+  const router = useRouter();
 
   const now = new Date();
   const filtered = tours.filter((t) => {
@@ -110,6 +115,31 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl 
       setSyncingId(null);
     }
   }, [slug]);
+
+  const convertToDeal = useCallback(async (tourId: string) => {
+    setConvertingId(tourId);
+    try {
+      const res = await fetch('/api/tours/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, tourId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTours((prev) =>
+          prev.map((t) => (t.id === tourId ? { ...t, sourceDealId: data.deal.id } : t))
+        );
+        router.push(`/s/${slug}/deals/${data.deal.id}`);
+      } else if (res.status === 409) {
+        const data = await res.json();
+        if (data.dealId) router.push(`/s/${slug}/deals/${data.dealId}`);
+      }
+    } catch (err) {
+      console.error('[Tours] Convert failed:', err);
+    } finally {
+      setConvertingId(null);
+    }
+  }, [slug, router]);
 
   function formatDateTime(iso: string) {
     const d = new Date(iso);
@@ -284,6 +314,23 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl 
                                 Cancel Tour
                               </button>
                             </>
+                          )}
+                          {(tour.status === 'completed' || tour.status === 'confirmed') && !tour.sourceDealId && (
+                            <button
+                              onClick={() => { setActionMenuId(null); convertToDeal(tour.id); }}
+                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors flex items-center gap-1.5"
+                            >
+                              <Briefcase size={11} />
+                              {convertingId === tour.id ? 'Creating...' : 'Create Deal'}
+                            </button>
+                          )}
+                          {tour.sourceDealId && (
+                            <a
+                              href={`/s/${slug}/deals/${tour.sourceDealId}`}
+                              className="w-full block text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors text-primary"
+                            >
+                              View Deal
+                            </a>
                           )}
                           {tour.status === 'cancelled' && (
                             <button onClick={() => updateStatus(tour.id, 'scheduled')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">

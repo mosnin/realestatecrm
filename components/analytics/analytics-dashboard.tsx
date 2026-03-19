@@ -82,6 +82,12 @@ export interface AnalyticsData {
   // conversion funnel
   contactFunnel: { label: string; count: number; rate: number }[];
   dealWinRate: number;
+
+  // tour analytics
+  totalTours: number;
+  completedTours: number;
+  toursConvertedToDeals: number;
+  tourConversionRate: number;
 }
 
 const TABS = ['Overview', 'Leads', 'Qualification', 'Deals', 'Contacts'] as const;
@@ -538,6 +544,20 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
               sub="deals closed as won"
             />
           </div>
+
+          {/* Tour conversion stats */}
+          {data.totalTours > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <StatCard label="Total tours" value={data.totalTours} sub="all time" />
+              <StatCard label="Completed" value={data.completedTours} sub="tours finished" />
+              <StatCard label="Converted to deal" value={data.toursConvertedToDeals} sub="from tours" />
+              <StatCard
+                label="Tour → Deal rate"
+                value={data.completedTours > 0 ? `${data.tourConversionRate}%` : '—'}
+                sub="of completed tours"
+              />
+            </div>
+          )}
 
           <div className="grid sm:grid-cols-2 gap-4">
             <ChartSection title="Deals per stage" sub="Number of deals in each pipeline stage">

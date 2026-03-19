@@ -49,18 +49,22 @@ export default async function AnalyticsPage({
   if (!space) notFound();
 
   // Fetch raw data — include applicationData & scoreDetails for qualification analytics
-  const [contactsRes, dealsRes, stagesRes] = await Promise.all([
+  const [contactsRes, dealsRes, stagesRes, toursRes] = await Promise.all([
     supabase
       .from('Contact')
       .select('id, type, tags, leadScore, scoreLabel, scoringStatus, createdAt, applicationData, scoreDetails')
       .eq('spaceId', space.id),
     supabase
       .from('Deal')
-      .select('id, value, stageId, priority, createdAt, status')
+      .select('id, value, stageId, priority, createdAt, status, sourceTourId')
       .eq('spaceId', space.id),
     supabase
       .from('DealStage')
       .select('id, name, color')
+      .eq('spaceId', space.id),
+    supabase
+      .from('Tour')
+      .select('id, status')
       .eq('spaceId', space.id),
   ]);
 
@@ -271,6 +275,13 @@ export default async function AnalyticsPage({
   const wonDeals = deals.filter((d) => d.status === 'won').length;
   const dealWinRate = deals.length > 0 ? Math.round((wonDeals / deals.length) * 100) : 0;
 
+  // Tour analytics
+  const allTours = (toursRes.data ?? []) as { id: string; status: string }[];
+  const totalTours = allTours.length;
+  const completedTours = allTours.filter((t) => t.status === 'completed').length;
+  const toursConvertedToDeals = deals.filter((d: any) => d.sourceTourId != null).length;
+  const tourConversionRate = completedTours > 0 ? Math.round((toursConvertedToDeals / completedTours) * 100) : 0;
+
   const data: AnalyticsData = {
     totalLeads: leads.length,
     totalContacts: contacts.length,
@@ -293,6 +304,12 @@ export default async function AnalyticsPage({
     // conversion funnel
     contactFunnel,
     dealWinRate,
+
+    // tour analytics
+    totalTours,
+    completedTours,
+    toursConvertedToDeals,
+    tourConversionRate,
   };
 
   return (
