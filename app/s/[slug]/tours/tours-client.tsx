@@ -40,11 +40,20 @@ interface Tour {
   Contact: { id: string; name: string; email: string | null; phone: string | null } | null;
 }
 
+interface PropertyProfile {
+  id: string;
+  name: string;
+  address: string | null;
+  tourDuration: number;
+  isActive: boolean;
+}
+
 interface ToursClientProps {
   slug: string;
   initialTours: Tour[];
   hasGoogleCalendar: boolean;
   bookingUrl: string;
+  propertyProfiles?: PropertyProfile[];
 }
 
 const STATUS_CONFIG: Record<TourStatus, { label: string; color: string }> = {
@@ -57,7 +66,7 @@ const STATUS_CONFIG: Record<TourStatus, { label: string; color: string }> = {
 
 type FilterTab = 'upcoming' | 'past' | 'all' | 'availability';
 
-export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl }: ToursClientProps) {
+export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl, propertyProfiles = [] }: ToursClientProps) {
   const [tours, setTours] = useState<Tour[]>(initialTours);
   const [tab, setTab] = useState<FilterTab>('upcoming');
   const [copied, setCopied] = useState(false);
@@ -207,7 +216,7 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl 
 
       {/* Availability tab */}
       {tab === 'availability' && (
-        <AvailabilityOverrides slug={slug} />
+        <AvailabilityOverrides slug={slug} propertyProfiles={propertyProfiles} />
       )}
 
       {/* Tour list */}

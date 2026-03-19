@@ -6,42 +6,66 @@ import { getSpaceFromSlug } from '@/lib/space';
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
   const dateStr = req.nextUrl.searchParams.get('date'); // YYYY-MM-DD
+  const propertyId = req.nextUrl.searchParams.get('propertyId');
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
   const space = await getSpaceFromSlug(slug);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
 
-  // Load space settings for availability config
+  // Load space settings
   const { data: settings } = await supabase
     .from('SpaceSetting')
     .select('tourDuration, tourStartHour, tourEndHour, tourDaysAvailable, timezone, tourBufferMinutes, tourBlockedDates')
     .eq('spaceId', space.id)
     .maybeSingle();
 
-  const duration = settings?.tourDuration ?? 30;
-  const startHour = settings?.tourStartHour ?? 9;
-  const endHour = settings?.tourEndHour ?? 17;
-  const daysAvailable: number[] = settings?.tourDaysAvailable ?? [1, 2, 3, 4, 5];
+  // If a property profile is specified, use its settings instead of defaults
+  let duration = settings?.tourDuration ?? 30;
+  let startHour = settings?.tourStartHour ?? 9;
+  let endHour = settings?.tourEndHour ?? 17;
+  let daysAvailable: number[] = settings?.tourDaysAvailable ?? [1, 2, 3, 4, 5];
+  let bufferMinutes = settings?.tourBufferMinutes ?? 0;
   const timezone = settings?.timezone ?? 'America/New_York';
-  const bufferMinutes = settings?.tourBufferMinutes ?? 0;
   const blockedDates: string[] = settings?.tourBlockedDates ?? [];
 
-  // Determine date range
+  let propertyProfile: any = null;
+  if (propertyId) {
+    const { data: profile } = await supabase
+      .from('TourPropertyProfile')
+      .select('*')
+      .eq('id', propertyId)
+      .eq('spaceId', space.id)
+      .eq('isActive', true)
+      .maybeSingle();
+    if (profile) {
+      propertyProfile = profile;
+      duration = profile.tourDuration;
+      startHour = profile.startHour;
+      endHour = profile.endHour;
+      daysAvailable = profile.daysAvailable;
+      bufferMinutes = profile.bufferMinutes;
+    }
+  }
+
+  // Determine date range in agent's timezone
   const now = new Date();
   const startDate = dateStr ? new Date(dateStr + 'T00:00:00') : now;
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + 14);
 
-  // Fetch existing tours in range
-  const { data: existingTours } = await supabase
+  // Fetch existing tours in range (filter by property if specified)
+  let toursQuery = supabase
     .from('Tour')
     .select('startsAt, endsAt')
     .eq('spaceId', space.id)
     .in('status', ['scheduled', 'confirmed'])
     .gte('startsAt', startDate.toISOString())
     .lte('startsAt', endDate.toISOString());
+  if (propertyId) {
+    toursQuery = toursQuery.eq('propertyProfileId', propertyId);
+  }
+  const { data: existingTours } = await toursQuery;
 
-  // Include buffer time around each booked tour
   const bookedSlots = (existingTours ?? []).map((t: any) => ({
     start: new Date(t.startsAt).getTime() - bufferMinutes * 60_000,
     end: new Date(t.endsAt).getTime() + bufferMinutes * 60_000,
@@ -51,39 +75,66 @@ export async function GET(req: NextRequest) {
   const gcalBusySlots = await fetchGoogleCalendarBusy(space.id, startDate, endDate);
   const allBusySlots = [...bookedSlots, ...gcalBusySlots];
 
-  // Build blocked dates set for fast lookup
   const blockedSet = new Set(blockedDates);
 
-  // Fetch per-date availability overrides
-  const { data: overridesRaw } = await supabase
+  // Fetch overrides (single-date and recurring) scoped to this property or global
+  let overridesQuery = supabase
     .from('TourAvailabilityOverride')
-    .select('date, isBlocked, startHour, endHour')
-    .eq('spaceId', space.id)
-    .gte('date', startDate.toISOString().split('T')[0])
-    .lte('date', endDate.toISOString().split('T')[0]);
+    .select('date, isBlocked, startHour, endHour, recurrence, endDate, propertyProfileId')
+    .eq('spaceId', space.id);
+  const { data: overridesRaw } = await overridesQuery;
 
+  // Build effective overrides for each date in range, expanding recurring ones
   const overrideMap = new Map<string, { isBlocked: boolean; startHour: number | null; endHour: number | null }>();
+
   for (const o of overridesRaw ?? []) {
-    overrideMap.set(o.date, { isBlocked: o.isBlocked, startHour: o.startHour, endHour: o.endHour });
+    // Filter by property: use override if it's global (null) or matches the requested property
+    if (propertyId && o.propertyProfileId && o.propertyProfileId !== propertyId) continue;
+    if (!propertyId && o.propertyProfileId) continue;
+
+    if (o.recurrence === 'none') {
+      overrideMap.set(o.date, { isBlocked: o.isBlocked, startHour: o.startHour, endHour: o.endHour });
+    } else {
+      // Expand recurring override into individual dates within our 14-day window
+      const oStart = new Date(o.date + 'T12:00:00');
+      const oEnd = o.endDate ? new Date(o.endDate + 'T12:00:00') : endDate;
+      const cur = new Date(oStart);
+
+      while (cur <= oEnd && cur <= endDate) {
+        if (cur >= startDate) {
+          const key = cur.toISOString().split('T')[0];
+          // Don't overwrite a more specific single-date override
+          if (!overrideMap.has(key)) {
+            overrideMap.set(key, { isBlocked: o.isBlocked, startHour: o.startHour, endHour: o.endHour });
+          }
+        }
+        // Advance cursor based on recurrence type
+        if (o.recurrence === 'weekly') {
+          cur.setDate(cur.getDate() + 7);
+        } else if (o.recurrence === 'biweekly') {
+          cur.setDate(cur.getDate() + 14);
+        } else if (o.recurrence === 'monthly') {
+          cur.setMonth(cur.getMonth() + 1);
+        }
+      }
+    }
   }
 
-  // Generate available slots day by day
+  // Generate slots day by day using timezone-aware date math
   const slots: { date: string; times: string[] }[] = [];
   const cursor = new Date(startDate);
   cursor.setHours(0, 0, 0, 0);
 
   for (let day = 0; day < 14; day++) {
-    const dayOfWeek = cursor.getDay(); // 0=Sun
+    const dayOfWeek = cursor.getDay();
     const dateKey = cursor.toISOString().split('T')[0];
     const override = overrideMap.get(dateKey);
 
-    // Determine if this day is available and what hours to use
     let dayAvailable = false;
     let dayStart = startHour;
     let dayEnd = endHour;
 
     if (override) {
-      // Override takes priority over default schedule
       if (override.isBlocked) {
         dayAvailable = false;
       } else if (override.startHour != null && override.endHour != null) {
@@ -92,7 +143,6 @@ export async function GET(req: NextRequest) {
         dayEnd = override.endHour;
       }
     } else {
-      // Fall back to default schedule
       dayAvailable = daysAvailable.includes(dayOfWeek) && !blockedSet.has(dateKey);
     }
 
@@ -104,10 +154,8 @@ export async function GET(req: NextRequest) {
           slotStart.setHours(hour, min, 0, 0);
           const slotEnd = new Date(slotStart.getTime() + duration * 60_000);
 
-          // Skip slots in the past
           if (slotStart.getTime() < now.getTime()) continue;
 
-          // Check for conflicts with tours (including buffer) and GCal busy times
           const hasConflict = allBusySlots.some(
             (b) => slotStart.getTime() < b.end && slotEnd.getTime() > b.start
           );
@@ -123,13 +171,25 @@ export async function GET(req: NextRequest) {
     cursor.setDate(cursor.getDate() + 1);
   }
 
-  return NextResponse.json({ slots, duration, timezone });
+  // Also fetch all active property profiles for this space (so the booking page can show them)
+  const { data: profiles } = await supabase
+    .from('TourPropertyProfile')
+    .select('id, name, address, tourDuration, isActive')
+    .eq('spaceId', space.id)
+    .eq('isActive', true)
+    .order('createdAt', { ascending: true });
+
+  return NextResponse.json({
+    slots,
+    duration,
+    timezone,
+    propertyProfileId: propertyId ?? null,
+    propertyProfiles: profiles ?? [],
+  });
 }
 
-/**
- * Fetch busy times from Google Calendar for the given space.
- * Returns empty array if not connected or if the API call fails.
- */
+// ── Google Calendar helpers ──────────────────────────────────────────────────
+
 async function fetchGoogleCalendarBusy(
   spaceId: string,
   timeMin: Date,

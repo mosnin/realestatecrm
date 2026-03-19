@@ -6,7 +6,7 @@ import { sendTourConfirmation, sendAgentNotification, type TourEmailData } from 
 /** Public endpoint — guests book a tour without authentication. */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { slug, guestName, guestEmail, guestPhone, propertyAddress, notes, startsAt } = body;
+  const { slug, guestName, guestEmail, guestPhone, propertyAddress, notes, startsAt, propertyProfileId } = body;
 
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
   if (!guestName?.trim() || !guestEmail?.trim() || !startsAt) {
@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
       notes: notes?.trim() || null,
       startsAt: start.toISOString(),
       endsAt: end.toISOString(),
+      propertyProfileId: propertyProfileId || null,
     })
     .select()
     .single();

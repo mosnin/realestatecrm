@@ -5,36 +5,58 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 /** GET — list overrides for the next 90 days */
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
+  const propertyId = req.nextUrl.searchParams.get('propertyId');
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const today = new Date().toISOString().split('T')[0];
-
-  const { data, error } = await supabase
+  let query = supabase
     .from('TourAvailabilityOverride')
     .select('*')
     .eq('spaceId', space.id)
-    .gte('date', today)
     .order('date', { ascending: true });
+
+  // Filter by property or show global-only
+  if (propertyId) {
+    query = query.or(`propertyProfileId.eq.${propertyId},propertyProfileId.is.null`);
+  } else {
+    query = query.is('propertyProfileId', null);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
 
-  return NextResponse.json(data ?? []);
+  // Filter out past non-recurring overrides
+  const today = new Date().toISOString().split('T')[0];
+  const filtered = (data ?? []).filter((o: any) => {
+    if (o.recurrence !== 'none') {
+      // Keep recurring overrides if endDate is in the future or not set
+      return !o.endDate || o.endDate >= today;
+    }
+    return o.date >= today;
+  });
+
+  return NextResponse.json(filtered);
 }
 
-/** POST — create or update an override for a specific date */
+/** POST — create or update an override */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { slug, date, isBlocked, startHour, endHour, label } = body;
+  const { slug, date, isBlocked, startHour, endHour, label, recurrence, endDate, propertyProfileId } = body;
 
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
   if (!date) return NextResponse.json({ error: 'date required' }, { status: 400 });
-
-  // Validate date format
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json({ error: 'Invalid date format (YYYY-MM-DD)' }, { status: 400 });
+  }
+
+  const validRecurrences = ['none', 'weekly', 'biweekly', 'monthly'];
+  const rec = recurrence && validRecurrences.includes(recurrence) ? recurrence : 'none';
+
+  if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+    return NextResponse.json({ error: 'Invalid endDate format' }, { status: 400 });
   }
 
   const auth = await requireSpaceOwner(slug);
@@ -50,18 +72,31 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Upsert — if an override already exists for this date, update it
+  // Validate property profile if provided
+  if (propertyProfileId) {
+    const { data: profile } = await supabase
+      .from('TourPropertyProfile')
+      .select('id')
+      .eq('id', propertyProfileId)
+      .eq('spaceId', space.id)
+      .maybeSingle();
+    if (!profile) return NextResponse.json({ error: 'Property profile not found' }, { status: 400 });
+  }
+
   const { data, error } = await supabase
     .from('TourAvailabilityOverride')
     .upsert(
       {
         id: crypto.randomUUID(),
         spaceId: space.id,
+        propertyProfileId: propertyProfileId || null,
         date,
         isBlocked: !!isBlocked,
         startHour: isBlocked ? null : startHour,
         endHour: isBlocked ? null : endHour,
         label: label?.trim() || null,
+        recurrence: rec,
+        endDate: rec !== 'none' ? (endDate || null) : null,
       },
       { onConflict: 'spaceId,date' }
     )

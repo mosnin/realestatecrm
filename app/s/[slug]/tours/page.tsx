@@ -45,12 +45,20 @@ export default async function ToursPage({
     .eq('spaceId', space.id)
     .maybeSingle();
 
+  // Fetch property profiles
+  const { data: propertyProfiles } = await supabase
+    .from('TourPropertyProfile')
+    .select('id, name, address, tourDuration, isActive')
+    .eq('spaceId', space.id)
+    .order('createdAt', { ascending: true });
+
   return (
     <ToursClient
       slug={slug}
       initialTours={tours ?? []}
       hasGoogleCalendar={!!gcalToken}
       bookingUrl={`/book/${slug}`}
+      propertyProfiles={(propertyProfiles ?? []) as any}
     />
   );
 }

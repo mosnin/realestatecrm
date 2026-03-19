@@ -273,15 +273,34 @@ ALTER TABLE "DealContact"         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Message"             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "BrokerageMembership" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Invitation"          ENABLE ROW LEVEL SECURITY;
+CREATE TABLE IF NOT EXISTS "TourPropertyProfile" (
+  id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "spaceId"       text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  name            text NOT NULL,
+  address         text,
+  "tourDuration"  integer NOT NULL DEFAULT 30,
+  "startHour"     integer NOT NULL DEFAULT 9,
+  "endHour"       integer NOT NULL DEFAULT 17,
+  "daysAvailable" integer[] NOT NULL DEFAULT '{1,2,3,4,5}',
+  "bufferMinutes" integer NOT NULL DEFAULT 0,
+  "isActive"      boolean NOT NULL DEFAULT true,
+  "createdAt"     timestamptz NOT NULL DEFAULT now(),
+  "updatedAt"     timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS "TourAvailabilityOverride" (
-  id          text PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  "spaceId"   text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
-  date        date NOT NULL,
-  "isBlocked" boolean NOT NULL DEFAULT false,
-  "startHour" integer,
-  "endHour"   integer,
-  label       text,
-  "createdAt" timestamptz NOT NULL DEFAULT now()
+  id                  text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "spaceId"           text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  "propertyProfileId" text REFERENCES "TourPropertyProfile"(id) ON DELETE CASCADE,
+  date                date NOT NULL,
+  "isBlocked"         boolean NOT NULL DEFAULT false,
+  "startHour"         integer,
+  "endHour"           integer,
+  label               text,
+  recurrence          text NOT NULL DEFAULT 'none'
+                        CHECK (recurrence IN ('none', 'weekly', 'biweekly', 'monthly')),
+  "endDate"           date,
+  "createdAt"         timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_override_space_date

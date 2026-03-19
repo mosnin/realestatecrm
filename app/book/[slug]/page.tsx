@@ -14,7 +14,7 @@ export default async function PublicBookingPage({
 
   const { data: settingsData } = await supabase
     .from('SpaceSetting')
-    .select('tourBookingPageTitle, tourBookingPageIntro, businessName, tourDuration')
+    .select('tourBookingPageTitle, tourBookingPageIntro, businessName, tourDuration, timezone')
     .eq('spaceId', space.id)
     .maybeSingle();
 
@@ -23,12 +23,14 @@ export default async function PublicBookingPage({
     tourBookingPageIntro: string | null;
     businessName: string | null;
     tourDuration: number | null;
+    timezone: string | null;
   } | null;
 
   const pageTitle = settings?.tourBookingPageTitle || `Book a Tour with ${space.name}`;
   const pageIntro = settings?.tourBookingPageIntro || 'Pick a time that works for you and we\'ll confirm your tour.';
   const businessName = settings?.businessName || space.name;
   const duration = settings?.tourDuration || 30;
+  const timezone = settings?.timezone || 'America/New_York';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
@@ -52,7 +54,7 @@ export default async function PublicBookingPage({
             </p>
           </div>
 
-          <BookingForm slug={slug} duration={duration} businessName={businessName} />
+          <BookingForm slug={slug} duration={duration} businessName={businessName} timezone={timezone} />
 
           <p className="text-center text-xs text-muted-foreground/70 pt-2">
             Your information is shared only with {businessName} and used solely for scheduling.
