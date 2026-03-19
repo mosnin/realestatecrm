@@ -32,10 +32,11 @@ export async function POST(req: Request) {
   // Resolve internal user id
   const { data: user, error: userErr } = await supabase
     .from('User')
-    .select('id, onboard')
+    .select('id, onboard, accountType')
     .eq('clerkId', clerkId)
     .maybeSingle();
   if (userErr || !user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  // Broker-only users are marked onboard during setup even without a Space
   if (!user.onboard) return NextResponse.json({ error: 'Complete onboarding first' }, { status: 403 });
 
   // Check: does this user already own a brokerage?

@@ -372,7 +372,12 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      if (!space) {
+      // Determine account type from request body
+      const accountType = (body as { accountType?: string }).accountType;
+      const isBrokerOnly = accountType === 'broker_only';
+
+      // Broker-only users don't need a workspace
+      if (!space && !isBrokerOnly) {
         return NextResponse.json(
           { error: 'Cannot complete onboarding without a workspace. Please create your workspace first.' },
           { status: 409 }
@@ -380,13 +385,18 @@ export async function POST(req: NextRequest) {
       }
 
       const completedAt = new Date();
+      const updatePayload: Record<string, unknown> = {
+        onboard: true,
+        onboardingCurrentStep: 7,
+        onboardingCompletedAt: completedAt.toISOString(),
+      };
+      if (accountType && ['realtor', 'broker_only', 'both'].includes(accountType)) {
+        updatePayload.accountType = accountType;
+      }
+
       const { error } = await supabase
         .from('User')
-        .update({
-          onboard: true,
-          onboardingCurrentStep: 7,
-          onboardingCompletedAt: completedAt.toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', user.id);
       if (error) throw error;
       return NextResponse.json({ success: true, onboard: true, onboardingCompletedAt: completedAt.toISOString() });

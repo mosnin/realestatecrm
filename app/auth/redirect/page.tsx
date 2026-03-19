@@ -25,13 +25,18 @@ export default async function AuthRedirectPage({
   // Look up the user row
   const { data: user } = await supabase
     .from('User')
-    .select('id')
+    .select('id, accountType')
     .eq('clerkId', userId)
     .maybeSingle();
 
   if (!user) {
     // New user — send to setup regardless of intent
     redirect('/setup');
+  }
+
+  // Broker-only users always go to /broker
+  if (user.accountType === 'broker_only') {
+    redirect('/broker');
   }
 
   if (intent === 'broker') {

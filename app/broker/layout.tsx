@@ -20,51 +20,66 @@ export default async function BrokerLayout({ children }: { children: React.React
     redirect('/setup');
   }
 
-  // Look up their realtor workspace for the unified sidebar
+  // Look up their realtor workspace (may not exist for broker-only accounts)
   const { data: spaceRow } = await supabase
     .from('Space')
     .select('id, slug, name, emoji')
     .eq('ownerId', ctx.dbUserId)
     .maybeSingle();
 
-  if (!spaceRow) {
+  // Check if this is a broker-only account (no personal workspace)
+  const { data: userRow } = await supabase
+    .from('User')
+    .select('accountType')
+    .eq('id', ctx.dbUserId)
+    .maybeSingle();
+
+  const isBrokerOnly = userRow?.accountType === 'broker_only';
+
+  // If they have no space and are NOT broker-only, send to setup
+  if (!spaceRow && !isBrokerOnly) {
     redirect('/setup');
   }
 
-  const slug = spaceRow.slug as string;
+  const slug = spaceRow?.slug as string ?? '';
+  const spaceName = (spaceRow?.name as string) ?? ctx.brokerage.name;
+  const spaceEmoji = (spaceRow?.emoji as string) || '\u{1F3E0}';
 
   let unreadLeadCount = 0;
-  try {
-    const { count, error: countError } = await supabase
-      .from('Contact')
-      .select('*', { count: 'exact', head: true })
-      .eq('spaceId', spaceRow.id)
-      .contains('tags', ['new-lead']);
-    if (countError) throw countError;
-    unreadLeadCount = count ?? 0;
-  } catch {
-    unreadLeadCount = 0;
+  if (spaceRow) {
+    try {
+      const { count, error: countError } = await supabase
+        .from('Contact')
+        .select('*', { count: 'exact', head: true })
+        .eq('spaceId', spaceRow.id)
+        .contains('tags', ['new-lead']);
+      if (countError) throw countError;
+      unreadLeadCount = count ?? 0;
+    } catch {
+      unreadLeadCount = 0;
+    }
   }
 
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
       <Sidebar
         slug={slug}
-        spaceName={spaceRow.name as string}
-        spaceEmoji={(spaceRow.emoji as string) || '\u{1F3E0}'}
+        spaceName={spaceName}
+        spaceEmoji={spaceEmoji}
         unreadLeadCount={unreadLeadCount}
         isBroker={true}
+        isBrokerOnly={isBrokerOnly}
         brokerageName={ctx.brokerage.name}
         brokerageRole={ctx.membership.role}
       />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header slug={slug} spaceName={spaceRow.name as string} title={spaceRow.name as string} isBroker={true} brokerageName={ctx.brokerage.name} />
+        <Header slug={slug} spaceName={spaceName} title={spaceName} isBroker={true} isBrokerOnly={isBrokerOnly} brokerageName={ctx.brokerage.name} />
         <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7">
           {children}
           <DashboardFooter />
         </main>
       </div>
-      <MobileNav slug={slug} isBroker={true} />
+      <MobileNav slug={slug} isBroker={true} isBrokerOnly={isBrokerOnly} />
     </div>
   );
 }

@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS "User" (
   "onboardingStartedAt"   timestamptz,
   "onboardingCompletedAt" timestamptz,
   onboard                 boolean NOT NULL DEFAULT false,
-  "platformRole"          text NOT NULL DEFAULT 'user' CHECK ("platformRole" IN ('user', 'admin'))
+  "platformRole"          text NOT NULL DEFAULT 'user' CHECK ("platformRole" IN ('user', 'admin')),
+  "accountType"           text NOT NULL DEFAULT 'realtor' CHECK ("accountType" IN ('realtor', 'broker_only', 'both'))
 );
 
 -- Brokerage must be created before Space (Space has FK to Brokerage)

@@ -14,6 +14,7 @@ interface SidebarProps {
   spaceEmoji: string;
   unreadLeadCount: number;
   isBroker?: boolean;
+  isBrokerOnly?: boolean;
   brokerageName?: string | null;
   brokerageRole?: string | null;
 }
@@ -26,7 +27,7 @@ const brokerTeamNavItems = [
   { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false },
 ];
 
-export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker = false, brokerageName = null, brokerageRole = null }: SidebarProps) {
+export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null }: SidebarProps) {
   const pathname = usePathname();
   const base = `/s/${slug}`;
   const { user } = useUser();
@@ -39,8 +40,8 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
   const isMemberOfBrokerage = !!brokerageName;
   const isOnBrokerPage = pathname.startsWith('/broker');
 
-  // ── Broker-focused sidebar (when on /broker/* pages) ──
-  if (isBroker && isOnBrokerPage) {
+  // ── Broker-focused sidebar (when on /broker/* pages or broker-only account) ──
+  if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
       <aside className="hidden md:flex flex-col w-60 h-full bg-sidebar border-r border-sidebar-border shrink-0">
         {/* ── Brand ── */}
@@ -107,25 +108,27 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
           })}
         </nav>
 
-        {/* ── Switch to workspace ── */}
-        <div className="px-3 pb-2 border-t border-sidebar-border/50 pt-3">
-          <Link
-            href={base}
-            className="group flex items-center gap-2.5 rounded-xl px-3 py-2.5 hover:bg-sidebar-accent border border-sidebar-border/40 transition-colors"
-          >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-sm flex-shrink-0">
-              {spaceEmoji}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-sidebar-foreground truncate">{spaceName}</p>
-              <p className="text-[10px] text-muted-foreground/50">My workspace</p>
-            </div>
-            <ArrowLeftRight
-              size={11}
-              className="text-muted-foreground/35 flex-shrink-0 group-hover:text-muted-foreground/65 transition-colors"
-            />
-          </Link>
-        </div>
+        {/* ── Switch to workspace (hidden for broker-only accounts) ── */}
+        {!isBrokerOnly && slug && (
+          <div className="px-3 pb-2 border-t border-sidebar-border/50 pt-3">
+            <Link
+              href={base}
+              className="group flex items-center gap-2.5 rounded-xl px-3 py-2.5 hover:bg-sidebar-accent border border-sidebar-border/40 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-sm flex-shrink-0">
+                {spaceEmoji}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-sidebar-foreground truncate">{spaceName}</p>
+                <p className="text-[10px] text-muted-foreground/50">My workspace</p>
+              </div>
+              <ArrowLeftRight
+                size={11}
+                className="text-muted-foreground/35 flex-shrink-0 group-hover:text-muted-foreground/65 transition-colors"
+              />
+            </Link>
+          </div>
+        )}
 
         {/* ── User card ── */}
         <div className="px-3 pb-4 pt-2 border-t border-sidebar-border/50">

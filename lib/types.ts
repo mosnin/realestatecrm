@@ -1,6 +1,7 @@
 // Database model types — replaces Prisma generated types
 
 export type PlatformRole = 'user' | 'admin';
+export type AccountType = 'realtor' | 'broker_only' | 'both';
 export type MembershipRole = 'broker_owner' | 'broker_manager' | 'realtor_member';
 export type InvitationStatus = 'pending' | 'accepted' | 'expired' | 'cancelled';
 
@@ -17,6 +18,7 @@ export type User = {
   onboardingCompletedAt: Date | null;
   onboard: boolean;
   platformRole: PlatformRole;
+  accountType: AccountType;
 };
 
 export type Brokerage = {

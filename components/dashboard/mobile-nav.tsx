@@ -16,27 +16,30 @@ const brokerMobileItems = [
 interface MobileNavProps {
   slug: string;
   isBroker?: boolean;
+  isBrokerOnly?: boolean;
 }
 
-export function MobileNav({ slug, isBroker = false }: MobileNavProps) {
+export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: MobileNavProps) {
   const pathname = usePathname();
   const base = `/s/${slug}`;
   const isOnBrokerPage = pathname.startsWith('/broker');
 
-  // When broker is on /broker/* pages, show team nav with a link back to workspace
-  if (isBroker && isOnBrokerPage) {
+  // When broker is on /broker/* pages (or broker-only), show team nav
+  if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex safe-area-bottom">
-        {/* CRM workspace link */}
-        <Link
-          href={base}
-          className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors text-muted-foreground"
-        >
-          <div className="w-9 h-6 rounded-full flex items-center justify-center transition-colors">
-            <Briefcase size={18} />
-          </div>
-          <span>CRM</span>
-        </Link>
+        {/* CRM workspace link (hidden for broker-only) */}
+        {!isBrokerOnly && slug && (
+          <Link
+            href={base}
+            className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors text-muted-foreground"
+          >
+            <div className="w-9 h-6 rounded-full flex items-center justify-center transition-colors">
+              <Briefcase size={18} />
+            </div>
+            <span>CRM</span>
+          </Link>
+        )}
         {brokerMobileItems.map((item) => {
           const isActive = item.exact
             ? pathname === item.href

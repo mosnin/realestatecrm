@@ -62,6 +62,11 @@ export default async function SetupPage() {
     // non-fatal
   }
 
+  // Broker-only users who are already set up — go straight to /broker
+  if (dbUser?.accountType === 'broker_only' && dbUser?.onboard) {
+    redirect('/broker');
+  }
+
   // Already has a workspace — check if broker first (brokers land on /broker)
   if (dbUser?.space?.slug) {
     // Check if this user is a broker — redirect to broker dashboard instead

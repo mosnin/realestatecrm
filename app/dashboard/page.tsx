@@ -72,6 +72,11 @@ export default async function DashboardRedirectPage() {
     // non-blocking
   }
 
+  // Broker-only users go straight to /broker
+  if (user?.accountType === 'broker_only') {
+    redirect('/broker');
+  }
+
   // Simple routing: has workspace → go there. No workspace → setup.
   if (user?.space?.slug) {
     redirect(`/s/${user.space.slug}`);

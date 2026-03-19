@@ -9,7 +9,7 @@ import { BrandLogo } from '@/components/brand-logo';
 import { CheckCircle2, Loader2, AlertCircle, Users, UserCircle, ArrowLeft, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-type SetupRole = 'choose' | 'realtor' | 'broker';
+type SetupRole = 'choose' | 'realtor' | 'broker' | 'broker_only';
 
 export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
   const router = useRouter();
@@ -21,6 +21,8 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
   const [checking, setChecking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const needsWorkspace = role === 'realtor' || role === 'broker';
 
   // Auto-derive slug from business name
   useEffect(() => {
@@ -49,13 +51,17 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
   }, []);
 
   useEffect(() => {
+    if (!needsWorkspace) return;
     const timer = setTimeout(() => checkSlug(slug), 400);
     return () => clearTimeout(timer);
-  }, [slug, checkSlug]);
+  }, [slug, checkSlug, needsWorkspace]);
 
-  const canSubmit =
-    businessName.trim() && slug.length >= 3 && slugAvailable === true && !saving &&
-    (role === 'realtor' || (role === 'broker' && brokerageName.trim()));
+  const canSubmit = !saving && (() => {
+    if (role === 'broker_only') return brokerageName.trim().length > 0;
+    if (!businessName.trim() || slug.length < 3 || slugAvailable !== true) return false;
+    if (role === 'broker') return brokerageName.trim().length > 0;
+    return true;
+  })();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -64,7 +70,42 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
     setError('');
 
     try {
-      // Save profile (name only for now)
+      if (role === 'broker_only') {
+        // Broker-only: skip workspace entirely
+        // Save profile
+        await fetch('/api/onboarding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'save_profile',
+            name: defaultName,
+            phone: '',
+            businessName: brokerageName.trim(),
+          }),
+        });
+
+        // Mark onboarding complete with broker_only account type
+        await fetch('/api/onboarding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'complete', accountType: 'broker_only' }),
+        });
+
+        // Create the brokerage
+        const brokerRes = await fetch('/api/broker/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: brokerageName.trim() }),
+        });
+        const brokerData = await brokerRes.json().catch(() => ({}));
+        if (!brokerRes.ok) throw new Error(brokerData.error || 'Failed to create brokerage.');
+
+        router.push('/broker');
+        return;
+      }
+
+      // Realtor or broker-with-workspace flow
+      // Save profile
       await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -91,11 +132,12 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
       const spaceData = await spaceRes.json().catch(() => ({}));
       if (!spaceRes.ok) throw new Error(spaceData.error || 'Failed to create workspace.');
 
-      // Mark onboarding complete so user is never redirected back here
+      // Mark onboarding complete
+      const accountType = role === 'broker' ? 'both' : 'realtor';
       await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'complete' }),
+        body: JSON.stringify({ action: 'complete', accountType }),
       });
 
       // If broker role, also create the brokerage
@@ -107,7 +149,6 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
         });
         const brokerData = await brokerRes.json().catch(() => ({}));
         if (!brokerRes.ok) throw new Error(brokerData.error || 'Failed to create brokerage.');
-        // Brokers land on the broker dashboard
         router.push('/broker');
         return;
       }
@@ -138,7 +179,7 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-3 gap-4">
             <button
               onClick={() => setRole('realtor')}
               className="group text-left rounded-xl border border-border bg-card p-6 hover:border-primary/40 hover:shadow-[0_4px_24px_-8px_rgba(13,148,136,0.15)] transition-all"
@@ -148,7 +189,7 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
               </div>
               <h2 className="text-base font-semibold mb-1">I&apos;m a realtor</h2>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Set up your personal CRM workspace to manage leads, clients, and deals.
+                Personal CRM for leads, clients, and deals.
               </p>
             </button>
 
@@ -157,11 +198,24 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
               className="group text-left rounded-xl border border-border bg-card p-6 hover:border-primary/40 hover:shadow-[0_4px_24px_-8px_rgba(13,148,136,0.15)] transition-all"
             >
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/15 transition-colors">
+                <Users size={20} className="text-primary" />
+              </div>
+              <h2 className="text-base font-semibold mb-1">Both</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Manage a team and your own workspace.
+              </p>
+            </button>
+
+            <button
+              onClick={() => setRole('broker_only')}
+              className="group text-left rounded-xl border border-border bg-card p-6 hover:border-primary/40 hover:shadow-[0_4px_24px_-8px_rgba(13,148,136,0.15)] transition-all"
+            >
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/15 transition-colors">
                 <Building2 size={20} className="text-primary" />
               </div>
-              <h2 className="text-base font-semibold mb-1">I&apos;m a broker</h2>
+              <h2 className="text-base font-semibold mb-1">Broker only</h2>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Create a brokerage to manage a team of realtors with centralized analytics.
+                Manage your team. No personal workspace.
               </p>
             </button>
           </div>
@@ -170,7 +224,7 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
     );
   }
 
-  // Step 2: Workspace creation form (realtor or broker)
+  // Step 2: Workspace / brokerage creation form
   return (
     <div className="app-theme min-h-screen bg-background flex items-start justify-center px-4 py-10">
       <div className="w-full max-w-sm">
@@ -188,21 +242,27 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
         <div className="rounded-xl border border-border bg-card px-6 py-7">
           <div className="mb-6">
             <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-2.5 py-0.5 text-[11px] font-semibold text-primary mb-3">
-              {role === 'broker' ? <Building2 size={10} /> : <UserCircle size={10} />}
-              {role === 'broker' ? 'Broker setup' : 'Realtor setup'}
+              {role === 'broker_only' ? <Building2 size={10} /> : role === 'broker' ? <Users size={10} /> : <UserCircle size={10} />}
+              {role === 'broker_only' ? 'Broker setup' : role === 'broker' ? 'Broker + workspace setup' : 'Realtor setup'}
             </div>
             <h1 className="text-xl font-bold">
-              {role === 'broker' ? 'Set up your brokerage' : 'Create your workspace'}
+              {role === 'broker_only'
+                ? 'Create your brokerage'
+                : role === 'broker'
+                  ? 'Set up your brokerage'
+                  : 'Create your workspace'}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {role === 'broker'
-                ? 'Create your brokerage and personal workspace in one step.'
-                : 'Give your workspace a name and we\'ll generate your intake link.'}
+              {role === 'broker_only'
+                ? 'Set up your brokerage to manage your team of realtors.'
+                : role === 'broker'
+                  ? 'Create your brokerage and personal workspace in one step.'
+                  : 'Give your workspace a name and we\'ll generate your intake link.'}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {role === 'broker' && (
+            {(role === 'broker' || role === 'broker_only') && (
               <div className="space-y-1.5">
                 <Label htmlFor="brokerageName">Brokerage name</Label>
                 <Input
@@ -220,51 +280,55 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="businessName">
-                {role === 'broker' ? 'Your personal workspace name' : 'Business or brand name'}
-              </Label>
-              <Input
-                id="businessName"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                placeholder="Preston Leasing"
-                required
-                autoFocus={role === 'realtor'}
-              />
-            </div>
+            {needsWorkspace && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="businessName">
+                    {role === 'broker' ? 'Your personal workspace name' : 'Business or brand name'}
+                  </Label>
+                  <Input
+                    id="businessName"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    placeholder="Preston Leasing"
+                    required
+                    autoFocus={role === 'realtor'}
+                  />
+                </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="slug">Intake link slug</Label>
-              <div className="relative">
-                <Input
-                  id="slug"
-                  value={slug}
-                  onChange={(e) =>
-                    setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
-                  }
-                  placeholder="preston-leasing"
-                  className="pr-8"
-                  required
-                />
-                {slug.length >= 3 && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    {checking ? (
-                      <Loader2 size={14} className="animate-spin text-muted-foreground" />
-                    ) : slugAvailable === true ? (
-                      <CheckCircle2 size={14} className="text-green-500" />
-                    ) : slugAvailable === false ? (
-                      <span className="text-red-500 text-xs font-medium">taken</span>
-                    ) : null}
+                <div className="space-y-1.5">
+                  <Label htmlFor="slug">Intake link slug</Label>
+                  <div className="relative">
+                    <Input
+                      id="slug"
+                      value={slug}
+                      onChange={(e) =>
+                        setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
+                      }
+                      placeholder="preston-leasing"
+                      className="pr-8"
+                      required
+                    />
+                    {slug.length >= 3 && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        {checking ? (
+                          <Loader2 size={14} className="animate-spin text-muted-foreground" />
+                        ) : slugAvailable === true ? (
+                          <CheckCircle2 size={14} className="text-green-500" />
+                        ) : slugAvailable === false ? (
+                          <span className="text-red-500 text-xs font-medium">taken</span>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              {slug.length >= 3 && (
-                <p className="text-xs text-muted-foreground break-all">
-                  chippi.com/apply/{slug}
-                </p>
-              )}
-            </div>
+                  {slug.length >= 3 && (
+                    <p className="text-xs text-muted-foreground break-all">
+                      chippi.com/apply/{slug}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
             {error && (
               <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5">
@@ -277,7 +341,12 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
               {saving ? (
                 <>
                   <Loader2 size={16} className="mr-2 animate-spin" />
-                  {role === 'broker' ? 'Setting up brokerage...' : 'Creating...'}
+                  {role === 'broker_only' ? 'Creating brokerage...' : role === 'broker' ? 'Setting up...' : 'Creating...'}
+                </>
+              ) : role === 'broker_only' ? (
+                <>
+                  <Building2 size={16} className="mr-2" />
+                  Create brokerage
                 </>
               ) : role === 'broker' ? (
                 <>
