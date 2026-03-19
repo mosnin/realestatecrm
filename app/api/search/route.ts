@@ -15,7 +15,9 @@ export async function GET(req: NextRequest) {
 
   // Escape PostgreSQL ILIKE special characters before wrapping in wildcards
   const escaped = q.slice(0, 100).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
-  const term = `%${escaped}%`;
+  // Strip characters that break PostgREST filter syntax (commas, parens, dots in wrong places)
+  const sanitized = escaped.replace(/[,()]/g, '');
+  const term = `%${sanitized}%`;
 
   try {
     const [contactsResult, dealsResult] = await Promise.all([

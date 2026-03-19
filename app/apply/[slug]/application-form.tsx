@@ -288,11 +288,21 @@ export function ApplicationForm({
   const currentStepIndex = STEPS.findIndex((s) => s.id === step);
   const totalSteps = STEPS.length;
 
+  // Debounce localStorage saves to avoid jank on every keystroke
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedSave = useCallback(
+    (d: FormData) => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => saveDraft(slug, d), 500);
+    },
+    [slug]
+  );
+
   const set = useCallback(
     (key: string, value: string) => {
       setData((prev) => {
         const next = { ...prev, [key]: value };
-        saveDraft(slug, next);
+        debouncedSave(next);
         return next;
       });
       setErrors((prev) => {
@@ -304,7 +314,7 @@ export function ApplicationForm({
         return prev;
       });
     },
-    [slug]
+    [debouncedSave]
   );
 
   // ── Validation per step ──

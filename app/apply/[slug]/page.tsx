@@ -13,11 +13,20 @@ export default async function PublicApplyPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  const { data: settingsData } = await supabase
-    .from('SpaceSetting')
-    .select('intakePageTitle, intakePageIntro, businessName, phoneNumber, logoUrl, realtorPhotoUrl')
-    .eq('spaceId', space.id)
-    .maybeSingle();
+  // Parallelize both queries instead of running them sequentially
+  const [{ data: settingsData }, { data: ownerData }] = await Promise.all([
+    supabase
+      .from('SpaceSetting')
+      .select('intakePageTitle, intakePageIntro, businessName, phoneNumber, logoUrl, realtorPhotoUrl')
+      .eq('spaceId', space.id)
+      .maybeSingle(),
+    supabase
+      .from('User')
+      .select('name, avatar')
+      .eq('id', space.ownerId)
+      .maybeSingle(),
+  ]);
+
   const settings = settingsData as {
     intakePageTitle: string | null;
     intakePageIntro: string | null;
@@ -26,13 +35,6 @@ export default async function PublicApplyPage({
     logoUrl: string | null;
     realtorPhotoUrl: string | null;
   } | null;
-
-  // Fetch the agent's profile info
-  const { data: ownerData } = await supabase
-    .from('User')
-    .select('name, avatar')
-    .eq('id', space.ownerId)
-    .maybeSingle();
 
   const pageTitle = settings?.intakePageTitle || `Apply with ${space.name}`;
   const pageIntro = settings?.intakePageIntro || "Share your rental preferences and we'll follow up with next steps.";

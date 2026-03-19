@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     const duplicateCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const { data: existingRecentLeads, error: dupError } = await supabase
       .from('Contact')
-      .select('*')
+      .select('id, phone, email, scoringStatus, leadScore, scoreLabel, scoreSummary, scoreDetails')
       .eq('spaceId', space.id)
       .eq('name', payload.legalName)
       .contains('tags', ['application-link'])
@@ -165,69 +165,66 @@ export async function POST(req: NextRequest) {
       slug: payload.slug,
     });
 
-    let scoring: LeadScoringResult = {
-      scoringStatus: 'failed',
-      leadScore: null,
-      scoreLabel: 'unscored',
-      scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
-      scoreDetails: null,
-    };
+    // ── Defer AI scoring + email notification to after response ─────────────
+    // This avoids the 5-15s AI scoring latency blocking the user's submission.
+    void (async () => {
+      let scoring: LeadScoringResult = {
+        scoringStatus: 'failed',
+        leadScore: null,
+        scoreLabel: 'unscored',
+        scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
+        scoreDetails: null,
+      };
 
-    try {
-      scoring = await scoreLeadApplication({
-        contactId: contact.id,
-        name: payload.legalName,
-        email: payload.email ?? null,
-        phone: payload.phone,
-        budget: payload.monthlyRent ?? null,
-        applicationData,
-      });
-
-      const { error: scoreUpdateError } = await supabase
-        .from('Contact')
-        .update({
-          scoringStatus: scoring.scoringStatus,
-          leadScore: scoring.leadScore,
-          scoreLabel: scoring.scoreLabel,
-          scoreSummary: scoring.scoreSummary,
-          scoreDetails: scoring.scoreDetails,
-          updatedAt: new Date().toISOString(),
-        })
-        .eq('id', contact.id);
-      if (scoreUpdateError) throw scoreUpdateError;
-
-      console.info('[apply] scoring persisted', {
-        contactId: contact.id,
-        scoringStatus: scoring.scoringStatus,
-        scoreLabel: scoring.scoreLabel,
-      });
-    } catch (error) {
-      console.error('[apply] scoring persistence failed', {
-        contactId: contact.id,
-        error,
-      });
       try {
-        const { error: fallbackUpdateError } = await supabase
+        scoring = await scoreLeadApplication({
+          contactId: contact.id,
+          name: payload.legalName,
+          email: payload.email ?? null,
+          phone: payload.phone,
+          budget: payload.monthlyRent ?? null,
+          applicationData,
+        });
+
+        const { error: scoreUpdateError } = await supabase
           .from('Contact')
           .update({
-            scoringStatus: 'failed',
-            leadScore: null,
-            scoreLabel: 'unscored',
-            scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
+            scoringStatus: scoring.scoringStatus,
+            leadScore: scoring.leadScore,
+            scoreLabel: scoring.scoreLabel,
+            scoreSummary: scoring.scoreSummary,
+            scoreDetails: scoring.scoreDetails,
             updatedAt: new Date().toISOString(),
           })
           .eq('id', contact.id);
-        if (fallbackUpdateError) throw fallbackUpdateError;
-      } catch (fallbackErr: unknown) {
-        console.error('[apply] failed to persist fallback scoring state', {
-          contactId: contact.id,
-          fallbackErr,
-        });
+        if (scoreUpdateError) {
+          console.error('[apply] scoring update failed', { contactId: contact.id, scoreUpdateError });
+        } else {
+          console.info('[apply] scoring persisted', {
+            contactId: contact.id,
+            scoringStatus: scoring.scoringStatus,
+            scoreLabel: scoring.scoreLabel,
+          });
+        }
+      } catch (error) {
+        console.error('[apply] scoring failed', { contactId: contact.id, error });
+        try {
+          await supabase
+            .from('Contact')
+            .update({
+              scoringStatus: 'failed',
+              leadScore: null,
+              scoreLabel: 'unscored',
+              scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
+              updatedAt: new Date().toISOString(),
+            })
+            .eq('id', contact.id);
+        } catch (fallbackErr) {
+          console.error('[apply] fallback scoring state failed', { contactId: contact.id, fallbackErr });
+        }
       }
-    }
 
-    // ── Non-blocking email notification ──────────────────────────────────────
-    void (async () => {
+      // Email notification (after scoring so we can include the score)
       try {
         const [{ data: settingsRow }, { data: ownerRow }] = await Promise.all([
           supabase.from('SpaceSetting').select('notifications').eq('spaceId', space.id).maybeSingle(),
@@ -253,16 +250,17 @@ export async function POST(req: NextRequest) {
       }
     })();
 
+    // Return immediately — scoring happens in the background
     return NextResponse.json(
       {
         success: true,
         id: contact.id,
         applicationRef,
-        scoringStatus: scoring.scoringStatus,
-        leadScore: scoring.leadScore,
-        scoreLabel: scoring.scoreLabel,
-        scoreSummary: scoring.scoreSummary,
-        scoreDetails: scoring.scoreDetails,
+        scoringStatus: 'pending',
+        leadScore: null,
+        scoreLabel: 'unscored',
+        scoreSummary: null,
+        scoreDetails: null,
       },
       { status: 201 }
     );
