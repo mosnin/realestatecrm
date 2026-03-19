@@ -58,7 +58,7 @@ export async function chatWithRAG(
   ]);
 
   // Fetch deal↔contact links scoped to this space's deal IDs only
-  const dealIds = (allDeals ?? []).map((d: any) => d.id);
+  const dealIds = (allDeals ?? []).filter((d: any) => d?.id).map((d: any) => d.id);
   const { data: allDealContactRows } = dealIds.length
     ? await supabase
         .from('DealContact')

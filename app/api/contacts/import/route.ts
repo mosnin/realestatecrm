@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       name: r.name.trim(),
       phone: r.phone?.trim() || null,
       email: r.email?.trim() || null,
-      budget: r.budget != null && !isNaN(Number(r.budget)) ? Number(r.budget) : null,
+      budget: r.budget != null && !isNaN(parseFloat(String(r.budget))) && parseFloat(String(r.budget)) >= 0 ? parseFloat(String(r.budget)) : null,
       type: r.type && VALID_TYPES.has(r.type) ? r.type : 'QUALIFICATION',
       notes: r.notes?.trim() || null,
       tags: [],

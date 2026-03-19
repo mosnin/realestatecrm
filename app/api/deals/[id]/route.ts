@@ -78,6 +78,11 @@ export async function PATCH(
 
   const body = await req.json();
 
+  const VALID_STATUSES = ['active', 'won', 'lost', 'on_hold'];
+  if (body.status !== undefined && !VALID_STATUSES.includes(body.status)) {
+    return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+  }
+
   const valueVal = body.value != null && body.value !== '' ? parseFloat(body.value) : null;
   if (valueVal !== null && isNaN(valueVal)) {
     return NextResponse.json({ error: 'Invalid value' }, { status: 400 });

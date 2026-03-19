@@ -78,11 +78,19 @@ export function ChatInterface({
   }
 
   async function handleDeleteConversation(id: string) {
-    await fetch(`/api/ai/conversations/${id}`, { method: 'DELETE' });
-    setConversations((prev) => prev.filter((c) => c.id !== id));
-    if (activeConversationId === id) {
-      setActiveConversationId(null);
-      setMessages([]);
+    try {
+      const res = await fetch(`/api/ai/conversations/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        console.error('[Chat] Failed to delete conversation:', res.status);
+        return;
+      }
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      if (activeConversationId === id) {
+        setActiveConversationId(null);
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error('[Chat] Error deleting conversation:', err);
     }
   }
 
@@ -140,8 +148,8 @@ export function ChatInterface({
           });
         }
       }
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error('[Chat] Mention search failed:', err);
     }
     return results;
   }, [slug]);

@@ -35,11 +35,11 @@ export async function GET(req: NextRequest) {
 
     if (contactsResult.error) {
       console.error('[search] contacts query error:', contactsResult.error);
-      return NextResponse.json({ contacts: [], deals: [], error: 'Contact search failed' }, { status: 200 });
+      return NextResponse.json({ contacts: [], deals: [], error: 'Contact search failed' }, { status: 500 });
     }
     if (dealsResult.error) {
       console.error('[search] deals query error:', dealsResult.error);
-      return NextResponse.json({ contacts: [], deals: [], error: 'Deal search failed' }, { status: 200 });
+      return NextResponse.json({ contacts: [], deals: [], error: 'Deal search failed' }, { status: 500 });
     }
 
     const contacts = (contactsResult.data ?? []).map((c: any) => ({
