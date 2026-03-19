@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { buildIntakeUrl } from '@/lib/intake';
-import { CheckCircle2, Loader2, User, Link2, Bell, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Loader2, User, Link2, Bell, AlertCircle, Image, Palette } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ConfigureAccountFormProps {
@@ -19,6 +19,8 @@ interface ConfigureAccountFormProps {
     intakePageTitle: string;
     intakePageIntro: string;
     notifications: boolean;
+    logoUrl: string;
+    realtorPhotoUrl: string;
   };
   slug: string;
 }
@@ -57,6 +59,8 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
       'Share a few details so I can review your rental fit faster.'
   );
   const [notifications, setNotifications] = useState(initialData.notifications);
+  const [logoUrl, setLogoUrl] = useState(initialData.logoUrl || '');
+  const [realtorPhotoUrl, setRealtorPhotoUrl] = useState(initialData.realtorPhotoUrl || '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -93,6 +97,8 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
           intakePageTitle,
           intakePageIntro,
           businessName,
+          logoUrl: logoUrl.trim() || null,
+          realtorPhotoUrl: realtorPhotoUrl.trim() || null,
         }),
       });
       if (!spaceRes.ok) {
@@ -241,6 +247,56 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
               <p className="text-xs text-muted-foreground">
                 {intakePageIntro || 'Your intro line here.'}
               </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Branding ─────────────────────────────────────────── */}
+        <section className="rounded-xl border border-border bg-card px-5 py-5">
+          <SectionHeader
+            icon={Image}
+            title="Branding"
+            description="Customize how your intake and tour booking pages look to prospects."
+          />
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="logoUrl">Logo URL</Label>
+              <Input
+                id="logoUrl"
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                placeholder="https://example.com/logo.png"
+              />
+              <p className="text-xs text-muted-foreground">
+                Your company logo — displayed on intake and booking pages. Use a direct image URL.
+              </p>
+              {logoUrl && (
+                <div className="mt-2 p-3 rounded-lg bg-muted/30 border border-border">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2">Preview</p>
+                  <img src={logoUrl} alt="Logo preview" className="h-10 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                </div>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="realtorPhotoUrl">Profile photo URL</Label>
+              <Input
+                id="realtorPhotoUrl"
+                value={realtorPhotoUrl}
+                onChange={(e) => setRealtorPhotoUrl(e.target.value)}
+                placeholder="https://example.com/headshot.jpg"
+              />
+              <p className="text-xs text-muted-foreground">
+                Your professional headshot — shown on public pages alongside your name and phone number.
+              </p>
+              {realtorPhotoUrl && (
+                <div className="mt-2 flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
+                  <img src={realtorPhotoUrl} alt="Photo preview" className="w-12 h-12 rounded-full object-cover ring-2 ring-border" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  <div>
+                    <p className="text-sm font-medium">{name || 'Your Name'}</p>
+                    <p className="text-xs text-muted-foreground">{phone || 'Your phone'}</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </section>

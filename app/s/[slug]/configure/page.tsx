@@ -76,6 +76,8 @@ export default async function ConfigurePage({
     intakePageTitle: dbUser?.space?.settings?.intakePageTitle ?? '',
     intakePageIntro: dbUser?.space?.settings?.intakePageIntro ?? '',
     notifications: dbUser?.space?.settings?.notifications ?? true,
+    logoUrl: (dbUser?.space?.settings as any)?.logoUrl ?? '',
+    realtorPhotoUrl: (dbUser?.space?.settings as any)?.realtorPhotoUrl ?? '',
   };
 
   // Check broker status for the brokerage section

@@ -23,6 +23,8 @@ import {
   Info,
   User,
   Calendar,
+  CalendarDays,
+  CalendarPlus,
 } from 'lucide-react';
 import type { Contact, ApplicationData, LeadScoreDetails } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
@@ -63,7 +65,7 @@ export default async function ClientDetailPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  let contact: (Contact & { dealContacts: { deal: { id: string; title: string; address: string | null; value: number | null; stage: { name: string; color: string } } }[] }) | null = null;
+  let contact: (Contact & { dealContacts: { deal: { id: string; title: string; address: string | null; value: number | null; stage: { name: string; color: string } } }[]; tours: { id: string; startsAt: string; endsAt: string; status: string; propertyAddress: string | null }[] }) | null = null;
   try {
     const { data: contactData, error: contactError } = await supabase.from('Contact').select('*').eq('id', id).single();
     if (contactError && contactError.code === 'PGRST116') {
@@ -76,6 +78,7 @@ export default async function ClientDetailPage({
       if (c.spaceId !== space.id) notFound();
       const { data: dealRows, error: dealError } = await supabase.from('DealContact').select('Deal(id, title, address, value, DealStage(name, color))').eq('contactId', id);
       if (dealError) throw dealError;
+      const { data: tourRows } = await supabase.from('Tour').select('id, guestName, startsAt, endsAt, status, propertyAddress').eq('contactId', id).order('startsAt', { ascending: false }).limit(10);
       contact = {
         ...c,
         dealContacts: ((dealRows ?? []) as { Deal: { id: string; title: string; address: string | null; value: number | null; DealStage: { name: string; color: string } } }[]).map((row) => ({
@@ -90,6 +93,7 @@ export default async function ClientDetailPage({
             },
           },
         })),
+        tours: (tourRows ?? []) as any[],
       };
     }
   } catch (err) {
@@ -188,6 +192,29 @@ export default async function ClientDetailPage({
             followUpAt={contact.followUpAt ? String(contact.followUpAt) : null}
             lastContactedAt={contact.lastContactedAt ? String(contact.lastContactedAt) : null}
           />
+        </div>
+
+        {/* Quick actions */}
+        <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-2">
+          <Link
+            href={`/s/${slug}/tours?schedule=${contact.id}`}
+            className="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg border border-border hover:bg-accent transition-colors"
+          >
+            <CalendarPlus size={13} />
+            Schedule Tour
+          </Link>
+          <Link
+            href={`/s/${slug}/deals`}
+            className="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg border border-border hover:bg-accent transition-colors"
+          >
+            <Briefcase size={13} />
+            Create Deal
+          </Link>
+          {contact.sourceLabel && (
+            <span className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground px-2.5 py-1.5 rounded-full bg-muted">
+              Source: {contact.sourceLabel}
+            </span>
+          )}
         </div>
       </div>
 
@@ -553,6 +580,53 @@ export default async function ClientDetailPage({
 
       {/* Activity log */}
       <ContactActivityTab contactId={contact.id} />
+
+      {/* Tour history */}
+      {contact.tours.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+          <div className="px-6 py-4 border-b border-border flex items-center gap-2">
+            <CalendarDays size={14} className="text-primary" />
+            <h2 className="text-sm font-semibold">Tour History</h2>
+          </div>
+          <div className="px-6 py-4 space-y-2">
+            {contact.tours.map((tour: any) => {
+              const statusColors: Record<string, string> = {
+                scheduled: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+                confirmed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+                completed: 'bg-slate-100 text-slate-600',
+                cancelled: 'bg-red-100 text-red-700',
+                no_show: 'bg-amber-100 text-amber-800',
+              };
+              return (
+                <Link
+                  key={tour.id}
+                  href={`/s/${slug}/tours`}
+                  className="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <CalendarDays size={14} className="text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">
+                        {new Date(tour.startsAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                        {' at '}
+                        {new Date(tour.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      </p>
+                      {tour.propertyAddress && (
+                        <p className="text-xs text-muted-foreground">{tour.propertyAddress}</p>
+                      )}
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${statusColors[tour.status] || 'bg-muted'}`}>
+                    {tour.status}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Associated deals */}
       <div className="rounded-2xl border border-border bg-card overflow-hidden">

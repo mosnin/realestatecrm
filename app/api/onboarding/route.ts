@@ -211,11 +211,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'create_space') {
-      const { slug, intakePageTitle, intakePageIntro, businessName } = body as {
+      const { slug, intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl } = body as {
         slug: string;
         intakePageTitle: string;
         intakePageIntro: string;
         businessName: string;
+        logoUrl?: string | null;
+        realtorPhotoUrl?: string | null;
       };
 
       if (!slug) return NextResponse.json({ error: 'Slug is required' }, { status: 400 });
@@ -235,6 +237,8 @@ export async function POST(req: NextRequest) {
               intakePageTitle,
               intakePageIntro,
               businessName,
+              ...(logoUrl !== undefined && { logoUrl }),
+              ...(realtorPhotoUrl !== undefined && { realtorPhotoUrl }),
             },
             { onConflict: 'spaceId' }
           )

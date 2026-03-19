@@ -39,13 +39,15 @@ export default async function DashboardPage({
   if (!space) notFound();
 
   let contactCount = 0, dealCount = 0, newLeadCount = 0, totalLeads = 0, followUpDue = 0;
+  let upcomingTourCount = 0;
   let deals: { value: number | null; stageId: string }[] = [];
   let stages: { id: string; name: string; color: string; position: number; spaceId: string }[] = [];
   let recentLeads: { id: string; name: string; phone: string | null; budget: number | null; preferences: string | null; createdAt: Date; tags: string[]; leadScore: number | null; scoreLabel: string | null; scoringStatus: string | null }[] = [];
   let followUpContacts: FollowUpContact[] = [];
+  let upcomingTours: { id: string; guestName: string; startsAt: string; endsAt: string; propertyAddress: string | null; status: string }[] = [];
 
   try {
-    [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads, followUpDue, followUpContacts] =
+    [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads, followUpDue, followUpContacts, upcomingTourCount, upcomingTours] =
       await Promise.all([
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
         supabase.from('Deal').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
@@ -56,6 +58,8 @@ export default async function DashboardPage({
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).contains('tags', ['application-link']).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).lte('followUpAt', new Date().toISOString()).then(r => { return r.count ?? 0; }),
         supabase.from('Contact').select('id, name, phone, email, type, followUpAt').eq('spaceId', space.id).not('followUpAt', 'is', null).lte('followUpAt', new Date().toISOString()).order('followUpAt', { ascending: true }).limit(8).then(r => { return (r.data ?? []) as FollowUpContact[]; }),
+        supabase.from('Tour').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).gte('startsAt', new Date().toISOString()).in('status', ['scheduled', 'confirmed']).then(r => r.count ?? 0),
+        supabase.from('Tour').select('id, guestName, startsAt, endsAt, propertyAddress, status').eq('spaceId', space.id).gte('startsAt', new Date().toISOString()).in('status', ['scheduled', 'confirmed']).order('startsAt', { ascending: true }).limit(4).then(r => (r.data ?? []) as any[]),
       ]);
   } catch (err) {
     console.error('[space-home] DB queries failed', { slug, error: err });
@@ -134,10 +138,17 @@ export default async function DashboardPage({
             accent: false,
           },
           {
+            label: 'Upcoming tours',
+            value: upcomingTourCount,
+            sub: upcomingTourCount > 0 ? 'scheduled' : 'none',
+            icon: CalendarDays,
+            accent: upcomingTourCount > 0,
+          },
+          {
             label: 'Follow-ups due',
             value: followUpDue,
             sub: followUpDue > 0 ? 'need attention' : 'all clear',
-            icon: CalendarDays,
+            icon: null,
             accent: followUpDue > 0,
           },
         ].map(({ label, value, sub, icon: Icon, accent }) => (
@@ -203,6 +214,88 @@ export default async function DashboardPage({
           </div>
         </CardContent>
       </Card>
+
+      {/* Tour booking link */}
+      <Card>
+        <CardContent className="px-5 py-5">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center">
+              <CalendarDays size={14} className="text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Tour booking link</p>
+              <p className="text-xs text-muted-foreground">Share to let prospects schedule tours</p>
+            </div>
+            <div className="ml-auto flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-full px-2 py-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                Live
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2.5 break-all font-mono text-muted-foreground border border-border">
+              {`${intakeUrl.replace('/apply/', '/book/')}`}
+            </code>
+            <div className="flex gap-2 flex-shrink-0">
+              <CopyLinkButton url={intakeUrl.replace('/apply/', '/book/')} />
+              <a
+                href={`/book/${space.slug}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-colors"
+              >
+                <ExternalLink size={13} />
+                Preview
+              </a>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Upcoming tours */}
+      {upcomingTours.length > 0 && (
+        <Card>
+          <CardContent className="px-5 py-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center">
+                  <CalendarDays size={14} className="text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Upcoming tours</p>
+                  <p className="text-xs text-muted-foreground">{upcomingTourCount} scheduled</p>
+                </div>
+              </div>
+              <Link href={`/s/${slug}/tours`} className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
+                View all <ArrowRight size={12} />
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {upcomingTours.map((tour: any) => (
+                <Link key={tour.id} href={`/s/${slug}/tours`} className="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
+                      {new Date(tour.startsAt).getDate()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{tour.guestName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(tour.startsAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                        {' at '}
+                        {new Date(tour.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                  {tour.propertyAddress && (
+                    <span className="text-xs text-muted-foreground truncate max-w-[150px]">{tour.propertyAddress}</span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Follow-up widget */}
       <FollowUpWidget slug={slug} contacts={followUpContacts} />

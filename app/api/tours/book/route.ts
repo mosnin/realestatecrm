@@ -79,6 +79,16 @@ export async function POST(req: NextRequest) {
     .single();
   if (error) throw error;
 
+  // Set source attribution on the contact if not already set
+  if (contactRow?.id) {
+    supabase
+      .from('Contact')
+      .update({ sourceLabel: 'tour-booking' })
+      .eq('id', contactRow.id)
+      .is('sourceLabel', null)
+      .then(({ error: srcErr }) => { if (srcErr) console.error('[book] Source update failed:', srcErr); });
+  }
+
   // Send confirmation email (non-blocking)
   const { data: settingsFull } = await supabase
     .from('SpaceSetting')
