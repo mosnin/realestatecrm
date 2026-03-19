@@ -52,20 +52,52 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'This time slot is no longer available' }, { status: 409 });
   }
 
-  // Try to match to existing contact by email
+  // Try to match to existing contact by email, or create one
+  let contactId: string | null = null;
   const { data: contactRow } = await supabase
     .from('Contact')
     .select('id')
     .eq('spaceId', space.id)
-    .eq('email', guestEmail.trim().toLowerCase())
+    .ilike('email', guestEmail.trim())
     .maybeSingle();
+
+  if (contactRow) {
+    contactId = contactRow.id;
+    // Set source attribution if not already set
+    supabase
+      .from('Contact')
+      .update({ sourceLabel: 'tour-booking' })
+      .eq('id', contactId)
+      .is('sourceLabel', null)
+      .then(({ error: srcErr }) => { if (srcErr) console.error('[book] Source update failed:', srcErr); });
+  } else {
+    // Auto-create a contact for this tour guest
+    const newContactId = crypto.randomUUID();
+    const { error: createErr } = await supabase.from('Contact').insert({
+      id: newContactId,
+      spaceId: space.id,
+      name: guestName.trim(),
+      email: guestEmail.trim().toLowerCase(),
+      phone: guestPhone?.trim() || null,
+      address: propertyAddress?.trim() || null,
+      type: 'TOUR',
+      tags: ['tour-booking'],
+      sourceLabel: 'tour-booking',
+      scoringStatus: 'unscored',
+    });
+    if (!createErr) {
+      contactId = newContactId;
+    } else {
+      console.error('[book] Auto-create contact failed:', createErr);
+    }
+  }
 
   const { data: tour, error } = await supabase
     .from('Tour')
     .insert({
       id: crypto.randomUUID(),
       spaceId: space.id,
-      contactId: contactRow?.id ?? null,
+      contactId,
       guestName: guestName.trim(),
       guestEmail: guestEmail.trim().toLowerCase(),
       guestPhone: guestPhone?.trim() || null,
@@ -78,16 +110,6 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
   if (error) throw error;
-
-  // Set source attribution on the contact if not already set
-  if (contactRow?.id) {
-    supabase
-      .from('Contact')
-      .update({ sourceLabel: 'tour-booking' })
-      .eq('id', contactRow.id)
-      .is('sourceLabel', null)
-      .then(({ error: srcErr }) => { if (srcErr) console.error('[book] Source update failed:', srcErr); });
-  }
 
   // Send confirmation email (non-blocking)
   const { data: settingsFull } = await supabase

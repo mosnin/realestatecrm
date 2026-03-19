@@ -75,6 +75,36 @@ export async function PATCH(
     .single();
   if (error) throw error;
 
+  // Auto-create follow-up reminder when tour is completed (24h later)
+  if (body.status === 'completed' && ctx.tour.status !== 'completed' && data.contactId) {
+    const followUpAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    supabase
+      .from('Contact')
+      .update({ followUpAt, type: 'TOUR' })
+      .eq('id', data.contactId)
+      .is('followUpAt', null)
+      .then(({ error: fuErr }) => { if (fuErr) console.error('[tour] Follow-up set failed:', fuErr); });
+
+    // Log activity on the contact
+    supabase.from('ContactActivity').insert({
+      id: crypto.randomUUID(),
+      contactId: data.contactId,
+      type: 'follow_up',
+      content: `Auto follow-up set for 24h after tour completion${data.propertyAddress ? ` — ${data.propertyAddress}` : ''}`,
+    }).then(({ error: actErr }) => { if (actErr) console.error('[tour] Activity log failed:', actErr); });
+  }
+
+  // Auto-set follow-up for no-shows (48h later)
+  if (body.status === 'no_show' && ctx.tour.status !== 'no_show' && data.contactId) {
+    const followUpAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    supabase
+      .from('Contact')
+      .update({ followUpAt })
+      .eq('id', data.contactId)
+      .is('followUpAt', null)
+      .then(({ error: fuErr }) => { if (fuErr) console.error('[tour] No-show follow-up failed:', fuErr); });
+  }
+
   // Send follow-up email when marked completed
   if (body.status === 'completed' && ctx.tour.status !== 'completed') {
     const { data: settings } = await supabase

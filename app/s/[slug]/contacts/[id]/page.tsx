@@ -30,6 +30,7 @@ import type { Contact, ApplicationData, LeadScoreDetails } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
 import { ComposeEmailDialog } from '@/components/contacts/compose-email-dialog';
 import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-field';
+import { FollowUpSuggestions } from '@/components/contacts/follow-up-suggestions';
 import { RescoreButton } from '@/components/contacts/rescore-button';
 import { getInitials, formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug } from '@/lib/space';
@@ -217,6 +218,16 @@ export default async function ClientDetailPage({
           )}
         </div>
       </div>
+
+      {/* Smart follow-up suggestions */}
+      <FollowUpSuggestions
+        contactId={contact.id}
+        scoreLabel={contact.scoreLabel}
+        contactType={contact.type}
+        hasTours={contact.tours.length > 0}
+        hasDeals={contact.dealContacts.length > 0}
+        hasFollowUp={!!contact.followUpAt}
+      />
 
       {/* ── AI Lead Score Card ── */}
       {contact.scoringStatus === 'scored' && contact.leadScore != null && (
@@ -579,7 +590,7 @@ export default async function ClientDetailPage({
       )}
 
       {/* Activity log */}
-      <ContactActivityTab contactId={contact.id} />
+      <ContactActivityTab contactId={contact.id} contactCreatedAt={String(contact.createdAt)} slug={slug} />
 
       {/* Tour history */}
       {contact.tours.length > 0 && (

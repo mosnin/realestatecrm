@@ -1,43 +1,118 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Clock } from 'lucide-react';
+import {
+  Plus,
+  Clock,
+  CalendarDays,
+  Briefcase,
+  UserPlus,
+  ArrowRight,
+  FileText,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { ACTIVITY_META } from '@/lib/constants';
 
-type ActivityType = 'note' | 'call' | 'email' | 'meeting' | 'follow_up';
+type ManualActivityType = 'note' | 'call' | 'email' | 'meeting' | 'follow_up';
 
-type Activity = {
+type TimelineEntry = {
   id: string;
-  type: ActivityType;
+  kind: 'activity' | 'tour' | 'deal' | 'system';
+  type: string;
   content: string | null;
   metadata: Record<string, unknown> | null;
   createdAt: string;
 };
 
 const TYPE_META = ACTIVITY_META;
+const ACTIVITY_TYPES: ManualActivityType[] = ['note', 'call', 'email', 'meeting', 'follow_up'];
 
-const ACTIVITY_TYPES: ActivityType[] = ['note', 'call', 'email', 'meeting', 'follow_up'];
+// Meta for system/tour/deal events
+const SYSTEM_META: Record<string, { label: string; icon: typeof CalendarDays; color: string }> = {
+  tour_scheduled: { label: 'Tour scheduled', icon: CalendarDays, color: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/10' },
+  tour_confirmed: { label: 'Tour confirmed', icon: CalendarDays, color: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10' },
+  tour_completed: { label: 'Tour completed', icon: CalendarDays, color: 'text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-slate-500/10' },
+  tour_cancelled: { label: 'Tour cancelled', icon: CalendarDays, color: 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/10' },
+  tour_no_show: { label: 'No-show', icon: CalendarDays, color: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10' },
+  deal_created: { label: 'Deal created', icon: Briefcase, color: 'text-indigo-700 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-500/10' },
+  contact_created: { label: 'Contact added', icon: UserPlus, color: 'text-primary bg-primary/10' },
+  stage_change: { label: 'Stage change', icon: ArrowRight, color: 'text-indigo-700 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-500/10' },
+  status_change: { label: 'Status change', icon: FileText, color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-500/10' },
+};
 
-export function ContactActivityTab({ contactId }: { contactId: string }) {
-  const [activities, setActivities] = useState<Activity[]>([]);
+function getEntryMeta(entry: TimelineEntry) {
+  if (entry.kind === 'activity') {
+    return (TYPE_META as any)[entry.type] ?? TYPE_META.note;
+  }
+  return SYSTEM_META[entry.type] ?? { label: entry.type, icon: Clock, color: 'text-muted-foreground bg-muted' };
+}
+
+export function ContactActivityTab({ contactId, contactCreatedAt, slug }: { contactId: string; contactCreatedAt?: string; slug?: string }) {
+  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [type, setType] = useState<ActivityType>('note');
+  const [type, setType] = useState<ManualActivityType>('note');
   const [content, setContent] = useState('');
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
 
-  const fetchActivities = useCallback(async () => {
-    const res = await fetch(`/api/contacts/${contactId}/activity`);
-    if (res.ok) setActivities(await res.json());
-    setLoading(false);
-  }, [contactId]);
+  const fetchTimeline = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [activitiesRes, toursRes] = await Promise.all([
+        fetch(`/api/contacts/${contactId}/activity`),
+        fetch(`/api/contacts/${contactId}/timeline`),
+      ]);
 
-  useEffect(() => {
-    fetchActivities();
-  }, [fetchActivities]);
+      const entries: TimelineEntry[] = [];
+
+      // Manual activities
+      if (activitiesRes.ok) {
+        const activities = await activitiesRes.json();
+        for (const a of activities) {
+          entries.push({
+            id: a.id,
+            kind: 'activity',
+            type: a.type,
+            content: a.content,
+            metadata: a.metadata,
+            createdAt: a.createdAt,
+          });
+        }
+      }
+
+      // Tour + deal events from timeline endpoint
+      if (toursRes.ok) {
+        const events = await toursRes.json();
+        for (const e of events) {
+          entries.push(e);
+        }
+      }
+
+      // Contact creation event
+      if (contactCreatedAt) {
+        entries.push({
+          id: 'contact-created',
+          kind: 'system',
+          type: 'contact_created',
+          content: 'Contact was added to the CRM',
+          metadata: null,
+          createdAt: contactCreatedAt,
+        });
+      }
+
+      // Sort by date descending
+      entries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setTimeline(entries);
+    } catch (err) {
+      console.error('[timeline] Failed to load:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [contactId, contactCreatedAt]);
+
+  useEffect(() => { fetchTimeline(); }, [fetchTimeline]);
 
   async function handlePost() {
     if (!content.trim()) return;
@@ -51,7 +126,14 @@ export function ContactActivityTab({ contactId }: { contactId: string }) {
       });
       if (res.ok) {
         const newActivity = await res.json();
-        setActivities((prev) => [newActivity, ...prev]);
+        setTimeline((prev) => [{
+          id: newActivity.id,
+          kind: 'activity' as const,
+          type: newActivity.type,
+          content: newActivity.content,
+          metadata: newActivity.metadata,
+          createdAt: newActivity.createdAt,
+        }, ...prev]);
         setContent('');
       } else {
         setPostError('Failed to save. Please try again.');
@@ -66,18 +148,17 @@ export function ContactActivityTab({ contactId }: { contactId: string }) {
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
       <div className="px-6 py-4 border-b border-border flex items-center gap-2">
         <Clock size={14} className="text-muted-foreground" />
-        <h2 className="text-sm font-semibold">Activity log</h2>
-        {activities.length > 0 && (
-          <span className="ml-auto text-xs text-muted-foreground">{activities.length} entries</span>
+        <h2 className="text-sm font-semibold">Timeline</h2>
+        {timeline.length > 0 && (
+          <span className="ml-auto text-xs text-muted-foreground">{timeline.length} events</span>
         )}
       </div>
 
       {/* Add activity */}
       <div className="px-6 pt-4 pb-3 border-b border-border/60">
-        {/* Type selector */}
         <div className="flex gap-1 mb-3 flex-wrap">
           {ACTIVITY_TYPES.map((t) => {
-            const meta = TYPE_META[t];
+            const meta = (TYPE_META as any)[t];
             const Icon = meta.icon;
             return (
               <button
@@ -98,7 +179,7 @@ export function ContactActivityTab({ contactId }: { contactId: string }) {
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder={`Add a ${TYPE_META[type].label.toLowerCase()}…`}
+          placeholder={`Add a ${(TYPE_META as any)[type].label.toLowerCase()}…`}
           rows={2}
           className="w-full text-sm rounded-lg border border-input bg-background px-3 py-2 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
           onKeyDown={(e) => {
@@ -134,36 +215,44 @@ export function ContactActivityTab({ contactId }: { contactId: string }) {
           </div>
         )}
 
-        {!loading && activities.length === 0 && (
+        {!loading && timeline.length === 0 && (
           <div className="text-center py-8">
             <p className="text-sm text-muted-foreground">No activity yet. Log a call, note, or email above.</p>
           </div>
         )}
 
-        {!loading && activities.length > 0 && (
-          <div className="space-y-4">
-            {activities.map((activity) => {
-              const meta = TYPE_META[activity.type] ?? TYPE_META.note;
-              const Icon = meta.icon;
-              return (
-                <div key={activity.id} className="flex gap-3">
-                  <div className={cn('w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5', meta.color)}>
-                    <Icon size={13} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-semibold text-foreground">{meta.label}</span>
-                      <span className="text-xs text-muted-foreground">{timeAgo(activity.createdAt as string)}</span>
+        {!loading && timeline.length > 0 && (
+          <div className="relative">
+            {/* Timeline line */}
+            <div className="absolute left-[13px] top-4 bottom-4 w-px bg-border" />
+
+            <div className="space-y-4">
+              {timeline.map((entry) => {
+                const meta = getEntryMeta(entry);
+                const Icon = meta.icon;
+                const isSystem = entry.kind !== 'activity';
+                return (
+                  <div key={entry.id} className="flex gap-3 relative">
+                    <div className={cn('w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 z-10', meta.color)}>
+                      <Icon size={13} />
                     </div>
-                    {activity.content && (
-                      <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed whitespace-pre-wrap">
-                        {activity.content}
-                      </p>
-                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={cn('text-xs font-semibold', isSystem ? 'text-muted-foreground' : 'text-foreground')}>
+                          {meta.label}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{timeAgo(entry.createdAt)}</span>
+                      </div>
+                      {entry.content && (
+                        <p className={cn('text-sm mt-0.5 leading-relaxed whitespace-pre-wrap', isSystem ? 'text-muted-foreground/80 italic' : 'text-muted-foreground')}>
+                          {entry.content}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
