@@ -9,6 +9,7 @@ import { History, X, AlertCircle, Sparkles, Plus } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import type { Conversation } from '@/lib/types';
+import type { CRMAction } from './action-card';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -237,6 +238,27 @@ export function ChatInterface({
     }
   }
 
+  const handleAction = useCallback(async (action: CRMAction): Promise<boolean> => {
+    const endpoint = action.type === 'update_contact'
+      ? `/api/contacts/${action.id}`
+      : `/api/deals/${action.id}`;
+    try {
+      const res = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(action.changes),
+      });
+      if (!res.ok) {
+        console.error('[Chat] Action failed:', res.status);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('[Chat] Action error:', err);
+      return false;
+    }
+  }, [slug]);
+
   const atLimit = messages.length >= MESSAGE_LIMIT;
 
   return (
@@ -348,7 +370,7 @@ export function ChatInterface({
           <ScrollArea className="h-full">
             <div className="max-w-3xl mx-auto space-y-4 px-4 sm:px-6 py-6">
               {messages.map((msg, i) => (
-                <MessageBubble key={i} role={msg.role} content={msg.content} />
+                <MessageBubble key={i} role={msg.role} content={msg.content} onAction={handleAction} />
               ))}
               {isStreaming && messages[messages.length - 1]?.content === '' && (
                 <div className="flex justify-start">

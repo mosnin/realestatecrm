@@ -1,10 +1,14 @@
 import { Fragment } from 'react';
 import { cn } from '@/lib/utils';
+import { ActionCard, type CRMAction } from './action-card';
 
 interface MessageBubbleProps {
   role: 'user' | 'assistant';
   content: string;
+  onAction?: (action: CRMAction) => Promise<boolean>;
 }
+
+const ACTION_REGEX = /<<ACTION>>([\s\S]*?)<{2}\/ACTION>>/g;
 
 /** Render inline markdown: **bold** and *italic* */
 function renderInline(text: string): React.ReactNode[] {
@@ -44,20 +48,81 @@ function renderMarkdown(text: string): React.ReactNode {
   ));
 }
 
-export function MessageBubble({ role, content }: MessageBubbleProps) {
+/** Parse content into text segments and action blocks */
+function parseContent(content: string): Array<{ type: 'text'; value: string } | { type: 'action'; value: CRMAction }> {
+  const parts: Array<{ type: 'text'; value: string } | { type: 'action'; value: CRMAction }> = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  const regex = new RegExp(ACTION_REGEX.source, 'g');
+
+  while ((match = regex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', value: content.slice(lastIndex, match.index) });
+    }
+    try {
+      const action = JSON.parse(match[1].trim()) as CRMAction;
+      if (action.type && action.id && action.changes) {
+        parts.push({ type: 'action', value: action });
+      } else {
+        parts.push({ type: 'text', value: match[0] });
+      }
+    } catch {
+      parts.push({ type: 'text', value: match[0] });
+    }
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    parts.push({ type: 'text', value: content.slice(lastIndex) });
+  }
+
+  return parts;
+}
+
+export function MessageBubble({ role, content, onAction }: MessageBubbleProps) {
   const isUser = role === 'user';
 
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap bg-primary text-primary-foreground rounded-br-sm">
+          {content}
+        </div>
+      </div>
+    );
+  }
+
+  const parts = parseContent(content);
+  const hasActions = parts.some((p) => p.type === 'action');
+
+  if (!hasActions) {
+    return (
+      <div className="flex justify-start">
+        <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap bg-muted text-foreground rounded-bl-sm">
+          {renderMarkdown(content)}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
-      <div
-        className={cn(
-          'max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap',
-          isUser
-            ? 'bg-primary text-primary-foreground rounded-br-sm'
-            : 'bg-muted text-foreground rounded-bl-sm'
+    <div className="flex justify-start">
+      <div className="max-w-[85%]">
+        {parts.map((part, i) =>
+          part.type === 'text' ? (
+            part.value.trim() ? (
+              <div key={i} className="rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap bg-muted text-foreground rounded-bl-sm">
+                {renderMarkdown(part.value.trim())}
+              </div>
+            ) : null
+          ) : (
+            <ActionCard
+              key={i}
+              action={part.value}
+              onApprove={onAction ?? (async () => false)}
+            />
+          )
         )}
-      >
-        {isUser ? content : renderMarkdown(content)}
       </div>
     </div>
   );
