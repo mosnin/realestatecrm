@@ -171,6 +171,42 @@ CREATE INDEX IF NOT EXISTS idx_dealstage_space_id ON "DealStage"("spaceId");
 CREATE INDEX IF NOT EXISTS idx_dealcontact_deal   ON "DealContact"("dealId");
 CREATE INDEX IF NOT EXISTS idx_dealcontact_contact ON "DealContact"("contactId");
 CREATE INDEX IF NOT EXISTS idx_message_space_id   ON "Message"("spaceId");
+
+-- Tour booking
+CREATE TABLE IF NOT EXISTS "Tour" (
+  id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "spaceId"       text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  "contactId"     text REFERENCES "Contact"(id) ON DELETE SET NULL,
+  "guestName"     text NOT NULL,
+  "guestEmail"    text NOT NULL,
+  "guestPhone"    text,
+  "propertyAddress" text,
+  notes           text,
+  "startsAt"      timestamptz NOT NULL,
+  "endsAt"        timestamptz NOT NULL,
+  status          text NOT NULL DEFAULT 'scheduled'
+                    CHECK (status IN ('scheduled', 'confirmed', 'completed', 'cancelled', 'no_show')),
+  "googleEventId" text,
+  "createdAt"     timestamptz NOT NULL DEFAULT now(),
+  "updatedAt"     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tour_space_starts ON "Tour" ("spaceId", "startsAt" DESC);
+CREATE INDEX IF NOT EXISTS idx_tour_contact      ON "Tour" ("contactId");
+CREATE INDEX IF NOT EXISTS idx_tour_status       ON "Tour" (status);
+
+-- Google Calendar OAuth tokens
+CREATE TABLE IF NOT EXISTS "GoogleCalendarToken" (
+  id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "spaceId"       text UNIQUE NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  "accessToken"   text NOT NULL,
+  "refreshToken"  text NOT NULL,
+  "expiresAt"     timestamptz NOT NULL,
+  "calendarId"    text NOT NULL DEFAULT 'primary',
+  "createdAt"     timestamptz NOT NULL DEFAULT now(),
+  "updatedAt"     timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_brokerage_owner       ON "Brokerage"("ownerId");
 CREATE INDEX       IF NOT EXISTS idx_brokerage_status       ON "Brokerage"(status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_brokerage_join_code   ON "Brokerage"("joinCode");
@@ -228,6 +264,8 @@ ALTER TABLE "DealContact"         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Message"             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "BrokerageMembership" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Invitation"          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Tour"                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "GoogleCalendarToken"   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "AuditLog"            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "DocumentEmbedding"   ENABLE ROW LEVEL SECURITY;
 

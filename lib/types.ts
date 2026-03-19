@@ -253,3 +253,22 @@ export type Conversation = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type TourStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
+
+export type Tour = {
+  id: string;
+  spaceId: string;
+  contactId: string | null;
+  guestName: string;
+  guestEmail: string;
+  guestPhone: string | null;
+  propertyAddress: string | null;
+  notes: string | null;
+  startsAt: Date;
+  endsAt: Date;
+  status: TourStatus;
+  googleEventId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};

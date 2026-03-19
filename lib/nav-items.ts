@@ -9,6 +9,7 @@ import {
   SlidersHorizontal,
   BarChart2,
   CreditCard,
+  CalendarDays,
 } from 'lucide-react';
 
 export const primaryNavItems = [
@@ -16,6 +17,7 @@ export const primaryNavItems = [
   { href: '/leads', label: 'Leads', icon: PhoneIncoming },
   { href: '/contacts', label: 'Clients', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
+  { href: '/tours', label: 'Tours', icon: CalendarDays },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/ai', label: 'Chip', icon: Sparkles },
 ] as const;
