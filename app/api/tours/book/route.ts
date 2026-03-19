@@ -92,6 +92,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Generate a unique manage token for guest self-service
+  const manageToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+
   const { data: tour, error } = await supabase
     .from('Tour')
     .insert({
@@ -106,6 +109,7 @@ export async function POST(req: NextRequest) {
       startsAt: start.toISOString(),
       endsAt: end.toISOString(),
       propertyProfileId: propertyProfileId || null,
+      manageToken,
     })
     .select()
     .single();

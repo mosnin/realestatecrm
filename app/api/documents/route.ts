@@ -1,0 +1,97 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
+import { requireContactAccess } from '@/lib/api-auth';
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
+
+/**
+ * POST — Upload a document for a contact.
+ * Stores metadata in ContactDocument table. In production, the file binary
+ * would go to S3/R2. For now we store a base64 data URL as the storageKey
+ * (suitable for small files and MVP).
+ */
+export async function POST(req: NextRequest) {
+  const formData = await req.formData();
+  const contactId = formData.get('contactId') as string;
+  const file = formData.get('file') as File;
+  const uploadedBy = (formData.get('uploadedBy') as string) || 'agent';
+
+  if (!contactId || !file) {
+    return NextResponse.json({ error: 'contactId and file required' }, { status: 400 });
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 400 });
+  }
+
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return NextResponse.json({ error: 'File type not supported' }, { status: 400 });
+  }
+
+  // Verify access if not a guest upload
+  if (uploadedBy !== 'guest') {
+    const auth = await requireContactAccess(contactId);
+    if (auth instanceof NextResponse) return auth;
+  }
+
+  // Get spaceId from contact
+  const { data: contact } = await supabase
+    .from('Contact')
+    .select('spaceId')
+    .eq('id', contactId)
+    .single();
+
+  if (!contact) {
+    return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+  }
+
+  // Store file as base64 data URL (MVP approach — replace with S3 in production)
+  const buffer = await file.arrayBuffer();
+  const base64 = Buffer.from(buffer).toString('base64');
+  const storageKey = `data:${file.type};base64,${base64}`;
+
+  const { data: doc, error } = await supabase
+    .from('ContactDocument')
+    .insert({
+      contactId,
+      spaceId: contact.spaceId,
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: file.size,
+      storageKey,
+      uploadedBy,
+    })
+    .select('id, fileName, fileType, fileSize, createdAt')
+    .single();
+
+  if (error) throw error;
+
+  return NextResponse.json(doc, { status: 201 });
+}
+
+/**
+ * GET — List documents for a contact.
+ */
+export async function GET(req: NextRequest) {
+  const contactId = req.nextUrl.searchParams.get('contactId');
+  if (!contactId) return NextResponse.json({ error: 'contactId required' }, { status: 400 });
+
+  const auth = await requireContactAccess(contactId);
+  if (auth instanceof NextResponse) return auth;
+
+  const { data: docs } = await supabase
+    .from('ContactDocument')
+    .select('id, fileName, fileType, fileSize, uploadedBy, createdAt')
+    .eq('contactId', contactId)
+    .order('createdAt', { ascending: false });
+
+  return NextResponse.json(docs ?? []);
+}

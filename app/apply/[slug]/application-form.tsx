@@ -20,10 +20,11 @@ import {
   ShieldCheck,
   FileText,
   PenLine,
+  Upload,
 } from 'lucide-react';
 
 // ── Step config ──
-const STEPS = [
+const ALL_STEPS = [
   { id: 1, label: 'Property', icon: Home },
   { id: 2, label: 'About You', icon: User },
   { id: 3, label: 'Housing', icon: MapPin },
@@ -32,7 +33,8 @@ const STEPS = [
   { id: 6, label: 'History', icon: History },
   { id: 7, label: 'Screening', icon: ShieldCheck },
   { id: 8, label: 'Details', icon: FileText },
-  { id: 9, label: 'Submit', icon: PenLine },
+  { id: 9, label: 'Documents', icon: Upload },
+  { id: 10, label: 'Submit', icon: PenLine },
 ] as const;
 
 type FormData = Record<string, string>;
@@ -223,10 +225,10 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
 }
 
 // ── Step labels (compact on mobile) ──
-function StepIndicator({ current }: { current: number }) {
+function StepIndicator({ current, steps }: { current: number; steps: readonly { id: number; label: string; icon: any }[] }) {
   return (
     <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
-      {STEPS.map((step) => {
+      {steps.map((step) => {
         const Icon = step.icon;
         const isActive = step.id === current;
         const isDone = step.id < current;
@@ -269,10 +271,22 @@ export function ApplicationForm({
     scoreLabel?: string;
     scoreSummary?: string | null;
     scoreDetails?: Record<string, unknown> | null;
+    applicationRef?: string;
   } | null>(null);
   const submissionLockRef = useRef(false);
 
   const get = useCallback((key: string) => data[key] ?? '', [data]);
+
+  // Conditional logic: determine which steps to show based on answers
+  const STEPS = ALL_STEPS.filter((s) => {
+    // Skip rental history (step 6) if they own their home
+    if (s.id === 6 && data.currentHousingStatus === 'own') return false;
+    return true;
+  });
+
+  // Map display index to actual step id
+  const currentStepIndex = STEPS.findIndex((s) => s.id === step);
+  const totalSteps = STEPS.length;
 
   const set = useCallback(
     (key: string, value: string) => {
@@ -304,7 +318,7 @@ export function ApplicationForm({
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = 'Invalid email';
     }
 
-    if (s === 9) {
+    if (s === 10) {
       if (!get('truthfulnessCertification') || get('truthfulnessCertification') !== 'true')
         errs.truthfulnessCertification = 'Please certify the information is accurate';
       if (!get('electronicSignature')?.trim())
@@ -317,11 +331,15 @@ export function ApplicationForm({
 
   function goNext() {
     if (!validateStep(step)) return;
-    if (step < STEPS.length) setStep(step + 1);
+    // Jump to next visible step
+    const nextSteps = STEPS.filter((s) => s.id > step);
+    if (nextSteps.length > 0) setStep(nextSteps[0].id);
   }
 
   function goBack() {
-    if (step > 1) setStep(step - 1);
+    // Jump to previous visible step
+    const prevSteps = STEPS.filter((s) => s.id < step);
+    if (prevSteps.length > 0) setStep(prevSteps[prevSteps.length - 1].id);
   }
 
   async function onSubmit() {
@@ -386,7 +404,7 @@ export function ApplicationForm({
       consentToScreening: get('consentToScreening'),
       truthfulnessCertification: get('truthfulnessCertification'),
       electronicSignature: get('electronicSignature'),
-      completedSteps: STEPS.map((s) => s.id),
+      completedSteps: ALL_STEPS.map((s) => s.id),
     };
 
     try {
@@ -426,6 +444,14 @@ export function ApplicationForm({
             {businessName} will review your application and follow up shortly.
           </p>
         </div>
+        {scoreState?.applicationRef && (
+          <a
+            href={`/apply/${slug}/status?ref=${scoreState.applicationRef}`}
+            className="inline-flex items-center gap-2 text-sm text-primary font-medium hover:underline"
+          >
+            Track your application status →
+          </a>
+        )}
         {scoreState?.scoringStatus === 'scored' && scoreState.scoreSummary && (
           <div className="rounded-xl border border-border bg-muted/30 p-4 text-left space-y-3">
             <div className="flex items-center gap-2">
@@ -646,6 +672,29 @@ export function ApplicationForm({
         return (
           <div className="space-y-5">
             <StepHeader
+              title="Supporting documents"
+              description="Optionally upload ID, pay stubs, proof of income, or pet records."
+            />
+            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                Uploading documents is optional but helps speed up the review process. You can always provide these later.
+              </p>
+            </div>
+            {scoreState?.applicationRef || get('_contactId') ? (
+              <DocumentUploadWidget contactId={scoreState?.applicationRef || get('_contactId')} />
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <p className="text-sm">Documents can be uploaded after submission.</p>
+                <p className="text-xs mt-1">Click Continue to proceed to review.</p>
+              </div>
+            )}
+          </div>
+        );
+
+      case 10:
+        return (
+          <div className="space-y-5">
+            <StepHeader
               title="Review and submit"
               description="Please confirm and sign your application."
             />
@@ -704,8 +753,8 @@ export function ApplicationForm({
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
       {/* Progress */}
       <div className="px-5 pt-5 pb-3 space-y-3 border-b border-border/50">
-        <ProgressBar current={step} total={STEPS.length} />
-        <StepIndicator current={step} />
+        <ProgressBar current={currentStepIndex + 1} total={totalSteps} />
+        <StepIndicator current={step} steps={STEPS} />
       </div>
 
       {/* Step content */}
@@ -717,7 +766,7 @@ export function ApplicationForm({
           <p className="text-sm text-destructive mb-3">{submitError}</p>
         )}
         <div className="flex gap-3">
-          {step > 1 && (
+          {currentStepIndex > 0 && (
             <Button
               type="button"
               variant="outline"
@@ -729,7 +778,7 @@ export function ApplicationForm({
             </Button>
           )}
           <div className="flex-1" />
-          {step < STEPS.length ? (
+          {currentStepIndex < totalSteps - 1 ? (
             <Button type="button" onClick={goNext} className="flex-shrink-0">
               Continue
               <ChevronRight size={16} className="ml-1" />
@@ -754,6 +803,17 @@ export function ApplicationForm({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Document upload widget (inline, simplified for public form) ──
+function DocumentUploadWidget({ contactId }: { contactId: string }) {
+  return (
+    <div className="rounded-xl border-2 border-dashed border-border p-6 text-center text-muted-foreground">
+      <Upload size={24} className="mx-auto mb-2 opacity-50" />
+      <p className="text-sm">Document upload available after submission</p>
+      <p className="text-xs mt-1">You&apos;ll be able to upload files from the status page.</p>
     </div>
   );
 }

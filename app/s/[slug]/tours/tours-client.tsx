@@ -24,6 +24,9 @@ import { Button } from '@/components/ui/button';
 import { AvailabilityOverrides } from './availability-overrides';
 import { PropertyProfiles } from './property-profiles';
 import { TourPrepCard } from '@/components/tours/tour-prep-card';
+import { TourTimeline } from '@/components/tours/tour-timeline';
+import { TourStatsStrip } from '@/components/tours/tour-stats-strip';
+import { TourFeedbackBadge } from '@/components/tours/tour-feedback-badge';
 
 type TourStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 
@@ -39,6 +42,7 @@ interface Tour {
   status: TourStatus;
   googleEventId: string | null;
   sourceDealId: string | null;
+  createdAt?: string;
   Contact: { id: string; name: string; email: string | null; phone: string | null } | null;
 }
 
@@ -200,6 +204,9 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl,
         </div>
       </div>
 
+      {/* Stats */}
+      <TourStatsStrip tours={tours.map((t) => ({ startsAt: t.startsAt, status: t.status, sourceDealId: t.sourceDealId, createdAt: t.createdAt }))} />
+
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-border">
         {(['upcoming', 'past', 'all', 'availability'] as const).map((t) => (
@@ -321,6 +328,16 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl,
                         Linked: {tour.Contact.name}
                       </a>
                     )}
+                    <div className="flex items-center gap-3">
+                      <TourTimeline
+                        status={tour.status}
+                        createdAt={tour.createdAt}
+                        startsAt={tour.startsAt}
+                        googleEventId={tour.googleEventId}
+                        sourceDealId={tour.sourceDealId}
+                      />
+                      <TourFeedbackBadge tourId={tour.id} slug={slug} status={tour.status} />
+                    </div>
                   </div>
 
                   {/* Actions */}

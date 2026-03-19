@@ -29,8 +29,10 @@ import {
   Bookmark,
   X,
   CheckSquare,
+  GitCompare,
 } from 'lucide-react';
 import Link from 'next/link';
+import { ApplicationCompare } from './application-compare';
 import { cn } from '@/lib/utils';
 import { downloadCSV } from '@/lib/csv';
 import type { SavedView } from '@/lib/types';
@@ -75,6 +77,7 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'card' | 'list'>('card');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showCompare, setShowCompare] = useState(false);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [saveViewName, setSaveViewName] = useState('');
   const [showSaveInput, setShowSaveInput] = useState(false);
@@ -645,6 +648,12 @@ export function ContactTable({ slug }: ContactTableProps) {
               <SelectItem value="APPLICATION">Applied</SelectItem>
             </SelectContent>
           </Select>
+          {selectedIds.size >= 2 && (
+            <Button size="sm" variant="outline" onClick={() => setShowCompare(true)} className="h-8 gap-1.5 text-xs">
+              <GitCompare size={12} />
+              Compare
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={handleExportSelected} className="h-8 gap-1.5 text-xs">
             <Download size={12} />
             Export
@@ -662,6 +671,13 @@ export function ContactTable({ slug }: ContactTableProps) {
         </div>
       )}
 
+      {showCompare && selectedIds.size >= 2 && (
+        <ApplicationCompare
+          slug={slug}
+          selectedIds={[...selectedIds]}
+          onClose={() => setShowCompare(false)}
+        />
+      )}
       <ContactForm open={addOpen} onOpenChange={setAddOpen} onSubmit={handleAdd} title="Add Client" />
       <ContactForm
         open={!!editContact}

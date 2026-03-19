@@ -130,6 +130,9 @@ export async function POST(req: NextRequest) {
     if (payload.monthlyGrossIncome != null) noteParts.push(`Income: $${payload.monthlyGrossIncome}/mo`);
     if (payload.additionalNotes) noteParts.push(payload.additionalNotes);
 
+    // Generate a unique application reference for the status page
+    const applicationRef = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+
     const { data: contacts, error: insertError } = await supabase
       .from('Contact')
       .insert({
@@ -149,6 +152,8 @@ export async function POST(req: NextRequest) {
         scoreLabel: 'unscored',
         sourceLabel: 'intake-form',
         applicationData,
+        applicationRef,
+        applicationStatus: 'received',
       })
       .select();
     if (insertError) throw insertError;
@@ -252,6 +257,7 @@ export async function POST(req: NextRequest) {
       {
         success: true,
         id: contact.id,
+        applicationRef,
         scoringStatus: scoring.scoringStatus,
         leadScore: scoring.leadScore,
         scoreLabel: scoring.scoreLabel,

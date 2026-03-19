@@ -1,66 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { sendTourReminder, type TourEmailData } from '@/lib/tour-emails';
 
 /**
- * Cron endpoint — sends reminder emails for tours happening in the next 24 hours.
- * Call this via Vercel Cron or external scheduler (e.g., every hour).
+ * POST — Tour reminder cron endpoint.
+ * Call this from a cron job (e.g. Vercel Cron, Railway, etc.) every 15 minutes.
+ * Finds tours starting within the next 24h and 1h,
+ * and returns the list of tours needing reminders.
  *
- * Protect with CRON_SECRET env var to prevent unauthorized calls.
+ * Protected by a simple CRON_SECRET header check.
  */
-export async function GET(req: NextRequest) {
-  const secret = req.nextUrl.searchParams.get('secret');
-  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
+export async function POST(req: NextRequest) {
+  const secret = req.headers.get('x-cron-secret') || req.nextUrl.searchParams.get('secret');
+  const expectedSecret = process.env.CRON_SECRET;
+
+  if (expectedSecret && secret !== expectedSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const now = new Date();
+  const in1h = new Date(now.getTime() + 60 * 60 * 1000);
   const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const in23h = new Date(now.getTime() + 23 * 60 * 60 * 1000);
 
-  // Find tours starting between 23–24 hours from now (1-hour window to avoid duplicates)
-  const { data: tours, error } = await supabase
+  const { data: tours24h } = await supabase
     .from('Tour')
-    .select('*, Space(name, id, ownerId)')
+    .select('id, guestName, guestEmail, guestPhone, propertyAddress, startsAt, endsAt, status, spaceId, manageToken, contactId')
     .in('status', ['scheduled', 'confirmed'])
-    .gte('startsAt', in23h.toISOString())
-    .lte('startsAt', in24h.toISOString());
+    .gte('startsAt', now.toISOString())
+    .lte('startsAt', in24h.toISOString())
+    .order('startsAt', { ascending: true })
+    .limit(100);
 
-  if (error) {
-    console.error('[tour-reminders] Query error:', error);
-    return NextResponse.json({ error: 'Query failed' }, { status: 500 });
-  }
+  const reminders: Array<{
+    tourId: string;
+    guestName: string;
+    guestEmail: string;
+    guestPhone: string | null;
+    propertyAddress: string | null;
+    startsAt: string;
+    manageToken: string | null;
+    spaceId: string;
+    type: '1h' | '24h';
+    businessName: string;
+  }> = [];
 
-  let sent = 0;
-  for (const tour of tours ?? []) {
-    const spaceName = (tour as any).Space?.name ?? '';
-    const spaceId = (tour as any).Space?.id ?? tour.spaceId;
-
+  if (tours24h?.length) {
+    const spaceIds = [...new Set(tours24h.map((t: any) => t.spaceId))];
     const { data: settings } = await supabase
       .from('SpaceSetting')
-      .select('businessName')
-      .eq('spaceId', spaceId)
-      .maybeSingle();
+      .select('spaceId, businessName')
+      .in('spaceId', spaceIds);
+    const nameMap = new Map((settings ?? []).map((s: any) => [s.spaceId, s.businessName]));
 
-    const emailData: TourEmailData = {
-      guestName: tour.guestName,
-      guestEmail: tour.guestEmail,
-      guestPhone: tour.guestPhone,
-      propertyAddress: tour.propertyAddress,
-      startsAt: tour.startsAt,
-      endsAt: tour.endsAt,
-      businessName: settings?.businessName || spaceName,
-      tourId: tour.id,
-      slug: '',
-    };
+    const { data: spaces } = await supabase
+      .from('Space')
+      .select('id, name')
+      .in('id', spaceIds);
+    const spaceNameMap = new Map((spaces ?? []).map((s: any) => [s.id, s.name]));
 
-    try {
-      await sendTourReminder(emailData);
-      sent++;
-    } catch (err) {
-      console.error(`[tour-reminders] Failed for tour ${tour.id}:`, err);
+    for (const tour of tours24h) {
+      const tourStart = new Date(tour.startsAt);
+      const type = tourStart <= in1h ? '1h' : '24h';
+
+      reminders.push({
+        tourId: tour.id,
+        guestName: tour.guestName,
+        guestEmail: tour.guestEmail,
+        guestPhone: tour.guestPhone,
+        propertyAddress: tour.propertyAddress,
+        startsAt: tour.startsAt,
+        manageToken: tour.manageToken,
+        spaceId: tour.spaceId,
+        type,
+        businessName: nameMap.get(tour.spaceId) || spaceNameMap.get(tour.spaceId) || 'Your Agent',
+      });
     }
   }
 
-  return NextResponse.json({ sent, total: tours?.length ?? 0 });
+  return NextResponse.json({
+    processed: reminders.length,
+    reminders,
+    timestamp: now.toISOString(),
+  });
 }

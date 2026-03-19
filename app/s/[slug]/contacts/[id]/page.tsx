@@ -33,6 +33,8 @@ import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-fi
 import { FollowUpSuggestions } from '@/components/contacts/follow-up-suggestions';
 import { StageProgression } from '@/components/contacts/stage-progression';
 import { RescoreButton } from '@/components/contacts/rescore-button';
+import { ApplicationStatusControl } from '@/components/contacts/application-status-control';
+import { PdfExportButton } from '@/components/contacts/pdf-export-button';
 import { getInitials, formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug } from '@/lib/space';
 
@@ -388,10 +390,19 @@ export default async function ClientDetailPage({
               )}
               {app.completedSteps && (
                 <span className="text-xs font-medium bg-primary/8 text-primary rounded-full px-2.5 py-0.5">
-                  {app.completedSteps.length}/9 steps
+                  {app.completedSteps.length}/10 steps
                 </span>
               )}
+              <PdfExportButton contactId={contact.id} />
             </div>
+          </div>
+          {/* Application status control */}
+          <div className="px-6 py-3 border-b border-border/50">
+            <ApplicationStatusControl
+              contactId={contact.id}
+              currentStatus={(contact as any).applicationStatus ?? 'received'}
+              statusNote={(contact as any).applicationStatusNote ?? null}
+            />
           </div>
           <div className="px-6 py-4 space-y-6">
             {/* Applicant basics — fields not shown in the profile header */}
