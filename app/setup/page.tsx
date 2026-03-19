@@ -62,8 +62,20 @@ export default async function SetupPage() {
     // non-fatal
   }
 
-  // Already has a workspace — go straight to it.
+  // Already has a workspace — check if broker first (brokers land on /broker)
   if (dbUser?.space?.slug) {
+    // Check if this user is a broker — redirect to broker dashboard instead
+    if (dbUser?.id) {
+      const { data: brokerMembership } = await supabase
+        .from('BrokerageMembership')
+        .select('id')
+        .eq('userId', dbUser.id)
+        .in('role', ['broker_owner', 'broker_manager'])
+        .maybeSingle();
+      if (brokerMembership) {
+        redirect('/broker');
+      }
+    }
     redirect(`/s/${dbUser.space.slug}`);
   }
 

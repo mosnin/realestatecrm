@@ -120,20 +120,43 @@ export default async function DashboardLayout({
     unreadLeadCount = 0;
   }
 
-  // Check if user is a broker so the sidebar can show the Brokerage link
+  // Check broker context and brokerage membership for sidebar
   let isBroker = false;
+  let brokerageName: string | null = null;
+  let brokerageRole: string | null = null;
   try {
     const ctx = await getBrokerContext();
-    isBroker = ctx !== null;
+    if (ctx) {
+      isBroker = true;
+      brokerageName = ctx.brokerage.name;
+      brokerageRole = ctx.membership.role;
+    } else {
+      // Not a broker — check if they're a realtor_member of a brokerage
+      const { data: membership } = await supabase
+        .from('BrokerageMembership')
+        .select('role, brokerageId')
+        .eq('userId', dbUser.id)
+        .eq('role', 'realtor_member')
+        .maybeSingle();
+      if (membership) {
+        const { data: brokerage } = await supabase
+          .from('Brokerage')
+          .select('name')
+          .eq('id', membership.brokerageId)
+          .maybeSingle();
+        brokerageName = brokerage?.name ?? null;
+        brokerageRole = 'realtor_member';
+      }
+    }
   } catch {
     isBroker = false;
   }
 
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
-      <Sidebar slug={slug} spaceName={space.name} spaceEmoji={space.emoji} unreadLeadCount={unreadLeadCount} isBroker={isBroker} />
+      <Sidebar slug={slug} spaceName={space.name} spaceEmoji={space.emoji} unreadLeadCount={unreadLeadCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header slug={slug} spaceName={space.name} title={space.name} />
+        <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
         <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7">
           {children}
           <DashboardFooter />

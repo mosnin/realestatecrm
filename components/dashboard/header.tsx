@@ -18,16 +18,26 @@ import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail } from 'lucide-react';
 import { GlobalSearch } from './global-search';
 import { NotificationCenter } from './notification-center';
+
+const brokerMobileNavItems = [
+  { href: '/broker', label: 'Team Overview', icon: LayoutDashboard, exact: true },
+  { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
+  { href: '/broker/members', label: 'Members', icon: Users, exact: false },
+  { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
+];
 
 interface HeaderProps {
   slug: string;
   spaceName: string;
   title: string;
+  isBroker?: boolean;
+  brokerageName?: string | null;
 }
 
-export function Header({ slug, spaceName, title }: HeaderProps) {
+export function Header({ slug, spaceName, title, isBroker = false, brokerageName = null }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const base = `/s/${slug}`;
@@ -76,6 +86,34 @@ export function Header({ slug, spaceName, title }: HeaderProps) {
                 );
               })}
             </nav>
+            {isBroker && (
+              <div className="px-3 pb-2 space-y-0.5 border-t border-sidebar-border pt-3">
+                <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  Team
+                </p>
+                {brokerMobileNavItems.map((item) => {
+                  const isActive = item.exact
+                    ? pathname === item.href
+                    : pathname.startsWith(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                        isActive
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                      )}
+                    >
+                      <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
             <div className="px-3 pb-4 space-y-0.5 border-t border-sidebar-border pt-3">
               <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
                 Account

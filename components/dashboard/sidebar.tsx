@@ -6,7 +6,7 @@ import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
 import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
-import { Building2, Settings, ChevronRight, Sparkles } from 'lucide-react';
+import { Building2, Settings, ChevronRight, Sparkles, Users, UserCircle, Mail, LayoutDashboard } from 'lucide-react';
 
 interface SidebarProps {
   slug: string;
@@ -14,9 +14,18 @@ interface SidebarProps {
   spaceEmoji: string;
   unreadLeadCount: number;
   isBroker?: boolean;
+  brokerageName?: string | null;
+  brokerageRole?: string | null;
 }
 
-export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker = false }: SidebarProps) {
+const brokerTeamNavItems = [
+  { href: '/broker', label: 'Team Overview', icon: LayoutDashboard, exact: true },
+  { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
+  { href: '/broker/members', label: 'Members', icon: Users, exact: false },
+  { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
+];
+
+export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker = false, brokerageName = null, brokerageRole = null }: SidebarProps) {
   const pathname = usePathname();
   const base = `/s/${slug}`;
   const { user } = useUser();
@@ -25,6 +34,8 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
     ? [user.firstName, user.lastName].filter(Boolean).join(' ') || 'My Account'
     : 'My Account';
   const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
+
+  const isMemberOfBrokerage = !!brokerageName;
 
   return (
     <aside className="hidden md:flex flex-col w-60 h-full bg-sidebar border-r border-sidebar-border shrink-0">
@@ -47,7 +58,14 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
             <p className="font-semibold text-sm leading-tight truncate text-sidebar-foreground">
               {spaceName}
             </p>
-            <p className="text-[11px] text-muted-foreground/60 truncate mt-0.5">{slug}</p>
+            {isMemberOfBrokerage ? (
+              <p className="text-[11px] text-muted-foreground/60 truncate mt-0.5 flex items-center gap-1">
+                <Building2 size={9} className="flex-shrink-0" />
+                {brokerageName}
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground/60 truncate mt-0.5">{slug}</p>
+            )}
           </div>
           <Settings
             size={13}
@@ -111,6 +129,42 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
             </Link>
           );
         })}
+
+        {/* ── Team section (broker only) ── */}
+        {isBroker && (
+          <>
+            <div className="mx-1 my-2 border-t border-sidebar-border/50" />
+            <p className="px-3 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/45">
+              Team
+            </p>
+            {brokerTeamNavItems.map((item) => {
+              const isActive = item.exact
+                ? pathname === item.href
+                : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    'group flex items-center gap-2.5 py-[7px] pr-3 rounded-lg text-sm font-medium transition-all duration-150 border-l-[3px] pl-[9px]',
+                    isActive
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  )}
+                >
+                  <item.icon
+                    size={15}
+                    className={cn(
+                      'flex-shrink-0 transition-opacity',
+                      isActive ? 'opacity-100' : 'opacity-45 group-hover:opacity-75'
+                    )}
+                  />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              );
+            })}
+          </>
+        )}
       </nav>
 
       {/* ── Secondary nav ── */}
@@ -118,16 +172,6 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
         <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/45">
           Account
         </p>
-        {/* Broker link */}
-        {isBroker && (
-          <Link
-            href="/broker"
-            className="group flex items-center gap-2.5 py-[7px] pr-3 rounded-lg text-sm font-medium border-l-[3px] border-transparent pl-[9px] transition-all duration-150 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <Building2 size={15} className="flex-shrink-0 opacity-45 group-hover:opacity-75 transition-opacity" />
-            Brokerage
-          </Link>
-        )}
         {secondaryNavItems.map((item) => {
           const href = `${base}${item.href}`;
           const isActive = pathname.startsWith(href);

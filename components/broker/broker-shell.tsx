@@ -108,8 +108,8 @@ export function BrokerShell({ children, brokerageName, realtorSlug }: BrokerShel
             href={`/s/${realtorSlug}`}
             className="group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-150"
           >
-            <span className="opacity-55 group-hover:opacity-80">←</span>
-            My workspace
+            <span className="opacity-55 group-hover:opacity-80">&larr;</span>
+            My CRM workspace
           </Link>
           <div className="flex items-center gap-2 px-3 pt-3">
             <BrandLogo className="h-4" alt="Chippi" />
