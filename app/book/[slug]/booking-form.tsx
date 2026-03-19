@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CalendarDays, Clock, Check, Loader2, ChevronLeft, ChevronRight, MapPin, Globe } from 'lucide-react';
+import { CalendarDays, Clock, Check, Loader2, ChevronLeft, ChevronRight, MapPin, Globe, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BookingFormProps {
@@ -44,6 +44,14 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
   const [guestPhone, setGuestPhone] = useState('');
   const [propertyAddress, setPropertyAddress] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Waitlist state
+  const [showWaitlist, setShowWaitlist] = useState(false);
+  const [waitlistDate, setWaitlistDate] = useState('');
+  const [waitlistName, setWaitlistName] = useState('');
+  const [waitlistEmail, setWaitlistEmail] = useState('');
+  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
+  const [waitlistDone, setWaitlistDone] = useState(false);
 
   // Detect guest timezone
   const guestTz = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : '';
@@ -134,6 +142,31 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
     try {
       return new Date().toLocaleTimeString('en-US', { timeZone: tz, timeZoneName: 'short' }).split(' ').pop() || tz;
     } catch { return tz; }
+  }
+
+  async function handleWaitlistSubmit() {
+    if (!waitlistName.trim() || !waitlistEmail.trim() || !waitlistDate) return;
+    setWaitlistSubmitting(true);
+    try {
+      const res = await fetch('/api/tours/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug,
+          guestName: waitlistName.trim(),
+          guestEmail: waitlistEmail.trim(),
+          preferredDate: waitlistDate,
+          propertyProfileId: selectedPropertyId,
+        }),
+      });
+      if (res.ok || res.status === 409) {
+        setWaitlistDone(true);
+      }
+    } catch {
+      // silent
+    } finally {
+      setWaitlistSubmitting(false);
+    }
   }
 
   if (loading) {
@@ -302,7 +335,36 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
       )}
 
       {slots.length === 0 ? (
-        <p className="text-center text-sm text-muted-foreground py-6">No available time slots right now. Please check back later.</p>
+        <div className="text-center py-6 space-y-4">
+          <p className="text-sm text-muted-foreground">No available time slots right now.</p>
+          {!showWaitlist && !waitlistDone && (
+            <button
+              type="button"
+              onClick={() => setShowWaitlist(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border text-sm hover:bg-accent/30 transition-all"
+            >
+              <Bell size={14} />
+              Join Waitlist
+            </button>
+          )}
+          {showWaitlist && !waitlistDone && (
+            <div className="text-left space-y-3 max-w-sm mx-auto">
+              <p className="text-xs text-muted-foreground">Get notified when a slot opens up.</p>
+              <input type="date" value={waitlistDate} min={new Date().toISOString().split('T')[0]} onChange={(e) => setWaitlistDate(e.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+              <input type="text" value={waitlistName} onChange={(e) => setWaitlistName(e.target.value)} placeholder="Your name" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+              <input type="email" value={waitlistEmail} onChange={(e) => setWaitlistEmail(e.target.value)} placeholder="Your email" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+              <button onClick={handleWaitlistSubmit} disabled={waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim() || !waitlistDate} className={cn('w-full rounded-xl py-2.5 text-sm font-semibold transition-all', waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim() ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground hover:bg-primary/90')}>
+                {waitlistSubmitting ? 'Joining...' : 'Join Waitlist'}
+              </button>
+            </div>
+          )}
+          {waitlistDone && (
+            <div className="flex items-center justify-center gap-2 text-sm text-emerald-600">
+              <Check size={16} />
+              You&apos;re on the waitlist! We&apos;ll notify you when a slot opens.
+            </div>
+          )}
+        </div>
       ) : (
         <>
           <div>

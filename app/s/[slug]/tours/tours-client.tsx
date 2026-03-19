@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AvailabilityOverrides } from './availability-overrides';
+import { PropertyProfiles } from './property-profiles';
 
 type TourStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 
@@ -66,13 +67,15 @@ const STATUS_CONFIG: Record<TourStatus, { label: string; color: string }> = {
 
 type FilterTab = 'upcoming' | 'past' | 'all' | 'availability';
 
-export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl, propertyProfiles = [] }: ToursClientProps) {
+export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl, propertyProfiles: initialProfiles = [] }: ToursClientProps) {
   const [tours, setTours] = useState<Tour[]>(initialTours);
   const [tab, setTab] = useState<FilterTab>('upcoming');
   const [copied, setCopied] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState(initialProfiles);
+  const [embedCopied, setEmbedCopied] = useState(false);
   const router = useRouter();
 
   const now = new Date();
@@ -216,7 +219,42 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl,
 
       {/* Availability tab */}
       {tab === 'availability' && (
-        <AvailabilityOverrides slug={slug} propertyProfiles={propertyProfiles} />
+        <div className="space-y-8">
+          <PropertyProfiles slug={slug} profiles={profiles as any} onUpdate={setProfiles as any} />
+
+          <div className="border-t border-border pt-6">
+            <AvailabilityOverrides slug={slug} propertyProfiles={profiles} />
+          </div>
+
+          {/* Embed Code */}
+          <div className="border-t border-border pt-6 space-y-3">
+            <div>
+              <h2 className="text-sm font-semibold">Embed Booking Widget</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Paste this code into your website or listing page to let visitors book tours directly.
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-muted/30 p-3">
+              <code className="text-xs text-foreground break-all block">
+                {`<iframe src="${typeof window !== 'undefined' ? window.location.origin : ''}/book/${slug}/embed" width="100%" height="600" frameborder="0" style="border: none; border-radius: 16px;"></iframe>`}
+              </code>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const code = `<iframe src="${window.location.origin}/book/${slug}/embed" width="100%" height="600" frameborder="0" style="border: none; border-radius: 16px;"></iframe>`;
+                navigator.clipboard.writeText(code);
+                setEmbedCopied(true);
+                setTimeout(() => setEmbedCopied(false), 2000);
+              }}
+              className="gap-1.5"
+            >
+              {embedCopied ? <Check size={14} /> : <Copy size={14} />}
+              {embedCopied ? 'Copied!' : 'Copy Embed Code'}
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Tour list */}

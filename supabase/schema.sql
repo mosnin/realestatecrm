@@ -306,7 +306,24 @@ CREATE TABLE IF NOT EXISTS "TourAvailabilityOverride" (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_override_space_date
   ON "TourAvailabilityOverride" ("spaceId", date);
 
+CREATE TABLE IF NOT EXISTS "TourWaitlist" (
+  id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "spaceId"       text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  "propertyProfileId" text REFERENCES "TourPropertyProfile"(id) ON DELETE SET NULL,
+  "guestName"     text NOT NULL,
+  "guestEmail"    text NOT NULL,
+  "guestPhone"    text,
+  "preferredDate" date NOT NULL,
+  notes           text,
+  status          text NOT NULL DEFAULT 'waiting'
+                    CHECK (status IN ('waiting', 'notified', 'booked', 'expired')),
+  "notifiedAt"    timestamptz,
+  "expiresAt"     timestamptz,
+  "createdAt"     timestamptz NOT NULL DEFAULT now()
+);
+
 ALTER TABLE "TourAvailabilityOverride" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "TourWaitlist"          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Tour"                  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "GoogleCalendarToken"   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "AuditLog"            ENABLE ROW LEVEL SECURITY;
