@@ -54,6 +54,19 @@ export async function GET(req: NextRequest) {
   // Build blocked dates set for fast lookup
   const blockedSet = new Set(blockedDates);
 
+  // Fetch per-date availability overrides
+  const { data: overridesRaw } = await supabase
+    .from('TourAvailabilityOverride')
+    .select('date, isBlocked, startHour, endHour')
+    .eq('spaceId', space.id)
+    .gte('date', startDate.toISOString().split('T')[0])
+    .lte('date', endDate.toISOString().split('T')[0]);
+
+  const overrideMap = new Map<string, { isBlocked: boolean; startHour: number | null; endHour: number | null }>();
+  for (const o of overridesRaw ?? []) {
+    overrideMap.set(o.date, { isBlocked: o.isBlocked, startHour: o.startHour, endHour: o.endHour });
+  }
+
   // Generate available slots day by day
   const slots: { date: string; times: string[] }[] = [];
   const cursor = new Date(startDate);
@@ -62,10 +75,30 @@ export async function GET(req: NextRequest) {
   for (let day = 0; day < 14; day++) {
     const dayOfWeek = cursor.getDay(); // 0=Sun
     const dateKey = cursor.toISOString().split('T')[0];
+    const override = overrideMap.get(dateKey);
 
-    if (daysAvailable.includes(dayOfWeek) && !blockedSet.has(dateKey)) {
+    // Determine if this day is available and what hours to use
+    let dayAvailable = false;
+    let dayStart = startHour;
+    let dayEnd = endHour;
+
+    if (override) {
+      // Override takes priority over default schedule
+      if (override.isBlocked) {
+        dayAvailable = false;
+      } else if (override.startHour != null && override.endHour != null) {
+        dayAvailable = true;
+        dayStart = override.startHour;
+        dayEnd = override.endHour;
+      }
+    } else {
+      // Fall back to default schedule
+      dayAvailable = daysAvailable.includes(dayOfWeek) && !blockedSet.has(dateKey);
+    }
+
+    if (dayAvailable) {
       const daySlots: string[] = [];
-      for (let hour = startHour; hour < endHour; hour++) {
+      for (let hour = dayStart; hour < dayEnd; hour++) {
         for (let min = 0; min < 60; min += duration) {
           const slotStart = new Date(cursor);
           slotStart.setHours(hour, min, 0, 0);

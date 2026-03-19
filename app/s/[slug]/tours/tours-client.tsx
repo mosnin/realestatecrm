@@ -21,6 +21,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { AvailabilityOverrides } from './availability-overrides';
 
 type TourStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 
@@ -54,7 +55,7 @@ const STATUS_CONFIG: Record<TourStatus, { label: string; color: string }> = {
   no_show: { label: 'No Show', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
 };
 
-type FilterTab = 'upcoming' | 'past' | 'all';
+type FilterTab = 'upcoming' | 'past' | 'all' | 'availability';
 
 export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl }: ToursClientProps) {
   const [tours, setTours] = useState<Tour[]>(initialTours);
@@ -188,7 +189,7 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl 
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-border">
-        {(['upcoming', 'past', 'all'] as const).map((t) => (
+        {(['upcoming', 'past', 'all', 'availability'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -199,19 +200,24 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl 
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
           >
-            {t === 'upcoming' ? 'Upcoming' : t === 'past' ? 'Past' : 'All'}
+            {t === 'upcoming' ? 'Upcoming' : t === 'past' ? 'Past' : t === 'all' ? 'All' : 'Availability'}
           </button>
         ))}
       </div>
 
+      {/* Availability tab */}
+      {tab === 'availability' && (
+        <AvailabilityOverrides slug={slug} />
+      )}
+
       {/* Tour list */}
-      {filtered.length === 0 ? (
+      {tab !== 'availability' && filtered.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground space-y-3">
           <CalendarDays size={40} className="mx-auto opacity-30" />
           <p className="text-sm">No {tab === 'all' ? '' : tab + ' '}tours yet</p>
           <p className="text-xs">Share your booking link to start receiving tour requests.</p>
         </div>
-      ) : (
+      ) : tab !== 'availability' ? (
         <div className="space-y-3">
           {filtered.map((tour) => {
             const { date, time } = formatDateTime(tour.startsAt);
@@ -346,7 +352,7 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl 
             );
           })}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

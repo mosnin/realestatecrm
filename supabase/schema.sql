@@ -273,6 +273,21 @@ ALTER TABLE "DealContact"         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Message"             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "BrokerageMembership" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Invitation"          ENABLE ROW LEVEL SECURITY;
+CREATE TABLE IF NOT EXISTS "TourAvailabilityOverride" (
+  id          text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "spaceId"   text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  date        date NOT NULL,
+  "isBlocked" boolean NOT NULL DEFAULT false,
+  "startHour" integer,
+  "endHour"   integer,
+  label       text,
+  "createdAt" timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_override_space_date
+  ON "TourAvailabilityOverride" ("spaceId", date);
+
+ALTER TABLE "TourAvailabilityOverride" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Tour"                  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "GoogleCalendarToken"   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "AuditLog"            ENABLE ROW LEVEL SECURITY;
