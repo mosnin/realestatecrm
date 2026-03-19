@@ -31,6 +31,7 @@ import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
 import { ComposeEmailDialog } from '@/components/contacts/compose-email-dialog';
 import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-field';
 import { FollowUpSuggestions } from '@/components/contacts/follow-up-suggestions';
+import { StageProgression } from '@/components/contacts/stage-progression';
 import { RescoreButton } from '@/components/contacts/rescore-button';
 import { getInitials, formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug } from '@/lib/space';
@@ -142,12 +143,8 @@ export default async function ClientDetailPage({
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-semibold tracking-tight">{contact.name}</h1>
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              <span
-                className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-1 border ${meta.className}`}
-              >
-                {meta.label}
-              </span>
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              <StageProgression contactId={contact.id} currentType={contact.type} />
               <span className="text-xs text-muted-foreground">
                 Added {new Date(contact.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
               </span>

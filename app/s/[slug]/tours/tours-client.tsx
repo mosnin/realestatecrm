@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AvailabilityOverrides } from './availability-overrides';
 import { PropertyProfiles } from './property-profiles';
+import { TourPrepCard } from '@/components/tours/tour-prep-card';
 
 type TourStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 
@@ -324,6 +325,9 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl,
 
                   {/* Actions */}
                   <div className="flex items-center gap-1.5 sm:flex-shrink-0 relative">
+                    {!isPast && tour.status !== 'cancelled' && (
+                      <TourPrepCard tourId={tour.id} />
+                    )}
                     {hasGoogleCalendar && !tour.googleEventId && tour.status !== 'cancelled' && (
                       <button
                         onClick={() => syncToGcal(tour.id)}
