@@ -90,7 +90,7 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-5 max-w-2xl">
+    <form onSubmit={handleSave} className="space-y-5">
       {/* Workspace */}
       <SectionBlock title="Workspace" description="Your workspace name and slug.">
         <div className="space-y-1.5">

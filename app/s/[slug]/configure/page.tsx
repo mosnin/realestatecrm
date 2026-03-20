@@ -94,7 +94,7 @@ export default async function ConfigurePage({
       <ConfigureAccountForm initialData={initialData} slug={slug} />
 
       {/* Brokerage section — links to dedicated page */}
-      <div className="max-w-3xl">
+      <div>
         <div className="mb-3">
           <p className="text-sm font-semibold">Brokerage</p>
           <p className="text-xs text-muted-foreground mt-0.5">

@@ -14,7 +14,7 @@ export default async function BrokerSettingsPage() {
   const isOwner = membership.role === 'broker_owner';
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Brokerage Settings</h1>
         <p className="text-sm text-muted-foreground mt-0.5">

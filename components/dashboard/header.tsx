@@ -196,7 +196,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
         {!isBrokerOnly && slug && <GlobalSearch slug={slug} />}
         {!isBrokerOnly && slug && <NotificationCenter slug={slug} />}
         {isBroker && <BrokerHelpGuide />}
-        {isBroker && <NotificationBell />}
+        {isBrokerOnly && <NotificationBell />}
         <Button
           variant="ghost"
           size="icon"
