@@ -284,6 +284,47 @@ CREATE TABLE IF NOT EXISTS "DocumentEmbedding" (
 );
 
 -- ============================================================
+-- Migrations: ADD COLUMN IF NOT EXISTS for existing databases
+-- Runs before indexes so columns exist when indexes are created.
+-- Safe to run on both fresh and existing databases.
+-- ============================================================
+
+ALTER TABLE "Message" ADD COLUMN IF NOT EXISTS "conversationId" text REFERENCES "Conversation"(id) ON DELETE CASCADE;
+
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "applicationData"       jsonb;
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "followUpAt"            timestamptz;
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "lastContactedAt"       timestamptz;
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "sourceLabel"           text;
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "stageChangedAt"        timestamptz;
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "applicationRef"        text;
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "applicationStatus"     text;
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "applicationStatusNote" text;
+
+ALTER TABLE "Tour" ADD COLUMN IF NOT EXISTS "manageToken"       text;
+ALTER TABLE "Tour" ADD COLUMN IF NOT EXISTS "propertyProfileId" text REFERENCES "TourPropertyProfile"(id) ON DELETE SET NULL;
+
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "accountType" text NOT NULL DEFAULT 'realtor' CHECK ("accountType" IN ('realtor', 'broker_only', 'both'));
+
+ALTER TABLE "Space" ADD COLUMN IF NOT EXISTS "brokerageId" text REFERENCES "Brokerage"(id) ON DELETE SET NULL;
+
+ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "joinCode"   text UNIQUE;
+ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "logoUrl"    text;
+ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "websiteUrl" text;
+
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourDuration"         integer NOT NULL DEFAULT 30;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourStartHour"        integer NOT NULL DEFAULT 9;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourEndHour"          integer NOT NULL DEFAULT 17;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourDaysAvailable"    integer[] NOT NULL DEFAULT '{1,2,3,4,5}';
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourBookingPageTitle" text;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourBookingPageIntro" text;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourBufferMinutes"    integer NOT NULL DEFAULT 0;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourBlockedDates"     text[] NOT NULL DEFAULT '{}';
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "anthropicApiKey"      text;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "businessName"         text;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "intakePageTitle"      text;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "intakePageIntro"      text;
+
+-- ============================================================
 -- Indexes
 -- ============================================================
 
@@ -404,53 +445,6 @@ BEGIN
   WHERE id = p_deal_id;
 END;
 $$;
-
--- ============================================================
--- Migrations: ADD COLUMN IF NOT EXISTS for existing databases
--- Safe to run on both fresh and existing databases.
--- ============================================================
-
--- Message: conversationId added for threaded conversations
-ALTER TABLE "Message" ADD COLUMN IF NOT EXISTS "conversationId" text REFERENCES "Conversation"(id) ON DELETE CASCADE;
-
--- Contact: fields added for application flow and follow-up tracking
-ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "applicationData"       jsonb;
-ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "followUpAt"            timestamptz;
-ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "lastContactedAt"       timestamptz;
-ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "sourceLabel"           text;
-ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "stageChangedAt"        timestamptz;
-ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "applicationRef"        text;
-ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "applicationStatus"     text;
-ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "applicationStatusNote" text;
-
--- Tour: fields added for self-service management and multi-property support
-ALTER TABLE "Tour" ADD COLUMN IF NOT EXISTS "manageToken"        text;
-ALTER TABLE "Tour" ADD COLUMN IF NOT EXISTS "propertyProfileId"  text REFERENCES "TourPropertyProfile"(id) ON DELETE SET NULL;
-
--- User: accountType added for broker-only accounts
-ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "accountType" text NOT NULL DEFAULT 'realtor' CHECK ("accountType" IN ('realtor', 'broker_only', 'both'));
-
--- Space: brokerageId added for brokerage association
-ALTER TABLE "Space" ADD COLUMN IF NOT EXISTS "brokerageId" text REFERENCES "Brokerage"(id) ON DELETE SET NULL;
-
--- Brokerage: joinCode added for invite-code flow
-ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "joinCode" text UNIQUE;
-ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "logoUrl"  text;
-ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "websiteUrl" text;
-
--- SpaceSetting: tour and business fields added
-ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourDuration"         integer NOT NULL DEFAULT 30;
-ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourStartHour"        integer NOT NULL DEFAULT 9;
-ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourEndHour"          integer NOT NULL DEFAULT 17;
-ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourDaysAvailable"    integer[] NOT NULL DEFAULT '{1,2,3,4,5}';
-ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourBookingPageTitle" text;
-ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourBookingPageIntro" text;
-ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourBufferMinutes"    integer NOT NULL DEFAULT 0;
-ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "tourBlockedDates"     text[] NOT NULL DEFAULT '{}';
-ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "anthropicApiKey"      text;
-ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "businessName"         text;
-ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "intakePageTitle"      text;
-ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "intakePageIntro"      text;
 
 -- ============================================================
 -- match_documents: similarity search RPC used by the AI assistant
