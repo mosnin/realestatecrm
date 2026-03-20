@@ -22,6 +22,7 @@ import { Building2, LayoutDashboard, UserCircle, Users, Mail } from 'lucide-reac
 import { GlobalSearch } from './global-search';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
+import { BrokerHelpGuide } from '@/components/broker/help-guide';
 
 const brokerMobileNavItems = [
   { href: '/broker', label: 'Team Overview', icon: LayoutDashboard, exact: true },
@@ -194,6 +195,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
       <div className="flex items-center gap-1.5">
         {!isBrokerOnly && slug && <GlobalSearch slug={slug} />}
         {!isBrokerOnly && slug && <NotificationCenter slug={slug} />}
+        {isBroker && <BrokerHelpGuide />}
         {isBroker && <NotificationBell />}
         <Button
           variant="ghost"
