@@ -2,7 +2,14 @@
 -- Run this in Supabase SQL Editor (Dashboard → SQL Editor → New query)
 
 -- ============================================================
--- Tables
+-- Extensions
+-- ============================================================
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- ============================================================
+-- Tables (in dependency order)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS "User" (
@@ -21,7 +28,6 @@ CREATE TABLE IF NOT EXISTS "User" (
   "accountType"           text NOT NULL DEFAULT 'realtor' CHECK ("accountType" IN ('realtor', 'broker_only', 'both'))
 );
 
--- Brokerage must be created before Space (Space has FK to Brokerage)
 CREATE TABLE IF NOT EXISTS "Brokerage" (
   id            text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   name          text NOT NULL,
@@ -84,13 +90,13 @@ CREATE TABLE IF NOT EXISTS "Contact" (
   "scoreSummary"  text,
   "scoringStatus" text NOT NULL DEFAULT 'pending',
   "scoreDetails"  jsonb,
-  "applicationData" jsonb,
-  "followUpAt"    timestamptz,
-  "lastContactedAt" timestamptz,
-  "sourceLabel"   text,
-  "stageChangedAt" timestamptz,
-  "applicationRef" text,
-  "applicationStatus" text,
+  "applicationData"       jsonb,
+  "followUpAt"            timestamptz,
+  "lastContactedAt"       timestamptz,
+  "sourceLabel"           text,
+  "stageChangedAt"        timestamptz,
+  "applicationRef"        text,
+  "applicationStatus"     text,
   "applicationStatusNote" text,
   "createdAt"     timestamptz NOT NULL DEFAULT now(),
   "updatedAt"     timestamptz NOT NULL DEFAULT now()
@@ -102,6 +108,43 @@ CREATE TABLE IF NOT EXISTS "DealStage" (
   name        text NOT NULL,
   color       text NOT NULL DEFAULT '#6B7280',
   position    integer NOT NULL DEFAULT 0
+);
+
+-- TourPropertyProfile must be defined before Tour (Tour.propertyProfileId FK)
+CREATE TABLE IF NOT EXISTS "TourPropertyProfile" (
+  id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "spaceId"       text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  name            text NOT NULL,
+  address         text,
+  "tourDuration"  integer NOT NULL DEFAULT 30,
+  "startHour"     integer NOT NULL DEFAULT 9,
+  "endHour"       integer NOT NULL DEFAULT 17,
+  "daysAvailable" integer[] NOT NULL DEFAULT '{1,2,3,4,5}',
+  "bufferMinutes" integer NOT NULL DEFAULT 0,
+  "isActive"      boolean NOT NULL DEFAULT true,
+  "createdAt"     timestamptz NOT NULL DEFAULT now(),
+  "updatedAt"     timestamptz NOT NULL DEFAULT now()
+);
+
+-- Tour must be defined before Deal (Deal.sourceTourId FK)
+CREATE TABLE IF NOT EXISTS "Tour" (
+  id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "spaceId"       text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  "contactId"     text REFERENCES "Contact"(id) ON DELETE SET NULL,
+  "propertyProfileId" text REFERENCES "TourPropertyProfile"(id) ON DELETE SET NULL,
+  "guestName"     text NOT NULL,
+  "guestEmail"    text NOT NULL,
+  "guestPhone"    text,
+  "propertyAddress" text,
+  notes           text,
+  "startsAt"      timestamptz NOT NULL,
+  "endsAt"        timestamptz NOT NULL,
+  status          text NOT NULL DEFAULT 'scheduled'
+                    CHECK (status IN ('scheduled', 'confirmed', 'completed', 'cancelled', 'no_show')),
+  "googleEventId" text,
+  "manageToken"   text,
+  "createdAt"     timestamptz NOT NULL DEFAULT now(),
+  "updatedAt"     timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS "Deal" (
@@ -134,9 +177,6 @@ CREATE TABLE IF NOT EXISTS "Conversation" (
   "updatedAt" timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_conversation_space_updated
-  ON "Conversation" ("spaceId", "updatedAt" DESC);
-
 CREATE TABLE IF NOT EXISTS "Message" (
   id               text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   "spaceId"        text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
@@ -145,9 +185,6 @@ CREATE TABLE IF NOT EXISTS "Message" (
   content          text NOT NULL,
   "createdAt"      timestamptz NOT NULL DEFAULT now()
 );
-
-CREATE INDEX IF NOT EXISTS idx_message_conversation_created
-  ON "Message" ("conversationId", "createdAt" ASC);
 
 CREATE TABLE IF NOT EXISTS "BrokerageMembership" (
   id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -172,51 +209,6 @@ CREATE TABLE IF NOT EXISTS "Invitation" (
   "createdAt"     timestamptz NOT NULL DEFAULT now()
 );
 
--- ============================================================
--- Indexes (for common query patterns)
--- ============================================================
-
-CREATE INDEX IF NOT EXISTS idx_user_clerk_id      ON "User"("clerkId");
-CREATE INDEX IF NOT EXISTS idx_space_owner_id     ON "Space"("ownerId");
-CREATE INDEX IF NOT EXISTS idx_space_slug         ON "Space"(slug);
-CREATE INDEX IF NOT EXISTS idx_space_setting_sid  ON "SpaceSetting"("spaceId");
-CREATE INDEX IF NOT EXISTS idx_contact_space_id   ON "Contact"("spaceId");
-CREATE INDEX IF NOT EXISTS idx_contact_tags       ON "Contact" USING gin(tags);
-CREATE INDEX IF NOT EXISTS idx_deal_space_id      ON "Deal"("spaceId");
-CREATE INDEX IF NOT EXISTS idx_deal_stage_id      ON "Deal"("stageId");
-CREATE INDEX IF NOT EXISTS idx_dealstage_space_id ON "DealStage"("spaceId");
-CREATE INDEX IF NOT EXISTS idx_dealcontact_deal   ON "DealContact"("dealId");
-CREATE INDEX IF NOT EXISTS idx_dealcontact_contact ON "DealContact"("contactId");
-CREATE INDEX IF NOT EXISTS idx_message_space_id   ON "Message"("spaceId");
-
--- Tour booking
-CREATE TABLE IF NOT EXISTS "Tour" (
-  id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  "spaceId"       text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
-  "contactId"     text REFERENCES "Contact"(id) ON DELETE SET NULL,
-  "guestName"     text NOT NULL,
-  "guestEmail"    text NOT NULL,
-  "guestPhone"    text,
-  "propertyAddress" text,
-  notes           text,
-  "startsAt"      timestamptz NOT NULL,
-  "endsAt"        timestamptz NOT NULL,
-  status          text NOT NULL DEFAULT 'scheduled'
-                    CHECK (status IN ('scheduled', 'confirmed', 'completed', 'cancelled', 'no_show')),
-  "googleEventId" text,
-  "manageToken"   text,
-  "propertyProfileId" text,
-  "createdAt"     timestamptz NOT NULL DEFAULT now(),
-  "updatedAt"     timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_tour_space_starts ON "Tour" ("spaceId", "startsAt" DESC);
-CREATE INDEX IF NOT EXISTS idx_tour_contact      ON "Tour" ("contactId");
-CREATE INDEX IF NOT EXISTS idx_tour_status       ON "Tour" (status);
-CREATE INDEX IF NOT EXISTS idx_tour_manage_token ON "Tour" ("manageToken");
-CREATE INDEX IF NOT EXISTS idx_tour_property_profile ON "Tour" ("propertyProfileId");
-
--- Google Calendar OAuth tokens
 CREATE TABLE IF NOT EXISTS "GoogleCalendarToken" (
   id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   "spaceId"       text UNIQUE NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
@@ -227,25 +219,6 @@ CREATE TABLE IF NOT EXISTS "GoogleCalendarToken" (
   "createdAt"     timestamptz NOT NULL DEFAULT now(),
   "updatedAt"     timestamptz NOT NULL DEFAULT now()
 );
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_brokerage_owner       ON "Brokerage"("ownerId");
-CREATE INDEX       IF NOT EXISTS idx_brokerage_status       ON "Brokerage"(status);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_brokerage_join_code   ON "Brokerage"("joinCode");
-
--- Migration for existing databases (run if upgrading from a version without joinCode):
--- ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "joinCode" text UNIQUE;
-CREATE INDEX IF NOT EXISTS idx_membership_brokerage         ON "BrokerageMembership"("brokerageId");
-CREATE INDEX IF NOT EXISTS idx_membership_user              ON "BrokerageMembership"("userId");
-CREATE INDEX IF NOT EXISTS idx_space_brokerage              ON "Space"("brokerageId");
-CREATE INDEX IF NOT EXISTS idx_invitation_brokerage         ON "Invitation"("brokerageId");
-CREATE INDEX IF NOT EXISTS idx_invitation_email             ON "Invitation"(email);
-CREATE INDEX IF NOT EXISTS idx_invitation_token             ON "Invitation"(token);
-CREATE INDEX IF NOT EXISTS idx_invitation_status            ON "Invitation"(status);
-
--- ============================================================
--- BrokerNotification: in-app notifications for broker dashboard
--- Written by lib/broker-notify.ts on key events (member joins, deals, etc.)
--- ============================================================
 
 CREATE TABLE IF NOT EXISTS "BrokerNotification" (
   id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -258,17 +231,6 @@ CREATE TABLE IF NOT EXISTS "BrokerNotification" (
   "createdAt"     timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_broker_notif_brokerage ON "BrokerNotification"("brokerageId", "createdAt" DESC);
-CREATE INDEX IF NOT EXISTS idx_broker_notif_unread    ON "BrokerNotification"("brokerageId", read) WHERE read = false;
-
-ALTER TABLE "BrokerNotification" ENABLE ROW LEVEL SECURITY;
-
--- ============================================================
--- AuditLog: immutable event log for compliance and security review
--- Written by lib/audit.ts on all critical Create/Update/Delete operations.
--- Uses service-role key; never directly readable by client keys.
--- ============================================================
-
 CREATE TABLE IF NOT EXISTS "AuditLog" (
   id            text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   "clerkId"     text,
@@ -279,46 +241,6 @@ CREATE TABLE IF NOT EXISTS "AuditLog" (
   "spaceId"     text,
   metadata      jsonb,
   "createdAt"   timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_audit_clerk_id    ON "AuditLog"("clerkId");
-CREATE INDEX IF NOT EXISTS idx_audit_resource    ON "AuditLog"(resource, "resourceId");
-CREATE INDEX IF NOT EXISTS idx_audit_space_id    ON "AuditLog"("spaceId");
-CREATE INDEX IF NOT EXISTS idx_audit_created_at  ON "AuditLog"("createdAt");
-
--- ============================================================
--- Row-Level Security
--- All tables have RLS enabled. The application exclusively uses the
--- Supabase service_role key, which bypasses RLS — so application
--- behaviour is unaffected. RLS protects against accidental exposure
--- of the anon/authenticated keys, which would otherwise grant
--- unrestricted table access.
--- ============================================================
-
-ALTER TABLE "User"                ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "Brokerage"           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "Space"               ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "SpaceSetting"        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "Contact"             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "DealStage"           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "Deal"                ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "DealContact"         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "Message"             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "BrokerageMembership" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "Invitation"          ENABLE ROW LEVEL SECURITY;
-CREATE TABLE IF NOT EXISTS "TourPropertyProfile" (
-  id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  "spaceId"       text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
-  name            text NOT NULL,
-  address         text,
-  "tourDuration"  integer NOT NULL DEFAULT 30,
-  "startHour"     integer NOT NULL DEFAULT 9,
-  "endHour"       integer NOT NULL DEFAULT 17,
-  "daysAvailable" integer[] NOT NULL DEFAULT '{1,2,3,4,5}',
-  "bufferMinutes" integer NOT NULL DEFAULT 0,
-  "isActive"      boolean NOT NULL DEFAULT true,
-  "createdAt"     timestamptz NOT NULL DEFAULT now(),
-  "updatedAt"     timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS "TourAvailabilityOverride" (
@@ -336,9 +258,6 @@ CREATE TABLE IF NOT EXISTS "TourAvailabilityOverride" (
   "createdAt"         timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_override_space_date
-  ON "TourAvailabilityOverride" ("spaceId", date);
-
 CREATE TABLE IF NOT EXISTS "TourWaitlist" (
   id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   "spaceId"       text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
@@ -355,16 +274,104 @@ CREATE TABLE IF NOT EXISTS "TourWaitlist" (
   "createdAt"     timestamptz NOT NULL DEFAULT now()
 );
 
-ALTER TABLE "TourAvailabilityOverride" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "TourWaitlist"          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "Tour"                  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "GoogleCalendarToken"   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "AuditLog"            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "DocumentEmbedding"   ENABLE ROW LEVEL SECURITY;
+CREATE TABLE IF NOT EXISTS "DocumentEmbedding" (
+  id            text PRIMARY KEY,
+  "spaceId"     text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  "entityType"  text NOT NULL,   -- 'contact' | 'deal'
+  "entityId"    text NOT NULL,
+  content       text NOT NULL,   -- plain text used to generate the embedding
+  embedding     vector(1536)     -- OpenAI text-embedding-3-small output
+);
 
--- No policies are defined here intentionally. With RLS enabled and no
--- permissive policies, the default is DENY ALL for anon and authenticated
--- roles. The service_role key bypasses these restrictions.
+-- ============================================================
+-- Indexes
+-- ============================================================
+
+CREATE INDEX IF NOT EXISTS idx_user_clerk_id       ON "User"("clerkId");
+CREATE INDEX IF NOT EXISTS idx_space_owner_id      ON "Space"("ownerId");
+CREATE INDEX IF NOT EXISTS idx_space_slug          ON "Space"(slug);
+CREATE INDEX IF NOT EXISTS idx_space_brokerage     ON "Space"("brokerageId");
+CREATE INDEX IF NOT EXISTS idx_space_setting_sid   ON "SpaceSetting"("spaceId");
+
+CREATE INDEX IF NOT EXISTS idx_contact_space_id    ON "Contact"("spaceId");
+CREATE INDEX IF NOT EXISTS idx_contact_tags        ON "Contact" USING gin(tags);
+CREATE INDEX IF NOT EXISTS idx_contact_email       ON "Contact"(email);
+CREATE INDEX IF NOT EXISTS idx_contact_phone       ON "Contact"(phone);
+
+CREATE INDEX IF NOT EXISTS idx_dealstage_space_id  ON "DealStage"("spaceId");
+CREATE INDEX IF NOT EXISTS idx_deal_space_id       ON "Deal"("spaceId");
+CREATE INDEX IF NOT EXISTS idx_deal_stage_id       ON "Deal"("stageId");
+CREATE INDEX IF NOT EXISTS idx_dealcontact_deal    ON "DealContact"("dealId");
+CREATE INDEX IF NOT EXISTS idx_dealcontact_contact ON "DealContact"("contactId");
+
+CREATE INDEX IF NOT EXISTS idx_conversation_space_updated
+  ON "Conversation" ("spaceId", "updatedAt" DESC);
+CREATE INDEX IF NOT EXISTS idx_message_conversation_created
+  ON "Message" ("conversationId", "createdAt" ASC);
+CREATE INDEX IF NOT EXISTS idx_message_space_id    ON "Message"("spaceId");
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_brokerage_owner     ON "Brokerage"("ownerId");
+CREATE INDEX        IF NOT EXISTS idx_brokerage_status    ON "Brokerage"(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_brokerage_join_code ON "Brokerage"("joinCode");
+CREATE INDEX IF NOT EXISTS idx_membership_brokerage       ON "BrokerageMembership"("brokerageId");
+CREATE INDEX IF NOT EXISTS idx_membership_user            ON "BrokerageMembership"("userId");
+CREATE INDEX IF NOT EXISTS idx_invitation_brokerage       ON "Invitation"("brokerageId");
+CREATE INDEX IF NOT EXISTS idx_invitation_email           ON "Invitation"(email);
+CREATE INDEX IF NOT EXISTS idx_invitation_token           ON "Invitation"(token);
+CREATE INDEX IF NOT EXISTS idx_invitation_status          ON "Invitation"(status);
+
+CREATE INDEX IF NOT EXISTS idx_tour_space_starts      ON "Tour"("spaceId", "startsAt" DESC);
+CREATE INDEX IF NOT EXISTS idx_tour_contact           ON "Tour"("contactId");
+CREATE INDEX IF NOT EXISTS idx_tour_status            ON "Tour"(status);
+CREATE INDEX IF NOT EXISTS idx_tour_manage_token      ON "Tour"("manageToken");
+CREATE INDEX IF NOT EXISTS idx_tour_property_profile  ON "Tour"("propertyProfileId");
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_override_space_date
+  ON "TourAvailabilityOverride"("spaceId", date);
+
+CREATE INDEX IF NOT EXISTS idx_broker_notif_brokerage
+  ON "BrokerNotification"("brokerageId", "createdAt" DESC);
+CREATE INDEX IF NOT EXISTS idx_broker_notif_unread
+  ON "BrokerNotification"("brokerageId", read) WHERE read = false;
+
+CREATE INDEX IF NOT EXISTS idx_audit_clerk_id   ON "AuditLog"("clerkId");
+CREATE INDEX IF NOT EXISTS idx_audit_resource   ON "AuditLog"(resource, "resourceId");
+CREATE INDEX IF NOT EXISTS idx_audit_space_id   ON "AuditLog"("spaceId");
+CREATE INDEX IF NOT EXISTS idx_audit_created_at ON "AuditLog"("createdAt");
+
+CREATE INDEX IF NOT EXISTS idx_doc_embedding_space  ON "DocumentEmbedding"("spaceId");
+CREATE INDEX IF NOT EXISTS idx_doc_embedding_entity ON "DocumentEmbedding"("entityId");
+CREATE INDEX IF NOT EXISTS idx_doc_embedding_hnsw
+  ON "DocumentEmbedding" USING hnsw (embedding vector_cosine_ops);
+
+-- ============================================================
+-- Row-Level Security
+-- All tables have RLS enabled. The application uses the Supabase
+-- service_role key, which bypasses RLS. RLS protects against
+-- accidental exposure of the anon/authenticated keys.
+-- No policies are defined — default is DENY ALL for anon/authenticated.
+-- ============================================================
+
+ALTER TABLE "User"                    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Brokerage"               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Space"                   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SpaceSetting"            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Contact"                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "DealStage"               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "TourPropertyProfile"     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Tour"                    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Deal"                    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "DealContact"             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Conversation"            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Message"                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "BrokerageMembership"     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Invitation"              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "GoogleCalendarToken"     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "BrokerNotification"      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "AuditLog"                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "TourAvailabilityOverride" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "TourWaitlist"            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "DocumentEmbedding"       ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================
 -- reorder_deal: atomically shift positions and move a deal
@@ -391,35 +398,12 @@ BEGIN
 
   -- Place the deal at its new stage and position
   UPDATE "Deal"
-  SET "stageId"  = p_new_stage_id,
-      position   = p_new_position,
+  SET "stageId"   = p_new_stage_id,
+      position    = p_new_position,
       "updatedAt" = now()
   WHERE id = p_deal_id;
 END;
 $$;
-
--- ============================================================
--- pgvector: Vector embeddings for AI-powered search
--- Run AFTER enabling the vector extension in Supabase:
---   Dashboard → Database → Extensions → enable "vector"
--- ============================================================
-
-CREATE EXTENSION IF NOT EXISTS vector;
-
-CREATE TABLE IF NOT EXISTS "DocumentEmbedding" (
-  id            text PRIMARY KEY,
-  "spaceId"     text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
-  "entityType"  text NOT NULL,   -- 'contact' | 'deal'
-  "entityId"    text NOT NULL,
-  content       text NOT NULL,   -- plain text used to generate the embedding
-  embedding     vector(1536)     -- OpenAI text-embedding-3-small output
-);
-
-CREATE INDEX IF NOT EXISTS idx_doc_embedding_space  ON "DocumentEmbedding"("spaceId");
-CREATE INDEX IF NOT EXISTS idx_doc_embedding_entity ON "DocumentEmbedding"("entityId");
--- HNSW index for fast approximate nearest-neighbour search with cosine distance
-CREATE INDEX IF NOT EXISTS idx_doc_embedding_hnsw
-  ON "DocumentEmbedding" USING hnsw (embedding vector_cosine_ops);
 
 -- ============================================================
 -- match_documents: similarity search RPC used by the AI assistant
@@ -455,17 +439,3 @@ BEGIN
   LIMIT match_count;
 END;
 $$;
-
--- Deferred foreign key: Tour.propertyProfileId -> TourPropertyProfile
--- (Tour is created before TourPropertyProfile so we add the constraint separately)
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_tour_property_profile') THEN
-    ALTER TABLE "Tour"
-      ADD CONSTRAINT fk_tour_property_profile
-      FOREIGN KEY ("propertyProfileId") REFERENCES "TourPropertyProfile"(id) ON DELETE SET NULL;
-  END IF;
-END $$;
-
--- Additional indexes for search performance
-CREATE INDEX IF NOT EXISTS idx_contact_email ON "Contact"(email);
-CREATE INDEX IF NOT EXISTS idx_contact_phone ON "Contact"(phone);
