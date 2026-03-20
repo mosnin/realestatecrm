@@ -223,7 +223,7 @@ export function ChatInterface({
         const { done, value } = await reader.read();
         if (done) break;
         accumulated += decoder.decode(value, { stream: true });
-        setMessages([...newMessages, { role: 'assistant', content: accumulated }]);
+        setMessages([...displayMessages, { role: 'assistant', content: accumulated }]);
       }
 
       if (conversationId) {
@@ -235,7 +235,7 @@ export function ChatInterface({
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sorry, I encountered an error. Please try again.';
-      setMessages([...newMessages, { role: 'assistant', content: message }]);
+      setMessages([...displayMessages, { role: 'assistant', content: message }]);
     } finally {
       inFlightRef.current = false;
       setIsStreaming(false);
@@ -373,10 +373,13 @@ export function ChatInterface({
         ) : (
           <ScrollArea className="h-full">
             <div className="max-w-3xl mx-auto space-y-4 px-4 sm:px-6 py-6">
-              {messages.map((msg, i) => (
-                <MessageBubble key={i} role={msg.role} content={msg.content} onAction={handleAction} />
-              ))}
-              {isStreaming && messages[messages.length - 1]?.content === '' && (
+              {messages.map((msg, i) =>
+                // Skip empty assistant placeholder — typing dots render below
+                msg.role === 'assistant' && !msg.content ? null : (
+                  <MessageBubble key={i} role={msg.role} content={msg.content} onAction={handleAction} />
+                )
+              )}
+              {isStreaming && (!messages[messages.length - 1]?.content) && (
                 <div className="flex justify-start">
                   <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3">
                     <div className="flex gap-1">
