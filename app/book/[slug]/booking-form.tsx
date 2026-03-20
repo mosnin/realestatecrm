@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { CalendarDays, Clock, Check, Loader2, ChevronLeft, ChevronRight, MapPin, Globe, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LiquidMetalButton } from '@/components/ui/liquid-metal-button';
 
 interface BookingFormProps {
   slug: string;
@@ -202,7 +203,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
   // Property selection step
   if (step === 'property' && properties.length > 0) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
+      <div className="space-y-5">
         <p className="text-xs font-medium text-muted-foreground">Which property are you interested in?</p>
         <div className="space-y-2">
           {properties.map((p) => (
@@ -236,7 +237,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
 
   if (step === 'details') {
     return (
-      <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
+      <div className="space-y-5">
         <button
           type="button"
           onClick={() => setStep('date')}
@@ -289,27 +290,20 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
 
         {error && <p className="text-xs text-destructive">{error}</p>}
 
-        <button
-          onClick={handleSubmit}
-          disabled={submitting || !guestName.trim() || !guestEmail.trim()}
-          className={cn(
-            'w-full rounded-xl py-3 text-sm font-semibold transition-all',
-            submitting || !guestName.trim() || !guestEmail.trim()
-              ? 'bg-muted text-muted-foreground cursor-not-allowed'
-              : 'bg-primary text-primary-foreground hover:bg-primary/90'
-          )}
-        >
-          {submitting ? (
-            <span className="flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> Booking...</span>
-          ) : 'Confirm Booking'}
-        </button>
+        <div className="flex justify-end">
+          <LiquidMetalButton
+            label={submitting ? 'Booking...' : 'Confirm Booking'}
+            onClick={handleSubmit}
+            disabled={submitting || !guestName.trim() || !guestEmail.trim()}
+          />
+        </div>
       </div>
     );
   }
 
   // Date + time selection step
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Clock size={14} />
@@ -353,9 +347,13 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
               <input type="date" value={waitlistDate} min={new Date().toISOString().split('T')[0]} onChange={(e) => setWaitlistDate(e.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
               <input type="text" value={waitlistName} onChange={(e) => setWaitlistName(e.target.value)} placeholder="Your name" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
               <input type="email" value={waitlistEmail} onChange={(e) => setWaitlistEmail(e.target.value)} placeholder="Your email" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
-              <button onClick={handleWaitlistSubmit} disabled={waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim() || !waitlistDate} className={cn('w-full rounded-xl py-2.5 text-sm font-semibold transition-all', waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim() ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground hover:bg-primary/90')}>
-                {waitlistSubmitting ? 'Joining...' : 'Join Waitlist'}
-              </button>
+              <div className="flex justify-end">
+                <LiquidMetalButton
+                  label={waitlistSubmitting ? 'Joining...' : 'Join Waitlist'}
+                  onClick={handleWaitlistSubmit}
+                  disabled={waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim() || !waitlistDate}
+                />
+              </div>
             </div>
           )}
           {waitlistDone && (
@@ -417,13 +415,9 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
           )}
 
           {selectedTime && (
-            <button
-              onClick={() => setStep('details')}
-              className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
-            >
-              Continue
-              <ChevronRight size={16} />
-            </button>
+            <div className="flex justify-end">
+              <LiquidMetalButton label="Continue" onClick={() => setStep('details')} />
+            </div>
           )}
         </>
       )}

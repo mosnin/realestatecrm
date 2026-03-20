@@ -7,11 +7,13 @@ interface LiquidMetalButtonProps {
   label?: string;
   onClick?: () => void;
   viewMode?: "text" | "icon";
+  disabled?: boolean;
 }
 export function LiquidMetalButton({
   label = "Get Started",
   onClick,
   viewMode = "text",
+  disabled = false,
 }: LiquidMetalButtonProps) {
   const { theme } = useTheme();
   const isLight = theme === "light";
@@ -146,7 +148,7 @@ export function LiquidMetalButton({
     onClick?.();
   };
   return (
-    <div className="relative inline-block">
+    <div className="relative inline-block" style={{ opacity: disabled ? 0.5 : 1, pointerEvents: disabled ? 'none' : 'auto' }}>
       <div
         style={{
           perspective: "1000px",

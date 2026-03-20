@@ -8,8 +8,6 @@ import { Label } from '@/components/ui/label';
 import { DateWheelPicker } from '@/components/ui/date-wheel-picker';
 import {
   CheckCircle2,
-  Loader2,
-  ChevronRight,
   ChevronLeft,
   Home,
   User,
@@ -22,6 +20,7 @@ import {
   PenLine,
   Upload,
 } from 'lucide-react';
+import { LiquidMetalButton } from '@/components/ui/liquid-metal-button';
 
 // ── Step config ──
 const ALL_STEPS = [
@@ -444,7 +443,7 @@ export function ApplicationForm({
   // ── Success screen ──
   if (submitted) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-6 md:p-8 text-center space-y-5">
+      <div className="p-6 md:p-8 text-center space-y-5">
         <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto">
           <CheckCircle2 size={28} className="text-green-600" />
         </div>
@@ -760,22 +759,22 @@ export function ApplicationForm({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+    <div>
       {/* Progress */}
-      <div className="px-5 pt-5 pb-3 space-y-3 border-b border-border/50">
+      <div className="pb-3 space-y-3 border-b border-border/50 mb-6">
         <ProgressBar current={currentStepIndex + 1} total={totalSteps} />
         <StepIndicator current={step} steps={STEPS} />
       </div>
 
       {/* Step content */}
-      <div className="px-5 py-6 md:px-7 md:py-7">{renderStep()}</div>
+      <div className="pb-6">{renderStep()}</div>
 
       {/* Navigation */}
-      <div className="px-5 pb-5 md:px-7 md:pb-7">
+      <div className="pt-2">
         {submitError && (
           <p className="text-sm text-destructive mb-3">{submitError}</p>
         )}
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center">
           {currentStepIndex > 0 && (
             <Button
               type="button"
@@ -789,27 +788,13 @@ export function ApplicationForm({
           )}
           <div className="flex-1" />
           {currentStepIndex < totalSteps - 1 ? (
-            <Button type="button" onClick={goNext} className="flex-shrink-0">
-              Continue
-              <ChevronRight size={16} className="ml-1" />
-            </Button>
+            <LiquidMetalButton label="Continue" onClick={goNext} />
           ) : (
-            <Button
-              type="button"
+            <LiquidMetalButton
+              label={submitting ? 'Submitting...' : 'Submit'}
               onClick={onSubmit}
               disabled={submitting}
-              size="lg"
-              className="flex-1 sm:flex-none"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 size={16} className="mr-2 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                'Submit application'
-              )}
-            </Button>
+            />
           )}
         </div>
       </div>

@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { ApplicationForm } from './application-form';
-import { Phone, Mail } from 'lucide-react';
+import { BrandLogo } from '@/components/brand-logo';
+import { Phone } from 'lucide-react';
 
 export default async function PublicApplyPage({
   params,
@@ -102,10 +103,16 @@ export default async function PublicApplyPage({
           {/* Form — no card wrapper, flush with page */}
           <ApplicationForm slug={slug} businessName={businessName} />
 
-          {/* Footer trust line */}
-          <p className="text-center text-xs text-muted-foreground/60 pt-4">
-            Your information is shared only with {agentName} and used solely for rental inquiries.
-          </p>
+          {/* Footer */}
+          <footer className="text-center pt-6 pb-8 space-y-3 border-t border-border/40">
+            <p className="text-xs text-muted-foreground/60">
+              Your information is shared only with {agentName} and used solely for rental inquiries.
+            </p>
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-xs text-muted-foreground/40">Powered by</span>
+              <BrandLogo className="h-4" />
+            </div>
+          </footer>
         </div>
       </div>
     </div>
