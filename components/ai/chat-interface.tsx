@@ -184,22 +184,26 @@ export function ChatInterface({
     inFlightRef.current = true;
 
     const isFirstMessage = messages.length === 0;
-    const newMessages: Message[] = [...messages, { role: 'user', content: fullMessage }];
-    setMessages(newMessages);
+    // Display the raw text in the UI — the context prefix is only for the API
+    const displayMessages: Message[] = [...messages, { role: 'user', content: text }];
+    setMessages(displayMessages);
     setIsStreaming(true);
 
     const assistantMessage: Message = { role: 'assistant', content: '' };
-    setMessages([...newMessages, assistantMessage]);
+    setMessages([...displayMessages, assistantMessage]);
 
     if (isFirstMessage && conversationId) {
       updateConversationTitle(conversationId, text);
     }
 
+    // Send fullMessage (with referencing prefix) to the API for context
+    const apiMessages: Message[] = [...messages, { role: 'user', content: fullMessage }];
+
     try {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages, slug, conversationId }),
+        body: JSON.stringify({ messages: apiMessages, slug, conversationId }),
       });
 
       if (!res.ok) {
