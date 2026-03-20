@@ -6,7 +6,16 @@ import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
 import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
-import { Building2, Settings, ChevronRight, Sparkles, Users, UserCircle, Mail, LayoutDashboard, SlidersHorizontal, Briefcase, ArrowLeftRight } from 'lucide-react';
+import {
+  Building2,
+  ChevronRight,
+  Users,
+  UserCircle,
+  Mail,
+  LayoutDashboard,
+  SlidersHorizontal,
+  Briefcase,
+} from 'lucide-react';
 
 interface SidebarProps {
   slug: string;
@@ -27,7 +36,51 @@ const brokerTeamNavItems = [
   { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false },
 ];
 
-export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null }: SidebarProps) {
+function NavItem({
+  href,
+  label,
+  icon: Icon,
+  isActive,
+  badge,
+}: {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  isActive: boolean;
+  badge?: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'group flex items-center gap-2.5 h-8 px-2 rounded-md text-[13px] font-medium transition-colors',
+        isActive
+          ? 'bg-primary/10 text-primary'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+      )}
+    >
+      <Icon
+        size={15}
+        className={cn(
+          'flex-shrink-0',
+          isActive ? 'text-primary' : 'text-muted-foreground/70 group-hover:text-foreground'
+        )}
+      />
+      <span className="flex-1 truncate">{label}</span>
+      {badge}
+    </Link>
+  );
+}
+
+export function Sidebar({
+  slug,
+  spaceName,
+  unreadLeadCount,
+  isBroker = false,
+  isBrokerOnly = false,
+  brokerageName = null,
+  brokerageRole = null,
+}: SidebarProps) {
   const pathname = usePathname();
   const base = `/s/${slug}`;
   const { user } = useUser();
@@ -35,130 +88,95 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
   const displayName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(' ') || 'My Account'
     : 'My Account';
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
 
-  const isMemberOfBrokerage = !!brokerageName;
   const isOnBrokerPage = pathname.startsWith('/broker');
 
-  // ── Broker-focused sidebar (when on /broker/* pages or broker-only account) ──
+  // ── Broker sidebar (when on /broker/* pages or broker-only account) ──
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
-      <aside className="hidden md:flex flex-col w-60 h-full bg-sidebar border-r border-sidebar-border shrink-0">
-        {/* ── Brand ── */}
-        <div className="px-5 pt-5 pb-4 flex items-center">
+      <aside className="hidden md:flex flex-col w-[220px] h-full bg-sidebar border-r border-border shrink-0">
+        <div className="px-4 pt-4 pb-3">
           <BrandLogo className="h-4" alt="Chippi" />
         </div>
 
-        {/* ── Brokerage context card ── */}
-        <div className="px-3 pb-3">
-          <Link
-            href="/broker/settings"
-            className="group flex items-center gap-3 rounded-xl px-3 py-2.5 bg-primary/5 hover:bg-primary/10 border border-primary/15 transition-colors"
-          >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center flex-shrink-0">
-              <Building2 size={16} className="text-primary" />
+        {/* Context: Brokerage */}
+        <div className="px-3 pb-2">
+          <div className="flex items-center gap-2.5 px-2 py-1.5">
+            <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Building2 size={13} className="text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm leading-tight truncate text-sidebar-foreground">
+              <p className="text-[13px] font-semibold truncate text-foreground leading-tight">
                 {brokerageName}
               </p>
-              <p className="text-[11px] text-primary/60 truncate mt-0.5">
-                Brokerage · {brokerageRole === 'broker_owner' ? 'Owner' : 'Manager'}
+              <p className="text-[11px] text-muted-foreground leading-tight">
+                {brokerageRole === 'broker_owner' ? 'Owner' : 'Manager'}
               </p>
             </div>
-            <Settings
-              size={13}
-              className="text-muted-foreground/40 flex-shrink-0 group-hover:text-muted-foreground/70 transition-colors"
-            />
-          </Link>
+          </div>
         </div>
 
-        <div className="mx-4 border-t border-sidebar-border/50 mb-1" />
+        <div className="mx-3 border-t border-border" />
 
-        {/* ── Team nav (primary when on broker pages) ── */}
-        <nav className="flex-1 px-3 pt-2 pb-2 space-y-0.5 overflow-y-auto">
-          <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/45">
-            Team
-          </p>
+        {/* Team nav */}
+        <nav className="flex-1 px-3 pt-3 pb-2 space-y-0.5 overflow-y-auto">
           {brokerTeamNavItems.map((item) => {
             const isActive = item.exact
               ? pathname === item.href
               : pathname.startsWith(item.href);
             return (
-              <Link
+              <NavItem
                 key={item.href}
                 href={item.href}
-                className={cn(
-                  'group flex items-center gap-2.5 py-[7px] pr-3 rounded-lg text-sm font-medium transition-all duration-150 border-l-[3px] pl-[9px]',
-                  isActive
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                )}
-              >
-                <item.icon
-                  size={15}
-                  className={cn(
-                    'flex-shrink-0 transition-opacity',
-                    isActive ? 'opacity-100' : 'opacity-45 group-hover:opacity-75'
-                  )}
-                />
-                <span className="truncate">{item.label}</span>
-              </Link>
+                label={item.label}
+                icon={item.icon}
+                isActive={isActive}
+              />
             );
           })}
         </nav>
 
-        {/* ── Switch to workspace (hidden for broker-only accounts) ── */}
+        {/* Switch to personal workspace */}
         {!isBrokerOnly && slug && (
-          <div className="px-3 pb-2 border-t border-sidebar-border/50 pt-3">
-            <Link
-              href={base}
-              className="group flex items-center gap-2.5 rounded-xl px-3 py-2.5 hover:bg-sidebar-accent border border-sidebar-border/40 transition-colors"
-            >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-sm flex-shrink-0">
-                {spaceEmoji}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-sidebar-foreground truncate">{spaceName}</p>
-                <p className="text-[10px] text-muted-foreground/50">My workspace</p>
-              </div>
-              <ArrowLeftRight
-                size={11}
-                className="text-muted-foreground/35 flex-shrink-0 group-hover:text-muted-foreground/65 transition-colors"
-              />
-            </Link>
-          </div>
+          <>
+            <div className="mx-3 border-t border-border" />
+            <div className="px-3 py-2">
+              <Link
+                href={base}
+                className="group flex items-center gap-2.5 h-8 px-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <Briefcase
+                  size={15}
+                  className="flex-shrink-0 text-muted-foreground/70 group-hover:text-foreground"
+                />
+                <span className="flex-1 truncate">{spaceName}</span>
+                <ChevronRight size={12} className="text-muted-foreground/40" />
+              </Link>
+            </div>
+          </>
         )}
 
-        {/* ── User card ── */}
-        <div className="px-3 pb-4 pt-2 border-t border-sidebar-border/50">
+        {/* User */}
+        <div className="mx-3 border-t border-border" />
+        <div className="px-3 py-3">
           <Link
-            href={`${base}/profile`}
-            className="group flex items-center gap-2.5 rounded-xl px-3 py-2.5 hover:bg-sidebar-accent transition-colors"
+            href={slug ? `${base}/profile` : '/broker/settings'}
+            className="group flex items-center gap-2.5 px-2 py-1 rounded-md hover:bg-muted transition-colors"
           >
             {user?.imageUrl ? (
               <img
                 src={user.imageUrl}
                 alt={displayName}
-                className="w-8 h-8 rounded-full flex-shrink-0 object-cover ring-2 ring-sidebar-border"
+                className="w-6 h-6 rounded-full flex-shrink-0 object-cover"
               />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0">
+              <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-muted-foreground font-medium text-xs flex-shrink-0">
                 {displayName.charAt(0).toUpperCase()}
               </div>
             )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground leading-tight truncate">
-                {displayName}
-              </p>
-              {email && (
-                <p className="text-[11px] text-muted-foreground/55 truncate mt-0.5">{email}</p>
-              )}
-            </div>
-            <ChevronRight
-              size={13}
-              className="text-muted-foreground/35 flex-shrink-0 group-hover:text-muted-foreground/65 transition-colors"
-            />
+            <span className="text-[13px] font-medium text-foreground truncate">
+              {displayName}
+            </span>
           </Link>
         </div>
       </aside>
@@ -167,199 +185,139 @@ export function Sidebar({ slug, spaceName, spaceEmoji, unreadLeadCount, isBroker
 
   // ── Standard workspace sidebar ──
   return (
-    <aside className="hidden md:flex flex-col w-60 h-full bg-sidebar border-r border-sidebar-border shrink-0">
-
-      {/* ── Brand ── */}
-      <div className="px-5 pt-5 pb-4 flex items-center">
+    <aside className="hidden md:flex flex-col w-[220px] h-full bg-sidebar border-r border-border shrink-0">
+      <div className="px-4 pt-4 pb-3">
         <BrandLogo className="h-4" alt="Chippi" />
       </div>
 
-      {/* ── Workspace card ── */}
-      <div className="px-3 pb-3">
+      {/* Context: Workspace */}
+      <div className="px-3 pb-2">
         <Link
           href={`${base}/settings`}
-          className="group flex items-center gap-3 rounded-xl px-3 py-2.5 bg-sidebar-accent/60 hover:bg-sidebar-accent border border-sidebar-border/60 transition-colors"
+          className="group flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-muted transition-colors"
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center text-lg flex-shrink-0 shadow-inner">
-            {spaceEmoji}
+          <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Briefcase size={13} className="text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm leading-tight truncate text-sidebar-foreground">
+            <p className="text-[13px] font-semibold truncate text-foreground leading-tight">
               {spaceName}
             </p>
-            {isMemberOfBrokerage ? (
-              <p className="text-[11px] text-muted-foreground/60 truncate mt-0.5 flex items-center gap-1">
-                <Building2 size={9} className="flex-shrink-0" />
-                {brokerageName}
-              </p>
-            ) : (
-              <p className="text-[11px] text-muted-foreground/60 truncate mt-0.5">{slug}</p>
-            )}
           </div>
-          <Settings
-            size={13}
-            className="text-muted-foreground/40 flex-shrink-0 group-hover:text-muted-foreground/70 transition-colors"
+          <ChevronRight
+            size={12}
+            className="text-muted-foreground/40 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
           />
         </Link>
       </div>
 
-      <div className="mx-4 border-t border-sidebar-border/50 mb-1" />
+      <div className="mx-3 border-t border-border" />
 
-      {/* ── Primary nav ── */}
-      <nav className="flex-1 px-3 pt-2 pb-2 space-y-0.5 overflow-y-auto">
-        <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/45">
-          Workspace
-        </p>
+      {/* Primary nav */}
+      <nav className="flex-1 px-3 pt-3 pb-2 space-y-0.5 overflow-y-auto">
         {primaryNavItems.map((item) => {
           const href = `${base}${item.href}`;
           const isActive =
             item.href === '' ? pathname === base : pathname.startsWith(`${base}${item.href}`);
+
+          let badge: React.ReactNode = undefined;
+          if (item.href === '/leads' && unreadLeadCount > 0) {
+            badge = (
+              <span
+                className={cn(
+                  'inline-flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums flex-shrink-0',
+                  isActive
+                    ? 'bg-primary/20 text-primary'
+                    : 'bg-primary text-primary-foreground'
+                )}
+              >
+                {unreadLeadCount > 99 ? '99+' : unreadLeadCount}
+              </span>
+            );
+          }
+
           return (
-            <Link
+            <NavItem
               key={item.href}
               href={href}
-              className={cn(
-                'group flex items-center gap-2.5 py-[7px] pr-3 rounded-lg text-sm font-medium transition-all duration-150 border-l-[3px] pl-[9px]',
-                isActive
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-              )}
-            >
-              <item.icon
-                size={15}
-                className={cn(
-                  'flex-shrink-0 transition-opacity',
-                  isActive ? 'opacity-100' : 'opacity-45 group-hover:opacity-75'
-                )}
-              />
-              <span className="flex items-center gap-1.5 flex-1 min-w-0">
-                <span className="truncate">{item.label}</span>
-                {/* Unread leads badge */}
-                {item.href === '/leads' && unreadLeadCount > 0 && (
-                  <span
-                    className={cn(
-                      'inline-flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full text-[10px] font-bold tabular-nums flex-shrink-0',
-                      isActive
-                        ? 'bg-primary/20 text-primary'
-                        : 'bg-primary text-primary-foreground'
-                    )}
-                  >
-                    {unreadLeadCount > 99 ? '99+' : unreadLeadCount}
-                  </span>
-                )}
-                {/* AI badge */}
-                {item.href === '/ai' && (
-                  <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold rounded-full px-1.5 py-0.5 bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400 flex-shrink-0 leading-none">
-                    <Sparkles size={8} />
-                    AI
-                  </span>
-                )}
-              </span>
-            </Link>
+              label={item.label}
+              icon={item.icon}
+              isActive={isActive}
+              badge={badge}
+            />
           );
         })}
 
-        {/* ── Team section (broker only — compact link to switch to broker dashboard) ── */}
+        {/* Switch to brokerage dashboard */}
         {isBroker && (
           <>
-            <div className="mx-1 my-2 border-t border-sidebar-border/50" />
+            <div className="mx-0 my-2 border-t border-border" />
             <Link
               href="/broker"
-              className="group flex items-center gap-2.5 rounded-xl px-3 py-2.5 hover:bg-sidebar-accent border border-sidebar-border/40 transition-colors"
+              className="group flex items-center gap-2.5 h-8 px-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
-              <div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center flex-shrink-0">
-                <Building2 size={14} className="text-primary/70" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-sidebar-foreground truncate">{brokerageName}</p>
-                <p className="text-[10px] text-muted-foreground/50">Team dashboard</p>
-              </div>
-              <ArrowLeftRight
-                size={11}
-                className="text-muted-foreground/35 flex-shrink-0 group-hover:text-muted-foreground/65 transition-colors"
+              <Building2
+                size={15}
+                className="flex-shrink-0 text-muted-foreground/70 group-hover:text-foreground"
               />
+              <span className="flex-1 truncate">{brokerageName}</span>
+              <ChevronRight size={12} className="text-muted-foreground/40" />
             </Link>
           </>
         )}
       </nav>
 
-      {/* ── Join a team (realtors without a brokerage) ── */}
-      {!isMemberOfBrokerage && (
+      {/* Join a team (realtors without a brokerage) */}
+      {!brokerageName && (
         <div className="px-3 pb-1">
-          <Link
+          <NavItem
             href="/brokerage"
-            className="group flex items-center gap-2.5 py-[7px] pr-3 rounded-lg text-sm font-medium transition-all duration-150 border-l-[3px] border-transparent pl-[9px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <Building2
-              size={15}
-              className="flex-shrink-0 opacity-45 group-hover:opacity-75 transition-opacity"
-            />
-            <span className="truncate">Join a team</span>
-          </Link>
+            label="Join a team"
+            icon={Building2}
+            isActive={false}
+          />
         </div>
       )}
 
-      {/* ── Secondary nav ── */}
-      <div className="px-3 pb-2 border-t border-sidebar-border/50 pt-3 space-y-0.5">
-        <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/45">
-          Account
-        </p>
+      {/* Secondary nav */}
+      <div className="mx-3 border-t border-border" />
+      <div className="px-3 py-2 space-y-0.5">
         {secondaryNavItems.map((item) => {
           const href = `${base}${item.href}`;
           const isActive = pathname.startsWith(href);
           return (
-            <Link
+            <NavItem
               key={item.href}
               href={href}
-              className={cn(
-                'group flex items-center gap-2.5 py-[7px] pr-3 rounded-lg text-sm font-medium transition-all duration-150 border-l-[3px] pl-[9px]',
-                isActive
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-              )}
-            >
-              <item.icon
-                size={15}
-                className={cn(
-                  'flex-shrink-0 transition-opacity',
-                  isActive ? 'opacity-100' : 'opacity-45 group-hover:opacity-75'
-                )}
-              />
-              {item.label}
-            </Link>
+              label={item.label}
+              icon={item.icon}
+              isActive={isActive}
+            />
           );
         })}
       </div>
 
-      {/* ── User card ── */}
-      <div className="px-3 pb-4 pt-2 border-t border-sidebar-border/50">
+      {/* User */}
+      <div className="mx-3 border-t border-border" />
+      <div className="px-3 py-3">
         <Link
           href={`${base}/profile`}
-          className="group flex items-center gap-2.5 rounded-xl px-3 py-2.5 hover:bg-sidebar-accent transition-colors"
+          className="group flex items-center gap-2.5 px-2 py-1 rounded-md hover:bg-muted transition-colors"
         >
           {user?.imageUrl ? (
             <img
               src={user.imageUrl}
               alt={displayName}
-              className="w-8 h-8 rounded-full flex-shrink-0 object-cover ring-2 ring-sidebar-border"
+              className="w-6 h-6 rounded-full flex-shrink-0 object-cover"
             />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0">
+            <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-muted-foreground font-medium text-xs flex-shrink-0">
               {displayName.charAt(0).toUpperCase()}
             </div>
           )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-foreground leading-tight truncate">
-              {displayName}
-            </p>
-            {email && (
-              <p className="text-[11px] text-muted-foreground/55 truncate mt-0.5">{email}</p>
-            )}
-          </div>
-          <ChevronRight
-            size={13}
-            className="text-muted-foreground/35 flex-shrink-0 group-hover:text-muted-foreground/65 transition-colors"
-          />
+          <span className="text-[13px] font-medium text-foreground truncate">
+            {displayName}
+          </span>
         </Link>
       </div>
     </aside>
