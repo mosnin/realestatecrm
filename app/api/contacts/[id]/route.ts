@@ -95,33 +95,42 @@ export async function PATCH(
   }
 
   const body = await req.json();
-  const budgetVal = body.budget != null && body.budget !== '' ? parseFloat(body.budget) : null;
-  if (budgetVal !== null && isNaN(budgetVal)) {
-    return NextResponse.json({ error: 'Invalid budget' }, { status: 400 });
+
+  // Build update object — only include fields present in the request body
+  const updates: Record<string, unknown> = {
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (body.name !== undefined) updates.name = body.name;
+  if (body.email !== undefined) updates.email = body.email ?? null;
+  if (body.phone !== undefined) updates.phone = body.phone ?? null;
+  if (body.address !== undefined) updates.address = body.address ?? null;
+  if (body.notes !== undefined) updates.notes = body.notes ?? null;
+  if (body.preferences !== undefined) updates.preferences = body.preferences ?? null;
+  if (body.properties !== undefined) updates.properties = body.properties ?? [];
+  if (body.tags !== undefined) updates.tags = body.tags ?? [];
+  if (body.followUpAt !== undefined) updates.followUpAt = body.followUpAt;
+  if (body.lastContactedAt !== undefined) updates.lastContactedAt = body.lastContactedAt;
+  if (body.sourceLabel !== undefined) updates.sourceLabel = body.sourceLabel;
+
+  if (body.budget !== undefined) {
+    const budgetVal = body.budget != null && body.budget !== '' ? parseFloat(body.budget) : null;
+    if (budgetVal !== null && isNaN(budgetVal)) {
+      return NextResponse.json({ error: 'Invalid budget' }, { status: 400 });
+    }
+    updates.budget = budgetVal;
   }
-  const propsVal = body.properties ?? [];
-  const tagsVal = body.tags ?? [];
-  const typeChanged = body.type && body.type !== existing.type;
+
+  if (body.type !== undefined) {
+    updates.type = body.type;
+    if (body.type !== existing.type) {
+      updates.stageChangedAt = new Date().toISOString();
+    }
+  }
 
   const { data: contact, error: updateError } = await supabase
     .from('Contact')
-    .update({
-      name: body.name,
-      email: body.email ?? null,
-      phone: body.phone ?? null,
-      budget: budgetVal,
-      preferences: body.preferences ?? null,
-      properties: propsVal,
-      address: body.address ?? null,
-      notes: body.notes ?? null,
-      type: body.type,
-      tags: tagsVal,
-      ...(body.followUpAt !== undefined && { followUpAt: body.followUpAt }),
-      ...(body.lastContactedAt !== undefined && { lastContactedAt: body.lastContactedAt }),
-      ...(body.sourceLabel !== undefined && { sourceLabel: body.sourceLabel }),
-      ...(typeChanged && { stageChangedAt: new Date().toISOString() }),
-      updatedAt: new Date().toISOString(),
-    })
+    .update(updates)
     .eq('id', id)
     .select()
     .single();

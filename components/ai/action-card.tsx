@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Check, X, Loader2, Users, Briefcase } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Check, X, Loader2, Users, Briefcase, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface CRMAction {
@@ -17,7 +17,15 @@ interface ActionCardProps {
 }
 
 export function ActionCard({ action, onApprove }: ActionCardProps) {
-  const [status, setStatus] = useState<'pending' | 'loading' | 'approved' | 'rejected'>('pending');
+  const [status, setStatus] = useState<'pending' | 'loading' | 'approved' | 'rejected' | 'error'>('pending');
+
+  // Auto-clear error after 3 seconds so user can retry
+  useEffect(() => {
+    if (status === 'error') {
+      const t = setTimeout(() => setStatus('pending'), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [status]);
 
   const isContact = action.type === 'update_contact';
   const Icon = isContact ? Users : Briefcase;
@@ -25,8 +33,12 @@ export function ActionCard({ action, onApprove }: ActionCardProps) {
 
   async function handleApprove() {
     setStatus('loading');
-    const ok = await onApprove(action);
-    setStatus(ok ? 'approved' : 'pending');
+    try {
+      const ok = await onApprove(action);
+      setStatus(ok ? 'approved' : 'error');
+    } catch {
+      setStatus('error');
+    }
   }
 
   const changeEntries = Object.entries(action.changes);
@@ -36,6 +48,7 @@ export function ActionCard({ action, onApprove }: ActionCardProps) {
       'my-2 rounded-xl border text-sm overflow-hidden',
       status === 'approved' ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/20' :
       status === 'rejected' ? 'border-border bg-muted/30 opacity-60' :
+      status === 'error' ? 'border-red-300 dark:border-red-700 bg-red-50/50 dark:bg-red-900/20' :
       'border-border bg-background'
     )}>
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border/60 bg-muted/30">
@@ -82,6 +95,13 @@ export function ActionCard({ action, onApprove }: ActionCardProps) {
         <div className="flex items-center gap-2 px-3 py-2 border-t border-border/60 text-xs text-muted-foreground">
           <Loader2 size={12} className="animate-spin" />
           Applying changes...
+        </div>
+      )}
+
+      {status === 'error' && (
+        <div className="flex items-center gap-2 px-3 py-2 border-t border-border/60 text-xs text-red-600 dark:text-red-400">
+          <AlertCircle size={12} />
+          Failed to apply — retrying in a moment...
         </div>
       )}
     </div>
