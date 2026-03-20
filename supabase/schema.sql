@@ -85,6 +85,13 @@ CREATE TABLE IF NOT EXISTS "Contact" (
   "scoringStatus" text NOT NULL DEFAULT 'pending',
   "scoreDetails"  jsonb,
   "applicationData" jsonb,
+  "followUpAt"    timestamptz,
+  "lastContactedAt" timestamptz,
+  "sourceLabel"   text,
+  "stageChangedAt" timestamptz,
+  "applicationRef" text,
+  "applicationStatus" text,
+  "applicationStatusNote" text,
   "createdAt"     timestamptz NOT NULL DEFAULT now(),
   "updatedAt"     timestamptz NOT NULL DEFAULT now()
 );
@@ -197,6 +204,8 @@ CREATE TABLE IF NOT EXISTS "Tour" (
   status          text NOT NULL DEFAULT 'scheduled'
                     CHECK (status IN ('scheduled', 'confirmed', 'completed', 'cancelled', 'no_show')),
   "googleEventId" text,
+  "manageToken"   text,
+  "propertyProfileId" text,
   "createdAt"     timestamptz NOT NULL DEFAULT now(),
   "updatedAt"     timestamptz NOT NULL DEFAULT now()
 );
@@ -204,6 +213,8 @@ CREATE TABLE IF NOT EXISTS "Tour" (
 CREATE INDEX IF NOT EXISTS idx_tour_space_starts ON "Tour" ("spaceId", "startsAt" DESC);
 CREATE INDEX IF NOT EXISTS idx_tour_contact      ON "Tour" ("contactId");
 CREATE INDEX IF NOT EXISTS idx_tour_status       ON "Tour" (status);
+CREATE INDEX IF NOT EXISTS idx_tour_manage_token ON "Tour" ("manageToken");
+CREATE INDEX IF NOT EXISTS idx_tour_property_profile ON "Tour" ("propertyProfileId");
 
 -- Google Calendar OAuth tokens
 CREATE TABLE IF NOT EXISTS "GoogleCalendarToken" (
@@ -444,3 +455,17 @@ BEGIN
   LIMIT match_count;
 END;
 $$;
+
+-- Deferred foreign key: Tour.propertyProfileId -> TourPropertyProfile
+-- (Tour is created before TourPropertyProfile so we add the constraint separately)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_tour_property_profile') THEN
+    ALTER TABLE "Tour"
+      ADD CONSTRAINT fk_tour_property_profile
+      FOREIGN KEY ("propertyProfileId") REFERENCES "TourPropertyProfile"(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+-- Additional indexes for search performance
+CREATE INDEX IF NOT EXISTS idx_contact_email ON "Contact"(email);
+CREATE INDEX IF NOT EXISTS idx_contact_phone ON "Contact"(phone);

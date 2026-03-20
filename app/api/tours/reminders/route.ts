@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const secret = req.headers.get('x-cron-secret') || req.nextUrl.searchParams.get('secret');
   const expectedSecret = process.env.CRON_SECRET;
 
-  if (expectedSecret && secret !== expectedSecret) {
+  if (!expectedSecret || secret !== expectedSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
