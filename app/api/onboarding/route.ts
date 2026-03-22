@@ -275,43 +275,36 @@ export async function POST(req: NextRequest) {
       let newSpace: Space;
       try {
         const spaceId = crypto.randomUUID();
-        const { data: createdSpace, error: createError } = await supabase
-          .from('Space')
-          .insert({
-            id: spaceId,
-            slug: sanitized,
-            name: businessName || sanitized,
-            emoji: '\u{1F3E0}',
-            ownerId: user.id,
-          })
-          .select()
-          .single();
-        if (createError) throw createError;
-        newSpace = createdSpace as Space;
-
-        const { error: settingsInsertError } = await supabase
-          .from('SpaceSetting')
-          .insert({
-            id: crypto.randomUUID(),
-            spaceId: spaceId,
-            intakePageTitle: intakePageTitle || 'Rental Application',
-            intakePageIntro: intakePageIntro || "Share a few details so I can review your rental fit faster.",
-            businessName,
-            phoneNumber: null,
-          });
-        if (settingsInsertError) throw settingsInsertError;
-
-        const stageRows = DEFAULT_STAGES.map((stage) => ({
+        const settingsId = crypto.randomUUID();
+        const stagesJson = DEFAULT_STAGES.map((stage) => ({
           id: crypto.randomUUID(),
-          spaceId: spaceId,
           name: stage.name,
           color: stage.color,
           position: stage.position,
         }));
-        const { error: stagesError } = await supabase
-          .from('DealStage')
-          .insert(stageRows);
-        if (stagesError) throw stagesError;
+
+        // Atomic creation: space + settings + default stages in one transaction
+        const { error: rpcError } = await supabase.rpc('create_space_with_defaults', {
+          p_space_id: spaceId,
+          p_slug: sanitized,
+          p_name: businessName || sanitized,
+          p_emoji: '\u{1F3E0}',
+          p_owner_id: user.id,
+          p_settings_id: settingsId,
+          p_intake_title: intakePageTitle || 'Rental Application',
+          p_intake_intro: intakePageIntro || "Share a few details so I can review your rental fit faster.",
+          p_business_name: businessName || '',
+          p_stages: JSON.stringify(stagesJson),
+        });
+        if (rpcError) throw rpcError;
+
+        const { data: createdSpace, error: fetchError } = await supabase
+          .from('Space')
+          .select('*')
+          .eq('id', spaceId)
+          .single();
+        if (fetchError) throw fetchError;
+        newSpace = createdSpace as Space;
       } catch {
         const { data: ownerSpace, error: ownerSpaceError } = await supabase
           .from('Space')

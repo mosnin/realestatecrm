@@ -47,29 +47,27 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (existing) return NextResponse.json({ error: 'You already own a brokerage' }, { status: 409 });
 
-  // Create brokerage
-  const { data: brokerage, error: createErr } = await supabase
-    .from('Brokerage')
-    .insert({ name: trimmedName, ownerId: user.id })
-    .select()
-    .single();
-  if (createErr || !brokerage) {
-    console.error('[broker/create] insert failed', createErr);
+  // Atomic creation: brokerage + owner membership in one transaction
+  const { data: brokerageId, error: rpcError } = await supabase.rpc('create_brokerage_with_owner', {
+    p_name: trimmedName,
+    p_owner_id: user.id,
+  });
+  if (rpcError || !brokerageId) {
+    console.error('[broker/create] rpc failed', rpcError);
     return NextResponse.json({ error: 'Failed to create brokerage' }, { status: 500 });
   }
 
-  // Auto-create broker_owner membership
-  const { error: memberErr } = await supabase
-    .from('BrokerageMembership')
-    .insert({ brokerageId: brokerage.id, userId: user.id, role: 'broker_owner' });
-  if (memberErr) {
-    console.error('[broker/create] membership insert failed', memberErr);
-    // Rollback: delete the brokerage so the user can try again
-    await supabase.from('Brokerage').delete().eq('id', brokerage.id);
-    return NextResponse.json({ error: 'Failed to create brokerage membership. Please try again.' }, { status: 500 });
+  const { data: brokerage, error: fetchErr } = await supabase
+    .from('Brokerage')
+    .select('*')
+    .eq('id', brokerageId)
+    .single();
+  if (fetchErr) {
+    console.error('[broker/create] fetch failed', fetchErr);
+    return NextResponse.json({ error: 'Brokerage created but failed to fetch details' }, { status: 500 });
   }
 
-  void audit({ actorClerkId: clerkId, action: 'CREATE', resource: 'Brokerage', resourceId: brokerage.id, metadata: { name: trimmedName } });
+  void audit({ actorClerkId: clerkId, action: 'CREATE', resource: 'Brokerage', resourceId: brokerageId, metadata: { name: trimmedName } });
 
   return NextResponse.json({ brokerage }, { status: 201 });
 }

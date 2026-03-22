@@ -39,19 +39,6 @@ export async function POST(req: NextRequest) {
 
   const end = new Date(start.getTime() + duration * 60 * 1000);
 
-  // Check for double booking
-  const { data: conflicts } = await supabase
-    .from('Tour')
-    .select('id')
-    .eq('spaceId', space.id)
-    .in('status', ['scheduled', 'confirmed'])
-    .lt('startsAt', end.toISOString())
-    .gt('endsAt', start.toISOString());
-
-  if (conflicts && conflicts.length > 0) {
-    return NextResponse.json({ error: 'This time slot is no longer available' }, { status: 409 });
-  }
-
   // Try to match to existing contact by email, or create one
   let contactId: string | null = null;
   const { data: contactRow } = await supabase
@@ -95,45 +82,37 @@ export async function POST(req: NextRequest) {
   // Generate a unique manage token for guest self-service
   const manageToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 16);
 
-  // Atomic insert — re-check for conflicts after insert and rollback if found.
-  // This closes the race window between the conflict check above and the insert.
+  // Atomic booking via DB function — conflict check + insert in a single
+  // transaction with row-level locking to prevent double-booking.
   const tourId = crypto.randomUUID();
-  const { data: tour, error } = await supabase
-    .from('Tour')
-    .insert({
-      id: tourId,
-      spaceId: space.id,
-      contactId,
-      guestName: guestName.trim(),
-      guestEmail: guestEmail.trim().toLowerCase(),
-      guestPhone: guestPhone?.trim() || null,
-      propertyAddress: propertyAddress?.trim() || null,
-      notes: notes?.trim() || null,
-      startsAt: start.toISOString(),
-      endsAt: end.toISOString(),
-      propertyProfileId: propertyProfileId || null,
-      manageToken,
-    })
-    .select()
-    .single();
-  if (error) throw error;
+  const { data: bookedId, error: rpcError } = await supabase.rpc('book_tour_atomic', {
+    p_id: tourId,
+    p_space_id: space.id,
+    p_contact_id: contactId,
+    p_guest_name: guestName.trim(),
+    p_guest_email: guestEmail.trim().toLowerCase(),
+    p_guest_phone: guestPhone?.trim() || null,
+    p_property_address: propertyAddress?.trim() || null,
+    p_notes: notes?.trim() || null,
+    p_starts_at: start.toISOString(),
+    p_ends_at: end.toISOString(),
+    p_property_profile_id: propertyProfileId || null,
+    p_manage_token: manageToken,
+  });
+  if (rpcError) throw rpcError;
 
-  // Post-insert conflict check: if another tour was inserted concurrently
-  // for the same slot, delete ours and return 409.
-  const { data: postConflicts } = await supabase
-    .from('Tour')
-    .select('id')
-    .eq('spaceId', space.id)
-    .in('status', ['scheduled', 'confirmed'])
-    .lt('startsAt', end.toISOString())
-    .gt('endsAt', start.toISOString())
-    .neq('id', tourId);
-
-  if (postConflicts && postConflicts.length > 0) {
-    // Rollback: delete the tour we just created
-    await supabase.from('Tour').delete().eq('id', tourId);
-    return NextResponse.json({ error: 'This time slot was just booked. Please choose another.' }, { status: 409 });
+  // NULL return means a conflicting tour was found
+  if (!bookedId) {
+    return NextResponse.json({ error: 'This time slot is no longer available' }, { status: 409 });
   }
+
+  // Fetch the created tour for the response
+  const { data: tour, error: fetchError } = await supabase
+    .from('Tour')
+    .select('*')
+    .eq('id', tourId)
+    .single();
+  if (fetchError) throw fetchError;
 
   // Send confirmation email (non-blocking)
   const { data: settingsFull } = await supabase

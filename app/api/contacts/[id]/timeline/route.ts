@@ -18,11 +18,12 @@ export async function GET(
   const { userId } = authResult;
   const { id: contactId } = await params;
 
-  // Verify contact belongs to this user's space
-  const { data: contact } = await supabase.from('Contact').select('spaceId').eq('id', contactId).maybeSingle();
-  if (!contact) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  // Get space first, then query contact scoped to that space to prevent
+  // cross-tenant information disclosure.
   const space = await getSpaceForUser(userId);
-  if (!space || contact.spaceId !== space.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const { data: contact } = await supabase.from('Contact').select('spaceId').eq('id', contactId).eq('spaceId', space.id).maybeSingle();
+  if (!contact) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const events: Array<{
     id: string;

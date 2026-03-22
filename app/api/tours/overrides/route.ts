@@ -19,7 +19,11 @@ export async function GET(req: NextRequest) {
     .order('date', { ascending: true });
 
   // Filter by property or show global-only
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (propertyId) {
+    if (!UUID_RE.test(propertyId)) {
+      return NextResponse.json({ error: 'Invalid propertyId' }, { status: 400 });
+    }
     query = query.or(`propertyProfileId.eq.${propertyId},propertyProfileId.is.null`);
   } else {
     query = query.is('propertyProfileId', null);

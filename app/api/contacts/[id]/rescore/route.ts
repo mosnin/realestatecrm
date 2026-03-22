@@ -15,19 +15,20 @@ export async function POST(
 
   const { id } = await params;
 
+  // Get space first, then query contact scoped to that space to prevent
+  // cross-tenant information disclosure.
+  const space = await getSpaceForUser(userId);
+  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const { data: rows, error: fetchError } = await supabase
     .from('Contact')
     .select('*')
-    .eq('id', id);
+    .eq('id', id)
+    .eq('spaceId', space.id);
   if (fetchError) throw fetchError;
   if (!rows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const contact = rows[0] as Contact;
-
-  const space = await getSpaceForUser(userId);
-  if (!space || contact.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   // Mark as pending while scoring
   await supabase

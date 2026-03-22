@@ -36,21 +36,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'File type not supported' }, { status: 400 });
   }
 
-  // Verify access if not a guest upload
-  if (uploadedBy !== 'guest') {
+  // Verify access — guest uploads are restricted to recently-created public
+  // intake contacts to prevent arbitrary file uploads to any contact.
+  let resolvedSpaceId: string;
+  if (uploadedBy === 'guest') {
+    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const { data: guestContact } = await supabase
+      .from('Contact')
+      .select('spaceId')
+      .eq('id', contactId)
+      .contains('tags', ['application-link'])
+      .gte('createdAt', thirtyMinAgo)
+      .maybeSingle();
+    if (!guestContact) {
+      return NextResponse.json({ error: 'Contact not found or upload window expired' }, { status: 404 });
+    }
+    resolvedSpaceId = guestContact.spaceId;
+  } else {
     const auth = await requireContactAccess(contactId);
     if (auth instanceof NextResponse) return auth;
-  }
 
-  // Get spaceId from contact
-  const { data: contact } = await supabase
-    .from('Contact')
-    .select('spaceId')
-    .eq('id', contactId)
-    .single();
-
-  if (!contact) {
-    return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+    const { data: authedContact } = await supabase
+      .from('Contact')
+      .select('spaceId')
+      .eq('id', contactId)
+      .single();
+    if (!authedContact) {
+      return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+    }
+    resolvedSpaceId = authedContact.spaceId;
   }
 
   // Store file as base64 data URL (MVP approach — replace with S3 in production)
@@ -62,7 +76,7 @@ export async function POST(req: NextRequest) {
     .from('ContactDocument')
     .insert({
       contactId,
-      spaceId: contact.spaceId,
+      spaceId: resolvedSpaceId,
       fileName: file.name,
       fileType: file.type,
       fileSize: file.size,

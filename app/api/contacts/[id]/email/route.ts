@@ -14,21 +14,22 @@ export async function POST(
 
   const { id } = await params;
 
+  // Get space first, then query contact scoped to that space to prevent
+  // cross-tenant information disclosure.
+  const space = await getSpaceForUser(userId);
+  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const { data: contactRows, error: contactError } = await supabase
     .from('Contact')
     .select('spaceId, name, email')
     .eq('id', id)
+    .eq('spaceId', space.id)
     .limit(1);
   if (contactError) throw contactError;
   if (!contactRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const contact = contactRows[0];
   if (!contact.email) return NextResponse.json({ error: 'Contact has no email' }, { status: 400 });
-
-  const space = await getSpaceForUser(userId);
-  if (!space || contact.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   // Get the user's email to use as reply-to
   const { data: userRows } = await supabase
