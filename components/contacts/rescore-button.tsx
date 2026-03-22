@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Sparkles, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface Props {
   contactId: string;
@@ -22,10 +23,12 @@ export function RescoreButton({ contactId, onComplete }: Props) {
       if (res.ok) {
         const data = await res.json();
         setDone(true);
+        toast.success('Lead re-scored');
         onComplete?.(data);
         // Refresh the page after a moment so the new score renders
         setTimeout(() => window.location.reload(), 800);
       } else {
+        toast.error('Scoring failed — try again');
         setError('Re-score failed. Please try again.');
       }
     } catch {

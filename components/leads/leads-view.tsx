@@ -205,14 +205,26 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
   }
 
   const patchLead = useCallback(async (id: string, patch: Record<string, unknown>) => {
-    const res = await fetch(`/api/contacts/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    });
-    if (!res.ok) return;
-    const updated = await res.json();
-    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...updated } : l)));
+    try {
+      const res = await fetch(`/api/contacts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) {
+        toast.error('Failed to update lead');
+        return;
+      }
+      const updated = await res.json();
+      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...updated } : l)));
+      if ('followUpAt' in patch) {
+        toast.success(patch.followUpAt ? 'Follow-up date set' : 'Follow-up date cleared');
+      } else if ('lastContactedAt' in patch) {
+        toast.success('Marked as contacted');
+      }
+    } catch {
+      toast.error('Failed to update lead');
+    }
   }, []);
 
   function toggleSelect(id: string) {
@@ -255,6 +267,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
   }
 
   function exportLeadsCSV(items: Contact[]) {
+    toast.success('Leads exported');
     downloadCSV('leads.csv', items.map((l) => {
       const app = l.applicationData as ApplicationData | null;
       return {
