@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -36,7 +37,10 @@ export function ConvertLeadDialog({
       // Sending only { tags } would wipe every other field to null because
       // the PATCH handler does a full-row update.
       const getRes = await fetch(`/api/contacts/${leadId}`);
-      if (!getRes.ok) return;
+      if (!getRes.ok) {
+        toast.error('Failed to load contact data');
+        return;
+      }
       const contact = await getRes.json();
 
       const newTags = (contact.tags ?? currentTags).filter(
@@ -60,9 +64,14 @@ export function ConvertLeadDialog({
         }),
       });
       if (res.ok) {
+        toast.success('Lead converted to client');
         onConverted(leadId);
         onOpenChange(false);
+      } else {
+        toast.error('Failed to convert lead');
       }
+    } catch {
+      toast.error('Failed to convert lead');
     } finally {
       setLoading(false);
     }

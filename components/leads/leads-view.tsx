@@ -248,12 +248,19 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
     const ids = [...selectedIds];
     if (!confirm(`Delete ${ids.length} lead${ids.length !== 1 ? 's' : ''}?`)) return;
     try {
-      await Promise.all(ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })));
-      toast.success(`Deleted ${ids.length} leads`);
+      const results = await Promise.all(ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })));
+      const failed = results.filter((r) => !r.ok).length;
+      if (failed > 0) {
+        toast.error(`Failed to delete ${failed} of ${ids.length} leads`);
+      } else {
+        toast.success(`Deleted ${ids.length} leads`);
+      }
+      // Only remove successfully deleted leads from UI
+      const successIds = ids.filter((_, i) => results[i].ok);
+      setLeads((prev) => prev.filter((l) => !successIds.includes(l.id)));
     } catch {
       toast.error('Failed to delete leads');
     }
-    setLeads((prev) => prev.filter((l) => !ids.includes(l.id)));
     setSelectedIds(new Set());
   }
 
