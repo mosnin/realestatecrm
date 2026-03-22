@@ -75,7 +75,7 @@ export function TourPrepCard({ tourId }: TourPrepCardProps) {
       </button>
 
       {expanded && prep && (
-        <div className="absolute right-0 top-full mt-2 z-30 w-80 sm:w-96 rounded-xl border border-border bg-card shadow-xl overflow-hidden">
+        <div className="absolute right-0 top-full mt-2 z-30 w-80 sm:w-96 rounded-lg border border-border bg-card shadow-xl overflow-hidden">
           {/* Header */}
           <div className="px-4 py-3 bg-primary/5 border-b border-border">
             <div className="flex items-center gap-2 text-xs font-semibold text-primary">

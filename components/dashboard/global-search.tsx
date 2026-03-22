@@ -126,7 +126,7 @@ export function GlobalSearch({ slug }: Props) {
       onClick={() => setOpen(false)}
     >
       <div
-        className="relative w-full max-w-lg mx-4 rounded-2xl border border-border bg-card shadow-2xl overflow-hidden"
+        className="relative w-full max-w-lg mx-4 rounded-lg border border-border bg-card shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Input */}

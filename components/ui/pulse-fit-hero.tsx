@@ -103,7 +103,7 @@ export function PulseFitHero({
         {ctaButton && (
           <button
             onClick={ctaButton.onClick}
-            className="rainbow-outline-btn px-5 py-2.5 rounded-full border border-border bg-background text-foreground text-sm font-semibold hover:bg-muted transition-colors"
+            className="px-5 py-2.5 rounded-full border border-border bg-background text-foreground text-sm font-semibold hover:bg-muted transition-colors"
           >
             {ctaButton.label}
           </button>

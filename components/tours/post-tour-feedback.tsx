@@ -45,7 +45,7 @@ export function PostTourFeedback({ token, guestName, businessName }: PostTourFee
 
   if (submitted) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-6 text-center space-y-3">
+      <div className="rounded-lg border border-border bg-card p-6 text-center space-y-3">
         <CheckCircle2 size={32} className="mx-auto text-emerald-500" />
         <h3 className="text-lg font-semibold">Thank you, {guestName}!</h3>
         <p className="text-sm text-muted-foreground">Your feedback helps {businessName} improve.</p>
@@ -54,7 +54,7 @@ export function PostTourFeedback({ token, guestName, businessName }: PostTourFee
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+    <div className="rounded-lg border border-border bg-card p-6 space-y-4">
       <div className="text-center space-y-1">
         <h3 className="text-lg font-semibold">How was your tour?</h3>
         <p className="text-sm text-muted-foreground">Rate your experience with {businessName}</p>

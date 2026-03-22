@@ -79,7 +79,7 @@ function SectionBlock({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="px-6 py-4 border-b border-border bg-muted/20">
         <p className="font-semibold text-sm">{title}</p>
         {description && (
@@ -170,7 +170,7 @@ export function BillingPage({
     <div className="space-y-5 max-w-2xl">
 
       {/* ── Stripe-not-live banner ── */}
-      <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/40 px-4 py-3.5">
+      <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/40 px-4 py-3.5">
         <Lock size={15} className="text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
         <div className="min-w-0">
           <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
@@ -218,7 +218,7 @@ export function BillingPage({
           </div>
 
           {/* Plan icon */}
-          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
             <Zap size={22} className="text-primary" />
           </div>
         </div>

@@ -85,7 +85,7 @@ export function MessageBubble({ role, content, onAction }: MessageBubbleProps) {
   if (isUser) {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap bg-primary text-primary-foreground rounded-br-sm">
+        <div className="max-w-[85%] rounded-lg px-4 py-3 text-sm whitespace-pre-wrap bg-primary text-primary-foreground rounded-br-sm">
           {content}
         </div>
       </div>
@@ -98,7 +98,7 @@ export function MessageBubble({ role, content, onAction }: MessageBubbleProps) {
   if (!hasActions) {
     return (
       <div className="flex justify-start">
-        <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap bg-muted text-foreground rounded-bl-sm">
+        <div className="max-w-[85%] rounded-lg px-4 py-3 text-sm whitespace-pre-wrap bg-muted text-foreground rounded-bl-sm">
           {renderMarkdown(content)}
         </div>
       </div>
@@ -111,7 +111,7 @@ export function MessageBubble({ role, content, onAction }: MessageBubbleProps) {
         {parts.map((part, i) =>
           part.type === 'text' ? (
             part.value.trim() ? (
-              <div key={i} className="rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap bg-muted text-foreground rounded-bl-sm">
+              <div key={i} className="rounded-lg px-4 py-3 text-sm whitespace-pre-wrap bg-muted text-foreground rounded-bl-sm">
                 {renderMarkdown(part.value.trim())}
               </div>
             ) : null

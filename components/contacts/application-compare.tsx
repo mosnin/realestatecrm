@@ -70,7 +70,7 @@ export function ApplicationCompare({ slug, selectedIds, onClose }: ApplicationCo
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl max-h-[90vh] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col">
+      <div className="w-full max-w-4xl max-h-[90vh] rounded-lg border border-border bg-card shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2">

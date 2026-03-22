@@ -79,7 +79,7 @@ export function TourStatsStrip({ tours }: TourStatsStripProps) {
         return (
           <div
             key={item.label}
-            className="rounded-xl border border-border bg-card px-4 py-3 flex items-center gap-3"
+            className="rounded-lg border border-border bg-card px-4 py-3 flex items-center gap-3"
           >
             <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
               <Icon size={15} className={item.color} />

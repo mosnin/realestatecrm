@@ -45,7 +45,7 @@ export function ActionCard({ action, onApprove }: ActionCardProps) {
 
   return (
     <div className={cn(
-      'my-2 rounded-xl border text-sm overflow-hidden',
+      'my-2 rounded-lg border text-sm overflow-hidden',
       status === 'approved' ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/20' :
       status === 'rejected' ? 'border-border bg-muted/30 opacity-60' :
       status === 'error' ? 'border-red-300 dark:border-red-700 bg-red-50/50 dark:bg-red-900/20' :

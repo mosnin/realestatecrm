@@ -82,7 +82,7 @@ export function NotificationCenter({ slug }: { slug: string }) {
   const dropdown = open && mounted ? createPortal(
     <div className="fixed inset-0 z-[90]" onClick={() => setOpen(false)}>
       <div
-        className="absolute right-4 md:right-8 top-12 w-80 sm:w-96 rounded-xl border border-border bg-card shadow-2xl overflow-hidden"
+        className="absolute right-4 md:right-8 top-12 w-80 sm:w-96 rounded-lg border border-border bg-card shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">

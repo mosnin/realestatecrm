@@ -363,7 +363,7 @@ export function ChatInterface({
                 <button
                   key={suggestion}
                   onClick={() => handleSend(suggestion, [])}
-                  className="text-xs text-left p-3 rounded-xl border border-border/60 hover:bg-accent/50 hover:border-border transition-all"
+                  className="text-xs text-left p-3 rounded-lg border border-border/60 hover:bg-accent/50 hover:border-border transition-all"
                 >
                   {suggestion}
                 </button>
@@ -381,7 +381,7 @@ export function ChatInterface({
               )}
               {isStreaming && (!messages[messages.length - 1]?.content) && (
                 <div className="flex justify-start">
-                  <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3">
+                  <div className="bg-muted rounded-lg rounded-bl-sm px-4 py-3">
                     <div className="flex gap-1">
                       <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" />
                       <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce [animation-delay:0.15s]" />
@@ -399,7 +399,7 @@ export function ChatInterface({
       {/* Input — pinned bottom, centered */}
       <div className="flex-shrink-0 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-2 pb-4">
         {atLimit ? (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
             <div className="flex justify-center mb-2">
               <AlertCircle size={20} className="text-amber-600 dark:text-amber-400" />
             </div>

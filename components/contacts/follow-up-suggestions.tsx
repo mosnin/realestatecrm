@@ -104,7 +104,7 @@ export function FollowUpSuggestions(props: FollowUpSuggestionsProps) {
   }
 
   return (
-    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2.5">
+    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2.5">
       <div className="flex items-center gap-2 text-xs font-semibold text-primary">
         <Sparkles size={13} />
         Suggested follow-ups
