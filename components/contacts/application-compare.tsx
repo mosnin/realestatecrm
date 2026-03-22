@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, GitCompare, X, Star, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -52,13 +52,13 @@ export function ApplicationCompare({ slug, selectedIds, onClose }: ApplicationCo
   const [contacts, setContacts] = useState<CompareContact[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useState(() => {
+  useEffect(() => {
     fetch(`/api/applications/compare?slug=${slug}&ids=${selectedIds.join(',')}`)
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setContacts(data); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  });
+  }, [slug, selectedIds]);
 
   if (loading) {
     return (
