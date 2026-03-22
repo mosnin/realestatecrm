@@ -56,31 +56,50 @@ export default async function DealDetailPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  const { data: dealRow, error: dealError } = await supabase
-    .from('Deal')
-    .select('*')
-    .eq('id', id)
-    .eq('spaceId', space.id)
-    .maybeSingle();
+  let dealRow: any;
+  let stage: DealStage | null;
+  let dealContacts: any[];
+  let activities: DealActivity[];
 
-  if (dealError) throw dealError;
-  if (!dealRow) notFound();
+  try {
+    const { data: dealData, error: dealError } = await supabase
+      .from('Deal')
+      .select('*')
+      .eq('id', id)
+      .eq('spaceId', space.id)
+      .maybeSingle();
 
-  const [stageResult, dcResult, activityResult] = await Promise.all([
-    supabase.from('DealStage').select('*').eq('id', dealRow.stageId).maybeSingle(),
-    supabase.from('DealContact').select('dealId, contactId, Contact(id, name, type, email, phone)').eq('dealId', id),
-    supabase.from('DealActivity').select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(100),
-  ]);
+    if (dealError) throw dealError;
+    if (!dealData) notFound();
+    dealRow = dealData;
 
-  const stage = stageResult.data as DealStage | null;
-  const dealContacts = ((dcResult.data ?? []) as any[]).map((row) => ({
-    dealId: row.dealId,
-    contactId: row.contactId,
-    contact: row.Contact
-      ? { id: row.Contact.id, name: row.Contact.name, type: row.Contact.type, email: row.Contact.email ?? null, phone: row.Contact.phone ?? null }
-      : null,
-  }));
-  const activities = (activityResult.data ?? []) as DealActivity[];
+    const [stageResult, dcResult, activityResult] = await Promise.all([
+      supabase.from('DealStage').select('*').eq('id', dealRow.stageId).maybeSingle(),
+      supabase.from('DealContact').select('dealId, contactId, Contact(id, name, type, email, phone)').eq('dealId', id),
+      supabase.from('DealActivity').select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(100),
+    ]);
+
+    stage = stageResult.data as DealStage | null;
+    dealContacts = ((dcResult.data ?? []) as any[]).map((row) => ({
+      dealId: row.dealId,
+      contactId: row.contactId,
+      contact: row.Contact
+        ? { id: row.Contact.id, name: row.Contact.name, type: row.Contact.type, email: row.Contact.email ?? null, phone: row.Contact.phone ?? null }
+        : null,
+    }));
+    activities = (activityResult.data ?? []) as DealActivity[];
+  } catch (err) {
+    console.error('[deal-detail] DB queries failed', err);
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="text-center space-y-4 p-8">
+          <h1 className="text-xl font-semibold">Something went wrong</h1>
+          <p className="text-sm text-muted-foreground">We couldn&apos;t load your data. This is usually temporary.</p>
+          <a href={`/s/${slug}/deals/${id}`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Try again</a>
+        </div>
+      </div>
+    );
+  }
 
   const status = (dealRow.status ?? 'active') as keyof typeof STATUS_META;
   const priority = (dealRow.priority ?? 'MEDIUM') as keyof typeof PRIORITY_META;

@@ -16,49 +16,72 @@ export default async function ToursPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  // Fetch tours with linked deal info
-  const { data: toursRaw } = await supabase
-    .from('Tour')
-    .select('*, Contact(id, name, email, phone)')
-    .eq('spaceId', space.id)
-    .order('startsAt', { ascending: false })
-    .limit(200);
+  let tours: any[] = [];
+  let hasGoogleCalendar = false;
+  let propertyProfiles: any[] = [];
 
-  // Fetch deals that came from tours to show the link
-  const tourIds = (toursRaw ?? []).map((t: any) => t.id);
-  const { data: dealLinks } = tourIds.length
-    ? await supabase
-        .from('Deal')
-        .select('id, sourceTourId')
-        .in('sourceTourId', tourIds)
-    : { data: [] };
-  const dealByTour = new Map((dealLinks ?? []).map((d: any) => [d.sourceTourId, d.id]));
-  const tours = (toursRaw ?? []).map((t: any) => ({
-    ...t,
-    sourceDealId: dealByTour.get(t.id) ?? null,
-  }));
+  try {
+    // Fetch tours with linked deal info
+    const { data: toursRaw, error: toursError } = await supabase
+      .from('Tour')
+      .select('*, Contact(id, name, email, phone)')
+      .eq('spaceId', space.id)
+      .order('startsAt', { ascending: false })
+      .limit(200);
+    if (toursError) throw toursError;
 
-  // Check Google Calendar status
-  const { data: gcalToken } = await supabase
-    .from('GoogleCalendarToken')
-    .select('id')
-    .eq('spaceId', space.id)
-    .maybeSingle();
+    // Fetch deals that came from tours to show the link
+    const tourIds = (toursRaw ?? []).map((t: any) => t.id);
+    const { data: dealLinks, error: dealLinksError } = tourIds.length
+      ? await supabase
+          .from('Deal')
+          .select('id, sourceTourId')
+          .in('sourceTourId', tourIds)
+      : { data: [] as any[], error: null };
+    if (dealLinksError) throw dealLinksError;
+    const dealByTour = new Map((dealLinks ?? []).map((d: any) => [d.sourceTourId, d.id]));
+    tours = (toursRaw ?? []).map((t: any) => ({
+      ...t,
+      sourceDealId: dealByTour.get(t.id) ?? null,
+    }));
 
-  // Fetch property profiles
-  const { data: propertyProfiles } = await supabase
-    .from('TourPropertyProfile')
-    .select('id, name, address, tourDuration, isActive')
-    .eq('spaceId', space.id)
-    .order('createdAt', { ascending: true });
+    // Check Google Calendar status
+    const { data: gcalToken, error: gcalError } = await supabase
+      .from('GoogleCalendarToken')
+      .select('id')
+      .eq('spaceId', space.id)
+      .maybeSingle();
+    if (gcalError) throw gcalError;
+    hasGoogleCalendar = !!gcalToken;
+
+    // Fetch property profiles
+    const { data: profilesData, error: profilesError } = await supabase
+      .from('TourPropertyProfile')
+      .select('id, name, address, tourDuration, isActive')
+      .eq('spaceId', space.id)
+      .order('createdAt', { ascending: true });
+    if (profilesError) throw profilesError;
+    propertyProfiles = profilesData ?? [];
+  } catch (err) {
+    console.error('[tours] DB queries failed', err);
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="text-center space-y-4 p-8">
+          <h1 className="text-xl font-semibold">Something went wrong</h1>
+          <p className="text-sm text-muted-foreground">We couldn&apos;t load your data. This is usually temporary.</p>
+          <a href={`/s/${slug}/tours`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Try again</a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ToursClient
       slug={slug}
-      initialTours={tours ?? []}
-      hasGoogleCalendar={!!gcalToken}
+      initialTours={tours}
+      hasGoogleCalendar={hasGoogleCalendar}
       bookingUrl={`/book/${slug}`}
-      propertyProfiles={(propertyProfiles ?? []) as any}
+      propertyProfiles={propertyProfiles as any}
     />
   );
 }

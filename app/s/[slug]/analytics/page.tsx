@@ -1,4 +1,5 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard';
@@ -45,9 +46,15 @@ export default async function AnalyticsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const { userId } = await auth();
+  if (!userId) redirect('/sign-in');
+
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
+  let data: AnalyticsData;
+
+  try {
   // Fetch raw data — include applicationData & scoreDetails for qualification analytics
   const [contactsRes, dealsRes, stagesRes, toursRes] = await Promise.all([
     supabase
@@ -282,7 +289,7 @@ export default async function AnalyticsPage({
   const toursConvertedToDeals = deals.filter((d: any) => d.sourceTourId != null).length;
   const tourConversionRate = completedTours > 0 ? Math.round((toursConvertedToDeals / completedTours) * 100) : 0;
 
-  const data: AnalyticsData = {
+  data = {
     totalLeads: leads.length,
     totalContacts: contacts.length,
     totalDeals: deals.length,
@@ -311,6 +318,18 @@ export default async function AnalyticsPage({
     toursConvertedToDeals,
     tourConversionRate,
   };
+  } catch (err) {
+    console.error('[analytics] DB queries failed', err);
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="text-center space-y-4 p-8">
+          <h1 className="text-xl font-semibold">Something went wrong</h1>
+          <p className="text-sm text-muted-foreground">We couldn&apos;t load your data. This is usually temporary.</p>
+          <a href={`/s/${slug}/analytics`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Try again</a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

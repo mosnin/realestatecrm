@@ -1,4 +1,5 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ChatInterface } from '@/components/ai/chat-interface';
@@ -10,6 +11,9 @@ export default async function AIPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const { userId } = await auth();
+  if (!userId) redirect('/sign-in');
+
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
