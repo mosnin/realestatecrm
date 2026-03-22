@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -215,9 +216,11 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
         <span>{pct}%</span>
       </div>
       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-        <div
-          className="h-full bg-primary rounded-full transition-all duration-300 ease-out"
-          style={{ width: `${pct}%` }}
+        <motion.div
+          className="h-full bg-primary rounded-full"
+          initial={false}
+          animate={{ width: `${pct}%` }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         />
       </div>
     </div>
@@ -260,6 +263,7 @@ export function ApplicationForm({
   businessName: string;
 }) {
   const [step, setStep] = useState(1);
+  const [direction, setDirection] = useState(1); // 1 = forward, -1 = backward
   const [data, setData] = useState<FormData>(() => loadDraft(slug));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -341,15 +345,19 @@ export function ApplicationForm({
 
   function goNext() {
     if (!validateStep(step)) return;
-    // Jump to next visible step
     const nextSteps = STEPS.filter((s) => s.id > step);
-    if (nextSteps.length > 0) setStep(nextSteps[0].id);
+    if (nextSteps.length > 0) {
+      setDirection(1);
+      setStep(nextSteps[0].id);
+    }
   }
 
   function goBack() {
-    // Jump to previous visible step
     const prevSteps = STEPS.filter((s) => s.id < step);
-    if (prevSteps.length > 0) setStep(prevSteps[prevSteps.length - 1].id);
+    if (prevSteps.length > 0) {
+      setDirection(-1);
+      setStep(prevSteps[prevSteps.length - 1].id);
+    }
   }
 
   async function onSubmit() {
@@ -444,10 +452,20 @@ export function ApplicationForm({
   // ── Success screen ──
   if (submitted) {
     return (
-      <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-6 md:p-8 text-center space-y-5">
-        <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-6 md:p-8 text-center space-y-5"
+      >
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 15 }}
+          className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto"
+        >
           <CheckCircle2 size={28} className="text-green-600" />
-        </div>
+        </motion.div>
         <div className="space-y-1.5">
           <h2 className="text-xl font-semibold text-foreground">Application received</h2>
           <p className="text-sm text-muted-foreground">
@@ -485,7 +503,7 @@ export function ApplicationForm({
             <p className="text-sm text-foreground leading-relaxed">{scoreState.scoreSummary}</p>
           </div>
         )}
-      </div>
+      </motion.div>
     );
   }
 
@@ -768,7 +786,20 @@ export function ApplicationForm({
       </div>
 
       {/* Step content */}
-      <div className="px-5 py-6 md:px-7 md:py-7">{renderStep()}</div>
+      <div className="px-5 py-6 md:px-7 md:py-7 overflow-hidden">
+        <AnimatePresence mode="wait" initial={false} custom={direction}>
+          <motion.div
+            key={step}
+            custom={direction}
+            initial={{ x: direction * 60, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: direction * -60, opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+          >
+            {renderStep()}
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
       {/* Navigation */}
       <div className="px-5 pb-5 md:px-7 md:pb-7">
