@@ -185,7 +185,39 @@ const sanitized = escaped.replace(/[,()]/g, '');  // Remove PostgREST syntax cha
 
 ---
 
-## 7. Public endpoint security
+## 7. HTTP security headers
+
+Configured in `next.config.ts`:
+
+| Header | Value | Purpose |
+|--------|-------|---------|
+| `X-Frame-Options` | `SAMEORIGIN` | Clickjacking prevention |
+| `X-Content-Type-Options` | `nosniff` | MIME-sniffing prevention |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Referrer leakage reduction |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` | Feature isolation |
+| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` | HSTS (2 years) |
+
+**CSP**: Not yet implemented. Clerk's hosted components require a large allowlist (clerk.com, lcl.dev, Cloudflare Turnstile). Deferred until full domain list validated against live deployment.
+
+**CSRF**: Not needed — Clerk uses JWT auth (Authorization header), not session cookies. Not vulnerable to traditional CSRF.
+
+---
+
+## 8. Rate limiting
+
+Implementation in `lib/rate-limit.ts` using Upstash Redis sliding-window counters. **Fails open** (allows request) if Redis is unavailable.
+
+| Endpoint | Limit | Key |
+|----------|-------|-----|
+| `POST /api/public/apply` | 10/hr per IP | `apply:rl:{ip}` |
+| `POST /api/ai/chat` | 60/hr per user | User-based |
+| `POST /api/contacts/import` | 5/hr per user | User-based |
+| `POST /api/broker/invite` | 20/hr per user | User-based |
+| `POST /api/broker/join` | 10/hr per user | User-based |
+
+---
+
+## 9. Public endpoint security
 
 ### `/api/public/apply` (intake form)
 
@@ -193,7 +225,7 @@ const sanitized = escaped.replace(/[,()]/g, '');  // Remove PostgREST syntax cha
 - Validated with `publicApplicationSchema` (Zod)
 - Deduplication: same name + normalized phone within 2-minute window
 - Redis idempotency lock for concurrent submissions
-- Rate limiting recommended (not yet enforced server-side)
+- IP-based rate limiting: 10/hr (see section 8)
 
 ### `/api/public/tours/*` (tour booking)
 
@@ -210,26 +242,28 @@ const sanitized = escaped.replace(/[,()]/g, '');  // Remove PostgREST syntax cha
 
 ---
 
-## 8. File upload security
+## 10. File upload security
 
-### Current implementation
+### Current implementation (`app/api/documents/route.ts`)
 
-- `ContactDocument` table tracks uploaded files
-- Files stored via Supabase Storage with `storageKey` path
-- `uploadedBy` field tracks whether upload came from `'guest'` or authenticated user
-- File size tracked in `fileSize` column
+- **Size limit**: 10MB max
+- **MIME whitelist**: PDF, JPEG, PNG, WebP, DOC, DOCX only — executables, scripts, archives rejected
+- **Storage**: Base64 data URLs in `ContactDocument.storageKey` (MVP approach)
+- **Auth for uploads**: Authenticated users must pass `requireContactAccess()`
+- **Guest uploads**: Restricted to contacts with `application-link` tag created within last 30 minutes
+- `uploadedBy` tracks `'guest'` vs authenticated user
 
 ### Rules
 
 1. Validate file type server-side (don't trust `Content-Type` header alone)
-2. Enforce file size limits
+2. Enforce 10MB size limit
 3. Store files with generated keys, never user-provided filenames
 4. Scope storage paths by spaceId to prevent cross-tenant access
-5. Guest uploads must be associated with a valid space via slug
+5. Guest uploads must be associated with a valid, recent intake contact
 
 ---
 
-## 9. API key handling
+## 11. API key handling
 
 | Key | Storage | Access |
 |-----|---------|--------|
@@ -248,7 +282,7 @@ const sanitized = escaped.replace(/[,()]/g, '');  // Remove PostgREST syntax cha
 
 ---
 
-## 10. Common security mistakes to avoid
+## 12. Common security mistakes to avoid
 
 | Mistake | Impact | Prevention |
 |---------|--------|------------|
@@ -263,7 +297,7 @@ const sanitized = escaped.replace(/[,()]/g, '');  // Remove PostgREST syntax cha
 
 ---
 
-## 11. Audit logging
+## 13. Audit logging
 
 The `AuditLog` table provides append-only event tracking:
 
@@ -288,7 +322,7 @@ await audit({
 
 ---
 
-## 12. Security review checklist
+## 14. Security review checklist
 
 Run this after any change to auth, API routes, or data access:
 
