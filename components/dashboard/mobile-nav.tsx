@@ -34,7 +34,7 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
             href={base}
             className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors text-muted-foreground"
           >
-            <div className="w-9 h-6 rounded-full flex items-center justify-center transition-colors">
+            <div className="w-9 h-6 rounded-md flex items-center justify-center transition-colors">
               <Briefcase size={18} />
             </div>
             <span>CRM</span>
@@ -55,7 +55,7 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
             >
               <div
                 className={cn(
-                  'w-9 h-6 rounded-full flex items-center justify-center transition-colors',
+                  'w-9 h-6 rounded-md flex items-center justify-center transition-colors',
                   isActive ? 'bg-primary/10' : ''
                 )}
               >
@@ -87,7 +87,7 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
           >
             <div
               className={cn(
-                'w-9 h-6 rounded-full flex items-center justify-center transition-colors',
+                'w-9 h-6 rounded-md flex items-center justify-center transition-colors',
                 isActive ? 'bg-primary/10' : ''
               )}
             >

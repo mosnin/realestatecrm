@@ -168,19 +168,19 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
           </div>
           {/* Status badge row */}
           <div className="flex flex-wrap gap-2 mt-1">
-            <span className={cn('inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full', statusMeta.className)}>
+            <span className={cn('inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md', statusMeta.className)}>
               <statusMeta.icon size={11} />
               {statusMeta.label}
             </span>
             {deal.value != null && (
-              <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-full px-2 py-0.5">
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-md px-2 py-0.5">
                 <DollarSign size={10} />
                 {deal.value.toLocaleString()}
               </span>
             )}
             {followUpDate && (
               <span className={cn(
-                'inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-0.5',
+                'inline-flex items-center gap-1 text-xs font-semibold rounded-md px-2 py-0.5',
                 followUpOverdue
                   ? 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400'
                   : 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
@@ -226,7 +226,7 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
                       type="button"
                       onClick={() => handleStatusChange(key)}
                       className={cn(
-                        'inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border-2 transition-all',
+                        'inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md border-2 transition-all',
                         (deal.status ?? 'active') === key
                           ? `${meta.className} border-current`
                           : 'border-transparent bg-muted text-muted-foreground hover:bg-accent'
@@ -312,7 +312,7 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
           {tab === 'activity' && (
             <div className="space-y-4">
               {/* Add activity */}
-              <div className="rounded-xl border border-border p-3 space-y-2.5">
+              <div className="rounded-lg border border-border p-3 space-y-2.5">
                 <div className="flex gap-2">
                   <Select value={activityType} onValueChange={setActivityType}>
                     <SelectTrigger className="w-36 h-8 text-xs">

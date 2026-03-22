@@ -105,7 +105,7 @@ function StatCard({
   sub?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card px-5 py-4">
+    <div className="rounded-lg border border-border bg-card px-5 py-4">
       <p className="text-xs text-muted-foreground font-medium">{label}</p>
       <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
       {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
@@ -146,7 +146,7 @@ function ChartSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <div className="rounded-lg border border-border bg-card p-5">
       <p className="font-semibold text-sm">{title}</p>
       {sub && <p className="text-xs text-muted-foreground mt-0.5 mb-4">{sub}</p>}
       {!sub && <div className="mb-4" />}
@@ -512,7 +512,7 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
           </div>
 
           {data.leadStateDistribution.length === 0 && data.employmentBreakdown.length === 0 && (
-            <div className="rounded-xl border border-border bg-card px-6 py-12 text-center">
+            <div className="rounded-lg border border-border bg-card px-6 py-12 text-center">
               <p className="text-sm text-muted-foreground">
                 Qualification data will appear here once leads submit applications with full details.
               </p>
@@ -614,7 +614,7 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                       </div>
                     )}
                     <div
-                      className="rounded-xl flex items-center justify-center text-white font-bold text-lg tabular-nums transition-all"
+                      className="rounded-lg flex items-center justify-center text-white font-bold text-lg tabular-nums transition-all"
                       style={{ backgroundColor: color, width: `${widthPct}%`, minWidth: 80, height: 64 }}
                     >
                       {stage.count}
