@@ -12,13 +12,16 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  // Get deals with stage
+  // Get deals with stage (paginated)
+  const limit = Math.min(Math.max(1, parseInt(req.nextUrl.searchParams.get('limit') ?? '200') || 200), 500);
+  const offset = Math.max(0, parseInt(req.nextUrl.searchParams.get('offset') ?? '0') || 0);
+
   const { data: dealRows, error: dealError } = await supabase
     .from('Deal')
     .select('*, DealStage(id, spaceId, name, color, position)')
     .eq('spaceId', space.id)
     .order('position', { ascending: true })
-    .limit(1000);
+    .range(offset, offset + limit - 1);
   if (dealError) throw dealError;
 
   const dealIds = dealRows.map((r: any) => r.id);
@@ -81,6 +84,11 @@ export async function POST(req: NextRequest) {
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
+
+  // Validate title length
+  if (!title || typeof title !== 'string' || title.trim().length === 0 || title.trim().length > 255) {
+    return NextResponse.json({ error: 'Title required (max 255 chars)' }, { status: 400 });
+  }
 
   // Verify the target stage belongs to this space (prevents cross-space stage injection)
   const { data: stageCheck, error: stageCheckErr } = await supabase

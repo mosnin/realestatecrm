@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const VALID_TYPES = new Set(['QUALIFICATION', 'TOUR', 'APPLICATION']);
 
@@ -26,7 +27,11 @@ export async function POST(req: NextRequest) {
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
-  const { space } = auth;
+  const { userId, space } = auth;
+
+  // Rate limit: max 5 imports per user per hour
+  const { allowed } = await checkRateLimit(`import:${userId}`, 5, 3600);
+  if (!allowed) return NextResponse.json({ error: 'Import rate limit exceeded. Try again later.' }, { status: 429 });
 
   const now = new Date().toISOString();
   const inserts = rows

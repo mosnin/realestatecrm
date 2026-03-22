@@ -116,3 +116,48 @@ BEGIN
   RETURN v_brokerage_id;
 END;
 $$ LANGUAGE plpgsql;
+
+-----------------------------------------------------------------------
+-- 4. Harden reorder_deal — verify deal and stage share the same space
+-----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION reorder_deal(
+  p_deal_id      text,
+  p_new_stage_id text,
+  p_new_position integer
+)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_deal_space_id UUID;
+  v_stage_space_id UUID;
+BEGIN
+  -- Verify deal exists and get its spaceId
+  SELECT "spaceId" INTO v_deal_space_id
+    FROM "Deal" WHERE id = p_deal_id;
+  IF v_deal_space_id IS NULL THEN
+    RAISE EXCEPTION 'Deal not found';
+  END IF;
+
+  -- Verify stage exists and belongs to the same space
+  SELECT "spaceId" INTO v_stage_space_id
+    FROM "DealStage" WHERE id = p_new_stage_id;
+  IF v_stage_space_id IS NULL OR v_stage_space_id != v_deal_space_id THEN
+    RAISE EXCEPTION 'Stage not found or belongs to different space';
+  END IF;
+
+  -- Shift deals at or after the target position up by one to make room
+  UPDATE "Deal"
+  SET position = position + 1
+  WHERE "stageId" = p_new_stage_id
+    AND position >= p_new_position
+    AND id != p_deal_id;
+
+  -- Place the deal at its new stage and position
+  UPDATE "Deal"
+  SET "stageId"   = p_new_stage_id,
+      position    = p_new_position,
+      "updatedAt" = now()
+  WHERE id = p_deal_id;
+END;
+$$;

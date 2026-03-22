@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 /**
  * POST — Submit tour feedback (from guest, token-based).
@@ -8,6 +9,15 @@ import { requireSpaceOwner } from '@/lib/api-auth';
  */
 export async function POST(req: NextRequest) {
   const { tourId, token, rating, comment } = await req.json();
+
+  if (!tourId && !token) {
+    return NextResponse.json({ error: 'tourId or token required' }, { status: 400 });
+  }
+
+  // Rate limit by tourId or token to prevent spam
+  const rlKey = `feedback:${token || tourId}`;
+  const { allowed } = await checkRateLimit(rlKey, 3, 3600);
+  if (!allowed) return NextResponse.json({ error: 'Too many attempts' }, { status: 429 });
 
   if (!rating || rating < 1 || rating > 5) {
     return NextResponse.json({ error: 'Rating must be 1-5' }, { status: 400 });
@@ -56,7 +66,7 @@ export async function POST(req: NextRequest) {
       tourId: tour.id,
       spaceId: tour.spaceId,
       rating: Math.round(rating),
-      comment: comment?.trim() || null,
+      comment: typeof comment === 'string' ? comment.trim().slice(0, 2000) || null : null,
     })
     .select()
     .single();

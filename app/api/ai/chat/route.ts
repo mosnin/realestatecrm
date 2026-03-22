@@ -3,12 +3,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { chatWithRAG } from '@/lib/ai';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { checkRateLimit } from '@/lib/rate-limit';
 import type { SpaceSetting } from '@/lib/types';
 
 export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Rate limit: 60 requests per user per hour
+    const { allowed } = await checkRateLimit(`ai:chat:${userId}`, 60, 3600);
+    if (!allowed) {
+      return NextResponse.json({ error: 'AI chat rate limit exceeded. Please wait before sending more messages.' }, { status: 429 });
+    }
 
     const { messages, slug, conversationId } = await req.json();
 

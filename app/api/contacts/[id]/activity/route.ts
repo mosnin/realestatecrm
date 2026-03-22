@@ -10,11 +10,15 @@ export async function GET(
   const auth = await requireContactAccess(id);
   if (auth instanceof NextResponse) return auth;
 
+  const limit = Math.min(Math.max(1, parseInt(_req.nextUrl.searchParams.get('limit') ?? '50') || 50), 200);
+  const offset = Math.max(0, parseInt(_req.nextUrl.searchParams.get('offset') ?? '0') || 0);
+
   const { data, error } = await supabase
     .from('ContactActivity')
     .select('*')
     .eq('contactId', id)
-    .order('createdAt', { ascending: false });
+    .order('createdAt', { ascending: false })
+    .range(offset, offset + limit - 1);
   if (error) throw error;
 
   return NextResponse.json(data ?? []);

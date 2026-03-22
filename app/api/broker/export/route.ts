@@ -37,13 +37,13 @@ export async function GET() {
   // Fetch stats
   const [leadRows, contactRows, dealRows] = await Promise.all([
     spaceIds.length > 0
-      ? supabase.from('Contact').select('spaceId').in('spaceId', spaceIds).contains('tags', ['new-lead']).then((r) => r.data ?? [])
+      ? supabase.from('Contact').select('spaceId').in('spaceId', spaceIds).contains('tags', ['new-lead']).limit(10000).then((r) => r.data ?? [])
       : Promise.resolve([]),
     spaceIds.length > 0
-      ? supabase.from('Contact').select('spaceId').in('spaceId', spaceIds).then((r) => r.data ?? [])
+      ? supabase.from('Contact').select('spaceId').in('spaceId', spaceIds).limit(10000).then((r) => r.data ?? [])
       : Promise.resolve([]),
     spaceIds.length > 0
-      ? supabase.from('Deal').select('spaceId, value, status').in('spaceId', spaceIds).then((r) => r.data ?? [])
+      ? supabase.from('Deal').select('spaceId, value, status').in('spaceId', spaceIds).limit(10000).then((r) => r.data ?? [])
       : Promise.resolve([]),
   ]);
 
