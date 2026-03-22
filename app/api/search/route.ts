@@ -15,8 +15,9 @@ export async function GET(req: NextRequest) {
 
   // Escape PostgreSQL ILIKE special characters before wrapping in wildcards
   const escaped = q.slice(0, 100).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
-  // Strip characters that break PostgREST filter syntax (commas, parens, dots in wrong places)
-  const sanitized = escaped.replace(/[,()]/g, '');
+  // Strip characters that break PostgREST filter syntax (commas, parens, colons, dots as operators)
+  const sanitized = escaped.replace(/[,()\.:;'"]/g, '');
+  if (!sanitized.trim()) return NextResponse.json({ contacts: [], deals: [] });
   const term = `%${sanitized}%`;
 
   try {
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
         .limit(8),
       supabase
         .from('Deal')
-        .select('id, title, address, value, status, stageId, DealStage(name, color)')
+        .select('id, title, address, value, status, stageId')
         .eq('spaceId', space.id)
         .or(`title.ilike.${term},address.ilike.${term}`)
         .limit(8),
@@ -54,18 +55,28 @@ export async function GET(req: NextRequest) {
       scoreLabel: c.scoreLabel ?? null,
     }));
 
-    const deals = (dealsResult.data ?? []).map((d: any) => {
-      const rawStage = d.DealStage;
-      const stage = Array.isArray(rawStage) ? rawStage[0] ?? null : rawStage ?? null;
-      return {
-        id: d.id,
-        title: d.title,
-        address: d.address ?? null,
-        value: d.value ?? null,
-        status: d.status ?? 'active',
-        stage: stage ? { name: stage.name, color: stage.color } : null,
-      };
-    });
+    // Fetch stage info separately to avoid PostgREST join + or() filter conflicts
+    const dealRows = dealsResult.data ?? [];
+    const stageIds = [...new Set(dealRows.map((d: any) => d.stageId).filter(Boolean))];
+    let stageMap: Record<string, { name: string; color: string }> = {};
+    if (stageIds.length > 0) {
+      const { data: stages } = await supabase
+        .from('DealStage')
+        .select('id, name, color')
+        .in('id', stageIds);
+      for (const s of stages ?? []) {
+        stageMap[s.id] = { name: s.name, color: s.color };
+      }
+    }
+
+    const deals = dealRows.map((d: any) => ({
+      id: d.id,
+      title: d.title,
+      address: d.address ?? null,
+      value: d.value ?? null,
+      status: d.status ?? 'active',
+      stage: stageMap[d.stageId] ?? null,
+    }));
 
     return NextResponse.json({ contacts, deals });
   } catch (err) {

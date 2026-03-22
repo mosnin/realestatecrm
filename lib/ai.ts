@@ -99,7 +99,7 @@ export async function chatWithRAG(
         sortedContacts
           .map(
             (c) =>
-              `- ${c.name} (${c.type})${priorityContactIds.has(c.id) ? ' ★' : ''} | Score: ${c.leadScore ?? 'N/A'} (${c.scoreLabel ?? 'unscored'}) | ${c.email ?? ''} | ${c.phone ?? ''} | Budget: ${c.budget != null ? `$${c.budget}` : 'N/A'} | ${c.address ?? ''} | Tags: ${(c.tags ?? []).join(', ')} | Notes: ${c.notes ?? ''}`
+              `- [ID:${c.id}] ${c.name} (${c.type})${priorityContactIds.has(c.id) ? ' ★' : ''} | Score: ${c.leadScore ?? 'N/A'} (${c.scoreLabel ?? 'unscored'}) | ${c.email ?? ''} | ${c.phone ?? ''} | Budget: ${c.budget != null ? `$${c.budget}` : 'N/A'} | ${c.address ?? ''} | Tags: ${(c.tags ?? []).join(', ')} | Notes: ${c.notes ?? ''}`
           )
           .join('\n')
     );
@@ -122,7 +122,7 @@ export async function chatWithRAG(
         sortedDeals
           .map(
             (d) =>
-              `- ${d.title}${priorityDealIds.has(d.id) ? ' ★' : ''} | Stage: ${d.DealStage?.name ?? 'N/A'} | Value: ${d.value != null ? `$${d.value}` : 'N/A'} | Priority: ${d.priority} | Address: ${d.address ?? ''} | Contacts: ${(contactsByDeal[d.id] ?? []).join(', ')}`
+              `- [ID:${d.id}] ${d.title}${priorityDealIds.has(d.id) ? ' ★' : ''} | Stage: ${d.DealStage?.name ?? 'N/A'} | Value: ${d.value != null ? `$${d.value}` : 'N/A'} | Priority: ${d.priority} | Address: ${d.address ?? ''} | Contacts: ${(contactsByDeal[d.id] ?? []).join(', ')}`
           )
           .join('\n')
     );
@@ -143,7 +143,7 @@ export async function chatWithRAG(
     `Editable deal fields: title, description, address, value (number), priority (LOW|MEDIUM|HIGH), status (active|won|lost|on_hold), closeDate (ISO date string).`,
     ``,
     `IMPORTANT RULES:`,
-    `- ALWAYS use the exact IDs from the CRM data. Never guess IDs.`,
+    `- Each contact and deal in the CRM data starts with [ID:xxx]. You MUST use these exact IDs in action blocks. Never guess or fabricate IDs.`,
     `- NEVER execute changes directly. Always propose them with <<ACTION>> blocks so the user can approve or reject.`,
     `- Include a brief natural language explanation before or after the action block so the user understands what you're proposing.`,
     `- You may include multiple <<ACTION>> blocks if the user asks to update several records.`,

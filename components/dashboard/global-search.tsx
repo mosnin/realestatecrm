@@ -77,14 +77,21 @@ export function GlobalSearch({ slug }: Props) {
 
   const search = useCallback(async (q: string) => {
     if (q.trim().length < 2) { setContacts([]); setDeals([]); setError(null); return; }
+    if (!slug) { setError('No workspace context'); return; }
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/search?slug=${slug}&q=${encodeURIComponent(q)}`);
+      const res = await fetch(`/api/search?slug=${encodeURIComponent(slug)}&q=${encodeURIComponent(q)}`);
       if (!res.ok) {
         const text = await res.text().catch(() => '');
         console.error('[GlobalSearch] API error:', res.status, text);
-        setError(`Search failed (${res.status})`);
+        if (res.status === 401) {
+          setError('Session expired — please refresh the page');
+        } else if (res.status === 403) {
+          setError('Access denied to this workspace');
+        } else {
+          setError(`Search failed (${res.status})`);
+        }
         return;
       }
       const data = await res.json();
@@ -93,7 +100,7 @@ export function GlobalSearch({ slug }: Props) {
       setCursor(0);
     } catch (err) {
       console.error('[GlobalSearch] fetch error:', err);
-      setError('Search unavailable');
+      setError('Search unavailable — check your connection');
     } finally {
       setLoading(false);
     }

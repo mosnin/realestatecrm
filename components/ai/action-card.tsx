@@ -19,10 +19,10 @@ interface ActionCardProps {
 export function ActionCard({ action, onApprove }: ActionCardProps) {
   const [status, setStatus] = useState<'pending' | 'loading' | 'approved' | 'rejected' | 'error'>('pending');
 
-  // Auto-clear error after 3 seconds so user can retry
+  // Auto-clear error after 5 seconds so user can retry
   useEffect(() => {
     if (status === 'error') {
-      const t = setTimeout(() => setStatus('pending'), 3000);
+      const t = setTimeout(() => setStatus('pending'), 5000);
       return () => clearTimeout(t);
     }
   }, [status]);
@@ -99,9 +99,11 @@ export function ActionCard({ action, onApprove }: ActionCardProps) {
       )}
 
       {status === 'error' && (
-        <div className="flex items-center gap-2 px-3 py-2 border-t border-border/60 text-xs text-red-600 dark:text-red-400">
-          <AlertCircle size={12} />
-          Failed to apply — retrying in a moment...
+        <div className="flex items-center justify-between px-3 py-2 border-t border-border/60 text-xs text-red-600 dark:text-red-400">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={12} />
+            Failed to apply changes. Click Approve to retry.
+          </div>
         </div>
       )}
     </div>
