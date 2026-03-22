@@ -166,11 +166,16 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
 
   async function handleEditDeal(data: any) {
     if (!editDeal) return;
-    await fetch(`/api/deals/${editDeal.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    try {
+      const res = await fetch(`/api/deals/${editDeal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) toast.error('Failed to update deal');
+    } catch {
+      toast.error('Failed to update deal');
+    }
     setEditDeal(null);
     fetchData();
   }
@@ -192,11 +197,16 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
   }
 
   async function handlePanelUpdate(id: string, updates: Partial<Deal>) {
-    await fetch(`/api/deals/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
-    });
+    try {
+      const res = await fetch(`/api/deals/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) toast.error('Failed to update deal');
+    } catch {
+      toast.error('Failed to update deal');
+    }
     fetchData();
     // Optimistically update panel deal
     setPanelDeal((prev) => prev && prev.id === id ? { ...prev, ...updates } : prev);

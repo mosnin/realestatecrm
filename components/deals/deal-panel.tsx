@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import {
   Sheet,
   SheetContent,
@@ -115,7 +116,11 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
       if (res.ok) {
         setActivityContent('');
         fetchActivities();
+      } else {
+        toast.error('Failed to post activity');
       }
+    } catch {
+      toast.error('Failed to post activity');
     } finally {
       setPostingActivity(false);
     }
