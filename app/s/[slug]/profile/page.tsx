@@ -17,8 +17,8 @@ import { CopyLinkButton } from '../copy-link-button';
 export default function ProfilePage() {
   const params = useParams<{ slug: string }>();
   const { user, isLoaded } = useUser();
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [firstName, setFirstName] = useState<string | null>(null);
+  const [lastName, setLastName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -39,8 +39,8 @@ export default function ProfilePage() {
     setSaving(true);
     try {
       await user!.update({
-        firstName: firstName || user!.firstName || undefined,
-        lastName: lastName || user!.lastName || undefined
+        firstName: firstName ?? user!.firstName ?? undefined,
+        lastName: lastName ?? user!.lastName ?? undefined,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);

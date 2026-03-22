@@ -43,13 +43,15 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
   const [myConnections, setMyConnections] = useState(settings?.myConnections ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [deleting, setDeleting] = useState(false);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setSaveError('');
     try {
-      await fetch(`/api/spaces`, {
+      const res = await fetch(`/api/spaces`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -60,9 +62,16 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
           myConnections,
         })
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setSaveError(data.error || 'Failed to save settings. Please try again.');
+        return;
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
       router.refresh();
+    } catch {
+      setSaveError('Network error. Please check your connection and try again.');
     } finally {
       setSaving(false);
     }
@@ -78,12 +87,19 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
 
     setDeleting(true);
     try {
-      await fetch(`/api/spaces`, {
+      const res = await fetch(`/api/spaces`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug: space.slug })
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to delete workspace. Please try again.');
+        return;
+      }
       router.push('/');
+    } catch {
+      alert('Network error. Please check your connection and try again.');
     } finally {
       setDeleting(false);
     }
@@ -144,11 +160,14 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
         </div>
       </SectionBlock>
 
-      <div className="flex items-center gap-3 pt-1">
-        <Button type="submit" disabled={saving}>
-          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save settings'}
-        </Button>
-        {saved && <p className="text-sm text-primary">Changes saved.</p>}
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center gap-3">
+          <Button type="submit" disabled={saving}>
+            {saving ? 'Saving...' : saved ? 'Saved!' : 'Save settings'}
+          </Button>
+          {saved && <p className="text-sm text-primary">Changes saved.</p>}
+        </div>
+        {saveError && <p className="text-sm text-destructive">{saveError}</p>}
       </div>
 
       {/* Danger zone */}

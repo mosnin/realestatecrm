@@ -6,6 +6,7 @@ import {
   Sparkles,
   User,
   Settings,
+  SlidersHorizontal,
   BarChart2,
   CreditCard,
   CalendarDays,
@@ -23,7 +24,8 @@ export const primaryNavItems = [
 
 export const secondaryNavItems = [
   { href: '/profile', label: 'Profile', icon: User },
-  { href: '/configure', label: 'Configure', icon: Settings },
+  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/configure', label: 'Configure', icon: SlidersHorizontal },
   { href: '/billing', label: 'Billing', icon: CreditCard },
 ] as const;
 
