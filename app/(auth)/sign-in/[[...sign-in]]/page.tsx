@@ -11,16 +11,15 @@ export default function SignInPage() {
       <div className="w-full space-y-4">
         <ThemedSignIn forceRedirectUrl="/dashboard" />
         <p className="text-center text-sm text-muted-foreground">
-          Are you a broker?{' '}
+          Don&apos;t have an account?{' '}
           <Link
-            href="/login/broker"
+            href="/sign-up"
             className="font-medium text-primary underline underline-offset-4 hover:text-primary/80 transition-colors"
           >
-            Brokerage login
+            Sign up
           </Link>
         </p>
       </div>
     </AuthPageLayout>
   );
 }
-
