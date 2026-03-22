@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -111,7 +112,13 @@ export function ContactForm({
       : [];
     const budget = data.budget ? parseFloat(data.budget) : undefined;
     const { tags: _rawTags, properties: _rawProperties, ...rest } = data;
-    await onSubmit({ ...rest, budget, properties, tags });
+    try {
+      await onSubmit({ ...rest, budget, properties, tags });
+      toast.success('Contact saved');
+    } catch {
+      toast.error('Failed to save contact');
+      return;
+    }
     reset();
     onOpenChange(false);
   }
