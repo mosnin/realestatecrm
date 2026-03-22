@@ -253,7 +253,8 @@ export function ChatInterface({
         body: JSON.stringify(action.changes),
       });
       if (!res.ok) {
-        console.error('[Chat] Action failed:', res.status);
+        const errorBody = await res.text().catch(() => '');
+        console.error('[Chat] Action failed:', res.status, errorBody);
         return false;
       }
       return true;
@@ -261,7 +262,7 @@ export function ChatInterface({
       console.error('[Chat] Action error:', err);
       return false;
     }
-  }, [slug]);
+  }, []);
 
   const atLimit = messages.length >= MESSAGE_LIMIT;
 
