@@ -1,0 +1,451 @@
+# API_CONTRACTS.md
+
+Request/response contracts for all Chippi API endpoints. Use this to prevent breaking changes when fixing bugs or adding features.
+
+**Rule**: If you change an endpoint's request or response shape, update this file and verify all callers.
+
+---
+
+## Auth patterns
+
+All protected routes use one of these auth helpers from `lib/api-auth.ts`:
+
+| Helper | Returns | Use when |
+|--------|---------|----------|
+| `requireAuth()` | `{ userId }` or `401` | Route needs auth but not space context |
+| `requireSpaceOwner(slug)` | `{ userId, space }` or `401/403/404` | Route operates on a specific workspace |
+| `requireContactAccess(contactId)` | `{ userId, space }` or `401/403/404` | Route operates on a specific contact |
+| `requireBroker()` | `{ brokerage, membership, dbUserId }` or throws | Broker dashboard routes |
+| `requirePlatformAdmin()` | `{ userId }` or throws | Admin routes |
+
+---
+
+## Core CRM endpoints
+
+### Contacts
+
+#### `GET /api/contacts?slug=X`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Query params**: `slug` (required), `search`, `type` (QUALIFICATION|TOUR|APPLICATION|ALL), `limit` (default 500, max 1000), `offset` (default 0)
+- **Response**: `200` — `Contact[]`
+- **Search**: ILIKE on name, email, phone, preferences (escaped)
+
+#### `POST /api/contacts`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Body**: `{ slug, name (required), email?, phone?, budget?, preferences?, properties?, address?, notes?, type?, tags? }`
+- **Validation**: name required (string, max 200 chars)
+- **Response**: `201` — `Contact`
+- **Side effect**: Async vector sync (`syncContact`)
+
+#### `GET /api/contacts/[id]?slug=X`
+- **Auth**: `requireSpaceOwner(slug)` + verify contact belongs to space
+- **Response**: `200` — `Contact`
+
+#### `PATCH /api/contacts/[id]`
+- **Auth**: `requireContactAccess(contactId)`
+- **Body**: Partial `Contact` fields
+- **Response**: `200` — updated `Contact`
+
+#### `DELETE /api/contacts/[id]`
+- **Auth**: `requireContactAccess(contactId)`
+- **Response**: `200` — `{ success: true }`
+
+#### `POST /api/contacts/[id]/rescore`
+- **Auth**: `requireContactAccess(contactId)`
+- **Response**: `200` — `LeadScoringResult`
+
+#### `GET /api/contacts/[id]/timeline`
+- **Auth**: `requireContactAccess(contactId)`
+- **Response**: `200` — Timeline events array
+
+#### `POST /api/contacts/[id]/email`
+- **Auth**: `requireContactAccess(contactId)`
+- **Body**: Email content
+- **Response**: `200` — Send result
+
+#### `GET /api/contacts/[id]/activity`
+- **Auth**: `requireContactAccess(contactId)`
+- **Response**: `200` — Activity log entries
+
+#### `POST /api/contacts/import`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Body**: CSV/bulk contact data
+- **Response**: `200` — Import result with counts
+
+### Deals
+
+#### `GET /api/deals?slug=X`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Query params**: `slug` (required), `limit` (default 200, max 500), `offset` (default 0)
+- **Response**: `200` — `Deal[]` with nested `DealStage` and `DealContact[]` with `Contact` names
+
+#### `POST /api/deals`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Body**: `{ slug, title (required), stageId (required), description?, value?, address?, priority?, contactIds? }`
+- **Response**: `201` — `Deal`
+- **Side effect**: Async vector sync, DealActivity log
+
+#### `PATCH /api/deals/[id]`
+- **Auth**: `requireAuth()` + verify deal belongs to user's space
+- **Body**: Partial `Deal` fields
+- **Response**: `200` — updated `Deal`
+- **Side effect**: DealActivity log for stage/status changes
+
+#### `DELETE /api/deals/[id]`
+- **Auth**: `requireAuth()` + verify deal belongs to user's space
+- **Response**: `200` — `{ success: true }`
+
+#### `POST /api/deals/reorder`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Body**: `{ slug, dealId, newStageId, newPosition }`
+- **Response**: `200` — `{ success: true }`
+- **Implementation**: Uses `reorder_deal` RPC (atomic with row locking)
+
+#### `GET /api/deals/[id]/activity`
+- **Auth**: `requireAuth()` + verify deal belongs to user's space
+- **Response**: `200` — `DealActivity[]`
+
+#### `POST /api/deals/[id]/activity`
+- **Auth**: `requireAuth()` + verify deal belongs to user's space
+- **Body**: `{ type, content?, metadata? }`
+- **Response**: `201` — `DealActivity`
+
+### Stages
+
+#### `GET /api/stages?slug=X`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Response**: `200` — `DealStage[]` ordered by position
+
+#### `POST /api/stages`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Body**: `{ slug, name (required), color?, position? }`
+- **Response**: `201` — `DealStage`
+
+#### `PATCH /api/stages/[id]`
+- **Auth**: `requireAuth()` + verify stage belongs to user's space
+- **Body**: Partial `DealStage` fields
+- **Response**: `200` — updated `DealStage`
+
+#### `DELETE /api/stages/[id]`
+- **Auth**: `requireAuth()` + verify stage belongs to user's space
+- **Response**: `200` — `{ success: true }`
+
+---
+
+## Public endpoints (no auth)
+
+### `POST /api/public/apply`
+- **Auth**: None (public)
+- **Rate limit**: 10 submissions / IP / hour (Redis-based, fail-open)
+- **Body**: Validated by `publicApplicationSchema` (Zod) — `{ slug, name, phone, email?, budget?, timeline?, preferredAreas?, notes?, moveInDate?, documents? }`
+- **Dedup**: Same name + normalized phone within 2-minute window → returns existing (200, not 201)
+- **Idempotency**: Redis lock on fingerprint
+- **Response**: `201` — `{ id, scoring: LeadScoringResult }` | `200` (duplicate)
+- **Side effects**: Creates Contact, triggers lead scoring, sends email notification
+
+### `POST /api/tours/book`
+- **Auth**: None (public)
+- **Body**: `{ spaceId, guestName, guestEmail, guestPhone?, propertyAddress?, notes?, startsAt, endsAt, propertyProfileId? }`
+- **Response**: `201` — `{ id, manageToken }` | `409` (conflict/double-booking)
+- **Implementation**: Uses `book_tour_atomic` RPC
+
+### `GET /api/tours/available?spaceId=X&date=Y`
+- **Auth**: None (public)
+- **Response**: `200` — Available time slots for the date
+
+### `GET /api/tours/manage?token=X`
+- **Auth**: Guest manage token
+- **Response**: `200` — Tour details for self-service management
+
+### `PATCH /api/tours/manage`
+- **Auth**: Guest manage token
+- **Body**: Reschedule or cancel
+- **Response**: `200` — Updated tour
+
+### `POST /api/tours/feedback`
+- **Auth**: None (token-based)
+- **Body**: `{ tourId, rating (1-5), comment? }`
+- **Response**: `201` — `TourFeedback`
+
+---
+
+## AI endpoints
+
+### `POST /api/ai/chat`
+- **Auth**: `requireAuth()`
+- **Body**: `{ slug, message, conversationId? }`
+- **Response**: Streaming text (SSE/ReadableStream)
+- **Side effects**: Persists user + assistant messages to `Message` table, RAG context lookup
+
+### `GET /api/ai/conversations?slug=X`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Response**: `200` — `Conversation[]` ordered by updatedAt desc
+
+### `GET /api/ai/conversations/[id]`
+- **Auth**: `requireAuth()` + verify conversation belongs to user's space
+- **Response**: `200` — `Conversation` with messages
+
+### `GET /api/ai/messages?slug=X&conversationId=Y`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Response**: `200` — `Message[]` ordered by createdAt asc
+
+---
+
+## Tour management endpoints (authenticated)
+
+### `GET /api/tours?slug=X`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Response**: `200` — `Tour[]` with optional contact info
+
+### `PATCH /api/tours/[id]`
+- **Auth**: `requireAuth()` + verify tour belongs to user's space
+- **Body**: Partial `Tour` fields (status, notes, etc.)
+- **Response**: `200` — updated `Tour`
+
+### `GET /api/tours/[id]/prep`
+- **Auth**: `requireAuth()` + verify tour belongs to user's space
+- **Response**: `200` — AI-generated tour prep notes
+
+### `POST /api/tours/convert`
+- **Auth**: `requireAuth()`
+- **Body**: `{ tourId, slug }`
+- **Response**: `201` — Created `Deal` from tour
+
+### Tour properties
+
+#### `GET /api/tours/properties?slug=X`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Response**: `200` — `TourPropertyProfile[]`
+
+#### `POST /api/tours/properties`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Body**: `{ slug, name, address?, tourDuration?, startHour?, endHour?, daysAvailable?, bufferMinutes? }`
+- **Response**: `201` — `TourPropertyProfile`
+
+#### `PATCH /api/tours/properties/[id]`
+- **Auth**: `requireAuth()` + verify profile belongs to user's space
+- **Response**: `200` — updated `TourPropertyProfile`
+
+### Tour overrides
+
+#### `GET /api/tours/overrides?slug=X`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Response**: `200` — `TourAvailabilityOverride[]`
+
+#### `POST /api/tours/overrides`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Body**: `{ slug, date, isBlocked?, startHour?, endHour?, label?, recurrence?, endDate? }`
+- **Response**: `201` — `TourAvailabilityOverride`
+
+#### `DELETE /api/tours/overrides/[id]`
+- **Auth**: `requireAuth()` + verify override belongs to user's space
+- **Response**: `200`
+
+### Tour waitlist
+
+#### `POST /api/tours/waitlist`
+- **Auth**: None (public)
+- **Body**: `{ spaceId, guestName, guestEmail, guestPhone?, preferredDate, notes?, propertyProfileId? }`
+- **Response**: `201` — `TourWaitlist`
+
+#### `POST /api/tours/waitlist/notify`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Body**: `{ waitlistId }`
+- **Response**: `200`
+
+---
+
+## Workspace & settings
+
+### `PATCH /api/spaces`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Body**: Space + SpaceSetting fields
+- **Response**: `200` — updated space/settings
+
+### `DELETE /api/spaces`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Response**: `200` — `{ success: true }`
+- **Side effects**: Resets `User.onboard = false`, `onboardingCurrentStep = 1`
+
+### `POST /api/onboarding`
+- **Auth**: `requireAuth()`
+- **Body**: `{ action, ...actionData }`
+- **Actions**: `start`, `save_step`, `save_profile`, `create_space`, `save_notifications`, `complete`, `check_slug`
+- **Response**: `200` — action-specific result
+
+---
+
+## Broker endpoints
+
+### `POST /api/broker/create`
+- **Auth**: `requireAuth()` + completed workspace
+- **Response**: `201` — `{ brokerageId }` | `409` (already exists)
+
+### `POST /api/broker/invite`
+- **Auth**: `requireBroker()`
+- **Body**: `{ email, role }`
+- **Response**: `201` — `Invitation`
+
+### `POST /api/broker/invite/bulk`
+- **Auth**: `requireBroker()`
+- **Body**: `{ invitations: [{ email, role }] }`
+- **Response**: `200` — Bulk result
+
+### `GET /api/broker/stats`
+- **Auth**: `requireBroker()`
+- **Response**: `200` — Member counts, leads, applications
+
+### `GET /api/broker/trends`
+- **Auth**: `requireBroker()`
+- **Response**: `200` — Time-series analytics
+
+### `GET /api/broker/settings`
+- **Auth**: `requireBroker()`
+- **Response**: `200` — Brokerage settings
+
+### `PATCH /api/broker/settings`
+- **Auth**: `requireBroker()`
+- **Body**: Brokerage fields (name, websiteUrl, logoUrl, joinCode)
+- **Response**: `200` — Updated brokerage
+
+### `GET /api/broker/export`
+- **Auth**: `requireBroker()`
+- **Response**: `200` — CSV export of member data
+
+### `POST /api/broker/join`
+- **Auth**: `requireAuth()`
+- **Body**: `{ joinCode }`
+- **Response**: `200` — Membership created
+
+### `POST /api/broker/join-code`
+- **Auth**: `requireBroker()`
+- **Response**: `200` — Generated/refreshed join code
+
+### Broker member management
+
+#### `GET /api/broker/realtors/[userId]`
+- **Auth**: `requireBroker()` + verify member belongs to brokerage
+- **Response**: `200` — Realtor details with stats
+
+#### `DELETE /api/broker/members/[id]`
+- **Auth**: `requireBroker()`
+- **Response**: `200`
+
+#### `PATCH /api/broker/members/[id]/role`
+- **Auth**: `requireBroker()`
+- **Body**: `{ role }`
+- **Response**: `200` — Updated membership
+
+### `GET /api/broker/notifications`
+- **Auth**: `requireBroker()`
+- **Response**: `200` — `BrokerNotification[]`
+
+---
+
+## Admin endpoints
+
+### `GET /api/admin/brokerages`
+- **Auth**: `requirePlatformAdmin()`
+- **Response**: `200` — All brokerages with owner info and member counts
+
+### `PATCH /api/admin/brokerages/[id]`
+- **Auth**: `requirePlatformAdmin()`
+- **Body**: `{ status: 'active' | 'suspended' }`
+- **Response**: `200`
+
+### `GET /api/admin/invitations`
+- **Auth**: `requirePlatformAdmin()`
+- **Response**: `200` — All invitations
+
+### `DELETE /api/admin/invitations/[id]`
+- **Auth**: `requirePlatformAdmin()`
+- **Response**: `200`
+
+### `DELETE /api/admin/memberships/[id]`
+- **Auth**: `requirePlatformAdmin()`
+- **Response**: `200`
+
+### `POST /api/admin/actions`
+- **Auth**: `requirePlatformAdmin()`
+- **Body**: Admin action payload
+- **Response**: `200`
+
+---
+
+## Invitation endpoints
+
+### `GET /api/invitations/[token]`
+- **Auth**: None (public read)
+- **Response**: `200` — Brokerage name + invitation details (no sensitive data)
+
+### `POST /api/invitations/[token]`
+- **Auth**: `requireAuth()`
+- **Response**: `200` — Invitation accepted, membership created
+
+---
+
+## Utility endpoints
+
+### `GET /api/health`
+- **Auth**: None
+- **Response**: `200` — DB connectivity check
+
+### `GET /api/search?slug=X&q=Y`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Response**: `200` — `{ contacts: Contact[], deals: Deal[] }` (parallel search, max 8 each)
+
+### `POST /api/vectorize/sync`
+- **Auth**: `requireAuth()`
+- **Body**: `{ slug }`
+- **Response**: `200` — Sync result
+
+### `POST /api/documents`
+- **Auth**: `requireAuth()`
+- **Body**: FormData with file + contactId
+- **Response**: `201` — `ContactDocument`
+
+### `GET /api/notifications`
+- **Auth**: `requireAuth()`
+- **Response**: `200` — User notifications
+
+### `POST /api/applications/compare`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Body**: `{ contactIds }`
+- **Response**: `200` — Side-by-side application comparison
+
+### `PATCH /api/applications/status`
+- **Auth**: `requireAuth()`
+- **Body**: `{ contactId, status, note? }`
+- **Response**: `200`
+
+### `GET /api/applications/pdf?contactId=X`
+- **Auth**: `requireAuth()` + verify contact access
+- **Response**: `200` — PDF binary
+
+---
+
+## CRON endpoints
+
+### `POST /api/cron/follow-up-reminders`
+- **Auth**: `CRON_SECRET` header validation
+- **Response**: `200` — Processed reminders count
+
+### `POST /api/tours/reminders`
+- **Auth**: `CRON_SECRET` header validation
+- **Response**: `200` — Sent reminders count
+
+---
+
+## Common error responses
+
+| Status | Meaning | When |
+|--------|---------|------|
+| `400` | Bad request | Missing required fields, validation failure |
+| `401` | Unauthorized | No auth token / invalid session |
+| `403` | Forbidden | Authenticated but not authorized for this resource |
+| `404` | Not found | Resource doesn't exist or not in user's space |
+| `409` | Conflict | Duplicate (brokerage already exists, tour double-booking) |
+| `429` | Rate limited | Too many submissions (public endpoints) |
+| `500` | Server error | Unhandled exception |
+
+Error response shape: `{ error: string }`
