@@ -10,10 +10,13 @@ import { supabase } from '@/lib/supabase';
  * Protected by a simple CRON_SECRET header check.
  */
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get('x-cron-secret') || req.nextUrl.searchParams.get('secret');
   const expectedSecret = process.env.CRON_SECRET;
-
-  if (!expectedSecret || secret !== expectedSecret) {
+  if (!expectedSecret) {
+    console.error('[tours/reminders] CRON_SECRET env var is not set — rejecting request');
+    return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+  }
+  const secret = req.headers.get('x-cron-secret') || req.nextUrl.searchParams.get('secret');
+  if (secret !== expectedSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

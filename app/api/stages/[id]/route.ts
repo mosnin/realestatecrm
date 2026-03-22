@@ -28,6 +28,17 @@ export async function PATCH(
   }
 
   const body = await req.json();
+
+  // Validate name
+  if (body.name !== undefined) {
+    if (typeof body.name !== 'string' || body.name.trim().length === 0) {
+      return NextResponse.json({ error: 'name must be a non-empty string' }, { status: 400 });
+    }
+    if (body.name.length > 100) {
+      return NextResponse.json({ error: 'name must be 100 characters or fewer' }, { status: 400 });
+    }
+  }
+
   // Validate color is a safe 6-digit hex code
   const HEX_COLOR = /^#[0-9a-f]{6}$/i;
   const safeColor = typeof body.color === 'string' && HEX_COLOR.test(body.color)
@@ -35,7 +46,7 @@ export async function PATCH(
     : existing.color; // keep existing color if invalid value supplied
   const { data: stage, error: updateError } = await supabase
     .from('DealStage')
-    .update({ name: body.name, color: safeColor })
+    .update({ name: body.name !== undefined ? body.name.trim() : existing.name, color: safeColor })
     .eq('id', id)
     .select()
     .single();

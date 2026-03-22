@@ -3,8 +3,13 @@ import { supabase } from '@/lib/supabase';
 import { sendFollowUpDigest } from '@/lib/email';
 
 export async function GET(req: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    console.error('[cron/follow-up-reminders] CRON_SECRET env var is not set — rejecting request');
+    return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+  }
   const authHeader = req.headers.get('Authorization');
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

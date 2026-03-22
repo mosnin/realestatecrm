@@ -84,30 +84,35 @@ export async function POST(req: NextRequest) {
 
     // Collect the full response text to save to DB (non-blocking)
     const [streamForResponse, streamForSave] = stream.tee();
-    (async () => {
-      const reader = streamForSave.getReader();
-      let fullText = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        fullText += new TextDecoder().decode(value);
-      }
-      await supabase
-        .from('Message')
-        .insert({
-          id: crypto.randomUUID(),
-          spaceId: space.id,
-          conversationId: conversationId ?? null,
-          role: 'assistant',
-          content: fullText,
-        })
-        .then(({ error }) => { if (error) console.error(error); });
+    void (async () => {
+      try {
+        const reader = streamForSave.getReader();
+        let fullText = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          fullText += new TextDecoder().decode(value);
+        }
+        const { error: insertError } = await supabase
+          .from('Message')
+          .insert({
+            id: crypto.randomUUID(),
+            spaceId: space.id,
+            conversationId: conversationId ?? null,
+            role: 'assistant',
+            content: fullText,
+          });
+        if (insertError) console.error('[chat] failed to save assistant message', insertError);
 
-      if (conversationId) {
-        await supabase
-          .from('Conversation')
-          .update({ updatedAt: new Date().toISOString() })
-          .eq('id', conversationId);
+        if (conversationId) {
+          const { error: updateError } = await supabase
+            .from('Conversation')
+            .update({ updatedAt: new Date().toISOString() })
+            .eq('id', conversationId);
+          if (updateError) console.error('[chat] failed to update conversation timestamp', updateError);
+        }
+      } catch (err) {
+        console.error('[chat] error in background save', err);
       }
     })();
 

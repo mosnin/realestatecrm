@@ -53,6 +53,13 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { slug, name, email, phone, budget, preferences, properties, address, notes, type, tags } = body;
 
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    return NextResponse.json({ error: 'name is required' }, { status: 400 });
+  }
+  if (name.length > 200) {
+    return NextResponse.json({ error: 'name must be 200 characters or fewer' }, { status: 400 });
+  }
+
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
