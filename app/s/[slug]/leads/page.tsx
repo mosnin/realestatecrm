@@ -89,7 +89,7 @@ export default async function LeadsPage({
           </p>
         </div>
         {unreadLeads.length > 0 && (
-          <div className="flex items-center gap-1.5 text-sm text-primary font-medium bg-primary/8 rounded-full px-3 py-1 flex-shrink-0">
+          <div className="flex items-center gap-1.5 text-sm text-primary font-medium bg-primary/8 rounded-md px-3 py-1 flex-shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
             {unreadLeads.length} new
           </div>
@@ -98,7 +98,7 @@ export default async function LeadsPage({
 
       {/* Tier summary bar */}
       {leads.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
             {leads.length} {leads.length === 1 ? 'application' : 'applications'}
           </span>
@@ -133,8 +133,8 @@ export default async function LeadsPage({
       )}
 
       {leads.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-card py-16 text-center px-6">
-          <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+        <div className="rounded-lg border border-dashed border-border bg-card py-16 text-center px-6">
+          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center mx-auto mb-4">
             <Phone size={20} className="text-muted-foreground" />
           </div>
           <p className="font-semibold text-foreground mb-1">No leads yet</p>

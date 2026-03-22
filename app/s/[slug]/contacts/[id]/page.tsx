@@ -138,9 +138,9 @@ export default async function ClientDetailPage({
       </div>
 
       {/* Profile header card */}
-      <div className="rounded-2xl border border-border bg-card px-6 py-5">
+      <div className="rounded-lg border border-border bg-card px-6 py-5">
         <div className="flex items-start gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-xl font-bold text-primary flex-shrink-0">
+          <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center text-xl font-bold text-primary flex-shrink-0">
             {getInitials(contact.name)}
           </div>
           <div className="flex-1 min-w-0">
@@ -230,7 +230,7 @@ export default async function ClientDetailPage({
 
       {/* ── AI Lead Score Card ── */}
       {contact.scoringStatus === 'scored' && contact.leadScore != null && (
-        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="px-6 py-4 border-b border-border flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-primary" />
@@ -348,7 +348,7 @@ export default async function ClientDetailPage({
 
             {/* Recommended next action */}
             {details?.recommendedNextAction && (
-              <div className="mt-4 rounded-xl bg-primary/5 border border-primary/10 px-4 py-3 flex items-start gap-2">
+              <div className="mt-4 rounded-lg bg-primary/5 border border-primary/10 px-4 py-3 flex items-start gap-2">
                 <ArrowRight size={14} className="text-primary mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-xs font-semibold text-primary mb-0.5">Recommended next action</p>
@@ -362,7 +362,7 @@ export default async function ClientDetailPage({
 
       {/* ── Unscored / failed — show score prompt ── */}
       {(contact.scoringStatus === 'failed' || contact.scoringStatus === 'unscored' || (contact.scoringStatus !== 'scored' && contact.scoringStatus !== 'pending')) && (
-        <div className="rounded-2xl border border-border bg-card px-6 py-5 flex items-center justify-between gap-4">
+        <div className="rounded-lg border border-border bg-card px-6 py-5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Sparkles size={16} className="text-muted-foreground" />
             <div>
@@ -378,7 +378,7 @@ export default async function ClientDetailPage({
 
       {/* ── Application Details (rich structured data) ── */}
       {app ? (
-        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="px-6 py-4 border-b border-border flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold">Application details</h2>
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -508,7 +508,7 @@ export default async function ClientDetailPage({
         </div>
       ) : (
         /* Legacy application details (no structured data) */
-        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="px-6 py-4 border-b border-border">
             <h2 className="text-sm font-semibold">Application details</h2>
           </div>
@@ -551,7 +551,7 @@ export default async function ClientDetailPage({
 
       {/* Notes */}
       {contact.notes && (
-        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="px-6 py-4 border-b border-border">
             <h2 className="text-sm font-semibold flex items-center gap-2">
               <FileText size={14} className="text-muted-foreground" /> Notes
@@ -567,7 +567,7 @@ export default async function ClientDetailPage({
 
       {/* Additional notes from application */}
       {app?.additionalNotes && (
-        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="px-6 py-4 border-b border-border">
             <h2 className="text-sm font-semibold flex items-center gap-2">
               <FileText size={14} className="text-muted-foreground" /> Applicant notes
@@ -583,7 +583,7 @@ export default async function ClientDetailPage({
 
       {/* Tags */}
       {contact.tags.filter((t) => t !== 'application-link' && t !== 'new-lead').length > 0 && (
-        <div className="rounded-2xl border border-border bg-card px-6 py-4">
+        <div className="rounded-lg border border-border bg-card px-6 py-4">
           <p className="text-xs text-muted-foreground mb-2">Tags</p>
           <div className="flex flex-wrap gap-1.5">
             {contact.tags
@@ -602,7 +602,7 @@ export default async function ClientDetailPage({
 
       {/* Tour history */}
       {contact.tours.length > 0 && (
-        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="px-6 py-4 border-b border-border flex items-center gap-2">
             <CalendarDays size={14} className="text-primary" />
             <h2 className="text-sm font-semibold">Tour History</h2>
@@ -620,7 +620,7 @@ export default async function ClientDetailPage({
                 <Link
                   key={tour.id}
                   href={`/s/${slug}/tours`}
-                  className="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors"
+                  className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -648,7 +648,7 @@ export default async function ClientDetailPage({
       )}
 
       {/* Associated deals */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
         <div className="px-6 py-4 border-b border-border">
           <h2 className="text-sm font-semibold">Associated deals</h2>
         </div>
@@ -669,7 +669,7 @@ export default async function ClientDetailPage({
                 <Link
                   key={deal.id}
                   href={`/s/${slug}/deals`}
-                  className="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors group"
+                  className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors group"
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{deal.title}</p>

@@ -26,8 +26,8 @@ export default function ProfilePage() {
     return (
       <div className="space-y-4 max-w-3xl animate-pulse">
         <div className="h-8 bg-muted rounded-lg w-32" />
-        <div className="h-40 bg-muted rounded-xl" />
-        <div className="h-64 bg-muted rounded-xl" />
+        <div className="h-40 bg-muted rounded-lg" />
+        <div className="h-64 bg-muted rounded-lg" />
       </div>
     );
   }
@@ -60,16 +60,16 @@ export default function ProfilePage() {
   return (
     <div className="space-y-5 max-w-3xl">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Profile</h2>
+        <h1 className="text-xl font-semibold tracking-tight">Profile</h1>
         <p className="text-muted-foreground text-sm">Manage your personal information and intake link</p>
       </div>
 
       {/* Intake link card */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="px-6 py-4 border-b border-border bg-muted/20 flex items-center gap-2">
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="px-6 py-4 border-b border-border bg-muted/40 flex items-center gap-2">
           <Link2 size={14} className="text-primary" />
           <p className="font-semibold text-sm">Public application link</p>
-          <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 text-[10px] font-semibold">
+          <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 text-[10px] font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
             Live
           </span>
@@ -93,8 +93,8 @@ export default function ProfilePage() {
       </div>
 
       {/* Account info */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="px-6 py-4 border-b border-border bg-muted/20">
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="px-6 py-4 border-b border-border bg-muted/40">
           <p className="font-semibold text-sm">Your account</p>
         </div>
         <div className="px-6 py-5 space-y-5">
@@ -150,8 +150,8 @@ export default function ProfilePage() {
       </div>
 
       {/* Account management */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="px-6 py-4 border-b border-border bg-muted/20">
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="px-6 py-4 border-b border-border bg-muted/40">
           <p className="font-semibold text-sm">Account management</p>
         </div>
         <div className="px-6 py-5">

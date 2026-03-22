@@ -18,7 +18,7 @@ export default async function Billing({
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Billing</h2>
+        <h1 className="text-xl font-semibold tracking-tight">Billing</h1>
         <p className="text-muted-foreground">Manage your subscription and payment details</p>
       </div>
       {/*

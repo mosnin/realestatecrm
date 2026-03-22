@@ -110,26 +110,26 @@ export default async function DealDetailPage({
       </div>
 
       {/* Header card */}
-      <div className="rounded-2xl border border-border bg-card px-6 py-5">
+      <div className="rounded-lg border border-border bg-card px-6 py-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-semibold tracking-tight">{dealRow.title}</h1>
             <div className="flex flex-wrap items-center gap-2 mt-2">
-              <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${statusMeta.className}`}>
+              <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md ${statusMeta.className}`}>
                 <StatusIcon size={11} />
                 {statusMeta.label}
               </span>
               {dealRow.value != null && (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-full px-2.5 py-1">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-md px-2.5 py-1">
                   <DollarSign size={11} />
                   {dealRow.value.toLocaleString()}
                 </span>
               )}
-              <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full ${priorityMeta.className}`}>
+              <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-md ${priorityMeta.className}`}>
                 {priorityMeta.label} priority
               </span>
               {stage && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground bg-muted rounded-full px-2.5 py-1">
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground bg-muted rounded-md px-2.5 py-1">
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
                   {stage.name}
                 </span>
@@ -169,7 +169,7 @@ export default async function DealDetailPage({
         {/* Left: description + contacts */}
         <div className="md:col-span-1 space-y-5">
           {/* Linked contacts */}
-          <div className="rounded-2xl border border-border bg-card px-5 py-4">
+          <div className="rounded-lg border border-border bg-card px-5 py-4">
             <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
               <Users size={14} className="text-muted-foreground" />
               Contacts
@@ -201,7 +201,7 @@ export default async function DealDetailPage({
 
           {/* Description */}
           {dealRow.description && (
-            <div className="rounded-2xl border border-border bg-card px-5 py-4">
+            <div className="rounded-lg border border-border bg-card px-5 py-4">
               <h2 className="text-sm font-semibold mb-2">Notes</h2>
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">{dealRow.description}</p>
             </div>

@@ -29,7 +29,7 @@ export default async function SettingsPage({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
+        <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
         <p className="text-muted-foreground">Manage your profile, connections, AI, and billing preferences</p>
       </div>
       <SettingsForm space={space} settings={settings} />
