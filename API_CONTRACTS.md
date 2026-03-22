@@ -145,22 +145,27 @@ All protected routes use one of these auth helpers from `lib/api-auth.ts`:
 
 ### `POST /api/tours/book`
 - **Auth**: None (public)
-- **Body**: `{ spaceId, guestName, guestEmail, guestPhone?, propertyAddress?, notes?, startsAt, endsAt, propertyProfileId? }`
-- **Response**: `201` — `{ id, manageToken }` | `409` (conflict/double-booking)
-- **Implementation**: Uses `book_tour_atomic` RPC
+- **Body**: `{ slug, guestName, guestEmail, guestPhone?, propertyAddress?, notes?, startsAt, propertyProfileId? }`
+- **Response**: `201` — Tour object with `manageToken` | `409` (conflict/double-booking)
+- **Validation**: `guestName` required, `guestEmail` required (valid format), `startsAt` required (not in past). `endsAt` auto-calculated from settings/profile duration.
+- **Implementation**: Uses `book_tour_atomic` RPC for atomic booking with conflict detection
+- **Side effects**: Auto-creates Contact if no match by email. Sends confirmation email to guest. Sends notification email to space owner.
 
-### `GET /api/tours/available?spaceId=X&date=Y`
+### `GET /api/tours/available?slug=X&date=Y&propertyId=Z`
 - **Auth**: None (public)
-- **Response**: `200` — Available time slots for the date
+- **Query params**: `slug` (required), `date` (optional, YYYY-MM-DD, defaults to today), `propertyId` (optional)
+- **Response**: `200` — `{ slots: [{ date, times: [ISO8601] }], duration, timezone, propertyProfileId, propertyProfiles: [{ id, name, address, tourDuration, isActive }] }`
+- **Computation**: 14-day rolling window. Considers existing bookings, Google Calendar busy times, availability overrides (including recurring), property profile settings, buffer minutes
 
 ### `GET /api/tours/manage?token=X`
 - **Auth**: Guest manage token
 - **Response**: `200` — Tour details for self-service management
 
-### `PATCH /api/tours/manage`
-- **Auth**: Guest manage token
-- **Body**: Reschedule or cancel
-- **Response**: `200` — Updated tour
+### `POST /api/tours/manage`
+- **Auth**: Guest manage token (in body)
+- **Body**: `{ token, action: 'cancel' }`
+- **Validation**: Cannot cancel within 1 hour of tour. Cannot cancel completed tours.
+- **Response**: `200` — `{ success: true, status: 'cancelled' }`
 
 ### `POST /api/tours/feedback`
 - **Auth**: None (token-based)
@@ -199,8 +204,12 @@ All protected routes use one of these auth helpers from `lib/api-auth.ts`:
 
 ### `PATCH /api/tours/[id]`
 - **Auth**: `requireAuth()` + verify tour belongs to user's space
-- **Body**: Partial `Tour` fields (status, notes, etc.)
+- **Body**: `{ status?, guestName?, guestEmail?, guestPhone?, propertyAddress?, notes?, startsAt?, endsAt?, contactId? }`
 - **Response**: `200` — updated `Tour`
+- **Side effects on status change**:
+  - `completed` → Sets contact `followUpAt` to 24h later, sends follow-up email to guest, logs activity, updates contact type to TOUR
+  - `no_show` → Sets contact `followUpAt` to 48h later
+  - `cancelled` → Sends cancellation email
 
 ### `GET /api/tours/[id]/prep`
 - **Auth**: `requireAuth()` + verify tour belongs to user's space
@@ -267,11 +276,22 @@ All protected routes use one of these auth helpers from `lib/api-auth.ts`:
 - **Response**: `200` — `{ success: true }`
 - **Side effects**: Resets `User.onboard = false`, `onboardingCurrentStep = 1`
 
+### `GET /api/onboarding`
+- **Auth**: `requireAuth()`
+- **Response**: `200` — `{ step, completed, user: { id, name, email, onboard, ... }, space: { id, slug, name, settings } | null }`
+
 ### `POST /api/onboarding`
 - **Auth**: `requireAuth()`
 - **Body**: `{ action, ...actionData }`
-- **Actions**: `start`, `save_step`, `save_profile`, `create_space`, `save_notifications`, `complete`, `check_slug`
-- **Response**: `200` — action-specific result
+- **Actions and their payloads**:
+  - `start` — no extra fields → `{ success: true }`
+  - `save_step` + `{ step: number }` → `{ success: true }`
+  - `save_profile` + `{ name, phone?, businessName }` → `{ success: true }`
+  - `create_space` + `{ slug, intakePageTitle, intakePageIntro, businessName, logoUrl?, realtorPhotoUrl? }` → `{ success: true, slug }` | `409` (slug taken)
+  - `save_notifications` + `{ emailNotifications, defaultSubmissionStatus }` → `{ success: true }`
+  - `complete` + `{ accountType?: 'realtor' | 'broker_only' | 'both' }` → `{ success: true, onboard: true, onboardingCompletedAt }`
+  - `check_slug` + `{ slug }` → `{ available: boolean, reason?: string }`
+- **Side effects**: `create_space` uses RPC `create_space_with_defaults` (atomic). `complete` sets accountType if provided.
 
 ---
 
@@ -387,8 +407,19 @@ All protected routes use one of these auth helpers from `lib/api-auth.ts`:
 ## Utility endpoints
 
 ### `GET /api/health`
-- **Auth**: None
-- **Response**: `200` — DB connectivity check
+- **Auth**: `requireAuth()` + admin role in Clerk publicMetadata
+- **Response**: `200` — `{ status: 'ok', db: 'ok' | 'error' }` (opaque, never exposes internals)
+
+### `GET /api/tours/gcal?slug=X`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Response**: `200` — `{ connected, configured, authUrl?, token? }`
+
+### `POST /api/tours/gcal`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Body**: `{ slug, action }` where action is:
+  - `exchange_code` + `{ code }` → `{ connected: true }` (OAuth code exchange)
+  - `sync_tour` + `{ tourId }` → `{ synced: true, googleEventId }` (create/update GCal event)
+  - `disconnect` → `{ connected: false }` (remove stored token)
 
 ### `GET /api/search?slug=X&q=Y`
 - **Auth**: `requireSpaceOwner(slug)`
@@ -404,9 +435,11 @@ All protected routes use one of these auth helpers from `lib/api-auth.ts`:
 - **Body**: FormData with file + contactId
 - **Response**: `201` — `ContactDocument`
 
-### `GET /api/notifications`
-- **Auth**: `requireAuth()`
-- **Response**: `200` — User notifications
+### `GET /api/notifications?slug=X`
+- **Auth**: `requireSpaceOwner(slug)`
+- **Response**: `200` — `[{ id, type, title, description, href, createdAt, priority }]`
+- **Types**: `new_lead`, `upcoming_tour`, `follow_up_due`, `waitlist`, `tour_needs_action`
+- **Computed in real-time** from: new unread leads, upcoming tours (24h), due follow-ups, waitlist entries, completed tours without deals
 
 ### `POST /api/applications/compare`
 - **Auth**: `requireSpaceOwner(slug)`
