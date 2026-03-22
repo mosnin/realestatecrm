@@ -31,10 +31,13 @@ export async function requireSpaceOwner(
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
 
-  const space = await getSpaceFromSlug(slug);
+  // Run both space lookups in parallel instead of sequentially
+  const [space, userSpace] = await Promise.all([
+    getSpaceFromSlug(slug),
+    getSpaceForUser(userId),
+  ]);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
 
-  const userSpace = await getSpaceForUser(userId);
   if (!userSpace || space.id !== userSpace.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }

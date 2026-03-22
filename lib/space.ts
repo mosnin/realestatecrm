@@ -6,7 +6,7 @@ export async function getSpaceFromSlug(inputSlug: string): Promise<Space | null>
   const slug = normalizeSlug(inputSlug);
   const { data, error } = await supabase
     .from('Space')
-    .select('*')
+    .select('id, slug, name, emoji, ownerId, brokerageId, createdAt')
     .eq('slug', slug)
     .limit(1)
     .maybeSingle();
@@ -26,6 +26,8 @@ export async function getSpaceByOwnerId(ownerId: string): Promise<Space | null> 
 }
 
 export async function getSpaceForUser(clerkUserId: string): Promise<Space | null> {
+  // Two queries but they're simple index lookups — keeping sequential to avoid
+  // PostgREST FK constraint name ambiguity with inline references
   const { data: user, error: userErr } = await supabase
     .from('User')
     .select('id')
@@ -37,7 +39,7 @@ export async function getSpaceForUser(clerkUserId: string): Promise<Space | null
 
   const { data, error } = await supabase
     .from('Space')
-    .select('*')
+    .select('id, slug, name, emoji, ownerId, brokerageId, createdAt')
     .eq('ownerId', user.id)
     .limit(1)
     .maybeSingle();

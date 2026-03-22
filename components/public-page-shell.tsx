@@ -34,11 +34,15 @@ export function PublicPageShell({
                 <img
                   src={agentPhoto}
                   alt={agentName}
+                  width={36}
+                  height={36}
+                  loading="eager"
+                  decoding="async"
                   className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover flex-shrink-0"
                 />
               ) : null}
               {logoUrl ? (
-                <img src={logoUrl} alt={businessName} className="h-6 sm:h-7 object-contain" />
+                <img src={logoUrl} alt={businessName} width={112} height={28} loading="eager" decoding="async" className="h-6 sm:h-7 object-contain" />
               ) : (
                 <span className="text-sm sm:text-base font-semibold text-foreground truncate">
                   {businessName}

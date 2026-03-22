@@ -8,7 +8,9 @@ interface MessageBubbleProps {
   onAction?: (action: CRMAction) => Promise<boolean>;
 }
 
-const ACTION_REGEX = /<<ACTION>>([\s\S]*?)<{2}\/ACTION>>/g;
+// Match both <<ACTION>>...json...<</ACTION>> and <<ACTION>>...json...</ACTION>
+// LLMs may output either format despite being told the double-bracket version.
+const ACTION_REGEX = /<<ACTION>>([\s\S]*?)(?:<{2}\/ACTION>>|<\/ACTION>>?)/g;
 
 /** Render inline markdown: **bold** and *italic* */
 function renderInline(text: string): React.ReactNode[] {

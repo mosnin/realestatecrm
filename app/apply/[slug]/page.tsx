@@ -4,22 +4,9 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { PublicPageShell } from '@/components/public-page-shell';
 
-// Lazy-load the form — it imports framer-motion (~100KB) and DateWheelPicker
-// which are not needed for the initial page shell render.
 const ApplicationForm = dynamic(
   () => import('./application-form').then((m) => m.ApplicationForm),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="space-y-4 animate-pulse">
-        <div className="h-2 w-24 bg-muted rounded" />
-        <div className="h-10 bg-muted rounded-lg" />
-        <div className="h-10 bg-muted rounded-lg" />
-        <div className="h-10 bg-muted rounded-lg" />
-        <div className="h-10 w-32 bg-muted rounded-lg" />
-      </div>
-    ),
-  }
+  { ssr: false }
 );
 
 export default async function PublicApplyPage({
@@ -31,6 +18,7 @@ export default async function PublicApplyPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
+  // Parallel queries — both depend on space but run simultaneously
   const [{ data: settingsData }, { data: ownerData }] = await Promise.all([
     supabase
       .from('SpaceSetting')
