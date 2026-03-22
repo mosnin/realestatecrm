@@ -105,7 +105,7 @@ export default async function ConfigurePage({
         </div>
 
         {existingBrokerageName ? (
-          <div className="rounded-xl border border-border bg-card px-5 py-4">
+          <div className="rounded-lg border border-border bg-card px-5 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -126,7 +126,7 @@ export default async function ConfigurePage({
           </div>
         ) : (
           <Link href="/brokerage">
-            <div className="rounded-xl border border-border bg-card px-5 py-4 hover:border-primary/40 transition-colors cursor-pointer group">
+            <div className="rounded-lg border border-border bg-card px-5 py-4 hover:border-primary/40 transition-colors cursor-pointer group">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
