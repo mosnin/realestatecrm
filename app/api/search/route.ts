@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get('q') ?? '').trim();
 
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
-  if (!q || q.length < 2) return NextResponse.json({ contacts: [], deals: [] });
+  if (!q || q.length < 2) return NextResponse.json({ contacts: [], deals: [], tours: [] });
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
@@ -17,11 +17,11 @@ export async function GET(req: NextRequest) {
   const escaped = q.slice(0, 100).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
   // Strip characters that break PostgREST filter syntax (commas, parens, colons, dots as operators)
   const sanitized = escaped.replace(/[,()\.:;'"]/g, '');
-  if (!sanitized.trim()) return NextResponse.json({ contacts: [], deals: [] });
+  if (!sanitized.trim()) return NextResponse.json({ contacts: [], deals: [], tours: [] });
   const term = `%${sanitized}%`;
 
   try {
-    const [contactsResult, dealsResult] = await Promise.all([
+    const [contactsResult, dealsResult, toursResult] = await Promise.all([
       supabase
         .from('Contact')
         .select('id, name, email, phone, type, leadScore, scoreLabel')
@@ -34,15 +34,25 @@ export async function GET(req: NextRequest) {
         .eq('spaceId', space.id)
         .or(`title.ilike.${term},address.ilike.${term}`)
         .limit(8),
+      supabase
+        .from('Tour')
+        .select('id, guestName, guestEmail, propertyAddress, startsAt, status')
+        .eq('spaceId', space.id)
+        .or(`guestName.ilike.${term},guestEmail.ilike.${term},propertyAddress.ilike.${term}`)
+        .limit(8),
     ]);
 
     if (contactsResult.error) {
       console.error('[search] contacts query error:', contactsResult.error);
-      return NextResponse.json({ contacts: [], deals: [], error: 'Contact search failed' }, { status: 500 });
+      return NextResponse.json({ contacts: [], deals: [], tours: [], error: 'Contact search failed' }, { status: 500 });
     }
     if (dealsResult.error) {
       console.error('[search] deals query error:', dealsResult.error);
-      return NextResponse.json({ contacts: [], deals: [], error: 'Deal search failed' }, { status: 500 });
+      return NextResponse.json({ contacts: [], deals: [], tours: [], error: 'Deal search failed' }, { status: 500 });
+    }
+    if (toursResult.error) {
+      console.error('[search] tours query error:', toursResult.error);
+      // Non-fatal: return contacts and deals even if tours fail
     }
 
     const contacts = (contactsResult.data ?? []).map((c: any) => ({
@@ -78,9 +88,18 @@ export async function GET(req: NextRequest) {
       stage: stageMap[d.stageId] ?? null,
     }));
 
-    return NextResponse.json({ contacts, deals });
+    const tours = (toursResult.data ?? []).map((t: any) => ({
+      id: t.id,
+      guestName: t.guestName,
+      guestEmail: t.guestEmail ?? null,
+      propertyAddress: t.propertyAddress ?? null,
+      startsAt: t.startsAt,
+      status: t.status ?? 'scheduled',
+    }));
+
+    return NextResponse.json({ contacts, deals, tours });
   } catch (err) {
     console.error('[search] unexpected error:', err);
-    return NextResponse.json({ contacts: [], deals: [], error: 'Search failed' }, { status: 500 });
+    return NextResponse.json({ contacts: [], deals: [], tours: [], error: 'Search failed' }, { status: 500 });
   }
 }

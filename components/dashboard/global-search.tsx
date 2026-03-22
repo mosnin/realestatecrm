@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { Search, Users, Briefcase, X } from 'lucide-react';
+import { Search, Users, Briefcase, Calendar, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ContactResult {
@@ -24,6 +24,15 @@ interface DealResult {
   stage: { name: string; color: string } | null;
 }
 
+interface TourResult {
+  id: string;
+  guestName: string;
+  guestEmail: string | null;
+  propertyAddress: string | null;
+  startsAt: string;
+  status: string;
+}
+
 const SCORE_COLORS: Record<string, string> = {
   hot: 'text-emerald-600',
   warm: 'text-amber-600',
@@ -39,6 +48,7 @@ export function GlobalSearch({ slug }: Props) {
   const [query, setQuery] = useState('');
   const [contacts, setContacts] = useState<ContactResult[]>([]);
   const [deals, setDeals] = useState<DealResult[]>([]);
+  const [tours, setTours] = useState<TourResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cursor, setCursor] = useState(0);
@@ -70,13 +80,14 @@ export function GlobalSearch({ slug }: Props) {
       setQuery('');
       setContacts([]);
       setDeals([]);
+      setTours([]);
       setError(null);
       setCursor(0);
     }
   }, [open]);
 
   const search = useCallback(async (q: string) => {
-    if (q.trim().length < 2) { setContacts([]); setDeals([]); setError(null); return; }
+    if (q.trim().length < 2) { setContacts([]); setDeals([]); setTours([]); setError(null); return; }
     if (!slug) { setError('No workspace context'); return; }
     setLoading(true);
     setError(null);
@@ -97,6 +108,7 @@ export function GlobalSearch({ slug }: Props) {
       const data = await res.json();
       setContacts(data.contacts ?? []);
       setDeals(data.deals ?? []);
+      setTours(data.tours ?? []);
       setCursor(0);
     } catch (err) {
       console.error('[GlobalSearch] fetch error:', err);
@@ -114,6 +126,7 @@ export function GlobalSearch({ slug }: Props) {
   const allResults = [
     ...contacts.map((c) => ({ type: 'contact' as const, id: c.id, label: c.name, sub: c.email ?? c.phone ?? c.type, href: `/s/${slug}/contacts/${c.id}`, scoreLabel: c.scoreLabel })),
     ...deals.map((d) => ({ type: 'deal' as const, id: d.id, label: d.title, sub: d.stage?.name ?? d.status, href: `/s/${slug}/deals/${d.id}`, scoreLabel: null })),
+    ...tours.map((t) => ({ type: 'tour' as const, id: t.id, label: t.guestName, sub: t.propertyAddress ?? new Date(t.startsAt).toLocaleDateString(), href: `/s/${slug}/tours`, scoreLabel: null })),
   ];
 
   function navigate(href: string) {
@@ -144,7 +157,7 @@ export function GlobalSearch({ slug }: Props) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Search contacts and deals…"
+            placeholder="Search contacts, deals, and tours…"
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           {query && (
@@ -233,6 +246,37 @@ export function GlobalSearch({ slug }: Props) {
                       <span className="text-xs text-muted-foreground">${d.value.toLocaleString()}</span>
                     )}
                     <Briefcase size={12} className="text-muted-foreground flex-shrink-0" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {!loading && tours.length > 0 && (
+            <div>
+              <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Tours</p>
+              {tours.map((t, i) => {
+                const idx = contacts.length + deals.length + i;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => navigate(`/s/${slug}/tours`)}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-4 py-2 text-left transition-colors',
+                      cursor === idx ? 'bg-accent' : 'hover:bg-accent/50'
+                    )}
+                  >
+                    <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                      <Calendar size={12} className="text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{t.guestName}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {t.propertyAddress ?? new Date(t.startsAt).toLocaleDateString()} · {t.status}
+                      </p>
+                    </div>
+                    <Calendar size={12} className="text-muted-foreground flex-shrink-0" />
                   </button>
                 );
               })}
