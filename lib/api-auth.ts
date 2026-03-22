@@ -53,20 +53,19 @@ export async function requireContactAccess(
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
 
+  const space = await getSpaceForUser(userId);
+  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const { data: rows, error } = await supabase
     .from('Contact')
     .select('spaceId')
     .eq('id', contactId)
+    .eq('spaceId', space.id)
     .limit(1)
     .maybeSingle();
 
   if (error) throw error;
-  if (!rows || !rows.spaceId) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  const space = await getSpaceForUser(userId);
-  if (!space || rows.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  if (!rows) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   return { userId, space };
 }

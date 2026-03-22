@@ -127,11 +127,20 @@ export async function POST(req: NextRequest) {
   }).select().single();
   if (dealError) throw dealError;
 
-  // Insert dealContacts
+  // Insert dealContacts — verify all contacts belong to this space
   if (contactIds?.length) {
-    const dcInserts = contactIds.map((cId: string) => ({ dealId, contactId: cId }));
-    const { error: dcError } = await supabase.from('DealContact').insert(dcInserts);
-    if (dcError) throw dcError;
+    const { data: validContacts, error: vcError } = await supabase
+      .from('Contact')
+      .select('id')
+      .in('id', contactIds)
+      .eq('spaceId', space.id);
+    if (vcError) throw vcError;
+    const validIds = new Set((validContacts ?? []).map((c: { id: string }) => c.id));
+    const dcInserts = (contactIds as string[]).filter((cId) => validIds.has(cId)).map((cId) => ({ dealId, contactId: cId }));
+    if (dcInserts.length > 0) {
+      const { error: dcError } = await supabase.from('DealContact').insert(dcInserts);
+      if (dcError) throw dcError;
+    }
   }
 
   // Get stage for the include

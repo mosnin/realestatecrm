@@ -7,13 +7,16 @@ import { audit } from '@/lib/audit';
 import type { Deal, DealStage } from '@/lib/types';
 
 async function resolveDealAndSpace(userId: string, dealId: string) {
-  const { data: rows, error } = await supabase.from('Deal').select('*').eq('id', dealId);
+  const space = await getSpaceForUser(userId);
+  if (!space) return null;
+  const { data: rows, error } = await supabase
+    .from('Deal')
+    .select('*')
+    .eq('id', dealId)
+    .eq('spaceId', space.id);
   if (error) throw error;
   if (!rows.length) return null;
-  const deal = rows[0];
-  const space = await getSpaceForUser(userId);
-  if (!space || deal.spaceId !== space.id) return null;
-  return { deal, space };
+  return { deal: rows[0], space };
 }
 
 export async function GET(
@@ -62,19 +65,18 @@ export async function PATCH(
 
   const { id } = await params;
 
+  const space = await getSpaceForUser(userId);
+  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const { data: existingRows, error: existingError } = await supabase
     .from('Deal')
     .select('*')
-    .eq('id', id);
+    .eq('id', id)
+    .eq('spaceId', space.id);
   if (existingError) throw existingError;
   if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const existing = existingRows[0];
-
-  const space = await getSpaceForUser(userId);
-  if (!space || existing.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   const body = await req.json();
 
@@ -109,14 +111,23 @@ export async function PATCH(
   const stageChanged = body.stageId && body.stageId !== existing.stageId;
   const statusChanged = body.status && body.status !== existing.status;
 
-  // Handle dealContacts replacement
+  // Handle dealContacts replacement — verify all contacts belong to this space
   if (body.contactIds) {
     const { error: delError } = await supabase.from('DealContact').delete().eq('dealId', id);
     if (delError) throw delError;
     if (body.contactIds.length > 0) {
-      const dcInserts = body.contactIds.map((cId: string) => ({ dealId: id, contactId: cId }));
-      const { error: insertError } = await supabase.from('DealContact').insert(dcInserts);
-      if (insertError) throw insertError;
+      const { data: validContacts, error: vcError } = await supabase
+        .from('Contact')
+        .select('id')
+        .in('id', body.contactIds)
+        .eq('spaceId', space.id);
+      if (vcError) throw vcError;
+      const validIds = new Set((validContacts ?? []).map((c: { id: string }) => c.id));
+      const dcInserts = (body.contactIds as string[]).filter((cId) => validIds.has(cId)).map((cId) => ({ dealId: id, contactId: cId }));
+      if (dcInserts.length > 0) {
+        const { error: insertError } = await supabase.from('DealContact').insert(dcInserts);
+        if (insertError) throw insertError;
+      }
     }
   }
 
@@ -198,19 +209,18 @@ export async function DELETE(
   const { userId } = authResult;
 
   const { id } = await params;
+  const space = await getSpaceForUser(userId);
+  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const { data: dealRows, error: dealError } = await supabase
     .from('Deal')
     .select('*')
-    .eq('id', id);
+    .eq('id', id)
+    .eq('spaceId', space.id);
   if (dealError) throw dealError;
   if (!dealRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const deal = dealRows[0];
-
-  const space = await getSpaceForUser(userId);
-  if (!space || deal.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   const { error: deleteError } = await supabase.from('Deal').delete().eq('id', id);
   if (deleteError) throw deleteError;

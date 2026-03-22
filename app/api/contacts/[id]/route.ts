@@ -15,20 +15,19 @@ export async function GET(
   const { userId } = authResult;
 
   const { id } = await params;
+  const space = await getSpaceForUser(userId);
+  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const { data: contactRows, error: contactError } = await supabase
     .from('Contact')
     .select('*')
-    .eq('id', id);
+    .eq('id', id)
+    .eq('spaceId', space.id);
   if (contactError) throw contactError;
 
   if (!contactRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const contact = contactRows[0] as Contact & { dealContacts?: any[] };
-
-  const space = await getSpaceForUser(userId);
-  if (!space || contact.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   // Get dealContacts with deal and stage info
   const { data: dealContactRows, error: dcError } = await supabase
@@ -80,19 +79,18 @@ export async function PATCH(
 
   const { id } = await params;
 
+  const space = await getSpaceForUser(userId);
+  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const { data: existingRows, error: existingError } = await supabase
     .from('Contact')
     .select('*')
-    .eq('id', id);
+    .eq('id', id)
+    .eq('spaceId', space.id);
   if (existingError) throw existingError;
   if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const existing = existingRows[0];
-
-  const space = await getSpaceForUser(userId);
-  if (!space || existing.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   const body = await req.json();
 
@@ -151,19 +149,18 @@ export async function DELETE(
   const { userId } = authResult;
 
   const { id } = await params;
+  const space = await getSpaceForUser(userId);
+  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const { data: contactRows, error: contactError } = await supabase
     .from('Contact')
     .select('*')
-    .eq('id', id);
+    .eq('id', id)
+    .eq('spaceId', space.id);
   if (contactError) throw contactError;
   if (!contactRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const contact = contactRows[0];
-
-  const space = await getSpaceForUser(userId);
-  if (!space || contact.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   const { error: deleteError } = await supabase.from('Contact').delete().eq('id', id);
   if (deleteError) throw deleteError;

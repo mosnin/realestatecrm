@@ -51,12 +51,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid date range' }, { status: 400 });
   }
 
+  // Verify linked contact belongs to this space
+  let validContactId: string | null = null;
+  if (contactId) {
+    const { data: contactRow, error: cErr } = await supabase
+      .from('Contact')
+      .select('id')
+      .eq('id', contactId)
+      .eq('spaceId', space.id)
+      .maybeSingle();
+    if (cErr) throw cErr;
+    validContactId = contactRow?.id ?? null;
+  }
+
   const { data, error } = await supabase
     .from('Tour')
     .insert({
       id: crypto.randomUUID(),
       spaceId: space.id,
-      contactId: contactId || null,
+      contactId: validContactId,
       guestName: guestName.trim(),
       guestEmail: guestEmail.trim(),
       guestPhone: guestPhone?.trim() || null,

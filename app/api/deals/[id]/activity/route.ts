@@ -4,15 +4,16 @@ import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 
 async function resolveDealSpace(dealId: string, userId: string) {
+  const space = await getSpaceForUser(userId);
+  if (!space) return null;
   const { data: dealRows, error } = await supabase
     .from('Deal')
     .select('spaceId')
     .eq('id', dealId)
+    .eq('spaceId', space.id)
     .limit(1);
   if (error) throw error;
   if (!dealRows?.length) return null;
-  const space = await getSpaceForUser(userId);
-  if (!space || dealRows[0].spaceId !== space.id) return null;
   return space;
 }
 
