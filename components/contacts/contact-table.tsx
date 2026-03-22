@@ -496,7 +496,7 @@ export function ContactTable({ slug }: ContactTableProps) {
           {STAGES.map((stage) => {
             const stageContacts = visibleContacts.filter((c) => c.type === stage.key);
             if (stageContacts.length === 0 && !search && !tagFilter) return (
-              <div key={stage.key} className={cn('rounded-xl border-2 border-dashed p-4 flex flex-col items-center justify-center min-h-[120px] text-center gap-2', stage.border)}>
+              <div key={stage.key} className={cn('rounded-lg border-2 border-dashed p-4 flex flex-col items-center justify-center min-h-[120px] text-center gap-2', stage.border)}>
                 <span className={cn('w-2 h-2 rounded-full', stage.dotColor)} />
                 <p className="text-xs font-semibold text-muted-foreground">{stage.label}</p>
                 <p className="text-[11px] text-muted-foreground/60">{stage.description}</p>
@@ -509,7 +509,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                 <div className={cn('flex items-center gap-2 rounded-lg px-3 py-2', stage.headerBg)}>
                   <span className={cn('w-2 h-2 rounded-full flex-shrink-0', stage.dotColor)} />
                   <span className="text-xs font-semibold text-foreground">{stage.label}</span>
-                  <span className={cn('ml-auto text-[11px] font-bold rounded-full px-1.5 py-0.5', stage.className)}>
+                  <span className={cn('ml-auto text-[11px] font-bold rounded-md px-1.5 py-0.5', stage.className)}>
                     {stageContacts.length}
                   </span>
                 </div>
@@ -535,7 +535,7 @@ export function ContactTable({ slug }: ContactTableProps) {
 
       {/* ── List view ── */}
       {!loading && visibleContacts.length > 0 && view === 'list' && (
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className="rounded-lg border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -634,7 +634,7 @@ export function ContactTable({ slug }: ContactTableProps) {
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-border bg-card shadow-lg px-4 py-3">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-lg border border-border bg-card shadow-lg px-4 py-3">
           <CheckSquare size={14} className="text-primary" />
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="h-4 w-px bg-border mx-1" />
@@ -737,7 +737,7 @@ function ContactCard({
 }) {
   return (
     <div className={cn(
-      'group rounded-xl border bg-card overflow-hidden transition-all duration-150 hover:shadow-md hover:-translate-y-px',
+      'group rounded-lg border bg-card overflow-hidden transition-all duration-150 hover:shadow-md hover:-translate-y-px',
       selected ? 'border-primary/40 bg-primary/5' : 'border-border',
     )}>
       <div className="px-4 py-3">

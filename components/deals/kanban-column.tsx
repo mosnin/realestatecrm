@@ -43,7 +43,7 @@ export function KanbanColumn({
             style={{ backgroundColor: stage.color }}
           />
           <span className="font-semibold text-sm">{stage.name}</span>
-          <span className="text-[11px] text-muted-foreground bg-muted rounded-full px-2 py-0.5 font-medium tabular-nums">
+          <span className="text-[11px] text-muted-foreground bg-muted rounded-md px-2 py-0.5 font-medium tabular-nums">
             {deals.length}
           </span>
         </div>
@@ -57,7 +57,7 @@ export function KanbanColumn({
       {/* Drop zone */}
       <div
         ref={setNodeRef}
-        className={`flex-1 min-h-24 rounded-xl transition-all duration-150 ${
+        className={`flex-1 min-h-24 rounded-lg transition-all duration-150 ${
           isOver
             ? 'bg-primary/5 border-2 border-dashed border-primary/30'
             : 'bg-muted/20 border-2 border-transparent'

@@ -255,7 +255,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
             </div>
             <DragOverlay>
               {activeDeal && (
-                <div className="w-72 rounded-xl border border-primary/30 bg-card px-3.5 py-3 shadow-[0_8px_24px_-8px_rgba(13,148,136,0.35)] opacity-95 rotate-1">
+                <div className="w-72 rounded-lg border border-primary/30 bg-card px-3.5 py-3 shadow-[0_8px_24px_-8px_rgba(13,148,136,0.35)] opacity-95 rotate-1">
                   <div className="flex items-center gap-2">
                     <GripVertical size={15} className="text-primary/50 flex-shrink-0" />
                     <p className="font-semibold text-sm truncate">{activeDeal.title}</p>
@@ -267,7 +267,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
         </div>
       ) : (
         /* ── List / table view ── */
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className="rounded-lg border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -341,7 +341,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
                         <td className="px-4 py-3 hidden md:table-cell">
                           <span
                             className={cn(
-                              'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5',
+                              'inline-flex text-[10px] font-semibold rounded-md px-2 py-0.5',
                               priorityMeta.className,
                             )}
                           >
