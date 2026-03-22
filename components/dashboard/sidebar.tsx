@@ -15,6 +15,8 @@ import {
   LayoutDashboard,
   SlidersHorizontal,
   Briefcase,
+  LogOut,
+  ChevronsUpDown,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -36,41 +38,144 @@ const brokerTeamNavItems = [
   { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false },
 ];
 
+// ── Section label ──────────────────────────────────────────────────────────
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="px-2 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 select-none">
+      {children}
+    </p>
+  );
+}
+
+// ── Nav item with left accent bar ──────────────────────────────────────────
+
 function NavItem({
   href,
   label,
   icon: Icon,
   isActive,
   badge,
+  isAI,
 }: {
   href: string;
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   isActive: boolean;
   badge?: React.ReactNode;
+  isAI?: boolean;
 }) {
   return (
     <Link
       href={href}
       className={cn(
-        'group flex items-center gap-2.5 h-8 px-2 rounded-md text-[13px] font-medium transition-colors',
+        'group relative flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sm font-medium transition-colors',
         isActive
           ? 'bg-primary/10 text-primary'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
       )}
     >
+      {/* Active indicator — 2px left bar */}
+      {isActive && (
+        <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-primary" />
+      )}
       <Icon
-        size={15}
+        size={16}
         className={cn(
-          'flex-shrink-0',
-          isActive ? 'text-primary' : 'text-muted-foreground/70 group-hover:text-foreground'
+          'flex-shrink-0 transition-colors',
+          isActive
+            ? 'text-primary'
+            : 'text-muted-foreground/60 group-hover:text-foreground',
+          isAI && !isActive && 'text-primary/50',
         )}
       />
-      <span className="flex-1 truncate">{label}</span>
+      <span className={cn('flex-1 truncate', isAI && !isActive && 'text-foreground/80')}>
+        {label}
+      </span>
       {badge}
     </Link>
   );
 }
+
+// ── Workspace switcher ─────────────────────────────────────────────────────
+
+function WorkspaceSwitcher({
+  href,
+  name,
+  icon: Icon,
+  subtitle,
+}: {
+  href: string;
+  name: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  subtitle?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-center gap-2.5 mx-3 px-2.5 py-2 rounded-md border border-border/60 bg-muted/30 hover:bg-muted hover:border-border transition-all"
+    >
+      <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+        <Icon size={14} className="text-primary" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold truncate text-foreground leading-tight">
+          {name}
+        </p>
+        {subtitle && (
+          <p className="text-[11px] text-muted-foreground leading-tight">{subtitle}</p>
+        )}
+      </div>
+      <ChevronsUpDown
+        size={13}
+        className="text-muted-foreground/40 flex-shrink-0 group-hover:text-muted-foreground transition-colors"
+      />
+    </Link>
+  );
+}
+
+// ── User footer ────────────────────────────────────────────────────────────
+
+function UserFooter({
+  href,
+  displayName,
+  imageUrl,
+}: {
+  href: string;
+  displayName: string;
+  imageUrl?: string | null;
+}) {
+  return (
+    <div className="px-3 py-3">
+      <Link
+        href={href}
+        className="group flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-muted transition-colors"
+      >
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={displayName}
+            className="w-7 h-7 rounded-full flex-shrink-0 object-cover ring-1 ring-border"
+          />
+        ) : (
+          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs flex-shrink-0">
+            {displayName.charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground truncate leading-tight">
+            {displayName}
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-tight">View profile</p>
+        </div>
+      </Link>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Sidebar
+// ═══════════════════════════════════════════════════════════════════════════
 
 export function Sidebar({
   slug,
@@ -91,35 +196,26 @@ export function Sidebar({
 
   const isOnBrokerPage = pathname.startsWith('/broker');
 
-  // ── Broker sidebar (when on /broker/* pages or broker-only account) ──
+  // ── Broker sidebar ──
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
-      <aside className="hidden md:flex flex-col w-[220px] h-full bg-sidebar border-r border-border shrink-0">
-        <div className="px-4 pt-4 pb-3">
+      <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0">
+        {/* Logo */}
+        <div className="px-5 pt-5 pb-4">
           <BrandLogo className="h-4" alt="Chippi" />
         </div>
 
-        {/* Context: Brokerage */}
-        <div className="px-3 pb-2">
-          <div className="flex items-center gap-2.5 px-2 py-1.5">
-            <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Building2 size={13} className="text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold truncate text-foreground leading-tight">
-                {brokerageName}
-              </p>
-              <p className="text-[11px] text-muted-foreground leading-tight">
-                {brokerageRole === 'broker_owner' ? 'Owner' : 'Manager'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mx-3 border-t border-border" />
+        {/* Brokerage switcher */}
+        <WorkspaceSwitcher
+          href="/broker"
+          name={brokerageName ?? 'Brokerage'}
+          icon={Building2}
+          subtitle={brokerageRole === 'broker_owner' ? 'Owner' : 'Manager'}
+        />
 
         {/* Team nav */}
-        <nav className="flex-1 px-3 pt-3 pb-2 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
+          <SectionLabel>Team</SectionLabel>
           {brokerTeamNavItems.map((item) => {
             const isActive = item.exact
               ? pathname === item.href
@@ -139,82 +235,47 @@ export function Sidebar({
         {/* Switch to personal workspace */}
         {!isBrokerOnly && slug && (
           <>
-            <div className="mx-3 border-t border-border" />
+            <div className="mx-4 border-t border-border" />
             <div className="px-3 py-2">
-              <Link
+              <NavItem
                 href={base}
-                className="group flex items-center gap-2.5 h-8 px-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              >
-                <Briefcase
-                  size={15}
-                  className="flex-shrink-0 text-muted-foreground/70 group-hover:text-foreground"
-                />
-                <span className="flex-1 truncate">{spaceName}</span>
-                <ChevronRight size={12} className="text-muted-foreground/40" />
-              </Link>
+                label={spaceName}
+                icon={Briefcase}
+                isActive={false}
+              />
             </div>
           </>
         )}
 
         {/* User */}
-        <div className="mx-3 border-t border-border" />
-        <div className="px-3 py-3">
-          <Link
-            href={slug ? `${base}/profile` : '/broker/settings'}
-            className="group flex items-center gap-2.5 px-2 py-1 rounded-md hover:bg-muted transition-colors"
-          >
-            {user?.imageUrl ? (
-              <img
-                src={user.imageUrl}
-                alt={displayName}
-                className="w-6 h-6 rounded-full flex-shrink-0 object-cover"
-              />
-            ) : (
-              <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-muted-foreground font-medium text-xs flex-shrink-0">
-                {displayName.charAt(0).toUpperCase()}
-              </div>
-            )}
-            <span className="text-[13px] font-medium text-foreground truncate">
-              {displayName}
-            </span>
-          </Link>
-        </div>
+        <div className="mx-4 border-t border-border" />
+        <UserFooter
+          href={slug ? `${base}/profile` : '/broker/settings'}
+          displayName={displayName}
+          imageUrl={user?.imageUrl}
+        />
       </aside>
     );
   }
 
   // ── Standard workspace sidebar ──
   return (
-    <aside className="hidden md:flex flex-col w-[220px] h-full bg-sidebar border-r border-border shrink-0">
-      <div className="px-4 pt-4 pb-3">
+    <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0">
+      {/* Logo */}
+      <div className="px-5 pt-5 pb-4">
         <BrandLogo className="h-4" alt="Chippi" />
       </div>
 
-      {/* Context: Workspace */}
-      <div className="px-3 pb-2">
-        <Link
-          href={`${base}/settings`}
-          className="group flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-muted transition-colors"
-        >
-          <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Briefcase size={13} className="text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold truncate text-foreground leading-tight">
-              {spaceName}
-            </p>
-          </div>
-          <ChevronRight
-            size={12}
-            className="text-muted-foreground/40 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-          />
-        </Link>
-      </div>
-
-      <div className="mx-3 border-t border-border" />
+      {/* Workspace switcher */}
+      <WorkspaceSwitcher
+        href={`${base}/settings`}
+        name={spaceName}
+        icon={Briefcase}
+      />
 
       {/* Primary nav */}
-      <nav className="flex-1 px-3 pt-3 pb-2 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
+        <SectionLabel>Workspace</SectionLabel>
         {primaryNavItems.map((item) => {
           const href = `${base}${item.href}`;
           const isActive =
@@ -228,7 +289,7 @@ export function Sidebar({
                   'inline-flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums flex-shrink-0',
                   isActive
                     ? 'bg-primary/20 text-primary'
-                    : 'bg-primary text-primary-foreground'
+                    : 'bg-primary text-primary-foreground',
                 )}
               >
                 {unreadLeadCount > 99 ? '99+' : unreadLeadCount}
@@ -244,6 +305,7 @@ export function Sidebar({
               icon={item.icon}
               isActive={isActive}
               badge={badge}
+              isAI={item.label === 'Chip'}
             />
           );
         })}
@@ -252,22 +314,17 @@ export function Sidebar({
         {isBroker && (
           <>
             <div className="mx-0 my-2 border-t border-border" />
-            <Link
+            <NavItem
               href="/broker"
-              className="group flex items-center gap-2.5 h-8 px-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
-              <Building2
-                size={15}
-                className="flex-shrink-0 text-muted-foreground/70 group-hover:text-foreground"
-              />
-              <span className="flex-1 truncate">{brokerageName}</span>
-              <ChevronRight size={12} className="text-muted-foreground/40" />
-            </Link>
+              label={brokerageName ?? 'Brokerage'}
+              icon={Building2}
+              isActive={false}
+            />
           </>
         )}
       </nav>
 
-      {/* Join a team (realtors without a brokerage) */}
+      {/* Join a team */}
       {!brokerageName && (
         <div className="px-3 pb-1">
           <NavItem
@@ -279,9 +336,10 @@ export function Sidebar({
         </div>
       )}
 
-      {/* Secondary nav */}
-      <div className="mx-3 border-t border-border" />
-      <div className="px-3 py-2 space-y-0.5">
+      {/* Settings section */}
+      <div className="mx-4 border-t border-border" />
+      <div className="px-3 space-y-0.5">
+        <SectionLabel>Settings</SectionLabel>
         {secondaryNavItems.map((item) => {
           const href = `${base}${item.href}`;
           const isActive = pathname.startsWith(href);
@@ -298,28 +356,12 @@ export function Sidebar({
       </div>
 
       {/* User */}
-      <div className="mx-3 border-t border-border" />
-      <div className="px-3 py-3">
-        <Link
-          href={`${base}/profile`}
-          className="group flex items-center gap-2.5 px-2 py-1 rounded-md hover:bg-muted transition-colors"
-        >
-          {user?.imageUrl ? (
-            <img
-              src={user.imageUrl}
-              alt={displayName}
-              className="w-6 h-6 rounded-full flex-shrink-0 object-cover"
-            />
-          ) : (
-            <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-muted-foreground font-medium text-xs flex-shrink-0">
-              {displayName.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <span className="text-[13px] font-medium text-foreground truncate">
-            {displayName}
-          </span>
-        </Link>
-      </div>
+      <div className="mx-4 mt-2 border-t border-border" />
+      <UserFooter
+        href={`${base}/profile`}
+        displayName={displayName}
+        imageUrl={user?.imageUrl}
+      />
     </aside>
   );
 }

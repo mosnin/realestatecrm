@@ -8,11 +8,12 @@ import {
   Users,
   Link2,
   ArrowRight,
-  Copy,
   ExternalLink,
   Clock,
   TrendingUp,
   CalendarDays,
+  AlertCircle,
+  Briefcase,
 } from 'lucide-react';
 import type { Metadata } from 'next';
 import { buildIntakeUrl } from '@/lib/intake';
@@ -85,227 +86,81 @@ export default async function DashboardPage({
     .filter((s) => s.count > 0);
 
   const intakeUrl = buildIntakeUrl(space.slug);
+  const bookingUrl = intakeUrl.replace('/apply/', '/book/');
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-8 max-w-[1120px]">
+      {/* ── Page header ──────────────────────────────────────────────────── */}
+      <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
             {space.emoji} {space.name}
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <p className="text-sm text-muted-foreground mt-1">
             Your leasing command center
           </p>
         </div>
         <Link
           href={`/s/${slug}/leads`}
-          className="hidden sm:flex items-center gap-1.5 text-sm text-primary font-medium hover:underline underline-offset-2"
+          className="hidden sm:inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:underline underline-offset-2"
         >
           View all leads <ArrowRight size={14} />
         </Link>
       </div>
 
-      {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      {/* ── Summary stats ────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
-          {
-            label: 'New applications',
-            value: newLeadCount,
-            sub: 'unread',
-            icon: PhoneIncoming,
-            accent: newLeadCount > 0,
-          },
-          {
-            label: 'Total leads',
-            value: totalLeads,
-            sub: 'all time',
-            icon: TrendingUp,
-            accent: false,
-          },
-          {
-            label: 'Clients',
-            value: contactCount,
-            sub: 'in CRM',
-            icon: Users,
-            accent: false,
-          },
-          {
-            label: 'Active deals',
-            value: dealCount,
-            sub: formatCurrency(totalValue),
-            icon: null,
-            accent: false,
-          },
-          {
-            label: 'Upcoming tours',
-            value: upcomingTourCount,
-            sub: upcomingTourCount > 0 ? 'scheduled' : 'none',
-            icon: CalendarDays,
-            accent: upcomingTourCount > 0,
-          },
-          {
-            label: 'Follow-ups due',
-            value: followUpDue,
-            sub: followUpDue > 0 ? 'need attention' : 'all clear',
-            icon: null,
-            accent: followUpDue > 0,
-          },
+          { label: 'New leads', value: newLeadCount, sub: 'unread', icon: PhoneIncoming, accent: newLeadCount > 0 },
+          { label: 'Total leads', value: totalLeads, sub: 'all time', icon: TrendingUp, accent: false },
+          { label: 'Clients', value: contactCount, sub: 'in CRM', icon: Users, accent: false },
+          { label: 'Active deals', value: dealCount, sub: formatCurrency(totalValue), icon: Briefcase, accent: false },
+          { label: 'Tours', value: upcomingTourCount, sub: upcomingTourCount > 0 ? 'scheduled' : 'none', icon: CalendarDays, accent: upcomingTourCount > 0 },
+          { label: 'Follow-ups', value: followUpDue, sub: followUpDue > 0 ? 'due now' : 'all clear', icon: AlertCircle, accent: followUpDue > 0 },
         ].map(({ label, value, sub, icon: Icon, accent }) => (
-          <Card
-            key={label}
-            className={accent ? 'border-primary/30 bg-primary/5' : ''}
-          >
-            <CardContent className="px-4 py-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                  <p className={`text-2xl font-bold mt-0.5 ${accent ? 'text-primary' : ''}`}>
-                    {value}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+          <Card key={label} className={accent ? 'border-primary/30 bg-primary/5' : ''}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className={`w-8 h-8 rounded-md flex items-center justify-center ${accent ? 'bg-primary/10' : 'bg-muted'}`}>
+                  <Icon size={15} className={accent ? 'text-primary' : 'text-muted-foreground'} />
                 </div>
-                {Icon && (
-                  <div className={`w-8 h-8 rounded-md flex items-center justify-center ${accent ? 'bg-primary/10' : 'bg-muted'}`}>
-                    <Icon size={15} className={accent ? 'text-primary' : 'text-muted-foreground'} />
-                  </div>
-                )}
               </div>
+              <p className={`text-2xl font-bold tabular-nums ${accent ? 'text-primary' : 'text-foreground'}`}>
+                {value}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">{label} · {sub}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Intake link card */}
-      <Card>
-        <CardContent className="px-5 py-5">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center">
-              <Link2 size={14} className="text-primary" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold">Intake link</p>
-              <p className="text-xs text-muted-foreground">Share to receive renter applications</p>
-            </div>
-            <div className="ml-auto flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-full px-2 py-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                Live
-              </span>
-            </div>
-          </div>
+      {/* ── Share links (side by side) ────────────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <ShareLinkCard
+          icon={Link2}
+          title="Intake link"
+          description="Receive renter applications"
+          url={intakeUrl}
+          previewHref={intakeUrl}
+        />
+        <ShareLinkCard
+          icon={CalendarDays}
+          title="Tour booking"
+          description="Let prospects schedule tours"
+          url={bookingUrl}
+          previewHref={`/book/${space.slug}`}
+        />
+      </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2.5 break-all font-mono text-muted-foreground border border-border">
-              {intakeUrl}
-            </code>
-            <div className="flex gap-2 flex-shrink-0">
-              <CopyLinkButton url={intakeUrl} />
-              <a
-                href={intakeUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-colors"
-              >
-                <ExternalLink size={13} />
-                Preview
-              </a>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tour booking link */}
-      <Card>
-        <CardContent className="px-5 py-5">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center">
-              <CalendarDays size={14} className="text-primary" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold">Tour booking link</p>
-              <p className="text-xs text-muted-foreground">Share to let prospects schedule tours</p>
-            </div>
-            <div className="ml-auto flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-full px-2 py-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                Live
-              </span>
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2.5 break-all font-mono text-muted-foreground border border-border">
-              {`${intakeUrl.replace('/apply/', '/book/')}`}
-            </code>
-            <div className="flex gap-2 flex-shrink-0">
-              <CopyLinkButton url={intakeUrl.replace('/apply/', '/book/')} />
-              <a
-                href={`/book/${space.slug}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-colors"
-              >
-                <ExternalLink size={13} />
-                Preview
-              </a>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Upcoming tours */}
-      {upcomingTours.length > 0 && (
-        <Card>
-          <CardContent className="px-5 py-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center">
-                  <CalendarDays size={14} className="text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">Upcoming tours</p>
-                  <p className="text-xs text-muted-foreground">{upcomingTourCount} scheduled</p>
-                </div>
-              </div>
-              <Link href={`/s/${slug}/tours`} className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
-                View all <ArrowRight size={12} />
-              </Link>
-            </div>
-            <div className="space-y-2">
-              {upcomingTours.map((tour: any) => (
-                <Link key={tour.id} href={`/s/${slug}/tours`} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
-                      {new Date(tour.startsAt).getDate()}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{tour.guestName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(tour.startsAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
-                        {' at '}
-                        {new Date(tour.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                      </p>
-                    </div>
-                  </div>
-                  {tour.propertyAddress && (
-                    <span className="text-xs text-muted-foreground truncate max-w-[150px]">{tour.propertyAddress}</span>
-                  )}
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Follow-up widget */}
+      {/* ── Follow-up widget ──────────────────────────────────────────────── */}
       <FollowUpWidget slug={slug} contacts={followUpContacts} />
 
-      {/* Recent applications + pipeline side by side on larger screens */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        {/* Recent applications */}
-        <div className="lg:col-span-3">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold">Recent applications</p>
+      {/* ── Main content: Applications + Sidebar ──────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent applications — 2/3 width */}
+        <div className="lg:col-span-2">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-foreground">Recent applications</h2>
             <Link
               href={`/s/${slug}/leads`}
               className="text-xs text-primary font-medium hover:underline underline-offset-2 flex items-center gap-1"
@@ -315,7 +170,7 @@ export default async function DashboardPage({
           </div>
           {recentLeads.length === 0 ? (
             <Card>
-              <CardContent className="px-5 py-8 text-center">
+              <CardContent className="p-8 text-center">
                 <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mx-auto mb-3">
                   <PhoneIncoming size={18} className="text-muted-foreground" />
                 </div>
@@ -326,20 +181,20 @@ export default async function DashboardPage({
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-2">
-              {recentLeads.map((lead) => {
-                const isNew = lead.tags.includes('new-lead');
-                const scoreBadge =
-                  lead.scoreLabel === 'hot'  ? { label: 'Hot',  cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' } :
-                  lead.scoreLabel === 'warm' ? { label: 'Warm', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' } :
-                  lead.scoreLabel === 'cold' ? { label: 'Cold', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-400' } :
-                  null;
-                return (
-                  <Link key={lead.id} href={`/s/${slug}/leads`}>
-                    <div className={`rounded-lg border bg-card px-4 py-3 hover:shadow-sm transition-all duration-150 ${isNew ? 'border-primary/30' : 'border-border'}`}>
-                      <div className="flex items-start justify-between gap-3">
+            <Card>
+              <div className="divide-y divide-border">
+                {recentLeads.map((lead) => {
+                  const isNew = lead.tags.includes('new-lead');
+                  const scoreBadge =
+                    lead.scoreLabel === 'hot'  ? { label: 'Hot',  cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' } :
+                    lead.scoreLabel === 'warm' ? { label: 'Warm', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' } :
+                    lead.scoreLabel === 'cold' ? { label: 'Cold', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-400' } :
+                    null;
+                  return (
+                    <Link key={lead.id} href={`/s/${slug}/leads`} className="block">
+                      <div className={`flex items-start justify-between gap-3 px-5 py-3.5 hover:bg-muted/40 transition-colors ${isNew ? 'bg-primary/[0.03]' : ''}`}>
                         <div className="flex items-start gap-3 min-w-0">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0 mt-0.5">
+                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0 mt-0.5">
                             {lead.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
                           </div>
                           <div className="min-w-0">
@@ -361,7 +216,7 @@ export default async function DashboardPage({
                                 </span>
                               )}
                               {lead.preferences && (
-                                <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                                <span className="text-xs text-muted-foreground truncate max-w-[140px]">
                                   · {lead.preferences}
                                 </span>
                               )}
@@ -383,58 +238,149 @@ export default async function DashboardPage({
                           </span>
                         </div>
                       </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </Card>
           )}
         </div>
 
-        {/* Pipeline stages */}
-        <div className="lg:col-span-2">
-          <p className="text-sm font-semibold mb-3">Pipeline</p>
-          <Card>
-            <CardContent className="px-4 py-4">
-              {dealsByStage.length === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-xs text-muted-foreground">No active deals.</p>
-                  <Link
-                    href={`/s/${slug}/deals`}
-                    className="text-xs text-primary font-medium hover:underline mt-1 inline-block"
-                  >
-                    Go to deals →
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {dealsByStage.map((stage) => (
-                    <div key={stage.id} className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: stage.color }}
-                        />
-                        <span className="text-sm truncate">{stage.name}</span>
-                        <span className="text-xs text-muted-foreground flex-shrink-0">
-                          {stage.count}
+        {/* Right sidebar — Pipeline + Tours */}
+        <div className="space-y-6">
+          {/* Pipeline */}
+          <div>
+            <h2 className="text-sm font-semibold text-foreground mb-4">Pipeline</h2>
+            <Card>
+              <CardContent className="p-4">
+                {dealsByStage.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-xs text-muted-foreground">No active deals.</p>
+                    <Link
+                      href={`/s/${slug}/deals`}
+                      className="text-xs text-primary font-medium hover:underline mt-1 inline-block"
+                    >
+                      Go to deals →
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {dealsByStage.map((stage) => (
+                      <div key={stage.id} className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: stage.color }}
+                          />
+                          <span className="text-sm truncate">{stage.name}</span>
+                          <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
+                            {stage.count}
+                          </span>
+                        </div>
+                        <span className="text-sm font-medium flex-shrink-0 tabular-nums">
+                          {formatCurrency(stage.value)}
                         </span>
                       </div>
-                      <span className="text-sm font-medium flex-shrink-0 tabular-nums">
-                        {formatCurrency(stage.value)}
-                      </span>
+                    ))}
+                    <div className="border-t border-border pt-3 flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">Total pipeline</span>
+                      <span className="text-sm font-bold tabular-nums">{formatCurrency(totalValue)}</span>
                     </div>
-                  ))}
-                  <div className="border-t border-border pt-2 flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Total pipeline</span>
-                    <span className="text-sm font-semibold tabular-nums">{formatCurrency(totalValue)}</span>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Upcoming tours */}
+          {upcomingTours.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-foreground">Upcoming tours</h2>
+                <Link href={`/s/${slug}/tours`} className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
+                  View all <ArrowRight size={12} />
+                </Link>
+              </div>
+              <Card>
+                <div className="divide-y divide-border">
+                  {upcomingTours.map((tour: any) => (
+                    <Link key={tour.id} href={`/s/${slug}/tours`} className="block">
+                      <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
+                        <div className="w-10 h-10 rounded-md bg-muted flex flex-col items-center justify-center flex-shrink-0">
+                          <span className="text-[10px] font-medium text-muted-foreground uppercase leading-none">
+                            {new Date(tour.startsAt).toLocaleDateString([], { month: 'short' })}
+                          </span>
+                          <span className="text-sm font-bold text-foreground leading-tight">
+                            {new Date(tour.startsAt).getDate()}
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{tour.guestName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(tour.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                            {tour.propertyAddress && ` · ${tour.propertyAddress}`}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </Card>
+            </div>
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Share link card component ───────────────────────────────────────────────
+
+function ShareLinkCard({
+  icon: Icon,
+  title,
+  description,
+  url,
+  previewHref,
+}: {
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  title: string;
+  description: string;
+  url: string;
+  previewHref: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Icon size={15} className="text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold leading-tight">{title}</p>
+            <p className="text-xs text-muted-foreground">{description}</p>
+          </div>
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-md px-2 py-0.5 flex-shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            Live
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 text-xs bg-muted rounded-md px-3 py-2 break-all font-mono text-muted-foreground border border-border truncate">
+            {url}
+          </code>
+          <CopyLinkButton url={url} />
+          <a
+            href={previewHref}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-colors flex-shrink-0"
+          >
+            <ExternalLink size={13} />
+            Preview
+          </a>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
