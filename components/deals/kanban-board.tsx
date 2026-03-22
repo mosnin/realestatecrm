@@ -177,7 +177,16 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
 
   async function handleDeleteDeal(id: string) {
     if (!confirm('Delete this deal?')) return;
-    await fetch(`/api/deals/${id}`, { method: 'DELETE' });
+    try {
+      const res = await fetch(`/api/deals/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Deal deleted');
+      } else {
+        toast.error('Failed to delete deal');
+      }
+    } catch {
+      toast.error('Failed to delete deal');
+    }
     if (panelDeal?.id === id) setPanelDeal(null);
     fetchData();
   }

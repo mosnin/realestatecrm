@@ -20,6 +20,7 @@ import { buildIntakeUrl } from '@/lib/intake';
 import { CopyLinkButton } from './copy-link-button';
 import { timeAgo, formatCurrency } from '@/lib/formatting';
 import { FollowUpWidget, type FollowUpContact } from '@/components/dashboard/follow-up-widget';
+import { OnboardingChecklist } from '@/components/dashboard/onboarding-checklist';
 
 export async function generateMetadata({
   params,
@@ -107,6 +108,15 @@ export default async function DashboardPage({
           View all leads <ArrowRight size={14} />
         </Link>
       </div>
+
+      {/* ── Onboarding checklist ──────────────────────────────────────────── */}
+      <OnboardingChecklist
+        slug={slug}
+        hasLeads={totalLeads > 0}
+        hasContacts={contactCount > 0}
+        hasTours={upcomingTourCount > 0}
+        hasDeals={dealCount > 0}
+      />
 
       {/* ── Summary stats ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">

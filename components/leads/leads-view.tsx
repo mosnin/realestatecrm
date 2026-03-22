@@ -35,6 +35,7 @@ import type { Contact, ApplicationData, LeadScoreDetails, SavedView } from '@/li
 import { downloadCSV } from '@/lib/csv';
 import { timeAgo, formatMoney, getInitials, formatFollowUpDate, toDateInputValue } from '@/lib/formatting';
 import { LEAD_TIERS, type TierKey } from '@/lib/constants';
+import { toast } from 'sonner';
 
 const TIERS = LEAD_TIERS;
 
@@ -234,7 +235,12 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
   async function handleBulkDelete() {
     const ids = [...selectedIds];
     if (!confirm(`Delete ${ids.length} lead${ids.length !== 1 ? 's' : ''}?`)) return;
-    await Promise.all(ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })));
+    try {
+      await Promise.all(ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })));
+      toast.success(`Deleted ${ids.length} leads`);
+    } catch {
+      toast.error('Failed to delete leads');
+    }
     setLeads((prev) => prev.filter((l) => !ids.includes(l.id)));
     setSelectedIds(new Set());
   }
