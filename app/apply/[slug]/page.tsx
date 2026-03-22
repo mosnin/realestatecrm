@@ -13,11 +13,10 @@ export default async function PublicApplyPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  // Parallelize both queries instead of running them sequentially
   const [{ data: settingsData }, { data: ownerData }] = await Promise.all([
     supabase
       .from('SpaceSetting')
-      .select('intakePageTitle, intakePageIntro, businessName, phoneNumber, logoUrl, realtorPhotoUrl')
+      .select('intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl')
       .eq('spaceId', space.id)
       .maybeSingle(),
     supabase
@@ -31,16 +30,14 @@ export default async function PublicApplyPage({
     intakePageTitle: string | null;
     intakePageIntro: string | null;
     businessName: string | null;
-    phoneNumber: string | null;
     logoUrl: string | null;
     realtorPhotoUrl: string | null;
   } | null;
 
-  const pageTitle = settings?.intakePageTitle || `Apply with ${space.name}`;
+  const pageTitle = settings?.intakePageTitle || 'Rental Application';
   const pageIntro = settings?.intakePageIntro || "Share your rental preferences and we'll follow up with next steps.";
   const businessName = settings?.businessName || space.name;
   const agentName = ownerData?.name || businessName;
-  const agentPhone = settings?.phoneNumber || null;
   const agentPhoto = settings?.realtorPhotoUrl || ownerData?.avatar || null;
   const logoUrl = settings?.logoUrl || null;
 
@@ -49,7 +46,7 @@ export default async function PublicApplyPage({
       logoUrl={logoUrl}
       businessName={businessName}
       agentName={agentName}
-      agentPhone={agentPhone}
+      agentPhone={null}
       agentPhoto={agentPhoto}
       pageTitle={pageTitle}
       pageIntro={pageIntro}

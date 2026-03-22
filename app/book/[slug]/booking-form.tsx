@@ -183,7 +183,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
 
   if (step === 'confirmed') {
     return (
-      <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/20 p-8 text-center space-y-4">
+      <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-8 text-center space-y-4">
         <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center mx-auto">
           <Check size={28} className="text-emerald-600" />
         </div>
@@ -206,7 +206,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
   // Property selection step
   if (step === 'property' && properties.length > 0) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
+      <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-6 space-y-5">
         <p className="text-xs font-medium text-muted-foreground">Which property are you interested in?</p>
         <div className="space-y-2">
           {properties.map((p) => (
@@ -240,7 +240,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
 
   if (step === 'details') {
     return (
-      <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
+      <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-6 space-y-5">
         <button
           type="button"
           onClick={() => setStep('date')}
@@ -313,7 +313,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
 
   // Date + time selection step
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
+    <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Clock size={14} />

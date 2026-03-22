@@ -69,7 +69,7 @@ export function TourManageClient({ tour, token, businessName, bookingSlug }: Tou
 
   return (
     <div className="w-full max-w-md">
-      <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
+      <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-6 space-y-5">
         <div className="text-center space-y-1">
           <h1 className="text-xl font-semibold">Your Tour</h1>
           <p className="text-sm text-muted-foreground">

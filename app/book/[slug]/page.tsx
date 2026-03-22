@@ -16,7 +16,7 @@ export default async function PublicBookingPage({
   const [{ data: settingsData }, { data: ownerData }] = await Promise.all([
     supabase
       .from('SpaceSetting')
-      .select('tourBookingPageTitle, tourBookingPageIntro, businessName, tourDuration, timezone, phoneNumber, logoUrl, realtorPhotoUrl')
+      .select('tourBookingPageTitle, tourBookingPageIntro, businessName, tourDuration, timezone, logoUrl, realtorPhotoUrl')
       .eq('spaceId', space.id)
       .maybeSingle(),
     supabase
@@ -32,18 +32,16 @@ export default async function PublicBookingPage({
     businessName: string | null;
     tourDuration: number | null;
     timezone: string | null;
-    phoneNumber: string | null;
     logoUrl: string | null;
     realtorPhotoUrl: string | null;
   } | null;
 
-  const pageTitle = settings?.tourBookingPageTitle || `Book a Tour with ${space.name}`;
+  const pageTitle = settings?.tourBookingPageTitle || 'Book a Tour';
   const pageIntro = settings?.tourBookingPageIntro || 'Pick a time that works for you and we\'ll confirm your tour.';
   const businessName = settings?.businessName || space.name;
   const duration = settings?.tourDuration || 30;
   const timezone = settings?.timezone || 'America/New_York';
   const agentName = ownerData?.name || businessName;
-  const agentPhone = settings?.phoneNumber || null;
   const agentPhoto = settings?.realtorPhotoUrl || ownerData?.avatar || null;
   const logoUrl = settings?.logoUrl || null;
 
@@ -52,7 +50,7 @@ export default async function PublicBookingPage({
       logoUrl={logoUrl}
       businessName={businessName}
       agentName={agentName}
-      agentPhone={agentPhone}
+      agentPhone={null}
       agentPhoto={agentPhoto}
       pageTitle={pageTitle}
       pageIntro={pageIntro}

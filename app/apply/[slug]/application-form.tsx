@@ -444,7 +444,7 @@ export function ApplicationForm({
   // ── Success screen ──
   if (submitted) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-6 md:p-8 text-center space-y-5">
+      <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-6 md:p-8 text-center space-y-5">
         <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto">
           <CheckCircle2 size={28} className="text-green-600" />
         </div>
@@ -760,9 +760,9 @@ export function ApplicationForm({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+    <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm overflow-hidden">
       {/* Progress */}
-      <div className="px-5 pt-5 pb-3 space-y-3 border-b border-border/50">
+      <div className="px-5 pt-5 pb-3 space-y-3 border-b border-border/40">
         <ProgressBar current={currentStepIndex + 1} total={totalSteps} />
         <StepIndicator current={step} steps={STEPS} />
       </div>

@@ -1,4 +1,4 @@
-import { Phone, Building2 } from 'lucide-react';
+import { BrandLogo } from '@/components/brand-logo';
 
 interface PublicPageShellProps {
   logoUrl: string | null;
@@ -7,7 +7,7 @@ interface PublicPageShellProps {
   agentPhone: string | null;
   agentPhoto: string | null;
   pageTitle: string;
-  pageIntro: string;
+  pageIntro?: string;
   trustLine: string;
   children: React.ReactNode;
 }
@@ -16,7 +16,6 @@ export function PublicPageShell({
   logoUrl,
   businessName,
   agentName,
-  agentPhone,
   agentPhoto,
   pageTitle,
   pageIntro,
@@ -24,69 +23,65 @@ export function PublicPageShell({
   children,
 }: PublicPageShellProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-accent/40 via-background to-background">
-      {/* Header bar */}
-      <header className="max-w-2xl mx-auto px-4 pt-6 pb-2">
-        <div className="flex items-center gap-3">
-          {logoUrl ? (
-            <img src={logoUrl} alt={businessName} className="h-8 object-contain" />
-          ) : (
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Building2 size={16} className="text-primary" />
+    <div className="min-h-screen bg-[#f5f5f7] dark:bg-background">
+      {/* ── Top bar ──────────────────────────────────────────────────────── */}
+      <header className="bg-white dark:bg-card border-b border-border">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center justify-between h-14 sm:h-16">
+            {/* Left: realtor branding */}
+            <div className="flex items-center gap-3 min-w-0">
+              {agentPhoto ? (
+                <img
+                  src={agentPhoto}
+                  alt={agentName}
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover flex-shrink-0"
+                />
+              ) : null}
+              {logoUrl ? (
+                <img src={logoUrl} alt={businessName} className="h-6 sm:h-7 object-contain" />
+              ) : (
+                <span className="text-sm sm:text-base font-semibold text-foreground truncate">
+                  {businessName}
+                </span>
+              )}
             </div>
-          )}
-          <span className="text-sm font-medium text-muted-foreground">{businessName}</span>
+
+            {/* Right: powered by Chippi */}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className="text-[11px] text-muted-foreground/70 hidden sm:inline">Powered by</span>
+              <BrandLogo className="h-4 sm:h-5" />
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Hero section */}
-      <div className="max-w-2xl mx-auto px-4 pt-6 pb-8">
-        <div className="space-y-8">
-          <div className="text-center space-y-5">
-            {/* Agent card */}
-            {(agentPhoto || agentName) && (
-              <div className="flex flex-col items-center gap-3">
-                {agentPhoto && (
-                  <img
-                    src={agentPhoto}
-                    alt={agentName}
-                    className="w-20 h-20 rounded-full object-cover ring-4 ring-background shadow-lg"
-                  />
-                )}
-                <div className="space-y-1">
-                  <p className="text-base font-semibold text-foreground">{agentName}</p>
-                  {agentPhone && (
-                    <a
-                      href={`tel:${agentPhone}`}
-                      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      <Phone size={12} />
-                      {agentPhone}
-                    </a>
-                  )}
-                </div>
-              </div>
-            )}
+      {/* ── Accent strip ─────────────────────────────────────────────────── */}
+      <div className="h-1 bg-primary" />
 
-            <div className="space-y-2">
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
-                {pageTitle}
-              </h1>
-              <p className="text-muted-foreground text-sm md:text-base max-w-md mx-auto leading-relaxed">
+      {/* ── Page content ─────────────────────────────────────────────────── */}
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <div className="space-y-6">
+          {/* Title area */}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+              {pageTitle}
+            </h1>
+            {pageIntro && (
+              <p className="text-sm text-muted-foreground mt-1 max-w-lg">
                 {pageIntro}
               </p>
-            </div>
+            )}
           </div>
 
           {/* Main content */}
           {children}
-
-          {/* Footer trust line */}
-          <p className="text-center text-xs text-muted-foreground pt-2 pb-6">
-            {trustLine}
-          </p>
         </div>
-      </div>
+
+        {/* Footer */}
+        <p className="text-center text-xs text-muted-foreground mt-10 pb-6">
+          {trustLine}
+        </p>
+      </main>
     </div>
   );
 }
@@ -105,23 +100,36 @@ export function PublicPageMinimalShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-accent/40 via-background to-background flex flex-col">
-      {/* Header bar */}
-      <header className="max-w-md mx-auto w-full px-4 pt-6 pb-2">
-        <div className="flex items-center justify-center gap-3">
-          {logoUrl ? (
-            <img src={logoUrl} alt={businessName} className="h-7 object-contain" />
-          ) : (
-            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Building2 size={14} className="text-primary" />
+    <div className="min-h-screen bg-[#f5f5f7] dark:bg-background flex flex-col">
+      {/* ── Top bar ────────────────────────────────────────────────────── */}
+      <header className="bg-white dark:bg-card border-b border-border">
+        <div className="max-w-lg mx-auto px-4">
+          <div className="flex items-center justify-between h-14">
+            {/* Left: business name */}
+            <div className="flex items-center gap-2 min-w-0">
+              {logoUrl ? (
+                <img src={logoUrl} alt={businessName} className="h-6 object-contain" />
+              ) : (
+                <span className="text-sm font-semibold text-foreground truncate">
+                  {businessName}
+                </span>
+              )}
             </div>
-          )}
-          <span className="text-sm font-medium text-muted-foreground">{businessName}</span>
+
+            {/* Right: powered by */}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className="text-[11px] text-muted-foreground/70 hidden sm:inline">Powered by</span>
+              <BrandLogo className="h-4" />
+            </div>
+          </div>
         </div>
       </header>
 
+      {/* ── Accent strip ───────────────────────────────────────────────── */}
+      <div className="h-1 bg-primary" />
+
       {/* Centered content */}
-      <div className="flex-1 flex items-center justify-center p-4">
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
         {children}
       </div>
     </div>
