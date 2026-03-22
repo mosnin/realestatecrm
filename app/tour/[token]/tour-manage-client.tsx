@@ -151,7 +151,7 @@ export function TourManageClient({ tour, token, businessName, bookingSlug }: Tou
           )}
         </div>
 
-        <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+        <p className="text-xs text-muted-foreground text-center leading-relaxed">
           Need help? Contact {businessName} directly.
         </p>
       </div>

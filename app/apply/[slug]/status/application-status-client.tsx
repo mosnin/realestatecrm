@@ -122,7 +122,7 @@ export function ApplicationStatusClient({ contact, businessName }: ApplicationSt
           )}
         </div>
 
-        <p className="text-[10px] text-muted-foreground text-center">
+        <p className="text-xs text-muted-foreground text-center">
           Questions? Contact {businessName} directly.
         </p>
       </div>

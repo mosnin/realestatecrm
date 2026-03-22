@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react';
 import { CalendarDays, Clock, Check, Loader2, ChevronLeft, ChevronRight, MapPin, Globe, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 
 interface BookingFormProps {
   slug: string;
@@ -264,45 +268,45 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
           </div>
         )}
 
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Full Name *</label>
-            <input type="text" value={guestName} onChange={(e) => setGuestName(e.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="Jane Smith" />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="guestName">Full Name <span className="text-destructive">*</span></Label>
+              <Input id="guestName" type="text" value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Jane Smith" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="guestEmail">Email <span className="text-destructive">*</span></Label>
+              <Input id="guestEmail" type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="jane@example.com" />
+            </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Email *</label>
-            <input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="jane@example.com" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="guestPhone">Phone</Label>
+              <Input id="guestPhone" type="tel" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="(555) 123-4567" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="propertyAddress">Property Address</Label>
+              <Input id="propertyAddress" type="text" value={propertyAddress} onChange={(e) => setPropertyAddress(e.target.value)} placeholder="123 Main St, Apt 4B" />
+            </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Phone</label>
-            <input type="tel" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="(555) 123-4567" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Property Address</label>
-            <input type="text" value={propertyAddress} onChange={(e) => setPropertyAddress(e.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" placeholder="123 Main St, Apt 4B" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Notes</label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" placeholder="Anything we should know?" />
+          <div className="space-y-1.5">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Anything we should know?" />
           </div>
         </div>
 
         {error && <p className="text-xs text-destructive">{error}</p>}
 
-        <button
+        <Button
           onClick={handleSubmit}
           disabled={submitting || !guestName.trim() || !guestEmail.trim()}
-          className={cn(
-            'w-full rounded-xl py-3 text-sm font-semibold transition-all',
-            submitting || !guestName.trim() || !guestEmail.trim()
-              ? 'bg-muted text-muted-foreground cursor-not-allowed'
-              : 'bg-primary text-primary-foreground hover:bg-primary/90'
-          )}
+          className="w-full"
+          size="lg"
         >
           {submitting ? (
-            <span className="flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> Booking...</span>
+            <><Loader2 size={16} className="mr-2 animate-spin" /> Booking...</>
           ) : 'Confirm Booking'}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -350,12 +354,21 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
           {showWaitlist && !waitlistDone && (
             <div className="text-left space-y-3 max-w-sm mx-auto">
               <p className="text-xs text-muted-foreground">Get notified when a slot opens up.</p>
-              <input type="date" value={waitlistDate} min={new Date().toISOString().split('T')[0]} onChange={(e) => setWaitlistDate(e.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
-              <input type="text" value={waitlistName} onChange={(e) => setWaitlistName(e.target.value)} placeholder="Your name" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
-              <input type="email" value={waitlistEmail} onChange={(e) => setWaitlistEmail(e.target.value)} placeholder="Your email" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
-              <button onClick={handleWaitlistSubmit} disabled={waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim() || !waitlistDate} className={cn('w-full rounded-xl py-2.5 text-sm font-semibold transition-all', waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim() ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground hover:bg-primary/90')}>
+              <div className="space-y-1.5">
+                <Label htmlFor="waitlistDate">Preferred date</Label>
+                <Input id="waitlistDate" type="date" value={waitlistDate} min={new Date().toISOString().split('T')[0]} onChange={(e) => setWaitlistDate(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="waitlistName">Your name</Label>
+                <Input id="waitlistName" type="text" value={waitlistName} onChange={(e) => setWaitlistName(e.target.value)} placeholder="Jane Smith" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="waitlistEmail">Your email</Label>
+                <Input id="waitlistEmail" type="email" value={waitlistEmail} onChange={(e) => setWaitlistEmail(e.target.value)} placeholder="jane@example.com" />
+              </div>
+              <Button onClick={handleWaitlistSubmit} disabled={waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim() || !waitlistDate} className="w-full">
                 {waitlistSubmitting ? 'Joining...' : 'Join Waitlist'}
-              </button>
+              </Button>
             </div>
           )}
           {waitlistDone && (
@@ -417,13 +430,10 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
           )}
 
           {selectedTime && (
-            <button
-              onClick={() => setStep('details')}
-              className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
-            >
+            <Button onClick={() => setStep('details')} className="w-full" size="lg">
               Continue
-              <ChevronRight size={16} />
-            </button>
+              <ChevronRight size={16} className="ml-1" />
+            </Button>
           )}
         </>
       )}

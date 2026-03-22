@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { ApplicationStatusClient } from './application-status-client';
+import { PublicPageMinimalShell } from '@/components/public-page-shell';
 
 export default async function ApplicationStatusPage({
   params,
@@ -18,23 +19,30 @@ export default async function ApplicationStatusPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  const { data: contact } = await supabase
-    .from('Contact')
-    .select('id, name, applicationStatus, applicationStatusNote, applicationData, scoringStatus, createdAt')
-    .eq('applicationRef', ref)
-    .eq('spaceId', space.id)
-    .maybeSingle();
+  const [{ data: contact }, { data: settings }] = await Promise.all([
+    supabase
+      .from('Contact')
+      .select('id, name, applicationStatus, applicationStatusNote, applicationData, scoringStatus, createdAt')
+      .eq('applicationRef', ref)
+      .eq('spaceId', space.id)
+      .maybeSingle(),
+    supabase
+      .from('SpaceSetting')
+      .select('businessName, logoUrl')
+      .eq('spaceId', space.id)
+      .maybeSingle(),
+  ]);
 
   if (!contact) notFound();
 
-  const { data: settings } = await supabase
-    .from('SpaceSetting')
-    .select('businessName')
-    .eq('spaceId', space.id)
-    .maybeSingle();
+  const businessName = settings?.businessName || space.name;
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <PublicPageMinimalShell
+      logoUrl={settings?.logoUrl}
+      businessName={businessName}
+      emoji={space.emoji}
+    >
       <ApplicationStatusClient
         contact={{
           name: contact.name,
@@ -42,8 +50,8 @@ export default async function ApplicationStatusPage({
           statusNote: contact.applicationStatusNote,
           createdAt: contact.createdAt,
         }}
-        businessName={settings?.businessName || space.name}
+        businessName={businessName}
       />
-    </div>
+    </PublicPageMinimalShell>
   );
 }

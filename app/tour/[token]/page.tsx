@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { TourManageClient } from './tour-manage-client';
+import { PublicPageMinimalShell } from '@/components/public-page-shell';
 
 export default async function TourManagePage({
   params,
@@ -17,20 +18,27 @@ export default async function TourManagePage({
 
   if (!tour) notFound();
 
-  const { data: settings } = await supabase
-    .from('SpaceSetting')
-    .select('businessName')
-    .eq('spaceId', tour.spaceId)
-    .maybeSingle();
+  const [{ data: settings }, { data: space }] = await Promise.all([
+    supabase
+      .from('SpaceSetting')
+      .select('businessName, logoUrl')
+      .eq('spaceId', tour.spaceId)
+      .maybeSingle(),
+    supabase
+      .from('Space')
+      .select('name, slug, emoji')
+      .eq('id', tour.spaceId)
+      .maybeSingle(),
+  ]);
 
-  const { data: space } = await supabase
-    .from('Space')
-    .select('name, slug')
-    .eq('id', tour.spaceId)
-    .maybeSingle();
+  const businessName = settings?.businessName || space?.name || 'the property';
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <PublicPageMinimalShell
+      logoUrl={settings?.logoUrl}
+      businessName={businessName}
+      emoji={space?.emoji}
+    >
       <TourManageClient
         tour={{
           id: tour.id,
@@ -42,9 +50,9 @@ export default async function TourManagePage({
           status: tour.status,
         }}
         token={token}
-        businessName={settings?.businessName || space?.name || 'the property'}
+        businessName={businessName}
         bookingSlug={space?.slug || ''}
       />
-    </div>
+    </PublicPageMinimalShell>
   );
 }
