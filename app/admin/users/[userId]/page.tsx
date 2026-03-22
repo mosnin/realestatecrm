@@ -248,7 +248,7 @@ export default async function AdminUserDetailPage({
               <InfoRow
                 icon={Building2}
                 label="Name"
-                value={`${fullUser.space.emoji} ${fullUser.space.name}`}
+                value={fullUser.space.name}
               />
               <InfoRow icon={Hash} label="Slug" value={fullUser.space.slug} mono />
               {intakeUrl && (

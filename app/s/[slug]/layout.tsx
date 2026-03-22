@@ -154,7 +154,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
-      <Sidebar slug={slug} spaceName={space.name} spaceEmoji={space.emoji} unreadLeadCount={unreadLeadCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} />
+      <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
         <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">

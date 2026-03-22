@@ -23,7 +23,7 @@ export default async function BrokerLayout({ children }: { children: React.React
   // Look up their realtor workspace (may not exist for broker-only accounts)
   const { data: spaceRow } = await supabase
     .from('Space')
-    .select('id, slug, name, emoji')
+    .select('id, slug, name')
     .eq('ownerId', ctx.dbUserId)
     .maybeSingle();
 
@@ -43,7 +43,6 @@ export default async function BrokerLayout({ children }: { children: React.React
 
   const slug = spaceRow?.slug as string ?? '';
   const spaceName = (spaceRow?.name as string) ?? ctx.brokerage.name;
-  const spaceEmoji = (spaceRow?.emoji as string) || '\u{1F3E0}';
 
   let unreadLeadCount = 0;
   if (spaceRow) {
@@ -65,7 +64,6 @@ export default async function BrokerLayout({ children }: { children: React.React
       <Sidebar
         slug={slug}
         spaceName={spaceName}
-        spaceEmoji={spaceEmoji}
         unreadLeadCount={unreadLeadCount}
         isBroker={true}
         isBrokerOnly={isBrokerOnly}

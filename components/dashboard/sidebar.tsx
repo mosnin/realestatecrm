@@ -22,7 +22,6 @@ import {
 interface SidebarProps {
   slug: string;
   spaceName: string;
-  spaceEmoji: string;
   unreadLeadCount: number;
   isBroker?: boolean;
   isBrokerOnly?: boolean;

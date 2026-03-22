@@ -17,7 +17,7 @@ type UserRow = {
   onboard: boolean;
   createdAt: string;
   onboardingCurrentStep: number;
-  space: { slug: string; name: string; emoji: string } | null;
+  space: { slug: string; name: string } | null;
 };
 
 const filters = [
@@ -173,7 +173,7 @@ export function UserListClient({
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {user.space && (
                       <span className="hidden sm:inline-flex text-[10px] font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5 max-w-[100px] truncate">
-                        {user.space.emoji} {user.space.slug}
+                        {user.space.slug}
                       </span>
                     )}
                     <span

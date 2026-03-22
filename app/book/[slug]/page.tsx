@@ -54,7 +54,6 @@ export default async function PublicBookingPage({
       agentName={agentName}
       agentPhone={agentPhone}
       agentPhoto={agentPhoto}
-      emoji={space.emoji}
       pageTitle={pageTitle}
       pageIntro={pageIntro}
       trustLine={`Your information is shared only with ${agentName} and used solely for scheduling.`}

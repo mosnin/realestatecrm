@@ -41,7 +41,6 @@ export default async function ApplicationStatusPage({
     <PublicPageMinimalShell
       logoUrl={settings?.logoUrl}
       businessName={businessName}
-      emoji={space.emoji}
     >
       <ApplicationStatusClient
         contact={{

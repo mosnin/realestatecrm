@@ -1,4 +1,4 @@
-import { Phone } from 'lucide-react';
+import { Phone, Building2 } from 'lucide-react';
 
 interface PublicPageShellProps {
   logoUrl: string | null;
@@ -6,7 +6,6 @@ interface PublicPageShellProps {
   agentName: string;
   agentPhone: string | null;
   agentPhoto: string | null;
-  emoji?: string;
   pageTitle: string;
   pageIntro: string;
   trustLine: string;
@@ -19,7 +18,6 @@ export function PublicPageShell({
   agentName,
   agentPhone,
   agentPhoto,
-  emoji,
   pageTitle,
   pageIntro,
   trustLine,
@@ -33,8 +31,8 @@ export function PublicPageShell({
           {logoUrl ? (
             <img src={logoUrl} alt={businessName} className="h-8 object-contain" />
           ) : (
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-sm">
-              {emoji}
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Building2 size={16} className="text-primary" />
             </div>
           )}
           <span className="text-sm font-medium text-muted-foreground">{businessName}</span>
@@ -100,12 +98,10 @@ export function PublicPageShell({
 export function PublicPageMinimalShell({
   logoUrl,
   businessName,
-  emoji,
   children,
 }: {
   logoUrl?: string | null;
   businessName: string;
-  emoji?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -115,11 +111,11 @@ export function PublicPageMinimalShell({
         <div className="flex items-center justify-center gap-3">
           {logoUrl ? (
             <img src={logoUrl} alt={businessName} className="h-7 object-contain" />
-          ) : emoji ? (
-            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-sm">
-              {emoji}
+          ) : (
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Building2 size={14} className="text-primary" />
             </div>
-          ) : null}
+          )}
           <span className="text-sm font-medium text-muted-foreground">{businessName}</span>
         </div>
       </header>

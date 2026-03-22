@@ -95,7 +95,7 @@ export default async function DashboardPage({
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            {space.emoji} {space.name}
+            {space.name}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Your leasing command center

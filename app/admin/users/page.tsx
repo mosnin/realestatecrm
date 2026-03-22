@@ -12,12 +12,12 @@ export default async function AdminUsersPage({
   const query = params.q?.trim() || '';
   const filter = params.filter || 'all';
 
-  let users: { id: string; name: string | null; email: string; onboard: boolean; createdAt: Date; onboardingCurrentStep: number; space: { slug: string; name: string; emoji: string } | null }[];
+  let users: { id: string; name: string | null; email: string; onboard: boolean; createdAt: Date; onboardingCurrentStep: number; space: { slug: string; name: string } | null }[];
   let totalCount: number;
 
   let supaQuery = supabase
     .from('User')
-    .select('id, name, email, onboard, createdAt, onboardingCurrentStep, Space(slug, name, emoji)');
+    .select('id, name, email, onboard, createdAt, onboardingCurrentStep, Space(slug, name)');
 
   if (filter === 'onboarded') supaQuery = supaQuery.eq('onboard', true);
   else if (filter === 'not-onboarded') supaQuery = supaQuery.eq('onboard', false);
@@ -48,7 +48,7 @@ export default async function AdminUsersPage({
     onboard: row.onboard as boolean,
     createdAt: row.createdAt as Date,
     onboardingCurrentStep: row.onboardingCurrentStep as number,
-    space: row.Space?.slug ? { slug: row.Space.slug as string, name: row.Space.name as string, emoji: row.Space.emoji as string } : null,
+    space: row.Space?.slug ? { slug: row.Space.slug as string, name: row.Space.name as string } : null,
   }));
 
   const { count, error: countError } = await supabase.from('User').select('*', { count: 'exact', head: true });

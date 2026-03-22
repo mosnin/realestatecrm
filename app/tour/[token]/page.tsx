@@ -26,7 +26,7 @@ export default async function TourManagePage({
       .maybeSingle(),
     supabase
       .from('Space')
-      .select('name, slug, emoji')
+      .select('name, slug')
       .eq('id', tour.spaceId)
       .maybeSingle(),
   ]);
@@ -37,7 +37,6 @@ export default async function TourManagePage({
     <PublicPageMinimalShell
       logoUrl={settings?.logoUrl}
       businessName={businessName}
-      emoji={space?.emoji}
     >
       <TourManageClient
         tour={{
