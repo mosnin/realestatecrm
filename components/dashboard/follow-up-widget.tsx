@@ -43,7 +43,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
   const overdue = contacts.filter((c) => new Date(c.followUpAt) < new Date());
 
   return (
-    <div className="rounded-2xl border border-amber-200 dark:border-amber-500/25 bg-amber-50/60 dark:bg-amber-500/5 overflow-hidden">
+    <div className="rounded-lg border border-amber-200 dark:border-amber-500/25 bg-amber-50/60 dark:bg-amber-500/5 overflow-hidden">
       {/* Header */}
       <button
         type="button"
@@ -51,7 +51,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
         className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors"
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+          <div className="w-7 h-7 rounded-md bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-shrink-0">
             <Calendar size={14} className="text-amber-600 dark:text-amber-400" />
           </div>
           <div>
@@ -116,7 +116,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span
                     className={cn(
-                      'text-[11px] font-semibold rounded-full px-2 py-0.5',
+                      'text-[11px] font-semibold rounded-md px-2 py-0.5',
                       isOverdue
                         ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
                         : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'

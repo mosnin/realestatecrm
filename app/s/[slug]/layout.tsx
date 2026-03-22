@@ -157,7 +157,7 @@ export default async function DashboardLayout({
       <Sidebar slug={slug} spaceName={space.name} spaceEmoji={space.emoji} unreadLeadCount={unreadLeadCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
-        <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-white text-gray-900">
+        <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
           {children}
           <DashboardFooter />
         </main>

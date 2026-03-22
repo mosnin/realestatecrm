@@ -278,7 +278,7 @@ export function ContactTable({ slug }: ContactTableProps) {
 
       {/* Pipeline mini bar (card view only, non-empty) */}
       {!loading && contacts.length > 0 && view === 'card' && (
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3">
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3">
           {STAGES.map((stage, i) => {
             const count = stageCounts[stage.key];
             return (
@@ -454,7 +454,7 @@ export function ContactTable({ slug }: ContactTableProps) {
       {loading && (
         <div className="grid gap-3 sm:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="rounded-xl border border-border bg-card px-5 py-4 animate-pulse">
+            <div key={i} className="rounded-lg border border-border bg-card px-5 py-4 animate-pulse">
               <div className="flex gap-3">
                 <div className="w-9 h-9 rounded-full bg-muted flex-shrink-0" />
                 <div className="flex-1 space-y-2 pt-1">

@@ -55,10 +55,10 @@ function ScoreHero({ lead }: { lead: Contact }) {
   const score = lead.leadScore != null ? Math.round(lead.leadScore) : null;
 
   return (
-    <div className={cn('flex items-center gap-3 rounded-xl px-4 py-3', tier.bg)}>
-      <div className={cn('w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 ring-2', tier.ring, tier.scoreBg)}>
+    <div className={cn('flex items-center gap-3 rounded-lg px-4 py-3', tier.bg)}>
+      <div className={cn('w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 ring-2', tier.ring, tier.scoreBg)}>
         {score != null ? (
-          <span className="text-white font-bold text-xl tabular-nums leading-none">{score}</span>
+          <span className="text-white font-bold text-lg tabular-nums leading-none">{score}</span>
         ) : (
           <TierIcon size={20} className="text-white opacity-80" />
         )}
@@ -439,7 +439,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
 
       {/* ── Empty state ── */}
       {filtered.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-border bg-card py-12 text-center px-6">
+        <div className="rounded-lg border border-dashed border-border bg-card py-12 text-center px-6">
           <p className="font-semibold text-foreground mb-1">No {tierFilter !== 'all' ? tierFilter : ''} leads</p>
           <p className="text-sm text-muted-foreground">
             {tierFilter !== 'all' ? 'Try a different filter.' : 'Share your intake link to receive applications.'}
@@ -464,7 +464,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
               <div
                 key={lead.id}
                 className={cn(
-                  'rounded-xl border bg-card overflow-hidden transition-all duration-150 hover:shadow-md',
+                  'rounded-lg border bg-card overflow-hidden transition-all duration-150 hover:shadow-md',
                   isSelected ? 'border-primary/40 bg-primary/5' :
                   tierKey === 'hot' ? 'border-emerald-200/80 dark:border-emerald-800/50' :
                   tierKey === 'warm' ? 'border-amber-200/80 dark:border-amber-800/50' :
@@ -494,7 +494,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                           {lead.name}
                         </Link>
                         {isNew && (
-                          <span className="inline-flex text-[10px] font-bold text-primary bg-primary/10 rounded-full px-2 py-0.5 flex-shrink-0">
+                          <span className="inline-flex text-[10px] font-bold text-primary bg-primary/10 rounded-md px-2 py-0.5 flex-shrink-0">
                             NEW
                           </span>
                         )}
@@ -635,7 +635,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
 
       {/* ── List view ── */}
       {view === 'list' && filtered.length > 0 && (
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className="rounded-lg border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -692,7 +692,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                             <div className="flex items-center gap-2">
                               <span className="font-medium hover:text-primary transition-colors">{lead.name}</span>
                               {isNew && (
-                                <span className="text-[10px] font-bold text-primary bg-primary/10 rounded-full px-1.5 py-0.5">NEW</span>
+                                <span className="text-[10px] font-bold text-primary bg-primary/10 rounded-md px-1.5 py-0.5">NEW</span>
                               )}
                             </div>
                           </div>
@@ -764,7 +764,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-border bg-card shadow-lg px-4 py-3">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-lg border border-border bg-card shadow-lg px-4 py-3">
           <CheckSquare size={14} className="text-primary" />
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="h-4 w-px bg-border mx-1" />

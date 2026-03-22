@@ -107,7 +107,7 @@ export default async function DashboardPage({
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {[
           {
             label: 'New applications',
@@ -166,7 +166,7 @@ export default async function DashboardPage({
                   <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
                 </div>
                 {Icon && (
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${accent ? 'bg-primary/10' : 'bg-muted'}`}>
+                  <div className={`w-8 h-8 rounded-md flex items-center justify-center ${accent ? 'bg-primary/10' : 'bg-muted'}`}>
                     <Icon size={15} className={accent ? 'text-primary' : 'text-muted-foreground'} />
                   </div>
                 )}
@@ -273,7 +273,7 @@ export default async function DashboardPage({
             </div>
             <div className="space-y-2">
               {upcomingTours.map((tour: any) => (
-                <Link key={tour.id} href={`/s/${slug}/tours`} className="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors">
+                <Link key={tour.id} href={`/s/${slug}/tours`} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
                       {new Date(tour.startsAt).getDate()}
@@ -316,7 +316,7 @@ export default async function DashboardPage({
           {recentLeads.length === 0 ? (
             <Card>
               <CardContent className="px-5 py-8 text-center">
-                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
+                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mx-auto mb-3">
                   <PhoneIncoming size={18} className="text-muted-foreground" />
                 </div>
                 <p className="text-sm font-medium text-muted-foreground">No applications yet</p>
@@ -336,7 +336,7 @@ export default async function DashboardPage({
                   null;
                 return (
                   <Link key={lead.id} href={`/s/${slug}/leads`}>
-                    <div className={`rounded-xl border bg-card px-4 py-3 hover:shadow-sm transition-all duration-150 ${isNew ? 'border-primary/30' : 'border-border'}`}>
+                    <div className={`rounded-lg border bg-card px-4 py-3 hover:shadow-sm transition-all duration-150 ${isNew ? 'border-primary/30' : 'border-border'}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 min-w-0">
                           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0 mt-0.5">
@@ -346,7 +346,7 @@ export default async function DashboardPage({
                             <div className="flex items-center gap-2">
                               <p className="text-sm font-semibold truncate">{lead.name}</p>
                               {isNew && (
-                                <span className="inline-flex text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-1.5 py-0.5 flex-shrink-0">
+                                <span className="inline-flex text-[10px] font-semibold text-primary bg-primary/10 rounded-md px-1.5 py-0.5 flex-shrink-0">
                                   New
                                 </span>
                               )}
@@ -370,7 +370,7 @@ export default async function DashboardPage({
                         </div>
                         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                           {lead.scoringStatus === 'scored' && lead.leadScore != null && scoreBadge ? (
-                            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2 py-0.5 ${scoreBadge.cls}`}>
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold rounded-md px-2 py-0.5 ${scoreBadge.cls}`}>
                               {Math.round(lead.leadScore)}
                               <span className="font-medium opacity-80">{scoreBadge.label}</span>
                             </span>
