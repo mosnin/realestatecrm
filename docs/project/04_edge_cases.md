@@ -29,6 +29,11 @@ Scenario: 7-day free trial expires without subscription.
 Expected system behavior: Show trial expired message with subscription CTA. Account paused — no automatic charges.
 Relevant page or module: /s/[slug]/billing, dashboard banner
 
+### Edge Case: Payment fails during upgrade
+Scenario: User initiates plan upgrade but Stripe payment fails (card declined).
+Expected system behavior: User stays on current plan. Show "Payment failed" error with link to update payment method. Do not partially apply the new plan.
+Relevant page or module: /s/[slug]/settings (billing tab)
+
 ## Product Edge Cases
 
 ### Edge Case: Concurrent Kanban drag-and-drop
@@ -89,3 +94,8 @@ Relevant page or module: /apply/[slug], contact detail
 Scenario: Realtor clicks an invitation link after the 7-day expiry.
 Expected system behavior: Show "Invitation expired" message with prompt to request a new invitation from the broker. Do not auto-accept or create membership.
 Relevant page or module: /invite/[token]
+
+### Edge Case: Sole owner deletes account
+Scenario: Last remaining Space owner deletes their account.
+Expected system behavior: Prevent deletion if user is the sole owner of any Space. Show "Transfer ownership or delete your workspace before deleting your account" prompt. Never allow orphaned Spaces.
+Relevant page or module: Account settings, account deletion flow

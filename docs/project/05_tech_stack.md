@@ -68,6 +68,22 @@ Geist Sans (primary), Open Sans (headings). Both loaded via next/font.
 
 Amplitude (@amplitude/unified) for product analytics. Vercel Analytics and Speed Insights for performance.
 
+### Server Actions
+
+next-safe-action for type-safe server actions with built-in Zod validation. Wraps Next.js server actions with input validation, auth checks, and typed return values.
+
+### Environment Validation
+
+T3 Env (@t3-oss/env-nextjs) for type-safe environment variables. Validates all env vars at build time — catches missing CLERK_SECRET_KEY or DATABASE_URL at startup.
+
+### Date and Number Formatting
+
+date-fns for date manipulation (relative time, ranges). Intl API for number and currency formatting. date-fns is tree-shakeable and covers gaps the Intl API doesn't.
+
+### Testing
+
+Vitest for unit and integration tests. Playwright for E2E tests. Supporting: MSW for mocking external APIs (Stripe, Clerk, OpenAI), @faker-js/faker for test data generation.
+
 ## Include When Needed (Currently Active)
 
 ### Charts
@@ -97,6 +113,24 @@ dotted-map — decorative world map visualization.
 - frimousse — emoji picker for workspace emoji
 - simplex-noise — noise generation for visual effects
 
+## Include When Needed
+
+### Complex Tables
+
+Tanstack Table (headless) — add when feature modules require sortable, filterable tables with 5+ columns. Used for leads view, contacts list, and admin user management. Pairs with shadcn table component.
+
+### File Uploads
+
+uploadthing for upload infrastructure, react-dropzone for drag-and-drop UI — add when avatar uploads, document attachments, or property photos are needed.
+
+### Background Jobs
+
+Trigger.dev or Inngest for async processing — AI lead scoring queue, email sequences, webhook handling, report generation. For simpler needs (daily cleanup), Vercel Cron Jobs.
+
+### Error Tracking
+
+Sentry (@sentry/nextjs) — captures runtime errors with stack traces, breadcrumbs, and user context. Add when deploying to production.
+
 ## Not Included (Intentional)
 
 | Library | Reason |
@@ -106,7 +140,7 @@ dotted-map — decorative world map visualization.
 | tRPC | API routes + server actions sufficient |
 | next-themes | Custom ThemeProvider already implemented |
 | Auth.js / NextAuth | Using Clerk instead |
-| T3 Env | Not currently used — env vars accessed directly |
+| T3 Env | Now included — used for build-time env validation |
 
 ## Constraints
 

@@ -78,6 +78,15 @@
 - Configure page manages intake page title/intro, tour settings, AI personalization.
 - Billing page shows subscription status.
 
+## Billing
+
+- Current plan and billing period are displayed accurately on billing page.
+- Upgrade redirects to Stripe Checkout and returns to settings/billing on completion.
+- Cancellation shows "Active until [date]" message and does not immediately remove access.
+- Invoice history is accessible and shows PDF download links.
+- Downgrade or plan change shows confirmation dialog with proration details.
+- 7-day free trial displays days remaining and converts automatically.
+
 ## Broker Portal
 
 - Broker portal at /broker shows brokerage overview.
@@ -93,6 +102,8 @@
 - Brokerage list shows all brokerages with owner, status, member count.
 - Individual user/brokerage detail pages work.
 - Non-admin redirect to /dashboard.
+- Admin actions (suspend account, change role, manage brokerage) are logged in AuditLog.
+- Admin cannot remove their own platform admin access.
 
 ## Mobile Responsiveness
 

@@ -6,6 +6,8 @@
 - [ ] Sign-in fails gracefully with invalid credentials
 - [ ] OAuth flow works (Google, etc.)
 - [ ] Logout clears Clerk session and redirects to /
+- [ ] Forgot password flow sends reset email via Clerk
+- [ ] Password reset link works and expires correctly
 
 ## Redirects
 - [ ] Unauthenticated user visiting /dashboard → redirected to /
@@ -15,6 +17,7 @@
 - [ ] Non-admin visiting /admin → redirected to /dashboard
 - [ ] Broker-only user visiting /dashboard → redirected to /broker
 - [ ] User visiting /s/[other-user-slug] → 404
+- [ ] Deep links preserve intended destination after login
 
 ## Onboarding
 - [ ] New user (no space) sees OnboardingFlow at /
@@ -33,6 +36,7 @@
 - [ ] Follow-up widget shows past-due contacts
 - [ ] Upcoming tours widget shows next tours
 - [ ] Empty states show when no data exists
+- [ ] Loading skeleton appears while data fetches
 
 ## Leads
 - [ ] Leads view shows intake-sourced contacts
@@ -80,6 +84,24 @@
 - [ ] Configure page: intake title/intro save
 - [ ] Configure page: tour settings save
 - [ ] Billing page displays subscription status
+- [ ] Workspace settings restricted to space owner
+- [ ] Notification preferences persist across sessions
+- [ ] Security settings (password change via Clerk) work correctly
+
+## Permissions
+- [ ] Each role (Platform Admin, Broker Owner, Broker Manager, Realtor Member, Solo Realtor) can only access their permitted routes
+- [ ] Sidebar hides links the user cannot access based on role
+- [ ] API endpoints enforce role checks (not just UI visibility)
+- [ ] Role changes take effect without requiring re-login
+- [ ] Space-scoped routes filter data by spaceId
+
+## Billing
+- [ ] Current plan displays accurately with billing period
+- [ ] Upgrade flow completes via Stripe Checkout and returns correctly
+- [ ] Downgrade/cancel shows correct messaging and grace period
+- [ ] Stripe webhook updates subscription status in real time
+- [ ] Invoice history accessible with download links
+- [ ] 7-day trial countdown displays correctly and converts on expiry
 
 ## Broker Portal
 - [ ] Broker dashboard loads for broker_owner/broker_manager
@@ -96,6 +118,8 @@
 - [ ] Individual user detail page works
 - [ ] Individual brokerage detail page works
 - [ ] Non-admin redirected to /dashboard
+- [ ] Admin actions are logged to AuditLog
+- [ ] Admin cannot remove their own platform admin access
 
 ## Empty States
 - [ ] Dashboard empty state: intake link card always shown, prompts for no leads/deals/tours
@@ -111,6 +135,7 @@
 - [ ] Form validation errors appear inline
 - [ ] 404 page exists and is helpful
 - [ ] Rate limit errors show appropriate message
+- [ ] 500 page exists with support contact info
 
 ## Mobile
 - [ ] All pages render at 375px width without horizontal scroll

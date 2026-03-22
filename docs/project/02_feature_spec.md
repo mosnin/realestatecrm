@@ -20,6 +20,7 @@ Required in v1: Yes
 Dependencies: OpenAI API key configured.
 Key states:
 - Loading: "scoring..." indicator in leads view
+- Empty: No leads scored yet — scoring triggers automatically when first application arrives via intake link
 - Success: Score badge with tier label (Hot 85, Warm 62, Cold 30)
 - Error: Scoring fails silently — contact remains with scoringStatus='pending'
 
@@ -127,6 +128,7 @@ Required in v1: Yes
 Dependencies: Space and SpaceSetting records
 Key states:
 - Loading: Skeleton form
+- Empty: Not applicable — settings page always renders with default values pre-filled
 - Success: Settings saved with toast confirmation
 - Error: Validation errors inline
 
@@ -139,3 +141,4 @@ Dependencies: None
 Key states:
 - Loading: Not applicable (static/SSR)
 - Success: Rendered pages with navigation
+- Error: Static pages — server render failure returns Next.js default 500 page
