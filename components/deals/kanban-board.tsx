@@ -31,6 +31,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { formatCurrency as _formatCurrency } from '@/lib/formatting';
+import { toast } from 'sonner';
 
 type DealWithRelations = Deal & {
   stage: DealStage;
@@ -127,21 +128,39 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
     const targetIndex = targetStage.deals.findIndex((d) => d.id === over.id);
     const newPosition = targetIndex >= 0 ? targetIndex : targetStage.deals.length - 1;
 
-    await fetch('/api/deals/reorder', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dealId: active.id, newStageId: targetStage.id, newPosition }),
-    });
+    try {
+      const res = await fetch('/api/deals/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealId: active.id, newStageId: targetStage.id, newPosition }),
+      });
+      if (res.ok) {
+        toast.success(`Deal moved to ${targetStage.name}`);
+      } else {
+        toast.error('Failed to move deal');
+      }
+    } catch {
+      toast.error('Failed to move deal');
+    }
 
     fetchData();
   }
 
   async function handleAddDeal(data: any) {
-    await fetch('/api/deals', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, slug }),
-    });
+    try {
+      const res = await fetch('/api/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, slug }),
+      });
+      if (res.ok) {
+        toast.success('Deal created');
+      } else {
+        toast.error('Failed to create deal');
+      }
+    } catch {
+      toast.error('Failed to create deal');
+    }
     fetchData();
   }
 

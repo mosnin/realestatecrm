@@ -39,6 +39,7 @@ import type { SavedView } from '@/lib/types';
 import { formatCurrency as _formatCurrency, getInitials } from '@/lib/formatting';
 import { CONTACT_STAGES } from '@/lib/constants';
 import { CsvImportModal } from './csv-import-modal';
+import { toast } from 'sonner';
 
 type Client = {
   id: string;
@@ -165,7 +166,16 @@ export function ContactTable({ slug }: ContactTableProps) {
 
   async function handleDelete(id: string) {
     if (!confirm('Remove this client?')) return;
-    await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
+    try {
+      const res = await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Contact deleted');
+      } else {
+        toast.error('Failed to delete contact');
+      }
+    } catch {
+      toast.error('Failed to delete contact');
+    }
     fetchContacts();
   }
 
@@ -189,7 +199,12 @@ export function ContactTable({ slug }: ContactTableProps) {
   async function handleBulkDelete() {
     const ids = [...selectedIds];
     if (!confirm(`Delete ${ids.length} client${ids.length !== 1 ? 's' : ''}?`)) return;
-    await Promise.all(ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })));
+    try {
+      await Promise.all(ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })));
+      toast.success(`Deleted ${ids.length} contacts`);
+    } catch {
+      toast.error('Failed to delete contacts');
+    }
     setSelectedIds(new Set());
     fetchContacts();
   }
@@ -708,7 +723,10 @@ export function ContactTable({ slug }: ContactTableProps) {
           onClose={() => setImportOpen(false)}
           onImported={(count) => {
             setImportOpen(false);
-            if (count > 0) fetchContacts();
+            if (count > 0) {
+              toast.success('Contacts imported successfully');
+              fetchContacts();
+            }
           }}
         />
       )}
