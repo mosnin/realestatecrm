@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS "SpaceSetting" (
   id                  text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   "spaceId"           text UNIQUE NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
   notifications       boolean NOT NULL DEFAULT true,
+  "smsNotifications"  boolean NOT NULL DEFAULT false,
   timezone            text NOT NULL DEFAULT 'America/New_York',
   "phoneNumber"       text,
   "myConnections"     text,
@@ -323,6 +324,7 @@ ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "anthropicApiKey"      text;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "businessName"         text;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "intakePageTitle"      text;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "intakePageIntro"      text;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "smsNotifications"    boolean NOT NULL DEFAULT false;
 
 -- ============================================================
 -- Indexes

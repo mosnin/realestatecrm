@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { syncDeal } from '@/lib/vectorize';
+import { notifyNewDeal } from '@/lib/notify';
 import type { Deal, DealStage } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
@@ -165,6 +166,13 @@ export async function POST(req: NextRequest) {
   } as Deal & { stage: DealStage | null };
 
   syncDeal(deal).catch(console.error);
+
+  // SMS notification for new deal (non-blocking)
+  notifyNewDeal({
+    spaceId: space.id,
+    dealTitle: title,
+    dealValue: valueVal,
+  }).catch(console.error);
 
   return NextResponse.json(deal, { status: 201 });
 }

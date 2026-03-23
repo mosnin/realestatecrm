@@ -14,6 +14,7 @@ export async function PATCH(req: NextRequest) {
     slug,
     emoji,
     notifications,
+    smsNotifications,
   } = body;
 
   // Sanitize and cap all free-text fields to prevent storage DoS and injection
@@ -57,6 +58,7 @@ export async function PATCH(req: NextRequest) {
         id: crypto.randomUUID(),
         spaceId: space.id,
         notifications,
+        smsNotifications: typeof smsNotifications === 'boolean' ? smsNotifications : false,
         phoneNumber,
         myConnections,
         aiPersonalization,

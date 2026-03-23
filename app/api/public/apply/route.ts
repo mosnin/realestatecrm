@@ -12,6 +12,7 @@ import {
   publicApplicationSchema,
 } from '@/lib/public-application';
 import { sendNewLeadNotification } from '@/lib/email';
+import { notifyNewLead } from '@/lib/notify';
 
 export async function POST(req: NextRequest) {
   // ── IP-based rate limiting (10 submissions / IP / hour) ──────────────────
@@ -247,6 +248,23 @@ export async function POST(req: NextRequest) {
         }
       } catch (err) {
         console.error('[apply] email notification failed', { contactId: contact.id, err });
+      }
+
+      // SMS notification (uses unified dispatcher which checks preferences)
+      try {
+        await notifyNewLead({
+          spaceId: space.id,
+          contactId: contact.id,
+          name: payload.legalName,
+          phone: payload.phone,
+          email: payload.email,
+          leadScore: scoring.leadScore,
+          scoreLabel: scoring.scoreLabel,
+          scoreSummary: scoring.scoreSummary,
+          applicationData,
+        });
+      } catch (err) {
+        console.error('[apply] SMS notification failed', { contactId: contact.id, err });
       }
     })();
 

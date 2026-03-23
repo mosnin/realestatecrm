@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
-import { sendTourConfirmation, sendAgentNotification, type TourEmailData } from '@/lib/tour-emails';
+import { sendTourConfirmation, type TourEmailData } from '@/lib/tour-emails';
+import { notifyNewTour } from '@/lib/notify';
+import { sendSMS, tourConfirmationSMS } from '@/lib/sms';
 
 /** Public endpoint — guests book a tour without authentication. */
 export async function POST(req: NextRequest) {
@@ -133,15 +135,23 @@ export async function POST(req: NextRequest) {
   };
   sendTourConfirmation(emailData).catch(console.error);
 
-  // Notify the space owner
-  const { data: ownerRow } = await supabase
-    .from('User')
-    .select('email')
-    .eq('id', space.ownerId)
-    .maybeSingle();
-  if (ownerRow?.email) {
-    sendAgentNotification(ownerRow.email, emailData).catch(console.error);
+  // Send SMS confirmation to guest (non-blocking)
+  if (tour.guestPhone) {
+    const d = new Date(tour.startsAt);
+    sendSMS(
+      tourConfirmationSMS({
+        guestName: tour.guestName,
+        guestPhone: tour.guestPhone,
+        businessName: settingsFull?.businessName || space.name,
+        date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+        property: tour.propertyAddress,
+      })
+    ).catch(console.error);
   }
+
+  // Notify the space owner (email + SMS via unified dispatcher)
+  notifyNewTour({ spaceId: space.id, tourData: emailData }).catch(console.error);
 
   return NextResponse.json(tour, { status: 201 });
 }

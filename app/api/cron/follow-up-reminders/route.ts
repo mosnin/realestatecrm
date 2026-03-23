@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sendFollowUpDigest } from '@/lib/email';
+import { sendSMS, followUpReminderSMS } from '@/lib/sms';
 
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -43,11 +44,11 @@ export async function GET(req: NextRequest) {
 
     const { data: setting } = await supabase
       .from('SpaceSetting')
-      .select('notifications')
+      .select('notifications, smsNotifications, phoneNumber')
       .eq('spaceId', spaceId)
       .maybeSingle();
-    // Skip if notifications explicitly disabled
-    if (setting?.notifications === false) continue;
+    // Skip if all notifications explicitly disabled
+    if (setting?.notifications === false && setting?.smsNotifications !== true) continue;
 
     const { data: user } = await supabase
       .from('User')
@@ -57,16 +58,33 @@ export async function GET(req: NextRequest) {
     if (!user?.email) continue;
 
     try {
-      await sendFollowUpDigest({
-        toEmail: user.email,
-        spaceName: space.name,
-        spaceSlug: space.slug,
-        contacts: spaceContacts.map((c) => ({
-          name: c.name,
-          phone: c.phone,
-          followUpAt: c.followUpAt,
-        })),
-      });
+      // Email digest
+      if (setting?.notifications !== false) {
+        await sendFollowUpDigest({
+          toEmail: user.email,
+          spaceName: space.name,
+          spaceSlug: space.slug,
+          contacts: spaceContacts.map((c) => ({
+            name: c.name,
+            phone: c.phone,
+            followUpAt: c.followUpAt,
+          })),
+        });
+      }
+
+      // SMS reminders (one per contact)
+      if (setting?.smsNotifications && setting?.phoneNumber) {
+        for (const c of spaceContacts) {
+          sendSMS(
+            followUpReminderSMS({
+              spaceName: space.name,
+              contactName: c.name,
+              phone: setting.phoneNumber,
+            })
+          ).catch((err) => console.error('[cron] SMS follow-up failed', err));
+        }
+      }
+
       sent++;
     } catch (err) {
       console.error('[cron/follow-up-reminders] Failed to send digest', { spaceId, error: err });

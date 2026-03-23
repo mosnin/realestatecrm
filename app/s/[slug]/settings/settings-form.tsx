@@ -10,6 +10,7 @@ import type { Space } from '@/lib/types';
 
 type UserSettings = {
   notifications?: boolean;
+  smsNotifications?: boolean;
   phoneNumber?: string | null;
   myConnections?: string | null;
 };
@@ -39,6 +40,9 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
   const [notifications, setNotifications] = useState(
     settings?.notifications ?? true
   );
+  const [smsNotifications, setSmsNotifications] = useState(
+    settings?.smsNotifications ?? false
+  );
   const [phoneNumber, setPhoneNumber] = useState(settings?.phoneNumber ?? '');
   const [myConnections, setMyConnections] = useState(settings?.myConnections ?? '');
   const [saving, setSaving] = useState(false);
@@ -58,6 +62,7 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
           slug: space.slug,
           name,
           notifications,
+          smsNotifications,
           phoneNumber,
           myConnections,
         })
@@ -147,16 +152,37 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
       </SectionBlock>
 
       {/* Notifications */}
-      <SectionBlock title="Notifications" description="Control how you receive updates about workspace activity.">
+      <SectionBlock title="Notifications" description="Control how you receive updates about new leads, tours, and deals.">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium">Email notifications</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Receive updates about your space activity</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Get emails for new leads, tour bookings, and follow-up reminders
+            </p>
           </div>
           <Switch
             checked={notifications}
             onCheckedChange={setNotifications}
           />
+        </div>
+        <div className="border-t border-border pt-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">SMS notifications</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Get text messages for new leads, tours, and deals
+              </p>
+              {smsNotifications && !phoneNumber && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Add your phone number above to receive SMS notifications
+                </p>
+              )}
+            </div>
+            <Switch
+              checked={smsNotifications}
+              onCheckedChange={setSmsNotifications}
+            />
+          </div>
         </div>
       </SectionBlock>
 

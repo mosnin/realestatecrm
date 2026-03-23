@@ -1,14 +1,17 @@
 /**
  * Tour email notifications.
  *
- * Uses a pluggable transport: set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS
- * env vars to send real emails, otherwise logs to console (dev mode).
+ * Uses Resend (same transport as lib/email.ts) when RESEND_API_KEY is set.
+ * Falls back to console logging in dev when no key is configured.
  *
- * Three email types:
- *   1. Confirmation — sent immediately when a tour is booked
- *   2. Reminder — sent ~24h before the tour starts (call via cron / Vercel cron)
- *   3. Follow-up — sent after a tour is completed
+ * Four email types:
+ *   1. Confirmation — sent immediately when a tour is booked (to guest)
+ *   2. Reminder — sent ~24h before the tour starts (to guest, via cron)
+ *   3. Follow-up — sent after a tour is completed (to guest)
+ *   4. Agent notification — sent to space owner when a tour is booked
  */
+
+import { Resend } from 'resend';
 
 export interface TourEmailData {
   guestName: string;
@@ -22,6 +25,17 @@ export interface TourEmailData {
   slug: string;
 }
 
+/** Escape HTML special characters to prevent XSS in email templates. */
+function esc(value: string | null | undefined): string {
+  if (!value) return '';
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 function formatDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -31,30 +45,52 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-async function sendEmail(to: string, subject: string, html: string) {
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpPort = process.env.SMTP_PORT;
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
-  const fromEmail = process.env.SMTP_FROM || 'noreply@example.com';
+/** Shared email wrapper matching the design from lib/email.ts */
+function wrapHtml(header: string, subtitle: string, bodyContent: string, footer: string): string {
+  return `
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
+        <tr><td style="background:#0f172a;padding:20px 28px">
+          <p style="margin:0;color:#94a3b8;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.05em">${esc(header)}</p>
+          <p style="margin:4px 0 0;color:#ffffff;font-size:20px;font-weight:700">${esc(subtitle)}</p>
+        </td></tr>
+        <tr><td style="padding:24px 28px">
+          ${bodyContent}
+        </td></tr>
+        <tr><td style="padding:16px 28px;border-top:1px solid #f1f5f9">
+          <p style="margin:0;font-size:11px;color:#9ca3af">${footer}</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
 
-  if (!smtpHost || !smtpUser || !smtpPass) {
+function detailBox(items: { label: string; value: string }[]): string {
+  const rows = items
+    .filter((i) => i.value)
+    .map((i) => `<p style="margin:4px 0;font-size:14px;color:#111827"><strong style="color:#6b7280">${esc(i.label)}:</strong> ${esc(i.value)}</p>`)
+    .join('');
+  return `<div style="background:#f8fafc;border-radius:8px;padding:16px;margin:16px 0;border:1px solid #f1f5f9">${rows}</div>`;
+}
+
+async function sendEmail(to: string, subject: string, html: string) {
+  if (!process.env.RESEND_API_KEY) {
     console.log(`[tour-email] (dev) To: ${to} | Subject: ${subject}`);
     console.log(`[tour-email] (dev) HTML preview:\n${html.replace(/<[^>]+>/g, '').slice(0, 300)}...`);
     return;
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const nodemailer = (await import('nodemailer' as string)) as any;
-    const createTransport = nodemailer.default?.createTransport ?? nodemailer.createTransport;
-    const transport = createTransport({
-      host: smtpHost,
-      port: parseInt(smtpPort || '587', 10),
-      secure: smtpPort === '465',
-      auth: { user: smtpUser, pass: smtpPass },
-    });
-    await transport.sendMail({ from: fromEmail, to, subject, html });
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
+    const safeSubject = subject.replace(/[\r\n\t]/g, ' ').slice(0, 200);
+    await resend.emails.send({ from: FROM, to, subject: safeSubject, html });
     console.log(`[tour-email] Sent "${subject}" to ${to}`);
   } catch (err) {
     console.error('[tour-email] Send failed:', err);
@@ -64,72 +100,81 @@ async function sendEmail(to: string, subject: string, html: string) {
 export async function sendTourConfirmation(data: TourEmailData) {
   const { guestName, guestEmail, businessName, startsAt, endsAt, propertyAddress } = data;
   const subject = `Tour Confirmed — ${formatDate(startsAt)}`;
-  const html = `
-    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-      <h2 style="color: #111;">Your tour is booked!</h2>
-      <p>Hi ${guestName},</p>
-      <p>Your tour with <strong>${businessName}</strong> has been confirmed:</p>
-      <div style="background: #f5f5f5; border-radius: 8px; padding: 16px; margin: 16px 0;">
-        <p style="margin: 4px 0;"><strong>Date:</strong> ${formatDate(startsAt)}</p>
-        <p style="margin: 4px 0;"><strong>Time:</strong> ${formatTime(startsAt)} – ${formatTime(endsAt)}</p>
-        ${propertyAddress ? `<p style="margin: 4px 0;"><strong>Property:</strong> ${propertyAddress}</p>` : ''}
-      </div>
-      <p>If you need to reschedule or cancel, please reply to this email.</p>
-      <p style="color: #888; font-size: 12px; margin-top: 24px;">— ${businessName}</p>
-    </div>
+
+  const body = `
+    <p style="margin:0 0 12px;font-size:15px;color:#111827;line-height:1.6">Hi ${esc(guestName)},</p>
+    <p style="margin:0 0 4px;font-size:15px;color:#111827;line-height:1.6">Your tour with <strong>${esc(businessName)}</strong> has been confirmed:</p>
+    ${detailBox([
+      { label: 'Date', value: formatDate(startsAt) },
+      { label: 'Time', value: `${formatTime(startsAt)} – ${formatTime(endsAt)}` },
+      { label: 'Property', value: propertyAddress ?? '' },
+    ])}
+    <p style="margin:0;font-size:14px;color:#374151;line-height:1.5">If you need to reschedule or cancel, please reply to this email.</p>
   `;
+
+  const html = wrapHtml(businessName, 'Tour confirmed', body, `Sent by ${esc(businessName)}`);
   await sendEmail(guestEmail, subject, html);
 }
 
 export async function sendTourReminder(data: TourEmailData) {
   const { guestName, guestEmail, businessName, startsAt, endsAt, propertyAddress } = data;
   const subject = `Reminder: Tour Tomorrow — ${formatTime(startsAt)}`;
-  const html = `
-    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-      <h2 style="color: #111;">Tour Reminder</h2>
-      <p>Hi ${guestName},</p>
-      <p>Just a friendly reminder — you have a tour scheduled tomorrow with <strong>${businessName}</strong>:</p>
-      <div style="background: #f5f5f5; border-radius: 8px; padding: 16px; margin: 16px 0;">
-        <p style="margin: 4px 0;"><strong>Date:</strong> ${formatDate(startsAt)}</p>
-        <p style="margin: 4px 0;"><strong>Time:</strong> ${formatTime(startsAt)} – ${formatTime(endsAt)}</p>
-        ${propertyAddress ? `<p style="margin: 4px 0;"><strong>Property:</strong> ${propertyAddress}</p>` : ''}
-      </div>
-      <p>We look forward to seeing you!</p>
-      <p style="color: #888; font-size: 12px; margin-top: 24px;">— ${businessName}</p>
-    </div>
+
+  const body = `
+    <p style="margin:0 0 12px;font-size:15px;color:#111827;line-height:1.6">Hi ${esc(guestName)},</p>
+    <p style="margin:0 0 4px;font-size:15px;color:#111827;line-height:1.6">Friendly reminder — you have a tour scheduled tomorrow with <strong>${esc(businessName)}</strong>:</p>
+    ${detailBox([
+      { label: 'Date', value: formatDate(startsAt) },
+      { label: 'Time', value: `${formatTime(startsAt)} – ${formatTime(endsAt)}` },
+      { label: 'Property', value: propertyAddress ?? '' },
+    ])}
+    <p style="margin:0;font-size:14px;color:#374151;line-height:1.5">We look forward to seeing you!</p>
   `;
+
+  const html = wrapHtml(businessName, 'Tour reminder', body, `Sent by ${esc(businessName)}`);
   await sendEmail(guestEmail, subject, html);
 }
 
 export async function sendTourFollowUp(data: TourEmailData) {
   const { guestName, guestEmail, businessName, propertyAddress } = data;
   const subject = `Thanks for touring with ${businessName}!`;
-  const html = `
-    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-      <h2 style="color: #111;">Thanks for visiting!</h2>
-      <p>Hi ${guestName},</p>
-      <p>Thank you for touring${propertyAddress ? ` <strong>${propertyAddress}</strong>` : ''} with us. We hope you enjoyed the visit.</p>
-      <p>If you have any questions or would like to move forward, simply reply to this email and we'll get back to you right away.</p>
-      <p>Best regards,<br/><strong>${businessName}</strong></p>
-    </div>
+
+  const body = `
+    <p style="margin:0 0 12px;font-size:15px;color:#111827;line-height:1.6">Hi ${esc(guestName)},</p>
+    <p style="margin:0 0 4px;font-size:15px;color:#111827;line-height:1.6">
+      Thank you for touring${propertyAddress ? ` <strong>${esc(propertyAddress)}</strong>` : ''} with us. We hope you enjoyed the visit.
+    </p>
+    <p style="margin:12px 0 0;font-size:14px;color:#374151;line-height:1.5">
+      If you have any questions or would like to move forward, simply reply to this email and we'll get back to you right away.
+    </p>
+    <p style="margin:16px 0 0;font-size:14px;color:#111827">Best regards,<br/><strong>${esc(businessName)}</strong></p>
   `;
+
+  const html = wrapHtml(businessName, 'Thanks for visiting!', body, `Sent by ${esc(businessName)}`);
   await sendEmail(guestEmail, subject, html);
 }
 
 export async function sendAgentNotification(agentEmail: string, data: TourEmailData) {
-  const { guestName, guestEmail, guestPhone = null, startsAt, propertyAddress } = data;
+  const { guestName, guestEmail, guestPhone = null, startsAt, propertyAddress, businessName, slug } = data;
   const subject = `New Tour Booked — ${guestName} on ${formatDate(startsAt)}`;
-  const html = `
-    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-      <h2 style="color: #111;">New Tour Booking</h2>
-      <div style="background: #f5f5f5; border-radius: 8px; padding: 16px; margin: 16px 0;">
-        <p style="margin: 4px 0;"><strong>Guest:</strong> ${guestName}</p>
-        <p style="margin: 4px 0;"><strong>Email:</strong> ${guestEmail}</p>
-        ${guestPhone ? `<p style="margin: 4px 0;"><strong>Phone:</strong> ${guestPhone}</p>` : ''}
-        <p style="margin: 4px 0;"><strong>Date:</strong> ${formatDate(startsAt)} at ${formatTime(startsAt)}</p>
-        ${propertyAddress ? `<p style="margin: 4px 0;"><strong>Property:</strong> ${propertyAddress}</p>` : ''}
-      </div>
-    </div>
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.yourdomain.com';
+  const toursUrl = `${appUrl}/s/${slug}/tours`;
+
+  const body = `
+    ${detailBox([
+      { label: 'Guest', value: guestName },
+      { label: 'Email', value: guestEmail },
+      { label: 'Phone', value: guestPhone ?? '' },
+      { label: 'Date', value: `${formatDate(startsAt)} at ${formatTime(startsAt)}` },
+      { label: 'Property', value: propertyAddress ?? '' },
+    ])}
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px">
+      <tr><td>
+        <a href="${toursUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 22px;border-radius:8px">View tours →</a>
+      </td></tr>
+    </table>
   `;
+
+  const html = wrapHtml(businessName || 'Tour', 'New tour booking', body, `You're receiving this because a guest booked a tour on your workspace.`);
   await sendEmail(agentEmail, subject, html);
 }

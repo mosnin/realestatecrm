@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { syncContact } from '@/lib/vectorize';
+import { notifyNewContact } from '@/lib/notify';
 import type { Contact } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
@@ -90,6 +91,15 @@ export async function POST(req: NextRequest) {
 
   // Async vectorization — don't block the response
   syncContact(contact as Contact).catch(console.error);
+
+  // SMS notification for new leads (non-blocking)
+  notifyNewContact({
+    spaceId: space.id,
+    contactName: name,
+    contactPhone: phone || null,
+    contactEmail: email || null,
+    tags: tagsVal,
+  }).catch(console.error);
 
   return NextResponse.json(contact, { status: 201 });
 }
