@@ -1,13 +1,8 @@
 import { notFound } from 'next/navigation';
-import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { PublicPageShell } from '@/components/public-page-shell';
-
-const ApplicationForm = dynamic(
-  () => import('./application-form').then((m) => m.ApplicationForm),
-  { ssr: false }
-);
+import { ApplicationFormLoader } from './application-form-loader';
 
 export default async function PublicApplyPage({
   params,
@@ -58,7 +53,7 @@ export default async function PublicApplyPage({
       pageIntro={pageIntro}
       trustLine={`Your information is shared only with ${agentName} and used solely for rental inquiries.`}
     >
-      <ApplicationForm slug={slug} businessName={businessName} />
+      <ApplicationFormLoader slug={slug} businessName={businessName} />
     </PublicPageShell>
   );
 }
