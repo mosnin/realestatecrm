@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ import {
   FileText,
   PenLine,
   Upload,
+  X,
 } from 'lucide-react';
 
 // ── Step config ──
@@ -270,6 +271,7 @@ export function ApplicationForm({
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [scoreState, setScoreState] = useState<{
+    id?: string;
     scoringStatus?: string;
     leadScore?: number | null;
     scoreLabel?: string;
@@ -277,6 +279,7 @@ export function ApplicationForm({
     scoreDetails?: Record<string, unknown> | null;
     applicationRef?: string;
   } | null>(null);
+  const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const submissionLockRef = useRef(false);
 
   const get = useCallback((key: string) => data[key] ?? '', [data]);
@@ -472,6 +475,9 @@ export function ApplicationForm({
             {businessName} will review your application and follow up shortly.
           </p>
         </div>
+        {scoreState?.id && stagedFiles.length > 0 && (
+          <UploadProgressWidget contactId={scoreState.id} stagedFiles={stagedFiles} />
+        )}
         {scoreState?.applicationRef && (
           <a
             href={`/apply/${slug}/status?ref=${scoreState.applicationRef}`}
@@ -707,15 +713,19 @@ export function ApplicationForm({
               <p className="text-xs font-medium text-muted-foreground">
                 Uploading documents is optional but helps speed up the review process. You can always provide these later.
               </p>
-            </div>
-            {scoreState?.applicationRef || get('_contactId') ? (
-              <DocumentUploadWidget contactId={scoreState?.applicationRef || get('_contactId')} />
-            ) : (
-              <div className="text-center py-6 text-muted-foreground">
-                <p className="text-sm">Documents can be uploaded after submission.</p>
-                <p className="text-xs mt-1">Click Continue to proceed to review.</p>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {['Photo ID', 'Pay stubs', 'Proof of income', 'Pet records', 'Employment letter', 'Bank statements'].map((label) => (
+                  <span key={label} className="inline-flex items-center px-2 py-0.5 rounded-md bg-background border border-border text-[11px] text-muted-foreground">
+                    {label}
+                  </span>
+                ))}
               </div>
-            )}
+            </div>
+            <StagedFilePicker
+              files={stagedFiles}
+              onAdd={(file) => setStagedFiles((prev) => [...prev, file])}
+              onRemove={(index) => setStagedFiles((prev) => prev.filter((_, i) => i !== index))}
+            />
           </div>
         );
 
@@ -738,6 +748,7 @@ export function ApplicationForm({
                 {get('employmentStatus') && <SummaryRow label="Employment" value={get('employmentStatus')} />}
                 {get('monthlyGrossIncome') && <SummaryRow label="Income" value={`$${get('monthlyGrossIncome')}/mo`} />}
                 {get('hasPets') && <SummaryRow label="Pets" value={get('hasPets') === 'true' ? `Yes${get('petDetails') ? ` — ${get('petDetails')}` : ''}` : 'No'} />}
+                {stagedFiles.length > 0 && <SummaryRow label="Documents" value={`${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`} />}
               </div>
             </div>
 
@@ -848,13 +859,175 @@ export function ApplicationForm({
   );
 }
 
-// ── Document upload widget (inline, simplified for public form) ──
-function DocumentUploadWidget({ contactId }: { contactId: string }) {
+// ── Staged file picker (pre-submission — files held in memory) ──
+function StagedFilePicker({
+  files,
+  onAdd,
+  onRemove,
+}: {
+  files: File[];
+  onAdd: (file: File) => void;
+  onRemove: (index: number) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState('');
+
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
+  const ALLOWED_EXTS = '.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx';
+
+  function validate(file: File): boolean {
+    if (file.size > MAX_FILE_SIZE) {
+      setError('File too large (max 10MB)');
+      return false;
+    }
+    if (files.length >= 10) {
+      setError('Maximum 10 files allowed');
+      return false;
+    }
+    setError('');
+    return true;
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file && validate(file)) onAdd(file);
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file && validate(file)) onAdd(file);
+    if (inputRef.current) inputRef.current.value = '';
+  }
+
+  function formatSize(bytes: number) {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  }
+
   return (
-    <div className="rounded-xl border-2 border-dashed border-border p-6 text-center text-muted-foreground">
-      <Upload size={24} className="mx-auto mb-2 opacity-50" />
-      <p className="text-sm">Document upload available after submission</p>
-      <p className="text-xs mt-1">You&apos;ll be able to upload files from the status page.</p>
+    <div className="space-y-3">
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => inputRef.current?.click()}
+        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
+          dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30 hover:bg-muted/30'
+        }`}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          className="hidden"
+          accept={ALLOWED_EXTS}
+          onChange={handleChange}
+        />
+        <Upload size={24} className="mx-auto text-muted-foreground mb-2" />
+        <p className="text-sm font-medium">Drop files here or click to upload</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          PDF, images, or Word documents (max 10MB each)
+        </p>
+      </div>
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      {files.length > 0 && (
+        <div className="space-y-1.5">
+          {files.map((file, i) => (
+            <div key={`${file.name}-${i}`} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+              <FileText size={14} className="text-muted-foreground flex-shrink-0" />
+              <span className="text-xs font-medium truncate flex-1">{file.name}</span>
+              <span className="text-[10px] text-muted-foreground">{formatSize(file.size)}</span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onRemove(i); }}
+                className="text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+          <p className="text-xs text-muted-foreground">
+            {files.length} file{files.length !== 1 ? 's' : ''} ready — will upload when you submit.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Upload progress display (post-submission) ──
+function UploadProgressWidget({
+  contactId,
+  stagedFiles,
+}: {
+  contactId: string;
+  stagedFiles: File[];
+}) {
+  const [status, setStatus] = useState<Record<number, 'pending' | 'uploading' | 'done' | 'error'>>({});
+  const startedRef = useRef(false);
+
+  function formatSize(bytes: number) {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  }
+
+  // Upload all files sequentially on mount
+  useEffect(() => {
+    if (startedRef.current || stagedFiles.length === 0) return;
+    startedRef.current = true;
+
+    const initial: Record<number, 'pending'> = {};
+    stagedFiles.forEach((_, i) => { initial[i] = 'pending'; });
+    setStatus(initial);
+
+    (async () => {
+      for (let i = 0; i < stagedFiles.length; i++) {
+        setStatus((prev) => ({ ...prev, [i]: 'uploading' }));
+        try {
+          const formData = new FormData();
+          formData.append('contactId', contactId);
+          formData.append('file', stagedFiles[i]);
+          formData.append('uploadedBy', 'guest');
+          const res = await fetch('/api/documents', { method: 'POST', body: formData });
+          setStatus((prev) => ({ ...prev, [i]: res.ok ? 'done' : 'error' }));
+        } catch {
+          setStatus((prev) => ({ ...prev, [i]: 'error' }));
+        }
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (stagedFiles.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        Uploading documents
+      </p>
+      <div className="space-y-1.5">
+        {stagedFiles.map((file, i) => (
+          <div key={i} className="flex items-center gap-2 text-xs">
+            {status[i] === 'uploading' ? (
+              <Loader2 size={12} className="animate-spin text-primary flex-shrink-0" />
+            ) : status[i] === 'done' ? (
+              <CheckCircle2 size={12} className="text-emerald-500 flex-shrink-0" />
+            ) : status[i] === 'error' ? (
+              <X size={12} className="text-destructive flex-shrink-0" />
+            ) : (
+              <Upload size={12} className="text-muted-foreground flex-shrink-0" />
+            )}
+            <span className="truncate flex-1">{file.name}</span>
+            <span className="text-[10px] text-muted-foreground">{formatSize(file.size)}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

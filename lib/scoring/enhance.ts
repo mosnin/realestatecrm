@@ -60,7 +60,7 @@ export async function enhanceWithAI(
     ].filter(Boolean).join('\n');
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.4-mini',
       temperature: 0,
       max_tokens: 300,
       response_format: {
