@@ -38,7 +38,25 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
     }
   }
 
-  if (contacts.length === 0) return null;
+  if (contacts.length === 0) {
+    if (initialContacts.length === 0) return null;
+    // User cleared all follow-ups this session — show success state
+    return (
+      <div className="rounded-lg border border-emerald-200 dark:border-emerald-500/25 bg-emerald-50/60 dark:bg-emerald-500/5 px-5 py-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-md bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">All caught up!</p>
+            <p className="text-xs text-emerald-700/70 dark:text-emerald-400/70">
+              No follow-ups due right now. Nice work.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const overdue = contacts.filter((c) => new Date(c.followUpAt) < new Date());
 

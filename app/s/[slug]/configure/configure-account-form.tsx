@@ -149,9 +149,28 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
         </p>
       </div>
 
+      {/* Section nav */}
+      <div className="flex items-center gap-3 overflow-x-auto pb-1 mb-2">
+        {[
+          { id: 'profile', label: 'Profile', icon: User },
+          { id: 'intake', label: 'Intake link', icon: Link2 },
+          { id: 'branding', label: 'Branding', icon: Image },
+          { id: 'notifications', label: 'Notifications', icon: Bell },
+        ].map(({ id, label, icon: Icon }) => (
+          <a
+            key={id}
+            href={`#section-${id}`}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-md border border-border hover:bg-muted transition-colors whitespace-nowrap"
+          >
+            <Icon size={12} />
+            {label}
+          </a>
+        ))}
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* ── Profile ─────────────────────────────────────────── */}
-        <section className="rounded-xl border border-border bg-card px-5 py-5">
+        <section id="section-profile" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
           <SectionHeader
             icon={User}
             title="Your profile"
@@ -186,7 +205,9 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
                 disabled
                 className="text-muted-foreground"
               />
-              <p className="text-xs text-muted-foreground">Managed via your Clerk account</p>
+              <p className="text-xs text-muted-foreground">
+                Email is managed through your login provider and can&apos;t be changed here.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="phone">Phone number</Label>
@@ -203,7 +224,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
         </section>
 
         {/* ── Intake link ──────────────────────────────────────── */}
-        <section className="rounded-xl border border-border bg-card px-5 py-5">
+        <section id="section-intake" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
           <SectionHeader
             icon={Link2}
             title="Intake link"
@@ -252,7 +273,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
         </section>
 
         {/* ── Branding ─────────────────────────────────────────── */}
-        <section className="rounded-xl border border-border bg-card px-5 py-5">
+        <section id="section-branding" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
           <SectionHeader
             icon={Image}
             title="Branding"
@@ -302,7 +323,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
         </section>
 
         {/* ── Notifications ────────────────────────────────────── */}
-        <section className="rounded-xl border border-border bg-card px-5 py-5">
+        <section id="section-notifications" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
           <SectionHeader
             icon={Bell}
             title="Notifications"

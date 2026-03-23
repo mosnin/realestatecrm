@@ -36,6 +36,7 @@ import { downloadCSV } from '@/lib/csv';
 import { timeAgo, formatMoney, getInitials, formatFollowUpDate, toDateInputValue } from '@/lib/formatting';
 import { LEAD_TIERS, type TierKey } from '@/lib/constants';
 import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 const TIERS = LEAD_TIERS;
 
@@ -69,7 +70,10 @@ function ScoreHero({ lead }: { lead: Contact }) {
           <TierIcon size={14} />
           {tier.label} lead
           {lead.scoringStatus === 'pending' && (
-            <span className="text-xs font-normal opacity-70">(scoring…)</span>
+            <span className="inline-flex items-center gap-1 text-xs font-normal opacity-70">
+              <span className="w-3 h-3 rounded-full border-2 border-current/30 border-t-current animate-spin" />
+              scoring
+            </span>
           )}
         </div>
         {lead.scoreSummary ? (
@@ -77,7 +81,7 @@ function ScoreHero({ lead }: { lead: Contact }) {
             {lead.scoreSummary}
           </p>
         ) : lead.scoringStatus === 'pending' ? (
-          <p className="text-xs text-muted-foreground mt-0.5">AI analysis in progress…</p>
+          <p className="text-xs text-muted-foreground mt-0.5">AI is analyzing this lead — usually takes a few seconds.</p>
         ) : (
           <p className="text-xs text-muted-foreground mt-0.5">No score available</p>
         )}
@@ -140,6 +144,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
   const [saveViewName, setSaveViewName] = useState('');
   const [showSaveInput, setShowSaveInput] = useState(false);
   const saveInputRef = useRef<HTMLInputElement>(null);
+  const { confirm, ConfirmDialog } = useConfirm();
 
   // Load saved views from localStorage on mount
   useEffect(() => {
@@ -246,7 +251,11 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
 
   async function handleBulkDelete() {
     const ids = [...selectedIds];
-    if (!confirm(`Delete ${ids.length} lead${ids.length !== 1 ? 's' : ''}?`)) return;
+    const confirmed = await confirm({
+      title: `Delete ${ids.length} lead${ids.length !== 1 ? 's' : ''}?`,
+      description: 'This will permanently remove the selected leads. This cannot be undone.',
+    });
+    if (!confirmed) return;
     try {
       const results = await Promise.all(ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })));
       const failed = results.filter((r) => !r.ok).length;
@@ -830,6 +839,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
           onConverted={handleConverted}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }

@@ -40,6 +40,7 @@ import { formatCurrency as _formatCurrency, getInitials } from '@/lib/formatting
 import { CONTACT_STAGES } from '@/lib/constants';
 import { CsvImportModal } from './csv-import-modal';
 import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type Client = {
   id: string;
@@ -83,6 +84,7 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [saveViewName, setSaveViewName] = useState('');
   const [showSaveInput, setShowSaveInput] = useState(false);
   const saveInputRef = useRef<HTMLInputElement>(null);
+  const { confirm, ConfirmDialog } = useConfirm();
 
   // Load saved views from localStorage on mount
   useEffect(() => {
@@ -165,7 +167,12 @@ export function ContactTable({ slug }: ContactTableProps) {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Remove this client?')) return;
+    const contact = contacts.find((c) => c.id === id);
+    const confirmed = await confirm({
+      title: 'Remove this client?',
+      description: contact ? `"${contact.name}" will be permanently removed from your CRM.` : 'This client will be permanently removed.',
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -198,7 +205,11 @@ export function ContactTable({ slug }: ContactTableProps) {
 
   async function handleBulkDelete() {
     const ids = [...selectedIds];
-    if (!confirm(`Delete ${ids.length} client${ids.length !== 1 ? 's' : ''}?`)) return;
+    const confirmed = await confirm({
+      title: `Delete ${ids.length} client${ids.length !== 1 ? 's' : ''}?`,
+      description: 'This will permanently remove the selected clients from your CRM. This cannot be undone.',
+    });
+    if (!confirmed) return;
     try {
       await Promise.all(ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })));
       toast.success(`Deleted ${ids.length} contacts`);
@@ -730,6 +741,7 @@ export function ContactTable({ slug }: ContactTableProps) {
           }}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }

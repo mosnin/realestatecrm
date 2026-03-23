@@ -76,9 +76,14 @@ export default async function DashboardPage({
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">We couldn&apos;t load your dashboard data. This is usually temporary.</p>
-          <a href={`/s/${slug}`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Try again</a>
+          <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center mx-auto mb-2">
+            <AlertCircle size={22} className="text-destructive" />
+          </div>
+          <h1 className="text-xl font-semibold">Couldn&apos;t load your dashboard</h1>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+            This is usually a temporary connection issue. Try refreshing the page. If it keeps happening, check your internet connection or try again in a few minutes.
+          </p>
+          <a href={`/s/${slug}`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Refresh page</a>
         </div>
       </div>
     );
@@ -262,7 +267,10 @@ export default async function DashboardPage({
                               </span>
                             </div>
                           ) : lead.scoringStatus === 'pending' ? (
-                            <span className="text-[11px] text-muted-foreground/60 italic">scoring…</span>
+                            <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/60 italic">
+                              <span className="w-3 h-3 rounded-full border-2 border-muted-foreground/30 border-t-primary animate-spin" />
+                              AI scoring
+                            </span>
                           ) : null}
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <Clock size={11} />
@@ -291,13 +299,19 @@ export default async function DashboardPage({
             <Card>
               <CardContent className="p-4">
                 {dealsByStage.length === 0 ? (
-                  <div className="text-center py-4">
-                    <p className="text-xs text-muted-foreground">No active deals.</p>
+                  <div className="text-center py-6">
+                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mx-auto mb-2">
+                      <Briefcase size={18} className="text-muted-foreground" />
+                    </div>
+                    <p className="text-xs font-medium text-foreground">No active deals yet</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 max-w-[180px] mx-auto">
+                      Convert a lead or add a deal to start tracking your pipeline.
+                    </p>
                     <Link
                       href={`/s/${slug}/deals`}
-                      className="text-xs text-primary font-medium hover:underline mt-1 inline-block"
+                      className="text-xs text-primary font-medium hover:underline mt-2 inline-flex items-center gap-1"
                     >
-                      Go to deals →
+                      Go to deals <ArrowRight size={11} />
                     </Link>
                   </div>
                 ) : (
@@ -341,14 +355,32 @@ export default async function DashboardPage({
           </div>
 
           {/* Upcoming tours */}
-          {upcomingTours.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-foreground">Upcoming tours</h2>
-                <Link href={`/s/${slug}/tours`} className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
-                  View all <ArrowRight size={12} />
-                </Link>
-              </div>
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-foreground">Upcoming tours</h2>
+              <Link href={`/s/${slug}/tours`} className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
+                View all <ArrowRight size={12} />
+              </Link>
+            </div>
+            {upcomingTours.length === 0 ? (
+              <Card>
+                <CardContent className="py-6 text-center">
+                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mx-auto mb-2">
+                    <CalendarDays size={18} className="text-muted-foreground" />
+                  </div>
+                  <p className="text-xs font-medium text-foreground">No upcoming tours</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 max-w-[180px] mx-auto">
+                    Share your booking link so prospects can schedule tours.
+                  </p>
+                  <Link
+                    href={`/s/${slug}/tours`}
+                    className="text-xs text-primary font-medium hover:underline mt-2 inline-flex items-center gap-1"
+                  >
+                    Manage tours <ArrowRight size={11} />
+                  </Link>
+                </CardContent>
+              </Card>
+            ) : (
               <Card>
                 <div className="divide-y divide-border">
                   {upcomingTours.map((tour: any) => {
@@ -387,8 +419,8 @@ export default async function DashboardPage({
                   })}
                 </div>
               </Card>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -427,7 +459,7 @@ function ShareLinkCard({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2 break-all font-mono text-muted-foreground border border-border/60 truncate">
+          <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2 font-mono text-muted-foreground border border-border/60 break-all line-clamp-2 sm:line-clamp-1">
             {url}
           </code>
           <CopyLinkButton url={url} />

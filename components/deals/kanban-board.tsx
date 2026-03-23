@@ -29,11 +29,13 @@ import {
   DollarSign,
   Search,
   X,
+  Briefcase,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { formatCurrency as _formatCurrency } from '@/lib/formatting';
 import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type DealWithRelations = Deal & {
   stage: DealStage;
@@ -67,6 +69,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
   const [view, setView] = useState<'kanban' | 'list'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -184,7 +187,12 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
   }
 
   async function handleDeleteDeal(id: string) {
-    if (!confirm('Delete this deal?')) return;
+    const deal = stages.flatMap((s) => s.deals).find((d) => d.id === id);
+    const confirmed = await confirm({
+      title: 'Delete this deal?',
+      description: deal ? `"${deal.title}" will be permanently removed. This cannot be undone.` : 'This deal will be permanently removed.',
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch(`/api/deals/${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -315,7 +323,56 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
       </div>
 
       {view === 'kanban' ? (
-        <div className="overflow-x-auto pb-4">
+        <>
+        {/* Mobile stacked view */}
+        <div className="md:hidden space-y-4">
+          {filteredStages.map((stage) => (
+            <div key={stage.id} className="rounded-lg border border-border overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-muted/40 border-b border-border">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
+                <span className="text-xs font-semibold">{stage.name}</span>
+                <span className="text-[11px] text-muted-foreground bg-muted rounded-md px-1.5 py-0.5 ml-auto">{stage.deals.length}</span>
+              </div>
+              {stage.deals.length === 0 ? (
+                <div className="px-3 py-4 text-center">
+                  <p className="text-xs text-muted-foreground">No deals in this stage</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {stage.deals.map((deal) => {
+                    const priorityMeta = PRIORITY_META[deal.priority] ?? PRIORITY_META.MEDIUM;
+                    return (
+                      <div
+                        key={deal.id}
+                        className="flex items-center gap-3 px-3 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
+                        onClick={() => setPanelDeal(deal)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{deal.title}</p>
+                          {deal.address && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <MapPin size={10} />{deal.address}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {deal.value != null && (
+                            <span className="text-xs font-medium">{formatCurrency(deal.value)}</span>
+                          )}
+                          <span className={cn('text-[10px] font-semibold rounded-md px-1.5 py-0.5', priorityMeta.className)}>
+                            {priorityMeta.label}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        {/* Desktop kanban view */}
+        <div className="hidden md:block overflow-x-auto pb-4">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
@@ -348,6 +405,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
             </DragOverlay>
           </DndContext>
         </div>
+        </>
       ) : (
         /* ── List / table view ── */
         <div className="rounded-lg border border-border overflow-hidden">
@@ -376,8 +434,14 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
               <tbody className="divide-y divide-border bg-card">
                 {allDeals.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                      No deals yet. Add your first deal to get started.
+                    <td colSpan={6} className="px-4 py-12 text-center">
+                      <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
+                        <Briefcase size={20} className="text-muted-foreground" />
+                      </div>
+                      <p className="text-sm font-medium text-foreground">No deals yet</p>
+                      <p className="text-xs text-muted-foreground mt-1 max-w-[220px] mx-auto">
+                        Add your first deal to start tracking your leasing pipeline.
+                      </p>
                     </td>
                   </tr>
                 ) : (
@@ -504,6 +568,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
         onUpdate={handlePanelUpdate}
         slug={slug}
       />
+      {ConfirmDialog}
     </div>
   );
 }

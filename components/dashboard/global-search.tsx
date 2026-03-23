@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { Search, Users, Briefcase, Calendar, X } from 'lucide-react';
+import { Search, Users, Briefcase, Calendar, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ContactResult {
@@ -170,7 +170,10 @@ export function GlobalSearch({ slug }: Props) {
         {/* Results */}
         <div className="max-h-80 overflow-y-auto py-2">
           {loading && (
-            <p className="text-center text-xs text-muted-foreground py-6">Searching…</p>
+            <div className="flex items-center justify-center gap-2 py-6">
+              <Loader2 size={14} className="animate-spin text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">Searching…</p>
+            </div>
           )}
           {!loading && error && (
             <p className="text-center text-xs text-destructive py-6">{error}</p>

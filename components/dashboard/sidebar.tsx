@@ -235,7 +235,8 @@ export function Sidebar({
         {!isBrokerOnly && slug && (
           <>
             <div className="mx-4 border-t border-border" />
-            <div className="px-3 py-2">
+            <div className="px-3 py-1">
+              <SectionLabel>Personal</SectionLabel>
               <NavItem
                 href={base}
                 label={spaceName}
@@ -312,7 +313,7 @@ export function Sidebar({
         {/* Switch to brokerage dashboard */}
         {isBroker && (
           <>
-            <div className="mx-0 my-2 border-t border-border" />
+            <SectionLabel>Brokerage</SectionLabel>
             <NavItem
               href="/broker"
               label={brokerageName ?? 'Brokerage'}
@@ -323,14 +324,14 @@ export function Sidebar({
         )}
       </nav>
 
-      {/* Join a team */}
-      {!brokerageName && (
+      {/* Join or create a brokerage */}
+      {!isBroker && !brokerageName && (
         <div className="px-3 pb-1">
           <NavItem
             href="/brokerage"
-            label="Join a team"
+            label="Join or create a team"
             icon={Building2}
-            isActive={false}
+            isActive={pathname.startsWith('/brokerage')}
           />
         </div>
       )}
