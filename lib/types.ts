@@ -67,6 +67,10 @@ export type SpaceSetting = {
   spaceId: string;
   notifications: boolean;
   smsNotifications: boolean;
+  notifyNewLeads: boolean;
+  notifyTourBookings: boolean;
+  notifyNewDeals: boolean;
+  notifyFollowUps: boolean;
   timezone: string;
   phoneNumber: string | null;
   myConnections: string | null;

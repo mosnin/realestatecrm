@@ -11,7 +11,6 @@ import {
   normalizePhone,
   publicApplicationSchema,
 } from '@/lib/public-application';
-import { sendNewLeadNotification } from '@/lib/email';
 import { notifyNewLead } from '@/lib/notify';
 
 export async function POST(req: NextRequest) {
@@ -225,32 +224,8 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Email notification (after scoring so we can include the score)
-      try {
-        const [{ data: settingsRow }, { data: ownerRow }] = await Promise.all([
-          supabase.from('SpaceSetting').select('notifications').eq('spaceId', space.id).maybeSingle(),
-          supabase.from('User').select('email').eq('id', space.ownerId).maybeSingle(),
-        ]);
-        if (settingsRow?.notifications && ownerRow?.email) {
-          await sendNewLeadNotification({
-            toEmail: ownerRow.email,
-            spaceName: space.name,
-            spaceSlug: space.slug,
-            contactId: contact.id,
-            name: payload.legalName,
-            phone: payload.phone,
-            email: payload.email,
-            leadScore: scoring.leadScore,
-            scoreLabel: scoring.scoreLabel,
-            scoreSummary: scoring.scoreSummary,
-            applicationData,
-          });
-        }
-      } catch (err) {
-        console.error('[apply] email notification failed', { contactId: contact.id, err });
-      }
-
-      // SMS notification (uses unified dispatcher which checks preferences)
+      // Email + SMS notification via unified dispatcher
+      // (handles channel toggles, per-event toggles, owner lookup)
       try {
         await notifyNewLead({
           spaceId: space.id,
@@ -264,7 +239,7 @@ export async function POST(req: NextRequest) {
           applicationData,
         });
       } catch (err) {
-        console.error('[apply] SMS notification failed', { contactId: contact.id, err });
+        console.error('[apply] notification failed', { contactId: contact.id, err });
       }
     })();
 

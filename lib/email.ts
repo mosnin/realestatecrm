@@ -236,6 +236,73 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
   });
 }
 
+export interface NewDealEmailParams {
+  toEmail: string;
+  spaceName: string;
+  spaceSlug: string;
+  dealTitle: string;
+  dealValue?: number | null;
+  dealAddress?: string | null;
+  dealPriority?: string | null;
+  contactNames?: string[];
+}
+
+export async function sendNewDealNotification(params: NewDealEmailParams): Promise<void> {
+  if (!process.env.RESEND_API_KEY) return;
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
+
+  const { toEmail, spaceName, spaceSlug, dealTitle, dealValue, dealAddress, dealPriority, contactNames } = params;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.yourdomain.com';
+  const dealsUrl = `${appUrl}/s/${spaceSlug}/deals`;
+
+  const detailRows = [
+    row('Title', dealTitle),
+    row('Value', dealValue != null ? fmt(dealValue) : null),
+    row('Address', dealAddress),
+    row('Priority', dealPriority),
+    row('Contacts', contactNames?.length ? contactNames.join(', ') : null),
+  ].filter(Boolean).join('');
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
+        <tr><td style="background:#0f172a;padding:20px 28px">
+          <p style="margin:0;color:#94a3b8;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.05em">${esc(spaceName)}</p>
+          <p style="margin:4px 0 0;color:#ffffff;font-size:20px;font-weight:700">New deal created</p>
+        </td></tr>
+        <tr><td style="padding:24px 28px">
+          <p style="margin:0;font-size:18px;font-weight:700;color:#111827">${esc(dealTitle)}</p>
+          ${dealValue != null ? `<p style="margin:6px 0 0;font-size:24px;font-weight:700;color:#059669">${fmt(dealValue)}</p>` : ''}
+          ${detailRows ? `<table cellpadding="0" cellspacing="0" style="margin-top:18px;width:100%">${detailRows}</table>` : ''}
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px">
+            <tr><td>
+              <a href="${dealsUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 22px;border-radius:8px">View deals →</a>
+            </td></tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding:16px 28px;border-top:1px solid #f1f5f9">
+          <p style="margin:0;font-size:11px;color:#9ca3af">You're receiving this because notifications are enabled for <strong>${esc(spaceName)}</strong>.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const safeDealTitle = dealTitle.replace(/[\r\n\t]/g, ' ').slice(0, 200);
+  await resend.emails.send({
+    from: FROM,
+    to: toEmail,
+    subject: `New deal: ${safeDealTitle}${dealValue != null ? ` · ${fmt(dealValue)}` : ''}`,
+    html,
+  });
+}
+
 export interface BrokerageInvitationEmailParams {
   toEmail: string;
   brokerageName: string;

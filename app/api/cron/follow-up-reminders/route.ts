@@ -44,10 +44,11 @@ export async function GET(req: NextRequest) {
 
     const { data: setting } = await supabase
       .from('SpaceSetting')
-      .select('notifications, smsNotifications, phoneNumber')
+      .select('notifications, smsNotifications, phoneNumber, notifyFollowUps')
       .eq('spaceId', spaceId)
       .maybeSingle();
-    // Skip if all notifications explicitly disabled
+    // Skip if follow-up notifications are disabled, or all channels are off
+    if (setting?.notifyFollowUps === false) continue;
     if (setting?.notifications === false && setting?.smsNotifications !== true) continue;
 
     const { data: user } = await supabase

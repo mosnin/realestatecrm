@@ -11,6 +11,10 @@ import type { Space } from '@/lib/types';
 type UserSettings = {
   notifications?: boolean;
   smsNotifications?: boolean;
+  notifyNewLeads?: boolean;
+  notifyTourBookings?: boolean;
+  notifyNewDeals?: boolean;
+  notifyFollowUps?: boolean;
   phoneNumber?: string | null;
   myConnections?: string | null;
 };
@@ -18,6 +22,7 @@ type UserSettings = {
 interface SettingsFormProps {
   space: Space;
   settings: UserSettings | null;
+  userEmail: string;
 }
 
 function SectionBlock({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
@@ -34,7 +39,7 @@ function SectionBlock({ title, description, children }: { title: string; descrip
   );
 }
 
-export function SettingsForm({ space, settings }: SettingsFormProps) {
+export function SettingsForm({ space, settings, userEmail }: SettingsFormProps) {
   const router = useRouter();
   const [name, setName] = useState(space.name);
   const [notifications, setNotifications] = useState(
@@ -43,12 +48,18 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
   const [smsNotifications, setSmsNotifications] = useState(
     settings?.smsNotifications ?? false
   );
+  const [notifyNewLeads, setNotifyNewLeads] = useState(settings?.notifyNewLeads ?? true);
+  const [notifyTourBookings, setNotifyTourBookings] = useState(settings?.notifyTourBookings ?? true);
+  const [notifyNewDeals, setNotifyNewDeals] = useState(settings?.notifyNewDeals ?? true);
+  const [notifyFollowUps, setNotifyFollowUps] = useState(settings?.notifyFollowUps ?? true);
   const [phoneNumber, setPhoneNumber] = useState(settings?.phoneNumber ?? '');
   const [myConnections, setMyConnections] = useState(settings?.myConnections ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  const anyChannelOn = notifications || smsNotifications;
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -63,6 +74,10 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
           name,
           notifications,
           smsNotifications,
+          notifyNewLeads,
+          notifyTourBookings,
+          notifyNewDeals,
+          notifyFollowUps,
           phoneNumber,
           myConnections,
         })
@@ -139,6 +154,9 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
             onChange={(e) => setPhoneNumber(e.target.value)}
             placeholder="(555) 123-4567"
           />
+          <p className="text-xs text-muted-foreground">
+            Used for SMS notifications and displayed on tour booking pages
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="connections">My connections</Label>
@@ -152,38 +170,107 @@ export function SettingsForm({ space, settings }: SettingsFormProps) {
       </SectionBlock>
 
       {/* Notifications */}
-      <SectionBlock title="Notifications" description="Control how you receive updates about new leads, tours, and deals.">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium">Email notifications</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Get emails for new leads, tour bookings, and follow-up reminders
-            </p>
-          </div>
-          <Switch
-            checked={notifications}
-            onCheckedChange={setNotifications}
-          />
-        </div>
-        <div className="border-t border-border pt-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">SMS notifications</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Get text messages for new leads, tours, and deals
-              </p>
-              {smsNotifications && !phoneNumber && (
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Add your phone number above to receive SMS notifications
+      <SectionBlock title="Notifications" description="Choose how and when you get notified about workspace activity.">
+        {/* Delivery channels */}
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Delivery channels</p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Email</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Notifications sent to <span className="font-medium text-foreground">{userEmail}</span>
                 </p>
-              )}
+              </div>
+              <Switch
+                checked={notifications}
+                onCheckedChange={setNotifications}
+              />
             </div>
-            <Switch
-              checked={smsNotifications}
-              onCheckedChange={setSmsNotifications}
-            />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">SMS</p>
+                {phoneNumber ? (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Text messages sent to <span className="font-medium text-foreground">{phoneNumber}</span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                    Add your phone number above to enable SMS
+                  </p>
+                )}
+              </div>
+              <Switch
+                checked={smsNotifications}
+                onCheckedChange={setSmsNotifications}
+                disabled={!phoneNumber}
+              />
+            </div>
           </div>
         </div>
+
+        {/* Per-event toggles */}
+        {anyChannelOn && (
+          <div className="border-t border-border pt-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Event types</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">New leads</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    When a new lead application is submitted
+                  </p>
+                </div>
+                <Switch
+                  checked={notifyNewLeads}
+                  onCheckedChange={setNotifyNewLeads}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Tour bookings</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    When a guest books a property tour
+                  </p>
+                </div>
+                <Switch
+                  checked={notifyTourBookings}
+                  onCheckedChange={setNotifyTourBookings}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">New deals</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    When a new deal is created in your pipeline
+                  </p>
+                </div>
+                <Switch
+                  checked={notifyNewDeals}
+                  onCheckedChange={setNotifyNewDeals}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Follow-up reminders</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Daily digest of contacts due for follow-up
+                  </p>
+                </div>
+                <Switch
+                  checked={notifyFollowUps}
+                  onCheckedChange={setNotifyFollowUps}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!anyChannelOn && (
+          <p className="text-xs text-muted-foreground italic pt-2">
+            Enable at least one delivery channel to configure event notifications.
+          </p>
+        )}
       </SectionBlock>
 
       <div className="space-y-2 pt-1">

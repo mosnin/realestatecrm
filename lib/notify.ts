@@ -4,11 +4,20 @@
  * Sends email (via Resend) and SMS (via Telnyx) notifications to space owners
  * based on their notification preferences in SpaceSetting.
  *
+ * Preferences:
+ *   - notifications (master email toggle)
+ *   - smsNotifications (master SMS toggle)
+ *   - notifyNewLeads (per-event: new lead applications)
+ *   - notifyTourBookings (per-event: new tour bookings)
+ *   - notifyNewDeals (per-event: new deals)
+ *   - notifyFollowUps (per-event: follow-up reminders)
+ *
  * All functions are non-blocking and never throw.
  */
 
 import { supabase } from '@/lib/supabase';
-import { sendNewLeadNotification, type NewLeadEmailParams } from '@/lib/email';
+import { sendNewLeadNotification } from '@/lib/email';
+import { sendNewDealNotification } from '@/lib/email';
 import { sendAgentNotification, type TourEmailData } from '@/lib/tour-emails';
 import { sendSMS, newLeadSMS, newTourSMS, newDealSMS } from '@/lib/sms';
 import { formatCompact } from '@/lib/formatting';
@@ -18,19 +27,29 @@ interface SpaceOwnerInfo {
   ownerPhone: string | null;
   spaceName: string;
   spaceSlug: string;
-  notifications: boolean;
-  smsNotifications: boolean;
+  // Channel toggles
+  emailEnabled: boolean;
+  smsEnabled: boolean;
+  // Per-event toggles
+  notifyNewLeads: boolean;
+  notifyTourBookings: boolean;
+  notifyNewDeals: boolean;
+  notifyFollowUps: boolean;
 }
 
 /**
- * Fetch the space owner's email, phone, and notification preferences.
- * Returns null if space/settings not found.
+ * Fetch the space owner's contact info and notification preferences.
+ * Returns null if space/owner not found.
  */
 async function getSpaceOwnerInfo(spaceId: string): Promise<SpaceOwnerInfo | null> {
   try {
     const [{ data: space }, { data: settings }] = await Promise.all([
       supabase.from('Space').select('ownerId, name, slug').eq('id', spaceId).maybeSingle(),
-      supabase.from('SpaceSetting').select('notifications, smsNotifications, phoneNumber').eq('spaceId', spaceId).maybeSingle(),
+      supabase
+        .from('SpaceSetting')
+        .select('notifications, smsNotifications, phoneNumber, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps')
+        .eq('spaceId', spaceId)
+        .maybeSingle(),
     ]);
 
     if (!space) return null;
@@ -43,8 +62,12 @@ async function getSpaceOwnerInfo(spaceId: string): Promise<SpaceOwnerInfo | null
       ownerPhone: settings?.phoneNumber ?? null,
       spaceName: space.name,
       spaceSlug: space.slug,
-      notifications: settings?.notifications ?? true,
-      smsNotifications: settings?.smsNotifications ?? false,
+      emailEnabled: settings?.notifications ?? true,
+      smsEnabled: settings?.smsNotifications ?? false,
+      notifyNewLeads: settings?.notifyNewLeads ?? true,
+      notifyTourBookings: settings?.notifyTourBookings ?? true,
+      notifyNewDeals: settings?.notifyNewDeals ?? true,
+      notifyFollowUps: settings?.notifyFollowUps ?? true,
     };
   } catch (err) {
     console.error('[notify] Failed to fetch space owner info', err);
@@ -68,16 +91,16 @@ export interface NotifyNewLeadParams {
 
 /**
  * Notify space owner about a new lead via email + SMS.
- * Non-blocking — fire and forget.
+ * Respects both the channel toggles AND the notifyNewLeads event toggle.
  */
 export async function notifyNewLead(params: NotifyNewLeadParams): Promise<void> {
   const info = await getSpaceOwnerInfo(params.spaceId);
-  if (!info) return;
+  if (!info || !info.notifyNewLeads) return;
 
   const promises: Promise<unknown>[] = [];
 
   // Email notification
-  if (info.notifications) {
+  if (info.emailEnabled) {
     promises.push(
       sendNewLeadNotification({
         toEmail: info.ownerEmail,
@@ -96,12 +119,13 @@ export async function notifyNewLead(params: NotifyNewLeadParams): Promise<void> 
   }
 
   // SMS notification
-  if (info.smsNotifications && info.ownerPhone) {
+  if (info.smsEnabled && info.ownerPhone) {
     promises.push(
       sendSMS(
         newLeadSMS({
           spaceName: info.spaceName,
           leadName: params.name,
+          leadPhone: params.phone,
           phone: info.ownerPhone,
           scoreLabel: params.scoreLabel,
         })
@@ -121,16 +145,16 @@ export interface NotifyNewTourParams {
 
 /**
  * Notify space owner about a new tour booking via email + SMS.
- * Non-blocking — fire and forget.
+ * Respects both the channel toggles AND the notifyTourBookings event toggle.
  */
 export async function notifyNewTour(params: NotifyNewTourParams): Promise<void> {
   const info = await getSpaceOwnerInfo(params.spaceId);
-  if (!info) return;
+  if (!info || !info.notifyTourBookings) return;
 
   const promises: Promise<unknown>[] = [];
 
   // Email notification to agent
-  if (info.notifications) {
+  if (info.emailEnabled) {
     promises.push(
       sendAgentNotification(info.ownerEmail, params.tourData)
         .catch((err) => console.error('[notify] tour email failed', err))
@@ -138,7 +162,7 @@ export async function notifyNewTour(params: NotifyNewTourParams): Promise<void> 
   }
 
   // SMS notification to agent
-  if (info.smsNotifications && info.ownerPhone) {
+  if (info.smsEnabled && info.ownerPhone) {
     const d = new Date(params.tourData.startsAt);
     promises.push(
       sendSMS(
@@ -163,27 +187,52 @@ export interface NotifyNewDealParams {
   spaceId: string;
   dealTitle: string;
   dealValue?: number | null;
+  dealAddress?: string | null;
+  dealPriority?: string | null;
+  contactNames?: string[];
 }
 
 /**
  * Notify space owner about a new deal via email + SMS.
- * Currently SMS only (email for deals is not yet implemented).
+ * Respects both the channel toggles AND the notifyNewDeals event toggle.
  */
 export async function notifyNewDeal(params: NotifyNewDealParams): Promise<void> {
   const info = await getSpaceOwnerInfo(params.spaceId);
-  if (!info) return;
+  if (!info || !info.notifyNewDeals) return;
+
+  const promises: Promise<unknown>[] = [];
+
+  // Email notification
+  if (info.emailEnabled) {
+    promises.push(
+      sendNewDealNotification({
+        toEmail: info.ownerEmail,
+        spaceName: info.spaceName,
+        spaceSlug: info.spaceSlug,
+        dealTitle: params.dealTitle,
+        dealValue: params.dealValue,
+        dealAddress: params.dealAddress,
+        dealPriority: params.dealPriority,
+        contactNames: params.contactNames,
+      }).catch((err) => console.error('[notify] deal email failed', err))
+    );
+  }
 
   // SMS notification
-  if (info.smsNotifications && info.ownerPhone) {
-    sendSMS(
-      newDealSMS({
-        spaceName: info.spaceName,
-        dealTitle: params.dealTitle,
-        value: params.dealValue != null ? formatCompact(params.dealValue) : null,
-        phone: info.ownerPhone,
-      })
-    ).catch((err) => console.error('[notify] deal SMS failed', err));
+  if (info.smsEnabled && info.ownerPhone) {
+    promises.push(
+      sendSMS(
+        newDealSMS({
+          spaceName: info.spaceName,
+          dealTitle: params.dealTitle,
+          value: params.dealValue != null ? formatCompact(params.dealValue) : null,
+          phone: info.ownerPhone,
+        })
+      ).catch((err) => console.error('[notify] deal SMS failed', err))
+    );
   }
+
+  await Promise.allSettled(promises);
 }
 
 // ── New Contact (manually added) ─────────────────────────────────────────
@@ -205,13 +254,14 @@ export async function notifyNewContact(params: NotifyNewContactParams): Promise<
   if (!params.tags?.includes('new-lead')) return;
 
   const info = await getSpaceOwnerInfo(params.spaceId);
-  if (!info) return;
+  if (!info || !info.notifyNewLeads) return;
 
-  if (info.smsNotifications && info.ownerPhone) {
+  if (info.smsEnabled && info.ownerPhone) {
     sendSMS(
       newLeadSMS({
         spaceName: info.spaceName,
         leadName: params.contactName,
+        leadPhone: params.contactPhone,
         phone: info.ownerPhone,
       })
     ).catch((err) => console.error('[notify] contact SMS failed', err));

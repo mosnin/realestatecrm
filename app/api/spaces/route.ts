@@ -15,6 +15,10 @@ export async function PATCH(req: NextRequest) {
     emoji,
     notifications,
     smsNotifications,
+    notifyNewLeads,
+    notifyTourBookings,
+    notifyNewDeals,
+    notifyFollowUps,
   } = body;
 
   // Sanitize and cap all free-text fields to prevent storage DoS and injection
@@ -59,6 +63,10 @@ export async function PATCH(req: NextRequest) {
         spaceId: space.id,
         notifications,
         smsNotifications: typeof smsNotifications === 'boolean' ? smsNotifications : false,
+        notifyNewLeads: typeof notifyNewLeads === 'boolean' ? notifyNewLeads : true,
+        notifyTourBookings: typeof notifyTourBookings === 'boolean' ? notifyTourBookings : true,
+        notifyNewDeals: typeof notifyNewDeals === 'boolean' ? notifyNewDeals : true,
+        notifyFollowUps: typeof notifyFollowUps === 'boolean' ? notifyFollowUps : true,
         phoneNumber,
         myConnections,
         aiPersonalization,

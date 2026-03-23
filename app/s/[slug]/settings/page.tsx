@@ -18,10 +18,15 @@ export default async function SettingsPage({
   if (!space) notFound();
 
   let settings: SpaceSetting | null = null;
+  let userEmail = '';
   try {
-    const { data, error } = await supabase.from('SpaceSetting').select('*').eq('spaceId', space.id).maybeSingle();
+    const [{ data, error }, { data: userRow }] = await Promise.all([
+      supabase.from('SpaceSetting').select('*').eq('spaceId', space.id).maybeSingle(),
+      supabase.from('User').select('email').eq('id', space.ownerId).maybeSingle(),
+    ]);
     if (error) throw error;
     settings = (data as SpaceSetting) ?? null;
+    userEmail = userRow?.email ?? '';
   } catch (err) {
     console.error('[settings] DB queries failed', err);
     return (
@@ -41,7 +46,7 @@ export default async function SettingsPage({
         <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
         <p className="text-muted-foreground">Manage your profile, connections, AI, and billing preferences</p>
       </div>
-      <SettingsForm space={space} settings={settings} />
+      <SettingsForm space={space} settings={settings} userEmail={userEmail} />
     </div>
   );
 }

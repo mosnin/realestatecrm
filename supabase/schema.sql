@@ -54,6 +54,10 @@ CREATE TABLE IF NOT EXISTS "SpaceSetting" (
   "spaceId"           text UNIQUE NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
   notifications       boolean NOT NULL DEFAULT true,
   "smsNotifications"  boolean NOT NULL DEFAULT false,
+  "notifyNewLeads"    boolean NOT NULL DEFAULT true,
+  "notifyTourBookings" boolean NOT NULL DEFAULT true,
+  "notifyNewDeals"    boolean NOT NULL DEFAULT true,
+  "notifyFollowUps"   boolean NOT NULL DEFAULT true,
   timezone            text NOT NULL DEFAULT 'America/New_York',
   "phoneNumber"       text,
   "myConnections"     text,
@@ -325,6 +329,10 @@ ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "businessName"         text;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "intakePageTitle"      text;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "intakePageIntro"      text;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "smsNotifications"    boolean NOT NULL DEFAULT false;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "notifyNewLeads"     boolean NOT NULL DEFAULT true;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "notifyTourBookings" boolean NOT NULL DEFAULT true;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "notifyNewDeals"     boolean NOT NULL DEFAULT true;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "notifyFollowUps"    boolean NOT NULL DEFAULT true;
 
 -- ============================================================
 -- Indexes

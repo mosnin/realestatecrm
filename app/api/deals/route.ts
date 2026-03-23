@@ -167,11 +167,13 @@ export async function POST(req: NextRequest) {
 
   syncDeal(deal).catch(console.error);
 
-  // SMS notification for new deal (non-blocking)
+  // Email + SMS notification for new deal (non-blocking)
   notifyNewDeal({
     spaceId: space.id,
     dealTitle: title,
     dealValue: valueVal,
+    dealAddress: address || null,
+    dealPriority: priority || null,
   }).catch(console.error);
 
   return NextResponse.json(deal, { status: 201 });

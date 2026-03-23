@@ -62,11 +62,12 @@ export async function sendSMS(params: SendSMSParams): Promise<boolean> {
 
 // ── Pre-built SMS templates ──────────────────────────────────────────────
 
-export function newLeadSMS(p: { spaceName: string; leadName: string; phone: string; scoreLabel?: string | null }): SendSMSParams {
+export function newLeadSMS(p: { spaceName: string; leadName: string; leadPhone?: string | null; phone: string; scoreLabel?: string | null }): SendSMSParams {
   const score = p.scoreLabel ? ` (${p.scoreLabel})` : '';
+  const leadContact = p.leadPhone ? ` Phone: ${p.leadPhone}.` : '';
   return {
     to: p.phone,
-    body: `[${p.spaceName}] New lead: ${p.leadName}${score}. Phone: ${p.phone}. Open your dashboard to review.`,
+    body: `[${p.spaceName}] New lead: ${p.leadName}${score}.${leadContact} Open your dashboard to review.`,
   };
 }
 
