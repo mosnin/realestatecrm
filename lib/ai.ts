@@ -160,7 +160,7 @@ export async function chatWithRAG(
     try {
       const openai = new OpenAI({ apiKey: openAIKey });
       const stream = await openai.chat.completions.create({
-        model: 'gpt-5-mini',
+        model: 'gpt-4o-mini',
         temperature: 0.2,
         stream: true,
         messages: [
@@ -178,12 +178,18 @@ export async function chatWithRAG(
           controller.close();
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       // Log full error server-side; never return internal details (API key snippets, rate limit info) to the client
-      console.error('[ai] OpenAI provider error', error);
+      console.error('[ai] OpenAI provider error', error?.message ?? error);
       if (!looksLikeAnthropicKey(anthropicKey)) {
-        return textStream('AI provider is temporarily unavailable. Please try again in a moment.');
+        const hint = error?.status === 401
+          ? 'The OpenAI API key appears to be invalid. Check Settings → AI or your OPENAI_API_KEY environment variable.'
+          : error?.status === 404
+          ? 'The OpenAI model was not found. The API key may not have access to the configured model.'
+          : 'AI provider is temporarily unavailable. Please try again in a moment.';
+        return textStream(hint);
       }
+      // Fall through to Anthropic
     }
   }
 
