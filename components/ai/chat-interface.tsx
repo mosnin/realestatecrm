@@ -9,7 +9,7 @@ import { History, X, AlertCircle, Sparkles, Plus } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import type { Conversation } from '@/lib/types';
-import type { CRMAction } from './action-card';
+import type { CRMAction, ActionResult } from './action-card';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -242,7 +242,7 @@ export function ChatInterface({
     }
   }
 
-  const handleAction = useCallback(async (action: CRMAction): Promise<boolean> => {
+  const handleAction = useCallback(async (action: CRMAction): Promise<ActionResult> => {
     const endpoint = action.type === 'update_contact'
       ? `/api/contacts/${action.id}`
       : `/api/deals/${action.id}`;
@@ -255,12 +255,15 @@ export function ChatInterface({
       if (!res.ok) {
         const errorBody = await res.text().catch(() => '');
         console.error('[Chat] Action failed:', res.status, errorBody);
-        return false;
+        let parsed: { error?: string } = {};
+        try { parsed = JSON.parse(errorBody); } catch {}
+        const detail = parsed.error || `HTTP ${res.status}`;
+        return { ok: false, error: detail };
       }
-      return true;
+      return { ok: true };
     } catch (err) {
       console.error('[Chat] Action error:', err);
-      return false;
+      return { ok: false, error: 'Network error — check your connection' };
     }
   }, []);
 

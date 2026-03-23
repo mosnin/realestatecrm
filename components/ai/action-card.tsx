@@ -11,18 +11,24 @@ export interface CRMAction {
   changes: Record<string, unknown>;
 }
 
+export interface ActionResult {
+  ok: boolean;
+  error?: string;
+}
+
 interface ActionCardProps {
   action: CRMAction;
-  onApprove: (action: CRMAction) => Promise<boolean>;
+  onApprove: (action: CRMAction) => Promise<ActionResult>;
 }
 
 export function ActionCard({ action, onApprove }: ActionCardProps) {
   const [status, setStatus] = useState<'pending' | 'loading' | 'approved' | 'rejected' | 'error'>('pending');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Auto-clear error after 5 seconds so user can retry
+  // Auto-clear error after 8 seconds so user can retry
   useEffect(() => {
     if (status === 'error') {
-      const t = setTimeout(() => setStatus('pending'), 5000);
+      const t = setTimeout(() => setStatus('pending'), 8000);
       return () => clearTimeout(t);
     }
   }, [status]);
@@ -33,11 +39,18 @@ export function ActionCard({ action, onApprove }: ActionCardProps) {
 
   async function handleApprove() {
     setStatus('loading');
+    setErrorMessage(null);
     try {
-      const ok = await onApprove(action);
-      setStatus(ok ? 'approved' : 'error');
+      const result = await onApprove(action);
+      if (result.ok) {
+        setStatus('approved');
+      } else {
+        setStatus('error');
+        setErrorMessage(result.error ?? null);
+      }
     } catch {
       setStatus('error');
+      setErrorMessage('Network error — check your connection');
     }
   }
 
@@ -99,10 +112,10 @@ export function ActionCard({ action, onApprove }: ActionCardProps) {
       )}
 
       {status === 'error' && (
-        <div className="flex items-center justify-between px-3 py-2 border-t border-border/60 text-xs text-red-600 dark:text-red-400">
+        <div className="px-3 py-2 border-t border-border/60 text-xs text-red-600 dark:text-red-400 space-y-1">
           <div className="flex items-center gap-2">
-            <AlertCircle size={12} />
-            Failed to apply changes. Click Approve to retry.
+            <AlertCircle size={12} className="flex-shrink-0" />
+            <span>{errorMessage || 'Failed to apply changes.'} Click Approve to retry.</span>
           </div>
         </div>
       )}

@@ -1,11 +1,11 @@
 import { Fragment } from 'react';
 import { cn } from '@/lib/utils';
-import { ActionCard, type CRMAction } from './action-card';
+import { ActionCard, type CRMAction, type ActionResult } from './action-card';
 
 interface MessageBubbleProps {
   role: 'user' | 'assistant';
   content: string;
-  onAction?: (action: CRMAction) => Promise<boolean>;
+  onAction?: (action: CRMAction) => Promise<ActionResult>;
 }
 
 // Match both <<ACTION>>...json...<</ACTION>> and <<ACTION>>...json...</ACTION>
@@ -121,7 +121,7 @@ export function MessageBubble({ role, content, onAction }: MessageBubbleProps) {
             <ActionCard
               key={i}
               action={part.value}
-              onApprove={onAction ?? (async () => false)}
+              onApprove={onAction ?? (async () => ({ ok: false, error: 'No action handler' }))}
             />
           )
         )}
