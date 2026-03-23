@@ -18,11 +18,14 @@ export interface ActionResult {
 
 interface ActionCardProps {
   action: CRMAction;
+  initialApplied?: boolean;
   onApprove: (action: CRMAction) => Promise<ActionResult>;
 }
 
-export function ActionCard({ action, onApprove }: ActionCardProps) {
-  const [status, setStatus] = useState<'pending' | 'loading' | 'approved' | 'rejected' | 'error'>('pending');
+export function ActionCard({ action, initialApplied, onApprove }: ActionCardProps) {
+  const [status, setStatus] = useState<'pending' | 'loading' | 'approved' | 'rejected' | 'error'>(
+    initialApplied ? 'approved' : 'pending'
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Auto-clear error after 8 seconds so user can retry

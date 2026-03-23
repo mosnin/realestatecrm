@@ -247,7 +247,11 @@ export function ChatInterface({
       const res = await fetch('/api/ai/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, action }),
+        body: JSON.stringify({
+          slug,
+          action,
+          conversationId: activeConversationId,
+        }),
       });
       if (!res.ok) {
         const errorBody = await res.text().catch(() => '');
@@ -257,12 +261,27 @@ export function ChatInterface({
         const detail = parsed.error || `HTTP ${res.status}`;
         return { ok: false, error: detail };
       }
+
+      // Update local message state: replace <<ACTION>> with <<APPLIED>> for the matching block
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.role !== 'assistant') return msg;
+          // Match ACTION blocks containing this action's id
+          const pattern = new RegExp(
+            `<<ACTION>>([\\s\\S]*?"id"\\s*:\\s*"${action.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[\\s\\S]*?)(?:<<\\/ACTION>>|<\\/ACTION>>?)`,
+            'g'
+          );
+          const updated = msg.content.replace(pattern, '<<APPLIED>>$1<</APPLIED>>');
+          return updated !== msg.content ? { ...msg, content: updated } : msg;
+        })
+      );
+
       return { ok: true };
     } catch (err) {
       console.error('[Chat] Action error:', err);
       return { ok: false, error: 'Network error — check your connection' };
     }
-  }, [slug]);
+  }, [slug, activeConversationId]);
 
   const atLimit = messages.length >= MESSAGE_LIMIT;
 

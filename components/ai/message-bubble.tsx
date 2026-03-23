@@ -12,6 +12,12 @@ interface MessageBubbleProps {
 // LLMs may output either format despite being told the double-bracket version.
 const ACTION_REGEX = /<<ACTION>>([\s\S]*?)(?:<{2}\/ACTION>>|<\/ACTION>>?)/g;
 
+// Match already-applied actions (persisted after approval)
+const APPLIED_REGEX = /<<APPLIED>>([\s\S]*?)(?:<{2}\/APPLIED>>|<\/APPLIED>>?)/g;
+
+// Combined regex to match both ACTION and APPLIED blocks
+const BLOCK_REGEX = /<<(ACTION|APPLIED)>>([\s\S]*?)(?:<{2}\/\1>>|<\/\1>>?)/g;
+
 /** Render inline markdown: **bold** and *italic* */
 function renderInline(text: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
@@ -50,21 +56,27 @@ function renderMarkdown(text: string): React.ReactNode {
   ));
 }
 
+type ParsedPart =
+  | { type: 'text'; value: string }
+  | { type: 'action'; value: CRMAction; applied: boolean };
+
 /** Parse content into text segments and action blocks */
-function parseContent(content: string): Array<{ type: 'text'; value: string } | { type: 'action'; value: CRMAction }> {
-  const parts: Array<{ type: 'text'; value: string } | { type: 'action'; value: CRMAction }> = [];
+function parseContent(content: string): ParsedPart[] {
+  const parts: ParsedPart[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
-  const regex = new RegExp(ACTION_REGEX.source, 'g');
+  const regex = new RegExp(BLOCK_REGEX.source, 'g');
 
   while ((match = regex.exec(content)) !== null) {
     if (match.index > lastIndex) {
       parts.push({ type: 'text', value: content.slice(lastIndex, match.index) });
     }
+    const tag = match[1]; // "ACTION" or "APPLIED"
+    const json = match[2];
     try {
-      const action = JSON.parse(match[1].trim()) as CRMAction;
+      const action = JSON.parse(json.trim()) as CRMAction;
       if (action.type && action.id && action.changes) {
-        parts.push({ type: 'action', value: action });
+        parts.push({ type: 'action', value: action, applied: tag === 'APPLIED' });
       } else {
         parts.push({ type: 'text', value: match[0] });
       }
@@ -121,6 +133,7 @@ export function MessageBubble({ role, content, onAction }: MessageBubbleProps) {
             <ActionCard
               key={i}
               action={part.value}
+              initialApplied={part.applied}
               onApprove={onAction ?? (async () => ({ ok: false, error: 'No action handler' }))}
             />
           )

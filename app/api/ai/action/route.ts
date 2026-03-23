@@ -15,7 +15,7 @@ import type { Contact, Deal, DealStage } from '@/lib/types';
  */
 export async function POST(req: NextRequest) {
   try {
-    const { slug, action } = await req.json();
+    const { slug, action, conversationId } = await req.json();
 
     if (!slug || !action?.type || !action?.changes) {
       return NextResponse.json({ error: 'Invalid action payload' }, { status: 400 });
@@ -25,16 +25,61 @@ export async function POST(req: NextRequest) {
     if (auth instanceof NextResponse) return auth;
     const { userId, space } = auth;
 
+    let result: NextResponse;
     if (action.type === 'update_contact') {
-      return await handleContactUpdate(action, space.id, userId, req);
+      result = await handleContactUpdate(action, space.id, userId, req);
     } else if (action.type === 'update_deal') {
-      return await handleDealUpdate(action, space.id, userId, req);
+      result = await handleDealUpdate(action, space.id, userId, req);
+    } else {
+      return NextResponse.json({ error: `Unknown action type: ${action.type}` }, { status: 400 });
     }
 
-    return NextResponse.json({ error: `Unknown action type: ${action.type}` }, { status: 400 });
+    // On success, mark the action as applied in the stored message
+    if (result.status === 200 && conversationId && action.id) {
+      markActionApplied(conversationId, action.id).catch((err) =>
+        console.error('[ai/action] failed to mark applied:', err)
+      );
+    }
+
+    return result;
+
   } catch (err) {
     console.error('[ai/action] unexpected error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
+}
+
+/**
+ * Replace <<ACTION>>json<</ACTION>> with <<APPLIED>>json<</APPLIED>> in the
+ * stored message so the action card renders as "approved" on reload.
+ */
+async function markActionApplied(conversationId: string, actionId: string) {
+  // Find recent assistant messages in this conversation
+  const { data: msgs } = await supabase
+    .from('Message')
+    .select('id, content')
+    .eq('conversationId', conversationId)
+    .eq('role', 'assistant')
+    .order('createdAt', { ascending: false })
+    .limit(10);
+
+  if (!msgs) return;
+
+  const escapedId = actionId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(
+    `<<ACTION>>([\\s\\S]*?"id"\\s*:\\s*"${escapedId}"[\\s\\S]*?)(?:<<\\/ACTION>>|<\\/ACTION>>?)`,
+    'g'
+  );
+
+  for (const msg of msgs) {
+    const updated = msg.content.replace(pattern, '<<APPLIED>>$1<</APPLIED>>');
+    if (updated !== msg.content) {
+      await supabase
+        .from('Message')
+        .update({ content: updated })
+        .eq('id', msg.id);
+      return;
+    }
   }
 }
 
@@ -132,11 +177,13 @@ async function handleContactUpdate(
 ) {
   const contact = await resolveContact(action.id, action.summary, spaceId);
   if (!contact) {
+    console.error('[ai/action] contact not found — id:', action.id, 'summary:', action.summary);
     return NextResponse.json(
       { error: 'Contact not found — the AI may have used an incorrect ID' },
       { status: 404 },
     );
   }
+  console.log('[ai/action] resolved contact:', contact.id, contact.name, '(requested id:', action.id, ')');
 
   const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
   const body = action.changes;
