@@ -16,6 +16,7 @@ import {
   CalendarPlus,
   Loader2,
   Briefcase,
+  Search,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -78,16 +79,28 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl,
   const [copied, setCopied] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState(initialProfiles);
   const [embedCopied, setEmbedCopied] = useState(false);
   const router = useRouter();
 
   const now = new Date();
+  const searchLower = searchQuery.toLowerCase().trim();
   const filtered = tours.filter((t) => {
     const start = new Date(t.startsAt);
-    if (tab === 'upcoming') return start >= now && t.status !== 'cancelled';
-    if (tab === 'past') return start < now || t.status === 'completed';
+    if (tab === 'upcoming' && !(start >= now && t.status !== 'cancelled')) return false;
+    if (tab === 'past' && !(start < now || t.status === 'completed')) return false;
+    if (searchLower) {
+      return (
+        t.guestName.toLowerCase().includes(searchLower) ||
+        (t.guestEmail?.toLowerCase().includes(searchLower) ?? false) ||
+        (t.guestPhone?.toLowerCase().includes(searchLower) ?? false) ||
+        (t.propertyAddress?.toLowerCase().includes(searchLower) ?? false) ||
+        (t.notes?.toLowerCase().includes(searchLower) ?? false) ||
+        (t.Contact?.name.toLowerCase().includes(searchLower) ?? false)
+      );
+    }
     return true;
   });
 
@@ -202,6 +215,27 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl,
             Preview
           </a>
         </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by guest, email, phone, or address…"
+          className="h-9 w-full rounded-lg border border-border bg-muted/60 pl-9 pr-8 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background transition-colors"
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X size={13} />
+          </button>
+        )}
       </div>
 
       {/* Stats */}

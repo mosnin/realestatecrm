@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -27,6 +27,8 @@ import {
   Trash2,
   MapPin,
   DollarSign,
+  Search,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
@@ -64,6 +66,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
   const [defaultStageId, setDefaultStageId] = useState<string>('');
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
   const [view, setView] = useState<'kanban' | 'list'>('kanban');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -219,7 +222,28 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
 
   const allStages = stages as DealStage[];
   const activeDeal = stages.flatMap((s) => s.deals).find((d) => d.id === activeDealId);
-  const allDeals = stages.flatMap((s) => s.deals);
+
+  const searchLower = searchQuery.toLowerCase().trim();
+
+  function dealMatchesSearch(deal: DealWithRelations) {
+    if (!searchLower) return true;
+    return (
+      deal.title.toLowerCase().includes(searchLower) ||
+      (deal.address?.toLowerCase().includes(searchLower) ?? false) ||
+      (deal.description?.toLowerCase().includes(searchLower) ?? false) ||
+      deal.dealContacts.some((dc) => dc.contact.name.toLowerCase().includes(searchLower))
+    );
+  }
+
+  const filteredStages = useMemo(() => {
+    if (!searchLower) return stages;
+    return stages.map((s) => ({
+      ...s,
+      deals: s.deals.filter(dealMatchesSearch),
+    }));
+  }, [stages, searchLower]);
+
+  const allDeals = filteredStages.flatMap((s) => s.deals);
 
   return (
     <div className="space-y-4">
@@ -231,6 +255,27 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Search */}
+          <div className="relative">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search deals…"
+              className="h-8 w-44 rounded-lg border border-border bg-muted/60 pl-8 pr-7 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
           {/* View toggle */}
           <div className="flex rounded-md border border-border overflow-hidden bg-card">
             <button
@@ -279,7 +324,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
             onDragEnd={handleDragEnd}
           >
             <div className="flex gap-4 min-w-max">
-              {stages.map((stage) => (
+              {filteredStages.map((stage) => (
                 <KanbanColumn
                   key={stage.id}
                   stage={stage}
