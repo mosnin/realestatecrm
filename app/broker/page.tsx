@@ -17,10 +17,20 @@ import {
   ArrowRight,
   Building2,
   Globe,
+  CalendarDays,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
 import { TrendsChart } from '@/components/broker/trends-chart';
+import { BrokerOnboardingChecklist } from '@/components/broker/onboarding-checklist';
+import { TeamActivityFeed } from '@/components/broker/team-activity-feed';
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
 
 export default async function BrokerOverviewPage() {
   const ctx = await getBrokerContext();
@@ -111,10 +121,13 @@ export default async function BrokerOverviewPage() {
   const leadsToApps = totalLeads > 0 ? Math.round((totalApplications / totalLeads) * 100) : 0;
   const appsToDeals = totalApplications > 0 ? Math.round((totalDeals / totalApplications) * 100) : 0;
 
+  const nonOwnerMembers = members.filter((m) => m.role !== 'broker_owner');
+  const hasSettings = !!(brokerage.name && (brokerage.logoUrl || brokerage.websiteUrl));
+
   return (
-    <div className="space-y-8">
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-8 max-w-[1120px]">
+      {/* ── Page header (matching realtor dashboard) ── */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div className="flex items-center gap-4">
           {brokerage.logoUrl ? (
             <img src={brokerage.logoUrl} alt="" className="h-10 max-w-[120px] object-contain rounded-lg" />
@@ -124,25 +137,23 @@ export default async function BrokerOverviewPage() {
             </div>
           )}
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">{brokerage.name}</h1>
-            <div className="flex items-center gap-3 mt-0.5">
-              <p className="text-sm text-muted-foreground">
-                {members.length} {members.length === 1 ? 'member' : 'members'} · {activeMembers} active
-              </p>
-              {brokerage.websiteUrl && (
-                <a
-                  href={brokerage.websiteUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
-                >
-                  <Globe size={10} /> Website
-                </a>
-              )}
-            </div>
+            <p className="text-sm text-muted-foreground">{getGreeting()}</p>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
+              {brokerage.name}
+            </h1>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          {brokerage.websiteUrl && (
+            <a
+              href={brokerage.websiteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-medium border border-border text-foreground px-3 py-2 rounded-lg hover:bg-muted transition-colors"
+            >
+              <Globe size={12} /> Website
+            </a>
+          )}
           <a
             href="/api/broker/export"
             className="inline-flex items-center gap-1.5 text-xs font-medium border border-border text-foreground px-3 py-2 rounded-lg hover:bg-muted transition-colors"
@@ -158,51 +169,42 @@ export default async function BrokerOverviewPage() {
         </div>
       </div>
 
-      {/* ── Highlight Stats ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Pipeline — Large hero card */}
-        <Card className="col-span-2 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/20">
-          <CardContent className="px-5 py-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary/70">Total Pipeline</p>
-                <p className="text-4xl font-bold mt-2 tabular-nums text-primary">{formatCompact(totalPipeline)}</p>
-                <p className="text-sm text-muted-foreground mt-1">{totalDeals} active deals across {activeMembers} realtors</p>
-              </div>
-              <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <TrendingUp size={22} className="text-primary" />
-              </div>
-            </div>
-            {totalWonValue > 0 && (
-              <div className="mt-3 pt-3 border-t border-primary/10 flex items-center gap-2">
-                <CheckCircle2 size={12} className="text-emerald-500" />
-                <p className="text-xs text-muted-foreground">
-                  <span className="font-semibold text-emerald-600">{formatCompact(totalWonValue)}</span> closed won ({wonDeals.length} deals)
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* ── Onboarding checklist ── */}
+      <BrokerOnboardingChecklist
+        hasMembers={nonOwnerMembers.length > 0}
+        hasInvitations={pendingInvitations.length > 0}
+        hasSettings={hasSettings}
+      />
 
-        {/* Smaller stat cards */}
+      {/* ── Summary stats (matching realtor dashboard 6-col pattern) ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: 'Team Size',      value: members.length, sub: `${activeMembers} active`, icon: Users,        gradient: 'from-blue-500/10 to-blue-500/0',   iconColor: 'text-blue-500' },
-          { label: 'New Leads',       value: totalLeads,     sub: `${totalApplications} applications`, icon: PhoneIncoming, gradient: 'from-violet-500/10 to-violet-500/0', iconColor: 'text-violet-500' },
-        ].map(({ label, value, sub, icon: Icon, gradient, iconColor }) => (
-          <Card key={label} className={`bg-gradient-to-br ${gradient} to-transparent`}>
-            <CardContent className="px-4 py-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                  <p className="text-2xl font-bold mt-1 tabular-nums">{value}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
+          { label: 'Team size', value: members.length, sub: `${activeMembers} active`, icon: Users, accent: false, href: '/broker/members' },
+          { label: 'New leads', value: totalLeads, sub: 'across team', icon: PhoneIncoming, accent: totalLeads > 0, href: '/broker/realtors' },
+          { label: 'Applications', value: totalApplications, sub: 'submitted', icon: FileText, accent: false, href: '/broker/realtors' },
+          { label: 'Active deals', value: totalDeals, sub: formatCompact(totalPipeline), icon: Briefcase, accent: false, href: '/broker/realtors' },
+          { label: 'Won deals', value: wonDeals.length, sub: formatCompact(totalWonValue), icon: CheckCircle2, accent: wonDeals.length > 0, href: '/broker/realtors' },
+          { label: 'Invitations', value: pendingInvitations.length, sub: pendingInvitations.length > 0 ? 'pending' : 'none', icon: Mail, accent: pendingInvitations.length > 0, href: '/broker/invitations' },
+        ].map(({ label, value, sub, icon: Icon, accent, href }) => (
+          <Link key={label} href={href}>
+            <Card className={`transition-shadow hover:shadow-md ${accent ? 'border-primary/30 bg-primary/5' : ''}`}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${accent ? 'bg-primary/10' : 'bg-muted'}`}>
+                    <Icon size={16} className={accent ? 'text-primary' : 'text-muted-foreground'} />
+                  </div>
+                  {accent && value > 0 && (
+                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  )}
                 </div>
-                <div className="w-9 h-9 rounded-xl bg-background/50 flex items-center justify-center flex-shrink-0">
-                  <Icon size={16} className={iconColor} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                <p className={`text-2xl font-bold tabular-nums leading-tight ${accent ? 'text-primary' : 'text-foreground'}`}>
+                  {value}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1 leading-tight">{label}</p>
+                <p className="text-[10px] text-muted-foreground/70">{sub}</p>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 
@@ -268,38 +270,44 @@ export default async function BrokerOverviewPage() {
       {/* ── Weekly Trends ── */}
       <TrendsChart />
 
-      {/* ── Team Performance + Invitations ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      {/* ── Team Performance + Sidebar ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Team performance table */}
+        {/* Team performance table — 2/3 width */}
         <div className="lg:col-span-2 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">Team Performance</p>
-            <Link href="/broker/realtors" className="text-xs text-primary font-medium hover:underline underline-offset-2">
-              Full breakdown →
+            <h2 className="text-sm font-semibold text-foreground">Team Performance</h2>
+            <Link href="/broker/realtors" className="text-xs text-primary font-medium hover:underline underline-offset-2 flex items-center gap-1">
+              View all <ArrowRight size={12} />
             </Link>
           </div>
           <Card>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Realtor</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground hidden sm:table-cell">Role</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Leads</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground hidden md:table-cell">Apps</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Deals</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground hidden sm:table-cell">Pipeline</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Status</th>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Realtor</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Role</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Leads</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Apps</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deals</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Pipeline</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border bg-card">
                   {members.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                        No members yet.{' '}
-                        <Link href="/broker/invitations" className="text-primary hover:underline">
-                          Invite realtors →
+                      <td colSpan={7} className="px-4 py-12 text-center">
+                        <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
+                          <Users size={20} className="text-muted-foreground" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">No team members yet</p>
+                        <p className="text-xs text-muted-foreground mt-1 max-w-[220px] mx-auto">
+                          Invite your first realtor to start tracking team performance.
+                        </p>
+                        <Link href="/broker/invitations" className="text-xs text-primary font-medium hover:underline mt-2 inline-flex items-center gap-1">
+                          Invite realtors <ArrowRight size={11} />
                         </Link>
                       </td>
                     </tr>
@@ -315,7 +323,7 @@ export default async function BrokerOverviewPage() {
                       const pipeline = space ? (dealsBySpace[space.id]?.value ?? 0) : 0;
 
                       return (
-                        <tr key={m.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors group">
+                        <tr key={m.id} className="hover:bg-muted/30 transition-colors group">
                           <td className="px-4 py-3">
                             <Link href={`/broker/realtors/${m.userId}`} className="flex items-center gap-2.5 min-w-0">
                               <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-semibold text-primary flex-shrink-0">
@@ -359,77 +367,65 @@ export default async function BrokerOverviewPage() {
           </Card>
         </div>
 
-        {/* Pending invitations panel */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">Pending Invitations</p>
-            <Link href="/broker/invitations" className="text-xs text-primary font-medium hover:underline underline-offset-2">
-              View all →
-            </Link>
-          </div>
-
-          {pendingInvitations.length === 0 ? (
-            <Card>
-              <CardContent className="px-4 py-8 flex flex-col items-center gap-2 text-center">
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                  <Mail size={18} className="text-muted-foreground/60" />
-                </div>
-                <p className="text-xs text-muted-foreground">No pending invitations.</p>
-                <Link
-                  href="/broker/invitations"
-                  className="text-xs text-primary font-medium hover:underline underline-offset-2"
-                >
-                  Invite a realtor →
-                </Link>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {pendingInvitations.map((inv) => (
-                <div key={inv.id} className="rounded-xl border border-border bg-card px-4 py-3 hover:border-primary/30 transition-colors">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-6 h-6 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                      <Mail size={10} className="text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium truncate">{inv.email}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {inv.roleToAssign === 'broker_manager' ? 'Manager' : 'Realtor'} ·{' '}
-                        {new Date(inv.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <Link
-                href="/broker/invitations"
-                className="block text-center text-xs text-primary font-medium hover:underline underline-offset-2 pt-1"
-              >
-                Manage invitations →
+        {/* Right sidebar — Invitations + Activity */}
+        <div className="space-y-6">
+          {/* Pending invitations */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-foreground">Pending Invitations</h2>
+              <Link href="/broker/invitations" className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
+                View all <ArrowRight size={12} />
               </Link>
             </div>
-          )}
 
-          {/* Quick stats sidebar cards */}
-          <div className="space-y-2 pt-2">
-            <Card className="bg-gradient-to-br from-emerald-500/5 to-transparent">
-              <CardContent className="px-4 py-3 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Won Deals</p>
-                  <p className="text-lg font-bold tabular-nums">{wonDeals.length}</p>
+            {pendingInvitations.length === 0 ? (
+              <Card>
+                <CardContent className="py-6 text-center">
+                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mx-auto mb-2">
+                    <Mail size={18} className="text-muted-foreground" />
+                  </div>
+                  <p className="text-xs font-medium text-foreground">No pending invitations</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 max-w-[180px] mx-auto">
+                    Grow your team by inviting realtors to join your brokerage.
+                  </p>
+                  <Link
+                    href="/broker/invitations"
+                    className="text-xs text-primary font-medium hover:underline mt-2 inline-flex items-center gap-1"
+                  >
+                    Invite realtors <ArrowRight size={11} />
+                  </Link>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <div className="divide-y divide-border">
+                  {pendingInvitations.map((inv) => (
+                    <Link key={inv.id} href="/broker/invitations" className="block">
+                      <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
+                        <div className="w-8 h-8 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                          <Mail size={12} className="text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{inv.email}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {inv.roleToAssign === 'broker_manager' ? 'Manager' : 'Realtor'} ·{' '}
+                            {new Date(inv.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
                 </div>
-                <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{formatCompact(totalWonValue)}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-amber-500/5 to-transparent">
-              <CardContent className="px-4 py-3 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Applications</p>
-                  <p className="text-lg font-bold tabular-nums">{totalApplications}</p>
-                </div>
-                <FileText size={16} className="text-amber-500/50" />
-              </CardContent>
-            </Card>
+              </Card>
+            )}
+          </div>
+
+          {/* Recent team activity */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-foreground">Recent Activity</h2>
+            </div>
+            <TeamActivityFeed />
           </div>
         </div>
       </div>

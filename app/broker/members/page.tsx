@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { RemoveMemberButton } from '@/components/broker/remove-member-button';
 import { ChangeRoleButton } from '@/components/broker/change-role-button';
+import { MembersSearch } from '@/components/broker/members-search';
 
 export default async function BrokerMembersPage() {
   const ctx = await getBrokerContext();
@@ -30,11 +31,13 @@ export default async function BrokerMembersPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Members</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {members.length} {members.length === 1 ? 'member' : 'members'} in {ctx.brokerage.name}
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Members</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {members.length} {members.length === 1 ? 'member' : 'members'} in {ctx.brokerage.name}
+          </p>
+        </div>
       </div>
 
       {members.length === 0 ? (
@@ -53,61 +56,70 @@ export default async function BrokerMembersPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
-          {members.map((m) => {
-            const user = m.User;
-            const initials = ((user?.name ?? user?.email ?? '?').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2));
-            const joinedAt = new Date(m.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            return (
-              <div key={m.id} className="rounded-xl border border-border bg-card px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-                      {initials}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate">{user?.name ?? 'No name'}</p>
-                      <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+        <MembersSearch
+          members={members.map((m) => ({ id: m.id, name: m.User?.name ?? null, email: m.User?.email ?? null }))}
+        >
+          {(visibleIds) => (
+            <div className="space-y-2">
+              {members.filter((m) => visibleIds.has(m.id)).map((m) => {
+                const user = m.User;
+                const initials = ((user?.name ?? user?.email ?? '?').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2));
+                const joinedAt = new Date(m.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                return (
+                  <div key={m.id} className="rounded-xl border border-border bg-card px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
+                          {initials}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold truncate">{user?.name ?? 'No name'}</p>
+                          <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 text-right">
+                        <div className="hidden sm:block text-right">
+                          <p className="text-[10px] text-muted-foreground">Joined {joinedAt}</p>
+                          {m.Space?.slug && (
+                            <p className="text-[10px] text-primary font-medium">/{m.Space.slug}</p>
+                          )}
+                        </div>
+                        <span className="hidden sm:inline-flex text-[10px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                          {roleLabel(m.role)}
+                        </span>
+                        {user?.onboard ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
+                            <CheckCircle2 size={10} /> Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
+                            <AlertCircle size={10} /> Pending
+                          </span>
+                        )}
+                        {m.role !== 'broker_owner' && ctx.membership.role === 'broker_owner' && (
+                          <>
+                            <ChangeRoleButton
+                              membershipId={m.id}
+                              currentRole={m.role}
+                              memberName={user?.name ?? user?.email ?? 'this member'}
+                            />
+                            <RemoveMemberButton
+                              membershipId={m.id}
+                              memberName={user?.name ?? user?.email ?? 'this member'}
+                            />
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 text-right">
-                    <div className="hidden sm:block text-right">
-                      <p className="text-[10px] text-muted-foreground">Joined {joinedAt}</p>
-                      {m.Space?.slug && (
-                        <p className="text-[10px] text-primary font-medium">/{m.Space.slug}</p>
-                      )}
-                    </div>
-                    <span className="hidden sm:inline-flex text-[10px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
-                      {roleLabel(m.role)}
-                    </span>
-                    {user?.onboard ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
-                        <CheckCircle2 size={10} /> Active
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
-                        <AlertCircle size={10} /> Pending
-                      </span>
-                    )}
-                    {m.role !== 'broker_owner' && ctx.membership.role === 'broker_owner' && (
-                      <>
-                        <ChangeRoleButton
-                          membershipId={m.id}
-                          currentRole={m.role}
-                          memberName={user?.name ?? user?.email ?? 'this member'}
-                        />
-                        <RemoveMemberButton
-                          membershipId={m.id}
-                          memberName={user?.name ?? user?.email ?? 'this member'}
-                        />
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+              {visibleIds.size === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-6">No members match your search.</p>
+              )}
+            </div>
+          )}
+        </MembersSearch>
       )}
     </div>
   );

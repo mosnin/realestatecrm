@@ -11,6 +11,8 @@ import {
   ArrowDown,
   LayoutGrid,
   List,
+  Search,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
@@ -103,6 +105,7 @@ export function RealtorsClient({ realtors }: { realtors: RealtorRow[] }) {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [view, setView] = useState<ViewMode>('cards');
+  const [searchQuery, setSearchQuery] = useState('');
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -114,9 +117,11 @@ export function RealtorsClient({ realtors }: { realtors: RealtorRow[] }) {
   }
 
   const sorted = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     const filtered = realtors.filter((r) => {
-      if (statusFilter === 'active') return r.onboard;
-      if (statusFilter === 'pending') return !r.onboard;
+      if (statusFilter === 'active' && !r.onboard) return false;
+      if (statusFilter === 'pending' && r.onboard) return false;
+      if (q && !(r.name ?? '').toLowerCase().includes(q) && !r.email.toLowerCase().includes(q)) return false;
       return true;
     });
 
@@ -140,7 +145,7 @@ export function RealtorsClient({ realtors }: { realtors: RealtorRow[] }) {
       }
       return sortDir === 'asc' ? (va as number) - (vb as number) : (vb as number) - (va as number);
     });
-  }, [realtors, sortKey, sortDir, statusFilter]);
+  }, [realtors, sortKey, sortDir, statusFilter, searchQuery]);
 
   const activeCount = realtors.filter((r) => r.onboard).length;
   const pendingCount = realtors.filter((r) => !r.onboard).length;
@@ -149,8 +154,28 @@ export function RealtorsClient({ realtors }: { realtors: RealtorRow[] }) {
     <div className="space-y-4">
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-2 justify-between">
-        {/* Sort pills */}
+        {/* Search + Sort pills */}
         <div className="flex flex-wrap items-center gap-1.5">
+          {/* Search */}
+          <div className="relative mr-1">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search realtors…"
+              className="h-8 w-44 rounded-lg border border-border bg-muted/60 pl-8 pr-7 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
           <span className="text-xs text-muted-foreground font-medium mr-0.5">Sort:</span>
           {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
             <SortButton key={k} col={k} current={sortKey} dir={sortDir} onSort={handleSort} />

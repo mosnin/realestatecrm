@@ -249,10 +249,10 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
       </div>
 
       <div className="flex items-center gap-1.5">
-        {!isBrokerOnly && slug && <GlobalSearch slug={slug} />}
-        {!isBrokerOnly && slug && <NotificationCenter slug={slug} />}
+        {slug && <GlobalSearch slug={slug} />}
+        {slug && <NotificationCenter slug={slug} />}
         {isBroker && <BrokerHelpGuide />}
-        {isBrokerOnly && <NotificationBell />}
+        {isBrokerOnly && !slug && <NotificationBell />}
         <Button
           variant="ghost"
           size="icon"
