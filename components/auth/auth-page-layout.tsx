@@ -26,15 +26,15 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
     <main className="relative min-h-screen bg-background lg:flex lg:h-screen lg:overflow-hidden">
 
       {/* ── Left form panel ── */}
-      <div className="relative flex w-full flex-col bg-card px-6 py-6 sm:px-10 sm:py-8 lg:w-[480px] lg:min-w-[480px] lg:py-10">
+      <div className="relative flex w-full flex-col bg-card px-6 py-6 sm:px-10 sm:py-8 lg:w-[480px] lg:min-w-[480px] lg:overflow-y-auto lg:py-10">
 
         {/* Logo — top-left */}
         <div className="shrink-0">
           <BrandLogo className="h-6 sm:h-7" alt="Chippi" />
         </div>
 
-        {/* Form area — vertically centred */}
-        <div className="flex flex-1 flex-col justify-center py-6 sm:py-8 lg:py-0">
+        {/* Form area — top-aligned on mobile, vertically centred on desktop */}
+        <div className="flex flex-1 flex-col pt-6 sm:pt-8 lg:justify-center lg:py-0">
           <div className="mx-auto w-full max-w-[380px]">
 
             {/* Role switcher — visible on login pages */}
@@ -43,25 +43,25 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
                 <Link
                   href="/login/realtor"
                   className={cn(
-                    'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all',
+                    'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-all sm:py-2',
                     isRealtorLogin
                       ? 'bg-card text-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  <User size={14} />
+                  <User size={16} className="shrink-0 sm:size-[14px]" />
                   Realtor
                 </Link>
                 <Link
                   href="/login/broker"
                   className={cn(
-                    'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all',
+                    'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-all sm:py-2',
                     isBrokerLogin
                       ? 'bg-card text-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  <Building2 size={14} />
+                  <Building2 size={16} className="shrink-0 sm:size-[14px]" />
                   Broker
                 </Link>
               </div>
