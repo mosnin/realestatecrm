@@ -243,14 +243,11 @@ export function ChatInterface({
   }
 
   const handleAction = useCallback(async (action: CRMAction): Promise<ActionResult> => {
-    const endpoint = action.type === 'update_contact'
-      ? `/api/contacts/${action.id}`
-      : `/api/deals/${action.id}`;
     try {
-      const res = await fetch(endpoint, {
-        method: 'PATCH',
+      const res = await fetch('/api/ai/action', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(action.changes),
+        body: JSON.stringify({ slug, action }),
       });
       if (!res.ok) {
         const errorBody = await res.text().catch(() => '');
@@ -265,7 +262,7 @@ export function ChatInterface({
       console.error('[Chat] Action error:', err);
       return { ok: false, error: 'Network error — check your connection' };
     }
-  }, []);
+  }, [slug]);
 
   const atLimit = messages.length >= MESSAGE_LIMIT;
 
