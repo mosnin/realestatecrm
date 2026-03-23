@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { mobileNavItems } from '@/lib/nav-items';
-import { LayoutDashboard, UserCircle, Users, Mail, Briefcase } from 'lucide-react';
+import { LayoutDashboard, UserCircle, Users, Mail, Briefcase, Building2 } from 'lucide-react';
 
 const brokerMobileItems = [
   { href: '/broker', label: 'Team', icon: LayoutDashboard, exact: true },
@@ -97,6 +97,18 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
           </Link>
         );
       })}
+      {/* Broker users get a quick link to brokerage */}
+      {isBroker && (
+        <Link
+          href="/broker"
+          className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors text-muted-foreground"
+        >
+          <div className="w-9 h-6 rounded-md flex items-center justify-center transition-colors">
+            <Building2 size={18} />
+          </div>
+          <span>Team</span>
+        </Link>
+      )}
     </nav>
   );
 }

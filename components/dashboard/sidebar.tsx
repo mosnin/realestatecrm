@@ -15,8 +15,8 @@ import {
   LayoutDashboard,
   SlidersHorizontal,
   Briefcase,
-  LogOut,
   ChevronsUpDown,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -236,13 +236,15 @@ export function Sidebar({
           <>
             <div className="mx-4 border-t border-border" />
             <div className="px-3 py-1">
-              <SectionLabel>Personal</SectionLabel>
-              <NavItem
+              <SectionLabel>Personal workspace</SectionLabel>
+              <Link
                 href={base}
-                label={spaceName}
-                icon={Briefcase}
-                isActive={false}
-              />
+                className="group relative flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <Briefcase size={16} className="flex-shrink-0 text-muted-foreground/60 group-hover:text-foreground" />
+                <span className="flex-1 truncate">{spaceName}</span>
+                <ChevronRight size={13} className="text-muted-foreground/40 flex-shrink-0" />
+              </Link>
             </div>
           </>
         )}
@@ -314,12 +316,14 @@ export function Sidebar({
         {isBroker && (
           <>
             <SectionLabel>Brokerage</SectionLabel>
-            <NavItem
+            <Link
               href="/broker"
-              label={brokerageName ?? 'Brokerage'}
-              icon={Building2}
-              isActive={false}
-            />
+              className="group relative flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Building2 size={16} className="flex-shrink-0 text-muted-foreground/60 group-hover:text-foreground" />
+              <span className="flex-1 truncate">{brokerageName ?? 'Brokerage'}</span>
+              <ChevronRight size={13} className="text-muted-foreground/40 flex-shrink-0" />
+            </Link>
           </>
         )}
       </nav>

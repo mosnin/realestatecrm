@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronRight } from 'lucide-react';
 import { GlobalSearch } from './global-search';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
@@ -58,8 +58,42 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
             <SheetHeader className="px-4 py-5 border-b border-sidebar-border">
               <SheetTitle className="flex items-center gap-2.5 text-sidebar-foreground">
                 <BrandLogo className="h-5" alt="Chippi" />
-                <span className="text-sm font-semibold">{spaceName}</span>
               </SheetTitle>
+              {/* Context indicator */}
+              <div className="mt-2">
+                {isBroker && !isBrokerOnly ? (
+                  <div className="flex items-center gap-2 text-xs">
+                    <Link
+                      href={base}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border transition-colors font-medium',
+                        !pathname.startsWith('/broker')
+                          ? 'bg-primary/10 text-primary border-primary/20'
+                          : 'text-muted-foreground border-border hover:bg-muted'
+                      )}
+                    >
+                      <Briefcase size={12} />
+                      {spaceName}
+                    </Link>
+                    <Link
+                      href="/broker"
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border transition-colors font-medium',
+                        pathname.startsWith('/broker')
+                          ? 'bg-primary/10 text-primary border-primary/20'
+                          : 'text-muted-foreground border-border hover:bg-muted'
+                      )}
+                    >
+                      <Building2 size={12} />
+                      {brokerageName ?? 'Brokerage'}
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground font-medium">{spaceName}</p>
+                )}
+              </div>
             </SheetHeader>
             <nav className="flex-1 px-3 pt-4 pb-2 space-y-0.5">
               {!isBrokerOnly && (
@@ -169,6 +203,17 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                  pathname.startsWith('/broker/invitations') ? 'Invitations' :
                  pathname.startsWith('/broker/settings') ? 'Settings' : 'Team'}
               </span>
+              {/* Quick switch to workspace */}
+              {!isBrokerOnly && slug && (
+                <Link
+                  href={base}
+                  className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md border border-border hover:bg-muted transition-colors"
+                  title={`Switch to ${spaceName}`}
+                >
+                  <ArrowLeftRight size={11} />
+                  {spaceName}
+                </Link>
+              )}
             </>
           ) : (
             <>
@@ -187,6 +232,17 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                   <><span className="text-muted-foreground/40">/</span><span className="font-medium text-foreground">Overview</span></>
                 );
               })()}
+              {/* Quick switch to brokerage */}
+              {isBroker && brokerageName && (
+                <Link
+                  href="/broker"
+                  className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md border border-border hover:bg-muted transition-colors"
+                  title={`Switch to ${brokerageName}`}
+                >
+                  <ArrowLeftRight size={11} />
+                  {brokerageName}
+                </Link>
+              )}
             </>
           )}
         </div>
