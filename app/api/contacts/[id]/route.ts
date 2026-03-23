@@ -73,75 +73,86 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authResult = await requireAuth();
-  if (authResult instanceof NextResponse) return authResult;
-  const { userId } = authResult;
+  try {
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
+    const { userId } = authResult;
 
-  const { id } = await params;
+    const { id } = await params;
 
-  const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const space = await getSpaceForUser(userId);
+    if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { data: existingRows, error: existingError } = await supabase
-    .from('Contact')
-    .select('*')
-    .eq('id', id)
-    .eq('spaceId', space.id);
-  if (existingError) throw existingError;
-  if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  const existing = existingRows[0];
-
-  const body = await req.json();
-
-  // Build update object — only include fields present in the request body
-  const updates: Record<string, unknown> = {
-    updatedAt: new Date().toISOString(),
-  };
-
-  if (body.name !== undefined) updates.name = body.name;
-  if (body.email !== undefined) updates.email = body.email ?? null;
-  if (body.phone !== undefined) updates.phone = body.phone ?? null;
-  if (body.address !== undefined) updates.address = body.address ?? null;
-  if (body.notes !== undefined) updates.notes = body.notes ?? null;
-  if (body.preferences !== undefined) updates.preferences = body.preferences ?? null;
-  if (body.properties !== undefined) updates.properties = body.properties ?? [];
-  if (body.tags !== undefined) updates.tags = body.tags ?? [];
-  if (body.followUpAt !== undefined) updates.followUpAt = body.followUpAt;
-  if (body.lastContactedAt !== undefined) updates.lastContactedAt = body.lastContactedAt;
-  if (body.sourceLabel !== undefined) updates.sourceLabel = body.sourceLabel;
-
-  if (body.budget !== undefined) {
-    const budgetVal = body.budget != null && body.budget !== '' ? parseFloat(body.budget) : null;
-    if (budgetVal !== null && isNaN(budgetVal)) {
-      return NextResponse.json({ error: 'Invalid budget' }, { status: 400 });
+    const { data: existingRows, error: existingError } = await supabase
+      .from('Contact')
+      .select('*')
+      .eq('id', id)
+      .eq('spaceId', space.id);
+    if (existingError) {
+      console.error('[contacts/PATCH] fetch error:', existingError);
+      return NextResponse.json({ error: 'Failed to fetch contact' }, { status: 500 });
     }
-    updates.budget = budgetVal;
+    if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    const existing = existingRows[0];
+
+    const body = await req.json();
+
+    // Build update object — only include fields present in the request body
+    const updates: Record<string, unknown> = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.email !== undefined) updates.email = body.email ?? null;
+    if (body.phone !== undefined) updates.phone = body.phone ?? null;
+    if (body.address !== undefined) updates.address = body.address ?? null;
+    if (body.notes !== undefined) updates.notes = body.notes ?? null;
+    if (body.preferences !== undefined) updates.preferences = body.preferences ?? null;
+    if (body.properties !== undefined) updates.properties = body.properties ?? [];
+    if (body.tags !== undefined) updates.tags = body.tags ?? [];
+    if (body.followUpAt !== undefined) updates.followUpAt = body.followUpAt;
+    if (body.lastContactedAt !== undefined) updates.lastContactedAt = body.lastContactedAt;
+    if (body.sourceLabel !== undefined) updates.sourceLabel = body.sourceLabel;
+
+    if (body.budget !== undefined) {
+      const budgetVal = body.budget != null && body.budget !== '' ? parseFloat(body.budget) : null;
+      if (budgetVal !== null && isNaN(budgetVal)) {
+        return NextResponse.json({ error: 'Invalid budget' }, { status: 400 });
+      }
+      updates.budget = budgetVal;
+    }
+
+    if (body.type !== undefined) {
+      const VALID_CONTACT_TYPES = ['QUALIFICATION', 'TOUR', 'APPLICATION'];
+      if (!VALID_CONTACT_TYPES.includes(body.type)) {
+        return NextResponse.json({ error: 'Invalid type. Must be QUALIFICATION, TOUR, or APPLICATION' }, { status: 400 });
+      }
+      updates.type = body.type;
+      if (body.type !== existing.type) {
+        updates.stageChangedAt = new Date().toISOString();
+      }
+    }
+
+    const { data: contact, error: updateError } = await supabase
+      .from('Contact')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    if (updateError) {
+      console.error('[contacts/PATCH] update error:', updateError);
+      return NextResponse.json({ error: 'Failed to update contact' }, { status: 500 });
+    }
+
+    syncContact(contact as Contact).catch(console.error);
+    void audit({ actorClerkId: userId, action: 'UPDATE', resource: 'Contact', resourceId: id, spaceId: space.id, req });
+
+    return NextResponse.json(contact);
+  } catch (err) {
+    console.error('[contacts/PATCH] unexpected error:', err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
-
-  if (body.type !== undefined) {
-    const VALID_CONTACT_TYPES = ['QUALIFICATION', 'TOUR', 'APPLICATION'];
-    if (!VALID_CONTACT_TYPES.includes(body.type)) {
-      return NextResponse.json({ error: 'Invalid type. Must be QUALIFICATION, TOUR, or APPLICATION' }, { status: 400 });
-    }
-    updates.type = body.type;
-    if (body.type !== existing.type) {
-      updates.stageChangedAt = new Date().toISOString();
-    }
-  }
-
-  const { data: contact, error: updateError } = await supabase
-    .from('Contact')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-  if (updateError) throw updateError;
-
-  syncContact(contact as Contact).catch(console.error);
-  void audit({ actorClerkId: userId, action: 'UPDATE', resource: 'Contact', resourceId: id, spaceId: space.id, req });
-
-  return NextResponse.json(contact);
 }
 
 export async function DELETE(

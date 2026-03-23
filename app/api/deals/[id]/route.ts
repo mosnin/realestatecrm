@@ -59,145 +59,167 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authResult = await requireAuth();
-  if (authResult instanceof NextResponse) return authResult;
-  const { userId } = authResult;
+  try {
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
+    const { userId } = authResult;
 
-  const { id } = await params;
+    const { id } = await params;
 
-  const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const space = await getSpaceForUser(userId);
+    if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { data: existingRows, error: existingError } = await supabase
-    .from('Deal')
-    .select('*')
-    .eq('id', id)
-    .eq('spaceId', space.id);
-  if (existingError) throw existingError;
-  if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  const existing = existingRows[0];
-
-  const body = await req.json();
-
-  const VALID_STATUSES = ['active', 'won', 'lost', 'on_hold'];
-  if (body.status !== undefined && !VALID_STATUSES.includes(body.status)) {
-    return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
-  }
-
-  const valueVal = body.value != null && body.value !== '' ? parseFloat(body.value) : null;
-  if (valueVal !== null && isNaN(valueVal)) {
-    return NextResponse.json({ error: 'Invalid value' }, { status: 400 });
-  }
-
-  let closeDateVal: string | null = null;
-  if (body.closeDate) {
-    const d = new Date(body.closeDate);
-    if (isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid closeDate' }, { status: 400 });
-    closeDateVal = d.toISOString();
-  }
-
-  let followUpAtVal: string | null | undefined = undefined;
-  if (body.followUpAt !== undefined) {
-    if (!body.followUpAt) {
-      followUpAtVal = null;
-    } else {
-      const d = new Date(body.followUpAt);
-      if (isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid followUpAt' }, { status: 400 });
-      followUpAtVal = d.toISOString();
+    const { data: existingRows, error: existingError } = await supabase
+      .from('Deal')
+      .select('*')
+      .eq('id', id)
+      .eq('spaceId', space.id);
+    if (existingError) {
+      console.error('[deals/PATCH] fetch error:', existingError);
+      return NextResponse.json({ error: 'Failed to fetch deal' }, { status: 500 });
     }
-  }
+    if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const stageChanged = body.stageId && body.stageId !== existing.stageId;
-  const statusChanged = body.status && body.status !== existing.status;
+    const existing = existingRows[0];
 
-  // Handle dealContacts replacement — verify all contacts belong to this space
-  if (body.contactIds) {
-    const { error: delError } = await supabase.from('DealContact').delete().eq('dealId', id);
-    if (delError) throw delError;
-    if (body.contactIds.length > 0) {
-      const { data: validContacts, error: vcError } = await supabase
-        .from('Contact')
-        .select('id')
-        .in('id', body.contactIds)
-        .eq('spaceId', space.id);
-      if (vcError) throw vcError;
-      const validIds = new Set((validContacts ?? []).map((c: { id: string }) => c.id));
-      const dcInserts = (body.contactIds as string[]).filter((cId) => validIds.has(cId)).map((cId) => ({ dealId: id, contactId: cId }));
-      if (dcInserts.length > 0) {
-        const { error: insertError } = await supabase.from('DealContact').insert(dcInserts);
-        if (insertError) throw insertError;
+    const body = await req.json();
+
+    const VALID_STATUSES = ['active', 'won', 'lost', 'on_hold'];
+    if (body.status !== undefined && !VALID_STATUSES.includes(body.status)) {
+      return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+    }
+
+    const valueVal = body.value != null && body.value !== '' ? parseFloat(body.value) : null;
+    if (valueVal !== null && isNaN(valueVal)) {
+      return NextResponse.json({ error: 'Invalid value' }, { status: 400 });
+    }
+
+    let closeDateVal: string | null = null;
+    if (body.closeDate) {
+      const d = new Date(body.closeDate);
+      if (isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid closeDate' }, { status: 400 });
+      closeDateVal = d.toISOString();
+    }
+
+    let followUpAtVal: string | null | undefined = undefined;
+    if (body.followUpAt !== undefined) {
+      if (!body.followUpAt) {
+        followUpAtVal = null;
+      } else {
+        const d = new Date(body.followUpAt);
+        if (isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid followUpAt' }, { status: 400 });
+        followUpAtVal = d.toISOString();
       }
     }
+
+    const stageChanged = body.stageId && body.stageId !== existing.stageId;
+    const statusChanged = body.status && body.status !== existing.status;
+
+    // Handle dealContacts replacement — verify all contacts belong to this space
+    if (body.contactIds) {
+      const { error: delError } = await supabase.from('DealContact').delete().eq('dealId', id);
+      if (delError) {
+        console.error('[deals/PATCH] dealContact delete error:', delError);
+        return NextResponse.json({ error: 'Failed to update deal contacts' }, { status: 500 });
+      }
+      if (body.contactIds.length > 0) {
+        const { data: validContacts, error: vcError } = await supabase
+          .from('Contact')
+          .select('id')
+          .in('id', body.contactIds)
+          .eq('spaceId', space.id);
+        if (vcError) {
+          console.error('[deals/PATCH] contact validation error:', vcError);
+          return NextResponse.json({ error: 'Failed to validate contacts' }, { status: 500 });
+        }
+        const validIds = new Set((validContacts ?? []).map((c: { id: string }) => c.id));
+        const dcInserts = (body.contactIds as string[]).filter((cId) => validIds.has(cId)).map((cId) => ({ dealId: id, contactId: cId }));
+        if (dcInserts.length > 0) {
+          const { error: insertError } = await supabase.from('DealContact').insert(dcInserts);
+          if (insertError) {
+            console.error('[deals/PATCH] dealContact insert error:', insertError);
+            return NextResponse.json({ error: 'Failed to link contacts' }, { status: 500 });
+          }
+        }
+      }
+    }
+
+    const { data: dealRow, error: updateError } = await supabase
+      .from('Deal')
+      .update({
+        ...(body.title !== undefined && { title: body.title }),
+        ...(body.description !== undefined && { description: body.description ?? null }),
+        ...(body.value !== undefined && { value: valueVal }),
+        ...(body.address !== undefined && { address: body.address ?? null }),
+        ...(body.priority !== undefined && { priority: body.priority }),
+        ...(body.closeDate !== undefined && { closeDate: closeDateVal }),
+        ...(body.stageId !== undefined && { stageId: body.stageId }),
+        ...(body.position !== undefined && { position: body.position }),
+        ...(body.status !== undefined && { status: body.status }),
+        ...(followUpAtVal !== undefined && { followUpAt: followUpAtVal }),
+        updatedAt: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    if (updateError) {
+      console.error('[deals/PATCH] update error:', updateError);
+      return NextResponse.json({ error: 'Failed to update deal' }, { status: 500 });
+    }
+
+    // Auto-log stage_change and status_change activities
+    const activityInserts: Array<{ id: string; dealId: string; spaceId: string; type: string; content: string; metadata: Record<string, unknown> }> = [];
+    if (stageChanged) {
+      const { data: newStageRow } = await supabase.from('DealStage').select('name').eq('id', body.stageId).maybeSingle();
+      const { data: oldStageRow } = await supabase.from('DealStage').select('name').eq('id', existing.stageId).maybeSingle();
+      activityInserts.push({
+        id: crypto.randomUUID(),
+        dealId: id,
+        spaceId: existing.spaceId,
+        type: 'stage_change',
+        content: `Moved from "${oldStageRow?.name ?? 'Unknown'}" to "${newStageRow?.name ?? 'Unknown'}"`,
+        metadata: { fromStageId: existing.stageId, toStageId: body.stageId },
+      });
+    }
+    if (statusChanged) {
+      const labelMap: Record<string, string> = { active: 'Active', won: 'Won', lost: 'Lost', on_hold: 'On Hold' };
+      activityInserts.push({
+        id: crypto.randomUUID(),
+        dealId: id,
+        spaceId: existing.spaceId,
+        type: 'status_change',
+        content: `Marked as ${labelMap[body.status] ?? body.status}`,
+        metadata: { fromStatus: existing.status, toStatus: body.status },
+      });
+    }
+    if (activityInserts.length > 0) {
+      await supabase.from('DealActivity').insert(activityInserts);
+    }
+
+    // Get stage for the include
+    const stageIdToFetch = body.stageId ?? existing.stageId;
+    const { data: stageRow, error: stageError } = await supabase
+      .from('DealStage')
+      .select('*')
+      .eq('id', stageIdToFetch)
+      .single();
+    if (stageError && stageError.code !== 'PGRST116') {
+      console.error('[deals/PATCH] stage fetch error:', stageError);
+    }
+
+    const deal = {
+      ...dealRow,
+      stage: stageRow || null
+    } as Deal & { stage: DealStage | null };
+
+    syncDeal(deal).catch(console.error);
+    void audit({ actorClerkId: userId, action: 'UPDATE', resource: 'Deal', resourceId: id, spaceId: space.id, req });
+
+    return NextResponse.json(deal);
+  } catch (err) {
+    console.error('[deals/PATCH] unexpected error:', err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
-
-  const { data: dealRow, error: updateError } = await supabase
-    .from('Deal')
-    .update({
-      ...(body.title !== undefined && { title: body.title }),
-      ...(body.description !== undefined && { description: body.description ?? null }),
-      ...(body.value !== undefined && { value: valueVal }),
-      ...(body.address !== undefined && { address: body.address ?? null }),
-      ...(body.priority !== undefined && { priority: body.priority }),
-      ...(body.closeDate !== undefined && { closeDate: closeDateVal }),
-      ...(body.stageId !== undefined && { stageId: body.stageId }),
-      ...(body.position !== undefined && { position: body.position }),
-      ...(body.status !== undefined && { status: body.status }),
-      ...(followUpAtVal !== undefined && { followUpAt: followUpAtVal }),
-      updatedAt: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .select()
-    .single();
-  if (updateError) throw updateError;
-
-  // Auto-log stage_change and status_change activities
-  const activityInserts: Array<{ id: string; dealId: string; spaceId: string; type: string; content: string; metadata: Record<string, unknown> }> = [];
-  if (stageChanged) {
-    const { data: newStageRow } = await supabase.from('DealStage').select('name').eq('id', body.stageId).maybeSingle();
-    const { data: oldStageRow } = await supabase.from('DealStage').select('name').eq('id', existing.stageId).maybeSingle();
-    activityInserts.push({
-      id: crypto.randomUUID(),
-      dealId: id,
-      spaceId: existing.spaceId,
-      type: 'stage_change',
-      content: `Moved from "${oldStageRow?.name ?? 'Unknown'}" to "${newStageRow?.name ?? 'Unknown'}"`,
-      metadata: { fromStageId: existing.stageId, toStageId: body.stageId },
-    });
-  }
-  if (statusChanged) {
-    const labelMap: Record<string, string> = { active: 'Active', won: 'Won', lost: 'Lost', on_hold: 'On Hold' };
-    activityInserts.push({
-      id: crypto.randomUUID(),
-      dealId: id,
-      spaceId: existing.spaceId,
-      type: 'status_change',
-      content: `Marked as ${labelMap[body.status] ?? body.status}`,
-      metadata: { fromStatus: existing.status, toStatus: body.status },
-    });
-  }
-  if (activityInserts.length > 0) {
-    await supabase.from('DealActivity').insert(activityInserts);
-  }
-
-  // Get stage for the include
-  const stageIdToFetch = body.stageId ?? existing.stageId;
-  const { data: stageRow, error: stageError } = await supabase
-    .from('DealStage')
-    .select('*')
-    .eq('id', stageIdToFetch)
-    .single();
-  if (stageError && stageError.code !== 'PGRST116') throw stageError;
-
-  const deal = {
-    ...dealRow,
-    stage: stageRow || null
-  } as Deal & { stage: DealStage | null };
-
-  syncDeal(deal).catch(console.error);
-  void audit({ actorClerkId: userId, action: 'UPDATE', resource: 'Deal', resourceId: id, spaceId: space.id, req });
-
-  return NextResponse.json(deal);
 }
 
 export async function DELETE(

@@ -9,51 +9,55 @@ export async function GET(req: NextRequest) {
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
   if (!q || q.length < 2) return NextResponse.json({ contacts: [], deals: [], tours: [] });
 
-  const auth = await requireSpaceOwner(slug);
-  if (auth instanceof NextResponse) return auth;
-  const { space } = auth;
-
-  // Escape PostgreSQL ILIKE special characters before wrapping in wildcards
-  const escaped = q.slice(0, 100).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
-  // Strip characters that break PostgREST filter syntax (commas, parens, colons, dots as operators)
-  const sanitized = escaped.replace(/[,()\.:;'"]/g, '');
-  if (!sanitized.trim()) return NextResponse.json({ contacts: [], deals: [], tours: [] });
-  const term = `%${sanitized}%`;
-
   try {
+    const auth = await requireSpaceOwner(slug);
+    if (auth instanceof NextResponse) return auth;
+    const { space } = auth;
+
+    // Escape PostgreSQL ILIKE special characters before wrapping in wildcards
+    const escaped = q.slice(0, 100).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+    // Strip characters that break PostgREST filter syntax (commas, parens, colons, dots as operators)
+    const sanitized = escaped.replace(/[,()\.:;'"]/g, '');
+    if (!sanitized.trim()) return NextResponse.json({ contacts: [], deals: [], tours: [] });
+    const term = `%${sanitized}%`;
+
+    // Run each query independently so one failure doesn't block the others
+    const contactsPromise = supabase
+      .from('Contact')
+      .select('id, name, email, phone, type, leadScore, scoreLabel')
+      .eq('spaceId', space.id)
+      .or(`name.ilike.${term},email.ilike.${term},phone.ilike.${term}`)
+      .limit(8)
+      .then((r) => r)
+      .catch((err) => { console.error('[search] contacts threw:', err); return { data: null, error: err }; });
+
+    const dealsPromise = supabase
+      .from('Deal')
+      .select('id, title, address, value, status, stageId')
+      .eq('spaceId', space.id)
+      .or(`title.ilike.${term},address.ilike.${term}`)
+      .limit(8)
+      .then((r) => r)
+      .catch((err) => { console.error('[search] deals threw:', err); return { data: null, error: err }; });
+
+    const toursPromise = supabase
+      .from('Tour')
+      .select('id, guestName, guestEmail, propertyAddress, startsAt, status')
+      .eq('spaceId', space.id)
+      .or(`guestName.ilike.${term},guestEmail.ilike.${term},propertyAddress.ilike.${term}`)
+      .limit(8)
+      .then((r) => r)
+      .catch((err) => { console.error('[search] tours threw:', err); return { data: null, error: err }; });
+
     const [contactsResult, dealsResult, toursResult] = await Promise.all([
-      supabase
-        .from('Contact')
-        .select('id, name, email, phone, type, leadScore, scoreLabel')
-        .eq('spaceId', space.id)
-        .or(`name.ilike.${term},email.ilike.${term},phone.ilike.${term}`)
-        .limit(8),
-      supabase
-        .from('Deal')
-        .select('id, title, address, value, status, stageId')
-        .eq('spaceId', space.id)
-        .or(`title.ilike.${term},address.ilike.${term}`)
-        .limit(8),
-      supabase
-        .from('Tour')
-        .select('id, guestName, guestEmail, propertyAddress, startsAt, status')
-        .eq('spaceId', space.id)
-        .or(`guestName.ilike.${term},guestEmail.ilike.${term},propertyAddress.ilike.${term}`)
-        .limit(8),
+      contactsPromise,
+      dealsPromise,
+      toursPromise,
     ]);
 
-    if (contactsResult.error) {
-      console.error('[search] contacts query error:', contactsResult.error);
-      return NextResponse.json({ contacts: [], deals: [], tours: [], error: 'Contact search failed' }, { status: 500 });
-    }
-    if (dealsResult.error) {
-      console.error('[search] deals query error:', dealsResult.error);
-      return NextResponse.json({ contacts: [], deals: [], tours: [], error: 'Deal search failed' }, { status: 500 });
-    }
-    if (toursResult.error) {
-      console.error('[search] tours query error:', toursResult.error);
-      // Non-fatal: return contacts and deals even if tours fail
-    }
+    if (contactsResult.error) console.error('[search] contacts error:', contactsResult.error);
+    if (dealsResult.error) console.error('[search] deals error:', dealsResult.error);
+    if (toursResult.error) console.error('[search] tours error:', toursResult.error);
 
     const contacts = (contactsResult.data ?? []).map((c: any) => ({
       id: c.id,
