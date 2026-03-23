@@ -18,7 +18,7 @@ export default async function AuthRedirectPage({
   searchParams: Promise<{ intent?: string }>;
 }) {
   const { userId } = await auth();
-  if (!userId) redirect('/sign-in');
+  if (!userId) redirect('/login/realtor');
 
   const { intent } = await searchParams;
 

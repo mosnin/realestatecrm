@@ -1,25 +1,10 @@
-import { AuthPageLayout } from '@/components/auth/auth-page-layout';
-import { ThemedSignIn } from '@/components/auth/clerk-sign-in';
-import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
+/**
+ * Redirect /sign-in to /login/realtor so all sign-in flows use
+ * Clerk's path-based routing consistently. This prevents mobile
+ * navigation issues when switching between broker/realtor tabs.
+ */
 export default function SignInPage() {
-  return (
-    <AuthPageLayout
-      heading="Welcome back"
-      subheading="Sign in to your Chippi workspace"
-    >
-      <div className="w-full space-y-4">
-        <ThemedSignIn forceRedirectUrl="/dashboard" />
-        <p className="text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{' '}
-          <Link
-            href="/sign-up"
-            className="font-medium text-primary underline underline-offset-4 hover:text-primary/80 transition-colors"
-          >
-            Sign up
-          </Link>
-        </p>
-      </div>
-    </AuthPageLayout>
-  );
+  redirect('/login/realtor');
 }

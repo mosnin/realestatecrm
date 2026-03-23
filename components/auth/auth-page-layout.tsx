@@ -18,11 +18,9 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
   const pathname = usePathname();
 
   // Determine which auth flow we're in for the role switcher
-  const isSignUp = pathname.startsWith('/sign-up');
   const isBrokerLogin = pathname.startsWith('/login/broker');
-  const isRealtorLogin = pathname.startsWith('/login/realtor');
-  const isMainSignIn = pathname.startsWith('/sign-in');
-  const showRoleSwitcher = isBrokerLogin || isRealtorLogin || isMainSignIn;
+  const isRealtorLogin = pathname.startsWith('/login/realtor') || pathname.startsWith('/sign-in');
+  const showRoleSwitcher = isBrokerLogin || isRealtorLogin;
 
   return (
     <main className="relative min-h-screen bg-background lg:flex lg:h-screen lg:overflow-hidden">
@@ -43,10 +41,10 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
             {showRoleSwitcher && (
               <div className="mb-6 flex rounded-lg border border-border bg-muted/50 p-1">
                 <Link
-                  href="/sign-in"
+                  href="/login/realtor"
                   className={cn(
                     'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all',
-                    (isMainSignIn || isRealtorLogin)
+                    isRealtorLogin
                       ? 'bg-card text-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground',
                   )}
