@@ -117,7 +117,7 @@ export function BrokerageSettingsForm({ name: initialName, websiteUrl: initialWe
       )}
 
       {!isOwner && (
-        <p className="text-xs text-muted-foreground">Only the brokerage owner can edit these settings.</p>
+        <p className="text-xs text-muted-foreground">Only the brokerage owner or admins can edit these settings.</p>
       )}
     </form>
   );

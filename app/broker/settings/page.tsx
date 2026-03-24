@@ -11,7 +11,7 @@ export default async function BrokerSettingsPage() {
   if (!ctx) redirect('/');
 
   const { brokerage, membership } = ctx;
-  const isOwner = membership.role === 'broker_owner';
+  const canEdit = membership.role === 'broker_owner' || membership.role === 'broker_admin';
 
   return (
     <div className="space-y-6">
@@ -28,7 +28,7 @@ export default async function BrokerSettingsPage() {
             name={brokerage.name}
             websiteUrl={brokerage.websiteUrl}
             logoUrl={brokerage.logoUrl}
-            isOwner={isOwner}
+            isOwner={canEdit}
           />
         </CardContent>
       </Card>
