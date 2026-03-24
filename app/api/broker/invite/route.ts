@@ -61,6 +61,24 @@ export async function POST(req: Request) {
     );
   }
 
+  // Check if this email already belongs to a member
+  const { data: existingUser } = await supabase
+    .from('User')
+    .select('id')
+    .eq('email', trimmedEmail)
+    .maybeSingle();
+  if (existingUser) {
+    const { data: existingMember } = await supabase
+      .from('BrokerageMembership')
+      .select('id')
+      .eq('brokerageId', brokerage.id)
+      .eq('userId', existingUser.id)
+      .maybeSingle();
+    if (existingMember) {
+      return NextResponse.json({ error: 'This person is already a member of your brokerage' }, { status: 409 });
+    }
+  }
+
   // Idempotency: return existing pending invite for this email
   const { data: existing } = await supabase
     .from('Invitation')

@@ -36,8 +36,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Max 50 invitations per batch' }, { status: 400 });
   }
 
-  // Rate limit: 50 bulk invites per broker per hour
-  const { allowed } = await checkRateLimit(`broker:bulk-invite:${ctx.dbUserId}`, 50, 3600);
+  // Rate limit: shared key with single-invite endpoint, 100 total per hour
+  const { allowed } = await checkRateLimit(`broker:invite:${ctx.dbUserId}`, 100, 3600);
   if (!allowed) {
     return NextResponse.json({ error: 'Too many invitations. Try again in an hour.' }, { status: 429 });
   }
@@ -84,6 +84,21 @@ export async function POST(req: Request) {
     if (roleToAssign === 'broker_admin' && ctx.membership.role !== 'broker_owner') {
       results.push({ email, status: 'error', error: 'Only the owner can invite admins' });
       continue;
+    }
+
+    // Check if already a member
+    const { data: existingUser } = await supabase.from('User').select('id').eq('email', email).maybeSingle();
+    if (existingUser) {
+      const { data: existingMember } = await supabase
+        .from('BrokerageMembership')
+        .select('id')
+        .eq('brokerageId', brokerage.id)
+        .eq('userId', existingUser.id)
+        .maybeSingle();
+      if (existingMember) {
+        results.push({ email, status: 'duplicate' });
+        continue;
+      }
     }
 
     // Check for existing pending invite
