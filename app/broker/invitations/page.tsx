@@ -87,7 +87,7 @@ export default async function BrokerInvitationsPage() {
                       </p>
                     </div>
                     <span
-                      className={`inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 capitalize flex-shrink-0 ${statusBadge(inv.status)}`}
+                      className={`inline-flex text-xs font-semibold rounded-full px-2 py-0.5 capitalize flex-shrink-0 ${statusBadge(inv.status)}`}
                     >
                       {inv.status}
                     </span>

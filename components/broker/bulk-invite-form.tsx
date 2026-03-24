@@ -138,12 +138,12 @@ export function BulkInviteForm() {
           <div className="space-y-2 pt-2 border-t border-border">
             <div className="flex items-center gap-3 text-xs">
               {sentCount > 0 && (
-                <span className="flex items-center gap-1 text-emerald-600">
+                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                   <CheckCircle2 size={12} /> {sentCount} sent
                 </span>
               )}
               {dupCount > 0 && (
-                <span className="flex items-center gap-1 text-amber-600">
+                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
                   <AlertCircle size={12} /> {dupCount} duplicate{dupCount !== 1 ? 's' : ''}
                 </span>
               )}

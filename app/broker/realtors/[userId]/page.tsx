@@ -137,15 +137,15 @@ export default async function RealtorDrilldownPage({ params }: Params) {
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-semibold tracking-tight">{user.name ?? 'No name'}</h1>
             {user.onboard ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
-                <CheckCircle2 size={10} /> Active
+              <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
+                <CheckCircle2 size={11} /> Active
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
-                <AlertCircle size={10} /> Pending
+              <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
+                <AlertCircle size={11} /> Pending
               </span>
             )}
-            <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+            <span className="text-xs font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
               {roleLabel}
             </span>
           </div>
@@ -169,7 +169,7 @@ export default async function RealtorDrilldownPage({ params }: Params) {
         ].map(({ label, value, icon: Icon }) => (
           <Card key={label}>
             <CardContent className="px-3 py-3">
-              <p className="text-[10px] text-muted-foreground font-medium">{label}</p>
+              <p className="text-xs text-muted-foreground font-medium">{label}</p>
               <div className="flex items-center justify-between mt-1">
                 <p className="text-lg font-bold tabular-nums">{value}</p>
                 <Icon size={14} className="text-muted-foreground/50" />
@@ -211,28 +211,28 @@ export default async function RealtorDrilldownPage({ params }: Params) {
                           <td className="px-4 py-2.5">
                             <p className="text-xs font-medium truncate max-w-[150px]">{c.name}</p>
                             {c.followUpAt && (
-                              <p className="text-[10px] text-amber-600 flex items-center gap-1 mt-0.5">
-                                <Calendar size={9} /> {new Date(c.followUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-0.5">
+                                <Calendar size={11} /> {new Date(c.followUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                               </p>
                             )}
                           </td>
                           <td className="px-4 py-2.5 hidden sm:table-cell">
                             <div className="space-y-0.5">
                               {c.email && (
-                                <p className="text-[10px] text-muted-foreground flex items-center gap-1 truncate max-w-[140px]">
-                                  <MailIcon size={9} /> {c.email}
+                                <p className="text-xs text-muted-foreground flex items-center gap-1 truncate max-w-[140px]">
+                                  <MailIcon size={11} /> {c.email}
                                 </p>
                               )}
                               {c.phone && (
-                                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                  <Phone size={9} /> {c.phone}
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Phone size={11} /> {c.phone}
                                 </p>
                               )}
                             </div>
                           </td>
                           <td className="px-4 py-2.5 text-right">
                             {c.scoreLabel && (
-                              <span className={`inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 capitalize ${scoreBadge(c.scoreLabel)}`}>
+                              <span className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-0.5 capitalize ${scoreBadge(c.scoreLabel)}`}>
                                 {c.leadScore != null ? Math.round(c.leadScore) : ''} {c.scoreLabel}
                               </span>
                             )}
@@ -272,20 +272,20 @@ export default async function RealtorDrilldownPage({ params }: Params) {
                     ) : (
                       deals.slice(0, 20).map((d) => {
                         const stage = stageMap[d.stageId];
-                        const statusColor = d.status === 'won' ? 'text-emerald-600' : d.status === 'lost' ? 'text-red-500' : d.status === 'on_hold' ? 'text-amber-500' : '';
+                        const statusColor = d.status === 'won' ? 'text-emerald-600' : d.status === 'lost' ? 'text-red-500 dark:text-red-400' : d.status === 'on_hold' ? 'text-amber-500 dark:text-amber-400' : '';
                         return (
                           <tr key={d.id} className="border-b border-border last:border-0">
                             <td className="px-4 py-2.5">
                               <p className="text-xs font-medium truncate max-w-[150px]">{d.title}</p>
                               {d.closeDate && (
-                                <p className="text-[10px] text-muted-foreground mt-0.5">
+                                <p className="text-xs text-muted-foreground mt-0.5">
                                   Close: {new Date(d.closeDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </p>
                               )}
                             </td>
                             <td className="px-4 py-2.5">
                               <span
-                                className={`inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 ${statusColor}`}
+                                className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-0.5 ${statusColor}`}
                                 style={stage ? { backgroundColor: `${stage.color}15`, color: stage.color } : undefined}
                               >
                                 {stage?.name ?? d.status}

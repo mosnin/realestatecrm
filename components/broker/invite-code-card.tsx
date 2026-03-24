@@ -87,7 +87,7 @@ export function InviteCodeCard({ isOwner = true }: { isOwner?: boolean }) {
         )}
 
         {code && (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Link: <span className="font-mono">{typeof window !== 'undefined' ? window.location.origin : ''}/join/{code}</span>
             {' · '}Rotating generates a new code; the old one stops working immediately.
           </p>

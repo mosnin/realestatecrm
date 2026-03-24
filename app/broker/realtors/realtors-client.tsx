@@ -272,7 +272,7 @@ function RealtorCard({ row, rank, sortKey }: { row: RealtorRow; rank: number; so
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
                 {initials(row.name, row.email)}
               </div>
-              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-muted border border-background text-[9px] font-bold text-muted-foreground flex items-center justify-center">
+              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-muted border border-background text-[10px] font-bold text-muted-foreground flex items-center justify-center">
                 {rank}
               </span>
             </div>
@@ -283,15 +283,15 @@ function RealtorCard({ row, rank, sortKey }: { row: RealtorRow; rank: number; so
           </div>
           <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
             {row.onboard ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
-                <CheckCircle2 size={10} /> Active
+              <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
+                <CheckCircle2 size={11} /> Active
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
-                <AlertCircle size={10} /> Pending
+              <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
+                <AlertCircle size={11} /> Pending
               </span>
             )}
-            <span className="text-[10px] text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+            <span className="text-xs text-muted-foreground bg-muted rounded-full px-2.5 py-0.5">
               {roleLabel(row.role)}
             </span>
           </div>
@@ -308,7 +308,7 @@ function RealtorCard({ row, rank, sortKey }: { row: RealtorRow; rank: number; so
                   : 'bg-muted/50'
               }`}
             >
-              <p className={`text-[10px] font-medium uppercase tracking-wide ${key === sortKey ? 'text-primary' : 'text-muted-foreground'}`}>
+              <p className={`text-[11px] font-medium uppercase tracking-wide ${key === sortKey ? 'text-primary' : 'text-muted-foreground'}`}>
                 {label}
               </p>
               <p className={`text-lg font-bold mt-0.5 tabular-nums ${key === sortKey ? 'text-primary' : ''}`}>
@@ -320,12 +320,12 @@ function RealtorCard({ row, rank, sortKey }: { row: RealtorRow; rank: number; so
 
         {/* Footer */}
         <div className="flex items-center justify-between mt-auto pt-1 border-t border-border">
-          <p className="text-[11px] text-muted-foreground">Joined {joinedAt}</p>
+          <p className="text-xs text-muted-foreground">Joined {joinedAt}</p>
           <Link
             href={`/broker/realtors/${row.userId}`}
-            className="inline-flex items-center gap-1 text-[11px] text-primary font-medium hover:underline underline-offset-2"
+            className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline underline-offset-2"
           >
-            View details <ExternalLink size={10} />
+            View details <ExternalLink size={11} />
           </Link>
         </div>
       </CardContent>
@@ -358,7 +358,7 @@ function TableView({
           {active ? (
             sortDir === 'desc' ? <ArrowDown size={11} /> : <ArrowUp size={11} />
           ) : (
-            <ArrowUpDown size={10} className="opacity-0 group-hover:opacity-40" />
+            <ArrowUpDown size={11} className="opacity-0 group-hover:opacity-40" />
           )}
         </span>
       </th>
@@ -402,17 +402,17 @@ function TableView({
                   <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">{i + 1}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-semibold text-primary flex-shrink-0">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
                         {initials(r.name, r.email)}
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium text-xs truncate">{r.name ?? 'No name'}</p>
-                        <p className="text-[11px] text-muted-foreground truncate">{r.email}</p>
+                        <p className="text-xs text-muted-foreground truncate">{r.email}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
-                    <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                    <span className="text-xs font-medium text-muted-foreground bg-muted rounded-full px-2.5 py-0.5">
                       {roleLabel(r.role)}
                     </span>
                   </td>
@@ -421,7 +421,7 @@ function TableView({
                   </td>
                   <td className={`px-4 py-3 text-right tabular-nums text-xs hidden md:table-cell ${sortKey === 'hotLeads' ? 'text-primary' : ''}`}>
                     {r.hotLeads > 0 ? (
-                      <span className="text-rose-600 font-semibold">{r.hotLeads}</span>
+                      <span className="text-rose-600 dark:text-rose-400 font-semibold">{r.hotLeads}</span>
                     ) : (
                       <span className="text-muted-foreground">{r.hotLeads}</span>
                     )}
@@ -436,18 +436,18 @@ function TableView({
                     {formatCompact(r.pipeline)}
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
-                    <span className={`text-[11px] text-muted-foreground ${sortKey === 'joined' ? 'text-primary font-medium' : ''}`}>
+                    <span className={`text-xs text-muted-foreground ${sortKey === 'joined' ? 'text-primary font-medium' : ''}`}>
                       {joinedAt}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
                     {r.onboard ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
-                        <CheckCircle2 size={9} /> Active
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
+                        <CheckCircle2 size={11} /> Active
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
-                        <AlertCircle size={9} /> Pending
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
+                        <AlertCircle size={11} /> Pending
                       </span>
                     )}
                   </td>

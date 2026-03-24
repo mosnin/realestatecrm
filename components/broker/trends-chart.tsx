@@ -72,7 +72,7 @@ export function TrendsChart() {
             <TrendingUp size={15} className="text-primary" />
             <p className="text-sm font-semibold">Weekly Trends</p>
             {trendPct !== 0 && (
-              <span className={`text-[10px] font-semibold rounded-full px-2 py-0.5 ${
+              <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
                 trendPct > 0
                   ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15'
                   : 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15'
@@ -81,7 +81,7 @@ export function TrendsChart() {
               </span>
             )}
           </div>
-          <div className="flex rounded-lg border border-border overflow-hidden text-[10px] font-medium">
+          <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium">
             {(Object.keys(METRIC_LABELS) as Metric[]).map((m) => (
               <button
                 key={m}
@@ -104,7 +104,7 @@ export function TrendsChart() {
             const height = maxVal > 0 ? Math.max((values[i] / maxVal) * 100, 4) : 4;
             return (
               <div key={w.label} className="flex-1 flex flex-col items-center gap-1.5">
-                <span className="text-[9px] font-semibold text-muted-foreground tabular-nums">
+                <span className="text-xs font-semibold text-muted-foreground tabular-nums">
                   {formatVal(values[i])}
                 </span>
                 <div className="w-full flex items-end" style={{ height: '100px' }}>
@@ -113,7 +113,7 @@ export function TrendsChart() {
                     style={{ height: `${height}%` }}
                   />
                 </div>
-                <span className="text-[9px] text-muted-foreground font-medium">{w.label}</span>
+                <span className="text-[10px] text-muted-foreground font-medium">{w.label}</span>
               </div>
             );
           })}

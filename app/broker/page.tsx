@@ -384,7 +384,7 @@ export default async function BrokerOverviewPage() {
                     <Mail size={18} className="text-muted-foreground" />
                   </div>
                   <p className="text-xs font-medium text-foreground">No pending invitations</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 max-w-[180px] mx-auto">
+                  <p className="text-xs text-muted-foreground mt-0.5 max-w-[180px] mx-auto">
                     Grow your team by inviting realtors to join your brokerage.
                   </p>
                   <Link
