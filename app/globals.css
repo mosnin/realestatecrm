@@ -191,6 +191,7 @@
   --sidebar-border: #e4e6ea;
   --sidebar-ring: #ff964f;
 }
+.dark .app-theme,
 .app-theme.dark {
   --background: #121314;
   --surface: #1a1b1d;
