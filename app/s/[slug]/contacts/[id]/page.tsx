@@ -7,21 +7,15 @@ import {
   ArrowLeft,
   Mail,
   Phone,
-  MapPin,
   FileText,
-  Wallet,
   ExternalLink,
   Briefcase,
-  Users,
-  Home,
-  PawPrint,
   AlertTriangle,
   CheckCircle2,
   XCircle,
   ArrowRight,
   Sparkles,
   Info,
-  User,
   Calendar,
   CalendarDays,
   CalendarPlus,
@@ -39,20 +33,6 @@ import { CollapsibleSection } from '@/components/contacts/collapsible-section';
 import { getInitials, formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug } from '@/lib/space';
 
-const TYPE_META: Record<string, { label: string; className: string }> = {
-  QUALIFICATION: {
-    label: 'Qualifying',
-    className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-400 dark:border-blue-500/30',
-  },
-  TOUR: {
-    label: 'Tour scheduled',
-    className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30',
-  },
-  APPLICATION: {
-    label: 'Applied',
-    className: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-500/15 dark:text-green-400 dark:border-green-500/30',
-  },
-};
 
 function tierBadgeClasses(label: string) {
   if (label === 'hot') return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400';
@@ -116,7 +96,6 @@ export default async function ClientDetailPage({
 
   if (!contact) notFound();
 
-  const meta = TYPE_META[contact.type];
   const app = contact.applicationData as ApplicationData | null;
   const details = contact.scoreDetails as LeadScoreDetails | null;
 
@@ -719,18 +698,6 @@ export default async function ClientDetailPage({
 }
 
 // ── Helper components ──
-
-function Section({ icon: Icon, title, children }: { icon: React.ComponentType<{ size: number; className?: string }>; title: string; children: React.ReactNode }) {
-  return (
-    <div className="border-t border-border/50 pt-4 first:border-t-0 first:pt-0">
-      <p className="text-sm font-semibold text-foreground flex items-center gap-1.5 mb-3">
-        <Icon size={14} className="text-muted-foreground" />
-        {title}
-      </p>
-      {children}
-    </div>
-  );
-}
 
 function DetailGrid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">{children}</div>;
