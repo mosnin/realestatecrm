@@ -31,6 +31,15 @@ export default clerkMiddleware(async (auth, request) => {
   // Uses /auth/redirect which does a server-side DB lookup and sends them
   // to the correct destination (/s/{slug}, /broker, or /setup).
   const { pathname } = request.nextUrl;
+
+  // `/` is a routing-only page: send everyone to the right place immediately.
+  if (pathname === '/') {
+    if (session.userId) {
+      return NextResponse.redirect(new URL('/auth/redirect?intent=realtor', request.url));
+    }
+    return NextResponse.redirect(new URL('/login/realtor', request.url));
+  }
+
   if (session.userId && (pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up') || pathname.startsWith('/login'))) {
     return NextResponse.redirect(new URL('/auth/redirect?intent=realtor', request.url));
   }

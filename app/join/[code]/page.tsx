@@ -11,7 +11,7 @@ export default async function JoinWithCodePage({ params }: Params) {
 
   const { userId } = await auth();
   if (!userId) {
-    redirect(`/sign-in?redirect_url=/join/${code}`);
+    redirect(`/login/realtor?redirect_url=/join/${code}`);
   }
 
   const normalizedCode = code.trim().toUpperCase();

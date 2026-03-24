@@ -1,37 +1,19 @@
-'use client';
+import { auth } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
 
-import { useUser } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { AuthPageLayout } from '@/components/auth/auth-page-layout';
-import { OnboardingFlow } from '@/components/auth/onboarding-dialog';
+/**
+ * `/` is a routing-only page. Middleware handles the redirect for all users,
+ * but this server component acts as a fallback in case middleware is bypassed.
+ *
+ * - Unauthenticated → /login/realtor
+ * - Authenticated   → /auth/redirect (which routes to /s/{slug}, /broker, or /setup)
+ */
+export default async function HomePage() {
+  const { userId } = await auth();
 
-export default function HomePage() {
-  const { isSignedIn, isLoaded } = useUser();
-  const router = useRouter();
-
-  // Redirect unauthenticated users to the proper sign-in page
-  useEffect(() => {
-    if (isLoaded && !isSignedIn) {
-      router.replace('/login/realtor');
-    }
-  }, [isLoaded, isSignedIn, router]);
-
-  // Show onboarding flow inline if signed in
-  if (isLoaded && isSignedIn) {
-    return (
-      <AuthPageLayout heading="" subheading="">
-        <OnboardingFlow />
-      </AuthPageLayout>
-    );
+  if (userId) {
+    redirect('/auth/redirect?intent=realtor');
   }
 
-  // Loading state while Clerk initializes
-  return (
-    <AuthPageLayout heading="" subheading="">
-      <div className="flex items-center justify-center py-12">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
-    </AuthPageLayout>
-  );
+  redirect('/login/realtor');
 }

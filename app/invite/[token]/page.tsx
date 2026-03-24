@@ -24,8 +24,8 @@ export default async function AcceptInvitationPage({ params }: Params) {
   // Auth: must be signed in to accept
   const { userId } = await auth();
   if (!userId) {
-    // Middleware already redirects unauthenticated users to /sign-in with redirect_url set
-    redirect(`/sign-in?redirect_url=/invite/${token}`);
+    // Middleware already redirects unauthenticated users to /login/realtor with redirect_url set
+    redirect(`/login/realtor?redirect_url=/invite/${token}`);
   }
 
   // Fetch invitation details
