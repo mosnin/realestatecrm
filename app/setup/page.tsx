@@ -154,9 +154,12 @@ export default async function SetupPage() {
     redirect(`/s/${resolvedUser.space.slug}`);
   }
 
+  const email = clerkUser?.emailAddresses?.[0]?.emailAddress ?? '';
+
   return (
     <CreateWorkspaceForm
       defaultName={resolvedUser?.name ?? ''}
+      userEmail={email}
     />
   );
 }

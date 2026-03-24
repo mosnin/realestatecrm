@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BrandLogo } from '@/components/brand-logo';
-import { CheckCircle2, Loader2, AlertCircle, Users, UserCircle, ArrowLeft, Building2 } from 'lucide-react';
+import { CheckCircle2, Loader2, AlertCircle, Users, UserCircle, ArrowLeft, Building2, LogOut } from 'lucide-react';
+import { useClerk } from '@clerk/nextjs';
 import { toast } from 'sonner';
 
 type SetupRole = 'choose' | 'realtor' | 'broker' | 'broker_only';
 
-export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
+export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: string; userEmail: string }) {
+  const { signOut } = useClerk();
   const router = useRouter();
   const [role, setRole] = useState<SetupRole>('choose');
   const [businessName, setBusinessName] = useState('');
@@ -197,10 +199,23 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
           </div>
 
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold tracking-tight">How will you use Chippi?</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Finish setting up your account</h1>
             <p className="text-sm text-muted-foreground mt-2">
               Choose your role to get the right setup.
             </p>
+            {userEmail && (
+              <p className="text-xs text-muted-foreground mt-3">
+                Signed in as <span className="font-medium text-foreground">{userEmail}</span>
+                {' \u00B7 '}
+                <button
+                  onClick={() => signOut({ redirectUrl: '/login/realtor' })}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+                >
+                  <LogOut size={10} />
+                  Sign out
+                </button>
+              </p>
+            )}
           </div>
 
           <div className="grid sm:grid-cols-3 gap-4">
@@ -256,12 +271,21 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
           <BrandLogo className="h-7" alt="Chippi" />
         </div>
 
-        <button
-          onClick={() => { setRole('choose'); setError(''); }}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
-        >
-          <ArrowLeft size={14} /> Back
-        </button>
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => { setRole('choose'); setError(''); }}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft size={14} /> Back
+          </button>
+          <button
+            onClick={() => signOut({ redirectUrl: '/login/realtor' })}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <LogOut size={12} />
+            Sign out
+          </button>
+        </div>
 
         <div className="rounded-xl border border-border bg-card px-6 py-7">
           <div className="mb-6">
