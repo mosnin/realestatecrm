@@ -24,15 +24,15 @@ const isAdminRoute = createRouteMatcher([
   '/api/admin(.*)'
 ]);
 
+// Routes that should NEVER be passed as redirect_url after login.
+// Only actual dashboard pages (/s/...) are valid post-login destinations.
+const SAFE_REDIRECT_PREFIXES = ['/s/', '/broker', '/admin'];
+
 export default clerkMiddleware(async (auth, request) => {
   const session = await auth();
-
-  // Redirect authenticated users away from auth pages to their workspace.
-  // Uses /auth/redirect which does a server-side DB lookup and sends them
-  // to the correct destination (/s/{slug}, /broker, or /setup).
   const { pathname } = request.nextUrl;
 
-  // `/` is a routing-only page: send everyone to the right place immediately.
+  // `/` → send everyone to the right place immediately.
   if (pathname === '/') {
     if (session.userId) {
       return NextResponse.redirect(new URL('/auth/redirect?intent=realtor', request.url));
@@ -40,18 +40,26 @@ export default clerkMiddleware(async (auth, request) => {
     return NextResponse.redirect(new URL('/login/realtor', request.url));
   }
 
+  // Authenticated users on auth pages → send to their dashboard.
   if (session.userId && (pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up') || pathname.startsWith('/login'))) {
     return NextResponse.redirect(new URL('/auth/redirect?intent=realtor', request.url));
   }
 
+  // Protected routes: must be logged in.
   if (isProtectedRoute(request) && !isPublicRoute(request)) {
     if (!session.userId) {
+      // Redirect to login. Only pass redirect_url for safe dashboard pages —
+      // never for /setup, /auth/redirect, etc. to avoid Clerk honouring a
+      // redirect_url that skips the proper post-signup flow.
       const signInUrl = new URL('/login/realtor', request.url);
-      signInUrl.searchParams.set('redirect_url', request.url);
+      const isSafeRedirect = SAFE_REDIRECT_PREFIXES.some((p) => pathname.startsWith(p));
+      if (isSafeRedirect) {
+        signInUrl.searchParams.set('redirect_url', request.url);
+      }
       return NextResponse.redirect(signInUrl);
     }
 
-    // Admin route protection: require role=admin in publicMetadata
+    // Admin route protection
     if (isAdminRoute(request)) {
       const metadata = (session.sessionClaims?.publicMetadata ?? {}) as Record<string, unknown>;
       if (metadata.role !== 'admin') {

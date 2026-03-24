@@ -10,6 +10,10 @@ export default async function SetupPage() {
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
 
+  // Belt-and-suspenders: verify this is a real Clerk user, not a stale token.
+  const clerkUser = await currentUser();
+  if (!clerkUser) redirect('/login/realtor');
+
   // On DB error: render error UI. NEVER .catch(() => null) (shows create-workspace
   // form to users who already have one). NEVER throw (generic "Application error").
   let dbUser;
@@ -90,7 +94,6 @@ export default async function SetupPage() {
   let resolvedUser = dbUser;
   if (!resolvedUser) {
     try {
-      const clerkUser = await currentUser();
       const newId = crypto.randomUUID();
       const email = clerkUser?.emailAddresses?.[0]?.emailAddress ?? '';
       const name = clerkUser?.fullName ?? clerkUser?.firstName ?? null;
