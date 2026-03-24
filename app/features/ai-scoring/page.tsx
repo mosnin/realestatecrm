@@ -301,7 +301,7 @@ export default function AIScoringPage() {
             { href: '/legal/privacy', label: 'Privacy' },
             { href: '/legal/terms', label: 'Terms' },
             { href: '/legal/cookies', label: 'Cookies' },
-            { href: '/sign-in', label: 'Log in' },
+            { href: '/login/realtor', label: 'Log in' },
           ]}
           copyrightText={`© ${new Date().getFullYear()} Chippi. Leasing workflow clarity for modern realtors.`}
         />

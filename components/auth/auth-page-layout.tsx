@@ -19,7 +19,7 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
 
   // Determine which auth flow we're in for the role switcher
   const isBrokerLogin = pathname.startsWith('/login/broker');
-  const isRealtorLogin = pathname.startsWith('/login/realtor') || pathname.startsWith('/sign-in');
+  const isRealtorLogin = pathname.startsWith('/login/realtor');
   const showRoleSwitcher = isBrokerLogin || isRealtorLogin;
 
   return (
