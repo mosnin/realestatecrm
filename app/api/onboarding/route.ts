@@ -305,14 +305,25 @@ export async function POST(req: NextRequest) {
           .single();
         if (fetchError) throw fetchError;
         newSpace = createdSpace as Space;
-      } catch {
+      } catch (rpcErr: unknown) {
+        // Check if the user already owns a space (race with another tab/request)
         const { data: ownerSpace, error: ownerSpaceError } = await supabase
           .from('Space')
           .select('slug')
           .eq('ownerId', user.id)
           .maybeSingle();
         if (!ownerSpaceError && ownerSpace) return NextResponse.json({ success: true, slug: ownerSpace.slug });
-        return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
+
+        // Only return "slug taken" if it's actually a unique constraint violation
+        const errMsg = rpcErr instanceof Error ? rpcErr.message : String(rpcErr ?? '');
+        const isUniqueViolation = errMsg.includes('duplicate key') || errMsg.includes('unique constraint') || errMsg.includes('23505');
+        if (isUniqueViolation) {
+          return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
+        }
+
+        // For any other error, return a generic 500 so the user isn't misled
+        console.error('[onboarding] create_space RPC failed:', rpcErr);
+        return NextResponse.json({ error: 'Failed to create workspace. Please try again.' }, { status: 500 });
       }
 
       const { error: stepError } = await supabase
