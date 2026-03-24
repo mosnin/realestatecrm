@@ -34,7 +34,7 @@ export function RemoveMemberButton({ membershipId, memberName }: RemoveMemberBut
   if (confirming) {
     return (
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        <span className="text-xs text-muted-foreground hidden sm:inline">Remove {memberName}?</span>
+        <span className="text-xs text-muted-foreground">Remove?</span>
         <Button
           variant="destructive"
           size="sm"
