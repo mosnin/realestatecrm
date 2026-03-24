@@ -57,7 +57,7 @@ export function ApplicationStatusControl({ contactId, currentStatus, statusNote 
               onClick={() => updateStatus(s.key)}
               disabled={updating}
               className={cn(
-                'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border',
+                'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all border',
                 isActive
                   ? `${s.color} border-current/20 ring-1 ring-current/20`
                   : 'border-border text-muted-foreground hover:bg-muted',

@@ -124,20 +124,20 @@ export function FollowUpSuggestions(props: FollowUpSuggestionsProps) {
               <CalendarDays size={14} className="text-muted-foreground flex-shrink-0" />
               <div>
                 <p className="text-xs font-medium">{s.label}</p>
-                <p className="text-[10px] text-muted-foreground">{s.description}</p>
+                <p className="text-xs text-muted-foreground">{s.description}</p>
               </div>
             </div>
             {applied.has(i) ? (
-              <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium flex-shrink-0">
-                <Check size={11} /> Set
+              <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium flex-shrink-0">
+                <Check size={12} /> Set
               </span>
             ) : (
               <button
                 onClick={() => applySuggestion(i, s.delayHours)}
                 disabled={applying === i}
-                className="flex-shrink-0 text-[10px] font-medium px-2.5 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
-                {applying === i ? <Loader2 size={10} className="animate-spin" /> : 'Set'}
+                {applying === i ? <Loader2 size={12} className="animate-spin" /> : 'Set'}
               </button>
             )}
           </div>

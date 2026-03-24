@@ -41,7 +41,7 @@ export function StageProgression({ contactId, currentType }: StageProgressionPro
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1.5">
       {STAGES.map((stage, i) => {
         const isActive = stage.type === currentType;
         const isPast = i < currentIndex;
@@ -49,7 +49,7 @@ export function StageProgression({ contactId, currentType }: StageProgressionPro
         const isNext = i === currentIndex + 1;
 
         return (
-          <div key={stage.type} className="flex items-center gap-1">
+          <div key={stage.type} className="flex items-center gap-1.5">
             {i > 0 && (
               <ArrowRight size={12} className={cn('flex-shrink-0', isPast ? 'text-foreground/40' : 'text-muted-foreground/30')} />
             )}
@@ -58,7 +58,7 @@ export function StageProgression({ contactId, currentType }: StageProgressionPro
               onClick={() => isFuture ? moveTo(stage.type) : undefined}
               disabled={updating || isActive || isPast}
               className={cn(
-                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all',
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all',
                 isActive && 'ring-2 ring-primary/30',
                 isPast && 'bg-muted text-muted-foreground',
                 isActive && 'bg-primary/10 text-primary',
@@ -66,9 +66,9 @@ export function StageProgression({ contactId, currentType }: StageProgressionPro
                 (isActive || isPast) && 'cursor-default',
               )}
             >
-              {isPast && <Check size={10} />}
-              {updating && isNext && <Loader2 size={10} className="animate-spin" />}
-              <span className={cn('w-1.5 h-1.5 rounded-full', isActive ? stage.color : isPast ? 'bg-muted-foreground/40' : 'bg-muted-foreground/20')} />
+              {isPast && <Check size={11} />}
+              {updating && isNext && <Loader2 size={11} className="animate-spin" />}
+              <span className={cn('w-2 h-2 rounded-full', isActive ? stage.color : isPast ? 'bg-muted-foreground/40' : 'bg-muted-foreground/20')} />
               {stage.label}
             </button>
           </div>
