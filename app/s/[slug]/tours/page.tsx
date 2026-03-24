@@ -20,8 +20,8 @@ export default async function ToursPage({
   let hasGoogleCalendar = false;
   let propertyProfiles: any[] = [];
 
+  // Fetch tours — this is the essential query
   try {
-    // Fetch tours with linked deal info
     const { data: toursRaw, error: toursError } = await supabase
       .from('Tour')
       .select('*, Contact(id, name, email, phone)')
@@ -32,38 +32,20 @@ export default async function ToursPage({
 
     // Fetch deals that came from tours to show the link
     const tourIds = (toursRaw ?? []).map((t: any) => t.id);
-    const { data: dealLinks, error: dealLinksError } = tourIds.length
-      ? await supabase
-          .from('Deal')
-          .select('id, sourceTourId')
-          .in('sourceTourId', tourIds)
-      : { data: [] as any[], error: null };
-    if (dealLinksError) throw dealLinksError;
-    const dealByTour = new Map((dealLinks ?? []).map((d: any) => [d.sourceTourId, d.id]));
+    let dealByTour = new Map<string, string>();
+    if (tourIds.length) {
+      const { data: dealLinks } = await supabase
+        .from('Deal')
+        .select('id, sourceTourId')
+        .in('sourceTourId', tourIds);
+      dealByTour = new Map((dealLinks ?? []).map((d: any) => [d.sourceTourId, d.id]));
+    }
     tours = (toursRaw ?? []).map((t: any) => ({
       ...t,
       sourceDealId: dealByTour.get(t.id) ?? null,
     }));
-
-    // Check Google Calendar status
-    const { data: gcalToken, error: gcalError } = await supabase
-      .from('GoogleCalendarToken')
-      .select('id')
-      .eq('spaceId', space.id)
-      .maybeSingle();
-    if (gcalError) throw gcalError;
-    hasGoogleCalendar = !!gcalToken;
-
-    // Fetch property profiles
-    const { data: profilesData, error: profilesError } = await supabase
-      .from('TourPropertyProfile')
-      .select('id, name, address, tourDuration, isActive')
-      .eq('spaceId', space.id)
-      .order('createdAt', { ascending: true });
-    if (profilesError) throw profilesError;
-    propertyProfiles = profilesData ?? [];
   } catch (err) {
-    console.error('[tours] DB queries failed', err);
+    console.error('[tours] Failed to load tours', err);
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <div className="text-center space-y-4 p-8">
@@ -73,6 +55,29 @@ export default async function ToursPage({
         </div>
       </div>
     );
+  }
+
+  // Non-essential queries — fail gracefully
+  try {
+    const { data: gcalToken } = await supabase
+      .from('GoogleCalendarToken')
+      .select('id')
+      .eq('spaceId', space.id)
+      .maybeSingle();
+    hasGoogleCalendar = !!gcalToken;
+  } catch (err) {
+    console.error('[tours] GoogleCalendar check failed', err);
+  }
+
+  try {
+    const { data: profilesData } = await supabase
+      .from('TourPropertyProfile')
+      .select('id, name, address, tourDuration, isActive')
+      .eq('spaceId', space.id)
+      .order('createdAt', { ascending: true });
+    propertyProfiles = profilesData ?? [];
+  } catch (err) {
+    console.error('[tours] PropertyProfiles fetch failed', err);
   }
 
   return (
