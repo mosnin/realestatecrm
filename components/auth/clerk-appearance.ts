@@ -26,8 +26,8 @@ export function clerkAuthAppearance(isDark: boolean) {
       header: 'hidden',
       headerTitle: 'hidden',
       headerSubtitle: 'hidden',
-      footer: 'bg-transparent border-0 shadow-none mt-2',
-      footerAction: 'bg-transparent',
+      footer: 'hidden',
+      footerAction: 'hidden',
     },
   } as const;
 }

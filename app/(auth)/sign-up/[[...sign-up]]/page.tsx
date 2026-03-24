@@ -9,16 +9,19 @@ export default function SignUpPage() {
   return (
     <AuthPageLayout
       heading="Create your account"
-      subheading="Start managing leads and clients with Chippi"
+      subheading="Welcome! Please fill in the details to get started."
     >
       <div className="w-full space-y-4">
         <ThemedSignUp
+          routing="path"
+          path="/sign-up"
           forceRedirectUrl="/auth/redirect?intent=realtor"
+          signInUrl="/login/realtor"
         />
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{' '}
           <Link
-            href="/sign-in"
+            href="/login/realtor"
             className="font-medium text-primary underline underline-offset-4 hover:text-primary/80 transition-colors"
           >
             Sign in

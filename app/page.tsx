@@ -1,41 +1,37 @@
 'use client';
 
 import { useUser } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { AuthPageLayout } from '@/components/auth/auth-page-layout';
-import { ThemedSignIn } from '@/components/auth/clerk-sign-in';
 import { OnboardingFlow } from '@/components/auth/onboarding-dialog';
-import Link from 'next/link';
 
 export default function HomePage() {
   const { isSignedIn, isLoaded } = useUser();
+  const router = useRouter();
+
+  // Redirect unauthenticated users to the proper sign-in page
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      router.replace('/login/realtor');
+    }
+  }, [isLoaded, isSignedIn, router]);
 
   // Show onboarding flow inline if signed in
-  const showOnboarding = isLoaded && isSignedIn;
-
-  return (
-    <AuthPageLayout
-      heading={showOnboarding ? '' : 'Welcome to Chippi'}
-      subheading={showOnboarding ? '' : 'Sign in to your workspace or create an account'}
-    >
-      {showOnboarding ? (
-        /* Inline multi-step onboarding replaces the sign-in form */
+  if (isLoaded && isSignedIn) {
+    return (
+      <AuthPageLayout heading="" subheading="">
         <OnboardingFlow />
-      ) : (
-        <div className="w-full space-y-4">
-          <ThemedSignIn forceRedirectUrl="/auth/redirect?intent=realtor" />
-          <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
-            <p>
-              Are you a broker?{' '}
-              <Link
-                href="/login/broker"
-                className="font-medium text-primary underline underline-offset-4 hover:text-primary/80 transition-colors"
-              >
-                Brokerage login
-              </Link>
-            </p>
-          </div>
-        </div>
-      )}
+      </AuthPageLayout>
+    );
+  }
+
+  // Loading state while Clerk initializes
+  return (
+    <AuthPageLayout heading="" subheading="">
+      <div className="flex items-center justify-center py-12">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
     </AuthPageLayout>
   );
 }

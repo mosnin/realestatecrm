@@ -37,7 +37,7 @@ export default clerkMiddleware(async (auth, request) => {
 
   if (isProtectedRoute(request) && !isPublicRoute(request)) {
     if (!session.userId) {
-      const signInUrl = new URL('/', request.url);
+      const signInUrl = new URL('/login/realtor', request.url);
       signInUrl.searchParams.set('redirect_url', request.url);
       return NextResponse.redirect(signInUrl);
     }
