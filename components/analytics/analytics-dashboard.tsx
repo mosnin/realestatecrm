@@ -105,10 +105,10 @@ function StatCard({
   sub?: string;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card px-5 py-4">
+    <div className="rounded-lg border border-border bg-card px-3 py-3 sm:px-5 sm:py-4">
       <p className="text-xs text-muted-foreground font-medium">{label}</p>
-      <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+      <p className="text-xl sm:text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
+      {sub && <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">{sub}</p>}
     </div>
   );
 }
@@ -146,11 +146,13 @@ function ChartSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-5">
+    <div className="rounded-lg border border-border bg-card p-3 sm:p-5">
       <p className="font-semibold text-sm">{title}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-0.5 mb-4">{sub}</p>}
-      {!sub && <div className="mb-4" />}
-      {children}
+      {sub && <p className="text-xs text-muted-foreground mt-0.5 mb-3 sm:mb-4">{sub}</p>}
+      {!sub && <div className="mb-3 sm:mb-4" />}
+      <div className="overflow-x-auto -mx-1 px-1">
+        {children}
+      </div>
     </div>
   );
 }
@@ -162,23 +164,25 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
 
   return (
     <div className="space-y-5">
-      {/* Tab bar */}
-      <div className="flex gap-1 p-1 rounded-lg bg-muted w-fit">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={cn(
-              'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-              tab === t
-                ? 'bg-card text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {t}
-          </button>
-        ))}
+      {/* Tab bar — horizontally scrollable on mobile */}
+      <div className="overflow-x-auto -mx-1 px-1 scrollbar-none">
+        <div className="flex gap-1 p-1 rounded-lg bg-muted w-max min-w-full sm:w-fit">
+          {TABS.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={cn(
+                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap',
+                tab === t
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── Overview ── */}
@@ -349,11 +353,11 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                     data={data.employmentBreakdown}
                     layout="vertical"
                     barSize={14}
-                    margin={{ left: 8 }}
+                    margin={{ left: 0 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
                     <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis type="category" dataKey="label" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={100} />
+                    <YAxis type="category" dataKey="label" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" width={80} />
                     <Tooltip content={<ChartTooltip />} />
                     <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="hsl(var(--primary))" />
                   </BarChart>
@@ -428,7 +432,7 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
                     <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis type="category" dataKey="label" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={130} />
+                    <YAxis type="category" dataKey="label" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" width={90} />
                     <Tooltip content={<ChartTooltip />} />
                     <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="#f87171" />
                   </BarChart>
@@ -475,7 +479,7 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
                     <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis type="category" dataKey="label" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" width={160} />
+                    <YAxis type="category" dataKey="label" tick={{ fontSize: 9 }} stroke="hsl(var(--muted-foreground))" width={100} />
                     <Tooltip content={<ChartTooltip />} />
                     <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="#f59e0b" />
                   </BarChart>
@@ -600,36 +604,31 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
 
           {/* Client pipeline conversion funnel */}
           <ChartSection title="Client pipeline funnel" sub="Conversion rates across your renter pipeline">
-            <div className="flex flex-col sm:flex-row gap-4 items-center justify-center py-2">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center justify-center py-2">
               {data.contactFunnel.map((stage, i) => {
                 const colors = ['#3b82f6', '#f59e0b', '#10b981'];
                 const color = colors[i] ?? '#94a3b8';
-                const maxCount = data.contactFunnel[0]?.count ?? 1;
-                const widthPct = maxCount > 0 ? Math.max(30, Math.round((stage.count / maxCount) * 100)) : 30;
                 return (
-                  <div key={stage.label} className="flex flex-col items-center gap-2 flex-1">
-                    {i > 0 && (
-                      <div className="hidden sm:flex items-center text-muted-foreground/40 self-center absolute">
-                        →
-                      </div>
-                    )}
+                  <div key={stage.label} className="flex sm:flex-col items-center gap-3 sm:gap-2 flex-1">
                     <div
-                      className="rounded-lg flex items-center justify-center text-white font-bold text-lg tabular-nums transition-all"
-                      style={{ backgroundColor: color, width: `${widthPct}%`, minWidth: 80, height: 64 }}
+                      className="rounded-lg flex items-center justify-center text-white font-bold text-lg tabular-nums w-16 h-14 sm:w-full sm:h-16 shrink-0"
+                      style={{ backgroundColor: color }}
                     >
                       {stage.count}
                     </div>
-                    <p className="text-sm font-semibold text-foreground">{stage.label}</p>
-                    {i > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {stage.rate}% conversion
-                      </p>
-                    )}
+                    <div className="sm:text-center">
+                      <p className="text-sm font-semibold text-foreground">{stage.label}</p>
+                      {i > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {stage.rate}% conversion
+                        </p>
+                      )}
+                    </div>
                   </div>
                 );
               })}
             </div>
-            <div className="flex justify-center gap-6 mt-3 text-xs text-muted-foreground">
+            <div className="flex justify-center gap-4 sm:gap-6 mt-3 text-xs text-muted-foreground flex-wrap">
               {data.contactFunnel.map((stage, i) => {
                 const colors = ['#3b82f6', '#f59e0b', '#10b981'];
                 return (
