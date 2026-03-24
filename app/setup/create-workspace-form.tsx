@@ -73,7 +73,7 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
       if (role === 'broker_only') {
         // Broker-only: skip workspace entirely
         // Save profile
-        await fetch('/api/onboarding', {
+        const profileRes = await fetch('/api/onboarding', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -83,13 +83,21 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
             businessName: brokerageName.trim(),
           }),
         });
+        if (!profileRes.ok) {
+          const d = await profileRes.json().catch(() => ({}));
+          throw new Error(d.error || 'Failed to save profile.');
+        }
 
         // Mark onboarding complete with broker_only account type
-        await fetch('/api/onboarding', {
+        const completeRes = await fetch('/api/onboarding', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'complete', accountType: 'broker_only' }),
         });
+        if (!completeRes.ok) {
+          const d = await completeRes.json().catch(() => ({}));
+          throw new Error(d.error || 'Failed to complete onboarding.');
+        }
 
         // Create the brokerage
         const brokerRes = await fetch('/api/broker/create', {
@@ -106,7 +114,7 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
 
       // Realtor or broker-with-workspace flow
       // Save profile
-      await fetch('/api/onboarding', {
+      const profileRes2 = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -116,6 +124,10 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
           businessName,
         }),
       });
+      if (!profileRes2.ok) {
+        const d = await profileRes2.json().catch(() => ({}));
+        throw new Error(d.error || 'Failed to save profile.');
+      }
 
       // Create the workspace
       const spaceRes = await fetch('/api/onboarding', {
@@ -142,11 +154,15 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
 
       // Mark onboarding complete
       const accountType = role === 'broker' ? 'both' : 'realtor';
-      await fetch('/api/onboarding', {
+      const completeRes2 = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'complete', accountType }),
       });
+      if (!completeRes2.ok) {
+        const d = await completeRes2.json().catch(() => ({}));
+        throw new Error(d.error || 'Failed to complete onboarding.');
+      }
 
       // If broker role, also create the brokerage
       if (role === 'broker') {

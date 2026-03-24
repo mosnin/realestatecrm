@@ -41,7 +41,11 @@ export default clerkMiddleware(async (auth, request) => {
 
   // Authenticated users on auth pages → send to their dashboard.
   if (session.userId && (pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up') || pathname.startsWith('/login'))) {
-    return NextResponse.redirect(new URL('/auth/redirect?intent=realtor', request.url));
+    // Preserve intent from the page they're on (broker login → broker intent)
+    const isBrokerPath = pathname.startsWith('/login/broker');
+    const isBrokerIntent = request.nextUrl.searchParams.get('intent') === 'broker';
+    const intent = isBrokerPath || isBrokerIntent ? 'broker' : 'realtor';
+    return NextResponse.redirect(new URL(`/auth/redirect?intent=${intent}`, request.url));
   }
 
   // Protected routes: must be logged in.
