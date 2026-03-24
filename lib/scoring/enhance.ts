@@ -6,7 +6,7 @@
  * If the AI call fails, the deterministic score is still returned in full.
  */
 
-import OpenAI from 'openai';
+import type OpenAI from 'openai';
 import type { ScoringEngineResult } from './engine';
 import type { ApplicationData } from '@/lib/types';
 
@@ -25,11 +25,14 @@ const LEAD_STATES = [
   'likely_unqualified',
 ] as const;
 
-function getOpenAIClient() {
+async function getOpenAIClient(): Promise<InstanceType<typeof OpenAI>> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY missing');
   }
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  // Lazy-import to keep the heavy OpenAI SDK out of the server bundle
+  // for pages that don't use scoring (e.g. /apply/[slug]).
+  const { default: OpenAIClient } = await import('openai');
+  return new OpenAIClient({ apiKey: process.env.OPENAI_API_KEY });
 }
 
 export async function enhanceWithAI(
@@ -37,7 +40,7 @@ export async function enhanceWithAI(
   input: { name: string; applicationData: ApplicationData | null },
 ): Promise<AIEnhancement | null> {
   try {
-    const openai = getOpenAIClient();
+    const openai = await getOpenAIClient();
 
     // Build a compact context from the engine's deterministic analysis
     const categoryBreakdown = engineResult.categories
