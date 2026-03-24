@@ -86,10 +86,10 @@ export async function GET() {
     return [
       csvEscape(m.User?.name ?? ''),
       csvEscape(m.User?.email ?? ''),
-      role,
-      status,
-      joined,
-      m.Space?.slug ?? '',
+      csvEscape(role),
+      csvEscape(status),
+      csvEscape(joined),
+      csvEscape(m.Space?.slug ?? ''),
       leads,
       contacts,
       deals,
@@ -110,8 +110,13 @@ export async function GET() {
 }
 
 function csvEscape(val: string): string {
-  if (val.includes(',') || val.includes('"') || val.includes('\n')) {
-    return `"${val.replace(/"/g, '""')}"`;
+  // Prevent CSV injection: prefix formula-triggering characters with a tab
+  let safe = val;
+  if (/^[=+\-@\t\r]/.test(safe)) {
+    safe = `\t${safe}`;
   }
-  return val;
+  if (safe.includes(',') || safe.includes('"') || safe.includes('\n') || safe !== val) {
+    return `"${safe.replace(/"/g, '""')}"`;
+  }
+  return safe;
 }
