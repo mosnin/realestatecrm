@@ -25,7 +25,6 @@ import {
   AlertCircle,
   Download,
   RefreshCw,
-  Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -124,6 +123,7 @@ function InvoiceStatusBadge({ status }: { status: Invoice['status'] }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function BillingPage({
+  slug,
   subscriptionStatus,
   currentPeriodEnd,
   cardLast4,
@@ -138,27 +138,41 @@ export function BillingPage({
   // ── Handlers (wired to Stripe once live) ──────────────────────────────────
 
   async function handleSubscribe() {
-    // TODO: Call POST /api/billing/checkout → stripe.checkout.sessions.create()
-    // const res = await fetch('/api/billing/checkout', { method: 'POST' });
-    // const { url } = await res.json();
-    // window.location.href = url;
-    alert('Stripe integration coming soon — subscribe button is ready to wire up.');
+    const res = await fetch('/api/billing/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug }),
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    }
   }
 
   async function handleManage() {
-    // TODO: Call POST /api/billing/portal → stripe.billingPortal.sessions.create()
-    // const res = await fetch('/api/billing/portal', { method: 'POST' });
-    // const { url } = await res.json();
-    // window.location.href = url;
-    alert('Stripe billing portal coming soon.');
+    const res = await fetch('/api/billing/portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug }),
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    }
   }
 
   async function handleCancel() {
     setCanceling(true);
     try {
-      // TODO: Call POST /api/billing/cancel → stripe.subscriptions.update({ cancel_at_period_end: true })
-      await new Promise((r) => setTimeout(r, 800)); // placeholder delay
-      setCancelDialogOpen(false);
+      const res = await fetch('/api/billing/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      });
+      if (res.ok) {
+        setCancelDialogOpen(false);
+        window.location.reload();
+      }
     } finally {
       setCanceling(false);
     }
@@ -168,20 +182,6 @@ export function BillingPage({
 
   return (
     <div className="space-y-5 max-w-2xl">
-
-      {/* ── Stripe-not-live banner ── */}
-      <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/40 px-4 py-3.5">
-        <Lock size={15} className="text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-            Payments coming soon
-          </p>
-          <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
-            Stripe integration is being set up. The billing UI is fully built —
-            once the API keys are configured, subscriptions will go live automatically.
-          </p>
-        </div>
-      </div>
 
       {/* ── Current plan ── */}
       <SectionBlock

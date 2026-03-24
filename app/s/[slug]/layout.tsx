@@ -8,6 +8,7 @@ import { DashboardFooter } from '@/components/dashboard/footer';
 import { supabase } from '@/lib/supabase';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 import { getBrokerContext } from '@/lib/permissions';
+import { SubscriptionGate } from '@/components/billing/subscription-gate';
 
 export default async function DashboardLayout({
   children,
@@ -107,6 +108,23 @@ export default async function DashboardLayout({
   // Without this check any logged-in user could visit /s/<other-user-slug>.
   if (!dbUser.space || dbUser.space.id !== space.id) notFound();
 
+  // ── Subscription gate ──────────────────────────────────────────────────
+  // Determine if the user can bypass the paywall (admins skip it).
+  const subStatus = space.stripeSubscriptionStatus ?? 'inactive';
+  const hasActiveSubscription = subStatus === 'active' || subStatus === 'trialing';
+
+  let isAdmin = false;
+  if (!hasActiveSubscription) {
+    const { data: userRow } = await supabase
+      .from('User')
+      .select('platformRole')
+      .eq('id', dbUser.id)
+      .single();
+    isAdmin = userRow?.platformRole === 'admin';
+  }
+
+  const requiresSubscription = !hasActiveSubscription && !isAdmin;
+
   let unreadLeadCount = 0;
   try {
     const { count, error: countError } = await supabase
@@ -158,7 +176,11 @@ export default async function DashboardLayout({
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
         <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
-          {children}
+          {requiresSubscription ? (
+            <SubscriptionGate slug={slug}>{children}</SubscriptionGate>
+          ) : (
+            children
+          )}
           <DashboardFooter />
         </main>
       </div>

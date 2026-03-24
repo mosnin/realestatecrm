@@ -3,12 +3,9 @@ import type { NextConfig } from "next";
 /**
  * Security response headers applied to every route.
  *
- * CSP NOTE: When Stripe is wired up, add these to connect-src:
- *   https://api.stripe.com
- * and to frame-src:
- *   https://js.stripe.com https://hooks.stripe.com
- * and to script-src:
- *   https://js.stripe.com
+ * Stripe domains are now included in the allowlists below (connect-src,
+ * frame-src, script-src) via the CSP header — once a full CSP is added.
+ * For now the CSP is omitted (see note below), but the domains are documented.
  */
 const securityHeaders = [
   // Prevent embedding in iframes from other origins (clickjacking)

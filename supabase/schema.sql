@@ -46,7 +46,14 @@ CREATE TABLE IF NOT EXISTS "Space" (
   emoji         text NOT NULL DEFAULT '🏠',
   "createdAt"   timestamptz NOT NULL DEFAULT now(),
   "ownerId"     text UNIQUE NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
-  "brokerageId" text REFERENCES "Brokerage"(id) ON DELETE SET NULL
+  "brokerageId" text REFERENCES "Brokerage"(id) ON DELETE SET NULL,
+  "stripeCustomerId"          text,
+  "stripeSubscriptionId"      text,
+  "stripeSubscriptionStatus"  text NOT NULL DEFAULT 'inactive'
+    CHECK ("stripeSubscriptionStatus" IN (
+      'active', 'trialing', 'past_due', 'canceled', 'unpaid', 'inactive'
+    )),
+  "stripePeriodEnd"           timestamptz
 );
 
 CREATE TABLE IF NOT EXISTS "SpaceSetting" (

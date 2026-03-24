@@ -53,6 +53,8 @@ export type Invitation = {
   createdAt: Date;
 };
 
+export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'inactive';
+
 export type Space = {
   id: string;
   slug: string;
@@ -61,6 +63,10 @@ export type Space = {
   createdAt: Date;
   ownerId: string;
   brokerageId: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripeSubscriptionStatus: SubscriptionStatus;
+  stripePeriodEnd: string | null;
 };
 
 export type SpaceSetting = {

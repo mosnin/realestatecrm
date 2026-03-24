@@ -2,6 +2,8 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { BillingPage } from '@/components/billing/billing-page';
+import { getStripe } from '@/lib/stripe';
+import type Stripe from 'stripe';
 
 export default async function Billing({
   params,
@@ -15,18 +17,82 @@ export default async function Billing({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
+  let subscriptionStatus: 'active' | 'trialing' | 'past_due' | 'canceled' | 'inactive' =
+    (space.stripeSubscriptionStatus as any) ?? 'inactive';
+  let currentPeriodEnd: string | undefined;
+  let cardLast4: string | undefined;
+  let cardBrand: string | undefined;
+  let invoices: { id: string; date: string; amount: string; status: 'paid' | 'open' | 'void'; pdf?: string }[] = [];
+
+  // Fetch live data from Stripe if a subscription exists
+  if (space.stripeSubscriptionId) {
+    try {
+      const stripe = getStripe();
+      const sub = await stripe.subscriptions.retrieve(space.stripeSubscriptionId, {
+        expand: ['default_payment_method', 'latest_invoice'],
+      });
+
+      subscriptionStatus = mapStatus(sub.status);
+      const periodEndTs = sub.items.data[0]?.current_period_end ?? sub.start_date;
+      currentPeriodEnd = new Date(periodEndTs * 1000).toISOString();
+
+      // Payment method
+      const pm = sub.default_payment_method as Stripe.PaymentMethod | null;
+      if (pm?.card) {
+        cardLast4 = pm.card.last4;
+        cardBrand = pm.card.brand;
+      }
+
+      // Invoices — fetch recent
+      if (space.stripeCustomerId) {
+        const invoiceList = await stripe.invoices.list({
+          customer: space.stripeCustomerId,
+          limit: 10,
+        });
+        invoices = invoiceList.data.map((inv) => ({
+          id: inv.id,
+          date: new Date((inv.created ?? 0) * 1000).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+          amount: `$${((inv.amount_paid ?? 0) / 100).toFixed(2)}`,
+          status: inv.status === 'paid' ? 'paid' : inv.status === 'open' ? 'open' : 'void',
+          pdf: inv.invoice_pdf ?? undefined,
+        }));
+      }
+    } catch (err) {
+      console.error('[billing] Failed to fetch Stripe data', err);
+      // Fall back to DB-stored status
+    }
+  }
+
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Billing</h1>
         <p className="text-muted-foreground">Manage your subscription and payment details</p>
       </div>
-      {/*
-        TODO: When Stripe is live, fetch subscription status here:
-        const subscription = await stripe.subscriptions.retrieve(space.stripeSubscriptionId);
-        Pass status, currentPeriodEnd, paymentMethod, and invoices as props.
-      */}
-      <BillingPage slug={slug} subscriptionStatus="inactive" />
+      <BillingPage
+        slug={slug}
+        subscriptionStatus={subscriptionStatus}
+        currentPeriodEnd={currentPeriodEnd}
+        cardLast4={cardLast4}
+        cardBrand={cardBrand}
+        invoices={invoices}
+      />
     </div>
   );
+}
+
+function mapStatus(
+  status: Stripe.Subscription.Status,
+): 'active' | 'trialing' | 'past_due' | 'canceled' | 'inactive' {
+  switch (status) {
+    case 'active': return 'active';
+    case 'trialing': return 'trialing';
+    case 'past_due': return 'past_due';
+    case 'canceled': return 'canceled';
+    default: return 'inactive';
+  }
 }

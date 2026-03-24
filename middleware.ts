@@ -29,6 +29,7 @@ const isFullyPublicRoute = createRouteMatcher([
   '/apply/(.*)',
   '/book/(.*)',
   '/status/(.*)',
+  '/api/webhooks/(.*)',
 ]);
 
 // Routes that should NEVER be passed as redirect_url after login.
