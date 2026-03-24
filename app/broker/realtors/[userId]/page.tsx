@@ -53,16 +53,16 @@ export default async function RealtorDrilldownPage({ params }: Params) {
     .eq('ownerId', userId)
     .maybeSingle();
 
-  // Fetch data in parallel
+  // Fetch data in parallel — display rows are limited, but counts are separate
   const spaceId = space?.id;
-  const [contactsRes, dealsRes, stagesRes] = await Promise.all([
+  const [contactsRes, dealsRes, stagesRes, contactCountRes, newLeadCountRes, hotLeadCountRes, dealCountRes] = await Promise.all([
     spaceId
       ? supabase
           .from('Contact')
           .select('id, name, email, phone, type, tags, leadScore, scoreLabel, followUpAt, createdAt')
           .eq('spaceId', spaceId)
           .order('createdAt', { ascending: false })
-          .limit(50)
+          .limit(20)
       : Promise.resolve({ data: [] }),
     spaceId
       ? supabase
@@ -70,7 +70,7 @@ export default async function RealtorDrilldownPage({ params }: Params) {
           .select('id, title, value, status, stageId, closeDate, createdAt')
           .eq('spaceId', spaceId)
           .order('createdAt', { ascending: false })
-          .limit(50)
+          .limit(20)
       : Promise.resolve({ data: [] }),
     spaceId
       ? supabase
@@ -78,6 +78,19 @@ export default async function RealtorDrilldownPage({ params }: Params) {
           .select('id, name, color, position')
           .eq('spaceId', spaceId)
           .order('position', { ascending: true })
+      : Promise.resolve({ data: [] }),
+    // Accurate counts (head-only queries)
+    spaceId
+      ? supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', spaceId)
+      : Promise.resolve({ count: 0 }),
+    spaceId
+      ? supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', spaceId).contains('tags', ['new-lead'])
+      : Promise.resolve({ count: 0 }),
+    spaceId
+      ? supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', spaceId).eq('scoreLabel', 'hot')
+      : Promise.resolve({ count: 0 }),
+    spaceId
+      ? supabase.from('Deal').select('id, value, status').eq('spaceId', spaceId).limit(10000)
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -98,15 +111,16 @@ export default async function RealtorDrilldownPage({ params }: Params) {
 
   const stageMap = Object.fromEntries(stages.map((s) => [s.id, s]));
 
-  // Stats
-  const totalContacts = contacts.length;
-  const newLeads = contacts.filter((c) => c.tags?.includes('new-lead')).length;
-  const hotLeads = contacts.filter((c) => c.scoreLabel === 'hot').length;
-  const totalDeals = deals.length;
-  const activeDeals = deals.filter((d) => d.status === 'active').length;
-  const pipelineValue = deals.filter((d) => d.status === 'active').reduce((sum, d) => sum + (d.value ?? 0), 0);
-  const wonDeals = deals.filter((d) => d.status === 'won').length;
-  const wonValue = deals.filter((d) => d.status === 'won').reduce((sum, d) => sum + (d.value ?? 0), 0);
+  // Stats — use accurate counts, not the display-limited rows
+  const allDeals = (dealCountRes.data ?? []) as Array<{ id: string; value: number | null; status: string }>;
+  const totalContacts = contactCountRes.count ?? 0;
+  const newLeads = newLeadCountRes.count ?? 0;
+  const hotLeads = hotLeadCountRes.count ?? 0;
+  const totalDeals = allDeals.length;
+  const activeDeals = allDeals.filter((d) => d.status === 'active').length;
+  const pipelineValue = allDeals.filter((d) => d.status === 'active').reduce((sum, d) => sum + (d.value ?? 0), 0);
+  const wonDeals = allDeals.filter((d) => d.status === 'won').length;
+  const wonValue = allDeals.filter((d) => d.status === 'won').reduce((sum, d) => sum + (d.value ?? 0), 0);
 
   const roleLabel = membership.role === 'broker_owner' ? 'Owner' : membership.role === 'broker_admin' ? 'Admin' : 'Realtor';
   const joinedAt = new Date(membership.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });

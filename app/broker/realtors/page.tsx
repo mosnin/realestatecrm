@@ -42,6 +42,7 @@ export default async function BrokerRealtorsPage() {
           .select('spaceId')
           .in('spaceId', spaceIds)
           .contains('tags', ['application-link'])
+          .limit(10000)
           .then((r) => r.data ?? [])
       : Promise.resolve([]),
     spaceIds.length > 0
@@ -50,6 +51,7 @@ export default async function BrokerRealtorsPage() {
           .select('spaceId')
           .in('spaceId', spaceIds)
           .not('tags', 'cs', '["application-link"]')
+          .limit(10000)
           .then((r) => r.data ?? [])
       : Promise.resolve([]),
     spaceIds.length > 0
@@ -57,15 +59,17 @@ export default async function BrokerRealtorsPage() {
           .from('Deal')
           .select('spaceId, value')
           .in('spaceId', spaceIds)
+          .limit(10000)
           .then((r) => r.data ?? [])
       : Promise.resolve([]),
-    // Hot leads: leadScore >= 70 (or scoreLabel = 'hot')
+    // Hot leads: scoreLabel = 'hot'
     spaceIds.length > 0
       ? supabase
           .from('Contact')
           .select('spaceId')
           .in('spaceId', spaceIds)
           .eq('scoreLabel', 'hot')
+          .limit(10000)
           .then((r) => r.data ?? [])
       : Promise.resolve([]),
   ]);

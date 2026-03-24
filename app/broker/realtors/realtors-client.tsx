@@ -397,19 +397,20 @@ function TableView({
               return (
                 <tr
                   key={r.membershipId}
-                  className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                  className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
+                  onClick={() => window.location.href = `/broker/realtors/${r.userId}`}
                 >
                   <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">{i + 1}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    <Link href={`/broker/realtors/${r.userId}`} className="flex items-center gap-2.5 min-w-0">
                       <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
                         {initials(r.name, r.email)}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-medium text-xs truncate">{r.name ?? 'No name'}</p>
+                        <p className="font-medium text-xs truncate hover:text-primary transition-colors">{r.name ?? 'No name'}</p>
                         <p className="text-xs text-muted-foreground truncate">{r.email}</p>
                       </div>
-                    </div>
+                    </Link>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <span className="text-xs font-medium text-muted-foreground bg-muted rounded-full px-2.5 py-0.5">
