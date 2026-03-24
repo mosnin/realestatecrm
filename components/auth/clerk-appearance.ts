@@ -20,9 +20,9 @@ export function clerkAuthAppearance(isDark: boolean) {
       socialButtonsVariant: 'blockButton' as const,
     },
     elements: {
-      rootBox: 'w-full',
-      card: 'shadow-none border-0 p-0 w-full gap-4 bg-transparent',
-      cardBox: 'shadow-none border-0 bg-transparent',
+      rootBox: 'w-full overflow-visible',
+      card: 'shadow-none border-0 p-0 w-full gap-4 bg-transparent overflow-visible',
+      cardBox: 'shadow-none border-0 bg-transparent overflow-visible',
       header: 'hidden',
       headerTitle: 'hidden',
       headerSubtitle: 'hidden',

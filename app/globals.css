@@ -245,6 +245,11 @@
 /* ── Clerk component overrides ────────────────────── */
 .cl-rootBox {
   width: 100%;
+  overflow: visible !important;
+}
+.cl-internal-b3fm6y,
+.cl-formField {
+  overflow: visible !important;
 }
 .cl-card,
 .cl-cardBox {
@@ -253,6 +258,13 @@
   border: none !important;
   padding: 0 !important;
   width: 100% !important;
+  overflow: visible !important;
+}
+.cl-main {
+  overflow: visible !important;
+}
+.cl-form {
+  overflow: visible !important;
 }
 .cl-header {
   display: none !important;
@@ -298,7 +310,6 @@
 }
 .cl-formFieldRow {
   border-radius: 0.75rem !important;
-  overflow: hidden;
 }
 .cl-formFieldInput:focus {
   border-color: #ff964f !important;
