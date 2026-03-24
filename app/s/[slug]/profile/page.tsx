@@ -2,7 +2,7 @@
 
 // This page uses client-side Clerk hooks for profile management
 import { useUser } from '@clerk/nextjs';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -17,12 +17,22 @@ import { CopyLinkButton } from '../copy-link-button';
 export default function ProfilePage() {
   const params = useParams<{ slug: string }>();
   const { user, isLoaded } = useUser();
-  const [firstName, setFirstName] = useState<string | null>(null);
-  const [lastName, setLastName] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  if (!isLoaded) {
+  // Sync state from Clerk user once loaded
+  useEffect(() => {
+    if (isLoaded && user && !initialized) {
+      setFirstName(user.firstName ?? '');
+      setLastName(user.lastName ?? '');
+      setInitialized(true);
+    }
+  }, [isLoaded, user, initialized]);
+
+  if (!isLoaded || !initialized) {
     return (
       <div className="space-y-4 max-w-3xl animate-pulse">
         <div className="h-8 bg-muted rounded-lg w-32" />
@@ -38,10 +48,7 @@ export default function ProfilePage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await user!.update({
-        firstName: firstName ?? user!.firstName ?? undefined,
-        lastName: lastName ?? user!.lastName ?? undefined,
-      });
+      await user!.update({ firstName, lastName });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } finally {
@@ -119,7 +126,7 @@ export default function ProfilePage() {
                 <Label htmlFor="firstName">First name</Label>
                 <Input
                   id="firstName"
-                  defaultValue={user.firstName ?? ''}
+                  value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                 />
               </div>
@@ -127,7 +134,7 @@ export default function ProfilePage() {
                 <Label htmlFor="lastName">Last name</Label>
                 <Input
                   id="lastName"
-                  defaultValue={user.lastName ?? ''}
+                  value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                 />
               </div>

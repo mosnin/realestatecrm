@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { getSpaceForUser } from '@/lib/space';
 import { audit } from '@/lib/audit';
+import { isValidSlug, normalizeSlug } from '@/lib/intake';
 
 export async function PATCH(req: NextRequest) {
   const { userId } = await auth();
@@ -48,12 +49,37 @@ export async function PATCH(req: NextRequest) {
   const updateFields: Record<string, unknown> = { name };
   if (emoji !== undefined) updateFields.emoji = emoji;
 
+  // Handle slug change
+  const rawNewSlug = typeof body.newSlug === 'string' ? body.newSlug.trim() : '';
+  if (rawNewSlug && rawNewSlug !== slug) {
+    const sanitized = normalizeSlug(rawNewSlug);
+    if (!isValidSlug(sanitized) || sanitized !== rawNewSlug) {
+      return NextResponse.json({ error: 'Only lowercase letters, numbers, and hyphens allowed (min 3 chars)' }, { status: 400 });
+    }
+    // Check uniqueness
+    const { data: existing } = await supabase
+      .from('Space')
+      .select('id')
+      .eq('slug', sanitized)
+      .maybeSingle();
+    if (existing) {
+      return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
+    }
+    updateFields.slug = sanitized;
+  }
+
   const { data: updatedRows, error: updateError } = await supabase
     .from('Space')
     .update(updateFields)
     .eq('slug', slug)
     .select('id, slug, name, emoji, createdAt, ownerId');
-  if (updateError) throw updateError;
+  if (updateError) {
+    const errMsg = updateError.message || '';
+    if (errMsg.includes('duplicate key') || errMsg.includes('unique') || updateError.code === '23505') {
+      return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
+    }
+    throw updateError;
+  }
 
   const { error: settingsError } = await supabase
     .from('SpaceSetting')
@@ -78,17 +104,22 @@ export async function PATCH(req: NextRequest) {
     .select();
   if (settingsError) throw settingsError;
 
-  // Update Redis emoji
+  // Update Redis cache
+  const updatedSpace = updatedRows![0];
   const existing = await redis.get<any>(`slug:${slug}`).catch(() => null);
   if (existing) {
-    await redis
-      .set(`slug:${slug}`, { ...existing, emoji })
-      .catch(() => null);
+    // If slug changed, delete old key and set new one
+    if (updatedSpace.slug !== slug) {
+      await redis.del(`slug:${slug}`).catch(() => null);
+      await redis.set(`slug:${updatedSpace.slug}`, { ...existing, slug: updatedSpace.slug, emoji: updatedSpace.emoji }).catch(() => null);
+    } else {
+      await redis.set(`slug:${slug}`, { ...existing, emoji }).catch(() => null);
+    }
   }
 
-  void audit({ actorClerkId: userId, action: 'UPDATE', resource: 'Space', resourceId: space.id, spaceId: space.id, req });
+  void audit({ actorClerkId: userId, action: 'UPDATE', resource: 'Space', resourceId: space.id, spaceId: space.id, req, metadata: updatedSpace.slug !== slug ? { oldSlug: slug, newSlug: updatedSpace.slug } : undefined });
 
-  return NextResponse.json(updatedRows![0]);
+  return NextResponse.json(updatedSpace);
 }
 
 export async function DELETE(req: NextRequest) {

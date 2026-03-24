@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { BookingForm } from './booking-form';
 import { PublicPageShell } from '@/components/public-page-shell';
 
+export const revalidate = 60;
+
 export default async function PublicBookingPage({
   params,
 }: {

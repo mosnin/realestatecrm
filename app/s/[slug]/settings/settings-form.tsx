@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { CheckCircle2, Loader2 } from 'lucide-react';
 import type { Space } from '@/lib/types';
 
 type UserSettings = {
@@ -42,6 +43,35 @@ function SectionBlock({ title, description, children }: { title: string; descrip
 export function SettingsForm({ space, settings, userEmail }: SettingsFormProps) {
   const router = useRouter();
   const [name, setName] = useState(space.name);
+  const [newSlug, setNewSlug] = useState(space.slug);
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
+  const [checkingSlug, setCheckingSlug] = useState(false);
+
+  const checkSlug = useCallback(async (value: string) => {
+    if (value === space.slug) { setSlugAvailable(null); return; }
+    if (value.length < 3) { setSlugAvailable(null); return; }
+    setCheckingSlug(true);
+    try {
+      const res = await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'check_slug', slug: value }),
+      });
+      const data = await res.json();
+      setSlugAvailable(data.available);
+    } finally {
+      setCheckingSlug(false);
+    }
+  }, [space.slug]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => checkSlug(newSlug), 400);
+    return () => clearTimeout(timer);
+  }, [newSlug, checkSlug]);
+
+  const slugChanged = newSlug !== space.slug;
+  const slugValid = !slugChanged || (slugChanged && newSlug.length >= 3 && slugAvailable === true);
+
   const [notifications, setNotifications] = useState(
     settings?.notifications ?? true
   );
@@ -71,6 +101,7 @@ export function SettingsForm({ space, settings, userEmail }: SettingsFormProps) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug: space.slug,
+          newSlug: slugChanged ? newSlug : undefined,
           name,
           notifications,
           smsNotifications,
@@ -84,12 +115,23 @@ export function SettingsForm({ space, settings, userEmail }: SettingsFormProps) 
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        if (res.status === 409) {
+          setSlugAvailable(false);
+          setSaveError('That slug was just taken. Please pick a different one.');
+          return;
+        }
         setSaveError(data.error || 'Failed to save settings. Please try again.');
         return;
       }
+      const updated = await res.json().catch(() => ({}));
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-      router.refresh();
+      // If slug changed, navigate to the new URL
+      if (slugChanged && updated.slug) {
+        router.replace(`/s/${updated.slug}/settings`);
+      } else {
+        router.refresh();
+      }
     } catch {
       setSaveError('Network error. Please check your connection and try again.');
     } finally {
@@ -138,9 +180,31 @@ export function SettingsForm({ space, settings, userEmail }: SettingsFormProps) 
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Slug</Label>
-          <Input value={space.slug} disabled />
-          <p className="text-xs text-muted-foreground">Slug cannot be changed after creation.</p>
+          <Label htmlFor="slug">Slug</Label>
+          <div className="relative">
+            <Input
+              id="slug"
+              value={newSlug}
+              onChange={(e) =>
+                setNewSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
+              }
+              className="pr-8"
+            />
+            {slugChanged && newSlug.length >= 3 && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                {checkingSlug ? (
+                  <Loader2 size={14} className="animate-spin text-muted-foreground" />
+                ) : slugAvailable === true ? (
+                  <CheckCircle2 size={14} className="text-green-500" />
+                ) : slugAvailable === false ? (
+                  <span className="text-red-500 text-xs font-medium">taken</span>
+                ) : null}
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Your intake link: chippi.com/apply/{newSlug}
+          </p>
         </div>
       </SectionBlock>
 
@@ -275,7 +339,7 @@ export function SettingsForm({ space, settings, userEmail }: SettingsFormProps) 
 
       <div className="space-y-2 pt-1">
         <div className="flex items-center gap-3">
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || !slugValid}>
             {saving ? 'Saving...' : saved ? 'Saved!' : 'Save settings'}
           </Button>
           {saved && <p className="text-sm text-primary">Changes saved.</p>}

@@ -4,6 +4,10 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { PublicPageShell } from '@/components/public-page-shell';
 import { ApplicationFormLoader } from './application-form-loader';
 
+// Cache this page for 60 seconds — it's public and rarely changes.
+// Eliminates cold-start latency for repeat visitors and crawlers.
+export const revalidate = 60;
+
 export default async function PublicApplyPage({
   params,
 }: {
