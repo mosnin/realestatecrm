@@ -163,6 +163,8 @@ CREATE TABLE IF NOT EXISTS "Deal" (
   "closeDate" timestamptz,
   "stageId"   text NOT NULL REFERENCES "DealStage"(id) ON DELETE CASCADE,
   position    integer NOT NULL DEFAULT 0,
+  status      text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'won', 'lost', 'on_hold')),
+  "followUpAt" timestamptz,
   "sourceTourId" text REFERENCES "Tour"(id) ON DELETE SET NULL,
   "createdAt" timestamptz NOT NULL DEFAULT now(),
   "updatedAt" timestamptz NOT NULL DEFAULT now()
@@ -368,7 +370,7 @@ CREATE INDEX IF NOT EXISTS idx_membership_brokerage       ON "BrokerageMembershi
 CREATE INDEX IF NOT EXISTS idx_membership_user            ON "BrokerageMembership"("userId");
 CREATE INDEX IF NOT EXISTS idx_invitation_brokerage       ON "Invitation"("brokerageId");
 CREATE INDEX IF NOT EXISTS idx_invitation_email           ON "Invitation"(email);
-CREATE INDEX IF NOT EXISTS idx_invitation_token           ON "Invitation"(token);
+-- token already has a UNIQUE constraint (implicit unique index)
 CREATE INDEX IF NOT EXISTS idx_invitation_status          ON "Invitation"(status);
 
 CREATE INDEX IF NOT EXISTS idx_tour_space_starts      ON "Tour"("spaceId", "startsAt" DESC);
