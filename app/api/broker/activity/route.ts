@@ -86,6 +86,10 @@ export async function GET() {
       .limit(10),
   ]);
 
+  if (leadsRes.error) console.error('[broker/activity] leads query failed:', leadsRes.error);
+  if (dealsRes.error) console.error('[broker/activity] deals query failed:', dealsRes.error);
+  if (toursRes.error) console.error('[broker/activity] tours query failed:', toursRes.error);
+
   const activities: ActivityItem[] = [];
 
   for (const lead of leadsRes.data ?? []) {
@@ -115,7 +119,7 @@ export async function GET() {
       id: `tour-${tour.id}`,
       type: 'tour',
       actor: actorForSpace(tour.spaceId),
-      action: 'completed a tour',
+      action: 'scheduled a tour',
       entity: tour.guestName ?? 'Unknown guest',
       timestamp: tour.createdAt,
     });

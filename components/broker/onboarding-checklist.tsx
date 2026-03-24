@@ -49,7 +49,7 @@ export function BrokerOnboardingChecklist({ hasMembers, hasInvitations, hasSetti
       description: 'Send an invitation to add a realtor to your brokerage',
       href: '/broker/invitations',
       icon: Users,
-      completed: hasMembers,
+      completed: hasMembers || hasInvitations,
     },
     {
       id: 'configure-settings',
