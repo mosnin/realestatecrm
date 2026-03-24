@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sparkles, CalendarDays, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -80,6 +81,7 @@ function getSuggestions(props: FollowUpSuggestionsProps): Suggestion[] {
 export function FollowUpSuggestions(props: FollowUpSuggestionsProps) {
   const [applying, setApplying] = useState<number | null>(null);
   const [applied, setApplied] = useState<Set<number>>(new Set());
+  const router = useRouter();
 
   const suggestions = getSuggestions(props);
   if (suggestions.length === 0) return null;
@@ -95,6 +97,7 @@ export function FollowUpSuggestions(props: FollowUpSuggestionsProps) {
       });
       if (res.ok) {
         setApplied((prev) => new Set(prev).add(index));
+        router.refresh();
       }
     } catch {
       // silent

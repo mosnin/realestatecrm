@@ -16,11 +16,15 @@ export function ContactFollowUpField({ contactId, followUpAt: initialFollowUpAt,
   const [lastContactedAt, setLastContactedAt] = useState(initialLastContactedAt);
 
   async function patch(data: Record<string, unknown>) {
-    await fetch(`/api/contacts/${contactId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    try {
+      await fetch(`/api/contacts/${contactId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    } catch (err) {
+      console.error('[follow-up] Patch failed:', err);
+    }
   }
 
   function handleFollowUpChange(value: string) {

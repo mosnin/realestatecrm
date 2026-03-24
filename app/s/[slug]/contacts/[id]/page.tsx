@@ -587,7 +587,7 @@ export default async function ClientDetailPage({
       )}
 
       {/* Activity log */}
-      <ContactActivityTab contactId={contact.id} contactCreatedAt={String(contact.createdAt)} slug={slug} />
+      <ContactActivityTab contactId={contact.id} contactCreatedAt={String(contact.createdAt)} />
 
       {/* Tour history */}
       {contact.tours.length > 0 && (

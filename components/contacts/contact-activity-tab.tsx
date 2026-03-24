@@ -49,7 +49,7 @@ function getEntryMeta(entry: TimelineEntry) {
   return SYSTEM_META[entry.type] ?? { label: entry.type, icon: Clock, color: 'text-muted-foreground bg-muted' };
 }
 
-export function ContactActivityTab({ contactId, contactCreatedAt, slug }: { contactId: string; contactCreatedAt?: string; slug?: string }) {
+export function ContactActivityTab({ contactId, contactCreatedAt }: { contactId: string; contactCreatedAt?: string }) {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [type, setType] = useState<ManualActivityType>('note');
