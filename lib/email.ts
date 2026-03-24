@@ -1,4 +1,3 @@
-import { Resend } from 'resend';
 import type { ApplicationData } from '@/lib/types';
 
 /** Escape characters that have special meaning in HTML to prevent XSS. */
@@ -38,6 +37,7 @@ export interface NewLeadEmailParams {
 
 export async function sendNewLeadNotification(params: NewLeadEmailParams): Promise<void> {
   if (!process.env.RESEND_API_KEY) return;
+  const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
 
@@ -127,6 +127,7 @@ export interface FollowUpDigestParams {
 
 export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<void> {
   if (!process.env.RESEND_API_KEY) return;
+  const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
 
@@ -202,6 +203,7 @@ export interface SendEmailFromCRMParams {
 
 export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<void> {
   if (!process.env.RESEND_API_KEY) return;
+  const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
 
@@ -249,6 +251,7 @@ export interface NewDealEmailParams {
 
 export async function sendNewDealNotification(params: NewDealEmailParams): Promise<void> {
   if (!process.env.RESEND_API_KEY) return;
+  const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
 
@@ -313,6 +316,7 @@ export interface BrokerageInvitationEmailParams {
 
 export async function sendBrokerageInvitation(params: BrokerageInvitationEmailParams): Promise<void> {
   if (!process.env.RESEND_API_KEY) return;
+  const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.yourdomain.com';

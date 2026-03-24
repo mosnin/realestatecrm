@@ -6,13 +6,12 @@
  * Gracefully no-ops when credentials are missing.
  */
 
-import { Telnyx } from 'telnyx';
+let telnyxClient: any = null;
 
-let telnyxClient: InstanceType<typeof Telnyx> | null = null;
-
-function getClient() {
+async function getClient() {
   if (!process.env.TELNYX_API_KEY) return null;
   if (!telnyxClient) {
+    const { Telnyx } = await import('telnyx');
     telnyxClient = new Telnyx({ apiKey: process.env.TELNYX_API_KEY });
   }
   return telnyxClient;
@@ -28,7 +27,7 @@ export interface SendSMSParams {
  * Never throws — errors are logged and swallowed.
  */
 export async function sendSMS(params: SendSMSParams): Promise<boolean> {
-  const client = getClient();
+  const client = await getClient();
   const fromNumber = process.env.TELNYX_FROM_NUMBER;
 
   if (!client || !fromNumber) {

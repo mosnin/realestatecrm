@@ -60,6 +60,7 @@ export type Space = {
   emoji: string;
   createdAt: Date;
   ownerId: string;
+  brokerageId: string | null;
 };
 
 export type SpaceSetting = {
@@ -105,6 +106,9 @@ export type Contact = {
   lastContactedAt: Date | null;
   sourceLabel: string | null;
   stageChangedAt: Date | null;
+  applicationStatus: string | null;
+  applicationStatusNote: string | null;
+  applicationRef: string | null;
   createdAt: Date;
   updatedAt: Date;
 };

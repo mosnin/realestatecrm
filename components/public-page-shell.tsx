@@ -16,6 +16,7 @@ export function PublicPageShell({
   logoUrl,
   businessName,
   agentName,
+  agentPhone,
   agentPhoto,
   pageTitle,
   pageIntro,

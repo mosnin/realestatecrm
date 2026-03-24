@@ -373,7 +373,7 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-semibold text-foreground">{meta.label}</span>
                             <span className="text-[10px] text-muted-foreground">
-                              {relativeTime(activity.createdAt)}
+                              {relativeTime(new Date(activity.createdAt))}
                             </span>
                           </div>
                           {activity.content && (

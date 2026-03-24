@@ -400,8 +400,8 @@ export default async function ClientDetailPage({
           <div className="px-6 py-3 border-b border-border/50">
             <ApplicationStatusControl
               contactId={contact.id}
-              currentStatus={(contact as any).applicationStatus ?? 'received'}
-              statusNote={(contact as any).applicationStatusNote ?? null}
+              currentStatus={contact.applicationStatus ?? 'received'}
+              statusNote={contact.applicationStatusNote ?? null}
             />
           </div>
           <div className="px-6 py-4 space-y-6">
