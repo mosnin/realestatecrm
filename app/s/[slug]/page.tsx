@@ -147,7 +147,7 @@ export default async function DashboardPage({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {stats.map(({ label, value, sub, icon: Icon, accent, href }) => (
           <Link key={label} href={href}>
-            <Card className={`transition-shadow hover:shadow-md ${accent ? 'border-primary/30 bg-primary/5' : ''}`}>
+            <Card className={`transition-shadow hover:shadow-md dark:hover:shadow-none ${accent ? 'border-primary/30 bg-primary/5' : ''}`}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${accent ? 'bg-primary/10' : 'bg-muted'}`}>

@@ -345,15 +345,15 @@ export function CsvImportModal({ slug, onClose, onImported }: Props) {
               </div>
               <ul className="space-y-1 text-sm text-muted-foreground">
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-green-500 flex-shrink-0" />
+                  <CheckCircle2 size={13} className="text-green-500 dark:text-green-400 flex-shrink-0" />
                   Stage defaults to <strong>Qualifying</strong> if not mapped
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-green-500 flex-shrink-0" />
+                  <CheckCircle2 size={13} className="text-green-500 dark:text-green-400 flex-shrink-0" />
                   Lead scoring runs manually after import
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-green-500 flex-shrink-0" />
+                  <CheckCircle2 size={13} className="text-green-500 dark:text-green-400 flex-shrink-0" />
                   Rows without a name are skipped
                 </li>
               </ul>
@@ -370,7 +370,7 @@ export function CsvImportModal({ slug, onClose, onImported }: Props) {
           {step === 'done' && (
             <div className="text-center py-6 space-y-3">
               <div className="w-14 h-14 rounded-full bg-green-50 dark:bg-green-500/15 flex items-center justify-center mx-auto">
-                <CheckCircle2 size={28} className="text-green-500" />
+                <CheckCircle2 size={28} className="text-green-500 dark:text-green-400" />
               </div>
               <p className="text-lg font-semibold">Import complete!</p>
               <p className="text-sm text-muted-foreground">

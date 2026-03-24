@@ -119,7 +119,7 @@ export function ComposeEmailDialog({ contactId, contactName, contactEmail }: Com
               <Button
                 onClick={handleSend}
                 disabled={sending || !subject.trim() || !body.trim() || status === 'sent'}
-                className={cn('gap-2', status === 'sent' && 'bg-emerald-600 hover:bg-emerald-600')}
+                className={cn('gap-2', status === 'sent' && 'bg-emerald-600 hover:bg-emerald-600 dark:bg-emerald-500 dark:hover:bg-emerald-500')}
               >
                 <Send size={14} />
                 {sending ? 'Sending…' : status === 'sent' ? 'Sent!' : 'Send'}

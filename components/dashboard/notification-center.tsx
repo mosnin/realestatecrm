@@ -111,8 +111,8 @@ export function NotificationCenter({ slug }: { slug: string }) {
                   >
                     <div className={cn(
                       'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5',
-                      n.priority === 'high' ? 'bg-red-100 dark:bg-red-900/20' :
-                      n.priority === 'medium' ? 'bg-amber-100 dark:bg-amber-900/20' :
+                      n.priority === 'high' ? 'bg-red-100 dark:bg-red-500/15' :
+                      n.priority === 'medium' ? 'bg-amber-100 dark:bg-amber-500/15' :
                       'bg-muted'
                     )}>
                       <Icon size={14} className={PRIORITY_COLORS[n.priority]} />

@@ -111,9 +111,9 @@ export function ApplicationCompare({ slug, selectedIds, onClose }: ApplicationCo
                       <td key={c.id} className="px-4 py-2">
                         <span className={cn(
                           'text-sm',
-                          isFlag && val === 'hot' && 'text-red-600 font-semibold',
-                          isFlag && val === 'warm' && 'text-amber-600 font-semibold',
-                          isFlag && val === 'cold' && 'text-slate-500',
+                          isFlag && val === 'hot' && 'text-red-600 dark:text-red-400 font-semibold',
+                          isFlag && val === 'warm' && 'text-amber-600 dark:text-amber-400 font-semibold',
+                          isFlag && val === 'cold' && 'text-slate-500 dark:text-slate-400',
                         )}>
                           {display}
                         </span>
@@ -161,7 +161,7 @@ export function ApplicationCompare({ slug, selectedIds, onClose }: ApplicationCo
                       <td key={c.id} className="px-4 py-2">
                         <span className={cn(
                           'text-sm font-semibold',
-                          ratio >= 3 ? 'text-emerald-600' : ratio >= 2 ? 'text-amber-600' : 'text-red-600'
+                          ratio >= 3 ? 'text-emerald-600 dark:text-emerald-400' : ratio >= 2 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
                         )}>
                           {ratio.toFixed(1)}x
                           {ratio >= 3 && <CheckCircle2 size={11} className="inline ml-1" />}

@@ -150,7 +150,7 @@ export function TourTimeline({ status, createdAt, startsAt, googleEventId, sourc
                     event.completed ? 'bg-emerald-100 dark:bg-emerald-900/30' :
                     event.active ? 'bg-primary/10' : 'bg-muted'
                   )}>
-                    <Icon size={10} className={cn(event.completed ? 'text-emerald-600' : event.active ? 'text-primary' : 'text-muted-foreground/50')} />
+                    <Icon size={10} className={cn(event.completed ? 'text-emerald-600 dark:text-emerald-400' : event.active ? 'text-primary' : 'text-muted-foreground/50')} />
                   </div>
                   {!isLast && (
                     <div className={cn('w-px h-3', event.completed ? 'bg-emerald-300 dark:bg-emerald-700' : 'bg-border')} />

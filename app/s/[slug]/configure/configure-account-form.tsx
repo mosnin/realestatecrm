@@ -364,7 +364,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
             </>
           ) : saved ? (
             <>
-              <CheckCircle2 size={16} className="mr-2 text-green-500" />
+              <CheckCircle2 size={16} className="mr-2 text-green-500 dark:text-green-400" />
               Saved
             </>
           ) : (

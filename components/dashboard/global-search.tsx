@@ -34,9 +34,9 @@ interface TourResult {
 }
 
 const SCORE_COLORS: Record<string, string> = {
-  hot: 'text-red-600',
-  warm: 'text-amber-600',
-  cold: 'text-slate-500',
+  hot: 'text-red-600 dark:text-red-400',
+  warm: 'text-amber-600 dark:text-amber-400',
+  cold: 'text-slate-500 dark:text-slate-400',
 };
 
 interface Props {

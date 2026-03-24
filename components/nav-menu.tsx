@@ -157,7 +157,7 @@ export function NavMenu() {
             {/* Arrow */}
             <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 bg-background border-t border-l border-border" />
 
-            <div className="rounded-2xl border border-border bg-background shadow-[0_8px_40px_-8px_rgba(0,0,0,0.18)] overflow-hidden">
+            <div className="rounded-2xl border border-border bg-background shadow-[0_8px_40px_-8px_rgba(0,0,0,0.18)] dark:shadow-[0_8px_40px_-8px_rgba(0,0,0,0.45)] overflow-hidden">
               <div className="grid grid-cols-[1fr_200px]">
                 {/* Left: feature links */}
                 <div className="p-4 border-r border-border">

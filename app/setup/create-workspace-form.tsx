@@ -362,9 +362,9 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
                         {checking ? (
                           <Loader2 size={14} className="animate-spin text-muted-foreground" />
                         ) : slugAvailable === true ? (
-                          <CheckCircle2 size={14} className="text-green-500" />
+                          <CheckCircle2 size={14} className="text-green-500 dark:text-green-400" />
                         ) : slugAvailable === false ? (
-                          <span className="text-red-500 text-xs font-medium">taken</span>
+                          <span className="text-red-500 dark:text-red-400 text-xs font-medium">taken</span>
                         ) : null}
                       </div>
                     )}

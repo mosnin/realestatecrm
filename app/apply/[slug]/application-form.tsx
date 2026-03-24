@@ -467,7 +467,7 @@ export function ApplicationForm({
           transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 15 }}
           className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto"
         >
-          <CheckCircle2 size={28} className="text-green-600" />
+          <CheckCircle2 size={28} className="text-green-600 dark:text-green-400" />
         </motion.div>
         <div className="space-y-1.5">
           <h2 className="text-xl font-semibold text-foreground">Application received</h2>

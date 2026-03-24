@@ -131,7 +131,7 @@ export function FollowUpSuggestions(props: FollowUpSuggestionsProps) {
               </div>
             </div>
             {applied.has(i) ? (
-              <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium flex-shrink-0">
+              <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium flex-shrink-0">
                 <Check size={12} /> Set
               </span>
             ) : (

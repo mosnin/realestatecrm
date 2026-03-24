@@ -82,7 +82,7 @@ export default function ProfilePage() {
           </span>
         </div>
         <div className="px-6 py-5 space-y-3">
-          <code className="block text-xs bg-surface border border-border rounded-lg px-3 py-2.5 break-all text-muted-foreground">
+          <code className="block text-xs bg-muted border border-border rounded-lg px-3 py-2.5 break-all text-muted-foreground">
             {applicationUrl}
           </code>
           <div className="flex items-center gap-2">

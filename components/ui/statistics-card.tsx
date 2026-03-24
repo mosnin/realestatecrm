@@ -33,7 +33,7 @@ export function Stats() {
     <section id="problem" className="py-20 px-6 border-t border-border">
       <style>{candyBgStyle}</style>
       <div className="max-w-5xl mx-auto">
-        <div className="rounded-2xl border border-border bg-card shadow-[0_2px_12px_rgba(0,0,0,0.06)] overflow-hidden">
+        <div className="rounded-2xl border border-border bg-card shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.25)] overflow-hidden">
           <div className="grid md:grid-cols-2 gap-0">
 
             {/* Left — text */}

@@ -375,6 +375,7 @@
 /* Dark mode overrides */
 .dark .cl-socialButtonsBlockButton {
   border-color: #32353a !important;
+  color: #f1f3f5 !important;
 }
 .dark .cl-socialButtonsBlockButton:hover {
   background: #24262a !important;
@@ -407,9 +408,21 @@
   color: #9ca3af !important;
 }
 .dark .cl-identityPreview,
-.dark .cl-alternativeMethodsBlockButton,
+.dark .cl-alternativeMethodsBlockButton {
+  border-color: #32353a !important;
+  color: #f1f3f5 !important;
+}
 .dark .cl-otpCodeFieldInput {
   border-color: #32353a !important;
+  color: #f1f3f5 !important;
+  background: transparent !important;
+}
+.dark .cl-formFieldErrorText {
+  color: #f87171 !important;
+}
+.dark .cl-alert {
+  border: 1px solid rgba(248, 113, 113, 0.25) !important;
+  background: rgba(248, 113, 113, 0.08) !important;
 }
 
 /* ── Scrollbar utilities ──────────────────────────── */

@@ -415,7 +415,7 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl,
                               <MoreHorizontal size={14} />
                             </button>
                             {actionMenuId === tour.id && (
-                              <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-border bg-card shadow-lg py-1">
+                              <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-border bg-card shadow-lg dark:shadow-none py-1">
                                 {tour.status === 'scheduled' && (
                                   <button onClick={() => updateStatus(tour.id, 'confirmed')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">
                                     Confirm
@@ -566,7 +566,7 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl,
                         <MoreHorizontal size={14} />
                       </button>
                       {actionMenuId === tour.id && (
-                        <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-border bg-card shadow-lg py-1">
+                        <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-border bg-card shadow-lg dark:shadow-none py-1">
                           {tour.status === 'scheduled' && (
                             <button onClick={() => updateStatus(tour.id, 'confirmed')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">
                               Confirm

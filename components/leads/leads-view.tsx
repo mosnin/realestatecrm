@@ -652,7 +652,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                       className={cn(
                         'inline-flex items-center gap-1 text-xs font-medium rounded-md px-2 py-1 transition-colors',
                         lead.lastContactedAt
-                          ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100'
+                          ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20'
                           : 'text-muted-foreground bg-muted hover:text-foreground hover:bg-muted/80',
                       )}
                       title="Mark as contacted now"
