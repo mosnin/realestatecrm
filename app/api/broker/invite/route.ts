@@ -37,6 +37,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
   }
 
+  // Only the owner can invite admins
+  if (roleToAssign === 'broker_admin' && ctx.membership.role !== 'broker_owner') {
+    return NextResponse.json({ error: 'Only the brokerage owner can invite admins' }, { status: 403 });
+  }
+
   // 20 invitations per broker per hour
   const { allowed } = await checkRateLimit(`broker:invite:${ctx.dbUserId}`, 20, 3600);
   if (!allowed) return NextResponse.json({ error: 'Too many invitations sent. Try again in an hour.' }, { status: 429 });

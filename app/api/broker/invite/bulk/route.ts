@@ -80,6 +80,12 @@ export async function POST(req: Request) {
 
     const roleToAssign = entry.role === 'broker_admin' ? 'broker_admin' : 'realtor_member';
 
+    // Only the owner can invite admins
+    if (roleToAssign === 'broker_admin' && ctx.membership.role !== 'broker_owner') {
+      results.push({ email, status: 'error', error: 'Only the owner can invite admins' });
+      continue;
+    }
+
     // Check for existing pending invite
     const { data: existing } = await supabase
       .from('Invitation')

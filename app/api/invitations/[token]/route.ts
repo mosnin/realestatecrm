@@ -68,6 +68,17 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Invitation has expired' }, { status: 410 });
   }
 
+  // Check brokerage is still active
+  const { data: brokerage } = await supabase
+    .from('Brokerage')
+    .select('id, status')
+    .eq('id', inv.brokerageId)
+    .maybeSingle();
+  if (!brokerage) return NextResponse.json({ error: 'Brokerage not found' }, { status: 404 });
+  if (brokerage.status === 'suspended') {
+    return NextResponse.json({ error: 'This brokerage has been suspended' }, { status: 403 });
+  }
+
   // Resolve current user
   const { data: user } = await supabase
     .from('User')
