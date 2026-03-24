@@ -1,8 +1,8 @@
 export default function ApplyLoading() {
   return (
-    <div className="min-h-screen bg-[#f5f5f7] dark:bg-background">
+    <div className="min-h-screen bg-muted dark:bg-background">
       {/* Header skeleton */}
-      <header className="bg-white dark:bg-card border-b border-border">
+      <header className="bg-card border-b border-border">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14 sm:h-16">
             <div className="h-5 w-32 bg-muted rounded animate-pulse" />
@@ -19,7 +19,7 @@ export default function ApplyLoading() {
             <div className="h-7 w-48 bg-muted rounded animate-pulse" />
             <div className="h-4 w-72 bg-muted rounded animate-pulse mt-2" />
           </div>
-          <div className="rounded-xl border border-border bg-white dark:bg-card p-6 space-y-4">
+          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
             <div className="h-5 w-24 bg-muted rounded animate-pulse" />
             <div className="h-10 w-full bg-muted rounded animate-pulse" />
             <div className="h-5 w-24 bg-muted rounded animate-pulse" />

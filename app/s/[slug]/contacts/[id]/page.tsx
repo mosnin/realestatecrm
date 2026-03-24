@@ -288,7 +288,7 @@ export default async function ClientDetailPage({
                       <ul className="space-y-1.5">
                         {details.strengths.map((s) => (
                           <li key={s} className="text-xs text-muted-foreground leading-relaxed flex items-start gap-1.5">
-                            <span className="text-emerald-500 mt-0.5 flex-shrink-0">+</span>
+                            <span className="text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0">+</span>
                             {s}
                           </li>
                         ))}
@@ -303,7 +303,7 @@ export default async function ClientDetailPage({
                       <ul className="space-y-1.5">
                         {details.weaknesses.map((w) => (
                           <li key={w} className="text-xs text-muted-foreground leading-relaxed flex items-start gap-1.5">
-                            <span className="text-amber-500 mt-0.5 flex-shrink-0">-</span>
+                            <span className="text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0">-</span>
                             {w}
                           </li>
                         ))}
@@ -547,7 +547,7 @@ export default async function ClientDetailPage({
             </h2>
           </div>
           <div className="px-4 sm:px-6 py-4">
-            <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
               {contact.notes}
             </p>
           </div>
@@ -563,7 +563,7 @@ export default async function ClientDetailPage({
             </h2>
           </div>
           <div className="px-4 sm:px-6 py-4">
-            <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
               {app.additionalNotes}
             </p>
           </div>

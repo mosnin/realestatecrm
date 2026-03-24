@@ -24,9 +24,9 @@ export function PublicPageShell({
   children,
 }: PublicPageShellProps) {
   return (
-    <div className="min-h-screen bg-[#f5f5f7] dark:bg-background">
+    <div className="min-h-screen bg-muted dark:bg-background">
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <header className="bg-white dark:bg-card border-b border-border">
+      <header className="bg-card border-b border-border">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14 sm:h-16">
             {/* Left: realtor branding */}
@@ -105,9 +105,9 @@ export function PublicPageMinimalShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#f5f5f7] dark:bg-background flex flex-col">
+    <div className="min-h-screen bg-muted dark:bg-background flex flex-col">
       {/* ── Top bar ────────────────────────────────────────────────────── */}
-      <header className="bg-white dark:bg-card border-b border-border">
+      <header className="bg-card border-b border-border">
         <div className="max-w-lg mx-auto px-4">
           <div className="flex items-center justify-between h-14">
             {/* Left: business name */}

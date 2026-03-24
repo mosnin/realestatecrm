@@ -459,7 +459,7 @@ export function ApplicationForm({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-6 md:p-8 text-center space-y-5"
+        className="rounded-xl bg-card border border-border/60 shadow-sm p-6 md:p-8 text-center space-y-5"
       >
         <motion.div
           initial={{ scale: 0 }}
@@ -789,7 +789,7 @@ export function ApplicationForm({
   }
 
   return (
-    <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm overflow-hidden">
+    <div className="rounded-xl bg-card border border-border/60 shadow-sm overflow-hidden">
       {/* Progress */}
       <div className="px-5 pt-5 pb-3 space-y-3 border-b border-border/40">
         <ProgressBar current={currentStepIndex + 1} total={totalSteps} />

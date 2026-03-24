@@ -63,13 +63,13 @@ const STATUS_META = {
 };
 
 const ACTIVITY_META = {
-  note: { label: 'Note', icon: FileText, color: 'text-slate-500' },
-  call: { label: 'Call', icon: PhoneCall, color: 'text-blue-500' },
-  email: { label: 'Email', icon: Mail, color: 'text-violet-500' },
-  meeting: { label: 'Meeting', icon: Users, color: 'text-teal-500' },
-  follow_up: { label: 'Follow-up', icon: Clock, color: 'text-amber-500' },
-  stage_change: { label: 'Stage change', icon: Activity, color: 'text-indigo-500' },
-  status_change: { label: 'Status change', icon: CheckCircle2, color: 'text-green-500' },
+  note: { label: 'Note', icon: FileText, color: 'text-slate-500 dark:text-slate-400' },
+  call: { label: 'Call', icon: PhoneCall, color: 'text-blue-500 dark:text-blue-400' },
+  email: { label: 'Email', icon: Mail, color: 'text-violet-500 dark:text-violet-400' },
+  meeting: { label: 'Meeting', icon: Users, color: 'text-teal-500 dark:text-teal-400' },
+  follow_up: { label: 'Follow-up', icon: Clock, color: 'text-amber-500 dark:text-amber-400' },
+  stage_change: { label: 'Stage change', icon: Activity, color: 'text-indigo-500 dark:text-indigo-400' },
+  status_change: { label: 'Status change', icon: CheckCircle2, color: 'text-green-500 dark:text-green-400' },
 };
 
 export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealPanelProps) {

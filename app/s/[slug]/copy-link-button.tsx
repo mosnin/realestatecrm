@@ -20,7 +20,7 @@ export function CopyLinkButton({ url }: { url: string }) {
     >
       {copied ? (
         <>
-          <Check size={13} className="text-green-600" />
+          <Check size={13} className="text-green-600 dark:text-green-400" />
           <span className="text-green-700 dark:text-green-400">Copied!</span>
         </>
       ) : (

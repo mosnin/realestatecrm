@@ -41,7 +41,7 @@ export function ApplicationStatusClient({ contact, businessName }: ApplicationSt
 
   return (
     <div className="w-full max-w-md">
-      <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-6 space-y-6">
+      <div className="rounded-xl bg-card border border-border/60 shadow-sm p-6 space-y-6">
         <div className="text-center space-y-1">
           <h1 className="text-xl font-semibold">Application Status</h1>
           <p className="text-sm text-muted-foreground">

@@ -289,7 +289,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
 
         <div className="rounded-xl border border-border bg-card px-6 py-7">
           <div className="mb-6">
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-2.5 py-0.5 text-[11px] font-semibold text-primary mb-3">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary mb-3">
               {role === 'broker_only' ? <Building2 size={10} /> : role === 'broker' ? <Users size={10} /> : <UserCircle size={10} />}
               {role === 'broker_only' ? 'Broker setup' : role === 'broker' ? 'Broker + workspace setup' : 'Realtor setup'}
             </div>
