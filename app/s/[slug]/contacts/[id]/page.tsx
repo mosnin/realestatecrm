@@ -35,7 +35,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 
 
 function tierBadgeClasses(label: string) {
-  if (label === 'hot') return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400';
+  if (label === 'hot') return 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400';
   if (label === 'warm') return 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400';
   return 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400';
 }

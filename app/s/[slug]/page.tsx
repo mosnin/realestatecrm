@@ -220,7 +220,7 @@ export default async function DashboardPage({
                 {recentLeads.map((lead) => {
                   const isNew = lead.tags.includes('new-lead');
                   const scoreBadge =
-                    lead.scoreLabel === 'hot'  ? { label: 'Hot',  cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', barCls: 'bg-emerald-500' } :
+                    lead.scoreLabel === 'hot'  ? { label: 'Hot',  cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', barCls: 'bg-red-500' } :
                     lead.scoreLabel === 'warm' ? { label: 'Warm', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', barCls: 'bg-amber-500' } :
                     lead.scoreLabel === 'cold' ? { label: 'Cold', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-400', barCls: 'bg-slate-400' } :
                     null;

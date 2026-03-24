@@ -109,7 +109,7 @@ export function TourPrepCard({ tourId }: TourPrepCardProps) {
                   <span className="text-lg font-bold tabular-nums">{Math.round(prep.scoreInfo.score)}</span>
                   <span className={cn(
                     'text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full',
-                    prep.scoreInfo.label === 'hot' ? 'bg-emerald-100 text-emerald-700' :
+                    prep.scoreInfo.label === 'hot' ? 'bg-red-100 text-red-700' :
                     prep.scoreInfo.label === 'warm' ? 'bg-amber-100 text-amber-700' :
                     'bg-slate-100 text-slate-600'
                   )}>

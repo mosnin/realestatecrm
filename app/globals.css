@@ -343,9 +343,7 @@
   font-size: 0.875rem !important;
 }
 .cl-footer {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
+  display: none !important;
 }
 .cl-identityPreview {
   border: 1px solid #d4d4d4 !important;

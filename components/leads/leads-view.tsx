@@ -501,7 +501,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                 className={cn(
                   'rounded-lg border bg-card overflow-hidden transition-all duration-150 hover:shadow-md',
                   isSelected ? 'border-primary/40 bg-primary/5' :
-                  tierKey === 'hot' ? 'border-emerald-200/80 dark:border-emerald-800/50' :
+                  tierKey === 'hot' ? 'border-red-200/80 dark:border-red-800/50' :
                   tierKey === 'warm' ? 'border-amber-200/80 dark:border-amber-800/50' :
                   'border-border',
                 )}

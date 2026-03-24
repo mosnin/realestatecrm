@@ -111,7 +111,7 @@ export function ApplicationCompare({ slug, selectedIds, onClose }: ApplicationCo
                       <td key={c.id} className="px-4 py-2">
                         <span className={cn(
                           'text-sm',
-                          isFlag && val === 'hot' && 'text-emerald-600 font-semibold',
+                          isFlag && val === 'hot' && 'text-red-600 font-semibold',
                           isFlag && val === 'warm' && 'text-amber-600 font-semibold',
                           isFlag && val === 'cold' && 'text-slate-500',
                         )}>
