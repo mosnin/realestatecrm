@@ -20,7 +20,7 @@ export default async function DashboardLayout({
   const { userId } = await auth();
 
   if (!userId) {
-    return null;
+    redirect('/login/realtor');
   }
 
   // Gate: user must exist in our DB. On DB error, render error UI

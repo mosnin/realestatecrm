@@ -8,7 +8,7 @@ export const metadata = { title: 'Create your workspace — Chippi' };
 
 export default async function SetupPage() {
   const { userId } = await auth();
-  if (!userId) redirect('/sign-in');
+  if (!userId) redirect('/login/realtor');
 
   // On DB error: render error UI. NEVER .catch(() => null) (shows create-workspace
   // form to users who already have one). NEVER throw (generic "Application error").

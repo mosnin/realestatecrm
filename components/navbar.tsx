@@ -113,7 +113,7 @@ export function Navbar() {
               <div className="flex items-center space-x-2">
                 <Link
                   className="hidden h-8 w-fit items-center justify-center rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground md:flex"
-                  href="/sign-in"
+                  href="/login/realtor"
                 >
                   Log in
                 </Link>
@@ -253,7 +253,7 @@ export function Navbar() {
 
                 <div className="flex flex-col gap-2">
                   <Link
-                    href="/sign-in"
+                    href="/login/realtor"
                     className="flex h-8 w-full items-center justify-center rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground transition-all ease-out active:scale-95"
                   >
                     Log in

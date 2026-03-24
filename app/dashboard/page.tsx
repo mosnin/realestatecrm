@@ -5,7 +5,7 @@ import { ensureOnboardingBackfill } from '@/lib/onboarding';
 
 export default async function DashboardRedirectPage() {
   const { userId } = await auth();
-  if (!userId) redirect('/sign-in');
+  if (!userId) redirect('/login/realtor');
 
   // On DB error: render an error UI instead of throwing (avoids generic
   // "Application error" page) and instead of .catch(() => null) (avoids

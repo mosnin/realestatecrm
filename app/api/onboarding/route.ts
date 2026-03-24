@@ -272,59 +272,70 @@ export async function POST(req: NextRequest) {
         { name: 'Declined', color: '#ef4444', position: 5 }
       ];
 
-      let newSpace: Space;
-      try {
-        const spaceId = crypto.randomUUID();
-        const settingsId = crypto.randomUUID();
-        const stagesJson = DEFAULT_STAGES.map((stage) => ({
-          id: crypto.randomUUID(),
-          name: stage.name,
-          color: stage.color,
-          position: stage.position,
-        }));
+      // Direct inserts instead of RPC — avoids UUID/TEXT type mismatch issues
+      // and works without requiring the migration to be deployed first.
+      const spaceId = crypto.randomUUID();
+      const settingsId = crypto.randomUUID();
 
-        // Atomic creation: space + settings + default stages in one transaction
-        const { error: rpcError } = await supabase.rpc('create_space_with_defaults', {
-          p_space_id: spaceId,
-          p_slug: sanitized,
-          p_name: businessName || sanitized,
-          p_emoji: '\u{1F3E0}',
-          p_owner_id: user.id,
-          p_settings_id: settingsId,
-          p_intake_title: intakePageTitle || 'Rental Application',
-          p_intake_intro: intakePageIntro || "Share a few details so I can review your rental fit faster.",
-          p_business_name: businessName || '',
-          p_stages: JSON.stringify(stagesJson),
-        });
-        if (rpcError) throw rpcError;
+      // 1. Create the Space
+      const { data: createdSpace, error: spaceInsertErr } = await supabase
+        .from('Space')
+        .insert({
+          id: spaceId,
+          slug: sanitized,
+          name: businessName || sanitized,
+          emoji: '\u{1F3E0}',
+          ownerId: user.id,
+        })
+        .select()
+        .single();
 
-        const { data: createdSpace, error: fetchError } = await supabase
-          .from('Space')
-          .select('*')
-          .eq('id', spaceId)
-          .single();
-        if (fetchError) throw fetchError;
-        newSpace = createdSpace as Space;
-      } catch (rpcErr: unknown) {
-        // Check if the user already owns a space (race with another tab/request)
-        const { data: ownerSpace, error: ownerSpaceError } = await supabase
-          .from('Space')
-          .select('slug')
-          .eq('ownerId', user.id)
-          .maybeSingle();
-        if (!ownerSpaceError && ownerSpace) return NextResponse.json({ success: true, slug: ownerSpace.slug });
+      if (spaceInsertErr) {
+        // Check if user already owns a space (race condition)
+        const { data: ownerSpace } = await supabase
+          .from('Space').select('slug').eq('ownerId', user.id).maybeSingle();
+        if (ownerSpace) return NextResponse.json({ success: true, slug: ownerSpace.slug });
 
-        // Only return "slug taken" if it's actually a unique constraint violation
-        const errMsg = rpcErr instanceof Error ? rpcErr.message : String(rpcErr ?? '');
-        const isUniqueViolation = errMsg.includes('duplicate key') || errMsg.includes('unique constraint') || errMsg.includes('23505');
-        if (isUniqueViolation) {
+        const errMsg = spaceInsertErr.message || '';
+        if (errMsg.includes('duplicate key') || errMsg.includes('unique') || spaceInsertErr.code === '23505') {
           return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
         }
-
-        // For any other error, return a generic 500 so the user isn't misled
-        console.error('[onboarding] create_space RPC failed:', rpcErr);
+        console.error('[onboarding] Space insert failed:', spaceInsertErr);
         return NextResponse.json({ error: 'Failed to create workspace. Please try again.' }, { status: 500 });
       }
+
+      // 2. Create SpaceSetting
+      const { error: settingsInsertErr } = await supabase
+        .from('SpaceSetting')
+        .insert({
+          id: settingsId,
+          spaceId,
+          intakePageTitle: intakePageTitle || 'Rental Application',
+          intakePageIntro: intakePageIntro || "Share a few details so I can review your rental fit faster.",
+          businessName: businessName || '',
+          ...(logoUrl !== undefined && { logoUrl }),
+          ...(realtorPhotoUrl !== undefined && { realtorPhotoUrl }),
+        });
+      if (settingsInsertErr) {
+        console.error('[onboarding] SpaceSetting insert failed:', settingsInsertErr);
+        // Space was created — don't fail the whole flow for settings
+      }
+
+      // 3. Create default deal stages
+      const stageRows = DEFAULT_STAGES.map((stage) => ({
+        id: crypto.randomUUID(),
+        spaceId,
+        name: stage.name,
+        color: stage.color,
+        position: stage.position,
+      }));
+      const { error: stagesErr } = await supabase.from('DealStage').insert(stageRows);
+      if (stagesErr) {
+        console.error('[onboarding] DealStage insert failed:', stagesErr);
+        // Non-fatal — stages can be created later
+      }
+
+      const newSpace = createdSpace as Space;
 
       const { error: stepError } = await supabase
         .from('User')

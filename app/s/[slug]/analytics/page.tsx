@@ -47,7 +47,7 @@ export default async function AnalyticsPage({
 }) {
   const { slug } = await params;
   const { userId } = await auth();
-  if (!userId) redirect('/sign-in');
+  if (!userId) redirect('/login/realtor');
 
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();

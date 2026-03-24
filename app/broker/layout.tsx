@@ -11,7 +11,7 @@ export const metadata = { title: 'Broker Dashboard — Chippi' };
 
 export default async function BrokerLayout({ children }: { children: React.ReactNode }) {
   const { userId } = await auth();
-  if (!userId) redirect('/sign-in');
+  if (!userId) redirect('/login/realtor');
 
   const ctx = await getBrokerContext();
 

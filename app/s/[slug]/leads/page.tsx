@@ -13,7 +13,7 @@ export default async function LeadsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { userId } = await auth();
-  if (!userId) redirect('/sign-in');
+  if (!userId) redirect('/login/realtor');
 
   const { slug } = await params;
   const space = await getSpaceFromSlug(slug);

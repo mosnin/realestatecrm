@@ -14,7 +14,7 @@ export const metadata = { title: 'Brokerage — Chippi' };
  */
 export default async function BrokeragePage() {
   const { userId } = await auth();
-  if (!userId) redirect('/sign-in');
+  if (!userId) redirect('/login/realtor');
 
   const { data: user } = await supabase
     .from('User')
