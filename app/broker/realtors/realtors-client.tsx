@@ -152,19 +152,18 @@ export function RealtorsClient({ realtors }: { realtors: RealtorRow[] }) {
 
   return (
     <div className="space-y-4">
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-2 justify-between">
-        {/* Search + Sort pills */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {/* Search */}
-          <div className="relative mr-1">
+      {/* Controls — stacks on mobile */}
+      <div className="space-y-3">
+        {/* Row 1: Search + Status filter + View toggle */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 sm:flex-initial sm:w-52">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search realtors…"
-              className="h-8 w-44 rounded-lg border border-border bg-muted/60 pl-8 pr-7 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background transition-colors"
+              className="h-9 w-full rounded-lg border border-border bg-muted/60 pl-8 pr-7 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background transition-colors"
             />
             {searchQuery && (
               <button
@@ -172,24 +171,16 @@ export function RealtorsClient({ realtors }: { realtors: RealtorRow[] }) {
                 onClick={() => setSearchQuery('')}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
-                <X size={12} />
+                <X size={14} />
               </button>
             )}
           </div>
-          <span className="text-xs text-muted-foreground font-medium mr-0.5">Sort:</span>
-          {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-            <SortButton key={k} col={k} current={sortKey} dir={sortDir} onSort={handleSort} />
-          ))}
-        </div>
-
-        {/* Status filter + view toggle */}
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium">
+          <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium flex-shrink-0">
             {(['all', 'active', 'pending'] as StatusFilter[]).map((f) => (
               <button
                 key={f}
                 onClick={() => setStatusFilter(f)}
-                className={`px-3 py-1.5 transition-colors ${
+                className={`px-2.5 sm:px-3 py-1.5 transition-colors ${
                   statusFilter === f
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted'
@@ -199,20 +190,30 @@ export function RealtorsClient({ realtors }: { realtors: RealtorRow[] }) {
               </button>
             ))}
           </div>
-          <div className="flex rounded-lg border border-border overflow-hidden">
+          <div className="flex rounded-lg border border-border overflow-hidden flex-shrink-0">
             <button
               onClick={() => setView('cards')}
               className={`p-1.5 transition-colors ${view === 'cards' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}
+              title="Card view"
             >
               <LayoutGrid size={14} />
             </button>
             <button
               onClick={() => setView('table')}
               className={`p-1.5 transition-colors ${view === 'table' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}
+              title="Table view"
             >
               <List size={14} />
             </button>
           </div>
+        </div>
+
+        {/* Row 2: Sort pills — scrollable on mobile */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 -mb-0.5">
+          <span className="text-xs text-muted-foreground font-medium mr-0.5 flex-shrink-0">Sort:</span>
+          {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+            <SortButton key={k} col={k} current={sortKey} dir={sortDir} onSort={handleSort} />
+          ))}
         </div>
       </div>
 

@@ -79,21 +79,21 @@ export default async function BrokerMembersPage() {
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 text-right">
                         <div className="hidden sm:block text-right">
-                          <p className="text-[10px] text-muted-foreground">Joined {joinedAt}</p>
+                          <p className="text-xs text-muted-foreground">Joined {joinedAt}</p>
                           {m.Space?.slug && (
-                            <p className="text-[10px] text-primary font-medium">/{m.Space.slug}</p>
+                            <p className="text-xs text-primary font-medium">/{m.Space.slug}</p>
                           )}
                         </div>
-                        <span className="hidden sm:inline-flex text-[10px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                        <span className="hidden sm:inline-flex text-xs font-medium text-muted-foreground bg-muted rounded-full px-2.5 py-0.5">
                           {roleLabel(m.role)}
                         </span>
                         {user?.onboard ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
-                            <CheckCircle2 size={10} /> Active
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
+                            <CheckCircle2 size={11} /> Active
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
-                            <AlertCircle size={10} /> Pending
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
+                            <AlertCircle size={11} /> Pending
                           </span>
                         )}
                         {m.role !== 'broker_owner' && (ctx.membership.role === 'broker_owner' || (ctx.membership.role === 'broker_admin' && m.role !== 'broker_admin')) && (

@@ -176,32 +176,30 @@ export default async function BrokerOverviewPage() {
         hasSettings={hasSettings}
       />
 
-      {/* ── Summary stats (matching realtor dashboard 6-col pattern) ── */}
+      {/* ── Summary stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: 'Team size', value: members.length, sub: `${activeMembers} active`, icon: Users, accent: false, href: '/broker/members' },
-          { label: 'New leads', value: totalLeads, sub: 'across team', icon: PhoneIncoming, accent: totalLeads > 0, href: '/broker/realtors' },
-          { label: 'Applications', value: totalApplications, sub: 'submitted', icon: FileText, accent: false, href: '/broker/realtors' },
-          { label: 'Active deals', value: totalDeals, sub: formatCompact(totalPipeline), icon: Briefcase, accent: false, href: '/broker/realtors' },
-          { label: 'Won deals', value: wonDeals.length, sub: formatCompact(totalWonValue), icon: CheckCircle2, accent: wonDeals.length > 0, href: '/broker/realtors' },
-          { label: 'Invitations', value: pendingInvitations.length, sub: pendingInvitations.length > 0 ? 'pending' : 'none', icon: Mail, accent: pendingInvitations.length > 0, href: '/broker/invitations' },
-        ].map(({ label, value, sub, icon: Icon, accent, href }) => (
+          { label: 'Team size', value: members.length, sub: `${activeMembers} active`, icon: Users, color: '', href: '/broker/members' },
+          { label: 'New leads', value: totalLeads, sub: 'across team', icon: PhoneIncoming, color: totalLeads > 0 ? 'text-violet-600 dark:text-violet-400' : '', href: '/broker/realtors' },
+          { label: 'Applications', value: totalApplications, sub: 'submitted', icon: FileText, color: totalApplications > 0 ? 'text-amber-600 dark:text-amber-400' : '', href: '/broker/realtors' },
+          { label: 'Active deals', value: totalDeals, sub: formatCompact(totalPipeline), icon: Briefcase, color: totalDeals > 0 ? 'text-cyan-600 dark:text-cyan-400' : '', href: '/broker/realtors' },
+          { label: 'Won deals', value: wonDeals.length, sub: formatCompact(totalWonValue), icon: CheckCircle2, color: wonDeals.length > 0 ? 'text-emerald-600 dark:text-emerald-400' : '', href: '/broker/realtors' },
+          { label: 'Invitations', value: pendingInvitations.length, sub: pendingInvitations.length > 0 ? 'pending' : 'none', icon: Mail, color: pendingInvitations.length > 0 ? 'text-primary' : '', href: '/broker/invitations' },
+        ].map(({ label, value, sub, icon: Icon, color, href }) => (
           <Link key={label} href={href}>
-            <Card className={`transition-shadow hover:shadow-md ${accent ? 'border-primary/30 bg-primary/5' : ''}`}>
+            <Card className="transition-all hover:shadow-md hover:border-primary/20 group">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${accent ? 'bg-primary/10' : 'bg-muted'}`}>
-                    <Icon size={16} className={accent ? 'text-primary' : 'text-muted-foreground'} />
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color ? 'bg-current/8' : 'bg-muted'}`}>
+                    <Icon size={16} className={color || 'text-muted-foreground'} />
                   </div>
-                  {accent && value > 0 && (
-                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                  )}
+                  <ArrowRight size={12} className="text-muted-foreground/0 group-hover:text-muted-foreground/60 transition-colors" />
                 </div>
-                <p className={`text-2xl font-bold tabular-nums leading-tight ${accent ? 'text-primary' : 'text-foreground'}`}>
+                <p className={`text-2xl font-bold tabular-nums leading-tight ${color || 'text-foreground'}`}>
                   {value}
                 </p>
-                <p className="text-[11px] text-muted-foreground mt-1 leading-tight">{label}</p>
-                <p className="text-[10px] text-muted-foreground/70">{sub}</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-tight">{label}</p>
+                <p className="text-xs text-muted-foreground/60">{sub}</p>
               </CardContent>
             </Card>
           </Link>
@@ -211,56 +209,57 @@ export default async function BrokerOverviewPage() {
       {/* ── Conversion Funnel ── */}
       {(totalLeads > 0 || totalApplications > 0 || totalDeals > 0) && (
         <Card>
-          <CardContent className="px-5 py-4">
+          <CardContent className="px-4 sm:px-5 py-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Conversion Funnel</p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {/* Leads */}
               <div className="flex-1 text-center">
-                <div className="h-10 rounded-lg bg-violet-500/15 flex items-center justify-center">
+                <div className="h-11 rounded-lg bg-violet-500/15 flex items-center justify-center">
                   <span className="text-sm font-bold text-violet-600 dark:text-violet-400 tabular-nums">{totalLeads}</span>
                 </div>
-                <p className="text-[10px] font-medium text-muted-foreground mt-1.5">Leads</p>
+                <p className="text-xs font-medium text-muted-foreground mt-1.5">Leads</p>
               </div>
 
               {/* Arrow + rate */}
-              <div className="flex flex-col items-center gap-0.5 px-1">
+              <div className="flex flex-col items-center gap-0.5 px-0.5 sm:px-1">
                 <ArrowRight size={12} className="text-muted-foreground/40" />
-                <span className="text-[9px] font-semibold text-muted-foreground tabular-nums">{leadsToApps}%</span>
+                <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">{leadsToApps}%</span>
               </div>
 
               {/* Applications */}
               <div className="flex-1 text-center">
-                <div className="h-10 rounded-lg bg-amber-500/15 flex items-center justify-center">
+                <div className="h-11 rounded-lg bg-amber-500/15 flex items-center justify-center">
                   <span className="text-sm font-bold text-amber-600 dark:text-amber-400 tabular-nums">{totalApplications}</span>
                 </div>
-                <p className="text-[10px] font-medium text-muted-foreground mt-1.5">Applications</p>
+                <p className="text-xs font-medium text-muted-foreground mt-1.5 hidden sm:block">Applications</p>
+                <p className="text-xs font-medium text-muted-foreground mt-1.5 sm:hidden">Apps</p>
               </div>
 
               {/* Arrow + rate */}
-              <div className="flex flex-col items-center gap-0.5 px-1">
+              <div className="flex flex-col items-center gap-0.5 px-0.5 sm:px-1">
                 <ArrowRight size={12} className="text-muted-foreground/40" />
-                <span className="text-[9px] font-semibold text-muted-foreground tabular-nums">{appsToDeals}%</span>
+                <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">{appsToDeals}%</span>
               </div>
 
               {/* Deals */}
               <div className="flex-1 text-center">
-                <div className="h-10 rounded-lg bg-cyan-500/15 flex items-center justify-center">
+                <div className="h-11 rounded-lg bg-cyan-500/15 flex items-center justify-center">
                   <span className="text-sm font-bold text-cyan-600 dark:text-cyan-400 tabular-nums">{totalDeals}</span>
                 </div>
-                <p className="text-[10px] font-medium text-muted-foreground mt-1.5">Deals</p>
+                <p className="text-xs font-medium text-muted-foreground mt-1.5">Deals</p>
               </div>
 
-              {/* Arrow + rate */}
-              <div className="flex flex-col items-center gap-0.5 px-1">
+              {/* Arrow */}
+              <div className="flex flex-col items-center gap-0.5 px-0.5 sm:px-1">
                 <ArrowRight size={12} className="text-muted-foreground/40" />
               </div>
 
               {/* Won value */}
               <div className="flex-1 text-center">
-                <div className="h-10 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+                <div className="h-11 rounded-lg bg-emerald-500/15 flex items-center justify-center">
                   <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{formatCompact(totalWonValue)}</span>
                 </div>
-                <p className="text-[10px] font-medium text-muted-foreground mt-1.5">Closed</p>
+                <p className="text-xs font-medium text-muted-foreground mt-1.5">Closed</p>
               </div>
             </div>
           </CardContent>
@@ -324,36 +323,36 @@ export default async function BrokerOverviewPage() {
 
                       return (
                         <tr key={m.id} className="hover:bg-muted/30 transition-colors group">
-                          <td className="px-4 py-3">
+                          <td className="px-3 sm:px-4 py-3">
                             <Link href={`/broker/realtors/${m.userId}`} className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-semibold text-primary flex-shrink-0">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
                                 {initials}
                               </div>
                               <div className="min-w-0">
-                                <p className="font-medium text-xs truncate group-hover:text-primary transition-colors">{user?.name ?? 'No name'}</p>
-                                <p className="text-[11px] text-muted-foreground truncate">{user?.email}</p>
+                                <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{user?.name ?? 'No name'}</p>
+                                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                               </div>
                             </Link>
                           </td>
-                          <td className="px-4 py-3 hidden sm:table-cell">
-                            <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                          <td className="px-3 sm:px-4 py-3 hidden sm:table-cell">
+                            <span className="text-xs font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
                               {roleLabel(m.role)}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right tabular-nums text-xs font-semibold">{leads}</td>
-                          <td className="px-4 py-3 text-right tabular-nums text-xs hidden md:table-cell">{apps}</td>
-                          <td className="px-4 py-3 text-right tabular-nums text-xs font-semibold">{deals}</td>
-                          <td className="px-4 py-3 text-right tabular-nums text-xs hidden sm:table-cell">
+                          <td className="px-3 sm:px-4 py-3 text-right tabular-nums text-xs font-semibold">{leads}</td>
+                          <td className="px-3 sm:px-4 py-3 text-right tabular-nums text-xs hidden md:table-cell">{apps}</td>
+                          <td className="px-3 sm:px-4 py-3 text-right tabular-nums text-xs font-semibold">{deals}</td>
+                          <td className="px-3 sm:px-4 py-3 text-right tabular-nums text-xs hidden sm:table-cell">
                             {formatCompact(pipeline)}
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-3 sm:px-4 py-3 text-right">
                             {user?.onboard ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
-                                <CheckCircle2 size={9} /> Active
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
+                                <CheckCircle2 size={11} /> Active
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
-                                <AlertCircle size={9} /> Pending
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
+                                <AlertCircle size={11} /> Pending
                               </span>
                             )}
                           </td>
