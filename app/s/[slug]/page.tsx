@@ -175,7 +175,7 @@ export default async function DashboardPage({
           title="Intake link"
           description="Receive renter applications"
           url={intakeUrl}
-          previewHref={intakeUrl}
+          previewHref={`/apply/${space.slug}`}
         />
         <ShareLinkCard
           icon={CalendarDays}

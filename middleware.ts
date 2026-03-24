@@ -23,13 +23,28 @@ const isAdminRoute = createRouteMatcher([
   '/api/admin(.*)'
 ]);
 
+// Public-facing pages that never need auth — skip the Clerk session
+// lookup entirely so these routes aren't blocked by the auth round-trip.
+const isFullyPublicRoute = createRouteMatcher([
+  '/apply/(.*)',
+  '/book/(.*)',
+  '/status/(.*)',
+]);
+
 // Routes that should NEVER be passed as redirect_url after login.
 // Only actual dashboard pages (/s/...) are valid post-login destinations.
 const SAFE_REDIRECT_PREFIXES = ['/s/', '/broker', '/admin'];
 
 export default clerkMiddleware(async (auth, request) => {
-  const session = await auth();
   const { pathname } = request.nextUrl;
+
+  // Fast-path: public-facing pages skip the Clerk auth() call entirely.
+  // This avoids an external API round-trip that adds seconds to page load.
+  if (isFullyPublicRoute(request)) {
+    return NextResponse.next();
+  }
+
+  const session = await auth();
 
   // `/` → send everyone to the right place immediately.
   if (pathname === '/') {
