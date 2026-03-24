@@ -1,288 +1,161 @@
 # Chippi
 
-Primary orientation document for humans and AI agents working in this repository.
+Real estate CRM and lead management platform for realtors and brokerages.
 
 ---
 
-## 1) Project overview
+## What is Chippi?
 
-Chippi is a self-serve SaaS for U.S. realtors focused on faster lead handling through:
-- intake
-- qualification
-- follow-up
-- lightweight CRM workflows
-- a polished, professional brand experience
+Chippi is a SaaS platform that helps realtors capture, qualify, and manage rental leads through a streamlined workflow. It combines a public-facing intake form, AI-powered lead scoring, a full CRM pipeline, tour scheduling, and brokerage team management into a single product.
 
-### Who it is for (current focus)
-- **Primary user now:** brand-new solo realtors in the U.S. handling renter/leasing leads.
-- **Later users (future direction):** established realtors, small teams, and brokerage-driven expansion.
+### Key features
 
-### Problem Chippi solves
-Most new realtors handle leasing leads across DMs, texts, forms, and spreadsheets. Chippi compresses this into one structured workflow so leads can be qualified and acted on faster.
+- **Public intake forms** — Custom-branded application pages for prospects to submit rental applications
+- **AI lead scoring** — Automatic lead qualification using GPT-4o-mini with score, tier (hot/warm/cold), and actionable summaries
+- **CRM pipeline** — Kanban-style deal management with customizable stages, drag-and-drop, and contact linking
+- **Tour scheduling** — Public booking page, calendar integration, automated confirmations/reminders
+- **Brokerage management** — Multi-user team dashboards, invite system, performance tracking across realtors
+- **AI assistant** — Context-aware chat with RAG-enriched vector search across contacts and deals
+- **Notifications** — Email (Resend) and SMS (Telnyx) notifications for leads, tours, deals, and follow-ups
+- **Analytics** — Weekly trends, conversion funnels, and team performance metrics
 
-### Current wedge (important)
-Chippi is **not** currently positioned as a broad CRM-first platform.
-The launch wedge is:
-- renter/leasing lead qualification
-- speed to qualification clarity
-- fast follow-up from a focused command center
+### Who it's for
+
+- **Solo realtors** handling leasing and rental leads
+- **Small teams** and brokerages managing multiple realtors
+- **Broker-only users** overseeing team performance without a personal workspace
 
 ---
 
-## 2) Current product scope (what exists now)
+## Tech stack
 
-What the app is trying to do right now:
-1. Realtor signs up with Clerk.
-2. Realtor completes onboarding.
-3. Realtor gets a slug workspace and public intake link.
-4. Prospect submits a structured rental application.
-5. Submission is saved as a contact/lead in CRM.
-6. Lead is scored (OpenAI-based scoring + summary).
-7. Realtor triages and follows up in Leads/Contacts/Deals views.
-8. Realtor can use AI assistant with optional RAG context.
-
-What is present in code today:
-- onboarding wizard and onboarding API
-- public intake form + submission API
-- CRM surfaces (overview, leads, contacts, deals kanban)
-- lead scoring on intake submission
-- AI assistant route + message persistence
-- workspace settings and profile pages
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 15 (App Router) |
+| Language | TypeScript |
+| UI | React 19, Tailwind CSS 4, shadcn/ui components |
+| Auth | Clerk |
+| Database | PostgreSQL via Supabase |
+| AI | OpenAI (scoring + embeddings), Anthropic (assistant fallback) |
+| Vector search | Supabase pgvector |
+| Email | Resend |
+| SMS | Telnyx |
+| Cache | Upstash Redis |
+| Deployment | Vercel |
 
 ---
 
-## 3) Core workflows
+## Project structure
 
-### A) User onboarding
-- Route: `/onboarding`
-- Multi-step onboarding persists progress and creates the user’s workspace (`Space`) + default stages.
-- Completion gate redirects users into `/s/[slug]` workspace.
-
-### B) Intake link creation
-- Intake link is generated from workspace/slug.
-- Public intake URL pattern: `/apply/[slug]`.
-- Intake page title/intro can be customized via `SpaceSetting`.
-
-### C) Prospect application flow
-- Prospect submits a structured application form (name/phone required, plus budget/timeline/areas/notes).
-- Submission is written as a `Contact` tagged as intake-generated.
-- Duplicate short-window protection exists for rapid repeat submits.
-
-### D) CRM lead handling
-- Leads view shows intake submissions and freshness/new markers.
-- Contacts view supports lifecycle-like stages (`QUALIFICATION`, `TOUR`, `APPLICATION`).
-- Deals uses a kanban model with configurable stages and drag/reorder APIs.
-
-### E) Scoring and AI assistance
-- On intake submission, lead scoring runs via OpenAI and stores:
-  - `leadScore`
-  - `scoreLabel`
-  - `scoreSummary`
-  - `scoringStatus`
-- AI assistant route supports streaming responses and can pull vector context when embeddings/Zilliz are configured.
-
----
-
-## 4) Repository architecture overview
-
-### Stack (actual repo)
-- **Framework:** Next.js 15 App Router
-- **Language:** TypeScript
-- **UI:** React 19 + Tailwind + Radix/shadcn-style components
-- **Auth:** Clerk
-- **Database:** PostgreSQL via Prisma
-- **AI providers:** OpenAI + Anthropic SDKs
-- **Vector search:** Zilliz/Milvus SDK
-- **Cache/legacy tenant metadata:** Upstash Redis
-- **Deployment target:** Vercel-style setup
-
-### Major directories
-- `app/` – App Router pages, layouts, and API routes
-- `components/` – UI and feature components (dashboard, leads, deals, AI, etc.)
-- `lib/` – data/access logic (`db`, scoring, AI, vector, redis, utils)
-- `prisma/` – schema and migrations
-- `scripts/` – build/deploy helper scripts for migrations/prisma shim
-
-### Main systems and where logic lives
-- **Onboarding**: `app/onboarding/*`, `app/api/onboarding/route.ts`
-- **Public application intake**: `app/apply/[slug]/*`, `app/api/public/apply/route.ts`
-- **CRM APIs**: `app/api/contacts/*`, `app/api/deals/*`, `app/api/stages/*`
-- **AI assistant**: `app/api/ai/chat/route.ts`, `lib/ai.ts`
-- **Lead scoring**: `lib/lead-scoring.ts` (called by public apply API)
-- **Vector sync/search**: `lib/embeddings.ts`, `lib/zilliz.ts`, `lib/vectorize.ts`, `app/api/vectorize/sync/route.ts`
-- **Auth middleware**: `middleware.ts`
-- **Data model**: `prisma/schema.prisma`
-
-### Data flow (high level)
-1. Clerk user auth/session established.
-2. Onboarding creates `User` + `Space` + default `DealStage` records.
-3. Public intake creates `Contact` under `Space`.
-4. Scoring result written back to `Contact`.
-5. CRM UI reads from APIs/Prisma-backed routes.
-6. Optional vector sync enables RAG context for AI assistant.
+```
+app/                    # Next.js App Router pages, layouts, API routes
+  (auth)/               # Sign-in, sign-up, login pages
+  s/[slug]/             # Workspace pages (dashboard, leads, contacts, deals, tours, settings)
+  broker/               # Brokerage management pages
+  setup/                # Onboarding and workspace creation
+  api/                  # API routes (contacts, deals, tours, onboarding, AI, etc.)
+components/             # UI and feature components
+  ui/                   # Base shadcn/ui components
+  dashboard/            # Dashboard widgets (header, sidebar, notification center)
+  deals/                # Kanban board, deal forms
+  broker/               # Brokerage-specific components
+  auth/                 # Auth page layout, onboarding flow
+lib/                    # Core business logic
+  email.ts              # Resend email templates (leads, deals, invitations, digests)
+  tour-emails.ts        # Tour confirmation, reminder, follow-up emails
+  sms.ts                # Telnyx SMS integration
+  notify.ts             # Unified notification dispatcher (email + SMS)
+  lead-scoring.ts       # AI lead scoring via OpenAI
+  ai.ts                 # AI assistant with provider fallback
+  supabase.ts           # Supabase client
+  permissions.ts        # Auth helpers and broker context
+supabase/
+  schema.sql            # Database schema and migrations
+docs/framework/         # Design system documentation (tokens, components, archetypes)
+```
 
 ---
 
-## 5) Environment and services
-
-### Confirmed integrations in code
-- **Clerk** – authentication and identity.
-- **PostgreSQL (Neon-compatible)** – primary app database through `DATABASE_URL`.
-- **OpenAI** – lead scoring and embeddings.
-- **Anthropic (optional per-space key + env fallback)** – AI assistant provider.
-- **Zilliz/Milvus** – vector storage/search for assistant context.
-- **Upstash Redis** – slug/admin metadata path still present.
-- **Vercel Analytics / Speed Insights** – frontend telemetry packages.
-
-### Billing
-- Marketing/pricing copy for `$97/mo` and `7-day free trial` exists.
-- **Stripe billing implementation is not confirmed in current codebase** (no Stripe package or API routes found).
-
-### Environment variables currently implied by code
-- `DATABASE_URL`
-- `KV_REST_API_URL`
-- `KV_REST_API_TOKEN`
-- `OPENAI_API_KEY`
-- `ANTHROPIC_API_KEY` (optional global fallback)
-- `ZILLIZ_URI`
-- `ZILLIZ_TOKEN`
-- `NEXT_PUBLIC_ROOT_DOMAIN`
-
-Unknown/not yet confirmed:
-- Dedicated `.env.example` file is not present in this repo.
-- Neon-specific setup docs are not explicitly documented in repo files.
-
----
-
-## 6) Setup and local development
+## Getting started
 
 ### Prerequisites
-- Node.js 18+
-- pnpm (repo is pnpm-based)
-- PostgreSQL database reachable via `DATABASE_URL`
-- Clerk/OpenAI/etc. credentials depending on features you run
 
-### Install
+- Node.js 18+
+- pnpm
+- Supabase project (or PostgreSQL database)
+- Clerk account for authentication
+
+### Environment setup
+
+Copy `.env.example` to `.env.local` and fill in your credentials:
+
+```bash
+cp .env.example .env.local
+```
+
+Required variables:
+- `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` — Supabase connection
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY` — Clerk auth
+- `OPENAI_API_KEY` — Lead scoring and embeddings
+
+Optional:
+- `RESEND_API_KEY` + `RESEND_FROM_EMAIL` — Email notifications
+- `TELNYX_API_KEY` + `TELNYX_FROM_NUMBER` — SMS notifications
+- `ANTHROPIC_API_KEY` — AI assistant fallback
+
+See [ENVIRONMENT.md](./ENVIRONMENT.md) for the full reference.
+
+### Install and run
+
 ```bash
 pnpm install
-```
-
-### Run dev server
-```bash
 pnpm dev
 ```
 
-### Build
+### Database setup
+
+1. Create a Supabase project
+2. Enable the pgvector extension (Database > Extensions > search "vector")
+3. Run `supabase/schema.sql` in the SQL editor
+
+### Build for production
+
 ```bash
 pnpm build
-```
-
-Build runs:
-1. migration resolution helper
-2. `prisma migrate deploy`
-3. prisma client shim helper
-4. Next build
-
-### Start production mode locally
-```bash
 pnpm start
 ```
 
 ---
 
-## 7) Protected systems and change rules (MANDATORY)
+## Core workflows
 
-For all contributors and AI agents:
-
-1. **Do not modify protected systems unless explicitly instructed.**
-2. Protected systems include:
-   - onboarding flow
-   - public application flow
-   - scoring logic and prompts
-   - AI behavior/model configuration
-   - CRM state/pipeline logic
-   - auth and access control
-   - billing logic
-   - database schema/migrations
-   - deployment/build configuration
-3. **No speculative refactors.**
-4. **No feature additions without explicit instruction.**
-5. Follow this order: **read first → explain second → edit third**.
-6. Keep edits minimal, scoped, and behavior-preserving unless behavior change is explicitly requested.
+1. **Realtor signs up** via Clerk and completes onboarding (or skips to set up later)
+2. **Workspace created** with a custom slug and public intake link
+3. **Prospects submit** rental applications through the public intake form
+4. **Leads are scored** automatically by AI and saved as contacts
+5. **Realtor manages** leads, contacts, deals, and tours from the workspace dashboard
+6. **Notifications sent** via email and/or SMS based on workspace preferences
+7. **Brokers** can invite realtors, track team performance, and manage the brokerage
 
 ---
 
-## 8) How to work safely in this repo
+## Environment reference
 
-Standard operating workflow:
-1. Inspect only relevant files first.
-2. Map the real code path end-to-end.
-3. Explain root cause/plan before editing.
-4. Change only necessary files.
-5. Validate using repo commands and focused checks.
-6. Report exactly what changed and why.
-7. If anything is unknown, state unknown (do not invent).
+See [ENVIRONMENT.md](./ENVIRONMENT.md) for a detailed breakdown of all environment variables, services, and per-workspace configuration.
 
 ---
 
-## 9) Known product principles (operator shorthand)
+## Design system
 
-- Protect the launch wedge: leasing/renter qualification for solo realtors.
-- Activation matters: intake link generation is a key activation moment.
-- Qualification speed/clarity > CRM breadth.
-- AI should be practical, explainable, and useful for action.
-- Keep setup low-friction and product-led.
-- Brand tone should remain modern, light, clear, calm, and professional.
-
----
-
-## 10) Current known gaps or risks (visible from repo)
-
-1. Existing README before this rewrite was stale template content.
-2. Auth checks are present, but fine-grained tenant authorization should always be treated as sensitive/high-risk area.
-3. Build config currently ignores TS/ESLint build errors (`next.config.ts`) — this can hide issues.
-4. Billing/trial backend implementation is not clearly present despite pricing copy.
-5. Repo still contains some legacy multi-tenant/admin patterns (Redis-based slug management) alongside Prisma-first app data.
+The design system documentation lives in `docs/framework/` and covers:
+- Design tokens (colors, spacing, typography, motion)
+- Component specs (cards, tables, forms, modals, etc.)
+- Screen archetypes (dashboard, analytics, table index, detail, settings)
+- Dashboard archetypes (queue, pipeline, analytics, admin overview)
+- Responsive breakpoints and mobile behavior
 
 ---
 
-## 11) Command reference
+## License
 
-Available scripts from `package.json`:
-
-```bash
-pnpm dev
-pnpm build
-pnpm start
-pnpm postinstall
-```
-
-Useful direct commands commonly needed:
-
-```bash
-pnpm exec prisma migrate deploy
-pnpm exec prisma generate
-pnpm exec tsc --noEmit
-```
-
-Note:
-- `build` already runs migration helper scripts under `scripts/`.
-
----
-
-## 12) Contribution note for AI agents (MANDATORY)
-
-1. Do **not** edit protected AI logic, prompts, scoring behavior, onboarding, CRM flow, auth, billing, schema, or deployment settings unless explicitly told.
-2. Do **not** add features unless explicitly told.
-3. Do **not** perform unrelated cleanup or broad refactors.
-4. Understand the existing implementation before proposing or making changes.
-5. Preserve Chippi’s current wedge and workflow intent in every change.
-6. Prefer minimal, scoped edits that solve only the requested task.
-
----
-
-## Additional project details
-
-`PASTE MY EXTRA PROJECT DETAILS HERE`
-
-(Placeholder retained intentionally from product instruction. Replace when finalized project notes are provided.)
+Proprietary. All rights reserved.

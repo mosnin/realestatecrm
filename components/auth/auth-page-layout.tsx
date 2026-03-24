@@ -23,7 +23,7 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
   const showRoleSwitcher = isBrokerLogin || isRealtorLogin;
 
   return (
-    <main className="relative min-h-screen bg-background lg:flex lg:h-screen lg:overflow-hidden">
+    <main className="relative min-h-screen bg-background lg:flex lg:h-screen lg:overflow-y-auto lg:overflow-x-hidden">
 
       {/* ── Left form panel ── */}
       <div className="relative flex w-full flex-col bg-card px-6 py-6 sm:px-10 sm:py-8 lg:w-[480px] lg:min-w-[480px] lg:overflow-y-auto lg:py-10">

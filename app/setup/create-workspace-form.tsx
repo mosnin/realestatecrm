@@ -130,7 +130,15 @@ export function CreateWorkspaceForm({ defaultName }: { defaultName: string }) {
         }),
       });
       const spaceData = await spaceRes.json().catch(() => ({}));
-      if (!spaceRes.ok) throw new Error(spaceData.error || 'Failed to create workspace.');
+      if (!spaceRes.ok) {
+        if (spaceRes.status === 409) {
+          setSlugAvailable(false);
+          setError('That slug was just taken. Please pick a different one.');
+          setSaving(false);
+          return;
+        }
+        throw new Error(spaceData.error || 'Failed to create workspace.');
+      }
 
       // Mark onboarding complete
       const accountType = role === 'broker' ? 'both' : 'realtor';

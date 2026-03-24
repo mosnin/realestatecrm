@@ -355,9 +355,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
+    if (action === 'skip') {
+      // Mark user as onboarded without requiring a workspace
+      // They'll be redirected to /setup to complete later
+      const { error } = await supabase
+        .from('User')
+        .update({
+          onboard: true,
+          onboardingCurrentStep: 7,
+          onboardingCompletedAt: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+      if (error) throw error;
+      return NextResponse.json({ success: true, redirect: '/setup' });
+    }
+
     if (action === 'complete') {
-      // Idempotent: if already onboarded, return success immediately
+      // If already onboarded, still update accountType if provided (for re-setup)
       if (user.onboard) {
+        const accountType = (body as { accountType?: string }).accountType;
+        if (accountType && ['realtor', 'broker_only', 'both'].includes(accountType)) {
+          await supabase.from('User').update({ accountType }).eq('id', user.id);
+        }
         return NextResponse.json({
           success: true,
           onboard: true,

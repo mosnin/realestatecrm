@@ -136,7 +136,17 @@ export function OnboardingFlow() {
         }),
       });
       const spaceData = await spaceRes.json().catch(() => ({}));
-      if (!spaceRes.ok) throw new Error(spaceData.error || 'Failed to create workspace.');
+
+      if (!spaceRes.ok) {
+        if (spaceRes.status === 409) {
+          // Slug was taken between availability check and create — let user pick another
+          setSlugAvailable(false);
+          setError('That slug was just taken. Please pick a different one.');
+          setSaving(false);
+          return;
+        }
+        throw new Error(spaceData.error || 'Failed to create workspace.');
+      }
 
       await fetch('/api/onboarding', {
         method: 'POST',
@@ -149,6 +159,22 @@ export function OnboardingFlow() {
       const msg = err instanceof Error ? err.message : 'Something went wrong.';
       setError(msg);
       toast.error(msg);
+      setSaving(false);
+    }
+  }
+
+  async function handleSkip() {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'skip' }),
+      });
+      if (!res.ok) throw new Error('Failed to skip');
+      router.push('/setup');
+    } catch {
+      toast.error('Something went wrong. Please try again.');
       setSaving(false);
     }
   }
@@ -227,6 +253,13 @@ export function OnboardingFlow() {
           >
             Get started <ArrowRight size={15} className="ml-1" />
           </Button>
+          <button
+            onClick={handleSkip}
+            disabled={saving}
+            className="w-full mt-3 text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
+          >
+            Skip for now
+          </button>
         </div>
       )}
 
@@ -273,6 +306,13 @@ export function OnboardingFlow() {
               Continue <ArrowRight size={15} className="ml-1" />
             </Button>
           </div>
+          <button
+            onClick={handleSkip}
+            disabled={saving}
+            className="w-full mt-3 text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
+          >
+            Skip for now
+          </button>
         </div>
       )}
 
@@ -356,6 +396,13 @@ export function OnboardingFlow() {
               )}
             </Button>
           </div>
+          <button
+            onClick={handleSkip}
+            disabled={saving}
+            className="w-full mt-3 text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
+          >
+            Skip for now
+          </button>
         </div>
       )}
     </div>
