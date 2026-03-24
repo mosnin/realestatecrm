@@ -59,16 +59,16 @@ export default async function BrokerOverviewPage() {
   // Aggregate per-space stats + pending invitations in parallel
   const [applicationRows, leadRows, dealRows, wonDealRows, invitationsRes] = await Promise.all([
     spaceIds.length > 0
-      ? supabase.from('Contact').select('spaceId').in('spaceId', spaceIds).contains('tags', ['application-link']).then((r) => r.data ?? [])
+      ? supabase.from('Contact').select('spaceId').in('spaceId', spaceIds).contains('tags', ['application-link']).limit(10000).then((r) => r.data ?? [])
       : Promise.resolve([]),
     spaceIds.length > 0
-      ? supabase.from('Contact').select('spaceId').in('spaceId', spaceIds).contains('tags', ['new-lead']).then((r) => r.data ?? [])
+      ? supabase.from('Contact').select('spaceId').in('spaceId', spaceIds).contains('tags', ['new-lead']).limit(10000).then((r) => r.data ?? [])
       : Promise.resolve([]),
     spaceIds.length > 0
-      ? supabase.from('Deal').select('spaceId, value').in('spaceId', spaceIds).then((r) => r.data ?? [])
+      ? supabase.from('Deal').select('spaceId, value').in('spaceId', spaceIds).eq('status', 'active').limit(10000).then((r) => r.data ?? [])
       : Promise.resolve([]),
     spaceIds.length > 0
-      ? supabase.from('Deal').select('spaceId, value').in('spaceId', spaceIds).eq('status', 'won').then((r) => r.data ?? [])
+      ? supabase.from('Deal').select('spaceId, value').in('spaceId', spaceIds).eq('status', 'won').limit(10000).then((r) => r.data ?? [])
       : Promise.resolve([]),
     supabase
       .from('Invitation')
