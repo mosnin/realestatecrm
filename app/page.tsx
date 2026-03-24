@@ -22,7 +22,7 @@ export default function HomePage() {
         <OnboardingFlow />
       ) : (
         <div className="w-full space-y-4">
-          <ThemedSignIn forceRedirectUrl="/" />
+          <ThemedSignIn forceRedirectUrl="/auth/redirect?intent=realtor" />
           <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
             <p>
               Are you a broker?{' '}
