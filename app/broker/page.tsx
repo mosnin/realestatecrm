@@ -179,18 +179,18 @@ export default async function BrokerOverviewPage() {
       {/* ── Summary stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: 'Team size', value: members.length, sub: `${activeMembers} active`, icon: Users, color: '', href: '/broker/members' },
-          { label: 'New leads', value: totalLeads, sub: 'across team', icon: PhoneIncoming, color: totalLeads > 0 ? 'text-violet-600 dark:text-violet-400' : '', href: '/broker/realtors' },
-          { label: 'Applications', value: totalApplications, sub: 'submitted', icon: FileText, color: totalApplications > 0 ? 'text-amber-600 dark:text-amber-400' : '', href: '/broker/realtors' },
-          { label: 'Active deals', value: totalDeals, sub: formatCompact(totalPipeline), icon: Briefcase, color: totalDeals > 0 ? 'text-cyan-600 dark:text-cyan-400' : '', href: '/broker/realtors' },
-          { label: 'Won deals', value: wonDeals.length, sub: formatCompact(totalWonValue), icon: CheckCircle2, color: wonDeals.length > 0 ? 'text-emerald-600 dark:text-emerald-400' : '', href: '/broker/realtors' },
-          { label: 'Invitations', value: pendingInvitations.length, sub: pendingInvitations.length > 0 ? 'pending' : 'none', icon: Mail, color: pendingInvitations.length > 0 ? 'text-primary' : '', href: '/broker/invitations' },
-        ].map(({ label, value, sub, icon: Icon, color, href }) => (
+          { label: 'Team size', value: members.length, sub: `${activeMembers} active`, icon: Users, color: '', bg: 'bg-muted', href: '/broker/members' },
+          { label: 'New leads', value: totalLeads, sub: 'across team', icon: PhoneIncoming, color: totalLeads > 0 ? 'text-violet-600 dark:text-violet-400' : '', bg: 'bg-violet-500/10', href: '/broker/realtors' },
+          { label: 'Applications', value: totalApplications, sub: 'submitted', icon: FileText, color: totalApplications > 0 ? 'text-amber-600 dark:text-amber-400' : '', bg: 'bg-amber-500/10', href: '/broker/realtors' },
+          { label: 'Active deals', value: totalDeals, sub: formatCompact(totalPipeline), icon: Briefcase, color: totalDeals > 0 ? 'text-cyan-600 dark:text-cyan-400' : '', bg: 'bg-cyan-500/10', href: '/broker/realtors' },
+          { label: 'Won deals', value: wonDeals.length, sub: formatCompact(totalWonValue), icon: CheckCircle2, color: wonDeals.length > 0 ? 'text-emerald-600 dark:text-emerald-400' : '', bg: 'bg-emerald-500/10', href: '/broker/realtors' },
+          { label: 'Invitations', value: pendingInvitations.length, sub: pendingInvitations.length > 0 ? 'pending' : 'none', icon: Mail, color: pendingInvitations.length > 0 ? 'text-primary' : '', bg: 'bg-primary/10', href: '/broker/invitations' },
+        ].map(({ label, value, sub, icon: Icon, color, bg, href }) => (
           <Link key={label} href={href}>
             <Card className="transition-all hover:shadow-md hover:border-primary/20 group">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color ? 'bg-current/8' : 'bg-muted'}`}>
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color ? bg : 'bg-muted'}`}>
                     <Icon size={16} className={color || 'text-muted-foreground'} />
                   </div>
                   <ArrowRight size={12} className="text-muted-foreground/0 group-hover:text-muted-foreground/60 transition-colors" />

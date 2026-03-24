@@ -155,8 +155,8 @@ export function RealtorsClient({ realtors }: { realtors: RealtorRow[] }) {
       {/* Controls — stacks on mobile */}
       <div className="space-y-3">
         {/* Row 1: Search + Status filter + View toggle */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 sm:flex-initial sm:w-52">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[140px] sm:flex-initial sm:w-52">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <input
               type="text"
