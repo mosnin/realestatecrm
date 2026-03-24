@@ -77,7 +77,7 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [editContact, setEditContact] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'card' | 'list'>('card');
+  const [view, setView] = useState<'card' | 'list'>('list');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showCompare, setShowCompare] = useState(false);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
@@ -445,18 +445,6 @@ export function ContactTable({ slug }: ContactTableProps) {
           <div className="flex rounded-md border border-border overflow-hidden bg-card">
             <button
               type="button"
-              onClick={() => setView('card')}
-              className={cn(
-                'px-2.5 flex items-center justify-center transition-colors',
-                view === 'card'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-              )}
-            >
-              <LayoutGrid size={15} />
-            </button>
-            <button
-              type="button"
               onClick={() => setView('list')}
               className={cn(
                 'px-2.5 flex items-center justify-center transition-colors',
@@ -466,6 +454,18 @@ export function ContactTable({ slug }: ContactTableProps) {
               )}
             >
               <List size={15} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('card')}
+              className={cn(
+                'px-2.5 flex items-center justify-center transition-colors',
+                view === 'card'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+              )}
+            >
+              <LayoutGrid size={15} />
             </button>
           </div>
 

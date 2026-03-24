@@ -17,9 +17,12 @@ import {
   Loader2,
   Briefcase,
   Search,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AvailabilityOverrides } from './availability-overrides';
@@ -80,6 +83,7 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl,
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [view, setView] = useState<'table' | 'card'>('table');
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState(initialProfiles);
   const [embedCopied, setEmbedCopied] = useState(false);
@@ -196,6 +200,35 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl,
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex rounded-md border border-border overflow-hidden bg-card">
+            <button
+              type="button"
+              onClick={() => setView('table')}
+              className={cn(
+                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
+                view === 'table'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+              )}
+              title="Table view"
+            >
+              <List size={15} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('card')}
+              className={cn(
+                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
+                view === 'card'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+              )}
+              title="Card view"
+            >
+              <LayoutGrid size={15} />
+            </button>
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -307,7 +340,136 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl,
           <p className="text-xs">Share your booking link to start receiving tour requests.</p>
         </div>
       ) : tab !== 'availability' ? (
-        <div className="space-y-3">
+        view === 'table' ? (
+          /* ── Table view ── */
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Guest</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Date & Time</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Property</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Contact</th>
+                    <th className="px-4 py-3 w-16" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border bg-card">
+                  {filtered.map((tour) => {
+                    const { date, time } = formatDateTime(tour.startsAt);
+                    const endTime = formatDateTime(tour.endsAt).time;
+                    const dur = getDuration(tour.startsAt, tour.endsAt);
+                    const statusConf = STATUS_CONFIG[tour.status];
+                    const isPast = new Date(tour.startsAt) < now;
+
+                    return (
+                      <tr
+                        key={tour.id}
+                        className={cn(
+                          'group hover:bg-muted/30 transition-colors',
+                          isPast && tour.status !== 'completed' && 'opacity-70',
+                        )}
+                      >
+                        <td className="px-4 py-3">
+                          <div>
+                            <p className="font-medium">{tour.guestName}</p>
+                            <p className="text-xs text-muted-foreground">{tour.guestEmail}</p>
+                            {tour.guestPhone && (
+                              <p className="text-xs text-muted-foreground sm:hidden">{tour.guestPhone}</p>
+                            )}
+                            {/* Show date on mobile since the date column is hidden */}
+                            <p className="text-xs text-muted-foreground mt-0.5 sm:hidden">{date} {time}</p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 hidden sm:table-cell">
+                          <p className="text-sm">{date}</p>
+                          <p className="text-xs text-muted-foreground">{time} – {endTime} ({dur} min)</p>
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">
+                          {tour.propertyAddress ? (
+                            <span className="flex items-center gap-1"><MapPin size={10} /> {tour.propertyAddress}</span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap', statusConf.color)}>
+                            {statusConf.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 hidden lg:table-cell text-xs">
+                          {tour.Contact ? (
+                            <a
+                              href={`/s/${slug}/contacts/${tour.Contact.id}`}
+                              className="text-primary hover:underline"
+                            >
+                              {tour.Contact.name}
+                            </a>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="relative">
+                            <button
+                              onClick={() => setActionMenuId(actionMenuId === tour.id ? null : tour.id)}
+                              className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
+                            >
+                              <MoreHorizontal size={14} />
+                            </button>
+                            {actionMenuId === tour.id && (
+                              <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-border bg-card shadow-lg py-1">
+                                {tour.status === 'scheduled' && (
+                                  <button onClick={() => updateStatus(tour.id, 'confirmed')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">
+                                    Confirm
+                                  </button>
+                                )}
+                                {(tour.status === 'scheduled' || tour.status === 'confirmed') && (
+                                  <>
+                                    <button onClick={() => updateStatus(tour.id, 'completed')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">
+                                      Mark Completed
+                                    </button>
+                                    <button onClick={() => updateStatus(tour.id, 'no_show')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">
+                                      Mark No-Show
+                                    </button>
+                                    <button onClick={() => updateStatus(tour.id, 'cancelled')} className="w-full text-left px-3 py-1.5 text-xs text-destructive hover:bg-accent transition-colors">
+                                      Cancel Tour
+                                    </button>
+                                  </>
+                                )}
+                                {(tour.status === 'completed' || tour.status === 'confirmed') && !tour.sourceDealId && (
+                                  <button
+                                    onClick={() => { setActionMenuId(null); convertToDeal(tour.id); }}
+                                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors flex items-center gap-1.5"
+                                  >
+                                    <Briefcase size={11} />
+                                    {convertingId === tour.id ? 'Creating...' : 'Create Deal'}
+                                  </button>
+                                )}
+                                {tour.sourceDealId && (
+                                  <a
+                                    href={`/s/${slug}/deals/${tour.sourceDealId}`}
+                                    className="w-full block text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors text-primary"
+                                  >
+                                    View Deal
+                                  </a>
+                                )}
+                                {tour.status === 'cancelled' && (
+                                  <button onClick={() => updateStatus(tour.id, 'scheduled')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">
+                                    Reschedule
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          /* ── Card view (existing) ── */
+          <div className="space-y-3">
           {filtered.map((tour) => {
             const { date, time } = formatDateTime(tour.startsAt);
             const endTime = formatDateTime(tour.endsAt).time;
@@ -454,6 +616,7 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl,
             );
           })}
         </div>
+        )
       ) : null}
     </div>
   );

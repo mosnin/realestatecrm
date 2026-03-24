@@ -67,7 +67,7 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
   const [panelDeal, setPanelDeal] = useState<DealWithRelations | null>(null);
   const [defaultStageId, setDefaultStageId] = useState<string>('');
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
-  const [view, setView] = useState<'kanban' | 'list'>('kanban');
+  const [view, setView] = useState<'kanban' | 'list'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const { confirm, ConfirmDialog } = useConfirm();
 
@@ -255,23 +255,33 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Pipeline</h2>
-          <p className="text-muted-foreground text-sm">
-            Track active deals through your leasing stages
-          </p>
+      {/* Header */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Pipeline</h2>
+            <p className="text-muted-foreground text-sm hidden sm:block">
+              Track active deals through your leasing stages
+            </p>
+          </div>
+          <LiquidMetalButton
+            label="Add deal"
+            onClick={() => {
+              setDefaultStageId(stages[0]?.id ?? '');
+              setAddDealOpen(true);
+            }}
+          />
         </div>
         <div className="flex items-center gap-2">
           {/* Search */}
-          <div className="relative">
+          <div className="relative flex-1 sm:flex-none">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search deals…"
-              className="h-8 w-44 rounded-lg border border-border bg-muted/60 pl-8 pr-7 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background transition-colors"
+              className="h-8 w-full sm:w-44 rounded-lg border border-border bg-muted/60 pl-8 pr-7 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background transition-colors"
             />
             {searchQuery && (
               <button
@@ -288,18 +298,6 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
           <div className="flex rounded-md border border-border overflow-hidden bg-card">
             <button
               type="button"
-              onClick={() => setView('kanban')}
-              className={cn(
-                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
-                view === 'kanban'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-              )}
-            >
-              <LayoutGrid size={15} />
-            </button>
-            <button
-              type="button"
               onClick={() => setView('list')}
               className={cn(
                 'px-2.5 py-1.5 flex items-center justify-center transition-colors',
@@ -307,18 +305,24 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
+              title="Table view"
             >
               <List size={15} />
             </button>
+            <button
+              type="button"
+              onClick={() => setView('kanban')}
+              className={cn(
+                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
+                view === 'kanban'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+              )}
+              title="Board view"
+            >
+              <LayoutGrid size={15} />
+            </button>
           </div>
-
-          <LiquidMetalButton
-            label="Add deal"
-            onClick={() => {
-              setDefaultStageId(stages[0]?.id ?? '');
-              setAddDealOpen(true);
-            }}
-          />
         </div>
       </div>
 
