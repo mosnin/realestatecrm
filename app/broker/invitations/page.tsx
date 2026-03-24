@@ -37,7 +37,7 @@ export default async function BrokerInvitationsPage() {
     createdAt: string;
   }>;
 
-  const roleLabel = (role: string) => (role === 'broker_manager' ? 'Manager' : 'Realtor');
+  const roleLabel = (role: string) => (role === 'broker_admin' ? 'Admin' : 'Realtor');
 
   return (
     <div className="space-y-6 max-w-3xl">

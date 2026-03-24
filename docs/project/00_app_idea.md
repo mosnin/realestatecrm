@@ -77,7 +77,7 @@ Multi-step inline onboarding flow triggered on first sign-in at `/`. Steps inclu
 
 - **Platform Admin** (User.platformRole = 'admin'): Full access to `/admin` panel — user management, brokerage management, invitations, system overview.
 - **Broker Owner** (BrokerageMembership.role = 'broker_owner'): Owns a brokerage. Access to `/broker` portal — view realtors, manage members, send invitations, brokerage settings.
-- **Broker Manager** (BrokerageMembership.role = 'broker_manager'): Same as broker owner but cannot delete brokerage.
+- **Broker Manager** (BrokerageMembership.role = 'broker_admin'): Same as broker owner but cannot delete brokerage.
 - **Realtor Member** (BrokerageMembership.role = 'realtor_member'): Member of a brokerage. Has their own workspace. Brokerage name shown in sidebar.
 - **Realtor (solo)** (default): Own workspace at `/s/[slug]`. Full access to their space — leads, contacts, deals, tours, AI, analytics, settings, billing, profile.
 

@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
  *
  * Called after Clerk sign-in from either login page.
  *
- * - intent=broker  → if the user is a broker_owner or broker_manager, go to /broker
+ * - intent=broker  → if the user is a broker_owner or broker_admin, go to /broker
  *                    otherwise fall back to the realtor flow
  * - intent=realtor → go to the user's workspace, or /setup if none yet
  * - no intent      → same as realtor
@@ -45,7 +45,7 @@ export default async function AuthRedirectPage({
       .from('BrokerageMembership')
       .select('id, role')
       .eq('userId', user.id)
-      .in('role', ['broker_owner', 'broker_manager'])
+      .in('role', ['broker_owner', 'broker_admin'])
       .maybeSingle();
 
     if (membership) {

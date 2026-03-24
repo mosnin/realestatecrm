@@ -115,7 +115,7 @@ export default async function BrokerOverviewPage() {
   const totalWonValue = wonDeals.reduce((sum, d) => sum + (d.value ?? 0), 0);
 
   const roleLabel = (role: string) =>
-    role === 'broker_owner' ? 'Owner' : role === 'broker_manager' ? 'Manager' : 'Realtor';
+    role === 'broker_owner' ? 'Owner' : role === 'broker_admin' ? 'Admin' : 'Realtor';
 
   // Funnel conversion rates
   const leadsToApps = totalLeads > 0 ? Math.round((totalApplications / totalLeads) * 100) : 0;
@@ -408,7 +408,7 @@ export default async function BrokerOverviewPage() {
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium truncate">{inv.email}</p>
                           <p className="text-xs text-muted-foreground">
-                            {inv.roleToAssign === 'broker_manager' ? 'Manager' : 'Realtor'} ·{' '}
+                            {inv.roleToAssign === 'broker_admin' ? 'Admin' : 'Realtor'} ·{' '}
                             {new Date(inv.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           </p>
                         </div>

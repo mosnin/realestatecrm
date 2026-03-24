@@ -27,7 +27,7 @@ export default async function BrokerMembersPage() {
   }>;
 
   const roleLabel = (role: string) =>
-    role === 'broker_owner' ? 'Owner' : role === 'broker_manager' ? 'Manager' : 'Realtor';
+    role === 'broker_owner' ? 'Owner' : role === 'broker_admin' ? 'Admin' : 'Realtor';
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -96,7 +96,7 @@ export default async function BrokerMembersPage() {
                             <AlertCircle size={10} /> Pending
                           </span>
                         )}
-                        {m.role !== 'broker_owner' && ctx.membership.role === 'broker_owner' && (
+                        {m.role !== 'broker_owner' && (ctx.membership.role === 'broker_owner' || (ctx.membership.role === 'broker_admin' && m.role !== 'broker_admin')) && (
                           <>
                             <ChangeRoleButton
                               membershipId={m.id}

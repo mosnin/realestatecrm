@@ -160,7 +160,7 @@ CREATE TABLE IF NOT EXISTS "BrokerageMembership" (
   "brokerageId" text        NOT NULL REFERENCES "Brokerage"(id) ON DELETE CASCADE,
   "userId"      text        NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
   role          text        NOT NULL
-                  CHECK (role IN ('broker_owner', 'broker_manager', 'realtor_member')),
+                  CHECK (role IN ('broker_owner', 'broker_admin', 'realtor_member')),
   "invitedById" text        REFERENCES "User"(id) ON DELETE SET NULL,
   "createdAt"   timestamptz NOT NULL DEFAULT now(),
   UNIQUE ("brokerageId", "userId")
@@ -171,7 +171,7 @@ CREATE TABLE IF NOT EXISTS "Invitation" (
   "brokerageId"  text        NOT NULL REFERENCES "Brokerage"(id) ON DELETE CASCADE,
   email          text        NOT NULL,
   "roleToAssign" text        NOT NULL
-                   CHECK ("roleToAssign" IN ('broker_manager', 'realtor_member')),
+                   CHECK ("roleToAssign" IN ('broker_admin', 'realtor_member')),
   token          text        UNIQUE NOT NULL DEFAULT encode(gen_random_bytes(32), 'hex'),
   status         text        NOT NULL DEFAULT 'pending'
                    CHECK (status IN ('pending', 'accepted', 'expired', 'cancelled')),

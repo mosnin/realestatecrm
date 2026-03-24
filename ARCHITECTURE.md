@@ -259,7 +259,7 @@ Added in migration `20260314000003_org_system.sql`.
 | Level | How determined | Access |
 |---|---|---|
 | **Realtor** | Default for all users | Own workspace only |
-| **Broker** | Has `BrokerageMembership` with `role IN (broker_owner, broker_manager)` | `/broker` dashboard + member oversight |
+| **Broker** | Has `BrokerageMembership` with `role IN (broker_owner, broker_admin)` | `/broker` dashboard + member oversight |
 | **Platform Admin** | `User.platformRole = 'admin'` OR Clerk `publicMetadata.role = 'admin'` | `/admin` + all management |
 
 Grant platform admin via DB: `UPDATE "User" SET "platformRole" = 'admin' WHERE "clerkId" = '...';`

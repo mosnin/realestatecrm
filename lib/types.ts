@@ -2,7 +2,7 @@
 
 export type PlatformRole = 'user' | 'admin';
 export type AccountType = 'realtor' | 'broker_only' | 'both';
-export type MembershipRole = 'broker_owner' | 'broker_manager' | 'realtor_member';
+export type MembershipRole = 'broker_owner' | 'broker_admin' | 'realtor_member';
 export type InvitationStatus = 'pending' | 'accepted' | 'expired' | 'cancelled';
 
 export type User = {
@@ -45,7 +45,7 @@ export type Invitation = {
   id: string;
   brokerageId: string;
   email: string;
-  roleToAssign: 'broker_manager' | 'realtor_member';
+  roleToAssign: 'broker_admin' | 'realtor_member';
   token: string;
   status: InvitationStatus;
   expiresAt: Date;

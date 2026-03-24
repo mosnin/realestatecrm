@@ -73,7 +73,7 @@ export async function GET() {
   const headers = ['Name', 'Email', 'Role', 'Status', 'Joined', 'Workspace', 'Leads', 'Contacts', 'Deals', 'Pipeline Value', 'Won Deals', 'Won Value'];
   const rows = members.map((m) => {
     const sid = m.Space?.id;
-    const role = m.role === 'broker_owner' ? 'Owner' : m.role === 'broker_manager' ? 'Manager' : 'Realtor';
+    const role = m.role === 'broker_owner' ? 'Owner' : m.role === 'broker_admin' ? 'Admin' : 'Realtor';
     const status = m.User?.onboard ? 'Active' : 'Pending';
     const joined = new Date(m.createdAt).toISOString().split('T')[0];
     const leads = sid ? (leadsBySpace[sid] ?? 0) : 0;

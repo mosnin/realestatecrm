@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
     return NextResponse.json({ error: 'Valid email required' }, { status: 400 });
   }
-  if (!['broker_manager', 'realtor_member'].includes(roleToAssign)) {
+  if (!['broker_admin', 'realtor_member'].includes(roleToAssign)) {
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
   }
 
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
     toEmail: trimmedEmail,
     brokerageName: brokerage.name,
     inviterName,
-    roleToAssign: roleToAssign as 'broker_manager' | 'realtor_member',
+    roleToAssign: roleToAssign as 'broker_admin' | 'realtor_member',
     token: invitation.token,
   }).catch((err) => console.error('[broker/invite] email send failed', err));
 

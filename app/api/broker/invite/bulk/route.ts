@@ -78,7 +78,7 @@ export async function POST(req: Request) {
       continue;
     }
 
-    const roleToAssign = entry.role === 'broker_manager' ? 'broker_manager' : 'realtor_member';
+    const roleToAssign = entry.role === 'broker_admin' ? 'broker_admin' : 'realtor_member';
 
     // Check for existing pending invite
     const { data: existing } = await supabase
@@ -116,7 +116,7 @@ export async function POST(req: Request) {
       toEmail: email,
       brokerageName: brokerage.name,
       inviterName,
-      roleToAssign: roleToAssign as 'broker_manager' | 'realtor_member',
+      roleToAssign: roleToAssign as 'broker_admin' | 'realtor_member',
       token: invitation.token,
     }).catch((err) => console.error('[broker/invite/bulk] email failed', err));
 

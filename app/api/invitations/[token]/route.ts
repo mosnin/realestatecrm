@@ -133,7 +133,7 @@ export async function POST(_req: Request, { params }: Params) {
     brokerageId: inv.brokerageId,
     type: 'member_joined',
     title: `${user.email} joined via invitation`,
-    body: `Assigned role: ${inv.roleToAssign === 'broker_manager' ? 'Manager' : 'Realtor'}`,
+    body: `Assigned role: ${inv.roleToAssign === 'broker_admin' ? 'Admin' : 'Realtor'}`,
     metadata: { userId: user.id, method: 'email_invitation' },
   });
 

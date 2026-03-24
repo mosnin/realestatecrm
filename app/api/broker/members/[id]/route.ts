@@ -8,8 +8,8 @@ type Params = { params: Promise<{ id: string }> };
 
 /**
  * DELETE /api/broker/members/[id]
- * Remove a member from the brokerage. Only broker_owner can remove members.
- * The owner cannot remove themselves.
+ * Remove a member from the brokerage. Owner or admin can remove members.
+ * The owner cannot remove themselves. Admins cannot remove other admins.
  */
 export async function DELETE(_req: Request, { params }: Params) {
   const { userId: clerkId } = await auth();
@@ -20,8 +20,10 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  if (ctx.membership.role !== 'broker_owner') {
-    return NextResponse.json({ error: 'Only the brokerage owner can remove members' }, { status: 403 });
+  const isOwner = ctx.membership.role === 'broker_owner';
+  const isAdmin = ctx.membership.role === 'broker_admin';
+  if (!isOwner && !isAdmin) {
+    return NextResponse.json({ error: 'Only the owner or admins can remove members' }, { status: 403 });
   }
 
   const { id: membershipId } = await params;
@@ -40,6 +42,11 @@ export async function DELETE(_req: Request, { params }: Params) {
 
   if (membership.role === 'broker_owner') {
     return NextResponse.json({ error: 'Cannot remove the brokerage owner' }, { status: 400 });
+  }
+
+  // Admins can only remove realtors, not other admins
+  if (isAdmin && membership.role === 'broker_admin') {
+    return NextResponse.json({ error: 'Only the owner can remove admins' }, { status: 403 });
   }
 
   // Delete the membership

@@ -37,7 +37,7 @@ deal_space_position_idx, audit_actor_created_idx
 - Contact types: UPPERCASE — `'QUALIFICATION'`, `'TOUR'`, `'APPLICATION'`
 - Deal priority: UPPERCASE — `'LOW'`, `'MEDIUM'`, `'HIGH'`
 - Deal status: lowercase — `'active'`, `'won'`, `'lost'`, `'on_hold'`
-- Roles: lowercase — `'user'`, `'admin'`, `'broker_owner'`, `'broker_manager'`, `'realtor_member'`
+- Roles: lowercase — `'user'`, `'admin'`, `'broker_owner'`, `'broker_admin'`, `'realtor_member'`
 - Brokerage status: lowercase — `'active'`, `'suspended'`
 
 **Rule**: Follow the existing convention for the domain. Don't mix UPPERCASE and lowercase within the same enum column.

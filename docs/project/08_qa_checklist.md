@@ -104,7 +104,7 @@
 - [ ] 7-day trial countdown displays correctly and converts on expiry
 
 ## Broker Portal
-- [ ] Broker dashboard loads for broker_owner/broker_manager
+- [ ] Broker dashboard loads for broker_owner/broker_admin
 - [ ] Realtors list shows brokerage members
 - [ ] Invitation send works
 - [ ] Invitation accept via /invite/[token] works

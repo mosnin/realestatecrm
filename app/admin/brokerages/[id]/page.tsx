@@ -88,7 +88,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
   const totalPipeline = (dealRows as { value: number | null }[]).reduce((a, r) => a + (r.value ?? 0), 0);
 
   const roleLabel = (role: string) =>
-    role === 'broker_owner' ? 'Owner' : role === 'broker_manager' ? 'Manager' : 'Realtor';
+    role === 'broker_owner' ? 'Owner' : role === 'broker_admin' ? 'Admin' : 'Realtor';
 
   const statusLabel = (s: string) =>
     s === 'accepted' ? 'Accepted' : s === 'cancelled' ? 'Revoked' : s === 'expired' ? 'Expired' : 'Pending';
@@ -350,7 +350,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                         <td className="px-4 py-3 text-xs font-medium">{inv.email}</td>
                         <td className="px-4 py-3 hidden sm:table-cell">
                           <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
-                            {inv.roleToAssign === 'broker_manager' ? 'Manager' : 'Realtor'}
+                            {inv.roleToAssign === 'broker_admin' ? 'Admin' : 'Realtor'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">{sent}</td>

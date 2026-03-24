@@ -108,7 +108,7 @@ export default async function RealtorDrilldownPage({ params }: Params) {
   const wonDeals = deals.filter((d) => d.status === 'won').length;
   const wonValue = deals.filter((d) => d.status === 'won').reduce((sum, d) => sum + (d.value ?? 0), 0);
 
-  const roleLabel = membership.role === 'broker_owner' ? 'Owner' : membership.role === 'broker_manager' ? 'Manager' : 'Realtor';
+  const roleLabel = membership.role === 'broker_owner' ? 'Owner' : membership.role === 'broker_admin' ? 'Admin' : 'Realtor';
   const joinedAt = new Date(membership.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const initials = (user.name ?? user.email ?? '?').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
 

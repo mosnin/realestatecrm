@@ -17,15 +17,15 @@ Add three account levels to Chippi:
 |---|---|
 | `User` | Add `platform_role` (user \| admin). Existing Clerk metadata stays as middleware fast-path. |
 | `Brokerage` | Brokerage entity. One owner per brokerage. One brokerage per owner (enforced by DB). |
-| `BrokerageMembership` | Join table: user ↔ brokerage with role (broker_owner \| broker_manager \| realtor_member). |
+| `BrokerageMembership` | Join table: user ↔ brokerage with role (broker_owner \| broker_admin \| realtor_member). |
 | `Space` | Add nullable `brokerageId` FK. Realtor workspace stays the atomic unit. |
 | `Invitation` | Token-based invite. Pending until accepted or expired. |
 
 ### Roles
 
 - **platform_role** on User: `user` (default) or `admin`
-- **BrokerageMembership.role**: `broker_owner`, `broker_manager`, `realtor_member`
-- "Is a broker" = has any BrokerageMembership where role ∈ {broker_owner, broker_manager}
+- **BrokerageMembership.role**: `broker_owner`, `broker_admin`, `realtor_member`
+- "Is a broker" = has any BrokerageMembership where role ∈ {broker_owner, broker_admin}
 
 ### Permissions (central helpers in `lib/permissions.ts`)
 
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS "BrokerageMembership" (
   id             text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   "brokerageId"  text NOT NULL REFERENCES "Brokerage"(id) ON DELETE CASCADE,
   "userId"       text NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
-  role           text NOT NULL CHECK (role IN ('broker_owner', 'broker_manager', 'realtor_member')),
+  role           text NOT NULL CHECK (role IN ('broker_owner', 'broker_admin', 'realtor_member')),
   "invitedById"  text REFERENCES "User"(id) ON DELETE SET NULL,
   "createdAt"    timestamptz NOT NULL DEFAULT now(),
   UNIQUE ("brokerageId", "userId")
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS "Invitation" (
   id             text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   "brokerageId"  text NOT NULL REFERENCES "Brokerage"(id) ON DELETE CASCADE,
   email          text NOT NULL,
-  "roleToAssign" text NOT NULL CHECK ("roleToAssign" IN ('broker_manager', 'realtor_member')),
+  "roleToAssign" text NOT NULL CHECK ("roleToAssign" IN ('broker_admin', 'realtor_member')),
   token          text UNIQUE NOT NULL DEFAULT encode(gen_random_bytes(32), 'hex'),
   status         text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'expired', 'cancelled')),
   "expiresAt"    timestamptz NOT NULL DEFAULT (now() + interval '7 days'),
@@ -123,7 +123,7 @@ Add the same tables to `supabase/schema.sql` (source of truth for fresh installs
 ### `lib/types.ts` additions
 ```ts
 export type PlatformRole = 'user' | 'admin';
-export type MembershipRole = 'broker_owner' | 'broker_manager' | 'realtor_member';
+export type MembershipRole = 'broker_owner' | 'broker_admin' | 'realtor_member';
 export type InvitationStatus = 'pending' | 'accepted' | 'expired' | 'cancelled';
 
 export type Brokerage = {
@@ -176,7 +176,7 @@ requireBroker()                → Promise<{ brokerage, membership, dbUserId }>
 
 ### `POST /api/broker/invite`
 - Auth: requireBroker()
-- Body: `{ email, role }` (role: realtor_member | broker_manager)
+- Body: `{ email, role }` (role: realtor_member | broker_admin)
 - Creates Invitation row
 - Sends email via Resend with `/invite/[token]` link
 - Idempotent: if pending invite for same email exists, return existing (don't send duplicate)
@@ -272,7 +272,7 @@ Add nav items: Brokerages (Building2 icon), Invitations (Mail icon)
 ## Phase 8 — Navigation Updates
 
 ### `app/s/[slug]/layout.tsx` (extend)
-Fetch broker membership for current user. If broker_owner or broker_manager, pass `isBroker: true` to Sidebar.
+Fetch broker membership for current user. If broker_owner or broker_admin, pass `isBroker: true` to Sidebar.
 
 ### `components/dashboard/sidebar.tsx` (extend)
 If `isBroker`, add "Brokerage" nav link (Building2 icon → `/broker`) in secondary nav section.

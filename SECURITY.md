@@ -142,7 +142,7 @@ if (!deal || !contact) return NextResponse.json({ error: 'Not found' }, { status
 isPlatformAdmin()       // DB check + Clerk metadata fallback
 requirePlatformAdmin()  // Throws if not admin
 getBrokerContext()      // Returns brokerage + membership or null
-requireBroker()         // Throws if not broker_owner or broker_manager
+requireBroker()         // Throws if not broker_owner or broker_admin
 getCurrentDbUser()      // Clerk userId → internal User row
 ```
 

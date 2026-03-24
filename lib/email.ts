@@ -310,7 +310,7 @@ export interface BrokerageInvitationEmailParams {
   toEmail: string;
   brokerageName: string;
   inviterName: string;
-  roleToAssign: 'broker_manager' | 'realtor_member';
+  roleToAssign: 'broker_admin' | 'realtor_member';
   token: string;
 }
 
@@ -323,7 +323,7 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
 
   const { toEmail, brokerageName, inviterName, roleToAssign, token } = params;
   const acceptUrl = `${appUrl}/invite/${token}`;
-  const roleLabel = roleToAssign === 'broker_manager' ? 'Broker Manager' : 'Realtor Member';
+  const roleLabel = roleToAssign === 'broker_admin' ? 'Brokerage Admin' : 'Realtor';
   const safeEmail = toEmail.replace(/[\r\n\t]/g, ' ').slice(0, 200);
 
   const html = `

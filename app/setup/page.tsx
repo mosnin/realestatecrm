@@ -75,7 +75,7 @@ export default async function SetupPage() {
         .from('BrokerageMembership')
         .select('id')
         .eq('userId', dbUser.id)
-        .in('role', ['broker_owner', 'broker_manager'])
+        .in('role', ['broker_owner', 'broker_admin'])
         .maybeSingle();
       if (brokerMembership) {
         redirect('/broker');

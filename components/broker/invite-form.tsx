@@ -6,7 +6,7 @@ import { Send } from 'lucide-react';
 
 export function InviteForm() {
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'realtor_member' | 'broker_manager'>('realtor_member');
+  const [role, setRole] = useState<'realtor_member' | 'broker_admin'>('realtor_member');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -57,7 +57,7 @@ export function InviteForm() {
         className="h-9 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
       >
         <option value="realtor_member">Realtor</option>
-        <option value="broker_manager">Manager</option>
+        <option value="broker_admin">Admin</option>
       </select>
       <Button type="submit" size="sm" disabled={loading} className="flex items-center gap-1.5">
         <Send size={14} />

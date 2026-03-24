@@ -35,7 +35,7 @@ export async function GET() {
 /**
  * POST /api/broker/join-code
  * Generates a new join code, replacing any existing one.
- * Only broker_owner can regenerate the code.
+ * Owner or admin can regenerate the code.
  */
 export async function POST() {
   const { userId: clerkId } = await auth();
@@ -46,8 +46,8 @@ export async function POST() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  if (ctx.membership.role !== 'broker_owner') {
-    return NextResponse.json({ error: 'Only the brokerage owner can manage the invite code' }, { status: 403 });
+  if (ctx.membership.role !== 'broker_owner' && ctx.membership.role !== 'broker_admin') {
+    return NextResponse.json({ error: 'Only the owner or admins can manage the invite code' }, { status: 403 });
   }
 
   // Generate a unique code (retry on collision, though extremely unlikely)

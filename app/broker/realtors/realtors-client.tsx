@@ -52,7 +52,7 @@ const SORT_LABELS: Record<SortKey, string> = {
 
 function roleLabel(role: string) {
   if (role === 'broker_owner') return 'Owner';
-  if (role === 'broker_manager') return 'Manager';
+  if (role === 'broker_admin') return 'Admin';
   return 'Realtor';
 }
 

@@ -34,7 +34,7 @@ export default async function AdminInvitationsPage() {
     Brokerage: { name: string } | null;
   }>;
 
-  const roleLabel = (r: string) => r === 'broker_manager' ? 'Manager' : 'Realtor';
+  const roleLabel = (r: string) => r === 'broker_admin' ? 'Admin' : 'Realtor';
 
   return (
     <div className="space-y-6 max-w-5xl">

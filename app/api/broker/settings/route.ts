@@ -27,7 +27,7 @@ export async function GET() {
 
 /**
  * PATCH /api/broker/settings
- * Update brokerage settings. Only broker_owner can update.
+ * Update brokerage settings. Owner or admin can update.
  */
 export async function PATCH(req: Request) {
   const { userId: clerkId } = await auth();
@@ -38,8 +38,8 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  if (ctx.membership.role !== 'broker_owner') {
-    return NextResponse.json({ error: 'Only the brokerage owner can update settings' }, { status: 403 });
+  if (ctx.membership.role !== 'broker_owner' && ctx.membership.role !== 'broker_admin') {
+    return NextResponse.json({ error: 'Only the owner or admins can update settings' }, { status: 403 });
   }
 
   let body: Record<string, unknown>;

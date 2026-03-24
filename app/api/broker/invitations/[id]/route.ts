@@ -8,7 +8,7 @@ type Params = { params: Promise<{ id: string }> };
 
 /**
  * PATCH /api/broker/invitations/[id]
- * Cancel a pending invitation. Available to broker_owner and broker_manager.
+ * Cancel a pending invitation. Available to broker_owner and broker_admin.
  */
 export async function PATCH(_req: Request, { params }: Params) {
   const { userId: clerkId } = await auth();

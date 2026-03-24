@@ -4,7 +4,7 @@
 
 - **Platform Admin** (User.platformRole = 'admin'): System-level access. Can view all users, brokerages, and invitations. One or more per platform.
 - **Broker Owner** (BrokerageMembership.role = 'broker_owner'): Owns a brokerage. Full access to broker portal. One per brokerage.
-- **Broker Manager** (BrokerageMembership.role = 'broker_manager'): Manages a brokerage. Same as owner except cannot delete brokerage.
+- **Broker Manager** (BrokerageMembership.role = 'broker_admin'): Manages a brokerage. Same as owner except cannot delete brokerage.
 - **Realtor Member** (BrokerageMembership.role = 'realtor_member'): Member of a brokerage. Has own workspace. Sees brokerage name in sidebar.
 - **Solo Realtor** (default, no brokerage membership): Owns their workspace. Full access to their space.
 

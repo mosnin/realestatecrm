@@ -3,7 +3,7 @@
  *
  * Three account levels:
  *   1. Realtor (default) — solo workspace owner
- *   2. Broker — has a BrokerageMembership with role broker_owner or broker_manager
+ *   2. Broker — has a BrokerageMembership with role broker_owner or broker_admin
  *   3. Platform Admin — User.platformRole = 'admin' (or Clerk metadata fallback)
  *
  * Always use these helpers in API routes, server actions, and layouts.
@@ -62,7 +62,7 @@ type BrokerContext = {
 
 /**
  * Returns the brokerage + membership for the current user if they are a broker
- * (role = broker_owner or broker_manager), or null if they are not.
+ * (role = broker_owner or broker_admin), or null if they are not.
  */
 export async function getBrokerContext(): Promise<BrokerContext | null> {
   const session = await auth();
@@ -81,7 +81,7 @@ export async function getBrokerContext(): Promise<BrokerContext | null> {
     .from('BrokerageMembership')
     .select('*')
     .eq('userId', user.id)
-    .in('role', ['broker_owner', 'broker_manager']);
+    .in('role', ['broker_owner', 'broker_admin']);
   if (!memberships?.length) return null;
 
   const membership =
