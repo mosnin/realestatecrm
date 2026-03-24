@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const { space } = auth;
 
   const stripe = getStripe();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://my.usechippi.com';
 
   // Reuse existing Stripe customer or create one
   let customerId = space.stripeCustomerId;

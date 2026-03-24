@@ -43,7 +43,7 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
 
   const { toEmail, spaceName, spaceSlug, contactId, name, phone, email, leadScore, scoreLabel, scoreSummary, applicationData: app } = params;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.yourdomain.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
   const contactUrl = `${appUrl}/s/${spaceSlug}/contacts/${contactId}`;
 
   const tierColor = scoreLabel === 'hot' ? '#059669' : scoreLabel === 'warm' ? '#d97706' : '#6b7280';
@@ -132,7 +132,7 @@ export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
 
   const { toEmail, spaceName, spaceSlug, contacts } = params;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.yourdomain.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
   const leadsUrl = `${appUrl}/s/${spaceSlug}/leads`;
 
   const contactRows = contacts
@@ -256,7 +256,7 @@ export async function sendNewDealNotification(params: NewDealEmailParams): Promi
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
 
   const { toEmail, spaceName, spaceSlug, dealTitle, dealValue, dealAddress, dealPriority, contactNames } = params;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.yourdomain.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
   const dealsUrl = `${appUrl}/s/${spaceSlug}/deals`;
 
   const detailRows = [
@@ -319,7 +319,7 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.yourdomain.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
 
   const { toEmail, brokerageName, inviterName, roleToAssign, token } = params;
   const acceptUrl = `${appUrl}/invite/${token}`;

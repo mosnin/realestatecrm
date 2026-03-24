@@ -156,7 +156,7 @@ export async function sendTourFollowUp(data: TourEmailData) {
 export async function sendAgentNotification(agentEmail: string, data: TourEmailData) {
   const { guestName, guestEmail, guestPhone = null, startsAt, propertyAddress, businessName, slug } = data;
   const subject = `New Tour Booked — ${guestName} on ${formatDate(startsAt)}`;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.yourdomain.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
   const toursUrl = `${appUrl}/s/${slug}/tours`;
 
   const body = `

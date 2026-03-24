@@ -19,7 +19,7 @@ export const protocol =
 const configuredRootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
 const defaultRootDomain =
   process.env.NODE_ENV === 'production'
-    ? 'workflowrouting.com'
+    ? 'my.usechippi.com'
     : 'localhost:3000';
 
 if (!configuredRootDomain && process.env.NODE_ENV !== 'production') {
