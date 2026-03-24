@@ -39,9 +39,11 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
 
             {/* Role switcher — visible on login pages */}
             {showRoleSwitcher && (
-              <div className="mb-6 flex rounded-lg border border-border bg-muted/50 p-1">
+              <div role="tablist" aria-label="Account type" className="mb-6 flex rounded-lg border border-border bg-muted/50 p-1">
                 <Link
                   href="/login/realtor"
+                  role="tab"
+                  aria-selected={isRealtorLogin}
                   className={cn(
                     'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-all sm:py-2',
                     isRealtorLogin
@@ -54,6 +56,8 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
                 </Link>
                 <Link
                   href="/login/broker"
+                  role="tab"
+                  aria-selected={isBrokerLogin}
                   className={cn(
                     'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-all sm:py-2',
                     isBrokerLogin

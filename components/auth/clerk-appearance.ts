@@ -11,7 +11,7 @@ export function clerkAuthAppearance(isDark: boolean) {
     variables: {
       colorPrimary: primary,
       colorNeutral: foreground,
-      borderRadius: '0.5rem',
+      borderRadius: '0.75rem',
       fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
       fontSize: '0.875rem',
     },

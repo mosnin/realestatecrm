@@ -1,6 +1,9 @@
 import { AuthPageLayout } from '@/components/auth/auth-page-layout';
 import { ThemedSignUp } from '@/components/auth/clerk-sign-up';
 import Link from 'next/link';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = { title: 'Sign Up — Chippi' };
 
 export default function SignUpPage() {
   return (
@@ -10,9 +13,7 @@ export default function SignUpPage() {
     >
       <div className="w-full space-y-4">
         <ThemedSignUp
-          forceRedirectUrl="/dashboard"
-          afterSignUpUrl="/dashboard"
-          signUpForceRedirectUrl="/dashboard"
+          forceRedirectUrl="/auth/redirect?intent=realtor"
         />
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{' '}

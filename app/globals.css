@@ -260,7 +260,7 @@
 .cl-socialButtonsBlockButton {
   border: 1px solid #d4d4d4 !important;
   background: transparent !important;
-  border-radius: 0.5rem !important;
+  border-radius: 0.75rem !important;
   box-shadow: none !important;
   height: 2.75rem !important;
   font-weight: 500 !important;
@@ -284,11 +284,21 @@
 .cl-formFieldInput {
   border: 1px solid #d4d4d4 !important;
   background: transparent !important;
-  border-radius: 0.5rem !important;
+  border-radius: 0.75rem !important;
   box-shadow: none !important;
   height: 2.75rem !important;
   font-size: 0.875rem !important;
   color: #1c1917 !important;
+}
+.cl-formFieldInput__emailAddress,
+.cl-formFieldInput__password,
+.cl-formFieldInput__phoneNumber,
+.cl-formFieldInput__identifier {
+  border-radius: 0.75rem !important;
+}
+.cl-formFieldRow {
+  border-radius: 0.75rem !important;
+  overflow: hidden;
 }
 .cl-formFieldInput:focus {
   border-color: #ff964f !important;
@@ -298,7 +308,7 @@
   background: #1c1917 !important;
   color: #ffffff !important;
   border: none !important;
-  border-radius: 0.5rem !important;
+  border-radius: 0.75rem !important;
   box-shadow: none !important;
   height: 2.75rem !important;
   font-weight: 600 !important;
@@ -328,19 +338,19 @@
 }
 .cl-identityPreview {
   border: 1px solid #d4d4d4 !important;
-  border-radius: 0.5rem !important;
+  border-radius: 0.75rem !important;
   background: transparent !important;
   box-shadow: none !important;
 }
 .cl-alternativeMethodsBlockButton {
   border: 1px solid #d4d4d4 !important;
-  border-radius: 0.5rem !important;
+  border-radius: 0.75rem !important;
   background: transparent !important;
   box-shadow: none !important;
 }
 .cl-otpCodeFieldInput {
   border: 1px solid #d4d4d4 !important;
-  border-radius: 0.5rem !important;
+  border-radius: 0.75rem !important;
   box-shadow: none !important;
 }
 .cl-formFieldErrorText {
@@ -350,7 +360,7 @@
 .cl-alert {
   border: 1px solid rgba(220, 38, 38, 0.2) !important;
   background: rgba(220, 38, 38, 0.05) !important;
-  border-radius: 0.5rem !important;
+  border-radius: 0.75rem !important;
   box-shadow: none !important;
 }
 /* Dark mode overrides */

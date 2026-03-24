@@ -194,7 +194,7 @@ export function OnboardingFlow() {
                 i < step
                   ? 'bg-primary text-primary-foreground'
                   : i === step
-                  ? 'bg-foreground text-white'
+                  ? 'bg-foreground text-background'
                   : 'bg-muted text-muted-foreground'
               }`}
             >
