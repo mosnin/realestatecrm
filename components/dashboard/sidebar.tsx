@@ -209,7 +209,7 @@ export function Sidebar({
           href="/broker"
           name={brokerageName ?? 'Brokerage'}
           icon={Building2}
-          subtitle={brokerageRole === 'broker_owner' ? 'Owner' : 'Manager'}
+          subtitle={brokerageRole === 'broker_owner' ? 'Owner' : brokerageRole === 'broker_admin' ? 'Admin' : 'Member'}
         />
 
         {/* Team nav */}
