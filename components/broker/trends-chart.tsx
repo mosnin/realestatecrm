@@ -25,14 +25,23 @@ const METRIC_LABELS: Record<Metric, string> = {
 export function TrendsChart() {
   const [weeks, setWeeks] = useState<WeekData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [metric, setMetric] = useState<Metric>('leads');
 
   useEffect(() => {
     const controller = new AbortController();
     fetch('/api/broker/trends', { signal: controller.signal })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((d) => setWeeks(d.weeks ?? []))
-      .catch((err) => { if (err.name !== 'AbortError') setWeeks([]); })
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          console.error('[trends] Failed to load:', err);
+          setError(true);
+        }
+      })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, []);
@@ -47,7 +56,17 @@ export function TrendsChart() {
     );
   }
 
-  if (weeks.length === 0) return null;
+  if (error || weeks.length === 0) {
+    return (
+      <Card>
+        <CardContent className="px-5 py-5 text-center">
+          <p className="text-sm text-muted-foreground">
+            {error ? 'Failed to load trends data.' : 'Not enough data for trends yet.'}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const values = weeks.map((w) => w[metric]);
   const maxVal = Math.max(...values, 1);
