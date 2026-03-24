@@ -40,8 +40,12 @@ export default clerkMiddleware(async (auth, request) => {
 
   // Fast-path: public-facing pages skip the Clerk auth() call entirely.
   // This avoids an external API round-trip that adds seconds to page load.
+  // The x-public-page header tells the root layout to skip ClerkProvider
+  // so Clerk's client-side JS doesn't prompt visitors to sign in.
   if (isFullyPublicRoute(request)) {
-    return NextResponse.next();
+    const headers = new Headers(request.headers);
+    headers.set('x-public-page', '1');
+    return NextResponse.next({ request: { headers } });
   }
 
   const session = await auth();

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { GeistSans } from 'geist/font/sans';
 import { Open_Sans } from 'next/font/google';
 
@@ -19,31 +20,38 @@ export const metadata: Metadata = {
   description: 'The CRM built for real estate agents. AI-powered pipeline management, deal tracking, and client workflows that help you close more deals faster.'
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return (
-    <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
-        <head>
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}})();`,
-            }}
-          />
-        </head>
-        <body className={`${GeistSans.variable} ${openSans.variable} antialiased bg-background text-foreground`}>
-          <ThemeProvider>
-            <AmplitudeProvider>
-              {children}
-            </AmplitudeProvider>
-          </ThemeProvider>
-          <Toaster richColors position="top-right" />
-          <SpeedInsights />
-        </body>
-      </html>
-    </ClerkProvider>
+  // Public-facing pages (intake, booking, status) set this header in
+  // middleware so we can skip ClerkProvider entirely — prevents Clerk's
+  // client-side JS from loading and prompting visitors to sign in.
+  const h = await headers();
+  const isPublicPage = h.get('x-public-page') === '1';
+
+  const inner = (
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}})();`,
+          }}
+        />
+      </head>
+      <body className={`${GeistSans.variable} ${openSans.variable} antialiased bg-background text-foreground`}>
+        <ThemeProvider>
+          <AmplitudeProvider>
+            {children}
+          </AmplitudeProvider>
+        </ThemeProvider>
+        <Toaster richColors position="top-right" />
+        <SpeedInsights />
+      </body>
+    </html>
   );
+
+  if (isPublicPage) return inner;
+  return <ClerkProvider>{inner}</ClerkProvider>;
 }
