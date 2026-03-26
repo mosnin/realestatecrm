@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { requirePaidSpaceOwner } from '@/lib/api-auth';
+import { requireSpaceOwner } from '@/lib/api-auth';
 import { syncContact } from '@/lib/vectorize';
 import { notifyNewContact } from '@/lib/notify';
 import type { Contact } from '@/lib/types';
@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
-  const auth = await requirePaidSpaceOwner(slug);
+  const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'name must be 200 characters or fewer' }, { status: 400 });
   }
 
-  const auth = await requirePaidSpaceOwner(slug);
+  const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 

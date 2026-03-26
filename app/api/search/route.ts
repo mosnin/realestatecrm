@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { requirePaidSpaceOwner } from '@/lib/api-auth';
+import { requireSpaceOwner } from '@/lib/api-auth';
 
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   if (!q || q.length < 2) return NextResponse.json({ contacts: [], deals: [], tours: [] });
 
   try {
-    const auth = await requirePaidSpaceOwner(slug);
+    const auth = await requireSpaceOwner(slug);
     if (auth instanceof NextResponse) return auth;
     const { space } = auth;
 

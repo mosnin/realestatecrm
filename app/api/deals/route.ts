@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { requirePaidSpaceOwner } from '@/lib/api-auth';
+import { requireSpaceOwner } from '@/lib/api-auth';
 import { syncDeal } from '@/lib/vectorize';
 import { notifyNewDeal } from '@/lib/notify';
 import type { Deal, DealStage } from '@/lib/types';
@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
-  const auth = await requirePaidSpaceOwner(slug);
+  const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { slug, title, description, value, address, priority, closeDate, stageId, contactIds } = body;
 
-  const auth = await requirePaidSpaceOwner(slug);
+  const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 

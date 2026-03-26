@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { requirePaidSpaceOwner } from '@/lib/api-auth';
+import { requireSpaceOwner } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 const VALID_TYPES = new Set(['QUALIFICATION', 'TOUR', 'APPLICATION']);
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   if (rows.length > 500)
     return NextResponse.json({ error: 'Maximum 500 rows per import' }, { status: 400 });
 
-  const auth = await requirePaidSpaceOwner(slug);
+  const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { userId, space } = auth;
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { requirePaidSpaceOwner } from '@/lib/api-auth';
+import { requireSpaceOwner } from '@/lib/api-auth';
 
 /**
  * POST — notify a waitlisted guest that a slot opened up.
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
   if (!waitlistId) return NextResponse.json({ error: 'waitlistId required' }, { status: 400 });
 
-  const auth = await requirePaidSpaceOwner(slug);
+  const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 

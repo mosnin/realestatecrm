@@ -6,7 +6,7 @@ export async function getSpaceFromSlug(inputSlug: string): Promise<Space | null>
   const slug = normalizeSlug(inputSlug);
   const { data, error } = await supabase
     .from('Space')
-    .select('id, slug, name, emoji, ownerId, brokerageId, createdAt, stripeCustomerId, stripeSubscriptionId, stripeSubscriptionStatus, stripePeriodEnd')
+    .select('id, slug, name, emoji, ownerId, brokerageId, createdAt')
     .eq('slug', slug)
     .limit(1)
     .maybeSingle();
@@ -39,7 +39,7 @@ export async function getSpaceForUser(clerkUserId: string): Promise<Space | null
 
   const { data, error } = await supabase
     .from('Space')
-    .select('id, slug, name, emoji, ownerId, brokerageId, createdAt, stripeCustomerId, stripeSubscriptionId, stripeSubscriptionStatus, stripePeriodEnd')
+    .select('id, slug, name, emoji, ownerId, brokerageId, createdAt')
     .eq('ownerId', user.id)
     .limit(1)
     .maybeSingle();
