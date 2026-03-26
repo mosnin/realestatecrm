@@ -18,10 +18,22 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
   // Force HTTPS for 2 years (only active when served over TLS)
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
-  // CSP intentionally omitted — Clerk's hosted component requires a large and
-  // environment-specific allowlist (clerk.com, lcl.dev, Cloudflare Turnstile, etc.)
-  // that must be validated against the live deployment before being enforced.
-  // Add a CSP once the full domain list is confirmed via browser console testing.
+  // Content Security Policy (report-only to avoid breaking Clerk while domains are validated)
+  {
+    key: 'Content-Security-Policy-Report-Only',
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      "img-src 'self' data: blob: https://img.clerk.com https://*.stripe.com",
+      "connect-src 'self' https://api.stripe.com https://*.clerk.accounts.dev https://*.supabase.co wss://*.supabase.co",
+      "frame-src https://js.stripe.com https://hooks.stripe.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
+      "worker-src 'self' blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+    ].join('; '),
+  },
 ];
 
 const nextConfig: NextConfig = {

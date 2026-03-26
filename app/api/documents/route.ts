@@ -36,6 +36,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'File type not supported' }, { status: 400 });
   }
 
+  // Validate file magic numbers to prevent MIME spoofing
+  const header = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  const isPdf = header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46; // %PDF
+  const isJpeg = header[0] === 0xFF && header[1] === 0xD8;
+  const isPng = header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47;
+  const isWebp = header[8 - 4] === 0x57 && header[8 - 3] === 0x45 && header[8 - 2] === 0x42 && header[8 - 1] === 0x50; // WEBP at offset 8
+  const isDoc = header[0] === 0xD0 && header[1] === 0xCF; // OLE2 (DOC)
+  const isDocx = header[0] === 0x50 && header[1] === 0x4B; // ZIP (DOCX)
+  if (!isPdf && !isJpeg && !isPng && !isWebp && !isDoc && !isDocx) {
+    return NextResponse.json({ error: 'File content does not match declared type' }, { status: 400 });
+  }
+
   // Verify access — guest uploads are restricted to recently-created public
   // intake contacts to prevent arbitrary file uploads to any contact.
   let resolvedSpaceId: string;
@@ -77,7 +89,7 @@ export async function POST(req: NextRequest) {
     .insert({
       contactId,
       spaceId: resolvedSpaceId,
-      fileName: file.name,
+      fileName: file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 255),
       fileType: file.type,
       fileSize: file.size,
       storageKey,

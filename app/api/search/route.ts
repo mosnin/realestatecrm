@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { requireSpaceOwner } from '@/lib/api-auth';
+import { requirePaidSpaceOwner } from '@/lib/api-auth';
 
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   if (!q || q.length < 2) return NextResponse.json({ contacts: [], deals: [], tours: [] });
 
   try {
-    const auth = await requireSpaceOwner(slug);
+    const auth = await requirePaidSpaceOwner(slug);
     if (auth instanceof NextResponse) return auth;
     const { space } = auth;
 
@@ -22,32 +22,30 @@ export async function GET(req: NextRequest) {
     const term = `%${sanitized}%`;
 
     // Run each query independently so one failure doesn't block the others
-    const contactsPromise = supabase
+    const safeQuery = async <T>(label: string, promise: PromiseLike<T>): Promise<T | { data: null; error: unknown }> => {
+      try { return await promise; } catch (err) { console.error(`[search] ${label} threw:`, err); return { data: null, error: err }; }
+    };
+
+    const contactsPromise = safeQuery('contacts', supabase
       .from('Contact')
       .select('id, name, email, phone, type, leadScore, scoreLabel')
       .eq('spaceId', space.id)
       .or(`name.ilike.${term},email.ilike.${term},phone.ilike.${term}`)
-      .limit(8)
-      .then((r) => r)
-      .catch((err) => { console.error('[search] contacts threw:', err); return { data: null, error: err }; });
+      .limit(8));
 
-    const dealsPromise = supabase
+    const dealsPromise = safeQuery('deals', supabase
       .from('Deal')
       .select('id, title, address, value, status, stageId')
       .eq('spaceId', space.id)
       .or(`title.ilike.${term},address.ilike.${term}`)
-      .limit(8)
-      .then((r) => r)
-      .catch((err) => { console.error('[search] deals threw:', err); return { data: null, error: err }; });
+      .limit(8));
 
-    const toursPromise = supabase
+    const toursPromise = safeQuery('tours', supabase
       .from('Tour')
       .select('id, guestName, guestEmail, propertyAddress, startsAt, status')
       .eq('spaceId', space.id)
       .or(`guestName.ilike.${term},guestEmail.ilike.${term},propertyAddress.ilike.${term}`)
-      .limit(8)
-      .then((r) => r)
-      .catch((err) => { console.error('[search] tours threw:', err); return { data: null, error: err }; });
+      .limit(8));
 
     const [contactsResult, dealsResult, toursResult] = await Promise.all([
       contactsPromise,

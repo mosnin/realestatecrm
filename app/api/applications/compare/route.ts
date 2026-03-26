@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { requireSpaceOwner } from '@/lib/api-auth';
+import { requirePaidSpaceOwner } from '@/lib/api-auth';
 
 /**
  * GET — Compare multiple applicants side by side.
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'slug and ids required' }, { status: 400 });
   }
 
-  const auth = await requireSpaceOwner(slug);
+  const auth = await requirePaidSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
 
   const ids = idsParam.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 10);

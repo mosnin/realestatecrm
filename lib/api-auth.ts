@@ -21,6 +21,33 @@ export async function requireAuth(): Promise<{ userId: string } | NextResponse> 
 }
 
 /**
+ * Checks that a space has an active or trialing subscription.
+ * Admins bypass the check. Returns null if OK, or a 403 NextResponse.
+ */
+export async function requireActiveSubscription(
+  space: Space,
+  userId?: string,
+): Promise<NextResponse | null> {
+  const status = space.stripeSubscriptionStatus ?? 'inactive';
+  if (status === 'active' || status === 'trialing') return null;
+
+  // Check if user is a platform admin (admins bypass paywall)
+  if (userId) {
+    const { data: userRow } = await supabase
+      .from('User')
+      .select('platformRole')
+      .eq('clerkId', userId)
+      .maybeSingle();
+    if (userRow?.platformRole === 'admin') return null;
+  }
+
+  return NextResponse.json(
+    { error: 'Active subscription required' },
+    { status: 403 },
+  );
+}
+
+/**
  * Verifies the calling user owns the given workspace slug.
  * Returns { userId, space } or a 4xx NextResponse.
  */
@@ -41,6 +68,22 @@ export async function requireSpaceOwner(
   if (!userSpace || space.id !== userSpace.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+
+  return { userId, space };
+}
+
+/**
+ * Same as requireSpaceOwner but also enforces active subscription.
+ */
+export async function requirePaidSpaceOwner(
+  slug: string,
+): Promise<{ userId: string; space: Space } | NextResponse> {
+  const result = await requireSpaceOwner(slug);
+  if (result instanceof NextResponse) return result;
+  const { userId, space } = result;
+
+  const subCheck = await requireActiveSubscription(space, userId);
+  if (subCheck) return subCheck;
 
   return { userId, space };
 }

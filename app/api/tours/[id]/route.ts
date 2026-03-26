@@ -48,13 +48,29 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
   }
 
+  // Whitelist and validate allowed fields
   const update: Record<string, unknown> = { updatedAt: new Date().toISOString() };
   if (body.status !== undefined) update.status = body.status;
-  if (body.guestName !== undefined) update.guestName = body.guestName;
-  if (body.guestEmail !== undefined) update.guestEmail = body.guestEmail;
-  if (body.guestPhone !== undefined) update.guestPhone = body.guestPhone || null;
-  if (body.propertyAddress !== undefined) update.propertyAddress = body.propertyAddress || null;
-  if (body.notes !== undefined) update.notes = body.notes || null;
+  if (body.guestName !== undefined) {
+    if (typeof body.guestName !== 'string' || body.guestName.length > 200) return NextResponse.json({ error: 'Invalid guestName' }, { status: 400 });
+    update.guestName = body.guestName;
+  }
+  if (body.guestEmail !== undefined) {
+    if (typeof body.guestEmail !== 'string' || body.guestEmail.length > 254) return NextResponse.json({ error: 'Invalid guestEmail' }, { status: 400 });
+    update.guestEmail = body.guestEmail;
+  }
+  if (body.guestPhone !== undefined) {
+    if (body.guestPhone && (typeof body.guestPhone !== 'string' || body.guestPhone.length > 50)) return NextResponse.json({ error: 'Invalid guestPhone' }, { status: 400 });
+    update.guestPhone = body.guestPhone || null;
+  }
+  if (body.propertyAddress !== undefined) {
+    if (body.propertyAddress && (typeof body.propertyAddress !== 'string' || body.propertyAddress.length > 500)) return NextResponse.json({ error: 'Invalid propertyAddress' }, { status: 400 });
+    update.propertyAddress = body.propertyAddress || null;
+  }
+  if (body.notes !== undefined) {
+    if (body.notes && (typeof body.notes !== 'string' || body.notes.length > 2000)) return NextResponse.json({ error: 'Invalid notes' }, { status: 400 });
+    update.notes = body.notes || null;
+  }
   if (body.startsAt !== undefined) {
     const d = new Date(body.startsAt);
     if (isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid startsAt' }, { status: 400 });

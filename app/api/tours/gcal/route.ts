@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { requireSpaceOwner } from '@/lib/api-auth';
+import { requirePaidSpaceOwner } from '@/lib/api-auth';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? '';
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
-  const auth = await requireSpaceOwner(slug);
+  const auth = await requirePaidSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
-  const auth = await requireSpaceOwner(slug);
+  const auth = await requirePaidSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 

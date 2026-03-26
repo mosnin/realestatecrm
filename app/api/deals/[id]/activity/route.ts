@@ -66,7 +66,7 @@ export async function POST(
       dealId: id,
       spaceId: space.id,
       type,
-      content: typeof content === 'string' ? content.slice(0, 5000) : null,
+      content: typeof content === 'string' ? content.replace(/<[^>]*>/g, '').slice(0, 5000) : null,
       metadata: metadata ?? null,
     })
     .select()

@@ -230,7 +230,7 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
 
   const safeSubject = subject.replace(/[\r\n\t]/g, ' ').slice(0, 200);
   await resend.emails.send({
-    from: `${fromName.replace(/[\r\n\t]/g, ' ').slice(0, 100)} <${FROM}>`,
+    from: `${fromName.replace(/[\r\n\t<>"]/g, ' ').slice(0, 100)} <${FROM}>`,
     to: toEmail,
     replyTo: replyTo ?? undefined,
     subject: safeSubject,

@@ -12,6 +12,7 @@ import {
   publicApplicationSchema,
 } from '@/lib/public-application';
 import { notifyNewLead } from '@/lib/notify';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
   // ── IP-based rate limiting (10 submissions / IP / hour) ──────────────────
@@ -19,18 +20,12 @@ export async function POST(req: NextRequest) {
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     req.headers.get('x-real-ip') ??
     'unknown';
-  const rateLimitKey = `apply:rl:${ip}`;
-  try {
-    const count = await redis.incr(rateLimitKey);
-    if (count === 1) await redis.expire(rateLimitKey, 3600);
-    if (count > 10) {
-      return NextResponse.json(
-        { error: 'Too many submissions. Please try again later.' },
-        { status: 429, headers: { 'Retry-After': '3600' } }
-      );
-    }
-  } catch {
-    // Redis unavailable — fail open to preserve availability; submission proceeds
+  const { allowed } = await checkRateLimit(`apply:rl:${ip}`, 10, 3600);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Too many submissions. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': '3600' } },
+    );
   }
 
   let requestBody: unknown;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { requireSpaceOwner } from '@/lib/api-auth';
+import { requirePaidSpaceOwner } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 /**
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
 
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
-  const auth = await requireSpaceOwner(slug);
+  const auth = await requirePaidSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
 
   if (tourId) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { requireSpaceOwner } from '@/lib/api-auth';
+import { requirePaidSpaceOwner } from '@/lib/api-auth';
 import { syncContact } from '@/lib/vectorize';
 import { syncDeal } from '@/lib/vectorize';
 import { audit } from '@/lib/audit';
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid action payload' }, { status: 400 });
     }
 
-    const auth = await requireSpaceOwner(slug);
+    const auth = await requirePaidSpaceOwner(slug);
     if (auth instanceof NextResponse) return auth;
     const { userId, space } = auth;
 

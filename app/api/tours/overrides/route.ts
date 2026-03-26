@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { requireSpaceOwner } from '@/lib/api-auth';
+import { requirePaidSpaceOwner } from '@/lib/api-auth';
 
 /** GET — list overrides for the next 90 days */
 export async function GET(req: NextRequest) {
@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const propertyId = req.nextUrl.searchParams.get('propertyId');
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
-  const auth = await requireSpaceOwner(slug);
+  const auth = await requirePaidSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid endDate format' }, { status: 400 });
   }
 
-  const auth = await requireSpaceOwner(slug);
+  const auth = await requirePaidSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
