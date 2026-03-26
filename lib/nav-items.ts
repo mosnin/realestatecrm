@@ -10,6 +10,7 @@ import {
   BarChart2,
   CreditCard,
   CalendarDays,
+  Clock,
 } from 'lucide-react';
 
 export const primaryNavItems = [
@@ -17,6 +18,7 @@ export const primaryNavItems = [
   { href: '/leads', label: 'Leads', icon: PhoneIncoming },
   { href: '/contacts', label: 'Clients', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
+  { href: '/follow-ups', label: 'Follow-ups', icon: Clock },
   { href: '/tours', label: 'Tours', icon: CalendarDays },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/ai', label: 'Chip', icon: Sparkles },
@@ -35,6 +37,6 @@ export const mobileNavItems = [
   { href: '/leads', label: 'Leads', icon: PhoneIncoming },
   { href: '/contacts', label: 'Clients', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
-  { href: '/tours', label: 'Tours', icon: CalendarDays },
+  { href: '/follow-ups', label: 'Tasks', icon: Clock },
   { href: '/ai', label: 'Chip', icon: Sparkles },
 ] as const;

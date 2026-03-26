@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Calendar, CheckCircle2, Phone, Mail, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, CheckCircle2, Phone, Mail, ChevronDown, ChevronUp, Timer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface FollowUpContact {
@@ -12,6 +12,8 @@ export interface FollowUpContact {
   email: string | null;
   type: string;
   followUpAt: string;
+  leadScore: number | null;
+  scoreLabel: string | null;
 }
 
 interface Props {
@@ -19,10 +21,31 @@ interface Props {
   contacts: FollowUpContact[];
 }
 
+const SNOOZE_OPTIONS = [
+  { label: 'Later today', hours: 3 },
+  { label: 'Tomorrow', hours: 24 },
+  { label: 'In 2 days', hours: 48 },
+  { label: 'Next week', hours: 168 },
+] as const;
+
+const SCORE_COLORS: Record<string, string> = {
+  hot: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
+  warm: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+  cold: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
+  unqualified: 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400',
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  qualification: 'Qual',
+  tour: 'Tour',
+  application: 'App',
+};
+
 export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
   const [contacts, setContacts] = useState<FollowUpContact[]>(initialContacts);
   const [expanded, setExpanded] = useState(true);
   const [clearing, setClearing] = useState<Set<string>>(new Set());
+  const [snoozeOpen, setSnoozeOpen] = useState<string | null>(null);
 
   async function handleClearFollowUp(id: string) {
     setClearing((s) => new Set(s).add(id));
@@ -33,6 +56,24 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
         body: JSON.stringify({ followUpAt: null }),
       });
       setContacts((prev) => prev.filter((c) => c.id !== id));
+    } finally {
+      setClearing((s) => { const n = new Set(s); n.delete(id); return n; });
+    }
+  }
+
+  async function handleSnooze(id: string, hours: number) {
+    setSnoozeOpen(null);
+    setClearing((s) => new Set(s).add(id));
+    try {
+      const newFollowUp = new Date(Date.now() + hours * 3600000).toISOString();
+      await fetch(`/api/contacts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ followUpAt: newFollowUp }),
+      });
+      setContacts((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, followUpAt: newFollowUp } : c))
+      );
     } finally {
       setClearing((s) => { const n = new Set(s); n.delete(id); return n; });
     }
@@ -95,6 +136,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
             const date = new Date(contact.followUpAt);
             const isOverdue = date < new Date();
             const isBusy = clearing.has(contact.id);
+            const typeLabel = TYPE_LABELS[contact.type] ?? contact.type;
             return (
               <div
                 key={contact.id}
@@ -110,12 +152,27 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <Link
-                    href={`/s/${slug}/contacts/${contact.id}`}
-                    className="text-sm font-medium hover:text-primary transition-colors truncate block"
-                  >
-                    {contact.name}
-                  </Link>
+                  <div className="flex items-center gap-1.5">
+                    <Link
+                      href={`/s/${slug}/contacts/${contact.id}`}
+                      className="text-sm font-medium hover:text-primary transition-colors truncate"
+                    >
+                      {contact.name}
+                    </Link>
+                    {contact.scoreLabel && (
+                      <span
+                        className={cn(
+                          'inline-flex items-center text-[10px] font-semibold rounded px-1.5 py-0.5 leading-none',
+                          SCORE_COLORS[contact.scoreLabel] ?? SCORE_COLORS.unqualified
+                        )}
+                      >
+                        {contact.scoreLabel}
+                      </span>
+                    )}
+                    <span className="inline-flex items-center text-[10px] font-medium rounded px-1.5 py-0.5 leading-none bg-muted text-muted-foreground">
+                      {typeLabel}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     {contact.phone && (
                       <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
@@ -130,7 +187,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
                   </div>
                 </div>
 
-                {/* Date + clear */}
+                {/* Date + snooze + clear */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span
                     className={cn(
@@ -143,6 +200,36 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
                     {isOverdue ? 'Overdue' : 'Due'}{' '}
                     {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
+
+                  {/* Snooze button */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      title="Snooze"
+                      disabled={isBusy}
+                      onClick={() =>
+                        setSnoozeOpen((prev) => (prev === contact.id ? null : contact.id))
+                      }
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/15 transition-colors"
+                    >
+                      <Timer size={14} />
+                    </button>
+                    {snoozeOpen === contact.id && (
+                      <div className="absolute right-0 top-8 z-50 w-36 rounded-md border bg-popover text-popover-foreground shadow-md py-1">
+                        {SNOOZE_OPTIONS.map((opt) => (
+                          <button
+                            key={opt.hours}
+                            type="button"
+                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+                            onClick={() => handleSnooze(contact.id, opt.hours)}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   <button
                     type="button"
                     title="Mark done"
@@ -156,6 +243,16 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
               </div>
             );
           })}
+
+          {/* View all link */}
+          <div className="px-5 py-2.5">
+            <Link
+              href={`/s/${slug}/follow-ups`}
+              className="block w-full text-center text-xs font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
+            >
+              View all &rarr;
+            </Link>
+          </div>
         </div>
       )}
     </div>

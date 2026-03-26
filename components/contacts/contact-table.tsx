@@ -30,6 +30,7 @@ import {
   X,
   CheckSquare,
   GitCompare,
+  CalendarDays,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ApplicationCompare } from './application-compare';
@@ -55,6 +56,7 @@ type Client = {
   address: string | null;
   notes: string | null;
   tags: string[];
+  followUpAt: string | null;
 };
 
 const STAGES = CONTACT_STAGES;
@@ -255,6 +257,7 @@ export function ContactTable({ slug }: ContactTableProps) {
       Preferences: c.preferences ?? '',
       Notes: c.notes ?? '',
       Tags: c.tags.join('; '),
+      'Follow-up': c.followUpAt ? new Date(c.followUpAt).toLocaleDateString('en-US') : '',
       'Added': new Date(c.createdAt).toLocaleDateString('en-US'),
     })));
   }
@@ -579,6 +582,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Contact</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Budget</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Preferences</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden xl:table-cell">Follow-up</th>
                   <th className="px-4 py-3 w-20" />
                 </tr>
               </thead>
@@ -638,6 +642,21 @@ export function ContactTable({ slug }: ContactTableProps) {
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground max-w-[200px] truncate">
                         {contact.preferences ?? '—'}
+                      </td>
+                      <td className="px-4 py-3 hidden xl:table-cell">
+                        {contact.followUpAt ? (
+                          <span className={cn(
+                            'inline-flex items-center gap-1 text-[11px] font-medium rounded px-1.5 py-0.5',
+                            new Date(contact.followUpAt) < new Date()
+                              ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                          )}>
+                            <CalendarDays size={10} />
+                            {new Date(contact.followUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
@@ -833,6 +852,18 @@ function ContactCard({
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <MapPin size={10} className="flex-shrink-0" />
               <span className="truncate">{contact.preferences}</span>
+            </div>
+          )}
+          {contact.followUpAt && (
+            <div className={cn(
+              'flex items-center gap-1.5 text-xs font-medium',
+              new Date(contact.followUpAt) < new Date() ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'
+            )}>
+              <CalendarDays size={10} className="flex-shrink-0" />
+              <span>
+                {new Date(contact.followUpAt) < new Date() ? 'Overdue' : 'Due'}{' '}
+                {new Date(contact.followUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
             </div>
           )}
         </div>

@@ -109,16 +109,27 @@ export default async function DashboardLayout({
   if (!dbUser.space || dbUser.space.id !== space.id) notFound();
 
   let unreadLeadCount = 0;
+  let overdueFollowUpCount = 0;
   try {
-    const { count, error: countError } = await supabase
-      .from('Contact')
-      .select('*', { count: 'exact', head: true })
-      .eq('spaceId', space.id)
-      .contains('tags', ['new-lead']);
-    if (countError) throw countError;
-    unreadLeadCount = count ?? 0;
+    const [leadResult, followUpResult] = await Promise.all([
+      supabase
+        .from('Contact')
+        .select('*', { count: 'exact', head: true })
+        .eq('spaceId', space.id)
+        .contains('tags', ['new-lead']),
+      supabase
+        .from('Contact')
+        .select('*', { count: 'exact', head: true })
+        .eq('spaceId', space.id)
+        .not('followUpAt', 'is', null)
+        .lte('followUpAt', new Date().toISOString()),
+    ]);
+    if (leadResult.error) throw leadResult.error;
+    unreadLeadCount = leadResult.count ?? 0;
+    overdueFollowUpCount = followUpResult.count ?? 0;
   } catch {
     unreadLeadCount = 0;
+    overdueFollowUpCount = 0;
   }
 
   // Check broker context and brokerage membership for sidebar
@@ -155,7 +166,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
-      <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} />
+      <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} overdueFollowUpCount={overdueFollowUpCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
         <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">

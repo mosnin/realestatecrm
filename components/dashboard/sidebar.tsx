@@ -23,6 +23,7 @@ interface SidebarProps {
   slug: string;
   spaceName: string;
   unreadLeadCount: number;
+  overdueFollowUpCount?: number;
   isBroker?: boolean;
   isBrokerOnly?: boolean;
   brokerageName?: string | null;
@@ -180,6 +181,7 @@ export function Sidebar({
   slug,
   spaceName,
   unreadLeadCount,
+  overdueFollowUpCount = 0,
   isBroker = false,
   isBrokerOnly = false,
   brokerageName = null,
@@ -295,6 +297,20 @@ export function Sidebar({
                 )}
               >
                 {unreadLeadCount > 99 ? '99+' : unreadLeadCount}
+              </span>
+            );
+          }
+          if (item.href === '/follow-ups' && overdueFollowUpCount > 0) {
+            badge = (
+              <span
+                className={cn(
+                  'inline-flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums flex-shrink-0',
+                  isActive
+                    ? 'bg-red-200/60 text-red-700 dark:bg-red-500/20 dark:text-red-400'
+                    : 'bg-red-500 text-white dark:bg-red-600',
+                )}
+              >
+                {overdueFollowUpCount > 99 ? '99+' : overdueFollowUpCount}
               </span>
             );
           }
