@@ -36,9 +36,9 @@ const SCORE_COLORS: Record<string, string> = {
 };
 
 const TYPE_LABELS: Record<string, string> = {
-  qualification: 'Qual',
-  tour: 'Tour',
-  application: 'App',
+  QUALIFICATION: 'Qual',
+  TOUR: 'Tour',
+  APPLICATION: 'App',
 };
 
 export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
@@ -235,7 +235,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
                     title="Mark done"
                     disabled={isBusy}
                     onClick={() => handleClearFollowUp(contact.id)}
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-500/15 transition-colors"
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/15 transition-colors"
                   >
                     <CheckCircle2 size={14} />
                   </button>

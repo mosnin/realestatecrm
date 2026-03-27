@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -93,6 +93,17 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
   const [tab, setTab] = useState<Tab>('overdue');
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [snoozeOpen, setSnoozeOpen] = useState<string | null>(null);
+
+  // Close snooze dropdown on click outside
+  useEffect(() => {
+    if (!snoozeOpen) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-snooze-dropdown]')) setSnoozeOpen(null);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [snoozeOpen]);
 
   const overdue = contacts.filter(c => isOverdue(c.followUpAt));
   const today = contacts.filter(c => isToday(c.followUpAt));
@@ -293,7 +304,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                   {/* Actions */}
                   <div className="flex items-center gap-1 flex-shrink-0">
                     {/* Snooze dropdown */}
-                    <div className="relative">
+                    <div className="relative" data-snooze-dropdown>
                       <button
                         type="button"
                         title="Snooze"
@@ -309,7 +320,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                             <button
                               key={opt.hours}
                               onClick={() => handleSnooze(contact.id, opt.hours)}
-                              className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground transition-colors"
                             >
                               {opt.label}
                             </button>
@@ -370,7 +381,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                     {formatDate(deal.followUpAt)}
                   </span>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <div className="relative">
+                    <div className="relative" data-snooze-dropdown>
                       <button
                         type="button"
                         title="Snooze"
@@ -386,7 +397,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                             <button
                               key={opt.hours}
                               onClick={() => handleSnooze(deal.id, opt.hours, true)}
-                              className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground transition-colors"
                             >
                               {opt.label}
                             </button>
