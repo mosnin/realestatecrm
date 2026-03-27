@@ -6,8 +6,11 @@ import { UserButton } from '@clerk/nextjs';
 import {
   LayoutDashboard,
   Users,
+  Building,
   Building2,
   Mail,
+  CreditCard,
+  ScrollText,
   Menu,
   Sun,
   Moon,
@@ -30,6 +33,8 @@ const navItems = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
   { href: '/admin/users', label: 'Users', icon: Users, exact: false },
   { href: '/admin/brokerages', label: 'Brokerages', icon: Building2, exact: false },
+  { href: '/admin/spaces', label: 'Spaces', icon: Building, exact: false },
+  { href: '/admin/billing', label: 'Billing', icon: CreditCard, exact: false },
   { href: '/admin/invitations', label: 'Invitations', icon: Mail, exact: false },
 ];
 

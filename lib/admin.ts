@@ -25,15 +25,22 @@ export async function requireAdmin(): Promise<{ userId: string }> {
 
 /**
  * Log an admin action for audit purposes.
+ * Persists to the AuditLog table via supabase with resource='AdminAction'.
  */
-export function logAdminAction(params: {
+export async function logAdminAction(params: {
   actor: string;
   action: string;
   target?: string;
   details?: Record<string, unknown>;
 }) {
-  console.info('[admin-audit]', {
-    ...params,
-    timestamp: new Date().toISOString(),
+  await audit({
+    actorClerkId: params.actor,
+    action: 'ADMIN_ACTION',
+    resource: 'AdminAction',
+    resourceId: params.target,
+    metadata: {
+      adminAction: params.action,
+      ...params.details,
+    },
   });
 }
