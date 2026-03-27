@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { UserListClient } from './user-list-client';
+import { isPlatformAdmin } from '@/lib/permissions';
+import { redirect } from 'next/navigation';
 
 export const metadata = { title: 'Users — Admin — Chippi' };
 
@@ -8,6 +10,8 @@ export default async function AdminUsersPage({
 }: {
   searchParams: Promise<{ q?: string; filter?: string }>;
 }) {
+  const isAdmin = await isPlatformAdmin();
+  if (!isAdmin) redirect('/');
   const params = await searchParams;
   const query = params.q?.trim() || '';
   const filter = params.filter || 'all';

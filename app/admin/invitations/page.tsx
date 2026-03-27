@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
+import { isPlatformAdmin } from '@/lib/permissions';
+import { redirect } from 'next/navigation';
 
 const statusStyle = (status: string) => {
   switch (status) {
@@ -10,6 +12,8 @@ const statusStyle = (status: string) => {
 };
 
 export default async function AdminInvitationsPage() {
+  const isAdmin = await isPlatformAdmin();
+  if (!isAdmin) redirect('/');
   const { data: invitations, error } = await supabase
     .from('Invitation')
     .select('*, Brokerage(name)')

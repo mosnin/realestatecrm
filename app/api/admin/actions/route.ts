@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClerkClient } from '@clerk/nextjs/server';
+import { createClerkClient, auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { requireAdmin, logAdminAction } from '@/lib/admin';
 import { shouldBackfillOnboardFromSpace } from '@/lib/onboarding';
+import { checkRateLimit } from '@/lib/rate-limit';
 import type { User, Space } from '@/lib/types';
 
 const clerkClient = createClerkClient({
@@ -17,6 +18,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  const session = await auth();
+  const { allowed } = await checkRateLimit(`admin:${session.userId}`, 30, 60);
+  if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -25,6 +30,11 @@ export async function POST(req: NextRequest) {
   }
 
   const { action } = body;
+
+  const ALLOWED_ACTIONS = ['send_password_reset', 'repair_onboarding'];
+  if (!ALLOWED_ACTIONS.includes(action as string)) {
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+  }
 
   try {
     // ── Send password reset ─────────────────────────────────────────────

@@ -10,12 +10,24 @@ import {
   TrendingUp,
   Briefcase,
   UserPlus,
+  DollarSign,
+  CreditCard,
+  Flame,
+  Thermometer,
+  Snowflake,
+  Calendar,
+  Bell,
+  BarChart3,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
 import { SignupChart } from './components/signup-chart';
+import { isPlatformAdmin } from '@/lib/permissions';
+import { redirect } from 'next/navigation';
 
 export default async function AdminOverviewPage() {
+  const isAdmin = await isPlatformAdmin();
+  if (!isAdmin) redirect('/');
   // ── Parallel data fetches ────────────────────────────────────────────────
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 86_400_000).toISOString();
@@ -33,6 +45,28 @@ export default async function AdminOverviewPage() {
     signupsLast7 = 0,
     signupsLast30 = 0,
     leadsLast7 = 0;
+  // Revenue metrics
+  let activeSubscriptions = 0,
+    trialUsers = 0,
+    pastDueUsers = 0,
+    canceledUsers = 0,
+    churnRate = 0,
+    mrr = 0;
+
+  // Feature usage metrics
+  let spacesWithLeads = 0,
+    spacesWithDeals = 0,
+    spacesWithTours = 0,
+    totalTours = 0,
+    totalFollowUps = 0,
+    totalSpaces = 0;
+
+  // Lead quality metrics
+  let hotLeads = 0,
+    warmLeads = 0,
+    coldLeads = 0,
+    unqualifiedLeads = 0;
+
   let recentUsers: {
     id: string;
     name: string | null;
@@ -200,6 +234,73 @@ export default async function AdminOverviewPage() {
     recentActivity = activities
       .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
       .slice(0, 8);
+
+    // ── Revenue metrics ───────────────────────────────────────────────
+    try {
+      const subRes = await supabase.from('Space').select('stripeSubscriptionStatus');
+      const statuses = (subRes.data ?? []) as { stripeSubscriptionStatus: string | null }[];
+      totalSpaces = statuses.length;
+      for (const row of statuses) {
+        const s = row.stripeSubscriptionStatus;
+        if (s === 'active') activeSubscriptions++;
+        else if (s === 'trialing') trialUsers++;
+        else if (s === 'past_due') pastDueUsers++;
+        else if (s === 'canceled') canceledUsers++;
+      }
+      mrr = activeSubscriptions * 97;
+      churnRate =
+        activeSubscriptions + canceledUsers > 0
+          ? Math.round((canceledUsers / (activeSubscriptions + canceledUsers)) * 100)
+          : 0;
+    } catch (e) {
+      console.error('[admin] Revenue queries failed', e);
+    }
+
+    // ── Feature usage metrics ─────────────────────────────────────────
+    try {
+      const [contactSpaces, dealSpaces, tourSpaces, toursCount, followUpsCount] =
+        await Promise.all([
+          supabase.from('Contact').select('spaceId').limit(1000),
+          supabase.from('Deal').select('spaceId').limit(1000),
+          supabase.from('Tour').select('spaceId').limit(1000),
+          supabase.from('Tour').select('*', { count: 'exact', head: true }),
+          supabase
+            .from('Contact')
+            .select('*', { count: 'exact', head: true })
+            .not('followUpAt', 'is', null),
+        ]);
+      spacesWithLeads = new Set(
+        (contactSpaces.data ?? []).map((r: any) => r.spaceId).filter(Boolean)
+      ).size;
+      spacesWithDeals = new Set(
+        (dealSpaces.data ?? []).map((r: any) => r.spaceId).filter(Boolean)
+      ).size;
+      spacesWithTours = new Set(
+        (tourSpaces.data ?? []).map((r: any) => r.spaceId).filter(Boolean)
+      ).size;
+      totalTours = toursCount.count ?? 0;
+      totalFollowUps = followUpsCount.count ?? 0;
+    } catch (e) {
+      console.error('[admin] Feature usage queries failed', e);
+    }
+
+    // ── Lead quality distribution ─────────────────────────────────────
+    try {
+      const scoreRes = await supabase
+        .from('Contact')
+        .select('scoreLabel')
+        .not('scoreLabel', 'is', null)
+        .limit(5000);
+      for (const row of (scoreRes.data ?? []) as { scoreLabel: string }[]) {
+        const label = row.scoreLabel?.toLowerCase();
+        if (label === 'hot') hotLeads++;
+        else if (label === 'warm') warmLeads++;
+        else if (label === 'cold') coldLeads++;
+        else if (label === 'unqualified') unqualifiedLeads++;
+      }
+    } catch (e) {
+      console.error('[admin] Lead quality queries failed', e);
+    }
   } catch (err) {
     console.error('[admin] DB queries failed', { error: err });
     return (
@@ -333,6 +434,190 @@ export default async function AdminOverviewPage() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* ── Revenue Overview ──────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          {
+            label: 'MRR',
+            value: `$${formatCompact(mrr)}`,
+            sub: `${activeSubscriptions} active subs`,
+            icon: DollarSign,
+            color: 'text-emerald-500',
+          },
+          {
+            label: 'Trial users',
+            value: trialUsers,
+            sub: 'currently trialing',
+            icon: CreditCard,
+            color: 'text-blue-500',
+          },
+          {
+            label: 'Past due',
+            value: pastDueUsers,
+            sub: 'payment failed',
+            icon: CreditCard,
+            color: 'text-amber-500',
+          },
+          {
+            label: 'Churn rate',
+            value: `${churnRate}%`,
+            sub: `${canceledUsers} canceled`,
+            icon: DollarSign,
+            color: 'text-rose-500',
+          },
+        ].map(({ label, value, sub, icon: Icon, color }) => (
+          <Card key={label}>
+            <CardContent className="px-4 py-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground font-medium">{label}</p>
+                  <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
+                </div>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
+                  <Icon size={15} className={color} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* ── Feature Usage ──────────────────────────────────────────────── */}
+      <div>
+        <p className="text-sm font-semibold mb-3">Feature adoption</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {[
+            {
+              label: 'Spaces with leads',
+              value: spacesWithLeads,
+              total: totalSpaces,
+              icon: PhoneIncoming,
+              color: 'text-emerald-500',
+            },
+            {
+              label: 'Spaces with deals',
+              value: spacesWithDeals,
+              total: totalSpaces,
+              icon: Briefcase,
+              color: 'text-cyan-500',
+            },
+            {
+              label: 'Spaces with tours',
+              value: spacesWithTours,
+              total: totalSpaces,
+              icon: Calendar,
+              color: 'text-violet-500',
+            },
+            {
+              label: 'Total tours booked',
+              value: totalTours,
+              total: null,
+              icon: Calendar,
+              color: 'text-blue-500',
+            },
+            {
+              label: 'Follow-ups set',
+              value: totalFollowUps,
+              total: null,
+              icon: Bell,
+              color: 'text-amber-500',
+            },
+          ].map(({ label, value, total, icon: Icon, color }) => {
+            const pct = total && total > 0 ? Math.round((value / total) * 100) : null;
+            return (
+              <Card key={label}>
+                <CardContent className="px-4 py-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <p className="text-xs text-muted-foreground font-medium">{label}</p>
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
+                      <Icon size={13} className={color} />
+                    </div>
+                  </div>
+                  <p className="text-xl font-bold tabular-nums">
+                    {value}
+                    {total !== null && (
+                      <span className="text-sm font-normal text-muted-foreground">
+                        {' '}
+                        / {total}
+                      </span>
+                    )}
+                  </p>
+                  {pct !== null && (
+                    <div className="mt-2">
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary rounded-full transition-all duration-500"
+                          style={{ width: `${Math.max(pct, 2)}%` }}
+                        />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">{pct}% of spaces</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Lead Quality Distribution ──────────────────────────────────── */}
+      <div>
+        <p className="text-sm font-semibold mb-3">Lead quality distribution</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            {
+              label: 'Hot leads',
+              value: hotLeads,
+              icon: Flame,
+              badgeColor: 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15',
+              iconColor: 'text-red-500',
+            },
+            {
+              label: 'Warm leads',
+              value: warmLeads,
+              icon: Thermometer,
+              badgeColor: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+              iconColor: 'text-amber-500',
+            },
+            {
+              label: 'Cold leads',
+              value: coldLeads,
+              icon: Snowflake,
+              badgeColor: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15',
+              iconColor: 'text-blue-500',
+            },
+            {
+              label: 'Unqualified',
+              value: unqualifiedLeads,
+              icon: BarChart3,
+              badgeColor:
+                'text-gray-700 bg-gray-50 dark:text-gray-400 dark:bg-gray-500/15',
+              iconColor: 'text-gray-500',
+            },
+          ].map(({ label, value, icon: Icon, badgeColor, iconColor }) => (
+            <Card key={label}>
+              <CardContent className="px-4 py-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium">{label}</p>
+                    <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
+                    <span
+                      className={`inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 mt-1 ${badgeColor}`}
+                    >
+                      {label}
+                    </span>
+                  </div>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
+                    <Icon size={15} className={iconColor} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
       {/* ── Growth + Funnel row ──────────────────────────────────────── */}
