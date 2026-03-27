@@ -112,7 +112,7 @@ export default async function AdminUserDetailPage({
   let contactCount = 0, dealCount = 0, stageCount = 0;
   if (spaceRow) {
     const [settingsRes, contactCountRes, dealCountRes, stageCountRes] = await Promise.all([
-      supabase.from('SpaceSetting').select('*').eq('spaceId', spaceRow.id).maybeSingle(),
+      supabase.from('SpaceSetting').select('id, spaceId, phoneNumber, businessName, timezone, notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps').eq('spaceId', spaceRow.id).maybeSingle(),
       supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', spaceRow.id),
       supabase.from('Deal').select('*', { count: 'exact', head: true }).eq('spaceId', spaceRow.id),
       supabase.from('DealStage').select('*', { count: 'exact', head: true }).eq('spaceId', spaceRow.id),

@@ -16,7 +16,7 @@ export default async function AdminInvitationsPage() {
   if (!isAdmin) redirect('/');
   const { data: invitations, error } = await supabase
     .from('Invitation')
-    .select('*, Brokerage(name)')
+    .select('id, email, roleToAssign, status, expiresAt, createdAt, brokerageId, Brokerage(name)')
     .order('createdAt', { ascending: false })
     .limit(200);
 
