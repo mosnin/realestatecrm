@@ -36,6 +36,7 @@ const navItems = [
   { href: '/admin/spaces', label: 'Spaces', icon: Building, exact: false },
   { href: '/admin/billing', label: 'Billing', icon: CreditCard, exact: false },
   { href: '/admin/invitations', label: 'Invitations', icon: Mail, exact: false },
+  { href: '/admin/audit-log', label: 'Audit Log', icon: ScrollText, exact: false },
 ];
 
 function NavLink({
