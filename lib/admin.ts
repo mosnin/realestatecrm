@@ -14,6 +14,7 @@
  */
 
 import { requirePlatformAdmin, isPlatformAdmin } from '@/lib/permissions';
+import { audit } from '@/lib/audit';
 
 export { isPlatformAdmin as checkAdmin };
 
