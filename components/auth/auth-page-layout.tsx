@@ -34,7 +34,7 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
         </div>
 
         {/* Form area — top-aligned on mobile, vertically centred on desktop */}
-        <div className="flex flex-1 flex-col pt-6 sm:pt-8 lg:justify-center lg:py-0">
+        <div className="flex flex-1 flex-col justify-center py-6 sm:py-8 lg:py-0">
           <div className="mx-auto w-full max-w-[380px]">
 
             {/* Role switcher — visible on login pages */}
