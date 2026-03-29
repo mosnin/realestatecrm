@@ -26,7 +26,7 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
     <main className="relative min-h-screen bg-background lg:flex lg:h-screen lg:overflow-y-auto lg:overflow-x-hidden">
 
       {/* ── Left form panel ── */}
-      <div className="relative flex w-full flex-col bg-card px-6 py-6 sm:px-10 sm:py-8 lg:w-[480px] lg:min-w-[480px] lg:overflow-y-auto lg:py-10">
+      <div className="relative flex w-full min-h-screen flex-col bg-card px-6 py-6 sm:px-10 sm:py-8 lg:min-h-0 lg:w-[480px] lg:min-w-[480px] lg:overflow-y-auto lg:py-10">
 
         {/* Logo — top-left */}
         <div className="shrink-0">
