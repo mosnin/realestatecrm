@@ -22,23 +22,42 @@ export default async function ToursPage({
 
   // Fetch tours — this is the essential query
   try {
-    const { data: toursRaw, error: toursError } = await supabase
+    // Try with Contact join first; fall back to plain query if FK join fails
+    let toursRaw: any[] | null = null;
+    const { data: joined, error: joinError } = await supabase
       .from('Tour')
       .select('*, Contact(id, name, email, phone)')
       .eq('spaceId', space.id)
       .order('startsAt', { ascending: false })
       .limit(200);
-    if (toursError) throw toursError;
+    if (!joinError) {
+      toursRaw = joined;
+    } else {
+      console.error('[tours] FK join failed, falling back to plain query', joinError);
+      const { data: plain, error: plainError } = await supabase
+        .from('Tour')
+        .select('id, spaceId, contactId, guestName, guestEmail, guestPhone, propertyAddress, notes, startsAt, endsAt, status, googleEventId, manageToken, createdAt, updatedAt')
+        .eq('spaceId', space.id)
+        .order('startsAt', { ascending: false })
+        .limit(200);
+      if (plainError) throw plainError;
+      toursRaw = plain;
+    }
 
-    // Fetch deals that came from tours to show the link
-    const tourIds = (toursRaw ?? []).map((t: any) => t.id);
+    // Fetch deals that came from tours to show the link (non-essential —
+    // sourceTourId column may not exist if migration hasn't been applied)
     let dealByTour = new Map<string, string>();
-    if (tourIds.length) {
-      const { data: dealLinks } = await supabase
-        .from('Deal')
-        .select('id, sourceTourId')
-        .in('sourceTourId', tourIds);
-      dealByTour = new Map((dealLinks ?? []).map((d: any) => [d.sourceTourId, d.id]));
+    try {
+      const tourIds = (toursRaw ?? []).map((t: any) => t.id);
+      if (tourIds.length) {
+        const { data: dealLinks } = await supabase
+          .from('Deal')
+          .select('id, sourceTourId')
+          .in('sourceTourId', tourIds);
+        dealByTour = new Map((dealLinks ?? []).map((d: any) => [d.sourceTourId, d.id]));
+      }
+    } catch (err) {
+      console.error('[tours] Deal link query failed (non-blocking)', err);
     }
     tours = (toursRaw ?? []).map((t: any) => ({
       ...t,
