@@ -37,6 +37,7 @@ export const mobileNavItems = [
   { href: '/leads', label: 'Leads', icon: PhoneIncoming },
   { href: '/contacts', label: 'Clients', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
+  { href: '/tours', label: 'Tours', icon: CalendarDays },
   { href: '/follow-ups', label: 'Tasks', icon: Clock },
   { href: '/ai', label: 'Chip', icon: Sparkles },
 ] as const;
