@@ -5,9 +5,10 @@ import { MessageBubble } from './message-bubble';
 import { ConversationSidebar } from './conversation-sidebar';
 import { GradientAIChatInput, type MentionItem } from '@/components/ui/gradient-ai-chat-input';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Sparkles, Plus } from 'lucide-react';
+import { History, X, AlertCircle, Sparkles, Plus, Mic } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { VoiceMode } from './voice-mode';
 import type { Conversation } from '@/lib/types';
 import type { CRMAction, ActionResult } from './action-card';
 
@@ -36,6 +37,8 @@ export function ChatInterface({
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [isStreaming, setIsStreaming] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [lastAssistantMsg, setLastAssistantMsg] = useState<string | null>(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const inFlightRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -157,6 +160,7 @@ export function ChatInterface({
 
   async function handleSend(text: string, mentions: MentionItem[]) {
     if (!text || inFlightRef.current) return;
+    setLastAssistantMsg(null);
 
     let contextPrefix = '';
     if (mentions.length > 0) {
@@ -226,6 +230,8 @@ export function ChatInterface({
         setMessages([...displayMessages, { role: 'assistant', content: accumulated }]);
       }
 
+      setLastAssistantMsg(accumulated);
+
       if (conversationId) {
         setConversations((prev) => {
           const conv = prev.find((c) => c.id === conversationId);
@@ -241,6 +247,11 @@ export function ChatInterface({
       setIsStreaming(false);
     }
   }
+
+  const handleVoiceTranscription = useCallback((text: string) => {
+    // Send the transcribed text as a regular chat message
+    handleSend(text, []);
+  }, [handleSend]);
 
   const handleAction = useCallback(async (action: CRMAction): Promise<ActionResult> => {
     try {
