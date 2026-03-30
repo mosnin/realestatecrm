@@ -620,6 +620,205 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
           </div>
         </section>
 
+        {/* ── Visual ────────────────────────────────────────────── */}
+        <section id="section-visual" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
+          <SectionHeader
+            icon={Eye}
+            title="Visual"
+            description="Customize the visual appearance of your intake page."
+          />
+          <div className="space-y-4">
+            {/* Logo Upload */}
+            <div className="space-y-2">
+              <Label>Logo</Label>
+              <p className="text-xs text-muted-foreground">Upload your business logo (PNG, JPEG, or SVG, max 2MB)</p>
+              <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-primary/50 transition-colors cursor-pointer" onClick={() => logoInputRef.current?.click()}>
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Logo" className="h-16 mx-auto object-contain" />
+                ) : (
+                  <div className="space-y-1">
+                    <Upload size={24} className="mx-auto text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Click to upload</p>
+                  </div>
+                )}
+                <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+              </div>
+            </div>
+
+            {/* Profile Photo Upload */}
+            <div className="space-y-2">
+              <Label>Profile photo</Label>
+              <p className="text-xs text-muted-foreground">Upload your professional headshot (PNG, JPEG, or SVG, max 2MB)</p>
+              <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-primary/50 transition-colors cursor-pointer" onClick={() => photoInputRef.current?.click()}>
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Profile photo" className="h-16 mx-auto object-contain rounded-full" />
+                ) : (
+                  <div className="space-y-1">
+                    <Upload size={24} className="mx-auto text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Click to upload</p>
+                  </div>
+                )}
+                <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+              </div>
+            </div>
+
+            {/* Header Background */}
+            <div className="space-y-2">
+              <Label>Header background</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={intakeHeaderBgColor || '#ffffff'}
+                  onChange={(e) => { setIntakeHeaderBgColor(e.target.value); setIntakeHeaderGradient(''); }}
+                  className="w-10 h-10 rounded-md border border-border cursor-pointer"
+                />
+                <span className="text-xs text-muted-foreground">Solid color</span>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                {[
+                  { label: 'None', value: '' },
+                  { label: 'Warm sunset', value: 'linear-gradient(135deg, #f97316, #ec4899)' },
+                  { label: 'Cool ocean', value: 'linear-gradient(135deg, #06b6d4, #3b82f6)' },
+                  { label: 'Forest', value: 'linear-gradient(135deg, #22c55e, #14b8a6)' },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => { setIntakeHeaderGradient(preset.value); if (preset.value) setIntakeHeaderBgColor(''); }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                      intakeHeaderGradient === preset.value
+                        ? 'border-primary bg-primary/10 text-foreground'
+                        : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">Choose a solid color or gradient preset for the intake page header.</p>
+            </div>
+
+            {/* Dark Mode */}
+            <div className="flex items-center justify-between py-3 border-t border-border">
+              <div>
+                <p className="text-sm font-medium">Dark mode</p>
+                <p className="text-xs text-muted-foreground">Enable dark mode for the intake form</p>
+              </div>
+              <Switch checked={intakeDarkMode} onCheckedChange={setIntakeDarkMode} />
+            </div>
+
+            {/* Favicon Upload */}
+            <div className="space-y-2">
+              <Label>Favicon</Label>
+              <p className="text-xs text-muted-foreground">Upload a favicon for your intake page (PNG, ICO, or SVG, max 2MB)</p>
+              <div className="border-2 border-dashed border-border rounded-xl p-4 text-center hover:border-primary/50 transition-colors cursor-pointer w-fit" onClick={() => faviconInputRef.current?.click()}>
+                {faviconPreview ? (
+                  <img src={faviconPreview} alt="Favicon" className="h-8 mx-auto object-contain" />
+                ) : (
+                  <div className="space-y-1 px-4">
+                    <Upload size={18} className="mx-auto text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">Click to upload</p>
+                  </div>
+                )}
+                <input ref={faviconInputRef} type="file" accept="image/*" className="hidden" onChange={handleFaviconUpload} />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Content ──────────────────────────────────────────── */}
+        <section id="section-content" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
+          <SectionHeader
+            icon={FileText}
+            title="Content"
+            description="Customize messages and content shown to applicants."
+          />
+          <div className="space-y-4">
+            {/* Welcome Video */}
+            <div className="space-y-1.5">
+              <Label htmlFor="intakeVideoUrl">Welcome video</Label>
+              <Input
+                id="intakeVideoUrl"
+                value={intakeVideoUrl}
+                onChange={(e) => setIntakeVideoUrl(e.target.value)}
+                placeholder="Paste YouTube or Loom URL"
+              />
+              <p className="text-xs text-muted-foreground">
+                Embed a welcome video at the top of your intake page.
+              </p>
+              {getVideoEmbedUrl(intakeVideoUrl) && (
+                <div className="mt-2 rounded-lg overflow-hidden border border-border aspect-video">
+                  <iframe
+                    src={getVideoEmbedUrl(intakeVideoUrl)!}
+                    className="w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Thank You Title */}
+            <div className="space-y-1.5">
+              <Label htmlFor="intakeThankYouTitle">Thank you title</Label>
+              <Input
+                id="intakeThankYouTitle"
+                value={intakeThankYouTitle}
+                onChange={(e) => setIntakeThankYouTitle(e.target.value)}
+                placeholder="Application received"
+              />
+              <p className="text-xs text-muted-foreground">
+                Custom heading shown after a successful submission.
+              </p>
+            </div>
+
+            {/* Thank You Message */}
+            <div className="space-y-1.5">
+              <Label htmlFor="intakeThankYouMessage">Thank you message</Label>
+              <Textarea
+                id="intakeThankYouMessage"
+                value={intakeThankYouMessage}
+                onChange={(e) => setIntakeThankYouMessage(e.target.value)}
+                placeholder="Thank you for submitting your application. We'll be in touch soon!"
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                Custom message shown on the success page after submission.
+              </p>
+            </div>
+
+            {/* Confirmation Email */}
+            <div className="space-y-1.5">
+              <Label htmlFor="intakeConfirmationEmail">Confirmation email</Label>
+              <Textarea
+                id="intakeConfirmationEmail"
+                value={intakeConfirmationEmail}
+                onChange={(e) => setIntakeConfirmationEmail(e.target.value)}
+                placeholder="Hi! Thanks for applying. We've received your application and will review it shortly."
+                rows={4}
+              />
+              <p className="text-xs text-muted-foreground">
+                Custom email body sent to the applicant after they submit the form.
+              </p>
+            </div>
+
+            {/* Terms / Disclaimer */}
+            <div className="space-y-1.5">
+              <Label htmlFor="intakeDisclaimerText">Terms / Disclaimer</Label>
+              <Textarea
+                id="intakeDisclaimerText"
+                value={intakeDisclaimerText}
+                onChange={(e) => setIntakeDisclaimerText(e.target.value)}
+                placeholder="By submitting this form, you agree to our terms and conditions..."
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                Legal text displayed at the bottom of the intake form.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* ── Form Fields ──────────────────────────────────────── */}
         <section id="section-form-fields" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
           <SectionHeader

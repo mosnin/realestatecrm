@@ -77,17 +77,17 @@ export default async function ConfigurePage({
     intakeFooterLinks: dbUser?.space?.settings?.intakeFooterLinks ?? [],
     bio: dbUser?.space?.settings?.bio ?? '',
     socialLinks: dbUser?.space?.settings?.socialLinks ?? { instagram: '', linkedin: '', facebook: '' },
-    // Visual (defaults handled in form component)
-    intakeHeaderBgColor: (dbUser?.space?.settings as any)?.intakeHeaderBgColor ?? '',
-    intakeHeaderGradient: (dbUser?.space?.settings as any)?.intakeHeaderGradient ?? '',
-    intakeDarkMode: (dbUser?.space?.settings as any)?.intakeDarkMode ?? false,
-    intakeFaviconUrl: (dbUser?.space?.settings as any)?.intakeFaviconUrl ?? '',
+    // Visual
+    intakeHeaderBgColor: dbUser?.space?.settings?.intakeHeaderBgColor ?? '',
+    intakeHeaderGradient: dbUser?.space?.settings?.intakeHeaderGradient ?? '',
+    intakeDarkMode: dbUser?.space?.settings?.intakeDarkMode ?? false,
+    intakeFaviconUrl: dbUser?.space?.settings?.intakeFaviconUrl ?? '',
     // Content
-    intakeVideoUrl: (dbUser?.space?.settings as any)?.intakeVideoUrl ?? '',
-    intakeThankYouTitle: (dbUser?.space?.settings as any)?.intakeThankYouTitle ?? '',
-    intakeThankYouMessage: (dbUser?.space?.settings as any)?.intakeThankYouMessage ?? '',
-    intakeConfirmationEmail: (dbUser?.space?.settings as any)?.intakeConfirmationEmail ?? '',
-    intakeDisclaimerText: (dbUser?.space?.settings as any)?.intakeDisclaimerText ?? '',
+    intakeVideoUrl: dbUser?.space?.settings?.intakeVideoUrl ?? '',
+    intakeThankYouTitle: dbUser?.space?.settings?.intakeThankYouTitle ?? '',
+    intakeThankYouMessage: dbUser?.space?.settings?.intakeThankYouMessage ?? '',
+    intakeConfirmationEmail: dbUser?.space?.settings?.intakeConfirmationEmail ?? '',
+    intakeDisclaimerText: dbUser?.space?.settings?.intakeDisclaimerText ?? '',
     // Form fields
     intakeDisabledSteps: dbUser?.space?.settings?.intakeDisabledSteps ?? [],
     intakeCustomQuestions: dbUser?.space?.settings?.intakeCustomQuestions ?? [],
