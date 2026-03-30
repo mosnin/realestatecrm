@@ -469,8 +469,10 @@ export function ChatInterface({
       <VoiceMode
         open={voiceOpen}
         onClose={() => setVoiceOpen(false)}
-        onTranscription={handleVoiceTranscription}
-        lastAssistantMessage={lastAssistantMsg}
+        slug={slug}
+        onTranscript={(role, text) => {
+          setMessages(prev => [...prev, { role, content: text }]);
+        }}
       />
     </div>
   );
