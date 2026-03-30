@@ -8,6 +8,7 @@ import { DashboardFooter } from '@/components/dashboard/footer';
 import { supabase } from '@/lib/supabase';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 import { getBrokerContext } from '@/lib/permissions';
+import { LiveNotifications } from '@/components/dashboard/live-notifications';
 
 
 export default async function DashboardLayout({
@@ -170,6 +171,7 @@ export default async function DashboardLayout({
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
         <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
+          <LiveNotifications spaceId={space.id} slug={slug} />
           {children}
           <DashboardFooter />
         </main>
