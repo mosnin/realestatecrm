@@ -163,6 +163,7 @@ export type ApplicationData = {
   outstandingBalances?: boolean;
   bankruptcy?: boolean;
   backgroundAcknowledgment?: boolean;
+  creditScore?: number;
   smoking?: boolean;
   hasPets?: boolean;
   petDetails?: string;
