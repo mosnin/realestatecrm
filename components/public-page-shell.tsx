@@ -85,28 +85,6 @@ export function PublicPageShell({
                     {businessName}
                   </span>
                 )}
-                {customization?.bio && (
-                  <p className="text-[11px] text-muted-foreground truncate max-w-[200px] sm:max-w-xs">
-                    {customization.bio}
-                  </p>
-                )}
-                {customization?.socialLinks && Object.keys(customization.socialLinks).length > 0 && (
-                  <div className="flex gap-2 mt-0.5">
-                    {Object.entries(customization.socialLinks).map(([platform, url]) =>
-                      url ? (
-                        <a
-                          key={platform}
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] text-muted-foreground hover:text-foreground capitalize"
-                        >
-                          {platform}
-                        </a>
-                      ) : null
-                    )}
-                  </div>
-                )}
               </div>
             </div>
 
@@ -125,6 +103,32 @@ export function PublicPageShell({
       {/* ── Page content ─────────────────────────────────────────────────── */}
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <div className="space-y-6">
+          {/* Bio + social links — below header, above form */}
+          {(customization?.bio || (customization?.socialLinks && Object.values(customization.socialLinks).some(Boolean))) && (
+            <div className="space-y-1">
+              {customization?.bio && (
+                <p className="text-sm text-muted-foreground">{customization.bio}</p>
+              )}
+              {customization?.socialLinks && Object.keys(customization.socialLinks).length > 0 && (
+                <div className="flex items-center gap-3">
+                  {Object.entries(customization.socialLinks).map(([platform, url]) =>
+                    url ? (
+                      <a
+                        key={platform}
+                        href={url as string}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-medium capitalize hover:underline"
+                        style={{ color: accentColor }}
+                      >
+                        {platform}
+                      </a>
+                    ) : null
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {/* Title area */}
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">

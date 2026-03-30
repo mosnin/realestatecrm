@@ -18,11 +18,16 @@ export default async function PublicApplyPage({
   if (!space) notFound();
 
   // Parallel queries — both depend on space but run simultaneously
-  const [{ data: settingsData }, { data: ownerData }] = await Promise.all([
+  // Use two queries: one for core fields (always exist), one for customization (may not exist yet)
+  const [{ data: coreSettings }, { data: customSettings }, { data: ownerData }] = await Promise.all([
+    supabase
+      .from('SpaceSetting')
+      .select('intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl')
+      .eq('spaceId', space.id)
+      .maybeSingle(),
     supabase
       .from('SpaceSetting')
       .select(
-        'intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl, ' +
         'intakeAccentColor, intakeBorderRadius, intakeFont, intakeDarkMode, ' +
         'intakeHeaderBgColor, intakeHeaderGradient, intakeVideoUrl, ' +
         'intakeDisclaimerText, intakeThankYouTitle, intakeThankYouMessage, ' +
@@ -30,7 +35,9 @@ export default async function PublicApplyPage({
         'intakeFaviconUrl, bio, socialLinks'
       )
       .eq('spaceId', space.id)
-      .maybeSingle(),
+      .maybeSingle()
+      .then(r => r) // always resolve, even on column-not-found errors
+      .catch(() => ({ data: null })) as any,
     supabase
       .from('User')
       .select('name, avatar')
@@ -38,6 +45,7 @@ export default async function PublicApplyPage({
       .maybeSingle(),
   ]);
 
+  const settingsData = { ...(coreSettings || {}), ...(customSettings || {}) };
   const settings = settingsData as {
     intakePageTitle: string | null;
     intakePageIntro: string | null;

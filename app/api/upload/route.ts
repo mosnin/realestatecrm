@@ -54,7 +54,10 @@ export async function POST(req: NextRequest) {
 
     if (uploadError) {
       console.error('[upload] storage error:', uploadError);
-      return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+      const msg = uploadError.message?.includes('not found')
+        ? 'Storage bucket "branding" not configured. Create it in Supabase Dashboard → Storage.'
+        : uploadError.message || 'Upload failed';
+      return NextResponse.json({ error: msg }, { status: 500 });
     }
 
     const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(fileName);
