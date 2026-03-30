@@ -369,3 +369,73 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
     html,
   });
 }
+
+// ── Welcome email ────────────────────────────────────────────────────────────
+
+export async function sendWelcomeEmail(params: {
+  toEmail: string;
+  userName: string | null;
+  spaceName?: string | null;
+  spaceSlug?: string | null;
+}): Promise<void> {
+  if (!process.env.RESEND_API_KEY) return;
+  const { Resend } = await import('resend');
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
+
+  const { toEmail, userName, spaceName, spaceSlug } = params;
+  const name = esc(userName) || 'there';
+  const domain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'my.usechippi.com';
+  const dashboardUrl = spaceSlug ? `https://${domain}/s/${spaceSlug}` : `https://${domain}/setup`;
+
+  const html = `
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;padding:32px 0">
+  <div style="text-align:center;margin-bottom:28px">
+    <span style="font-size:28px;font-weight:700;color:#111827">Welcome to Chippi</span>
+  </div>
+  <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:28px 24px">
+    <p style="margin:0 0 16px;font-size:15px;color:#111827;line-height:1.6">
+      Hi ${name},
+    </p>
+    <p style="margin:0 0 16px;font-size:14px;color:#374151;line-height:1.6">
+      Your Chippi account is ready${spaceName ? ` and your workspace <strong>${esc(spaceName)}</strong> has been created` : ''}. Here's what you can do now:
+    </p>
+    <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
+      <tr>
+        <td style="padding:8px 0;font-size:14px;color:#374151;line-height:1.5">
+          <strong style="color:#111827">1. Share your intake link</strong><br/>
+          Send it to renters so their inquiries flow straight into your pipeline.
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;font-size:14px;color:#374151;line-height:1.5">
+          <strong style="color:#111827">2. Review AI-scored leads</strong><br/>
+          Every submission is automatically scored — hot, warm, or cold.
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;font-size:14px;color:#374151;line-height:1.5">
+          <strong style="color:#111827">3. Set up follow-up reminders</strong><br/>
+          Never miss a callback. Chippi reminds you when to reach out.
+        </td>
+      </tr>
+    </table>
+    <div style="text-align:center;margin:24px 0 8px">
+      <a href="${dashboardUrl}" style="display:inline-block;background:#ff964f;color:#ffffff;font-weight:600;font-size:14px;text-decoration:none;padding:10px 28px;border-radius:8px">
+        Open your dashboard
+      </a>
+    </div>
+  </div>
+  <p style="text-align:center;font-size:12px;color:#9ca3af;margin-top:20px;line-height:1.5">
+    Questions? Just reply to this email. We're here to help.<br/>
+    — The Chippi team
+  </p>
+</div>`;
+
+  await resend.emails.send({
+    from: `Chippi <${FROM}>`,
+    to: toEmail,
+    subject: `Welcome to Chippi — your workspace is ready`,
+    html,
+  });
+}

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
 import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
+import { sendWelcomeEmail } from '@/lib/email';
 import type { User, Space, SpaceSetting } from '@/lib/types';
 
 export async function GET() {
@@ -433,6 +434,15 @@ export async function POST(req: NextRequest) {
         .update(updatePayload)
         .eq('id', user.id);
       if (error) throw error;
+
+      // Send welcome email (non-blocking)
+      sendWelcomeEmail({
+        toEmail: user.email,
+        userName: user.name,
+        spaceName: space?.name ?? null,
+        spaceSlug: space?.slug ?? null,
+      }).catch((err) => console.error('[onboarding] welcome email failed', err));
+
       return NextResponse.json({ success: true, onboard: true, onboardingCompletedAt: completedAt.toISOString() });
     }
 
