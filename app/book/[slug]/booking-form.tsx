@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { CalendarDays, Clock, Check, Loader2, ChevronLeft, ChevronRight, MapPin, Globe, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Confetti } from '@/components/ui/confetti';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -184,7 +185,9 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
 
   if (step === 'confirmed') {
     return (
-      <motion.div
+      <>
+        <Confetti active={true} />
+        <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
@@ -211,6 +214,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
           {businessName} will follow up with a confirmation.
         </p>
       </motion.div>
+      </>
     );
   }
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { Confetti } from '@/components/ui/confetti';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -455,6 +456,8 @@ export function ApplicationForm({
   // ── Success screen ──
   if (submitted) {
     return (
+      <>
+      <Confetti active={true} />
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -510,6 +513,7 @@ export function ApplicationForm({
           </div>
         )}
       </motion.div>
+      </>
     );
   }
 
