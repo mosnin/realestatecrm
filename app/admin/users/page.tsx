@@ -34,26 +34,38 @@ export default async function AdminUsersPage({
   // Filter by search across User fields and Space slug
   if (query) {
     const s = query.toLowerCase();
-    results = results.filter((r: any) =>
-      r.name?.toLowerCase().includes(s) ||
-      r.email?.toLowerCase().includes(s) ||
-      r.Space?.slug?.toLowerCase().includes(s)
-    );
+    results = results.filter((r: any) => {
+      const sp = Array.isArray(r.Space) ? r.Space[0] : r.Space;
+      return (
+        r.name?.toLowerCase().includes(s) ||
+        r.email?.toLowerCase().includes(s) ||
+        sp?.slug?.toLowerCase().includes(s)
+      );
+    });
   }
 
-  // Filter has-space / no-space in JS since PostgREST can't reliably do IS NULL on joins
-  if (filter === 'has-space') results = results.filter((r: any) => r.Space !== null);
-  if (filter === 'no-space') results = results.filter((r: any) => r.Space === null);
+  // Filter has-space / no-space
+  if (filter === 'has-space') results = results.filter((r: any) => {
+    const sp = Array.isArray(r.Space) ? r.Space[0] : r.Space;
+    return sp !== null && sp !== undefined;
+  });
+  if (filter === 'no-space') results = results.filter((r: any) => {
+    const sp = Array.isArray(r.Space) ? r.Space[0] : r.Space;
+    return !sp;
+  });
 
-  users = results.map((row: any) => ({
-    id: row.id as string,
-    name: row.name as string | null,
-    email: row.email as string,
-    onboard: row.onboard as boolean,
-    createdAt: row.createdAt as Date,
-    onboardingCurrentStep: row.onboardingCurrentStep as number,
-    space: row.Space?.slug ? { slug: row.Space.slug as string, name: row.Space.name as string } : null,
-  }));
+  users = results.map((row: any) => {
+    const spaceData = Array.isArray(row.Space) ? row.Space[0] : row.Space;
+    return {
+      id: row.id as string,
+      name: row.name as string | null,
+      email: row.email as string,
+      onboard: row.onboard as boolean,
+      createdAt: row.createdAt as Date,
+      onboardingCurrentStep: row.onboardingCurrentStep as number,
+      space: spaceData?.slug ? { slug: spaceData.slug as string, name: spaceData.name as string } : null,
+    };
+  });
 
   const { count, error: countError } = await supabase.from('User').select('*', { count: 'exact', head: true });
   if (countError) throw countError;
@@ -71,7 +83,7 @@ export default async function AdminUsersPage({
       <UserListClient
         users={users.map((u) => ({
           ...u,
-          createdAt: u.createdAt.toISOString(),
+          createdAt: typeof u.createdAt === 'string' ? u.createdAt : String(u.createdAt),
         }))}
         query={query}
         filter={filter}
