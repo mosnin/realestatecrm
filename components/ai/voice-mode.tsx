@@ -81,8 +81,16 @@ export function VoiceMode({ open, onClose, onTranscription, lastAssistantMessage
         await transcribe(blob);
       };
 
-      mediaRecorder.start();
+      // Collect data in 250ms chunks so we have data even if stop() is delayed
+      mediaRecorder.start(250);
       setState('listening');
+
+      // Auto-stop after 30 seconds max to prevent runaway recordings
+      setTimeout(() => {
+        if (mediaRecorderRef.current?.state === 'recording') {
+          stopRecording();
+        }
+      }, 30000);
     } catch (err: any) {
       console.error('[voice] mic error:', err);
       if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
@@ -110,9 +118,14 @@ export function VoiceMode({ open, onClose, onTranscription, lastAssistantMessage
     setState('processing');
     try {
       const formData = new FormData();
-      formData.append('audio', blob, 'recording.webm');
+      // Use correct extension based on actual mime type
+      const ext = blob.type.includes('mp4') ? 'mp4' : blob.type.includes('ogg') ? 'ogg' : 'webm';
+      formData.append('audio', blob, `recording.${ext}`);
       const res = await fetch('/api/ai/transcribe', { method: 'POST', body: formData });
-      if (!res.ok) throw new Error('Transcription failed');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Transcription failed');
+      }
       const data = await res.json();
       const text = data.text?.trim();
       if (text) {
@@ -209,7 +222,7 @@ export function VoiceMode({ open, onClose, onTranscription, lastAssistantMessage
             {error ? (
               <p className="text-xs text-destructive">{error}</p>
             ) : state === 'listening' ? (
-              <p className="text-xs text-foreground font-medium">Listening...</p>
+              <p className="text-xs text-foreground font-medium">Listening — tap to send</p>
             ) : state === 'processing' ? (
               <p className="text-xs text-muted-foreground flex items-center gap-1.5 justify-center">
                 <Loader2 size={12} className="animate-spin" /> Transcribing...
