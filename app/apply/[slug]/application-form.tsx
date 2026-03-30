@@ -227,19 +227,19 @@ function Field({
 }
 
 // ── Progress bar ──
-function ProgressBar({ current, total }: { current: number; total: number }) {
+function ProgressBar({ current, total, accentColor }: { current: number; total: number; accentColor?: string }) {
   const pct = Math.round((current / total) * 100);
+  const color = accentColor || 'hsl(var(--primary))';
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>
-          Step {current} of {total}
-        </span>
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground font-medium">
+        <span>Step {current} of {total}</span>
         <span>{pct}%</span>
       </div>
-      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+      <div className="h-1 bg-muted rounded-full overflow-hidden">
         <motion.div
-          className="h-full bg-primary rounded-full"
+          className="h-full rounded-full"
+          style={{ backgroundColor: color }}
           initial={false}
           animate={{ width: `${pct}%` }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
@@ -250,7 +250,8 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
 }
 
 // ── Step labels (compact on mobile) ──
-function StepIndicator({ current, steps }: { current: number; steps: readonly { id: number; label: string; icon: any }[] }) {
+function StepIndicator({ current, steps, accentColor }: { current: number; steps: readonly { id: number; label: string; icon: any }[]; accentColor?: string }) {
+  const color = accentColor || 'hsl(var(--primary))';
   return (
     <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
       {steps.map((step) => {
@@ -260,15 +261,14 @@ function StepIndicator({ current, steps }: { current: number; steps: readonly { 
         return (
           <div
             key={step.id}
-            className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
-              isActive
-                ? 'bg-primary text-primary-foreground'
-                : isDone
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground'
-            }`}
+            className={cn(
+              'flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all flex-shrink-0',
+              !isActive && !isDone && 'text-muted-foreground/60',
+              isDone && 'text-muted-foreground',
+            )}
+            style={isActive ? { backgroundColor: color, color: '#fff' } : isDone ? { backgroundColor: `${color}15`, color } : undefined}
           >
-            <Icon size={12} />
+            <Icon size={11} />
             <span className="hidden sm:inline">{step.label}</span>
           </div>
         );
@@ -980,7 +980,7 @@ export function ApplicationForm({
   return (
     <div
       className={cn(
-        'bg-card border border-border/60 shadow-sm overflow-hidden',
+        'bg-card border border-border/40 shadow-lg shadow-black/[0.03] overflow-hidden',
         radiusClass,
         fontClass,
         customization?.darkMode && 'dark',
@@ -1001,13 +1001,13 @@ export function ApplicationForm({
       )}
 
       {/* Progress */}
-      <div className="px-5 pt-5 pb-3 space-y-3 border-b border-border/40">
-        <ProgressBar current={currentStepIndex + 1} total={totalSteps} />
-        <StepIndicator current={step} steps={STEPS} />
+      <div className="px-5 pt-5 pb-3 md:px-7 space-y-3 border-b border-border/30">
+        <ProgressBar current={currentStepIndex + 1} total={totalSteps} accentColor={accentColor} />
+        <StepIndicator current={step} steps={STEPS} accentColor={accentColor} />
       </div>
 
       {/* Step content */}
-      <div className="px-5 py-6 md:px-7 md:py-7 overflow-hidden">
+      <div className="px-5 py-6 md:px-8 md:py-8 overflow-hidden">
         <AnimatePresence mode="wait" initial={false} custom={direction}>
           <motion.div
             key={step}
@@ -1023,7 +1023,7 @@ export function ApplicationForm({
       </div>
 
       {/* Navigation */}
-      <div className="px-5 pb-5 md:px-7 md:pb-7">
+      <div className="px-5 pb-6 md:px-8 md:pb-8 pt-2">
         {submitError && (
           <p className="text-sm text-destructive mb-3">{submitError}</p>
         )}
@@ -1033,9 +1033,9 @@ export function ApplicationForm({
               type="button"
               variant="outline"
               onClick={goBack}
-              className="flex-shrink-0"
+              className="flex-shrink-0 rounded-full px-5"
             >
-              <ChevronLeft size={16} className="mr-1" />
+              <ChevronLeft size={15} className="mr-1" />
               Back
             </Button>
           )}
@@ -1044,11 +1044,11 @@ export function ApplicationForm({
             <Button
               type="button"
               onClick={goNext}
-              className="flex-shrink-0"
+              className="flex-shrink-0 rounded-full px-6 text-white shadow-md hover:shadow-lg transition-shadow"
               style={{ backgroundColor: accentColor }}
             >
               Continue
-              <ChevronRight size={16} className="ml-1" />
+              <ChevronRight size={15} className="ml-1" />
             </Button>
           ) : (
             <Button
@@ -1056,7 +1056,7 @@ export function ApplicationForm({
               onClick={onSubmit}
               disabled={submitting}
               size="lg"
-              className="flex-1 sm:flex-none"
+              className="flex-1 sm:flex-none rounded-full px-8 text-white shadow-md hover:shadow-lg transition-shadow"
               style={{ backgroundColor: accentColor }}
             >
               {submitting ? (
