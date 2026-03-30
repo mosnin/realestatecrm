@@ -55,44 +55,38 @@ const testimonials = [
   },
 ];
 
-const col1 = testimonials.slice(0, 3);
-const col2 = testimonials.slice(3, 6);
-
-function MarqueeColumn({ items, duration, direction = 'up' }: { items: typeof testimonials; duration: number; direction?: 'up' | 'down' }) {
+function HorizontalMarquee({ items, duration }: { items: typeof testimonials; duration: number }) {
   return (
-    <div className="flex-1 overflow-hidden">
-      <motion.div
-        animate={{ translateY: direction === 'up' ? '-50%' : '0%' }}
-        initial={{ translateY: direction === 'up' ? '0%' : '-50%' }}
-        transition={{ duration, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
-        className="flex flex-col gap-4 pb-4"
-      >
-        {[0, 1].map((_, idx) => (
-          <React.Fragment key={idx}>
-            {items.map((t, i) => (
-              <div
-                key={i}
-                className="rounded-2xl border border-white/10 bg-white/[0.07] backdrop-blur-sm p-5 shadow-lg"
-              >
-                <div className="flex items-center gap-0.5 mb-2.5">
-                  {[...Array(t.stars)].map((_, s) => (
-                    <Star key={s} size={12} className="fill-primary text-primary" />
-                  ))}
-                </div>
-                <p className="text-[13px] leading-relaxed text-white/80 mb-3.5">{t.text}</p>
-                <div className="flex items-center gap-2.5">
-                  <img src={t.image} alt="" className="w-8 h-8 rounded-full object-cover ring-1 ring-white/20" width={32} height={32} />
-                  <div>
-                    <p className="text-[13px] font-medium text-white/90 leading-tight">{t.name}</p>
-                    <p className="text-[11px] text-white/50">{t.role}</p>
-                  </div>
+    <motion.div
+      animate={{ translateX: '-50%' }}
+      transition={{ duration, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
+      className="flex gap-4 pr-4"
+    >
+      {[0, 1].map((_, idx) => (
+        <React.Fragment key={idx}>
+          {items.map((t, i) => (
+            <div
+              key={i}
+              className="flex-shrink-0 w-[280px] rounded-xl border border-white/10 bg-black/40 backdrop-blur-md p-4 shadow-lg"
+            >
+              <div className="flex items-center gap-0.5 mb-2">
+                {[...Array(t.stars)].map((_, s) => (
+                  <Star key={s} size={10} className="fill-primary text-primary" />
+                ))}
+              </div>
+              <p className="text-[12px] leading-relaxed text-white/80 mb-3 line-clamp-3">{t.text}</p>
+              <div className="flex items-center gap-2">
+                <img src={t.image} alt="" className="w-7 h-7 rounded-full object-cover ring-1 ring-white/20" width={28} height={28} />
+                <div>
+                  <p className="text-[12px] font-medium text-white/90 leading-tight">{t.name}</p>
+                  <p className="text-[10px] text-white/50">{t.role}</p>
                 </div>
               </div>
-            ))}
-          </React.Fragment>
-        ))}
-      </motion.div>
-    </div>
+            </div>
+          ))}
+        </React.Fragment>
+      ))}
+    </motion.div>
   );
 }
 
@@ -197,24 +191,27 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
         </p>
       </div>
 
-      {/* ── Right panel — testimonial marquee ── */}
-      <div className="hidden lg:relative lg:flex lg:flex-1 overflow-hidden bg-[#1a1a1a]">
-        {/* Gradient overlays for fade effect */}
-        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#1a1a1a] to-transparent z-10 pointer-events-none" />
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#1a1a1a] to-transparent z-10 pointer-events-none" />
+      {/* ── Right decorative panel ── */}
+      <div className="hidden lg:relative lg:block lg:flex-1 overflow-hidden">
+        {/* Background image */}
+        <img
+          aria-hidden="true"
+          src="https://images.pexels.com/photos/18541706/pexels-photo-18541706.jpeg"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+        />
 
-        {/* Centered content */}
-        <div className="flex flex-col items-center justify-center w-full px-8 py-12">
-          {/* Logo + tagline */}
-          <div className="text-center mb-8 z-10">
-            <BrandLogo className="h-8 mx-auto mb-3" alt="" />
-            <p className="text-white/50 text-sm">Trusted by 2,400+ rental agents</p>
-          </div>
+        {/* Centred logo watermark */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+          <BrandLogo className="h-12 opacity-90 brightness-0 invert drop-shadow-lg" alt="" />
+        </div>
 
-          {/* Two-column marquee */}
-          <div className="flex gap-4 w-full max-w-[480px] h-[calc(100vh-200px)] overflow-hidden">
-            <MarqueeColumn items={col1} duration={20} direction="up" />
-            <MarqueeColumn items={col2} duration={24} direction="down" />
+        {/* Horizontal testimonial marquee at bottom */}
+        <div className="absolute inset-x-0 bottom-0 z-20">
+          <div className="bg-gradient-to-t from-black/70 via-black/40 to-transparent pt-16 pb-5 px-4">
+            <div className="overflow-hidden">
+              <HorizontalMarquee items={testimonials} duration={30} />
+            </div>
           </div>
         </div>
       </div>
