@@ -1,96 +1,148 @@
-'use client';
+"use client"
 
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import type { ReactNode } from "react"
+import React, {
+  createContext,
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+} from "react"
+import type {
+  GlobalOptions as ConfettiGlobalOptions,
+  CreateTypes as ConfettiInstance,
+  Options as ConfettiOptions,
+} from "canvas-confetti"
+import confetti from "canvas-confetti"
 
-const COLORS = ['#ff964f', '#ffb347', '#ff6f3c', '#ffd700', '#ff4500', '#ffa07a', '#e8e8e8', '#ffffff'];
+import { Button } from "@/components/ui/button"
 
-interface Particle {
-  id: number;
-  x: number;
-  y: number;
-  rotation: number;
-  scale: number;
-  color: string;
-  delay: number;
-  drift: number;
-  shape: 'rect' | 'circle';
+type Api = {
+  fire: (options?: ConfettiOptions) => void
 }
 
-function createParticles(count: number): Particle[] {
-  return Array.from({ length: count }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: -10 - Math.random() * 20,
-    rotation: Math.random() * 720 - 360,
-    scale: 0.4 + Math.random() * 0.8,
-    color: COLORS[Math.floor(Math.random() * COLORS.length)],
-    delay: Math.random() * 0.6,
-    drift: (Math.random() - 0.5) * 40,
-    shape: Math.random() > 0.5 ? 'rect' : 'circle',
-  }));
+type Props = React.ComponentPropsWithRef<"canvas"> & {
+  options?: ConfettiOptions
+  globalOptions?: ConfettiGlobalOptions
+  manualstart?: boolean
+  children?: ReactNode
 }
 
-interface ConfettiProps {
-  /** Whether confetti is currently active */
-  active: boolean;
-  /** Number of confetti particles (default 60) */
-  count?: number;
-  /** Duration in ms before auto-hiding (default 3000) */
-  duration?: number;
-}
+export type ConfettiRef = Api | null
 
-export function Confetti({ active, count = 60, duration = 3000 }: ConfettiProps) {
-  const [particles, setParticles] = useState<Particle[]>([]);
-  const [visible, setVisible] = useState(false);
+const ConfettiContext = createContext<Api>({} as Api)
+
+// Define component first
+const ConfettiComponent = forwardRef<ConfettiRef, Props>((props, ref) => {
+  const {
+    options,
+    globalOptions = { resize: true, useWorker: true },
+    manualstart = false,
+    children,
+    ...rest
+  } = props
+  const instanceRef = useRef<ConfettiInstance | null>(null)
+
+  const canvasRef = useCallback(
+    (node: HTMLCanvasElement) => {
+      if (node !== null) {
+        if (instanceRef.current) return
+        instanceRef.current = confetti.create(node, {
+          ...globalOptions,
+          resize: true,
+        })
+      } else {
+        if (instanceRef.current) {
+          instanceRef.current.reset()
+          instanceRef.current = null
+        }
+      }
+    },
+    [globalOptions]
+  )
+
+  const fire = useCallback(
+    async (opts = {}) => {
+      try {
+        await instanceRef.current?.({ ...options, ...opts })
+      } catch (error) {
+        console.error("Confetti error:", error)
+      }
+    },
+    [options]
+  )
+
+  const api = useMemo(
+    () => ({
+      fire,
+    }),
+    [fire]
+  )
+
+  useImperativeHandle(ref, () => api, [api])
 
   useEffect(() => {
-    if (active) {
-      setParticles(createParticles(count));
-      setVisible(true);
-      const timer = setTimeout(() => setVisible(false), duration);
-      return () => clearTimeout(timer);
+    if (!manualstart) {
+      ;(async () => {
+        try {
+          await fire()
+        } catch (error) {
+          console.error("Confetti effect error:", error)
+        }
+      })()
     }
-  }, [active, count, duration]);
+  }, [manualstart, fire])
 
   return (
-    <AnimatePresence>
-      {visible && (
-        <div className="pointer-events-none fixed inset-0 z-[9999] overflow-hidden">
-          {particles.map((p) => (
-            <motion.div
-              key={p.id}
-              initial={{
-                left: `${p.x}%`,
-                top: `${p.y}%`,
-                rotate: 0,
-                scale: 0,
-                opacity: 1,
-              }}
-              animate={{
-                top: `${100 + Math.random() * 20}%`,
-                left: `${p.x + p.drift}%`,
-                rotate: p.rotation,
-                scale: p.scale,
-                opacity: [1, 1, 0],
-              }}
-              exit={{ opacity: 0 }}
-              transition={{
-                duration: 2 + Math.random() * 1.5,
-                delay: p.delay,
-                ease: [0.25, 0.46, 0.45, 0.94],
-              }}
-              className="absolute"
-              style={{
-                width: p.shape === 'rect' ? 8 : 7,
-                height: p.shape === 'rect' ? 12 : 7,
-                backgroundColor: p.color,
-                borderRadius: p.shape === 'circle' ? '50%' : '1px',
-              }}
-            />
-          ))}
-        </div>
-      )}
-    </AnimatePresence>
-  );
+    <ConfettiContext.Provider value={api}>
+      <canvas ref={canvasRef} {...rest} />
+      {children}
+    </ConfettiContext.Provider>
+  )
+})
+
+// Set display name immediately
+ConfettiComponent.displayName = "Confetti"
+
+// Export as Confetti
+export const Confetti = ConfettiComponent
+
+interface ConfettiButtonProps extends React.ComponentProps<"button"> {
+  options?: ConfettiOptions &
+    ConfettiGlobalOptions & { canvas?: HTMLCanvasElement }
 }
+
+const ConfettiButtonComponent = ({
+  options,
+  children,
+  ...props
+}: ConfettiButtonProps) => {
+  const handleClick = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    try {
+      const rect = event.currentTarget.getBoundingClientRect()
+      const x = rect.left + rect.width / 2
+      const y = rect.top + rect.height / 2
+      await confetti({
+        ...options,
+        origin: {
+          x: x / window.innerWidth,
+          y: y / window.innerHeight,
+        },
+      })
+    } catch (error) {
+      console.error("Confetti button error:", error)
+    }
+  }
+
+  return (
+    <Button onClick={handleClick} {...props}>
+      {children}
+    </Button>
+  )
+}
+
+ConfettiButtonComponent.displayName = "ConfettiButton"
+
+export const ConfettiButton = ConfettiButtonComponent

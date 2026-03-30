@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Balloons, type BalloonsRef } from '@/components/ui/balloons';
+import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -271,7 +271,7 @@ export function ApplicationForm({
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const balloonsRef = useRef<BalloonsRef>(null);
+  const confettiRef = useRef<ConfettiRef>(null);
   const [scoreState, setScoreState] = useState<{
     id?: string;
     scoringStatus?: string;
@@ -441,7 +441,11 @@ export function ApplicationForm({
         const result = await response.json().catch(() => ({}));
         setScoreState(result);
         setSubmitted(true);
-        setTimeout(() => balloonsRef.current?.launchAnimation(), 300);
+        setTimeout(() => {
+          confettiRef.current?.fire({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+          confettiRef.current?.fire({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 } });
+          confettiRef.current?.fire({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1 } });
+        }, 300);
         clearDraft(slug);
       } else {
         const body = await response.json().catch(() => ({}));
@@ -456,10 +460,31 @@ export function ApplicationForm({
   }
 
   // ── Success screen ──
+  // Processing overlay
+  if (submitting) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="rounded-2xl bg-card border border-border shadow-xl p-8 text-center space-y-3"
+        >
+          <Loader2 size={28} className="animate-spin text-primary mx-auto" />
+          <p className="text-sm font-medium text-foreground">Processing your application...</p>
+          <p className="text-xs text-muted-foreground">This will only take a moment</p>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
   if (submitted) {
     return (
       <>
-      <Balloons ref={balloonsRef} type="default" />
+      <Confetti ref={confettiRef} manualstart className="pointer-events-none fixed inset-0 z-[9999] w-full h-full" />
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}

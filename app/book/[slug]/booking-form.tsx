@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { CalendarDays, Clock, Check, Loader2, ChevronLeft, ChevronRight, MapPin, Globe, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Balloons, type BalloonsRef } from '@/components/ui/balloons';
+import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,7 +32,7 @@ interface PropertyProfile {
 type Step = 'property' | 'date' | 'details' | 'confirmed';
 
 export function BookingForm({ slug, duration: defaultDuration, businessName, timezone }: BookingFormProps) {
-  const balloonsRef = useRef<BalloonsRef>(null);
+  const confettiRef = useRef<ConfettiRef>(null);
   const [step, setStep] = useState<Step>('date');
   const [slots, setSlots] = useState<DaySlots[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,7 +129,11 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
         throw new Error(data.error || 'Booking failed');
       }
       setStep('confirmed');
-      setTimeout(() => balloonsRef.current?.launchAnimation(), 300);
+      setTimeout(() => {
+        confettiRef.current?.fire({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        confettiRef.current?.fire({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 } });
+        confettiRef.current?.fire({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1 } });
+      }, 300);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -188,7 +192,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
   if (step === 'confirmed') {
     return (
       <>
-        <Balloons ref={balloonsRef} type="default" />
+        <Confetti ref={confettiRef} manualstart className="pointer-events-none fixed inset-0 z-[9999] w-full h-full" />
         <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -466,6 +470,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
   }
 
   return (
+    <>
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={step}
@@ -477,5 +482,29 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
         {renderCurrentStep()}
       </motion.div>
     </AnimatePresence>
+
+    {/* Processing overlay */}
+    <AnimatePresence>
+      {submitting && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="rounded-2xl bg-card border border-border shadow-xl p-8 text-center space-y-3"
+          >
+            <Loader2 size={28} className="animate-spin text-primary mx-auto" />
+            <p className="text-sm font-medium text-foreground">Processing your booking...</p>
+            <p className="text-xs text-muted-foreground">This will only take a moment</p>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }
