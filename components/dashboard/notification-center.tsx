@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getSupabaseBrowser } from '@/lib/supabase-browser';
 
 interface Notification {
   id: string;
@@ -59,8 +60,27 @@ export function NotificationCenter({ slug }: { slug: string }) {
 
   useEffect(() => {
     loadNotifications();
-    const interval = setInterval(loadNotifications, 60_000); // Refresh every minute
+    // Fallback polling every 5 minutes (realtime handles most updates)
+    const interval = setInterval(loadNotifications, 300_000);
     return () => clearInterval(interval);
+  }, [loadNotifications]);
+
+  // Realtime: refetch notifications when Contact or Tour changes
+  useEffect(() => {
+    const supabase = getSupabaseBrowser();
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel('notification-center')
+      .on('postgres_changes' as any, { event: 'INSERT', schema: 'public', table: 'Contact' }, () => {
+        loadNotifications();
+      })
+      .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'Tour' }, () => {
+        loadNotifications();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [loadNotifications]);
 
   // Close on escape

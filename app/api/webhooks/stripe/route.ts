@@ -3,6 +3,65 @@ import Stripe from 'stripe';
 import { getStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 
+/** Send a subscription status email to the space owner (non-blocking). */
+async function notifySubscriptionChange(subscriptionId: string, newStatus: string) {
+  try {
+    const { data: space } = await supabase
+      .from('Space')
+      .select('id, name, slug, ownerId')
+      .eq('stripeSubscriptionId', subscriptionId)
+      .maybeSingle();
+    if (!space) return;
+
+    const { data: owner } = await supabase
+      .from('User')
+      .select('email, name')
+      .eq('id', space.ownerId)
+      .maybeSingle();
+    if (!owner?.email) return;
+
+    if (!process.env.RESEND_API_KEY) return;
+    const { Resend } = await import('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
+
+    const statusMessages: Record<string, { subject: string; body: string }> = {
+      active: {
+        subject: `Your Chippi subscription is now active`,
+        body: `Great news! Your subscription for <strong>${space.name}</strong> is active. You have full access to all features.`,
+      },
+      past_due: {
+        subject: `Payment issue with your Chippi subscription`,
+        body: `We had trouble processing your payment for <strong>${space.name}</strong>. Please update your payment method to keep your access.`,
+      },
+      canceled: {
+        subject: `Your Chippi subscription has been canceled`,
+        body: `Your subscription for <strong>${space.name}</strong> has been canceled. You can resubscribe anytime from your billing page.`,
+      },
+    };
+
+    const msg = statusMessages[newStatus];
+    if (!msg) return;
+
+    const domain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'my.usechippi.com';
+
+    await resend.emails.send({
+      from: `Chippi <${FROM}>`,
+      to: owner.email,
+      subject: msg.subject,
+      html: `
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:480px;margin:0 auto;padding:24px 0">
+  <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px">Hi ${owner.name || 'there'},</p>
+  <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 20px">${msg.body}</p>
+  <a href="https://${domain}/s/${space.slug}/billing" style="display:inline-block;background:#ff964f;color:#fff;font-weight:600;font-size:14px;text-decoration:none;padding:10px 24px;border-radius:8px">View billing</a>
+  <p style="font-size:12px;color:#9ca3af;margin-top:20px">— The Chippi team</p>
+</div>`,
+    });
+  } catch (err) {
+    console.error('[stripe-webhook] subscription email failed:', err);
+  }
+}
+
 // Disable body parsing — Stripe needs the raw body for signature verification
 export const runtime = 'nodejs';
 
@@ -61,9 +120,10 @@ export async function POST(req: NextRequest) {
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
         const spaceId = subscription.metadata?.spaceId;
+        const newStatus = mapStatus(subscription.status);
 
         const updateData = {
-          stripeSubscriptionStatus: mapStatus(subscription.status),
+          stripeSubscriptionStatus: newStatus,
           stripePeriodEnd: getPeriodEnd(subscription),
         };
 
@@ -75,6 +135,8 @@ export async function POST(req: NextRequest) {
             .update(updateData)
             .eq('stripeSubscriptionId', subscription.id);
         }
+        // Notify owner of status change (non-blocking)
+        notifySubscriptionChange(subscription.id, newStatus).catch(console.error);
         break;
       }
 
@@ -87,6 +149,7 @@ export async function POST(req: NextRequest) {
             stripePeriodEnd: getPeriodEnd(subscription),
           })
           .eq('stripeSubscriptionId', subscription.id);
+        notifySubscriptionChange(subscription.id, 'canceled').catch(console.error);
         break;
       }
 
@@ -101,6 +164,7 @@ export async function POST(req: NextRequest) {
             .from('Space')
             .update({ stripeSubscriptionStatus: 'past_due' })
             .eq('stripeSubscriptionId', subId);
+          notifySubscriptionChange(subId, 'past_due').catch(console.error);
         }
         break;
       }
