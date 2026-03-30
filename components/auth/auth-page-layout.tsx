@@ -206,10 +206,10 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
           <BrandLogo className="h-12 opacity-90 brightness-0 invert drop-shadow-lg" alt="" />
         </div>
 
-        {/* Horizontal testimonial marquee at bottom */}
+        {/* Horizontal testimonial marquee at bottom — full width, no gaps */}
         <div className="absolute inset-x-0 bottom-0 z-20">
-          <div className="bg-gradient-to-t from-black/70 via-black/40 to-transparent pt-16 pb-5 px-4">
-            <div className="overflow-hidden">
+          <div className="bg-gradient-to-t from-black/70 via-black/40 to-transparent pt-16 pb-5">
+            <div className="overflow-hidden w-full">
               <HorizontalMarquee items={testimonials} duration={30} />
             </div>
           </div>

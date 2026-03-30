@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Confetti } from '@/components/ui/confetti';
+import { Balloons, type BalloonsRef } from '@/components/ui/balloons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -271,6 +271,7 @@ export function ApplicationForm({
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const balloonsRef = useRef<BalloonsRef>(null);
   const [scoreState, setScoreState] = useState<{
     id?: string;
     scoringStatus?: string;
@@ -440,6 +441,7 @@ export function ApplicationForm({
         const result = await response.json().catch(() => ({}));
         setScoreState(result);
         setSubmitted(true);
+        setTimeout(() => balloonsRef.current?.launchAnimation(), 300);
         clearDraft(slug);
       } else {
         const body = await response.json().catch(() => ({}));
@@ -457,7 +459,7 @@ export function ApplicationForm({
   if (submitted) {
     return (
       <>
-      <Confetti active={true} />
+      <Balloons ref={balloonsRef} type="default" />
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { CalendarDays, Clock, Check, Loader2, ChevronLeft, ChevronRight, MapPin, Globe, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Confetti } from '@/components/ui/confetti';
+import { Balloons, type BalloonsRef } from '@/components/ui/balloons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,6 +32,7 @@ interface PropertyProfile {
 type Step = 'property' | 'date' | 'details' | 'confirmed';
 
 export function BookingForm({ slug, duration: defaultDuration, businessName, timezone }: BookingFormProps) {
+  const balloonsRef = useRef<BalloonsRef>(null);
   const [step, setStep] = useState<Step>('date');
   const [slots, setSlots] = useState<DaySlots[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,6 +129,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
         throw new Error(data.error || 'Booking failed');
       }
       setStep('confirmed');
+      setTimeout(() => balloonsRef.current?.launchAnimation(), 300);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -186,7 +188,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
   if (step === 'confirmed') {
     return (
       <>
-        <Confetti active={true} />
+        <Balloons ref={balloonsRef} type="default" />
         <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}

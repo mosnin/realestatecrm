@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BrandLogo } from '@/components/brand-logo';
 import { CheckCircle2, Loader2, AlertCircle, Users, UserCircle, ArrowLeft, Building2, LogOut } from 'lucide-react';
-import { Confetti } from '@/components/ui/confetti';
+import { Balloons, type BalloonsRef } from '@/components/ui/balloons';
 import { useClerk } from '@clerk/nextjs';
 import { toast } from 'sonner';
 
@@ -23,7 +23,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
+  const balloonsRef = useRef<BalloonsRef>(null);
   const [error, setError] = useState('');
 
   const needsWorkspace = role === 'realtor' || role === 'broker';
@@ -112,7 +112,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
         const brokerData = await brokerRes.json().catch(() => ({}));
         if (!brokerRes.ok) throw new Error(brokerData.error || 'Failed to create brokerage.');
 
-        setShowConfetti(true);
+        balloonsRef.current?.launchAnimation();
         await new Promise(r => setTimeout(r, 800));
         router.push('/broker');
         return;
@@ -179,14 +179,14 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
         });
         const brokerData = await brokerRes.json().catch(() => ({}));
         if (!brokerRes.ok) throw new Error(brokerData.error || 'Failed to create brokerage.');
-        setShowConfetti(true);
+        balloonsRef.current?.launchAnimation();
         await new Promise(r => setTimeout(r, 800));
         router.push('/broker');
         return;
       }
 
       const resolvedSlug: string = spaceData.slug ?? slug;
-      setShowConfetti(true);
+      balloonsRef.current?.launchAnimation();
       await new Promise(r => setTimeout(r, 800));
       router.push(`/s/${resolvedSlug}`);
     } catch (err) {
@@ -274,7 +274,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
   // Step 2: Workspace / brokerage creation form
   return (
     <div className="app-theme min-h-screen bg-background flex items-start justify-center px-4 py-10">
-      <Confetti active={showConfetti} />
+      <Balloons ref={balloonsRef} type="default" />
       <div className="w-full max-w-sm">
         <div className="flex justify-center mb-8">
           <BrandLogo className="h-7" alt="Chippi" />
