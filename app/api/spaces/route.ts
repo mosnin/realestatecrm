@@ -28,6 +28,9 @@ export async function PATCH(req: NextRequest) {
   const myConnections   = typeof body.myConnections   === 'string' ? body.myConnections.slice(0, 500)    : null;
   const aiPersonalization = typeof body.aiPersonalization === 'string' ? body.aiPersonalization.slice(0, 1000) : null;
   const billingSettings = typeof body.billingSettings === 'string' ? body.billingSettings.slice(0, 2000) : null;
+  const bio             = typeof body.bio             === 'string' ? body.bio.slice(0, 500)             : undefined;
+  const socialLinks     = body.socialLinks && typeof body.socialLinks === 'object' ? body.socialLinks    : undefined;
+  const logoUrl         = typeof body.logoUrl         === 'string' ? body.logoUrl.slice(0, 500)         : undefined;
   // Anthropic key: validate prefix format; reject anything that looks wrong
   const rawKey = typeof body.anthropicApiKey === 'string' ? body.anthropicApiKey.trim() : '';
   const anthropicApiKey = rawKey === '' || rawKey.startsWith('sk-ant-') ? (rawKey || null) : null;
@@ -98,6 +101,9 @@ export async function PATCH(req: NextRequest) {
         aiPersonalization,
         billingSettings,
         anthropicApiKey: anthropicApiKey || null,
+        ...(bio !== undefined && { bio }),
+        ...(socialLinks !== undefined && { socialLinks }),
+        ...(logoUrl !== undefined && { logoUrl }),
       },
       { onConflict: 'spaceId' }
     )

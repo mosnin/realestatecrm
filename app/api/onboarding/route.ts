@@ -212,13 +212,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'create_space') {
-      const { slug, intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl } = body as {
+      const { slug, intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl, intakeAccentColor, intakeBorderRadius, intakeFont, intakeFooterLinks, bio, socialLinks } = body as {
         slug: string;
         intakePageTitle: string;
         intakePageIntro: string;
         businessName: string;
         logoUrl?: string | null;
         realtorPhotoUrl?: string | null;
+        intakeAccentColor?: string;
+        intakeBorderRadius?: 'rounded' | 'sharp';
+        intakeFont?: 'system' | 'serif' | 'mono';
+        intakeFooterLinks?: { label: string; url: string }[];
+        bio?: string | null;
+        socialLinks?: { instagram?: string; linkedin?: string; facebook?: string };
       };
 
       if (!slug) return NextResponse.json({ error: 'Slug is required' }, { status: 400 });
@@ -240,6 +246,12 @@ export async function POST(req: NextRequest) {
               businessName,
               ...(logoUrl !== undefined && { logoUrl }),
               ...(realtorPhotoUrl !== undefined && { realtorPhotoUrl }),
+              ...(intakeAccentColor !== undefined && { intakeAccentColor }),
+              ...(intakeBorderRadius !== undefined && { intakeBorderRadius }),
+              ...(intakeFont !== undefined && { intakeFont }),
+              ...(intakeFooterLinks !== undefined && { intakeFooterLinks }),
+              ...(bio !== undefined && { bio }),
+              ...(socialLinks !== undefined && { socialLinks }),
             },
             { onConflict: 'spaceId' }
           )

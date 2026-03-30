@@ -71,6 +71,12 @@ export default async function ConfigurePage({
     notifications: dbUser?.space?.settings?.notifications ?? true,
     logoUrl: (dbUser?.space?.settings as any)?.logoUrl ?? '',
     realtorPhotoUrl: (dbUser?.space?.settings as any)?.realtorPhotoUrl ?? '',
+    intakeAccentColor: dbUser?.space?.settings?.intakeAccentColor ?? '#ff964f',
+    intakeBorderRadius: dbUser?.space?.settings?.intakeBorderRadius ?? 'rounded',
+    intakeFont: dbUser?.space?.settings?.intakeFont ?? 'system',
+    intakeFooterLinks: dbUser?.space?.settings?.intakeFooterLinks ?? [],
+    bio: dbUser?.space?.settings?.bio ?? '',
+    socialLinks: dbUser?.space?.settings?.socialLinks ?? { instagram: '', linkedin: '', facebook: '' },
   };
 
   // Check broker status for the brokerage section

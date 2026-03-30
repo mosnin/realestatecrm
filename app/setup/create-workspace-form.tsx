@@ -6,17 +6,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BrandLogo } from '@/components/brand-logo';
-import { CheckCircle2, Loader2, AlertCircle, Users, UserCircle, ArrowLeft, Building2, LogOut } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { CheckCircle2, Loader2, AlertCircle, Users, UserCircle, ArrowLeft, Building2, LogOut, Instagram, Linkedin, Facebook, Image } from 'lucide-react';
 import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
 import { useClerk } from '@clerk/nextjs';
 import { toast } from 'sonner';
 
 type SetupRole = 'choose' | 'realtor' | 'broker' | 'broker_only';
+type SetupStep = 'choose' | 'create' | 'personalize';
 
 export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: string; userEmail: string }) {
   const { signOut } = useClerk();
   const router = useRouter();
   const [role, setRole] = useState<SetupRole>('choose');
+  const [step, setStep] = useState<SetupStep>('choose');
   const [businessName, setBusinessName] = useState('');
   const [brokerageName, setBrokerageName] = useState('');
   const [slug, setSlug] = useState('');
@@ -25,6 +28,15 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
   const [saving, setSaving] = useState(false);
   const confettiRef = useRef<ConfettiRef>(null);
   const [error, setError] = useState('');
+
+  // Personalize step state
+  const [resolvedSlug, setResolvedSlug] = useState('');
+  const [bio, setBio] = useState('');
+  const [instagram, setInstagram] = useState('');
+  const [linkedin, setLinkedin] = useState('');
+  const [facebook, setFacebook] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const needsWorkspace = role === 'realtor' || role === 'broker';
 
@@ -185,16 +197,175 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
         return;
       }
 
-      const resolvedSlug: string = spaceData.slug ?? slug;
+      const finalSlug: string = spaceData.slug ?? slug;
+      setResolvedSlug(finalSlug);
       confettiRef.current?.fire({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
       await new Promise(r => setTimeout(r, 800));
-      router.push(`/s/${resolvedSlug}`);
+      setSaving(false);
+      setStep('personalize');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong.';
       setError(msg);
       toast.error(msg);
       setSaving(false);
     }
+  }
+
+  // Personalize step handlers
+  async function handleSaveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingProfile(true);
+    try {
+      const socialLinks: Record<string, string> = {};
+      if (instagram.trim()) socialLinks.instagram = instagram.trim();
+      if (linkedin.trim()) socialLinks.linkedin = linkedin.trim();
+      if (facebook.trim()) socialLinks.facebook = facebook.trim();
+
+      const res = await fetch('/api/spaces', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: resolvedSlug,
+          name: businessName,
+          bio: bio.trim() || null,
+          socialLinks: Object.keys(socialLinks).length > 0 ? socialLinks : {},
+          logoUrl: logoUrl.trim() || null,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Failed to save profile.');
+      }
+      router.push(`/s/${resolvedSlug}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Something went wrong.';
+      toast.error(msg);
+      setSavingProfile(false);
+    }
+  }
+
+  function handleSkipProfile() {
+    router.push(`/s/${resolvedSlug}`);
+  }
+
+  // Personalize step
+  if (step === 'personalize') {
+    return (
+      <div className="app-theme min-h-screen bg-background flex items-start justify-center px-4 py-10">
+        <Confetti ref={confettiRef} manualstart className="pointer-events-none fixed inset-0 z-[9999] w-full h-full" />
+        <div className="w-full max-w-sm">
+          <div className="flex justify-center mb-8">
+            <BrandLogo className="h-7" alt="Chippi" />
+          </div>
+
+          <div className="rounded-xl border border-border bg-card px-6 py-7">
+            <div className="mb-6">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary mb-3">
+                <UserCircle size={10} />
+                Personalize
+              </div>
+              <h1 className="text-xl font-bold">Make it yours</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Add a few optional details to your workspace. You can always change these later.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="bio">Bio</Label>
+                <Textarea
+                  id="bio"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="Tell renters a bit about yourself (optional)"
+                  maxLength={500}
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-3">
+                <Label>Social links</Label>
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Instagram size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={instagram}
+                      onChange={(e) => setInstagram(e.target.value)}
+                      placeholder="Instagram URL (optional)"
+                      className="pl-9"
+                    />
+                  </div>
+                  <div className="relative">
+                    <Linkedin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={linkedin}
+                      onChange={(e) => setLinkedin(e.target.value)}
+                      placeholder="LinkedIn URL (optional)"
+                      className="pl-9"
+                    />
+                  </div>
+                  <div className="relative">
+                    <Facebook size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={facebook}
+                      onChange={(e) => setFacebook(e.target.value)}
+                      placeholder="Facebook URL (optional)"
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="logoUrl">Logo</Label>
+                <div className="relative">
+                  <Image size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="logoUrl"
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
+                    placeholder="Paste your logo URL (optional)"
+                    className="pl-9"
+                  />
+                </div>
+                {logoUrl.trim() && (
+                  <div className="mt-2 rounded-lg border border-border bg-muted/30 p-3 flex items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={logoUrl.trim()}
+                      alt="Logo preview"
+                      className="max-h-16 max-w-full object-contain"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      onLoad={(e) => { (e.target as HTMLImageElement).style.display = 'block'; }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <Button type="submit" className="w-full" disabled={savingProfile} size="lg">
+                {savingProfile ? (
+                  <>
+                    <Loader2 size={16} className="mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save & continue'
+                )}
+              </Button>
+            </form>
+
+            <button
+              type="button"
+              onClick={handleSkipProfile}
+              disabled={savingProfile}
+              className="w-full mt-3 text-sm text-muted-foreground hover:text-foreground transition-colors text-center py-1.5"
+            >
+              Skip &amp; go to dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Step 1: Role selection

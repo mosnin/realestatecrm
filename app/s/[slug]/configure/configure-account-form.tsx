@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { buildIntakeUrl } from '@/lib/intake';
-import { CheckCircle2, Loader2, User, Link2, Bell, AlertCircle, Image, Palette } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { CheckCircle2, Loader2, User, Link2, Bell, AlertCircle, Image, Palette, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ConfigureAccountFormProps {
@@ -21,6 +22,12 @@ interface ConfigureAccountFormProps {
     notifications: boolean;
     logoUrl: string;
     realtorPhotoUrl: string;
+    intakeAccentColor: string;
+    intakeBorderRadius: 'rounded' | 'sharp';
+    intakeFont: 'system' | 'serif' | 'mono';
+    intakeFooterLinks: { label: string; url: string }[];
+    bio: string;
+    socialLinks: { instagram?: string; linkedin?: string; facebook?: string };
   };
   slug: string;
 }
@@ -61,6 +68,12 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
   const [notifications, setNotifications] = useState(initialData.notifications);
   const [logoUrl, setLogoUrl] = useState(initialData.logoUrl || '');
   const [realtorPhotoUrl, setRealtorPhotoUrl] = useState(initialData.realtorPhotoUrl || '');
+  const [intakeAccentColor, setIntakeAccentColor] = useState(initialData.intakeAccentColor || '#ff964f');
+  const [intakeBorderRadius, setIntakeBorderRadius] = useState<'rounded' | 'sharp'>(initialData.intakeBorderRadius || 'rounded');
+  const [intakeFont, setIntakeFont] = useState<'system' | 'serif' | 'mono'>(initialData.intakeFont || 'system');
+  const [intakeFooterLinks, setIntakeFooterLinks] = useState<{ label: string; url: string }[]>(initialData.intakeFooterLinks || []);
+  const [bio, setBio] = useState(initialData.bio || '');
+  const [socialLinks, setSocialLinks] = useState<{ instagram?: string; linkedin?: string; facebook?: string }>(initialData.socialLinks || { instagram: '', linkedin: '', facebook: '' });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -99,6 +112,12 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
           businessName,
           logoUrl: logoUrl.trim() || null,
           realtorPhotoUrl: realtorPhotoUrl.trim() || null,
+          intakeAccentColor,
+          intakeBorderRadius,
+          intakeFont,
+          intakeFooterLinks,
+          bio: bio.trim() || null,
+          socialLinks,
         }),
       });
       if (!spaceRes.ok) {
@@ -155,6 +174,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
           { id: 'profile', label: 'Profile', icon: User },
           { id: 'intake', label: 'Intake link', icon: Link2 },
           { id: 'branding', label: 'Branding', icon: Image },
+          { id: 'form-design', label: 'Form Design', icon: Palette },
           { id: 'notifications', label: 'Notifications', icon: Bell },
         ].map(({ id, label, icon: Icon }) => (
           <a
@@ -318,6 +338,185 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Form Design ───────────────────────────────────────── */}
+        <section id="section-form-design" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
+          <SectionHeader
+            icon={Palette}
+            title="Form Design"
+            description="Customize the appearance of your intake form."
+          />
+          <div className="space-y-4">
+            {/* Color Scheme */}
+            <div className="space-y-1.5">
+              <Label>Color scheme</Label>
+              <div className="flex items-center gap-2">
+                {[
+                  { name: 'Orange', value: '#ff964f' },
+                  { name: 'Teal', value: '#14b8a6' },
+                  { name: 'Blue', value: '#3b82f6' },
+                  { name: 'Purple', value: '#8b5cf6' },
+                  { name: 'Rose', value: '#f43f5e' },
+                  { name: 'Emerald', value: '#10b981' },
+                ].map((color) => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    title={color.name}
+                    onClick={() => setIntakeAccentColor(color.value)}
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${
+                      intakeAccentColor === color.value
+                        ? 'border-foreground scale-110'
+                        : 'border-transparent hover:border-muted-foreground/40'
+                    }`}
+                    style={{ backgroundColor: color.value }}
+                  />
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Accent color used for buttons and highlights on the intake form.
+              </p>
+            </div>
+
+            {/* Border Radius */}
+            <div className="space-y-1.5">
+              <Label>Border radius</Label>
+              <div className="flex items-center gap-2">
+                {[
+                  { label: 'Rounded', value: 'rounded' as const },
+                  { label: 'Sharp', value: 'sharp' as const },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setIntakeBorderRadius(option.value)}
+                    className={`px-4 py-2 text-sm font-medium border transition-colors ${
+                      option.value === 'rounded' ? 'rounded-xl' : 'rounded-none'
+                    } ${
+                      intakeBorderRadius === option.value
+                        ? 'border-primary bg-primary/10 text-foreground'
+                        : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Controls the corner rounding of cards and inputs on the intake form.
+              </p>
+            </div>
+
+            {/* Font */}
+            <div className="space-y-1.5">
+              <Label htmlFor="intakeFont">Font</Label>
+              <select
+                id="intakeFont"
+                value={intakeFont}
+                onChange={(e) => setIntakeFont(e.target.value as 'system' | 'serif' | 'mono')}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="system">System (default)</option>
+                <option value="serif">Serif</option>
+                <option value="mono">Mono</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Font family used on the intake form.
+              </p>
+            </div>
+
+            {/* Bio */}
+            <div className="space-y-1.5">
+              <Label htmlFor="bio">Bio</Label>
+              <Textarea
+                id="bio"
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder="A short bio shown on your intake page..."
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                A brief description about you or your business, displayed on the intake page.
+              </p>
+            </div>
+
+            {/* Social Links */}
+            <div className="space-y-1.5">
+              <Label>Social links</Label>
+              <div className="space-y-2">
+                <Input
+                  value={socialLinks.instagram || ''}
+                  onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })}
+                  placeholder="Instagram URL"
+                />
+                <Input
+                  value={socialLinks.linkedin || ''}
+                  onChange={(e) => setSocialLinks({ ...socialLinks, linkedin: e.target.value })}
+                  placeholder="LinkedIn URL"
+                />
+                <Input
+                  value={socialLinks.facebook || ''}
+                  onChange={(e) => setSocialLinks({ ...socialLinks, facebook: e.target.value })}
+                  placeholder="Facebook URL"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Social media links displayed on the intake page.
+              </p>
+            </div>
+
+            {/* Footer Links */}
+            <div className="space-y-1.5">
+              <Label>Footer links</Label>
+              <div className="space-y-2">
+                {intakeFooterLinks.map((link, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      value={link.label}
+                      onChange={(e) => {
+                        const updated = [...intakeFooterLinks];
+                        updated[index] = { ...updated[index], label: e.target.value };
+                        setIntakeFooterLinks(updated);
+                      }}
+                      placeholder="Label"
+                      className="flex-1"
+                    />
+                    <Input
+                      value={link.url}
+                      onChange={(e) => {
+                        const updated = [...intakeFooterLinks];
+                        updated[index] = { ...updated[index], url: e.target.value };
+                        setIntakeFooterLinks(updated);
+                      }}
+                      placeholder="https://..."
+                      className="flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIntakeFooterLinks(intakeFooterLinks.filter((_, i) => i !== index));
+                      }}
+                      className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-md border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setIntakeFooterLinks([...intakeFooterLinks, { label: '', url: '' }])}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors mt-1"
+              >
+                <Plus size={14} />
+                Add link
+              </button>
+              <p className="text-xs text-muted-foreground">
+                Links shown in the footer of your intake form.
+              </p>
             </div>
           </div>
         </section>
