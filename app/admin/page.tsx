@@ -7,7 +7,6 @@ import {
   AlertTriangle,
   PhoneIncoming,
   Building2,
-  XCircle,
   TrendingUp,
   Briefcase,
   UserPlus,
