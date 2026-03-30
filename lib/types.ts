@@ -87,6 +87,12 @@ export type SpaceSetting = {
   businessName: string | null;
   intakePageTitle: string | null;
   intakePageIntro: string | null;
+  bio: string | null;
+  socialLinks: { instagram?: string; linkedin?: string; facebook?: string } | null;
+  intakeAccentColor: string | null;
+  intakeBorderRadius: 'rounded' | 'sharp';
+  intakeFont: 'system' | 'serif' | 'mono';
+  intakeFooterLinks: { label: string; url: string }[] | null;
 };
 
 export type Contact = {

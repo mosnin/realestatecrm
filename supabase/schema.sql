@@ -74,6 +74,14 @@ CREATE TABLE IF NOT EXISTS "SpaceSetting" (
   "businessName"      text,
   "intakePageTitle"   text,
   "intakePageIntro"   text,
+  bio                 text,
+  "socialLinks"       jsonb DEFAULT '{}',
+  "intakeAccentColor" text DEFAULT '#ff964f',
+  "intakeBorderRadius" text DEFAULT 'rounded'
+    CHECK ("intakeBorderRadius" IN ('rounded', 'sharp')),
+  "intakeFont"        text DEFAULT 'system'
+    CHECK ("intakeFont" IN ('system', 'serif', 'mono')),
+  "intakeFooterLinks" jsonb DEFAULT '[]',
   "tourDuration"         integer NOT NULL DEFAULT 30,
   "tourStartHour"        integer NOT NULL DEFAULT 9,
   "tourEndHour"          integer NOT NULL DEFAULT 17,
