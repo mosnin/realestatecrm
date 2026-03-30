@@ -466,6 +466,12 @@ export function ChatInterface({
           />
         )}
       </div>
+      <VoiceMode
+        open={voiceOpen}
+        onClose={() => setVoiceOpen(false)}
+        onTranscription={handleVoiceTranscription}
+        lastAssistantMessage={lastAssistantMsg}
+      />
     </div>
   );
 }
