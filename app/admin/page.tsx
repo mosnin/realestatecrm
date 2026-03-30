@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
   Users,
   CheckCircle2,
@@ -18,6 +19,8 @@ import {
   Calendar,
   Bell,
   BarChart3,
+  FileText,
+  LayoutGrid,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';

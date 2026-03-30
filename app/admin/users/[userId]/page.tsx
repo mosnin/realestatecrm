@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { createClerkClient } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { buildIntakeUrl } from '@/lib/intake';
 import { getOnboardingStatus } from '@/lib/onboarding';
@@ -20,6 +21,10 @@ import {
 import Link from 'next/link';
 import { UserActions } from './user-actions';
 import type { User, Space, SpaceSetting } from '@/lib/types';
+
+const clerkAdmin = createClerkClient({
+  secretKey: process.env.CLERK_SECRET_KEY!,
+});
 
 export async function generateMetadata({
   params,
@@ -96,6 +101,15 @@ export default async function AdminUserDetailPage({
   if (userError) throw userError;
   if (!userRow) notFound();
   const user = userRow as User;
+
+  // Check Clerk ban status
+  let isSuspended = false;
+  try {
+    const clerkUser = await clerkAdmin.users.getUser(user.clerkId);
+    isSuspended = clerkUser.banned ?? false;
+  } catch {
+    // If Clerk lookup fails, default to not suspended
+  }
 
   // Fetch space
   const { data: spaceData, error: spaceError } = await supabase
@@ -195,15 +209,22 @@ export default async function AdminUserDetailPage({
             <p className="text-sm text-muted-foreground">{fullUser.email}</p>
           </div>
         </div>
-        <span
-          className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-1 ${
-            onboarding.isOnboarded
-              ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15'
-              : 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
-          }`}
-        >
-          {onboarding.isOnboarded ? 'Onboarded' : 'Not onboarded'}
-        </span>
+        <div className="flex items-center gap-2">
+          {isSuspended && (
+            <span className="inline-flex text-xs font-semibold rounded-full px-2.5 py-1 text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15">
+              Suspended
+            </span>
+          )}
+          <span
+            className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-1 ${
+              onboarding.isOnboarded
+                ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15'
+                : 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
+            }`}
+          >
+            {onboarding.isOnboarded ? 'Onboarded' : 'Not onboarded'}
+          </span>
+        </div>
       </div>
 
       {/* Account details */}
@@ -381,6 +402,9 @@ export default async function AdminUserDetailPage({
         isOnboarded={onboarding.isOnboarded}
         hasSpace={onboarding.hasSpace}
         intakeUrl={intakeUrl}
+        isSuspended={isSuspended}
+        subscriptionStatus={(fullUser.space as any)?.stripeSubscriptionStatus ?? 'inactive'}
+        stripePeriodEnd={(fullUser.space as any)?.stripePeriodEnd ?? null}
       />
     </div>
   );

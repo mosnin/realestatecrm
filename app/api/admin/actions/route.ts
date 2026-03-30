@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   const { action } = body;
 
-  const ALLOWED_ACTIONS = ['send_password_reset', 'repair_onboarding'];
+  const ALLOWED_ACTIONS = ['send_password_reset', 'repair_onboarding', 'update_subscription', 'suspend_user', 'unsuspend_user'];
   if (!ALLOWED_ACTIONS.includes(action as string)) {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   }
@@ -146,6 +146,134 @@ export async function POST(req: NextRequest) {
       });
 
       return NextResponse.json({ success: true, repairAction, message });
+    }
+
+    // ── Update subscription status ───────────────────────────────────────
+    if (action === 'update_subscription') {
+      const { userId, status, periodEnd } = body as {
+        userId: string;
+        status: string;
+        periodEnd?: string;
+      };
+
+      if (!userId || typeof userId !== 'string') {
+        return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+      }
+
+      const VALID_STATUSES = ['active', 'trialing', 'past_due', 'canceled', 'unpaid', 'inactive'];
+      if (!status || !VALID_STATUSES.includes(status)) {
+        return NextResponse.json(
+          { error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` },
+          { status: 400 }
+        );
+      }
+
+      const { data: spaceData, error: spaceLookupError } = await supabase
+        .from('Space')
+        .select('id')
+        .eq('ownerId', userId)
+        .maybeSingle();
+
+      if (spaceLookupError) throw spaceLookupError;
+
+      if (!spaceData) {
+        return NextResponse.json({ error: 'No space found for this user' }, { status: 404 });
+      }
+
+      const updatePayload: Record<string, unknown> = { stripeSubscriptionStatus: status };
+      if (periodEnd) {
+        updatePayload.stripePeriodEnd = periodEnd;
+      }
+
+      const { error: updateError } = await supabase
+        .from('Space')
+        .update(updatePayload)
+        .eq('id', spaceData.id);
+
+      if (updateError) throw updateError;
+
+      logAdminAction({
+        actor: admin.userId,
+        action: 'update_subscription',
+        target: userId,
+        details: { status, periodEnd: periodEnd ?? null, spaceId: spaceData.id },
+      });
+
+      return NextResponse.json({ success: true, message: `Subscription status updated to '${status}'.` });
+    }
+
+    // ── Suspend user ─────────────────────────────────────────────────────
+    if (action === 'suspend_user') {
+      const { userId } = body as { userId: string };
+      if (!userId || typeof userId !== 'string') {
+        return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+      }
+
+      // Look up the user to get their Clerk ID
+      const { data: userRow, error: userError } = await supabase
+        .from('User')
+        .select('id, clerkId, email')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (userError) throw userError;
+      if (!userRow) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      const target = userRow as { id: string; clerkId: string; email: string };
+
+      // Ban the user in Clerk — prevents them from signing in
+      await clerkClient.users.banUser(target.clerkId);
+
+      logAdminAction({
+        actor: admin.userId,
+        action: 'suspend_user',
+        target: userId,
+        details: { clerkId: target.clerkId, email: target.email },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `User ${target.email} has been suspended. They will be unable to sign in.`,
+      });
+    }
+
+    // ── Unsuspend user ──────────────────────────────────────────────────
+    if (action === 'unsuspend_user') {
+      const { userId } = body as { userId: string };
+      if (!userId || typeof userId !== 'string') {
+        return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+      }
+
+      // Look up the user to get their Clerk ID
+      const { data: userRow, error: userError } = await supabase
+        .from('User')
+        .select('id, clerkId, email')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (userError) throw userError;
+      if (!userRow) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      const target = userRow as { id: string; clerkId: string; email: string };
+
+      // Unban the user in Clerk — restores their ability to sign in
+      await clerkClient.users.unbanUser(target.clerkId);
+
+      logAdminAction({
+        actor: admin.userId,
+        action: 'unsuspend_user',
+        target: userId,
+        details: { clerkId: target.clerkId, email: target.email },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `User ${target.email} has been unsuspended. They can now sign in again.`,
+      });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
