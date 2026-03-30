@@ -14,8 +14,8 @@ const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   // Limit referrer info sent to cross-origin requests
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  // Disable unused browser features
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+  // Disable unused browser features (microphone allowed for voice mode)
+  { key: 'Permissions-Policy', value: 'camera=(), geolocation=()' },
   // Force HTTPS for 2 years (only active when served over TLS)
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
   // Content Security Policy (report-only to avoid breaking Clerk while domains are validated)
