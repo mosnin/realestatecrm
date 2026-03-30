@@ -21,7 +21,14 @@ export default async function PublicApplyPage({
   const [{ data: settingsData }, { data: ownerData }] = await Promise.all([
     supabase
       .from('SpaceSetting')
-      .select('intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl')
+      .select(
+        'intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl, ' +
+        'intakeAccentColor, intakeBorderRadius, intakeFont, intakeDarkMode, ' +
+        'intakeHeaderBgColor, intakeHeaderGradient, intakeVideoUrl, ' +
+        'intakeDisclaimerText, intakeThankYouTitle, intakeThankYouMessage, ' +
+        'intakeFooterLinks, intakeDisabledSteps, intakeCustomQuestions, ' +
+        'intakeFaviconUrl, bio, socialLinks'
+      )
       .eq('spaceId', space.id)
       .maybeSingle(),
     supabase
@@ -37,6 +44,22 @@ export default async function PublicApplyPage({
     businessName: string | null;
     logoUrl: string | null;
     realtorPhotoUrl: string | null;
+    intakeAccentColor: string | null;
+    intakeBorderRadius: string | null;
+    intakeFont: string | null;
+    intakeDarkMode: boolean | null;
+    intakeHeaderBgColor: string | null;
+    intakeHeaderGradient: string | null;
+    intakeVideoUrl: string | null;
+    intakeDisclaimerText: string | null;
+    intakeThankYouTitle: string | null;
+    intakeThankYouMessage: string | null;
+    intakeFooterLinks: { label: string; url: string }[] | null;
+    intakeDisabledSteps: number[] | null;
+    intakeCustomQuestions: { id: string; label: string; type: string; required?: boolean }[] | null;
+    intakeFaviconUrl: string | null;
+    bio: string | null;
+    socialLinks: Record<string, string> | null;
   } | null;
 
   const pageTitle = settings?.intakePageTitle || 'Rental Application';
@@ -45,6 +68,25 @@ export default async function PublicApplyPage({
   const agentName = ownerData?.name || businessName;
   const agentPhoto = settings?.realtorPhotoUrl || ownerData?.avatar || null;
   const logoUrl = settings?.logoUrl || null;
+
+  const customization = {
+    accentColor: settings?.intakeAccentColor || '#ff964f',
+    borderRadius: settings?.intakeBorderRadius || 'rounded',
+    font: settings?.intakeFont || 'system',
+    darkMode: settings?.intakeDarkMode || false,
+    headerBgColor: settings?.intakeHeaderBgColor || null,
+    headerGradient: settings?.intakeHeaderGradient || null,
+    videoUrl: settings?.intakeVideoUrl || null,
+    disclaimerText: settings?.intakeDisclaimerText || null,
+    thankYouTitle: settings?.intakeThankYouTitle || null,
+    thankYouMessage: settings?.intakeThankYouMessage || null,
+    footerLinks: settings?.intakeFooterLinks || [],
+    disabledSteps: settings?.intakeDisabledSteps || [],
+    customQuestions: settings?.intakeCustomQuestions || [],
+    faviconUrl: settings?.intakeFaviconUrl || null,
+    bio: settings?.bio || null,
+    socialLinks: settings?.socialLinks || null,
+  };
 
   return (
     <PublicPageShell
@@ -56,8 +98,9 @@ export default async function PublicApplyPage({
       pageTitle={pageTitle}
       pageIntro={pageIntro}
       trustLine={`Your information is shared only with ${agentName} and used solely for rental inquiries.`}
+      customization={customization}
     >
-      <ApplicationFormLoader slug={slug} businessName={businessName} />
+      <ApplicationFormLoader slug={slug} businessName={businessName} customization={customization} />
     </PublicPageShell>
   );
 }

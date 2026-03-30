@@ -107,6 +107,10 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
   const [intakeConfirmationEmail, setIntakeConfirmationEmail] = useState(initialData.intakeConfirmationEmail || '');
   const [intakeDisclaimerText, setIntakeDisclaimerText] = useState(initialData.intakeDisclaimerText || '');
 
+  // Form fields
+  const [disabledSteps, setDisabledSteps] = useState<string[]>(initialData.intakeDisabledSteps || []);
+  const [customQuestions, setCustomQuestions] = useState<{ id: string; label: string; placeholder?: string; required?: boolean }[]>(initialData.intakeCustomQuestions || []);
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -208,6 +212,8 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
           intakeThankYouMessage: intakeThankYouMessage.trim() || null,
           intakeConfirmationEmail: intakeConfirmationEmail.trim() || null,
           intakeDisclaimerText: intakeDisclaimerText.trim() || null,
+          intakeDisabledSteps: disabledSteps,
+          intakeCustomQuestions: customQuestions,
         }),
       });
       if (!spaceRes.ok) {
@@ -267,6 +273,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
           { id: 'form-design', label: 'Form Design', icon: Palette },
           { id: 'visual', label: 'Visual', icon: Eye },
           { id: 'content', label: 'Content', icon: FileText },
+          { id: 'form-fields', label: 'Form Fields', icon: ListChecks },
           { id: 'notifications', label: 'Notifications', icon: Bell },
         ].map(({ id, label, icon: Icon }) => (
           <a
@@ -609,6 +616,139 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
               <p className="text-xs text-muted-foreground">
                 Links shown in the footer of your intake form.
               </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Form Fields ──────────────────────────────────────── */}
+        <section id="section-form-fields" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
+          <SectionHeader
+            icon={ListChecks}
+            title="Form Fields"
+            description="Control which steps appear on your intake form and add custom questions."
+          />
+          <div className="space-y-6">
+            {/* Step toggles */}
+            <div className="space-y-1.5">
+              <Label>Form steps</Label>
+              <p className="text-xs text-muted-foreground mb-3">
+                Toggle steps on or off. Disabled steps are hidden from the intake form.
+              </p>
+              <div className="space-y-0">
+                {[
+                  { id: 'property', label: 'Property Selection', locked: true },
+                  { id: 'about', label: 'About You', locked: true },
+                  { id: 'housing', label: 'Current Housing', locked: false },
+                  { id: 'household', label: 'Household', locked: false },
+                  { id: 'income', label: 'Income', locked: false },
+                  { id: 'history', label: 'Rental History', locked: false },
+                  { id: 'screening', label: 'Screening', locked: false },
+                  { id: 'details', label: 'Additional Notes', locked: false },
+                  { id: 'documents', label: 'Documents', locked: false },
+                  { id: 'submit', label: 'Review & Submit', locked: true },
+                ].map((step) => {
+                  const isDisabled = disabledSteps.includes(step.id);
+                  return (
+                    <div
+                      key={step.id}
+                      className="flex items-center justify-between py-2.5 border-b border-border last:border-b-0"
+                    >
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{step.label}</p>
+                        {step.locked && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                            <Lock size={10} />
+                            Required
+                          </span>
+                        )}
+                      </div>
+                      <Switch
+                        checked={step.locked ? true : !isDisabled}
+                        disabled={step.locked}
+                        onCheckedChange={(checked) => {
+                          if (step.locked) return;
+                          if (checked) {
+                            setDisabledSteps(disabledSteps.filter((s) => s !== step.id));
+                          } else {
+                            setDisabledSteps([...disabledSteps, step.id]);
+                          }
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom questions */}
+            <div className="space-y-1.5">
+              <Label>Custom questions</Label>
+              <p className="text-xs text-muted-foreground mb-3">
+                Add your own questions that appear at the end of the form.
+              </p>
+              <div className="space-y-3">
+                {customQuestions.map((q, index) => (
+                  <div key={q.id} className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                    <div className="flex items-start gap-2">
+                      <Input
+                        value={q.label}
+                        onChange={(e) => {
+                          const updated = [...customQuestions];
+                          updated[index] = { ...updated[index], label: e.target.value };
+                          setCustomQuestions(updated);
+                        }}
+                        placeholder="Enter your question..."
+                        className="flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomQuestions(customQuestions.filter((_, i) => i !== index));
+                        }}
+                        className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-md border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Input
+                        value={q.placeholder || ''}
+                        onChange={(e) => {
+                          const updated = [...customQuestions];
+                          updated[index] = { ...updated[index], placeholder: e.target.value };
+                          setCustomQuestions(updated);
+                        }}
+                        placeholder="Placeholder text (optional)"
+                        className="flex-1 text-xs"
+                      />
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-xs text-muted-foreground">Required</span>
+                        <Switch
+                          checked={q.required || false}
+                          onCheckedChange={(checked) => {
+                            const updated = [...customQuestions];
+                            updated[index] = { ...updated[index], required: checked };
+                            setCustomQuestions(updated);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setCustomQuestions([
+                    ...customQuestions,
+                    { id: crypto.randomUUID(), label: '', required: false },
+                  ])
+                }
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors mt-1"
+              >
+                <Plus size={14} />
+                Add question
+              </button>
             </div>
           </div>
         </section>

@@ -43,6 +43,25 @@ const ALL_STEPS = [
 
 type FormData = Record<string, string>;
 
+export interface IntakeCustomization {
+  accentColor: string;
+  borderRadius: string;
+  font: string;
+  darkMode: boolean;
+  headerBgColor: string | null;
+  headerGradient: string | null;
+  videoUrl: string | null;
+  disclaimerText: string | null;
+  thankYouTitle: string | null;
+  thankYouMessage: string | null;
+  footerLinks: { label: string; url: string }[];
+  disabledSteps: number[];
+  customQuestions: { id: string; label: string; type: string; required?: boolean }[];
+  faviconUrl: string | null;
+  bio: string | null;
+  socialLinks: Record<string, string> | null;
+}
+
 const STORAGE_KEY_PREFIX = 'chippi_apply_';
 
 function getStorageKey(slug: string) {
@@ -258,12 +277,50 @@ function StepIndicator({ current, steps }: { current: number; steps: readonly { 
   );
 }
 
+const FONT_CLASS_MAP: Record<string, string> = {
+  system: '',
+  sans: 'font-sans',
+  serif: 'font-serif',
+  mono: 'font-mono',
+};
+
+const RADIUS_CLASS_MAP: Record<string, string> = {
+  rounded: 'rounded-xl',
+  none: 'rounded-none',
+  full: 'rounded-2xl',
+};
+
+/** Parse a YouTube or Loom URL into an embeddable src. */
+function toEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    // YouTube
+    if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
+      const id = u.hostname.includes('youtu.be')
+        ? u.pathname.slice(1)
+        : u.searchParams.get('v');
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+    // Loom
+    if (u.hostname.includes('loom.com')) {
+      const match = u.pathname.match(/\/share\/([a-zA-Z0-9]+)/);
+      return match ? `https://www.loom.com/embed/${match[1]}` : null;
+    }
+    // Fallback: return as-is (may already be an embed URL)
+    return url;
+  } catch {
+    return null;
+  }
+}
+
 export function ApplicationForm({
   slug,
   businessName,
+  customization,
 }: {
   slug: string;
   businessName: string;
+  customization?: IntakeCustomization;
 }) {
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1); // 1 = forward, -1 = backward
@@ -287,10 +344,14 @@ export function ApplicationForm({
 
   const get = useCallback((key: string) => data[key] ?? '', [data]);
 
+  const disabledSteps = customization?.disabledSteps ?? [];
+
   // Conditional logic: determine which steps to show based on answers
   const STEPS = ALL_STEPS.filter((s) => {
     // Skip rental history (step 6) if they own their home
     if (s.id === 6 && data.currentHousingStatus === 'own') return false;
+    // Skip steps disabled by customization
+    if (disabledSteps.includes(s.id)) return false;
     return true;
   });
 
@@ -437,6 +498,14 @@ export function ApplicationForm({
       truthfulnessCertification: get('truthfulnessCertification'),
       electronicSignature: get('electronicSignature'),
       completedSteps: ALL_STEPS.map((s) => s.id),
+      // Include custom question answers
+      ...(customization?.customQuestions?.length
+        ? {
+            customAnswers: Object.fromEntries(
+              customization.customQuestions.map((q) => [q.id, get(`custom_${q.id}`)])
+            ),
+          }
+        : {}),
     };
 
     try {
@@ -509,9 +578,11 @@ export function ApplicationForm({
           <CheckCircle2 size={28} className="text-green-600 dark:text-green-400" />
         </motion.div>
         <div className="space-y-1.5">
-          <h2 className="text-xl font-semibold text-foreground">Application received</h2>
+          <h2 className="text-xl font-semibold text-foreground">
+            {customization?.thankYouTitle || 'Application received'}
+          </h2>
           <p className="text-sm text-muted-foreground">
-            {businessName} will review your application and follow up shortly.
+            {customization?.thankYouMessage || `${businessName} will review your application and follow up shortly.`}
           </p>
         </div>
         {scoreState?.id && stagedFiles.length > 0 && (
@@ -774,6 +845,43 @@ export function ApplicationForm({
                 rows={5}
               />
             </div>
+            {/* Custom questions from SpaceSetting */}
+            {customization?.customQuestions && customization.customQuestions.length > 0 && (
+              <div className="border-t border-border/50 pt-4 space-y-4">
+                {customization.customQuestions.map((q) => (
+                  q.type === 'textarea' ? (
+                    <div key={q.id} className="space-y-1.5">
+                      <Label htmlFor={`custom_${q.id}`}>
+                        {q.label} {q.required && <span className="text-destructive">*</span>}
+                      </Label>
+                      <Textarea
+                        id={`custom_${q.id}`}
+                        value={get(`custom_${q.id}`)}
+                        onChange={(e) => set(`custom_${q.id}`, e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                  ) : q.type === 'yesno' ? (
+                    <ToggleField
+                      key={q.id}
+                      id={`custom_${q.id}`}
+                      label={q.label}
+                      value={get(`custom_${q.id}`)}
+                      onChange={(v) => set(`custom_${q.id}`, v)}
+                    />
+                  ) : (
+                    <Field
+                      key={q.id}
+                      id={`custom_${q.id}`}
+                      label={q.label}
+                      required={q.required}
+                      value={get(`custom_${q.id}`)}
+                      onChange={(v) => set(`custom_${q.id}`, v)}
+                    />
+                  )
+                ))}
+              </div>
+            )}
           </div>
         );
 
@@ -853,8 +961,8 @@ export function ApplicationForm({
             />
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              By submitting, you agree to share this information with {businessName} for the purpose of evaluating your rental application.
-              {/* TODO: Add links to privacy policy and terms when those routes exist */}
+              {customization?.disclaimerText ||
+                `By submitting, you agree to share this information with ${businessName} for the purpose of evaluating your rental application.`}
             </p>
           </div>
         );
@@ -864,8 +972,34 @@ export function ApplicationForm({
     }
   }
 
+  const radiusClass = RADIUS_CLASS_MAP[customization?.borderRadius || 'rounded'] || 'rounded-xl';
+  const fontClass = FONT_CLASS_MAP[customization?.font || 'system'] || '';
+  const accentColor = customization?.accentColor || '#ff964f';
+  const embedUrl = customization?.videoUrl ? toEmbedUrl(customization.videoUrl) : null;
+
   return (
-    <div className="rounded-xl bg-card border border-border/60 shadow-sm overflow-hidden">
+    <div
+      className={cn(
+        'bg-card border border-border/60 shadow-sm overflow-hidden',
+        radiusClass,
+        fontClass,
+        customization?.darkMode && 'dark',
+      )}
+      style={{ '--intake-accent': accentColor } as React.CSSProperties}
+    >
+      {/* Video embed */}
+      {embedUrl && (
+        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+          <iframe
+            src={embedUrl}
+            title="Introduction video"
+            className="absolute inset-0 w-full h-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      )}
+
       {/* Progress */}
       <div className="px-5 pt-5 pb-3 space-y-3 border-b border-border/40">
         <ProgressBar current={currentStepIndex + 1} total={totalSteps} />
@@ -907,7 +1041,12 @@ export function ApplicationForm({
           )}
           <div className="flex-1" />
           {currentStepIndex < totalSteps - 1 ? (
-            <Button type="button" onClick={goNext} className="flex-shrink-0">
+            <Button
+              type="button"
+              onClick={goNext}
+              className="flex-shrink-0"
+              style={{ backgroundColor: accentColor }}
+            >
               Continue
               <ChevronRight size={16} className="ml-1" />
             </Button>
@@ -918,6 +1057,7 @@ export function ApplicationForm({
               disabled={submitting}
               size="lg"
               className="flex-1 sm:flex-none"
+              style={{ backgroundColor: accentColor }}
             >
               {submitting ? (
                 <>

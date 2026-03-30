@@ -212,7 +212,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'create_space') {
-      const { slug, intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl, intakeAccentColor, intakeBorderRadius, intakeFont, intakeFooterLinks, bio, socialLinks } = body as {
+      const { slug, intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl, intakeAccentColor, intakeBorderRadius, intakeFont, intakeFooterLinks, bio, socialLinks, intakeDisabledSteps, intakeCustomQuestions } = body as {
         slug: string;
         intakePageTitle: string;
         intakePageIntro: string;
@@ -225,6 +225,8 @@ export async function POST(req: NextRequest) {
         intakeFooterLinks?: { label: string; url: string }[];
         bio?: string | null;
         socialLinks?: { instagram?: string; linkedin?: string; facebook?: string };
+        intakeDisabledSteps?: string[];
+        intakeCustomQuestions?: { id: string; label: string; placeholder?: string; required?: boolean }[];
       };
 
       if (!slug) return NextResponse.json({ error: 'Slug is required' }, { status: 400 });
@@ -252,6 +254,8 @@ export async function POST(req: NextRequest) {
               ...(intakeFooterLinks !== undefined && { intakeFooterLinks }),
               ...(bio !== undefined && { bio }),
               ...(socialLinks !== undefined && { socialLinks }),
+              ...(intakeDisabledSteps !== undefined && { intakeDisabledSteps }),
+              ...(intakeCustomQuestions !== undefined && { intakeCustomQuestions }),
             },
             { onConflict: 'spaceId' }
           )
