@@ -342,279 +342,112 @@ export default async function AdminOverviewPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Chippi platform overview
-        </p>
-      </div>
-
-      {/* ── Top-level KPIs ───────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {[
-          {
-            label: 'Total users',
-            value: totalUsers,
-            sub: `+${signupsLast7} this week`,
-            icon: Users,
-            color: 'text-blue-500',
-            accent: false,
-          },
-          {
-            label: 'Onboarded',
-            value: onboardedUsers,
-            sub: `${onboardRate}% conversion`,
-            icon: CheckCircle2,
-            color: 'text-emerald-500',
-            accent: false,
-          },
-          {
-            label: 'Not onboarded',
-            value: notOnboarded,
-            sub: 'incomplete setup',
-            icon: AlertTriangle,
-            color: 'text-amber-500',
-            accent: notOnboarded > 0,
-          },
-          {
-            label: 'Brokerages',
-            value: totalBrokerages,
-            sub: `${activeBrokerages} active`,
-            icon: Building2,
-            color: 'text-violet-500',
-            accent: false,
-          },
-          {
-            label: 'Total leads',
-            value: totalLeads,
-            sub: `+${leadsLast7} this week`,
-            icon: PhoneIncoming,
-            color: 'text-cyan-500',
-            accent: false,
-          },
-          {
-            label: 'Pipeline',
-            value: formatCompact(totalPipelineValue),
-            sub: `${totalDeals} deals`,
-            icon: TrendingUp,
-            color: 'text-rose-500',
-            accent: false,
-          },
-        ].map(({ label, value, sub, icon: Icon, color, accent }) => (
-          <Card
-            key={label}
-            className={
-              accent
-                ? 'border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-500/5'
-                : ''
-            }
-          >
-            <CardContent className="px-4 py-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                  <p
-                    className={`text-2xl font-bold mt-0.5 tabular-nums ${
-                      accent ? 'text-amber-600 dark:text-amber-400' : ''
-                    }`}
-                  >
-                    {value}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
-                </div>
-                <div
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    accent ? 'bg-amber-100 dark:bg-amber-500/10' : 'bg-muted'
-                  }`}
-                >
-                  <Icon
-                    size={15}
-                    className={accent ? 'text-amber-600 dark:text-amber-400' : color}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* ── Revenue Overview ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          {
-            label: 'MRR',
-            value: `$${formatCompact(mrr)}`,
-            sub: `${activeSubscriptions} active subs`,
-            icon: DollarSign,
-            color: 'text-emerald-500',
-          },
-          {
-            label: 'Trial users',
-            value: trialUsers,
-            sub: 'currently trialing',
-            icon: CreditCard,
-            color: 'text-blue-500',
-          },
-          {
-            label: 'Past due',
-            value: pastDueUsers,
-            sub: 'payment failed',
-            icon: CreditCard,
-            color: 'text-amber-500',
-          },
-          {
-            label: 'Churn rate',
-            value: `${churnRate}%`,
-            sub: `${canceledUsers} canceled`,
-            icon: DollarSign,
-            color: 'text-rose-500',
-          },
-        ].map(({ label, value, sub, icon: Icon, color }) => (
-          <Card key={label}>
-            <CardContent className="px-4 py-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                  <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
-                </div>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
-                  <Icon size={15} className={color} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* ── Feature Usage ──────────────────────────────────────────────── */}
-      <div>
-        <p className="text-sm font-semibold mb-3">Feature adoption</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {[
-            {
-              label: 'Spaces with leads',
-              value: spacesWithLeads,
-              total: totalSpaces,
-              icon: PhoneIncoming,
-              color: 'text-emerald-500',
-            },
-            {
-              label: 'Spaces with deals',
-              value: spacesWithDeals,
-              total: totalSpaces,
-              icon: Briefcase,
-              color: 'text-cyan-500',
-            },
-            {
-              label: 'Spaces with tours',
-              value: spacesWithTours,
-              total: totalSpaces,
-              icon: Calendar,
-              color: 'text-violet-500',
-            },
-            {
-              label: 'Total tours booked',
-              value: totalTours,
-              total: null,
-              icon: Calendar,
-              color: 'text-blue-500',
-            },
-            {
-              label: 'Follow-ups set',
-              value: totalFollowUps,
-              total: null,
-              icon: Bell,
-              color: 'text-amber-500',
-            },
-          ].map(({ label, value, total, icon: Icon, color }) => {
-            const pct = total && total > 0 ? Math.round((value / total) * 100) : null;
-            return (
-              <Card key={label}>
-                <CardContent className="px-4 py-4">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
-                      <Icon size={13} className={color} />
-                    </div>
-                  </div>
-                  <p className="text-xl font-bold tabular-nums">
-                    {value}
-                    {total !== null && (
-                      <span className="text-sm font-normal text-muted-foreground">
-                        {' '}
-                        / {total}
-                      </span>
-                    )}
-                  </p>
-                  {pct !== null && (
-                    <div className="mt-2">
-                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full transition-all duration-500"
-                          style={{ width: `${Math.max(pct, 2)}%` }}
-                        />
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-1">{pct}% of spaces</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+    <div className="space-y-8">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Chippi platform overview
+          </p>
         </div>
       </div>
 
-      {/* ── Lead Quality Distribution ──────────────────────────────────── */}
-      <div>
-        <p className="text-sm font-semibold mb-3">Lead quality distribution</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* ── Quick Actions ────────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-2">
+        <Link href="/admin/users">
+          <Button variant="outline" size="sm" className="gap-1.5">
+            <Users size={14} />
+            View all users
+          </Button>
+        </Link>
+        <Link href="/admin/billing">
+          <Button variant="outline" size="sm" className="gap-1.5">
+            <CreditCard size={14} />
+            View billing
+          </Button>
+        </Link>
+        <Link href="/admin/audit-log">
+          <Button variant="outline" size="sm" className="gap-1.5">
+            <FileText size={14} />
+            View audit log
+          </Button>
+        </Link>
+        <Link href="/admin/spaces">
+          <Button variant="outline" size="sm" className="gap-1.5">
+            <LayoutGrid size={14} />
+            View spaces
+          </Button>
+        </Link>
+      </div>
+
+      {/* ── Platform Overview ────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Platform Overview</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             {
-              label: 'Hot leads',
-              value: hotLeads,
-              icon: Flame,
-              badgeColor: 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15',
-              iconColor: 'text-red-500',
+              label: 'Total users',
+              value: totalUsers,
+              sub: `+${signupsLast7} this week`,
+              icon: Users,
+              color: 'text-blue-500',
+              accent: false,
             },
             {
-              label: 'Warm leads',
-              value: warmLeads,
-              icon: Thermometer,
-              badgeColor: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
-              iconColor: 'text-amber-500',
+              label: 'Onboarded',
+              value: onboardedUsers,
+              sub: `${onboardRate}% conversion`,
+              icon: CheckCircle2,
+              color: 'text-emerald-500',
+              accent: false,
             },
             {
-              label: 'Cold leads',
-              value: coldLeads,
-              icon: Snowflake,
-              badgeColor: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15',
-              iconColor: 'text-blue-500',
+              label: 'Not onboarded',
+              value: notOnboarded,
+              sub: 'incomplete setup',
+              icon: AlertTriangle,
+              color: 'text-amber-500',
+              accent: notOnboarded > 0,
             },
             {
-              label: 'Unqualified',
-              value: unqualifiedLeads,
-              icon: BarChart3,
-              badgeColor:
-                'text-gray-700 bg-gray-50 dark:text-gray-400 dark:bg-gray-500/15',
-              iconColor: 'text-gray-500',
+              label: 'Brokerages',
+              value: totalBrokerages,
+              sub: `${activeBrokerages} active`,
+              icon: Building2,
+              color: 'text-violet-500',
+              accent: false,
             },
-          ].map(({ label, value, icon: Icon, badgeColor, iconColor }) => (
-            <Card key={label}>
-              <CardContent className="px-4 py-4">
+          ].map(({ label, value, sub, icon: Icon, color, accent }) => (
+            <Card
+              key={label}
+              className={`rounded-xl border bg-card ${
+                accent
+                  ? 'border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-500/5'
+                  : ''
+              }`}
+            >
+              <CardContent className="p-6">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                    <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
-                    <span
-                      className={`inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 mt-1 ${badgeColor}`}
+                    <p
+                      className={`text-2xl font-bold mt-0.5 tabular-nums ${
+                        accent ? 'text-amber-600 dark:text-amber-400' : ''
+                      }`}
                     >
-                      {label}
-                    </span>
+                      {value}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
                   </div>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
-                    <Icon size={15} className={iconColor} />
+                  <div
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                      accent ? 'bg-amber-100 dark:bg-amber-500/10' : 'bg-muted'
+                    }`}
+                  >
+                    <Icon
+                      size={15}
+                      className={accent ? 'text-amber-600 dark:text-amber-400' : color}
+                    />
                   </div>
                 </div>
               </CardContent>
@@ -623,12 +456,247 @@ export default async function AdminOverviewPage() {
         </div>
       </div>
 
+      {/* ── Revenue ──────────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Revenue</h2>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {[
+            {
+              label: 'MRR',
+              value: `$${formatCompact(mrr)}`,
+              sub: `${activeSubscriptions} active subs`,
+              icon: DollarSign,
+              color: 'text-emerald-500',
+            },
+            {
+              label: 'Active subscribers',
+              value: activeSubscriptions,
+              sub: 'paying customers',
+              icon: CheckCircle2,
+              color: 'text-emerald-500',
+            },
+            {
+              label: 'Trial users',
+              value: trialUsers,
+              sub: 'currently trialing',
+              icon: CreditCard,
+              color: 'text-blue-500',
+            },
+            {
+              label: 'Past due',
+              value: pastDueUsers,
+              sub: 'payment failed',
+              icon: CreditCard,
+              color: 'text-amber-500',
+            },
+            {
+              label: 'Churn rate',
+              value: `${churnRate}%`,
+              sub: `${canceledUsers} canceled`,
+              icon: DollarSign,
+              color: 'text-rose-500',
+            },
+          ].map(({ label, value, sub, icon: Icon, color }) => (
+            <Card key={label} className="rounded-xl border bg-card">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium">{label}</p>
+                    <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
+                  </div>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
+                    <Icon size={15} className={color} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Activity ─────────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Activity</h2>
+        <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
+          {[
+            {
+              label: 'Total leads',
+              value: totalLeads,
+              sub: `+${leadsLast7} this week`,
+              icon: PhoneIncoming,
+              color: 'text-cyan-500',
+            },
+            {
+              label: 'Pipeline value',
+              value: formatCompact(totalPipelineValue),
+              sub: `${totalDeals} deals`,
+              icon: TrendingUp,
+              color: 'text-rose-500',
+            },
+          ].map(({ label, value, sub, icon: Icon, color }) => (
+            <Card key={label} className="rounded-xl border bg-card">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium">{label}</p>
+                    <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
+                  </div>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
+                    <Icon size={15} className={color} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Feature Usage + Lead Quality (side by side) ───────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Feature Usage */}
+        <Card className="rounded-xl border bg-card">
+          <CardContent className="p-6">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Feature Adoption</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {[
+                {
+                  label: 'Spaces with leads',
+                  value: spacesWithLeads,
+                  total: totalSpaces,
+                  icon: PhoneIncoming,
+                  color: 'text-emerald-500',
+                },
+                {
+                  label: 'Spaces with deals',
+                  value: spacesWithDeals,
+                  total: totalSpaces,
+                  icon: Briefcase,
+                  color: 'text-cyan-500',
+                },
+                {
+                  label: 'Spaces with tours',
+                  value: spacesWithTours,
+                  total: totalSpaces,
+                  icon: Calendar,
+                  color: 'text-violet-500',
+                },
+                {
+                  label: 'Total tours booked',
+                  value: totalTours,
+                  total: null,
+                  icon: Calendar,
+                  color: 'text-blue-500',
+                },
+                {
+                  label: 'Follow-ups set',
+                  value: totalFollowUps,
+                  total: null,
+                  icon: Bell,
+                  color: 'text-amber-500',
+                },
+              ].map(({ label, value, total, icon: Icon, color }) => {
+                const pct = total && total > 0 ? Math.round((value / total) * 100) : null;
+                return (
+                  <div key={label} className="space-y-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs text-muted-foreground font-medium">{label}</p>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
+                        <Icon size={13} className={color} />
+                      </div>
+                    </div>
+                    <p className="text-xl font-bold tabular-nums">
+                      {value}
+                      {total !== null && (
+                        <span className="text-sm font-normal text-muted-foreground">
+                          {' '}
+                          / {total}
+                        </span>
+                      )}
+                    </p>
+                    {pct !== null && (
+                      <div>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full transition-all duration-500"
+                            style={{ width: `${Math.max(pct, 2)}%` }}
+                          />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-1">{pct}% of spaces</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Lead Quality Distribution */}
+        <Card className="rounded-xl border bg-card">
+          <CardContent className="p-6">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Lead Quality</h2>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                {
+                  label: 'Hot leads',
+                  value: hotLeads,
+                  icon: Flame,
+                  badgeColor: 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15',
+                  iconColor: 'text-red-500',
+                },
+                {
+                  label: 'Warm leads',
+                  value: warmLeads,
+                  icon: Thermometer,
+                  badgeColor: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+                  iconColor: 'text-amber-500',
+                },
+                {
+                  label: 'Cold leads',
+                  value: coldLeads,
+                  icon: Snowflake,
+                  badgeColor: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15',
+                  iconColor: 'text-blue-500',
+                },
+                {
+                  label: 'Unqualified',
+                  value: unqualifiedLeads,
+                  icon: BarChart3,
+                  badgeColor:
+                    'text-gray-700 bg-gray-50 dark:text-gray-400 dark:bg-gray-500/15',
+                  iconColor: 'text-gray-500',
+                },
+              ].map(({ label, value, icon: Icon, badgeColor, iconColor }) => (
+                <div key={label} className="space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground font-medium">{label}</p>
+                      <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
+                      <span
+                        className={`inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 mt-1 ${badgeColor}`}
+                      >
+                        {label}
+                      </span>
+                    </div>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
+                      <Icon size={15} className={iconColor} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* ── Growth + Funnel row ──────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Signup chart */}
         <div className="lg:col-span-2">
-          <Card>
-            <CardContent className="px-5 py-4">
+          <Card className="rounded-xl border bg-card">
+            <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-sm font-semibold">User growth</p>
@@ -644,10 +712,11 @@ export default async function AdminOverviewPage() {
 
         {/* Conversion funnel */}
         <div>
-          <Card className="h-full">
-            <CardContent className="px-5 py-4">
-              <p className="text-sm font-semibold mb-4">Conversion funnel</p>
-              <div className="space-y-4">
+          <Card className="rounded-xl border bg-card h-full">
+            <CardContent className="p-6">
+              <p className="text-sm font-semibold mb-1">Conversion funnel</p>
+              <p className="text-xs text-muted-foreground mb-5">User journey breakdown</p>
+              <div className="space-y-5">
                 {[
                   { label: 'Signed up', value: totalUsers, pct: 100 },
                   {
@@ -667,14 +736,14 @@ export default async function AdminOverviewPage() {
                   },
                 ].map(({ label, value, pct }) => (
                   <div key={label}>
-                    <div className="flex items-center justify-between text-xs mb-1">
+                    <div className="flex items-center justify-between text-xs mb-1.5">
                       <span className="text-muted-foreground">{label}</span>
                       <span className="font-semibold tabular-nums">
                         {typeof value === 'number' ? value : value}{' '}
                         <span className="text-muted-foreground font-normal">({pct}%)</span>
                       </span>
                     </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="h-2.5 bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full bg-primary rounded-full transition-all duration-500"
                         style={{ width: `${Math.max(pct, 2)}%` }}
@@ -689,11 +758,11 @@ export default async function AdminOverviewPage() {
       </div>
 
       {/* ── Recent signups + Activity feed ────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent signups */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold">Recent signups</p>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Recent Signups</h2>
             <Link
               href="/admin/users"
               className="text-xs text-primary font-medium hover:underline underline-offset-2"
@@ -702,85 +771,85 @@ export default async function AdminOverviewPage() {
             </Link>
           </div>
           {recentUsers.length === 0 ? (
-            <Card>
-              <CardContent className="px-5 py-8 text-center">
+            <Card className="rounded-xl border bg-card">
+              <CardContent className="p-6 text-center">
                 <p className="text-sm text-muted-foreground">No users yet.</p>
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-2">
-              {recentUsers.map((user) => (
-                <Link key={user.id} href={`/admin/users/${user.id}`}>
-                  <div className="rounded-xl border border-border bg-card px-4 py-3 hover:shadow-sm transition-all duration-150">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-                          {(user.name || user.email || '?')
-                            .split(' ')
-                            .map((n: string) => n[0])
-                            .join('')
-                            .toUpperCase()
-                            .slice(0, 2)}
+            <Card className="rounded-xl border bg-card">
+              <div className="divide-y divide-border">
+                {recentUsers.map((user) => (
+                  <Link key={user.id} href={`/admin/users/${user.id}`}>
+                    <div className="px-4 py-3 hover:bg-muted/50 transition-colors duration-150">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
+                            {(user.name || user.email || '?')
+                              .split(' ')
+                              .map((n: string) => n[0])
+                              .join('')
+                              .toUpperCase()
+                              .slice(0, 2)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold truncate">
+                              {user.name || 'No name'}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold truncate">
-                            {user.name || 'No name'}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {user.space?.slug && (
-                          <span className="hidden sm:inline-flex text-[10px] font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5">
-                            {user.space.slug}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {user.space?.slug && (
+                            <span className="hidden sm:inline-flex text-[10px] font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5">
+                              {user.space.slug}
+                            </span>
+                          )}
+                          <span
+                            className={`inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 ${
+                              user.onboard
+                                ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15'
+                                : 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
+                            }`}
+                          >
+                            {user.onboard ? 'Onboarded' : 'Pending'}
                           </span>
-                        )}
-                        <span
-                          className={`inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 ${
-                            user.onboard
-                              ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15'
-                              : 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
-                          }`}
-                        >
-                          {user.onboard ? 'Onboarded' : 'Pending'}
-                        </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
+                  </Link>
+                ))}
+              </div>
+            </Card>
           )}
         </div>
 
         {/* Activity feed */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold">Recent activity</p>
-          </div>
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Recent Activity</h2>
           {recentActivity.length === 0 ? (
-            <Card>
-              <CardContent className="px-5 py-8 text-center">
+            <Card className="rounded-xl border bg-card">
+              <CardContent className="p-6 text-center">
                 <p className="text-sm text-muted-foreground">No activity yet.</p>
               </CardContent>
             </Card>
           ) : (
-            <Card>
+            <Card className="rounded-xl border bg-card">
               <div className="divide-y divide-border">
                 {recentActivity.map((item, i) => {
                   const Icon = activityIcon[item.type];
                   const color = activityColor[item.type];
                   const ago = timeAgo(item.time);
                   return (
-                    <div key={i} className="flex items-center gap-3 px-4 py-3">
-                      <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                        <Icon size={13} className={color} />
+                    <div key={i} className="flex items-center gap-3 px-4 py-3.5">
+                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                        <Icon size={14} className={color} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium truncate">{item.label}</p>
-                        <p className="text-[11px] text-muted-foreground truncate">{item.detail}</p>
+                        <p className="text-sm font-medium truncate">{item.label}</p>
+                        <p className="text-xs text-muted-foreground truncate">{item.detail}</p>
                       </div>
-                      <span className="text-[11px] text-muted-foreground flex-shrink-0">{ago}</span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">{ago}</span>
                     </div>
                   );
                 })}
@@ -788,31 +857,6 @@ export default async function AdminOverviewPage() {
             </Card>
           )}
         </div>
-      </div>
-
-      {/* ── Quick links ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { href: '/admin/users', label: 'Manage users', icon: Users, count: totalUsers },
-          { href: '/admin/brokerages', label: 'Brokerages', icon: Building2, count: totalBrokerages },
-          { href: '/admin/invitations', label: 'Invitations', icon: XCircle, count: undefined },
-        ].map(({ href, label, icon: Icon, count }) => (
-          <Link key={href} href={href}>
-            <Card className="hover:shadow-sm transition-all duration-150 hover:border-primary/20">
-              <CardContent className="px-4 py-4 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                  <Icon size={15} className="text-muted-foreground" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold">{label}</p>
-                  {count !== undefined && (
-                    <p className="text-[11px] text-muted-foreground">{count} total</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
       </div>
     </div>
   );

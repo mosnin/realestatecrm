@@ -68,6 +68,19 @@ export default clerkMiddleware(async (auth, request) => {
     return NextResponse.redirect(new URL(`/auth/redirect?intent=${intent}`, request.url));
   }
 
+  // Block suspended (banned) users from accessing protected routes.
+  // Clerk's banUser invalidates sessions, but this serves as a safety net
+  // in case a session token is still valid during the propagation window.
+  if (session.userId) {
+    const metadata = (session.sessionClaims?.publicMetadata ?? {}) as Record<string, unknown>;
+    if (metadata.banned === true) {
+      // Sign out banned users by redirecting to login with a message
+      const bannedUrl = new URL('/login/realtor', request.url);
+      bannedUrl.searchParams.set('reason', 'suspended');
+      return NextResponse.redirect(bannedUrl);
+    }
+  }
+
   // Protected routes: must be logged in.
   if (isProtectedRoute(request) && !isPublicRoute(request)) {
     if (!session.userId) {
