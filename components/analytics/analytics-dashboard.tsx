@@ -210,8 +210,8 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={28} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" width={28} />
                   <Tooltip content={<ChartTooltip />} />
                   <Area
                     type="monotone"
@@ -230,8 +230,8 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={data.dealsByStage} barSize={18}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={28} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" width={28} />
                   <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="count" name="Deals" radius={[4, 4, 0, 0]}>
                     {data.dealsByStage.map((entry) => (
@@ -273,8 +273,8 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={28} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" width={28} />
                   <Tooltip content={<ChartTooltip />} />
                   <Area
                     type="monotone"
@@ -293,8 +293,8 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={data.leadScoreBuckets} barSize={32}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={28} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" width={28} />
                   <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="count" name="Leads" radius={[4, 4, 0, 0]}>
                     {data.leadScoreBuckets.map((entry) => {
@@ -356,8 +356,8 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                     margin={{ left: 0 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis type="category" dataKey="label" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" width={80} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis type="category" dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" width={80} />
                     <Tooltip content={<ChartTooltip />} />
                     <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="hsl(var(--primary))" />
                   </BarChart>
@@ -400,8 +400,8 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={data.moveInUrgency} barSize={28}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={28} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" width={28} />
                     <Tooltip content={<ChartTooltip />} />
                     <Bar dataKey="count" name="Leads" radius={[4, 4, 0, 0]}>
                       {data.moveInUrgency.map((entry) => {
@@ -431,8 +431,8 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                     margin={{ left: 8 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis type="category" dataKey="label" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" width={90} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis type="category" dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" width={90} />
                     <Tooltip content={<ChartTooltip />} />
                     <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="#f87171" />
                   </BarChart>
@@ -478,8 +478,8 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                     margin={{ left: 8 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis type="category" dataKey="label" tick={{ fontSize: 9 }} stroke="hsl(var(--muted-foreground))" width={100} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis type="category" dataKey="label" tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" width={100} />
                     <Tooltip content={<ChartTooltip />} />
                     <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="#f59e0b" />
                   </BarChart>
@@ -493,8 +493,8 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={data.avgScoreByMonth} barSize={22}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                    <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={28} />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" width={28} />
                     <Tooltip content={<ChartTooltip />} />
                     <Bar dataKey="avg" name="Avg score" radius={[4, 4, 0, 0]}>
                       {data.avgScoreByMonth.map((entry) => (
@@ -568,8 +568,8 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={data.dealsByStage} barSize={22}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={28} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" width={28} />
                   <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="count" name="Deals" radius={[4, 4, 0, 0]}>
                     {data.dealsByStage.map((entry) => (
@@ -584,9 +584,9 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={data.dealsByStage} barSize={22}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
                   <YAxis
-                    tick={{ fontSize: 11 }}
+                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                     stroke="hsl(var(--muted-foreground))"
                     width={48}
                     tickFormatter={(v) => formatCurrency(v)}
@@ -664,8 +664,8 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={28} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" width={28} />
                   <Tooltip content={<ChartTooltip />} />
                   <Area
                     type="monotone"
@@ -684,8 +684,8 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={data.contactsByStage} barSize={32}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={28} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" width={28} />
                   <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="count" name="Contacts" radius={[4, 4, 0, 0]}>
                     {data.contactsByStage.map((entry) => {
