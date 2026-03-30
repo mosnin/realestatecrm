@@ -267,6 +267,8 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
     }
 
     fetchData();
+    // Clear any queued realtime refetch since we just refetched
+    pendingRefetchRef.current = false;
   }
 
   async function handleAddDeal(data: any) {
