@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { buildIntakeUrl } from '@/lib/intake';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, Loader2, User, Link2, Bell, AlertCircle, Image, Palette, Plus, Trash2 } from 'lucide-react';
+import { CheckCircle2, Loader2, User, Link2, Bell, AlertCircle, Image, Palette, Plus, Trash2, Upload, Eye, FileText, Video, Moon } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ConfigureAccountFormProps {
@@ -28,6 +28,17 @@ interface ConfigureAccountFormProps {
     intakeFooterLinks: { label: string; url: string }[];
     bio: string;
     socialLinks: { instagram?: string; linkedin?: string; facebook?: string };
+    // Visual
+    intakeHeaderBgColor: string;
+    intakeHeaderGradient: string;
+    intakeDarkMode: boolean;
+    intakeFaviconUrl: string;
+    // Content
+    intakeVideoUrl: string;
+    intakeThankYouTitle: string;
+    intakeThankYouMessage: string;
+    intakeConfirmationEmail: string;
+    intakeDisclaimerText: string;
   };
   slug: string;
 }
@@ -74,9 +85,76 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
   const [intakeFooterLinks, setIntakeFooterLinks] = useState<{ label: string; url: string }[]>(initialData.intakeFooterLinks || []);
   const [bio, setBio] = useState(initialData.bio || '');
   const [socialLinks, setSocialLinks] = useState<{ instagram?: string; linkedin?: string; facebook?: string }>(initialData.socialLinks || { instagram: '', linkedin: '', facebook: '' });
+  // Visual
+  const [intakeHeaderBgColor, setIntakeHeaderBgColor] = useState(initialData.intakeHeaderBgColor || '');
+  const [intakeHeaderGradient, setIntakeHeaderGradient] = useState(initialData.intakeHeaderGradient || '');
+  const [intakeDarkMode, setIntakeDarkMode] = useState(initialData.intakeDarkMode || false);
+  const [intakeFaviconUrl, setIntakeFaviconUrl] = useState(initialData.intakeFaviconUrl || '');
+  const [logoPreview, setLogoPreview] = useState(initialData.logoUrl || '');
+  const [photoPreview, setPhotoPreview] = useState(initialData.realtorPhotoUrl || '');
+  const [faviconPreview, setFaviconPreview] = useState(initialData.intakeFaviconUrl || '');
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const faviconInputRef = useRef<HTMLInputElement>(null);
+
+  // Content
+  const [intakeVideoUrl, setIntakeVideoUrl] = useState(initialData.intakeVideoUrl || '');
+  const [intakeThankYouTitle, setIntakeThankYouTitle] = useState(initialData.intakeThankYouTitle || '');
+  const [intakeThankYouMessage, setIntakeThankYouMessage] = useState(initialData.intakeThankYouMessage || '');
+  const [intakeConfirmationEmail, setIntakeConfirmationEmail] = useState(initialData.intakeConfirmationEmail || '');
+  const [intakeDisclaimerText, setIntakeDisclaimerText] = useState(initialData.intakeDisclaimerText || '');
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+
+  async function handleUpload(file: File, type: 'logo' | 'photo' | 'favicon') {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', type);
+    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+    if (!res.ok) { toast.error('Upload failed'); return null; }
+    const { url } = await res.json();
+    return url;
+  }
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast.error('File must be under 2MB'); return; }
+    setLogoPreview(URL.createObjectURL(file));
+    const url = await handleUpload(file, 'logo');
+    if (url) { setLogoUrl(url); setLogoPreview(url); }
+  }
+
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast.error('File must be under 2MB'); return; }
+    setPhotoPreview(URL.createObjectURL(file));
+    const url = await handleUpload(file, 'photo');
+    if (url) { setRealtorPhotoUrl(url); setPhotoPreview(url); }
+  }
+
+  async function handleFaviconUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast.error('File must be under 2MB'); return; }
+    setFaviconPreview(URL.createObjectURL(file));
+    const url = await handleUpload(file, 'favicon');
+    if (url) { setIntakeFaviconUrl(url); setFaviconPreview(url); }
+  }
+
+  function getVideoEmbedUrl(url: string): string | null {
+    if (!url) return null;
+    // YouTube
+    const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
+    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+    // Loom
+    const loomMatch = url.match(/loom\.com\/share\/([\w-]+)/);
+    if (loomMatch) return `https://www.loom.com/embed/${loomMatch[1]}`;
+    return null;
+  }
 
   // Slug is always locked here — workspace already exists
   const previewUrl = buildIntakeUrl(slug);

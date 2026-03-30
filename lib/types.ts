@@ -93,6 +93,22 @@ export type SpaceSetting = {
   intakeBorderRadius: 'rounded' | 'sharp';
   intakeFont: 'system' | 'serif' | 'mono';
   intakeFooterLinks: { label: string; url: string }[] | null;
+  // Visual customization
+  intakeHeaderBgColor: string | null;
+  intakeHeaderGradient: string | null;
+  intakeDarkMode: boolean;
+  intakeFaviconUrl: string | null;
+  // Content customization
+  intakeThankYouTitle: string | null;
+  intakeThankYouMessage: string | null;
+  intakeConfirmationEmail: string | null;
+  intakeVideoUrl: string | null;
+  intakeDisclaimerText: string | null;
+  // Form field control
+  intakeDisabledSteps: string[];
+  intakeRequiredFields: string[];
+  intakeCustomQuestions: { id: string; label: string; placeholder?: string; required?: boolean }[];
+  intakeStepOrder: string[];
 };
 
 export type Contact = {
