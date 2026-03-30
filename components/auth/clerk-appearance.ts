@@ -4,7 +4,7 @@
  * This config handles Clerk's variables and layout options.
  */
 export function clerkAuthAppearance(isDark: boolean) {
-  const primary = isDark ? '#14b8a6' : '#b45309';
+  const primary = '#ff964f';
   const foreground = isDark ? '#f1f3f5' : '#1c1917';
 
   return {
@@ -28,6 +28,7 @@ export function clerkAuthAppearance(isDark: boolean) {
       headerSubtitle: 'hidden',
       footer: 'hidden',
       footerAction: 'hidden',
+      socialButtonsBlockButton: 'rounded-full border-border',
     },
   } as const;
 }
