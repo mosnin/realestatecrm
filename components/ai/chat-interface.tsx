@@ -327,6 +327,18 @@ export function ChatInterface({
             </span>
           )}
           <button
+            onClick={() => setVoiceOpen(v => !v)}
+            className={cn(
+              'w-8 h-8 rounded-full flex items-center justify-center transition-colors',
+              voiceOpen
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            )}
+            title="Voice mode"
+          >
+            <Mic size={16} />
+          </button>
+          <button
             type="button"
             onClick={handleNewConversation}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground"
