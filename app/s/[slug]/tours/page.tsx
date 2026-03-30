@@ -102,6 +102,7 @@ export default async function ToursPage({
   return (
     <ToursClient
       slug={slug}
+      spaceId={space.id}
       initialTours={tours}
       hasGoogleCalendar={hasGoogleCalendar}
       bookingUrl={`/book/${slug}`}

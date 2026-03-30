@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -36,6 +36,8 @@ import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { formatCurrency as _formatCurrency } from '@/lib/formatting';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { useRealtime } from '@/hooks/use-realtime';
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 type DealWithRelations = Deal & {
   stage: DealStage;
@@ -87,6 +89,121 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Derive spaceId from the first stage (all stages belong to the same space)
+  const spaceId = stages[0]?.spaceId ?? null;
+
+  // Track whether a drag is in progress to avoid disrupting the UX with refetches
+  const isDraggingRef = useRef(false);
+  useEffect(() => {
+    isDraggingRef.current = activeDealId !== null;
+  }, [activeDealId]);
+
+  // Refetch helper that skips when a drag is in progress.
+  // Queues a refetch for when the drag ends via the pendingRefetchRef.
+  const pendingRefetchRef = useRef(false);
+  const realtimeRefetch = useCallback(() => {
+    if (isDraggingRef.current) {
+      pendingRefetchRef.current = true;
+      return;
+    }
+    fetchData();
+  }, [fetchData]);
+
+  // Subscribe to Deal changes (INSERT / UPDATE / DELETE)
+  const handleDealEvent = useCallback(
+    (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+      const eventType = payload.eventType;
+
+      if (eventType === 'INSERT') {
+        // New deal created (possibly from another tab/user) — refetch to get full relations
+        realtimeRefetch();
+      } else if (eventType === 'UPDATE') {
+        const updated = payload.new as Record<string, unknown>;
+        // Update the deal in local state directly for snappy cross-tab stage moves
+        setStages((prev) => {
+          if (isDraggingRef.current) {
+            pendingRefetchRef.current = true;
+            return prev;
+          }
+          const dealId = updated.id as string;
+          const newStageId = updated.stageId as string;
+          const dealExists = prev.some((s) => s.deals.some((d) => d.id === dealId));
+          if (!dealExists) {
+            // Deal not in local state yet — full refetch needed
+            realtimeRefetch();
+            return prev;
+          }
+          return prev.map((stage) => {
+            // Remove deal from old stage
+            const deal = stage.deals.find((d) => d.id === dealId);
+            if (deal && stage.id !== newStageId) {
+              return { ...stage, deals: stage.deals.filter((d) => d.id !== dealId) };
+            }
+            // Add / update deal in new stage
+            if (stage.id === newStageId) {
+              const existing = stage.deals.find((d) => d.id === dealId);
+              if (existing) {
+                return {
+                  ...stage,
+                  deals: stage.deals.map((d) =>
+                    d.id === dealId ? { ...d, ...updated, stageId: newStageId } as typeof d : d,
+                  ),
+                };
+              }
+              // Deal moved here from another stage — find it across all stages
+              const movedDeal = prev.flatMap((s) => s.deals).find((d) => d.id === dealId);
+              if (movedDeal) {
+                return {
+                  ...stage,
+                  deals: [...stage.deals, { ...movedDeal, ...updated, stageId: newStageId } as typeof movedDeal],
+                };
+              }
+            }
+            return stage;
+          });
+        });
+      } else if (eventType === 'DELETE') {
+        const deleted = payload.old as Record<string, unknown>;
+        const dealId = deleted.id as string;
+        if (!dealId) {
+          realtimeRefetch();
+          return;
+        }
+        setStages((prev) =>
+          prev.map((stage) => ({
+            ...stage,
+            deals: stage.deals.filter((d) => d.id !== dealId),
+          })),
+        );
+      }
+    },
+    [realtimeRefetch],
+  );
+
+  useRealtime({
+    table: 'Deal',
+    event: '*',
+    filter: spaceId ? `spaceId=eq.${spaceId}` : undefined,
+    onEvent: handleDealEvent,
+    enabled: !!spaceId,
+  });
+
+  // Subscribe to DealStage changes to keep columns in sync
+  const handleStageEvent = useCallback(
+    (_payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+      realtimeRefetch();
+    },
+    [realtimeRefetch],
+  );
+
+  useRealtime({
+    table: 'DealStage',
+    event: '*',
+    filter: spaceId ? `spaceId=eq.${spaceId}` : undefined,
+    onEvent: handleStageEvent,
+    enabled: !!spaceId,
+  });
 
   function findStageForDeal(dealId: string) {
     return stages.find((s) => s.deals.some((d) => d.id === dealId));

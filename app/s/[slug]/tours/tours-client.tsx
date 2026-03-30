@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useRealtime } from '@/hooks/use-realtime';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,7 @@ interface PropertyProfile {
 
 interface ToursClientProps {
   slug: string;
+  spaceId: string;
   initialTours: Tour[];
   hasGoogleCalendar: boolean;
   bookingUrl: string;
@@ -76,7 +78,7 @@ const STATUS_CONFIG: Record<TourStatus, { label: string; color: string }> = {
 
 type FilterTab = 'upcoming' | 'past' | 'all' | 'availability';
 
-export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl, propertyProfiles: initialProfiles = [] }: ToursClientProps) {
+export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bookingUrl, propertyProfiles: initialProfiles = [] }: ToursClientProps) {
   const [tours, setTours] = useState<Tour[]>(initialTours);
   const [tab, setTab] = useState<FilterTab>('upcoming');
   const [copied, setCopied] = useState(false);
@@ -88,6 +90,32 @@ export function ToursClient({ slug, initialTours, hasGoogleCalendar, bookingUrl,
   const [profiles, setProfiles] = useState(initialProfiles);
   const [embedCopied, setEmbedCopied] = useState(false);
   const router = useRouter();
+
+  // --- Supabase Realtime: keep tours in sync across tabs / devices ---
+  useRealtime<Record<string, unknown>>({
+    table: 'Tour',
+    filter: `spaceId=eq.${spaceId}`,
+    onEvent: (payload) => {
+      if (payload.eventType === 'INSERT') {
+        const newTour = payload.new as unknown as Tour;
+        setTours((prev) => {
+          // Avoid duplicates (e.g. if we just created it locally)
+          if (prev.some((t) => t.id === newTour.id)) return prev;
+          return [newTour, ...prev];
+        });
+      } else if (payload.eventType === 'UPDATE') {
+        const updated = payload.new as unknown as Tour;
+        setTours((prev) =>
+          prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)),
+        );
+      } else if (payload.eventType === 'DELETE') {
+        const deleted = payload.old as unknown as { id: string };
+        if (deleted?.id) {
+          setTours((prev) => prev.filter((t) => t.id !== deleted.id));
+        }
+      }
+    },
+  });
 
   const now = new Date();
   const searchLower = searchQuery.toLowerCase().trim();
