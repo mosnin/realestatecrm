@@ -44,9 +44,30 @@ export function VoiceMode({ open, onClose, onTranscription, lastAssistantMessage
   const startRecording = useCallback(async () => {
     try {
       setError('');
+
+      // Check if mediaDevices API is available
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        setError('Voice not supported in this browser');
+        setState('idle');
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+
+      // Pick a supported mime type (webm for Chrome/Firefox, mp4 for Safari)
+      let mimeType = 'audio/webm;codecs=opus';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/webm';
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/mp4';
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = ''; // let browser pick default
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
@@ -55,15 +76,22 @@ export function VoiceMode({ open, onClose, onTranscription, lastAssistantMessage
       };
 
       mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        if (blob.size < 1000) { setState('idle'); return; } // too short
+        const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
+        if (blob.size < 1000) { setState('idle'); return; }
         await transcribe(blob);
       };
 
       mediaRecorder.start();
       setState('listening');
-    } catch (err) {
-      setError('Microphone access denied');
+    } catch (err: any) {
+      console.error('[voice] mic error:', err);
+      if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+        setError('Microphone blocked — check browser permissions');
+      } else if (err?.name === 'NotFoundError') {
+        setError('No microphone found');
+      } else {
+        setError(err?.message || 'Could not access microphone');
+      }
       setState('idle');
     }
   }, []);
