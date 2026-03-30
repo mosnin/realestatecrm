@@ -16,8 +16,20 @@ import { Toaster } from 'sonner';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Chippi — Close More Real Estate Deals',
-  description: 'The CRM built for real estate agents. AI-powered pipeline management, deal tracking, and client workflows that help you close more deals faster.'
+  title: 'Chippi — AI-Powered CRM for Rental Agents',
+  description: 'Chippi helps rental agents close leases faster with AI lead scoring, automated follow-ups, tour scheduling, and a deal pipeline built for leasing. Start your 7-day free trial.',
+  keywords: ['CRM', 'real estate', 'rental agents', 'leasing', 'AI lead scoring', 'property management', 'deal pipeline', 'tour scheduling'],
+  openGraph: {
+    title: 'Chippi — AI-Powered CRM for Rental Agents',
+    description: 'Score leads with AI, automate follow-ups, and manage your rental pipeline. Join 2,400+ agents closing leases faster with Chippi.',
+    siteName: 'Chippi',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Chippi — AI-Powered CRM for Rental Agents',
+    description: 'Score leads with AI, automate follow-ups, and manage your rental pipeline. Join 2,400+ agents closing leases faster.',
+  },
 };
 
 export default async function RootLayout({
