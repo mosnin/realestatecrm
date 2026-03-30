@@ -4,6 +4,9 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { ApplicationStatusClient } from './application-status-client';
 import { PublicPageMinimalShell } from '@/components/public-page-shell';
 
+// Disable caching so status updates show immediately
+export const dynamic = 'force-dynamic';
+
 export default async function ApplicationStatusPage({
   params,
   searchParams,
