@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { buildIntakeUrl } from '@/lib/intake';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, Loader2, User, Link2, Bell, AlertCircle, Image, Palette, Plus, Trash2, Upload, Eye, FileText, Video, Moon } from 'lucide-react';
+import { CheckCircle2, Loader2, User, Link2, Bell, AlertCircle, Image, Palette, Plus, Trash2, Upload, Eye, FileText, Video, Moon, ListChecks, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ConfigureAccountFormProps {
@@ -39,6 +39,9 @@ interface ConfigureAccountFormProps {
     intakeThankYouMessage: string;
     intakeConfirmationEmail: string;
     intakeDisclaimerText: string;
+    // Form fields
+    intakeDisabledSteps: string[];
+    intakeCustomQuestions: { id: string; label: string; placeholder?: string; required?: boolean }[];
   };
   slug: string;
 }
@@ -196,6 +199,15 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
           intakeFooterLinks,
           bio: bio.trim() || null,
           socialLinks,
+          intakeHeaderBgColor: intakeHeaderBgColor || null,
+          intakeHeaderGradient: intakeHeaderGradient || null,
+          intakeDarkMode,
+          intakeFaviconUrl: intakeFaviconUrl.trim() || null,
+          intakeVideoUrl: intakeVideoUrl.trim() || null,
+          intakeThankYouTitle: intakeThankYouTitle.trim() || null,
+          intakeThankYouMessage: intakeThankYouMessage.trim() || null,
+          intakeConfirmationEmail: intakeConfirmationEmail.trim() || null,
+          intakeDisclaimerText: intakeDisclaimerText.trim() || null,
         }),
       });
       if (!spaceRes.ok) {
@@ -253,6 +265,8 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
           { id: 'intake', label: 'Intake link', icon: Link2 },
           { id: 'branding', label: 'Branding', icon: Image },
           { id: 'form-design', label: 'Form Design', icon: Palette },
+          { id: 'visual', label: 'Visual', icon: Eye },
+          { id: 'content', label: 'Content', icon: FileText },
           { id: 'notifications', label: 'Notifications', icon: Bell },
         ].map(({ id, label, icon: Icon }) => (
           <a
