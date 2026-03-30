@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import { DateWheelPicker } from '@/components/ui/date-wheel-picker';
 import {
   CheckCircle2,
@@ -337,6 +338,13 @@ export function ApplicationForm({
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = 'Invalid email';
     }
 
+    if (s === 7) {
+      const score = Number(get('creditScore'));
+      if (!get('creditScore').trim() || isNaN(score) || score < 300 || score > 850) {
+        errs.creditScore = 'Please enter a valid credit score between 300 and 850';
+      }
+    }
+
     if (s === 10) {
       if (!get('truthfulnessCertification') || get('truthfulnessCertification') !== 'true')
         errs.truthfulnessCertification = 'Please certify the information is accurate';
@@ -414,6 +422,7 @@ export function ApplicationForm({
       leaseViolations: get('leaseViolations'),
       permissionToContactReferences: get('permissionToContactReferences'),
       // Step 7
+      creditScore: get('creditScore'),
       priorEvictions: get('priorEvictions'),
       outstandingBalances: get('outstandingBalances'),
       bankruptcy: get('bankruptcy'),
@@ -696,6 +705,41 @@ export function ApplicationForm({
               title="Screening questions"
               description="Quick questions to help us process your application."
             />
+            {/* Credit score */}
+            <div className="space-y-1.5">
+              <Label htmlFor="creditScore" className="text-sm font-medium">
+                Credit score <span className="text-destructive">*</span>
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Your approximate credit score (300-850). You can find this on Credit Karma or your bank app.
+              </p>
+              <Input
+                id="creditScore"
+                type="number"
+                inputMode="numeric"
+                min={300}
+                max={850}
+                placeholder="e.g. 720"
+                value={get('creditScore') ?? ''}
+                onChange={(e) => set('creditScore', e.target.value)}
+                required
+              />
+              {get('creditScore') && (
+                <p className={cn(
+                  'text-xs font-medium',
+                  Number(get('creditScore')) >= 750 ? 'text-emerald-600' :
+                  Number(get('creditScore')) >= 670 ? 'text-primary' :
+                  Number(get('creditScore')) >= 580 ? 'text-amber-600' : 'text-destructive'
+                )}>
+                  {Number(get('creditScore')) >= 750 ? 'Excellent' :
+                   Number(get('creditScore')) >= 670 ? 'Good' :
+                   Number(get('creditScore')) >= 580 ? 'Fair' : 'Needs improvement'}
+                </p>
+              )}
+              {errors.creditScore && (
+                <p className="text-xs text-destructive">{errors.creditScore}</p>
+              )}
+            </div>
             <div className="space-y-4">
               <ToggleField id="priorEvictions" label="Any prior evictions?" value={get('priorEvictions')} onChange={(v) => set('priorEvictions', v)} />
               <ToggleField id="outstandingBalances" label="Outstanding balances owed to a landlord?" value={get('outstandingBalances')} onChange={(v) => set('outstandingBalances', v)} />
@@ -778,6 +822,7 @@ export function ApplicationForm({
                 {get('monthlyRent') && <SummaryRow label="Rent" value={`$${get('monthlyRent')}`} />}
                 {get('employmentStatus') && <SummaryRow label="Employment" value={get('employmentStatus')} />}
                 {get('monthlyGrossIncome') && <SummaryRow label="Income" value={`$${get('monthlyGrossIncome')}/mo`} />}
+                {get('creditScore') && <SummaryRow label="Credit score" value={get('creditScore')} />}
                 {get('hasPets') && <SummaryRow label="Pets" value={get('hasPets') === 'true' ? `Yes${get('petDetails') ? ` — ${get('petDetails')}` : ''}` : 'No'} />}
                 {stagedFiles.length > 0 && <SummaryRow label="Documents" value={`${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`} />}
               </div>

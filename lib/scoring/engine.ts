@@ -17,13 +17,14 @@ import type { ApplicationData } from '@/lib/types';
 // ── Scoring weights — must sum to 1.0 ─────────────────────────────────────
 
 export const DEFAULT_WEIGHTS = {
-  affordability: 0.30,
-  moveInUrgency: 0.15,
-  employmentStability: 0.15,
-  rentalHistory: 0.15,
-  applicationCompleteness: 0.10,
-  householdFit: 0.05,
+  creditScore: 0.20,
+  affordability: 0.25,
+  moveInUrgency: 0.10,
+  employmentStability: 0.12,
+  rentalHistory: 0.12,
   screeningFlags: 0.10,
+  applicationCompleteness: 0.06,
+  householdFit: 0.05,
 } as const;
 
 export type ScoringWeights = typeof DEFAULT_WEIGHTS;
@@ -90,6 +91,50 @@ export type ScoringInput = {
 // ═══════════════════════════════════════════════════════════════════════════
 // Category scoring functions — each returns 0-1
 // ═══════════════════════════════════════════════════════════════════════════
+
+function scoreCreditScore(input: ScoringInput): CategoryResult {
+  const app = input.applicationData;
+  const signals: string[] = [];
+  let rawScore = 0.5; // neutral if not provided
+
+  const score = app?.creditScore;
+
+  if (!score || typeof score !== 'number') {
+    signals.push('Credit score not provided — using neutral baseline');
+  } else if (score >= 780) {
+    rawScore = 1.0;
+    signals.push(`Exceptional credit score: ${score} (780+)`);
+  } else if (score >= 750) {
+    rawScore = 0.95;
+    signals.push(`Excellent credit score: ${score} (750-779)`);
+  } else if (score >= 720) {
+    rawScore = 0.85;
+    signals.push(`Very good credit score: ${score} (720-749)`);
+  } else if (score >= 670) {
+    rawScore = 0.70;
+    signals.push(`Good credit score: ${score} (670-719)`);
+  } else if (score >= 620) {
+    rawScore = 0.50;
+    signals.push(`Fair credit score: ${score} (620-669)`);
+  } else if (score >= 580) {
+    rawScore = 0.30;
+    signals.push(`Below average credit score: ${score} (580-619)`);
+  } else if (score >= 500) {
+    rawScore = 0.15;
+    signals.push(`Poor credit score: ${score} (500-579)`);
+  } else {
+    rawScore = 0.05;
+    signals.push(`Very poor credit score: ${score} (below 500)`);
+  }
+
+  return {
+    category: 'creditScore',
+    rawScore,
+    weight: DEFAULT_WEIGHTS.creditScore,
+    weightedScore: rawScore * DEFAULT_WEIGHTS.creditScore,
+    signals,
+  };
+}
 
 function scoreAffordability(input: ScoringInput): CategoryResult {
   const app = input.applicationData;
@@ -352,7 +397,7 @@ function scoreApplicationCompleteness(input: ScoringInput): CategoryResult {
   }
 
   const fields = [
-    app.propertyAddress, app.unitType, app.targetMoveInDate, app.monthlyRent,
+    app.creditScore, app.propertyAddress, app.unitType, app.targetMoveInDate, app.monthlyRent,
     app.leaseTermPreference, app.numberOfOccupants, app.dateOfBirth,
     app.currentAddress, app.currentHousingStatus, app.currentMonthlyPayment,
     app.lengthOfResidence, app.reasonForMoving,
@@ -516,6 +561,22 @@ function computeRiskPenalties(input: ScoringInput): RiskPenalty[] {
 
   if (!app) return penalties;
 
+  // Very poor credit score = severe risk
+  const creditScore = app.creditScore;
+  if (typeof creditScore === 'number' && creditScore < 580 && app.priorEvictions === true) {
+    penalties.push({
+      flag: 'poor_credit_with_evictions',
+      multiplier: 0.5,
+      description: `Credit score ${creditScore} combined with prior evictions — very high risk profile`,
+    });
+  } else if (typeof creditScore === 'number' && creditScore < 500) {
+    penalties.push({
+      flag: 'very_poor_credit',
+      multiplier: 0.7,
+      description: `Credit score ${creditScore} (below 500) — severe credit risk`,
+    });
+  }
+
   // Eviction + outstanding balances = severe compound risk
   if (app.priorEvictions === true && app.outstandingBalances === true) {
     penalties.push({
@@ -558,7 +619,7 @@ function computeDataCompleteness(input: ScoringInput): number {
 
   // Weight critical fields higher for confidence calculation
   const criticalFields = [
-    app.monthlyGrossIncome, app.employmentStatus, app.monthlyRent,
+    app.creditScore, app.monthlyGrossIncome, app.employmentStatus, app.monthlyRent,
     app.priorEvictions, app.outstandingBalances, app.bankruptcy,
     app.targetMoveInDate, app.currentLandlordName,
   ];
@@ -619,6 +680,7 @@ function collectInsights(categories: CategoryResult[], penalties: RiskPenalty[],
   if (!app) {
     missingInformation.push('Full application data');
   } else {
+    if (!app.creditScore) missingInformation.push('Credit score');
     if (!app.monthlyGrossIncome) missingInformation.push('Monthly gross income');
     if (!app.employmentStatus) missingInformation.push('Employment status');
     if (!app.targetMoveInDate) missingInformation.push('Target move-in date');
@@ -644,6 +706,7 @@ function collectInsights(categories: CategoryResult[], penalties: RiskPenalty[],
 export function computeLeadScore(input: ScoringInput): ScoringEngineResult {
   // 1. Compute all category sub-scores
   const categories: CategoryResult[] = [
+    scoreCreditScore(input),
     scoreAffordability(input),
     scoreMoveInUrgency(input),
     scoreEmploymentStability(input),
