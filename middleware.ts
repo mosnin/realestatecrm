@@ -82,10 +82,17 @@ export default clerkMiddleware(async (auth, request) => {
       return NextResponse.redirect(signInUrl);
     }
 
-    // Admin route protection
+    // Admin route protection — lightweight check in middleware.
+    // The layout performs the authoritative DB check via requireAdmin().
+    // Here we only block users who are clearly NOT admins (no metadata claim).
+    // Users with DB-only admin role (no Clerk metadata) are allowed through
+    // so the layout can verify them against the database.
     if (isAdminRoute(request)) {
+      // If user has Clerk metadata confirming non-admin, block early.
+      // If metadata is missing/empty, let them through for DB check in layout.
       const metadata = (session.sessionClaims?.publicMetadata ?? {}) as Record<string, unknown>;
-      if (metadata.role !== 'admin') {
+      const hasExplicitNonAdminRole = metadata.role !== undefined && metadata.role !== 'admin';
+      if (hasExplicitNonAdminRole) {
         return NextResponse.redirect(new URL('/auth/redirect?intent=realtor', request.url));
       }
     }
