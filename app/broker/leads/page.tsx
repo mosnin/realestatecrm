@@ -2,7 +2,7 @@ import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
-import { BrokerLeadsClient, type LeadRow, type RealtorOption } from './broker-leads-client';
+import { BrokerLeadsClient, type LeadRow, type RealtorOption, type AssignedLeadProgress } from './broker-leads-client';
 
 export const metadata: Metadata = { title: 'Leads — Broker Dashboard' };
 
@@ -41,7 +41,7 @@ export default async function BrokerLeadsPage() {
   const { data: assignedRaw } = brokerSpaceId
     ? await supabase
         .from('Contact')
-        .select('id, name, email, phone, budget, scoreLabel, leadScore, tags, createdAt, notes, applicationData')
+        .select('id, name, email, phone, budget, scoreLabel, leadScore, tags, createdAt, notes, applicationData, applicationStatusNote')
         .eq('spaceId', brokerSpaceId)
         .contains('tags', ['assigned'])
         .order('createdAt', { ascending: false })
@@ -58,7 +58,7 @@ export default async function BrokerLeadsPage() {
     .eq('role', 'realtor_member')
     .order('createdAt', { ascending: true });
 
-  const members = (memberships ?? []) as Array<{
+  const members = (memberships ?? []) as unknown as Array<{
     id: string;
     role: string;
     userId: string;

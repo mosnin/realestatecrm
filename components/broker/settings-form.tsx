@@ -11,10 +11,11 @@ interface SettingsFormProps {
   name: string;
   websiteUrl: string | null;
   logoUrl: string | null;
+  joinCode: string | null;
   isOwner: boolean;
 }
 
-export function BrokerageSettingsForm({ name: initialName, websiteUrl: initialWebsite, logoUrl: initialLogo, isOwner }: SettingsFormProps) {
+export function BrokerageSettingsForm({ name: initialName, websiteUrl: initialWebsite, logoUrl: initialLogo, joinCode, isOwner }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [websiteUrl, setWebsiteUrl] = useState(initialWebsite ?? '');
   const [logoUrl, setLogoUrl] = useState(initialLogo ?? '');

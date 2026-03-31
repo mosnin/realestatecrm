@@ -102,6 +102,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ── Fetch the realtor's name ────────────────────────────────────────
+    const { data: realtorUser } = await supabase
+      .from('User')
+      .select('name, email')
+      .eq('id', realtorUserId)
+      .maybeSingle();
+    const realtorName = realtorUser?.name ?? realtorUser?.email ?? realtorUserId;
+
     // ── Prevent double-assignment ────────────────────────────────────────
     const existingTags: string[] = contact.tags ?? [];
     if (existingTags.includes('assigned')) {
@@ -143,16 +151,27 @@ export async function POST(req: NextRequest) {
     // ── Update original contact as assigned ──────────────────────────────
     const assignmentNote = [
       contact.notes,
-      `\n--- Assigned to realtor (${realtorUserId}) on ${now} by ${dbUserId} ---`,
+      `\nAssigned to: ${realtorName}`,
+      `--- Assigned to realtor (${realtorUserId}) on ${now} by ${dbUserId} ---`,
     ]
       .filter(Boolean)
       .join('\n');
+
+    const assignmentMeta = JSON.stringify({
+      assignedTo: realtorUserId,
+      assignedToName: realtorName,
+      assignedContactId: newContactId,
+      assignedSpaceId: realtorSpace.id,
+      assignedAt: now,
+    });
 
     const { error: updateError } = await supabase
       .from('Contact')
       .update({
         tags: [...existingTags.filter((t: string) => t !== 'new-lead'), 'assigned'],
         notes: assignmentNote,
+        applicationStatus: 'assigned',
+        applicationStatusNote: assignmentMeta,
         updatedAt: now,
       })
       .eq('id', contactId);

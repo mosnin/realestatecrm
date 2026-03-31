@@ -84,7 +84,13 @@ export default async function BrokerMembersPage() {
                             <p className="text-xs text-primary font-medium">/{m.Space.slug}</p>
                           )}
                         </div>
-                        <span className="hidden sm:inline-flex text-xs font-medium text-muted-foreground bg-muted rounded-full px-2.5 py-0.5">
+                        <span className={`hidden sm:inline-flex text-xs font-medium rounded-full px-2.5 py-0.5 ${
+                          m.role === 'broker_owner'
+                            ? 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
+                            : m.role === 'broker_admin'
+                            ? 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15'
+                            : 'text-muted-foreground bg-muted'
+                        }`}>
                           {roleLabel(m.role)}
                         </span>
                         {user?.onboard ? (
