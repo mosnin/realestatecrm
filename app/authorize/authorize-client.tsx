@@ -27,6 +27,7 @@ export function AuthorizeClient({
   scope,
 }: Props) {
   const [approving, setApproving] = useState(false);
+  const [approved, setApproved] = useState(false);
   const [error, setError] = useState('');
 
   async function handleApprove() {
@@ -52,7 +53,11 @@ export function AuthorizeClient({
       }
 
       const { redirect_url } = await res.json();
-      window.location.href = redirect_url;
+      setApproved(true);
+      // Show success briefly then redirect
+      setTimeout(() => {
+        window.location.href = redirect_url;
+      }, 1500);
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
       setApproving(false);
@@ -72,6 +77,30 @@ export function AuthorizeClient({
     { icon: CalendarDays, label: 'View your tours and calendar' },
     { icon: FileText, label: 'View your notes' },
   ];
+
+  if (approved) {
+    return (
+      <div className="min-h-screen bg-muted flex items-center justify-center px-4 py-10">
+        <div className="w-full max-w-sm space-y-6">
+          <div className="flex justify-center">
+            <BrandLogo className="h-8" alt="Chippi" />
+          </div>
+          <div className="rounded-2xl bg-card border border-border shadow-lg p-6 text-center space-y-4">
+            <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto">
+              <CheckCircle2 size={28} className="text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="space-y-1.5">
+              <h1 className="text-lg font-semibold">Successfully Connected</h1>
+              <p className="text-sm text-muted-foreground">
+                Claude now has read-only access to your <span className="font-medium text-foreground">{spaceName}</span> workspace.
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">Redirecting back to Claude...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-muted flex items-center justify-center px-4 py-10">
