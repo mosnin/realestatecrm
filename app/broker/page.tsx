@@ -1,4 +1,4 @@
-import { getBrokerContext } from '@/lib/permissions';
+import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,6 +24,7 @@ import { formatCompact } from '@/lib/formatting';
 import { TrendsChart } from '@/components/broker/trends-chart';
 import { BrokerOnboardingChecklist } from '@/components/broker/onboarding-checklist';
 import { TeamActivityFeed } from '@/components/broker/team-activity-feed';
+import { MemberDashboard } from './member-dashboard';
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -33,8 +34,13 @@ function getGreeting() {
 }
 
 export default async function BrokerOverviewPage() {
-  const ctx = await getBrokerContext();
+  const ctx = await getBrokerMemberContext();
   if (!ctx) redirect('/');
+
+  // If the user is a realtor_member, show the member dashboard instead
+  if (ctx.membership.role === 'realtor_member') {
+    return <MemberDashboard ctx={ctx} />;
+  }
 
   const { brokerage } = ctx;
 

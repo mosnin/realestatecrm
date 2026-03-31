@@ -110,6 +110,49 @@ export async function requireBroker(): Promise<BrokerContext> {
   return ctx;
 }
 
+/**
+ * Returns the brokerage + membership for the current user if they have ANY
+ * brokerage membership (including realtor_member). Use this for pages that
+ * are accessible to all brokerage members, not just admins/owners.
+ */
+export async function getBrokerMemberContext(): Promise<BrokerContext | null> {
+  const session = await auth();
+  if (!session.userId) return null;
+
+  const { data: user } = await supabase
+    .from('User')
+    .select('id')
+    .eq('clerkId', session.userId)
+    .maybeSingle();
+  if (!user) return null;
+
+  const { data: memberships } = await supabase
+    .from('BrokerageMembership')
+    .select('*')
+    .eq('userId', user.id)
+    .in('role', ['broker_owner', 'broker_admin', 'realtor_member']);
+  if (!memberships?.length) return null;
+
+  // Prefer broker_owner > broker_admin > realtor_member
+  const membership =
+    memberships.find((m) => m.role === 'broker_owner') ??
+    memberships.find((m) => m.role === 'broker_admin') ??
+    memberships[0];
+
+  const { data: brokerage } = await supabase
+    .from('Brokerage')
+    .select('*')
+    .eq('id', membership.brokerageId)
+    .maybeSingle();
+  if (!brokerage) return null;
+
+  return {
+    brokerage: brokerage as Brokerage,
+    membership: membership as BrokerageMembership,
+    dbUserId: user.id,
+  };
+}
+
 // ── Role-based permission helpers ─────────────────────────────────────────────
 
 /** Roles that can manage leads (assign, reassign, delete) */

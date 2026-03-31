@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
-import { getBrokerContext } from '@/lib/permissions';
+import { getBrokerMemberContext } from '@/lib/permissions';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
@@ -13,7 +13,7 @@ export default async function BrokerLayout({ children }: { children: React.React
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
 
-  const ctx = await getBrokerContext();
+  const ctx = await getBrokerMemberContext();
 
   // Not a broker — redirect to the setup page
   if (!ctx) {
