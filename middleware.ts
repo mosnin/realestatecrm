@@ -30,6 +30,9 @@ const isFullyPublicRoute = createRouteMatcher([
   '/book/(.*)',
   '/status/(.*)',
   '/api/webhooks/(.*)',
+  '/api/mcp',
+  '/api/mcp/oauth/(.*)',
+  '/.well-known/(.*)',
 ]);
 
 // Routes that should NEVER be passed as redirect_url after login.
