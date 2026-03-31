@@ -100,7 +100,9 @@ export default async function AcceptInvitationPage({ params }: Params) {
                     <span className="font-semibold">{roleLabel(inv.roleToAssign)}</span>.
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">
-                    You'll keep your own workspace, leads, and pipeline — this just adds you to the brokerage network.
+                    {inv.roleToAssign === 'broker_admin'
+                      ? 'You\'ll get access to the brokerage dashboard to help manage the team. No subscription required.'
+                      : 'You\'ll keep your own workspace, leads, and pipeline — this just adds you to the brokerage network.'}
                   </p>
                 </div>
                 <AcceptButton token={token} />

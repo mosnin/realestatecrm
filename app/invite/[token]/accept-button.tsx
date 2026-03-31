@@ -21,8 +21,9 @@ export function AcceptButton({ token }: AcceptButtonProps) {
       const data = await res.json();
       if (res.ok) {
         setDone(true);
-        // Redirect to setup which routes brokers to /broker and realtors to /s/slug
-        setTimeout(() => (window.location.href = '/setup'), 1500);
+        // Broker admins go straight to /broker; realtors go through /setup
+        const dest = data.roleToAssign === 'broker_admin' ? '/broker' : '/setup';
+        setTimeout(() => (window.location.href = dest), 1500);
       } else {
         setError(data.error ?? 'Something went wrong.');
       }

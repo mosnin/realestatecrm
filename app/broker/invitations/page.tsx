@@ -39,12 +39,17 @@ export default async function BrokerInvitationsPage() {
 
   const roleLabel = (role: string) => (role === 'broker_admin' ? 'Admin' : 'Realtor');
 
+const roleBadge = (role: string) =>
+  role === 'broker_admin'
+    ? 'text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-500/15'
+    : 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15';
+
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Invitations</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Invite realtors to join {ctx.brokerage.name}
+          Invite realtors and admins to join {ctx.brokerage.name}
         </p>
       </div>
 

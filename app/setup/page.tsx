@@ -154,6 +154,27 @@ export default async function SetupPage() {
     redirect(`/s/${resolvedUser.space.slug}`);
   }
 
+  // If the user has a broker_admin membership (e.g. accepted an admin invitation),
+  // set them as broker_only and redirect to /broker — no workspace needed.
+  if (resolvedUser?.id) {
+    const { data: adminMembership } = await supabase
+      .from('BrokerageMembership')
+      .select('id')
+      .eq('userId', resolvedUser.id)
+      .eq('role', 'broker_admin')
+      .maybeSingle();
+    if (adminMembership) {
+      // Ensure accountType is broker_only and onboarding is marked complete
+      if (resolvedUser.accountType !== 'broker_only' || !resolvedUser.onboard) {
+        await supabase
+          .from('User')
+          .update({ accountType: 'broker_only', onboard: true })
+          .eq('id', resolvedUser.id);
+      }
+      redirect('/broker');
+    }
+  }
+
   const email = clerkUser?.emailAddresses?.[0]?.emailAddress ?? '';
 
   return (

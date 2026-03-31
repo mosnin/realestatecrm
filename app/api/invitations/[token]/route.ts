@@ -143,6 +143,15 @@ export async function POST(_req: Request, { params }: Params) {
       .eq('id', space.id);
   }
 
+  // For broker_admin invitees without a Space, set them as broker_only
+  // so they skip subscription/workspace requirements.
+  if (inv.roleToAssign === 'broker_admin' && !space) {
+    await supabase
+      .from('User')
+      .update({ accountType: 'broker_only', onboard: true })
+      .eq('id', user.id);
+  }
+
   // Mark invitation accepted
   await supabase.from('Invitation').update({ status: 'accepted' }).eq('id', inv.id);
 
@@ -156,5 +165,5 @@ export async function POST(_req: Request, { params }: Params) {
     metadata: { userId: user.id, method: 'email_invitation' },
   });
 
-  return NextResponse.json({ message: 'Joined brokerage successfully' }, { status: 200 });
+  return NextResponse.json({ message: 'Joined brokerage successfully', roleToAssign: inv.roleToAssign }, { status: 200 });
 }
