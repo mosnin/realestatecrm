@@ -415,6 +415,190 @@ export function SettingsForm({ space, settings, userEmail }: SettingsFormProps) 
         {saveError && <p className="text-sm text-destructive">{saveError}</p>}
       </div>
 
+      {/* Integrations & MCP */}
+      <SectionBlock title="Integrations & MCP" description="Connect external AI tools to your workspace via the Model Context Protocol.">
+        {/* MCP Connection Info */}
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">MCP Connection Info</p>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>MCP Endpoint</Label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-9 rounded-lg border border-input bg-muted/40 px-3 flex items-center">
+                  <span className="text-sm font-mono select-all">{MCP_ENDPOINT}</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(MCP_ENDPOINT);
+                    setMcpCopiedEndpoint(true);
+                    setTimeout(() => setMcpCopiedEndpoint(false), 2000);
+                  }}
+                >
+                  {mcpCopiedEndpoint ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                  {mcpCopiedEndpoint ? 'Copied!' : 'Copy'}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Transport</Label>
+              <p className="text-sm text-muted-foreground">Streamable HTTP</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>How to connect</Label>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p>Add this server to your MCP client configuration:</p>
+                <div className="rounded-lg border border-input bg-muted/40 px-3 py-2 font-mono text-xs whitespace-pre">{`{
+  "mcpServers": {
+    "chippi": {
+      "url": "${MCP_ENDPOINT}",
+      "headers": {
+        "Authorization": "Bearer YOUR_API_KEY"
+      }
+    }
+  }
+}`}</div>
+                <p className="text-xs">Works with Claude Desktop, Cursor, Windsurf, and any MCP-compatible client. Generate an API key below and replace <span className="font-mono">YOUR_API_KEY</span> with it.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* API Keys */}
+        <div className="border-t border-border pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">API Keys</p>
+            {!mcpShowForm && !mcpNewFullKey && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => setMcpShowForm(true)}
+              >
+                <Plus size={12} />
+                Generate new key
+              </Button>
+            )}
+          </div>
+
+          {/* New key reveal */}
+          {mcpNewFullKey && (
+            <div className="rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 p-4 mb-3 space-y-2">
+              <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Your new API key</p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-9 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-background px-3 flex items-center overflow-hidden">
+                  <span className="text-sm font-mono select-all truncate">{mcpNewFullKey}</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5 shrink-0"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(mcpNewFullKey);
+                    setMcpCopiedKey(true);
+                    setTimeout(() => setMcpCopiedKey(false), 2000);
+                  }}
+                >
+                  {mcpCopiedKey ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                  {mcpCopiedKey ? 'Copied!' : 'Copy'}
+                </Button>
+              </div>
+              <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">This key won&apos;t be shown again. Copy it now and store it securely.</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                onClick={() => { setMcpNewFullKey(null); setMcpShowForm(false); }}
+              >
+                Dismiss
+              </Button>
+            </div>
+          )}
+
+          {/* Inline create form */}
+          {mcpShowForm && !mcpNewFullKey && (
+            <div className="rounded-lg border border-border bg-muted/20 p-3 mb-3 space-y-2">
+              <Label htmlFor="mcp-key-name">Key name</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="mcp-key-name"
+                  value={mcpNewKeyName}
+                  onChange={(e) => setMcpNewKeyName(e.target.value)}
+                  placeholder='e.g. "Claude Desktop" or "Cursor"'
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-9"
+                  disabled={mcpCreating || !mcpNewKeyName.trim()}
+                  onClick={handleCreateMcpKey}
+                >
+                  {mcpCreating ? <Loader2 size={13} className="animate-spin" /> : 'Create'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-9"
+                  onClick={() => { setMcpShowForm(false); setMcpNewKeyName(''); }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Keys list */}
+          {mcpKeysLoading ? (
+            <div className="h-16 rounded-lg bg-muted animate-pulse" />
+          ) : mcpKeys.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">No API keys yet. Generate one to connect your MCP client.</p>
+          ) : (
+            <div className="space-y-2">
+              {mcpKeys.map((k) => (
+                <div key={k.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Key size={14} className="text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{k.name}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="font-mono">{k.keyPrefix}...</span>
+                        <span>&#183;</span>
+                        <span>Created {new Date(k.createdAt).toLocaleDateString()}</span>
+                        {k.lastUsedAt && (
+                          <>
+                            <span>&#183;</span>
+                            <span>Last used {new Date(k.lastUsedAt).toLocaleDateString()}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0"
+                    onClick={() => handleDeleteMcpKey(k.id)}
+                    disabled={mcpDeletingId === k.id}
+                    title="Delete key"
+                  >
+                    {mcpDeletingId === k.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </SectionBlock>
+
       {/* Danger zone */}
       <div className="rounded-xl border border-destructive/30 bg-card overflow-hidden mt-8">
         <div className="px-6 py-4 border-b border-destructive/20 bg-destructive/5">
