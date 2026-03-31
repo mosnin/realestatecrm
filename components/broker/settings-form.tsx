@@ -93,6 +93,23 @@ export function BrokerageSettingsForm({ name: initialName, websiteUrl: initialWe
         <p className="text-xs text-muted-foreground">Optional. Displayed on invite pages and emails.</p>
       </div>
 
+      {joinCode && (
+        <div className="space-y-1.5">
+          <Label>Join Code</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              value={joinCode}
+              readOnly
+              disabled
+              className="font-mono tracking-widest"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Current invite code. Manage it in the Invite Code section below.
+          </p>
+        </div>
+      )}
+
       {logoUrl && /^https?:\/\/.+/i.test(logoUrl) && (
         <div className="rounded-lg border border-border p-3">
           <p className="text-xs text-muted-foreground mb-2">Logo preview</p>

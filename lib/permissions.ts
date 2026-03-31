@@ -110,6 +110,52 @@ export async function requireBroker(): Promise<BrokerContext> {
   return ctx;
 }
 
+// ── Role-based permission helpers ─────────────────────────────────────────────
+
+/** Roles that can manage leads (assign, reassign, delete) */
+const LEAD_MANAGEMENT_ROLES = ['broker_owner', 'broker_admin'] as const;
+
+/** Roles that can edit brokerage settings */
+const SETTINGS_EDIT_ROLES = ['broker_owner', 'broker_admin'] as const;
+
+/** Roles that can manage member roles (promote/demote) */
+const ROLE_MANAGEMENT_ROLES = ['broker_owner', 'broker_admin'] as const;
+
+/**
+ * Check if a broker membership role can manage leads (assign, reassign).
+ * Only broker_owner and broker_admin can assign leads.
+ * realtor_member can only view leads assigned to them.
+ */
+export function canManageLeads(role: string): boolean {
+  return (LEAD_MANAGEMENT_ROLES as readonly string[]).includes(role);
+}
+
+/**
+ * Check if a broker membership role can edit brokerage settings.
+ */
+export function canEditSettings(role: string): boolean {
+  return (SETTINGS_EDIT_ROLES as readonly string[]).includes(role);
+}
+
+/**
+ * Check if a broker membership role can change other members' roles.
+ */
+export function canManageRoles(role: string): boolean {
+  return (ROLE_MANAGEMENT_ROLES as readonly string[]).includes(role);
+}
+
+/**
+ * Check if a user with the given role can change the target member's role.
+ * - broker_owner can change any non-owner role
+ * - broker_admin can promote realtor_member to broker_admin, but cannot demote other admins
+ */
+export function canChangeRole(actorRole: string, targetCurrentRole: string): boolean {
+  if (targetCurrentRole === 'broker_owner') return false;
+  if (actorRole === 'broker_owner') return true;
+  if (actorRole === 'broker_admin' && targetCurrentRole === 'realtor_member') return true;
+  return false;
+}
+
 // ── Shared auth helper ────────────────────────────────────────────────────────
 
 /**

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireBroker } from '@/lib/permissions';
+import { requireBroker, canManageLeads } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { getSpaceByOwnerId } from '@/lib/space';
 import { notifyNewLead } from '@/lib/notify';
@@ -31,6 +31,14 @@ export async function POST(req: NextRequest) {
     ctx = await requireBroker();
   } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  // ── Role check: only broker_owner and broker_admin can assign leads ─────
+  if (!canManageLeads(ctx.membership.role)) {
+    return NextResponse.json(
+      { error: 'Only the owner or admins can assign leads' },
+      { status: 403 },
+    );
   }
 
   const { brokerage, dbUserId } = ctx;

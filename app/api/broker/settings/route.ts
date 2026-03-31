@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { requireBroker } from '@/lib/permissions';
+import { requireBroker, canEditSettings } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 
@@ -38,7 +38,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  if (ctx.membership.role !== 'broker_owner' && ctx.membership.role !== 'broker_admin') {
+  if (!canEditSettings(ctx.membership.role)) {
     return NextResponse.json({ error: 'Only the owner or admins can update settings' }, { status: 403 });
   }
 

@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Search, UserPlus, Check, PhoneIncoming, Users } from 'lucide-react';
+import { Search, UserPlus, Check, PhoneIncoming, Users, CalendarClock, Handshake, ArrowRight, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCompact } from '@/lib/formatting';
 
@@ -25,6 +25,20 @@ export interface LeadRow {
   assignedAt: string | null;
 }
 
+export interface AssignedLeadProgress {
+  realtorName: string;
+  assignedAt: string;
+  assignedContactId: string;
+  assignedSpaceId: string;
+  currentStage: 'QUALIFICATION' | 'TOUR' | 'APPLICATION';
+  currentScore: number | null;
+  currentScoreLabel: string | null;
+  lastActivityAt: string | null;
+  hasFollowUp: boolean;
+  followUpAt: string | null;
+  hasDeal: boolean;
+}
+
 export interface RealtorOption {
   userId: string;
   name: string | null;
@@ -37,6 +51,7 @@ interface Props {
   unassignedLeads: LeadRow[];
   assignedLeads: LeadRow[];
   realtors: RealtorOption[];
+  assignedLeadProgress?: Record<string, AssignedLeadProgress>;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -220,41 +235,185 @@ function LeadItem({
   );
 }
 
-function AssignedLeadItem({ lead }: { lead: LeadRow }) {
+function stageBadge(stage: AssignedLeadProgress['currentStage']) {
+  const styles: Record<string, string> = {
+    QUALIFICATION: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
+    TOUR: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400',
+    APPLICATION: 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400',
+  };
+  const labels: Record<string, string> = {
+    QUALIFICATION: 'Qualification',
+    TOUR: 'Tour',
+    APPLICATION: 'Application',
+  };
   return (
-    <div className="flex items-center gap-4 px-4 py-3 border-b border-border last:border-b-0">
-      <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground flex-shrink-0">
-        {initials(lead.name, lead.email)}
-      </div>
-      <div className="flex-1 min-w-0 space-y-0.5">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium truncate">{lead.name || 'Unnamed'}</p>
-          {scoreBadge(lead.scoreLabel)}
+    <Badge variant="secondary" className={styles[stage] ?? 'bg-muted text-muted-foreground'}>
+      {labels[stage] ?? stage}
+    </Badge>
+  );
+}
+
+function stageProgress(stage: AssignedLeadProgress['currentStage']) {
+  const stages = ['QUALIFICATION', 'TOUR', 'APPLICATION'] as const;
+  const idx = stages.indexOf(stage);
+  return (
+    <div className="flex items-center gap-1">
+      {stages.map((s, i) => (
+        <div key={s} className="flex items-center gap-1">
+          <div
+            className={`w-2 h-2 rounded-full ${
+              i <= idx
+                ? 'bg-primary'
+                : 'bg-muted-foreground/20'
+            }`}
+          />
+          {i < stages.length - 1 && (
+            <div className={`w-3 h-px ${i < idx ? 'bg-primary' : 'bg-muted-foreground/20'}`} />
+          )}
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-          {lead.assignedTo && (
-            <span className="inline-flex items-center gap-1">
-              <Check size={10} className="text-green-600" />
-              {lead.assignedTo}
+      ))}
+    </div>
+  );
+}
+
+function relativeTime(iso: string | null) {
+  if (!iso) return null;
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return formatDate(iso);
+}
+
+function AssignedLeadItem({
+  lead,
+  progress,
+}: {
+  lead: LeadRow;
+  progress?: AssignedLeadProgress;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="border-b border-border last:border-b-0">
+      <div
+        className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors"
+        onClick={() => progress && setExpanded(!expanded)}
+      >
+        {/* Avatar */}
+        <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground flex-shrink-0">
+          {initials(lead.name, lead.email)}
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0 space-y-0.5">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium truncate">{lead.name || 'Unnamed'}</p>
+            {progress ? stageBadge(progress.currentStage) : scoreBadge(lead.scoreLabel)}
+            {progress?.hasDeal && (
+              <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
+                <Handshake size={10} className="mr-1" />
+                Deal
+              </Badge>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+            {(progress?.realtorName ?? lead.assignedTo) && (
+              <span className="inline-flex items-center gap-1">
+                <Check size={10} className="text-green-600" />
+                {progress?.realtorName ?? lead.assignedTo}
+              </span>
+            )}
+            {progress && stageProgress(progress.currentStage)}
+            {progress?.lastActivityAt && (
+              <span className="inline-flex items-center gap-1">
+                <Clock size={10} />
+                {relativeTime(progress.lastActivityAt)}
+              </span>
+            )}
+            {progress?.hasFollowUp && (
+              <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                <CalendarClock size={10} />
+                Follow-up set
+              </span>
+            )}
+            {!progress && lead.assignedAt && <span>Assigned {formatDate(lead.assignedAt)}</span>}
+          </div>
+        </div>
+
+        {/* Score */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {(progress?.currentScore ?? lead.leadScore) != null && (
+            <span className="text-xs text-muted-foreground tabular-nums">
+              Score: {progress?.currentScore ?? lead.leadScore}
             </span>
           )}
-          {lead.assignedAt && <span>Assigned {formatDate(lead.assignedAt)}</span>}
+          {progress && (
+            <ArrowRight
+              size={14}
+              className={`text-muted-foreground transition-transform ${expanded ? 'rotate-90' : ''}`}
+            />
+          )}
         </div>
       </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
-        {lead.leadScore != null && (
-          <span className="text-xs text-muted-foreground tabular-nums">
-            Score: {lead.leadScore}
-          </span>
-        )}
-      </div>
+
+      {/* Expanded detail panel */}
+      {expanded && progress && (
+        <div className="px-4 pb-3 pl-[calc(36px+1rem)]">
+          <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div>
+                <p className="text-muted-foreground font-medium mb-0.5">Realtor</p>
+                <p className="font-medium">{progress.realtorName}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground font-medium mb-0.5">Stage</p>
+                <p className="font-medium">{progress.currentStage.charAt(0) + progress.currentStage.slice(1).toLowerCase()}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground font-medium mb-0.5">Score</p>
+                <p className="font-medium">
+                  {progress.currentScore != null ? progress.currentScore : '--'}
+                  {progress.currentScoreLabel && (
+                    <span className="ml-1 text-muted-foreground">({progress.currentScoreLabel})</span>
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground font-medium mb-0.5">Assigned</p>
+                <p className="font-medium">{formatDate(progress.assignedAt)}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div>
+                <p className="text-muted-foreground font-medium mb-0.5">Last Activity</p>
+                <p className="font-medium">{progress.lastActivityAt ? relativeTime(progress.lastActivityAt) : 'No activity yet'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground font-medium mb-0.5">Follow-up</p>
+                <p className="font-medium">
+                  {progress.followUpAt ? formatDate(progress.followUpAt) : 'None scheduled'}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground font-medium mb-0.5">Deal Created</p>
+                <p className="font-medium">{progress.hasDeal ? 'Yes' : 'No'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors }: Props) {
+export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, assignedLeadProgress = {} }: Props) {
   const [unassigned, setUnassigned] = useState(unassignedLeads);
   const [assigned, setAssigned] = useState(assignedLeads);
   const [tab, setTab] = useState('unassigned');
@@ -345,9 +504,14 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors }: 
                 <div className="w-9 flex-shrink-0" />
                 <div className="flex-1">Lead</div>
                 <div className="flex-shrink-0 w-20 text-right">Score</div>
+                <div className="flex-shrink-0 w-4" />
               </div>
               {assigned.map((lead) => (
-                <AssignedLeadItem key={lead.id} lead={lead} />
+                <AssignedLeadItem
+                  key={lead.id}
+                  lead={lead}
+                  progress={assignedLeadProgress[lead.id]}
+                />
               ))}
             </CardContent>
           </Card>

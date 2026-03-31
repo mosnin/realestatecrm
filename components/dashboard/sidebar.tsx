@@ -32,12 +32,12 @@ interface SidebarProps {
 }
 
 const brokerTeamNavItems = [
-  { href: '/broker', label: 'Team Overview', icon: LayoutDashboard, exact: true },
-  { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false },
-  { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
-  { href: '/broker/members', label: 'Members', icon: Users, exact: false },
-  { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
-  { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false },
+  { href: '/broker', label: 'Team Overview', icon: LayoutDashboard, exact: true, adminOnly: false },
+  { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
+  { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
+  { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
+  { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false, adminOnly: true },
+  { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
 ];
 
 // ── Section label ──────────────────────────────────────────────────────────
@@ -219,7 +219,9 @@ export function Sidebar({
         {/* Team nav */}
         <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
           <SectionLabel>Team</SectionLabel>
-          {brokerTeamNavItems.map((item) => {
+          {brokerTeamNavItems
+            .filter((item) => !item.adminOnly || brokerageRole === 'broker_owner' || brokerageRole === 'broker_admin')
+            .map((item) => {
             const isActive = item.exact
               ? pathname === item.href
               : pathname.startsWith(item.href);

@@ -104,6 +104,7 @@ export default async function BrokerLeadsPage() {
     createdAt: string;
     notes: string | null;
     applicationData: Record<string, unknown> | null;
+    applicationStatusNote?: string | null;
   };
 
   // Build a map of userId -> realtor name for resolving assignments
@@ -112,17 +113,110 @@ export default async function BrokerLeadsPage() {
     realtorNameMap.set(m.userId, m.User?.name ?? m.User?.email ?? 'Unknown');
   }
 
+  // ── Parse assignment metadata from assigned contacts ──────────────────
+  type AssignmentMeta = {
+    assignedTo: string;
+    assignedToName: string;
+    assignedContactId: string;
+    assignedSpaceId: string;
+    assignedAt: string;
+  };
+
+  const assignmentMap = new Map<string, AssignmentMeta>();
+  const realtorContactIds: string[] = [];
+
+  for (const c of (assignedRaw ?? []) as RawContact[]) {
+    if (c.applicationStatusNote) {
+      try {
+        const meta = JSON.parse(c.applicationStatusNote) as AssignmentMeta;
+        assignmentMap.set(c.id, meta);
+        if (meta.assignedContactId) {
+          realtorContactIds.push(meta.assignedContactId);
+        }
+      } catch {
+        // Legacy format or invalid JSON — fall back to notes parsing
+      }
+    }
+  }
+
+  // ── Fetch realtor-side contact progress for assigned leads ────────────
+  type RealtorContact = {
+    id: string;
+    type: string;
+    leadScore: number | null;
+    scoreLabel: string | null;
+    followUpAt: string | null;
+    lastContactedAt: string | null;
+    updatedAt: string;
+  };
+
+  const { data: realtorContacts } = realtorContactIds.length > 0
+    ? await supabase
+        .from('Contact')
+        .select('id, type, leadScore, scoreLabel, followUpAt, lastContactedAt, updatedAt')
+        .in('id', realtorContactIds)
+        .limit(500)
+    : { data: [] };
+
+  const realtorContactMap = new Map<string, RealtorContact>();
+  for (const rc of (realtorContacts ?? []) as RealtorContact[]) {
+    realtorContactMap.set(rc.id, rc);
+  }
+
+  // ── Fetch deals linked to realtor-side contacts ───────────────────────
+  const { data: dealContactLinks } = realtorContactIds.length > 0
+    ? await supabase
+        .from('DealContact')
+        .select('dealId, contactId')
+        .in('contactId', realtorContactIds)
+        .limit(500)
+    : { data: [] };
+
+  const contactHasDeal = new Set<string>();
+  for (const dc of (dealContactLinks ?? []) as { dealId: string; contactId: string }[]) {
+    contactHasDeal.add(dc.contactId);
+  }
+
+  // ── Build progress map keyed by broker contact ID ─────────────────────
+  const progressMap = new Map<string, AssignedLeadProgress>();
+
+  for (const [brokerContactId, meta] of assignmentMap) {
+    const rc = realtorContactMap.get(meta.assignedContactId);
+    progressMap.set(brokerContactId, {
+      realtorName: meta.assignedToName,
+      assignedAt: meta.assignedAt,
+      assignedContactId: meta.assignedContactId,
+      assignedSpaceId: meta.assignedSpaceId,
+      currentStage: (rc?.type as AssignedLeadProgress['currentStage']) ?? 'QUALIFICATION',
+      currentScore: rc?.leadScore ?? null,
+      currentScoreLabel: rc?.scoreLabel ?? null,
+      lastActivityAt: rc?.lastContactedAt ?? rc?.updatedAt ?? null,
+      hasFollowUp: rc?.followUpAt != null,
+      followUpAt: rc?.followUpAt ?? null,
+      hasDeal: contactHasDeal.has(meta.assignedContactId),
+    });
+  }
+
   function toLeadRow(c: RawContact): LeadRow {
     const moveTiming = c.applicationData?.targetMoveInDate as string | undefined;
-    // Try to extract assigned realtor from notes
-    // Format from API: "--- Assigned to realtor (userId) on date by assignerId ---"
-    const realtorIdMatch = c.notes?.match(/Assigned to realtor \(([^)]+)\)/);
-    const assignedName = realtorIdMatch?.[1]
-      ? realtorNameMap.get(realtorIdMatch[1]) ?? 'Realtor'
-      : null;
-    // Try to extract assignment date
-    const dateMatch = c.notes?.match(/Assigned to realtor .+ on (\S+)/);
-    const assignedAt = dateMatch?.[1] ?? (c.tags.includes('assigned') ? c.createdAt : null);
+
+    // Try structured metadata first, fall back to notes parsing
+    const meta = assignmentMap.get(c.id);
+    let assignedName: string | null = null;
+    let assignedAt: string | null = null;
+
+    if (meta) {
+      assignedName = meta.assignedToName;
+      assignedAt = meta.assignedAt;
+    } else {
+      // Legacy: parse from notes
+      const realtorIdMatch = c.notes?.match(/Assigned to realtor \(([^)]+)\)/);
+      assignedName = realtorIdMatch?.[1]
+        ? realtorNameMap.get(realtorIdMatch[1]) ?? 'Realtor'
+        : null;
+      const dateMatch = c.notes?.match(/Assigned to realtor .+ on (\S+)/);
+      assignedAt = dateMatch?.[1] ?? (c.tags.includes('assigned') ? c.createdAt : null);
+    }
 
     return {
       id: c.id,
@@ -142,6 +236,12 @@ export default async function BrokerLeadsPage() {
   const unassignedLeads: LeadRow[] = (unassignedRaw ?? []).map((c: unknown) => toLeadRow(c as RawContact));
   const assignedLeads: LeadRow[] = (assignedRaw ?? []).map((c: unknown) => toLeadRow(c as RawContact));
 
+  // Serialize progress map for client
+  const assignedLeadProgress: Record<string, AssignedLeadProgress> = {};
+  for (const [id, progress] of progressMap) {
+    assignedLeadProgress[id] = progress;
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -155,6 +255,7 @@ export default async function BrokerLeadsPage() {
         unassignedLeads={unassignedLeads}
         assignedLeads={assignedLeads}
         realtors={realtors}
+        assignedLeadProgress={assignedLeadProgress}
       />
     </div>
   );

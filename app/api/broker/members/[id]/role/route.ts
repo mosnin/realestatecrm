@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { requireBroker } from '@/lib/permissions';
+import { requireBroker, canManageRoles, canChangeRole } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 
@@ -20,9 +20,7 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const isOwner = ctx.membership.role === 'broker_owner';
-  const isAdmin = ctx.membership.role === 'broker_admin';
-  if (!isOwner && !isAdmin) {
+  if (!canManageRoles(ctx.membership.role)) {
     return NextResponse.json({ error: 'Only the owner or admins can change roles' }, { status: 403 });
   }
 
@@ -51,13 +49,12 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Member not found' }, { status: 404 });
   }
 
-  if (membership.role === 'broker_owner') {
-    return NextResponse.json({ error: 'Cannot change the owner\'s role' }, { status: 400 });
-  }
-
-  // Admins can only change realtor roles, not other admins
-  if (isAdmin && membership.role === 'broker_admin') {
-    return NextResponse.json({ error: 'Only the owner can change admin roles' }, { status: 403 });
+  // Use centralized permission check: owner can change any non-owner, admin can only change realtor_member
+  if (!canChangeRole(ctx.membership.role, membership.role)) {
+    const msg = membership.role === 'broker_owner'
+      ? 'Cannot change the owner\'s role'
+      : 'Only the owner can change admin roles';
+    return NextResponse.json({ error: msg }, { status: 403 });
   }
 
   if (membership.role === role) {
