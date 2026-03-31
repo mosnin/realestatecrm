@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import { notifyBroker } from '@/lib/broker-notify';
@@ -87,12 +87,43 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ error: 'This brokerage has been suspended' }, { status: 403 });
   }
 
-  // Resolve current user
-  const { data: user } = await supabase
+  // Resolve current user — auto-create the DB record if they just signed up
+  // (e.g. a new user clicking an invite link who hasn't gone through /setup yet).
+  let user: { id: string; email: string } | null = null;
+  const { data: existingUser } = await supabase
     .from('User')
     .select('id, email')
     .eq('clerkId', clerkId)
     .maybeSingle();
+  if (existingUser) {
+    user = existingUser;
+  } else {
+    // Auto-provision: fetch profile from Clerk and create the DB record
+    const clerkUser = await currentUser();
+    if (!clerkUser) return NextResponse.json({ error: 'User not found — complete sign-up first' }, { status: 404 });
+    const email = clerkUser.emailAddresses?.[0]?.emailAddress ?? '';
+    const name = clerkUser.fullName ?? clerkUser.firstName ?? null;
+    const { data: newUser, error: insertErr } = await supabase
+      .from('User')
+      .upsert(
+        {
+          id: crypto.randomUUID(),
+          clerkId,
+          email,
+          name,
+          onboardingStartedAt: new Date().toISOString(),
+          onboard: false,
+        },
+        { onConflict: 'clerkId' }
+      )
+      .select('id, email')
+      .single();
+    if (insertErr || !newUser) {
+      console.error('[invitations/accept] auto-provision user failed', insertErr);
+      return NextResponse.json({ error: 'Failed to create user account' }, { status: 500 });
+    }
+    user = newUser;
+  }
   if (!user) return NextResponse.json({ error: 'User not found — complete sign-up first' }, { status: 404 });
 
   // Verify this invitation was meant for the signed-in user's email

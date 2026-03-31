@@ -8,12 +8,17 @@ export const metadata: Metadata = { title: 'Sign Up — Chippi' };
 export default async function SignUpPage({
   searchParams,
 }: {
-  searchParams: Promise<{ intent?: string }>;
+  searchParams: Promise<{ intent?: string; redirect_url?: string }>;
 }) {
-  const { intent } = await searchParams;
+  const { intent, redirect_url } = await searchParams;
   const isBroker = intent === 'broker';
   const redirectIntent = isBroker ? 'broker' : 'realtor';
   const signInUrl = isBroker ? '/login/broker' : '/login/realtor';
+
+  // If there's a safe redirect_url (e.g. from an invitation link), honour it after sign-up.
+  const postSignUpUrl = redirect_url?.startsWith('/invite/')
+    ? redirect_url
+    : `/auth/redirect?intent=${redirectIntent}`;
 
   return (
     <AuthPageLayout
@@ -25,7 +30,7 @@ export default async function SignUpPage({
         <ThemedSignUp
           routing="path"
           path="/sign-up"
-          forceRedirectUrl={`/auth/redirect?intent=${redirectIntent}`}
+          forceRedirectUrl={postSignUpUrl}
           signInUrl={signInUrl}
         />
         <p className="text-center text-sm text-muted-foreground">
