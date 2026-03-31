@@ -1,8 +1,17 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, FormEvent } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, MapPin, Phone, Mail, Briefcase } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  Phone,
+  Mail,
+  Briefcase,
+  Plus,
+  X,
+} from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -31,11 +40,23 @@ interface DealFollowUp {
   followUpAt: string;
 }
 
+interface CustomEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  date: string;
+  time: string | null;
+  color: string;
+}
+
+type ViewMode = 'month' | 'week' | 'day';
+
 interface CalendarViewProps {
   slug: string;
   tours: Tour[];
   contactFollowUps: ContactFollowUp[];
   dealFollowUps: DealFollowUp[];
+  customEvents: CustomEvent[];
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -44,12 +65,9 @@ function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+function parseDateKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
 function formatTime(iso: string): string {
@@ -61,12 +79,66 @@ function formatTime(iso: string): string {
   });
 }
 
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+
+function getMonday(d: Date): Date {
+  const r = new Date(d);
+  const day = r.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  r.setDate(r.getDate() + diff);
+  return r;
+}
+
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+const MONTH_NAMES_SHORT = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAY_NAMES_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const COLOR_OPTIONS = [
+  { value: 'gray', label: 'Gray', dot: 'bg-gray-500' },
+  { value: 'orange', label: 'Orange', dot: 'bg-orange-500' },
+  { value: 'blue', label: 'Blue', dot: 'bg-blue-500' },
+  { value: 'purple', label: 'Purple', dot: 'bg-purple-500' },
+  { value: 'green', label: 'Green', dot: 'bg-green-500' },
+  { value: 'red', label: 'Red', dot: 'bg-red-500' },
+] as const;
+
+function colorToDotClass(color: string): string {
+  const map: Record<string, string> = {
+    gray: 'text-gray-500',
+    orange: 'text-orange-500',
+    blue: 'text-blue-500',
+    purple: 'text-purple-500',
+    green: 'text-green-500',
+    red: 'text-red-500',
+  };
+  return map[color] ?? 'text-gray-500';
+}
+
+function colorToBgClass(color: string): string {
+  const map: Record<string, string> = {
+    gray: 'bg-gray-500',
+    orange: 'bg-orange-500',
+    blue: 'bg-blue-500',
+    purple: 'bg-purple-500',
+    green: 'bg-green-500',
+    red: 'bg-red-500',
+  };
+  return map[color] ?? 'bg-gray-500';
+}
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -75,13 +147,29 @@ export function CalendarView({
   tours,
   contactFollowUps,
   dealFollowUps,
+  customEvents: initialCustomEvents,
 }: CalendarViewProps) {
   const today = new Date();
+  const todayKey = toDateKey(today);
+
+  const [view, setView] = useState<ViewMode>('month');
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
-  const [selectedDate, setSelectedDate] = useState<string | null>(toDateKey(today));
+  const [currentDate, setCurrentDate] = useState(today);
+  const [selectedDate, setSelectedDate] = useState<string>(todayKey);
+  const [customEvents, setCustomEvents] = useState<CustomEvent[]>(initialCustomEvents);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [formSubmitting, setFormSubmitting] = useState(false);
 
-  // Build lookup maps by date key
+  // Add-event form state
+  const [formTitle, setFormTitle] = useState('');
+  const [formDate, setFormDate] = useState(selectedDate);
+  const [formTime, setFormTime] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formColor, setFormColor] = useState('gray');
+
+  // ── Lookup maps ──────────────────────────────────────────────────────────
+
   const toursByDate = useMemo(() => {
     const map = new Map<string, Tour[]>();
     for (const t of tours) {
@@ -115,19 +203,17 @@ export function CalendarView({
     return map;
   }, [dealFollowUps]);
 
-  // Calendar grid computation
-  const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
-  const startDow = firstDayOfMonth.getDay(); // 0=Sun
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const customByDate = useMemo(() => {
+    const map = new Map<string, CustomEvent[]>();
+    for (const e of customEvents) {
+      const arr = map.get(e.date) ?? [];
+      arr.push(e);
+      map.set(e.date, arr);
+    }
+    return map;
+  }, [customEvents]);
 
-  // We need leading blanks for days before the 1st
-  const cells: (number | null)[] = [];
-  for (let i = 0; i < startDow; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-  // Trailing blanks to fill last row
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const todayKey = toDateKey(today);
+  // ── Navigation ───────────────────────────────────────────────────────────
 
   function prevMonth() {
     if (currentMonth === 0) {
@@ -147,125 +233,229 @@ export function CalendarView({
     }
   }
 
-  // Selected day events
+  function prevWeek() {
+    setCurrentDate(addDays(currentDate, -7));
+  }
+
+  function nextWeek() {
+    setCurrentDate(addDays(currentDate, 7));
+  }
+
+  function prevDay() {
+    const d = addDays(currentDate, -1);
+    setCurrentDate(d);
+    setSelectedDate(toDateKey(d));
+  }
+
+  function nextDay() {
+    const d = addDays(currentDate, 1);
+    setCurrentDate(d);
+    setSelectedDate(toDateKey(d));
+  }
+
+  function goToday() {
+    const t = new Date();
+    setCurrentMonth(t.getMonth());
+    setCurrentYear(t.getFullYear());
+    setCurrentDate(t);
+    setSelectedDate(toDateKey(t));
+  }
+
+  function selectDate(dateKey: string) {
+    setSelectedDate(dateKey);
+    setFormDate(dateKey);
+    const d = parseDateKey(dateKey);
+    setCurrentDate(d);
+  }
+
+  // ── Custom event CRUD ────────────────────────────────────────────────────
+
+  async function handleAddEvent(e: FormEvent) {
+    e.preventDefault();
+    if (!formTitle.trim()) return;
+    setFormSubmitting(true);
+
+    try {
+      const res = await fetch(`/api/calendar-events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug,
+          title: formTitle.trim(),
+          date: formDate,
+          time: formTime || null,
+          description: formDescription.trim() || null,
+          color: formColor,
+        }),
+      });
+
+      if (res.ok) {
+        const newEvent: CustomEvent = await res.json();
+        setCustomEvents((prev) => [...prev, newEvent]);
+        setFormTitle('');
+        setFormTime('');
+        setFormDescription('');
+        setFormColor('gray');
+        setShowAddForm(false);
+      }
+    } catch {
+      // Silently fail — user can retry
+    } finally {
+      setFormSubmitting(false);
+    }
+  }
+
+  async function handleDeleteEvent(id: string) {
+    try {
+      const res = await fetch(`/api/calendar-events/${id}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setCustomEvents((prev) => prev.filter((e) => e.id !== id));
+      }
+    } catch {
+      // Silently fail
+    }
+  }
+
+  // ── Selected day data ────────────────────────────────────────────────────
+
   const selectedTours = selectedDate ? toursByDate.get(selectedDate) ?? [] : [];
   const selectedContacts = selectedDate ? contactsByDate.get(selectedDate) ?? [] : [];
   const selectedDeals = selectedDate ? dealsByDate.get(selectedDate) ?? [] : [];
-  const hasSelectedEvents = selectedTours.length + selectedContacts.length + selectedDeals.length > 0;
+  const selectedCustom = selectedDate ? customByDate.get(selectedDate) ?? [] : [];
+  const hasSelectedEvents =
+    selectedTours.length + selectedContacts.length + selectedDeals.length + selectedCustom.length > 0;
 
-  return (
-    <div className="space-y-4">
-      {/* Month navigation */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={prevMonth}
-          className="p-2 rounded-md hover:bg-muted transition-colors"
-          aria-label="Previous month"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-        <h2 className="text-lg font-semibold">
-          {MONTH_NAMES[currentMonth]} {currentYear}
-        </h2>
-        <button
-          onClick={nextMonth}
-          className="p-2 rounded-md hover:bg-muted transition-colors"
-          aria-label="Next month"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
+  // ── Month grid computation ───────────────────────────────────────────────
+
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+  const startDow = firstDayOfMonth.getDay();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  // ── Week computation ─────────────────────────────────────────────────────
+
+  const weekStart = getMonday(currentDate);
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  function weekLabel(): string {
+    const first = weekDays[0];
+    const last = weekDays[6];
+    const fMonth = MONTH_NAMES_SHORT[first.getMonth()];
+    const lMonth = MONTH_NAMES_SHORT[last.getMonth()];
+    if (first.getMonth() === last.getMonth()) {
+      return `${fMonth} ${first.getDate()} - ${last.getDate()}, ${first.getFullYear()}`;
+    }
+    if (first.getFullYear() === last.getFullYear()) {
+      return `${fMonth} ${first.getDate()} - ${lMonth} ${last.getDate()}, ${first.getFullYear()}`;
+    }
+    return `${fMonth} ${first.getDate()}, ${first.getFullYear()} - ${lMonth} ${last.getDate()}, ${last.getFullYear()}`;
+  }
+
+  // ── Day label ────────────────────────────────────────────────────────────
+
+  function dayLabel(): string {
+    const d = parseDateKey(selectedDate);
+    return `${DAY_NAMES_FULL[d.getDay()]}, ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  }
+
+  // ── Dot indicators for a date key ────────────────────────────────────────
+
+  function renderDots(dateKey: string) {
+    const hasTours = toursByDate.has(dateKey);
+    const hasContacts = contactsByDate.has(dateKey);
+    const hasDeals = dealsByDate.has(dateKey);
+    const hasCustom = customByDate.has(dateKey);
+
+    if (!hasTours && !hasContacts && !hasDeals && !hasCustom) return null;
+
+    return (
+      <div className="flex gap-1 mt-0.5 md:mt-1 flex-wrap">
+        {hasTours && <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />}
+        {hasContacts && <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
+        {hasDeals && <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />}
+        {hasCustom && (
+          <span className={`text-[8px] leading-none ${colorToDotClass(customByDate.get(dateKey)![0].color)}`}>
+            &#x2756;
+          </span>
+        )}
       </div>
+    );
+  }
 
-      {/* Calendar grid */}
-      <Card>
-        <CardContent className="p-0">
-          {/* Header row */}
-          <div className="grid grid-cols-7 border-b border-border">
-            {DAY_NAMES.map((d) => (
-              <div
-                key={d}
-                className="py-2 text-center text-xs font-medium text-muted-foreground"
-              >
-                {d}
-              </div>
-            ))}
-          </div>
+  // ── Mini event cards for week view ───────────────────────────────────────
 
-          {/* Day cells */}
-          <div className="grid grid-cols-7">
-            {cells.map((day, idx) => {
-              if (day === null) {
-                return (
-                  <div
-                    key={`blank-${idx}`}
-                    className="h-12 md:h-20 border-b border-r border-border last:border-r-0"
-                  />
-                );
-              }
+  function renderMiniEvents(dateKey: string) {
+    const dayTours = toursByDate.get(dateKey) ?? [];
+    const dayContacts = contactsByDate.get(dateKey) ?? [];
+    const dayDeals = dealsByDate.get(dateKey) ?? [];
+    const dayCustom = customByDate.get(dateKey) ?? [];
 
-              const dateKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const isToday = dateKey === todayKey;
-              const isSelected = dateKey === selectedDate;
-              const hasTours = toursByDate.has(dateKey);
-              const hasContacts = contactsByDate.has(dateKey);
-              const hasDeals = dealsByDate.has(dateKey);
-
-              return (
-                <button
-                  key={dateKey}
-                  onClick={() => setSelectedDate(dateKey)}
-                  className={`
-                    h-12 md:h-20 border-b border-r border-border p-1 md:p-2
-                    text-left transition-colors relative
-                    hover:bg-muted/30
-                    ${isSelected ? 'bg-primary/5 border-primary/30' : ''}
-                  `}
-                >
-                  <span
-                    className={`
-                      inline-flex items-center justify-center text-sm
-                      ${isToday ? 'w-7 h-7 rounded-full ring-2 ring-primary text-primary font-semibold' : ''}
-                    `}
-                  >
-                    {day}
-                  </span>
-                  {/* Event dots */}
-                  {(hasTours || hasContacts || hasDeals) && (
-                    <div className="flex gap-1 mt-0.5 md:mt-1">
-                      {hasTours && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                      )}
-                      {hasContacts && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                      )}
-                      {hasDeals && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                      )}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Legend */}
-      <div className="flex gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-orange-500" /> Tours
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-blue-500" /> Contact follow-ups
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-purple-500" /> Deal follow-ups
-        </span>
+    return (
+      <div className="space-y-1 mt-1 overflow-y-auto max-h-32">
+        {dayTours.map((t) => (
+          <Link
+            key={t.id}
+            href={`/s/${slug}/tours`}
+            className="block text-[10px] leading-tight bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded px-1 py-0.5 truncate hover:bg-orange-100 dark:hover:bg-orange-950/50 transition-colors"
+          >
+            <span className="font-medium">{t.guestName}</span>
+            <span className="text-muted-foreground ml-1">{formatTime(t.startsAt)}</span>
+          </Link>
+        ))}
+        {dayContacts.map((c) => (
+          <Link
+            key={c.id}
+            href={`/s/${slug}/contacts/${c.id}`}
+            className="block text-[10px] leading-tight bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded px-1 py-0.5 truncate hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-colors"
+          >
+            <span className="font-medium">{c.name}</span>
+          </Link>
+        ))}
+        {dayDeals.map((d) => (
+          <Link
+            key={d.id}
+            href={`/s/${slug}/deals/${d.id}`}
+            className="block text-[10px] leading-tight bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded px-1 py-0.5 truncate hover:bg-purple-100 dark:hover:bg-purple-950/50 transition-colors"
+          >
+            <span className="font-medium">{d.title}</span>
+          </Link>
+        ))}
+        {dayCustom.map((e) => (
+          <button
+            key={e.id}
+            onClick={() => selectDate(dateKey)}
+            className={`block w-full text-left text-[10px] leading-tight rounded px-1 py-0.5 truncate transition-colors border ${
+              e.color === 'orange' ? 'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800' :
+              e.color === 'blue' ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800' :
+              e.color === 'purple' ? 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800' :
+              e.color === 'green' ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800' :
+              e.color === 'red' ? 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800' :
+              'bg-gray-50 dark:bg-gray-950/30 border-gray-200 dark:border-gray-800'
+            }`}
+          >
+            <span className={`${colorToDotClass(e.color)} mr-0.5`}>&#x2756;</span>
+            <span className="font-medium">{e.title}</span>
+            {e.time && <span className="text-muted-foreground ml-1">{e.time}</span>}
+          </button>
+        ))}
       </div>
+    );
+  }
 
-      {/* Day detail panel */}
-      {selectedDate && (
-        <div className="space-y-3">
+  // ── Detail panel (shared by all views) ───────────────────────────────────
+
+  function renderDetailPanel() {
+    if (!selectedDate) return null;
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-muted-foreground">
             {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
               weekday: 'long',
@@ -274,16 +464,114 @@ export function CalendarView({
               year: 'numeric',
             })}
           </h3>
+          <button
+            onClick={() => {
+              setShowAddForm(!showAddForm);
+              setFormDate(selectedDate);
+            }}
+            className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add event
+          </button>
+        </div>
 
-          {!hasSelectedEvents && (
-            <p className="text-sm text-muted-foreground">
-              No tours or follow-ups on this day.
-            </p>
-          )}
+        {/* Inline add-event form */}
+        {showAddForm && (
+          <Card>
+            <CardContent className="p-4">
+              <form onSubmit={handleAddEvent} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Title *</label>
+                  <input
+                    type="text"
+                    value={formTitle}
+                    onChange={(e) => setFormTitle(e.target.value)}
+                    required
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="Event title"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Date *</label>
+                    <input
+                      type="date"
+                      value={formDate}
+                      onChange={(e) => setFormDate(e.target.value)}
+                      required
+                      className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Time</label>
+                    <input
+                      type="time"
+                      value={formTime}
+                      onChange={(e) => setFormTime(e.target.value)}
+                      className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Description</label>
+                  <textarea
+                    value={formDescription}
+                    onChange={(e) => setFormDescription(e.target.value)}
+                    rows={2}
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                    placeholder="Optional description"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Color</label>
+                  <div className="flex gap-2">
+                    {COLOR_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setFormColor(opt.value)}
+                        className={`w-6 h-6 rounded-full ${opt.dot} transition-all ${
+                          formColor === opt.value
+                            ? 'ring-2 ring-offset-2 ring-primary'
+                            : 'opacity-50 hover:opacity-75'
+                        }`}
+                        title={opt.label}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="submit"
+                    disabled={formSubmitting}
+                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  >
+                    {formSubmitting ? 'Saving...' : 'Save event'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(false)}
+                    className="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
 
-          {/* Tours */}
-          {selectedTours.map((tour) => (
-            <Card key={tour.id}>
+        {!hasSelectedEvents && !showAddForm && (
+          <p className="text-sm text-muted-foreground">
+            No events on this day.
+          </p>
+        )}
+
+        {/* Tours */}
+        {selectedTours.map((tour) => (
+          <Link key={tour.id} href={`/s/${slug}/tours`} className="block group">
+            <Card className="transition-colors group-hover:border-primary/30">
               <CardContent className="p-4 flex items-start gap-3">
                 <span className="mt-1 w-2 h-2 rounded-full bg-orange-500 shrink-0" />
                 <div className="flex-1 min-w-0 space-y-1">
@@ -310,20 +598,16 @@ export function CalendarView({
                   <p className="text-xs text-muted-foreground">
                     {formatTime(tour.startsAt)} &ndash; {formatTime(tour.endsAt)}
                   </p>
-                  <Link
-                    href={`/s/${slug}/tours`}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    View tours &rarr;
-                  </Link>
                 </div>
               </CardContent>
             </Card>
-          ))}
+          </Link>
+        ))}
 
-          {/* Contact follow-ups */}
-          {selectedContacts.map((contact) => (
-            <Card key={contact.id}>
+        {/* Contact follow-ups */}
+        {selectedContacts.map((contact) => (
+          <Link key={contact.id} href={`/s/${slug}/contacts/${contact.id}`} className="block group">
+            <Card className="transition-colors group-hover:border-primary/30">
               <CardContent className="p-4 flex items-start gap-3">
                 <span className="mt-1 w-2 h-2 rounded-full bg-blue-500 shrink-0" />
                 <div className="flex-1 min-w-0 space-y-1">
@@ -340,20 +624,16 @@ export function CalendarView({
                       {contact.email}
                     </p>
                   )}
-                  <Link
-                    href={`/s/${slug}/contacts/${contact.id}`}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    View contact &rarr;
-                  </Link>
                 </div>
               </CardContent>
             </Card>
-          ))}
+          </Link>
+        ))}
 
-          {/* Deal follow-ups */}
-          {selectedDeals.map((deal) => (
-            <Card key={deal.id}>
+        {/* Deal follow-ups */}
+        {selectedDeals.map((deal) => (
+          <Link key={deal.id} href={`/s/${slug}/deals/${deal.id}`} className="block group">
+            <Card className="transition-colors group-hover:border-primary/30">
               <CardContent className="p-4 flex items-start gap-3">
                 <span className="mt-1 w-2 h-2 rounded-full bg-purple-500 shrink-0" />
                 <div className="flex-1 min-w-0 space-y-1">
@@ -361,18 +641,241 @@ export function CalendarView({
                     <Briefcase className="h-3.5 w-3.5" />
                     {deal.title}
                   </span>
-                  <Link
-                    href={`/s/${slug}/deals/${deal.id}`}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    View deal &rarr;
-                  </Link>
                 </div>
               </CardContent>
             </Card>
-          ))}
+          </Link>
+        ))}
+
+        {/* Custom events */}
+        {selectedCustom.map((evt) => (
+          <Card key={evt.id}>
+            <CardContent className="p-4 flex items-start gap-3">
+              <span className={`mt-0.5 text-sm shrink-0 ${colorToDotClass(evt.color)}`}>&#x2756;</span>
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-sm">{evt.title}</span>
+                  <button
+                    onClick={() => handleDeleteEvent(evt.id)}
+                    className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                    title="Delete event"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                {evt.time && (
+                  <p className="text-xs text-muted-foreground">{evt.time}</p>
+                )}
+                {evt.description && (
+                  <p className="text-xs text-muted-foreground">{evt.description}</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+
+  return (
+    <div className="space-y-4">
+      {/* View mode tabs */}
+      <div className="flex items-center gap-1 border-b border-border">
+        {(['month', 'week', 'day'] as const).map((mode) => (
+          <button
+            key={mode}
+            onClick={() => setView(mode)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              view === mode
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted'
+            }`}
+          >
+            {mode.charAt(0).toUpperCase() + mode.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Navigation */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={view === 'month' ? prevMonth : view === 'week' ? prevWeek : prevDay}
+          className="p-2 rounded-md hover:bg-muted transition-colors"
+          aria-label={`Previous ${view}`}
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold">
+            {view === 'month' && `${MONTH_NAMES[currentMonth]} ${currentYear}`}
+            {view === 'week' && weekLabel()}
+            {view === 'day' && dayLabel()}
+          </h2>
+          <button
+            onClick={goToday}
+            className="px-2.5 py-1 text-xs font-medium rounded-md border border-border hover:bg-muted transition-colors"
+          >
+            Today
+          </button>
+        </div>
+
+        <button
+          onClick={view === 'month' ? nextMonth : view === 'week' ? nextWeek : nextDay}
+          className="p-2 rounded-md hover:bg-muted transition-colors"
+          aria-label={`Next ${view}`}
+        >
+          <ChevronRight className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* ── Month View ──────────────────────────────────────────────────── */}
+      {view === 'month' && (
+        <>
+          <Card>
+            <CardContent className="p-0">
+              <div className="grid grid-cols-7 border-b border-border">
+                {DAY_NAMES.map((d) => (
+                  <div
+                    key={d}
+                    className="py-2 text-center text-xs font-medium text-muted-foreground"
+                  >
+                    {d}
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7">
+                {cells.map((day, idx) => {
+                  if (day === null) {
+                    return (
+                      <div
+                        key={`blank-${idx}`}
+                        className="h-12 md:h-20 border-b border-r border-border last:border-r-0"
+                      />
+                    );
+                  }
+
+                  const dateKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  const isToday = dateKey === todayKey;
+                  const isSelected = dateKey === selectedDate;
+
+                  return (
+                    <button
+                      key={dateKey}
+                      onClick={() => selectDate(dateKey)}
+                      className={`
+                        h-12 md:h-20 border-b border-r border-border p-1 md:p-2
+                        text-left transition-colors relative
+                        hover:bg-muted/30
+                        ${isSelected ? 'bg-primary/5 border-primary/30' : ''}
+                      `}
+                    >
+                      <span
+                        className={`
+                          inline-flex items-center justify-center text-sm
+                          ${isToday ? 'w-7 h-7 rounded-full ring-2 ring-primary text-primary font-semibold' : ''}
+                        `}
+                      >
+                        {day}
+                      </span>
+                      {renderDots(dateKey)}
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Legend */}
+          <div className="flex gap-4 text-xs text-muted-foreground flex-wrap">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-orange-500" /> Tours
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-500" /> Contact follow-ups
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-purple-500" /> Deal follow-ups
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="text-gray-500">&#x2756;</span> Custom events
+            </span>
+          </div>
+        </>
+      )}
+
+      {/* ── Week View ───────────────────────────────────────────────────── */}
+      {view === 'week' && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <div className="grid grid-cols-7 min-w-[600px]">
+                {/* Header */}
+                {weekDays.map((d, i) => {
+                  const key = toDateKey(d);
+                  const isToday = key === todayKey;
+                  const isSelected = key === selectedDate;
+
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => selectDate(key)}
+                      className={`
+                        border-b border-r border-border p-2 text-center transition-colors
+                        hover:bg-muted/30
+                        ${isSelected ? 'bg-primary/5' : ''}
+                      `}
+                    >
+                      <div className="text-xs font-medium text-muted-foreground">
+                        {DAY_NAMES_WEEK[i]}
+                      </div>
+                      <div
+                        className={`
+                          text-lg font-semibold mt-0.5
+                          ${isToday ? 'w-8 h-8 mx-auto rounded-full ring-2 ring-primary text-primary flex items-center justify-center' : ''}
+                        `}
+                      >
+                        {d.getDate()}
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {/* Event cells */}
+                {weekDays.map((d) => {
+                  const key = toDateKey(d);
+                  const isSelected = key === selectedDate;
+
+                  return (
+                    <div
+                      key={`events-${key}`}
+                      className={`
+                        border-r border-border p-1.5 min-h-[120px] transition-colors
+                        ${isSelected ? 'bg-primary/5' : ''}
+                      `}
+                    >
+                      {renderMiniEvents(key)}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Day View ────────────────────────────────────────────────────── */}
+      {view === 'day' && (
+        <div>
+          {/* Day view shows the detail panel directly, no extra grid needed */}
         </div>
       )}
+
+      {/* Detail panel (shown for all views) */}
+      {renderDetailPanel()}
     </div>
   );
 }
