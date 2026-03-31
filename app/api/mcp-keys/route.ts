@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
   if (error)
     return NextResponse.json({ error: 'Failed to load API keys' }, { status: 500 });
-  return NextResponse.json(data ?? []);
+  return NextResponse.json({ keys: data ?? [] });
 }
 
 // POST /api/mcp-keys — generate a new MCP API key (returns the full key ONCE)

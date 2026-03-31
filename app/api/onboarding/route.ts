@@ -1,5 +1,6 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
 import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
