@@ -5,10 +5,6 @@
       "schedule": "0 9 * * *"
     },
     {
-      "path": "/api/cron/lead-reassignment",
-      "schedule": "0 */4 * * *"
-    },
-    {
       "path": "/api/cron/broker-weekly-report",
       "schedule": "0 9 * * 1"
     }
