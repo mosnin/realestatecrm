@@ -12,6 +12,7 @@ import {
   publicApplicationSchema,
 } from '@/lib/public-application';
 import { notifyNewLead } from '@/lib/notify';
+import { autoAssignLead } from '@/lib/auto-assign';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
 
@@ -284,6 +285,20 @@ export async function POST(req: NextRequest) {
         });
       } catch (err) {
         console.error('[apply/brokerage] notification failed', { contactId: contact.id, err });
+      }
+
+      // Auto-assign to a realtor if enabled
+      try {
+        const assignedTo = await autoAssignLead(brokerage.id, contact.id, space.id);
+        if (assignedTo) {
+          console.info('[apply/brokerage] auto-assigned lead', {
+            contactId: contact.id,
+            assignedTo,
+            brokerageId: brokerage.id,
+          });
+        }
+      } catch (err) {
+        console.error('[apply/brokerage] auto-assign failed', { contactId: contact.id, err });
       }
     })();
 

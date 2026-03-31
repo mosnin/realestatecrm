@@ -3,6 +3,8 @@ import { auth } from '@clerk/nextjs/server';
 import { requireBroker, canEditSettings } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
+import { getAutoAssignSettings, setAutoAssignSettings } from '@/lib/auto-assign';
+import type { DistributionMethod } from '@/lib/auto-assign';
 
 /**
  * GET /api/broker/settings
@@ -16,12 +18,16 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  const autoAssign = await getAutoAssignSettings(ctx.brokerage.id);
+
   return NextResponse.json({
     id: ctx.brokerage.id,
     name: ctx.brokerage.name,
     websiteUrl: ctx.brokerage.websiteUrl,
     logoUrl: ctx.brokerage.logoUrl,
     status: ctx.brokerage.status,
+    autoAssignEnabled: autoAssign.enabled,
+    autoAssignMethod: autoAssign.method,
   });
 }
 
@@ -84,18 +90,36 @@ export async function PATCH(req: Request) {
     }
   }
 
-  if (Object.keys(updates).length === 0) {
+  // Auto-assign settings (stored in Redis, not DB)
+  const validMethods: DistributionMethod[] = ['round-robin', 'score-based', 'workload-balanced'];
+  let autoAssignUpdated = false;
+
+  if (body.autoAssignEnabled !== undefined || body.autoAssignMethod !== undefined) {
+    const current = await getAutoAssignSettings(ctx.brokerage.id);
+    const newSettings = {
+      enabled: typeof body.autoAssignEnabled === 'boolean' ? body.autoAssignEnabled : current.enabled,
+      method: (typeof body.autoAssignMethod === 'string' && validMethods.includes(body.autoAssignMethod as DistributionMethod))
+        ? body.autoAssignMethod as DistributionMethod
+        : current.method,
+    };
+    await setAutoAssignSettings(ctx.brokerage.id, newSettings);
+    autoAssignUpdated = true;
+  }
+
+  if (Object.keys(updates).length === 0 && !autoAssignUpdated) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
   }
 
-  const { error: updateErr } = await supabase
-    .from('Brokerage')
-    .update(updates)
-    .eq('id', ctx.brokerage.id);
+  if (Object.keys(updates).length > 0) {
+    const { error: updateErr } = await supabase
+      .from('Brokerage')
+      .update(updates)
+      .eq('id', ctx.brokerage.id);
 
-  if (updateErr) {
-    console.error('[broker/settings] update failed', updateErr);
-    return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
+    if (updateErr) {
+      console.error('[broker/settings] update failed', updateErr);
+      return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
+    }
   }
 
   void audit({

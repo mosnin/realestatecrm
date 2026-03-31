@@ -18,6 +18,8 @@ import {
   ChevronsUpDown,
   ArrowLeftRight,
   PhoneIncoming,
+  BarChart3,
+  Clock,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -35,6 +37,8 @@ const brokerTeamNavItems = [
   { href: '/broker', label: 'Team Overview', icon: LayoutDashboard, exact: true, adminOnly: false },
   { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
   { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
+  { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
+  { href: '/broker/response-times', label: 'Response Times', icon: Clock, exact: false, adminOnly: false },
   { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
   { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false, adminOnly: true },
   { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },

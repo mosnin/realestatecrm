@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Search, UserPlus, Check, PhoneIncoming, Users, CalendarClock, Handshake, ArrowRight, Clock } from 'lucide-react';
+import { Search, UserPlus, Check, PhoneIncoming, Users, CalendarClock, Handshake, ArrowRight, Clock, MessageSquare, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCompact } from '@/lib/formatting';
 
@@ -169,6 +169,108 @@ function RealtorPicker({
   );
 }
 
+// ── Lead notes component ─────────────────────────────────────────────────────
+
+function LeadNotes({ contactId }: { contactId: string }) {
+  const [notes, setNotes] = useState<string>('');
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadNotes = useCallback(async () => {
+    if (loaded) return;
+    try {
+      const res = await fetch(`/api/broker/lead-note?contactId=${contactId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setNotes(data.notes ?? '');
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setLoaded(true);
+    }
+  }, [contactId, loaded]);
+
+  // Load notes on mount
+  useState(() => { loadNotes(); });
+
+  async function handleAddNote(noteText: string) {
+    if (!noteText.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/broker/lead-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId, note: noteText.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to save note');
+      }
+      const data = await res.json();
+      setNotes(data.updatedNotes);
+      if (textareaRef.current) textareaRef.current.value = '';
+      toast.success('Note saved');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save note');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Parse notes into individual entries
+  const noteEntries = notes
+    .split(/\n\n/)
+    .filter((n) => n.trim())
+    .slice(0, 10);
+
+  return (
+    <div className="space-y-2">
+      {/* Note input */}
+      <div className="flex gap-2">
+        <textarea
+          ref={textareaRef}
+          placeholder="Add a note..."
+          rows={2}
+          className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-xs resize-none placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              handleAddNote(e.currentTarget.value);
+            }
+          }}
+        />
+        <button
+          disabled={saving}
+          onClick={() => {
+            if (textareaRef.current) handleAddNote(textareaRef.current.value);
+          }}
+          className="self-end px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+        >
+          {saving ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
+        </button>
+      </div>
+      <p className="text-[10px] text-muted-foreground">Press Cmd+Enter to save</p>
+
+      {/* Existing notes */}
+      {noteEntries.length > 0 && (
+        <div className="space-y-1.5 max-h-40 overflow-y-auto">
+          {noteEntries.map((entry, i) => (
+            <div key={i} className="text-xs text-muted-foreground bg-muted/40 rounded px-2.5 py-1.5 whitespace-pre-wrap">
+              {entry}
+            </div>
+          ))}
+        </div>
+      )}
+      {loaded && noteEntries.length === 0 && (
+        <p className="text-[11px] text-muted-foreground/60 italic">No notes yet</p>
+      )}
+    </div>
+  );
+}
+
 // ── Lead row component ────────────────────────────────────────────────────────
 
 function LeadItem({
@@ -181,6 +283,7 @@ function LeadItem({
   onAssigned: (leadId: string, realtor: RealtorOption) => void;
 }) {
   const [assigning, setAssigning] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
 
   async function handleAssign(realtor: RealtorOption) {
     setAssigning(true);
@@ -204,33 +307,54 @@ function LeadItem({
   }
 
   return (
-    <div className="flex items-center gap-4 px-4 py-3 border-b border-border last:border-b-0">
-      {/* Avatar */}
-      <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground flex-shrink-0">
-        {initials(lead.name, lead.email)}
+    <div className="border-b border-border last:border-b-0">
+      <div className="flex items-center gap-4 px-4 py-3">
+        {/* Avatar */}
+        <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground flex-shrink-0">
+          {initials(lead.name, lead.email)}
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0 space-y-0.5">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium truncate">{lead.name || 'Unnamed'}</p>
+            {scoreBadge(lead.scoreLabel)}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+            {lead.email && <span>{lead.email}</span>}
+            {lead.phone && <span>{lead.phone}</span>}
+            {lead.budget != null && <span>Budget: {formatCompact(lead.budget)}</span>}
+            {lead.moveTiming && <span>Move: {lead.moveTiming}</span>}
+          </div>
+        </div>
+
+        {/* Notes toggle */}
+        <button
+          onClick={() => setShowNotes(!showNotes)}
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:bg-muted transition-colors"
+          title="Notes"
+        >
+          <MessageSquare size={13} />
+          {showNotes ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+        </button>
+
+        {/* Date */}
+        <p className="text-[11px] text-muted-foreground tabular-nums flex-shrink-0 hidden sm:block">
+          {formatDate(lead.createdAt)}
+        </p>
+
+        {/* Assign */}
+        <RealtorPicker realtors={realtors} onSelect={(r) => handleAssign(r)} disabled={assigning} />
       </div>
 
-      {/* Info */}
-      <div className="flex-1 min-w-0 space-y-0.5">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium truncate">{lead.name || 'Unnamed'}</p>
-          {scoreBadge(lead.scoreLabel)}
+      {/* Notes panel */}
+      {showNotes && (
+        <div className="px-4 pb-3 pl-[calc(36px+1rem)]">
+          <div className="rounded-lg bg-muted/40 border border-border p-3">
+            <LeadNotes contactId={lead.id} />
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-          {lead.email && <span>{lead.email}</span>}
-          {lead.phone && <span>{lead.phone}</span>}
-          {lead.budget != null && <span>Budget: {formatCompact(lead.budget)}</span>}
-          {lead.moveTiming && <span>Move: {lead.moveTiming}</span>}
-        </div>
-      </div>
-
-      {/* Date */}
-      <p className="text-[11px] text-muted-foreground tabular-nums flex-shrink-0 hidden sm:block">
-        {formatDate(lead.createdAt)}
-      </p>
-
-      {/* Assign */}
-      <RealtorPicker realtors={realtors} onSelect={(r) => handleAssign(r)} disabled={assigning} />
+      )}
     </div>
   );
 }
@@ -297,6 +421,7 @@ function AssignedLeadItem({
   progress?: AssignedLeadProgress;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
 
   return (
     <div className="border-b border-border last:border-b-0">
@@ -364,7 +489,7 @@ function AssignedLeadItem({
       {/* Expanded detail panel */}
       {expanded && progress && (
         <div className="px-4 pb-3 pl-[calc(36px+1rem)]">
-          <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-2">
+          <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-3">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div>
                 <p className="text-muted-foreground font-medium mb-0.5">Realtor</p>
@@ -404,6 +529,31 @@ function AssignedLeadItem({
                 <p className="font-medium">{progress.hasDeal ? 'Yes' : 'No'}</p>
               </div>
             </div>
+
+            {/* Notes section */}
+            <div className="border-t border-border pt-3">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowNotes(!showNotes);
+                }}
+                className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors mb-2"
+              >
+                <MessageSquare size={12} />
+                Notes
+                {showNotes ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+              </button>
+              {showNotes && <LeadNotes contactId={lead.id} />}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notes panel for non-progress leads */}
+      {showNotes && !progress && (
+        <div className="px-4 pb-3 pl-[calc(36px+1rem)]">
+          <div className="rounded-lg bg-muted/40 border border-border p-3">
+            <LeadNotes contactId={lead.id} />
           </div>
         </div>
       )}
