@@ -1,18 +1,24 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { RealtorStats } from './page';
-import { Trophy, Medal, Flame, Zap, TrendingUp } from 'lucide-react';
+import { Trophy, Zap, Flame, Medal } from 'lucide-react';
 
 type SortMetric = 'dealsClosed' | 'pipelineValue' | 'totalLeads' | 'conversionRate';
+type TimePeriod = 'week' | 'month' | 'all';
 
 const metricLabels: Record<SortMetric, string> = {
-  dealsClosed: 'Deals Closed',
+  dealsClosed: 'Deals',
   pipelineValue: 'Pipeline Value',
-  totalLeads: 'Total Leads',
+  totalLeads: 'Leads',
   conversionRate: 'Conversion Rate',
+};
+
+const timePeriodLabels: Record<TimePeriod, string> = {
+  week: 'This Week',
+  month: 'This Month',
+  all: 'All Time',
 };
 
 function formatValue(metric: SortMetric, value: number): string {
@@ -23,6 +29,14 @@ function formatValue(metric: SortMetric, value: number): string {
   }
   if (metric === 'conversionRate') return `${value}%`;
   return value.toLocaleString();
+}
+
+function getCurrentMonthYear(): string {
+  return new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+function getCurrentTime(): string {
+  return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 function BadgeChip({ badge }: { badge: string }) {
@@ -41,206 +55,179 @@ function BadgeChip({ badge }: { badge: string }) {
   );
 }
 
-function Avatar({ name, avatar, size = 'md' }: { name: string; avatar: string | null; size?: 'sm' | 'md' | 'lg' }) {
-  const sizes = { sm: 'w-8 h-8 text-xs', md: 'w-10 h-10 text-sm', lg: 'w-16 h-16 text-xl' };
-  if (avatar) {
+function RankBadge({ rank }: { rank: number }) {
+  if (rank === 1) {
     return (
-      <img
-        src={avatar}
-        alt={name}
-        className={cn(sizes[size], 'rounded-full object-cover ring-2 ring-background')}
-      />
+      <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5 text-xs font-semibold dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700">
+        🏆 1st
+      </span>
     );
   }
+  if (rank === 2) {
+    return (
+      <span className="inline-flex items-center gap-1 bg-gray-50 text-gray-600 border border-gray-200 rounded-full px-2.5 py-0.5 text-xs font-semibold dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600">
+        🥈 2nd
+      </span>
+    );
+  }
+  if (rank === 3) {
+    return (
+      <span className="inline-flex items-center gap-1 bg-orange-50 text-orange-700 border border-orange-200 rounded-full px-2.5 py-0.5 text-xs font-semibold dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700">
+        🥉 3rd
+      </span>
+    );
+  }
+  return <span className="text-sm text-muted-foreground pl-1">{rank}</span>;
+}
+
+function Avatar({ name }: { name: string }) {
+  const initials = name
+    .split(' ')
+    .map((n) => n.charAt(0))
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+
   return (
-    <div
-      className={cn(
-        sizes[size],
-        'rounded-full bg-primary/10 flex items-center justify-center font-semibold text-primary ring-2 ring-background',
-      )}
-    >
-      {name.charAt(0).toUpperCase()}
+    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-semibold text-sm text-primary">
+      {initials}
     </div>
   );
 }
 
-// ── Podium ────────────────────────────────────────────────────────────────────
-
-function Podium({ top3, metric }: { top3: RealtorStats[]; metric: SortMetric }) {
-  if (top3.length === 0) return null;
-
-  const podiumOrder = top3.length >= 3
-    ? [top3[1], top3[0], top3[2]] // silver, gold, bronze display order
-    : top3.length === 2
-    ? [top3[1], top3[0]]
-    : [top3[0]];
-
-  const heights = ['h-24', 'h-32', 'h-20'];
-  const colors = [
-    'from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600', // silver
-    'from-amber-200 to-amber-400 dark:from-amber-700 dark:to-amber-500', // gold
-    'from-orange-200 to-orange-300 dark:from-orange-800 dark:to-orange-700', // bronze
-  ];
-  const medals = ['2nd', '1st', '3rd'];
-  const actualRanks = top3.length >= 3 ? [1, 0, 2] : top3.length === 2 ? [1, 0] : [0];
-
-  return (
-    <div className="flex items-end justify-center gap-3 md:gap-6 pt-4 pb-2">
-      {podiumOrder.map((agent, displayIdx) => {
-        const rankIdx = actualRanks[displayIdx];
-        return (
-          <div key={agent.userId} className="flex flex-col items-center gap-2">
-            <Avatar name={agent.name} avatar={agent.avatar} size={rankIdx === 0 ? 'lg' : 'md'} />
-            <div className="text-center">
-              <p className={cn('font-semibold truncate max-w-[120px]', rankIdx === 0 ? 'text-sm' : 'text-xs')}>
-                {agent.name}
-              </p>
-              <p className="text-xs text-muted-foreground font-medium">
-                {formatValue(metric, agent[metric])}
-              </p>
-              <div className="flex flex-wrap gap-1 justify-center mt-1">
-                {agent.badges.map((b) => (
-                  <BadgeChip key={b} badge={b} />
-                ))}
-              </div>
-            </div>
-            <div
-              className={cn(
-                'w-20 md:w-28 rounded-t-lg bg-gradient-to-t flex items-start justify-center pt-2',
-                heights[displayIdx] ?? 'h-20',
-                colors[displayIdx] ?? colors[2],
-              )}
-            >
-              <span className="text-xs font-bold opacity-70">
-                {medals[displayIdx] ?? `${rankIdx + 1}th`}
-              </span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+function getRowBorderClass(rank: number): string {
+  if (rank === 1) return 'border-l-4 border-l-amber-400';
+  if (rank === 2) return 'border-l-4 border-l-gray-400';
+  if (rank === 3) return 'border-l-4 border-l-orange-400';
+  return 'border-l-4 border-l-transparent';
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function LeaderboardClient({ initialStats }: { initialStats: RealtorStats[] }) {
   const [metric, setMetric] = useState<SortMetric>('dealsClosed');
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
 
   const sorted = useMemo(
     () => [...initialStats].sort((a, b) => b[metric] - a[metric]),
     [initialStats, metric],
   );
 
-  const top3 = sorted.slice(0, 3);
-
   return (
     <div className="space-y-6">
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm font-medium text-muted-foreground">Sort by</label>
-        <select
-          value={metric}
-          onChange={(e) => setMetric(e.target.value as SortMetric)}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          {(Object.entries(metricLabels) as [SortMetric, string][]).map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </select>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            🏆 Team Leaderboard
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Top performers for {getCurrentMonthYear()}
+          </p>
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center gap-3">
+          <select
+            value={metric}
+            onChange={(e) => setMetric(e.target.value as SortMetric)}
+            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            {(Object.entries(metricLabels) as [SortMetric, string][]).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={timePeriod}
+            onChange={(e) => setTimePeriod(e.target.value as TimePeriod)}
+            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            {(Object.entries(timePeriodLabels) as [TimePeriod, string][]).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* Podium */}
-      {top3.length > 0 && (
-        <Card>
-          <CardContent className="py-6 px-4">
-            <Podium top3={top3} metric={metric} />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Full ranking table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left">
-                  <th className="px-4 py-3 font-medium text-muted-foreground w-12">#</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Agent</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Deals Closed</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground text-right hidden md:table-cell">
-                    Pipeline Value
-                  </th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground text-right hidden md:table-cell">
-                    Leads
-                  </th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground text-right hidden lg:table-cell">
-                    Tours
-                  </th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Conv. Rate</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Badges</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((agent, idx) => (
+      {/* Table */}
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/30">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-20">
+                  Rank
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Deals Closed
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">
+                  Pipeline Value
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider w-20">
+                  Badges
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {sorted.map((agent, idx) => {
+                const rank = idx + 1;
+                return (
                   <tr
                     key={agent.userId}
                     className={cn(
-                      'border-b border-border/50 transition-colors hover:bg-muted/50',
-                      idx < 3 && 'bg-muted/20',
+                      'hover:bg-muted/20 transition-colors',
+                      getRowBorderClass(rank),
                     )}
                   >
-                    <td className="px-4 py-3">
-                      <span
-                        className={cn(
-                          'inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold',
-                          idx === 0 && 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
-                          idx === 1 && 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
-                          idx === 2 && 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400',
-                          idx >= 3 && 'text-muted-foreground',
-                        )}
-                      >
-                        {idx + 1}
-                      </span>
+                    <td className="px-4 py-4">
+                      <RankBadge rank={rank} />
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar name={agent.name} avatar={agent.avatar} size="sm" />
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar name={agent.name} />
                         <div className="min-w-0">
                           <p className="font-medium truncate">{agent.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{agent.email}</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {agent.badges.map((b) => (
+                              <BadgeChip key={b} badge={b} />
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-medium">{agent.dealsClosed}</td>
-                    <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
+                    <td className="px-4 py-4 text-right tabular-nums font-medium">
+                      {agent.dealsClosed}
+                    </td>
+                    <td className="px-4 py-4 text-right tabular-nums hidden md:table-cell">
                       {formatValue('pipelineValue', agent.pipelineValue)}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">{agent.totalLeads}</td>
-                    <td className="px-4 py-3 text-right tabular-nums hidden lg:table-cell">{agent.toursCompleted}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      <span className="flex items-center justify-end gap-1">
-                        {agent.conversionRate > 0 && <TrendingUp size={12} className="text-emerald-500" />}
-                        {agent.conversionRate}%
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 hidden sm:table-cell">
-                      <div className="flex flex-wrap gap-1">
-                        {agent.badges.map((b) => (
-                          <BadgeChip key={b} badge={b} />
-                        ))}
-                      </div>
+                    <td className="px-4 py-4 text-center">
+                      {agent.badges.length > 0 && (
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-border text-sm font-medium">
+                          {agent.badges.length}
+                        </span>
+                      )}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <p className="text-center text-xs text-muted-foreground">
+        Updated daily &middot; Last update: Today at {getCurrentTime()}
+      </p>
     </div>
   );
 }
