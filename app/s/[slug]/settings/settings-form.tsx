@@ -473,9 +473,11 @@ export function SettingsForm({ space, settings, userEmail }: SettingsFormProps) 
             </div>
             <div className="space-y-1.5">
               <Label>How to connect</Label>
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p>Add this server to your MCP client configuration:</p>
-                <div className="rounded-lg border border-input bg-muted/40 px-3 py-2 font-mono text-xs whitespace-pre">{`{
+              <div className="text-sm text-muted-foreground space-y-3">
+                <div>
+                  <p className="font-medium text-foreground text-xs mb-1">Claude Desktop / Cursor / Windsurf</p>
+                  <p className="text-xs mb-1.5">Add to your MCP config file:</p>
+                  <div className="rounded-lg border border-input bg-muted/40 px-3 py-2 font-mono text-xs whitespace-pre">{`{
   "mcpServers": {
     "chippi": {
       "url": "${MCP_ENDPOINT}",
@@ -485,7 +487,17 @@ export function SettingsForm({ space, settings, userEmail }: SettingsFormProps) 
     }
   }
 }`}</div>
-                <p className="text-xs">Works with Claude Desktop, Cursor, Windsurf, and any MCP-compatible client. Generate an API key below and replace <span className="font-mono">YOUR_API_KEY</span> with it.</p>
+                </div>
+                <div>
+                  <p className="font-medium text-foreground text-xs mb-1">Claude.ai (Web)</p>
+                  <p className="text-xs">Go to Claude → Settings → MCP → Add Remote Server. Enter:</p>
+                  <ul className="text-xs mt-1 space-y-0.5 list-disc list-inside">
+                    <li>URL: <span className="font-mono">{MCP_ENDPOINT}</span></li>
+                    <li>Leave Client ID and Client Secret empty</li>
+                    <li>After adding, Claude will redirect to Chippi to authorize</li>
+                  </ul>
+                </div>
+                <p className="text-xs">Generate an API key below and replace <span className="font-mono">YOUR_API_KEY</span> with it.</p>
               </div>
             </div>
           </div>

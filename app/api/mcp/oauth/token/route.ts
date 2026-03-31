@@ -183,3 +183,14 @@ export async function POST(req: NextRequest) {
   console.error('[mcp/token] unsupported grant_type:', grantType);
   return NextResponse.json({ error: 'unsupported_grant_type' }, { status: 400 });
 }
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
+}
