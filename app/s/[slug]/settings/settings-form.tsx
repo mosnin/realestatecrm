@@ -26,6 +26,28 @@ interface SettingsFormProps {
   userEmail: string;
 }
 
+function CredentialRow({ label, value, show, onCopy, copied }: { label: string; value: string; show: boolean; onCopy: () => void; copied: boolean }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-9 rounded-lg border bg-white dark:bg-background px-3 flex items-center overflow-hidden">
+          <span className="text-sm font-mono select-all truncate">
+            {show ? value : '•'.repeat(Math.min(value.length, 40))}
+          </span>
+        </div>
+        <button
+          type="button"
+          className="h-9 px-3 rounded-lg border text-xs font-medium hover:bg-muted transition-colors flex items-center gap-1"
+          onClick={async () => { await navigator.clipboard.writeText(value); onCopy(); }}
+        >
+          {copied ? '✓ Copied' : 'Copy'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SectionBlock({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -90,18 +112,20 @@ export function SettingsForm({ space, settings, userEmail }: SettingsFormProps) 
   const [deleting, setDeleting] = useState(false);
 
   // MCP / Integrations state
-  type McpKey = { id: string; name: string; keyPrefix: string; lastUsedAt: string | null; createdAt: string };
+  type McpKey = { id: string; name: string; keyPrefix: string; clientId?: string; lastUsedAt: string | null; createdAt: string };
   const [mcpKeys, setMcpKeys] = useState<McpKey[]>([]);
   const [mcpKeysLoading, setMcpKeysLoading] = useState(true);
   const [mcpNewKeyName, setMcpNewKeyName] = useState('');
   const [mcpCreating, setMcpCreating] = useState(false);
-  const [mcpNewFullKey, setMcpNewFullKey] = useState<string | null>(null);
+  const [mcpNewCreds, setMcpNewCreds] = useState<{ key: string; clientId: string; clientSecret: string } | null>(null);
   const [mcpShowForm, setMcpShowForm] = useState(false);
   const [mcpCopiedEndpoint, setMcpCopiedEndpoint] = useState(false);
-  const [mcpCopiedKey, setMcpCopiedKey] = useState(false);
+  const [mcpCopiedField, setMcpCopiedField] = useState<string | null>(null);
   const [mcpDeletingId, setMcpDeletingId] = useState<string | null>(null);
+  const [mcpShowSecrets, setMcpShowSecrets] = useState(false);
 
   const MCP_ENDPOINT = 'https://my.usechippi.com/api/mcp';
+  const TOKEN_ENDPOINT = 'https://my.usechippi.com/api/mcp/oauth/token';
 
   useEffect(() => {
     fetch(`/api/mcp-keys?slug=${encodeURIComponent(space.slug)}`)
@@ -122,8 +146,8 @@ export function SettingsForm({ space, settings, userEmail }: SettingsFormProps) 
       });
       const data = await res.json();
       if (res.ok) {
-        setMcpNewFullKey(data.key);
-        setMcpKeys((prev) => [{ id: data.id, name: data.name, keyPrefix: data.keyPrefix, lastUsedAt: null, createdAt: data.createdAt }, ...prev]);
+        setMcpNewCreds({ key: data.key, clientId: data.clientId, clientSecret: data.clientSecret });
+        setMcpKeys((prev) => [{ id: data.id, name: data.name, keyPrefix: data.keyPrefix, clientId: data.clientId, lastUsedAt: null, createdAt: data.createdAt }, ...prev]);
         setMcpNewKeyName('');
       } else {
         alert(data.error ?? 'Failed to create API key.');
@@ -471,7 +495,7 @@ export function SettingsForm({ space, settings, userEmail }: SettingsFormProps) 
         <div className="border-t border-border pt-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">API Keys</p>
-            {!mcpShowForm && !mcpNewFullKey && (
+            {!mcpShowForm && !mcpNewCreds && (
               <Button
                 type="button"
                 variant="outline"
@@ -485,44 +509,55 @@ export function SettingsForm({ space, settings, userEmail }: SettingsFormProps) 
             )}
           </div>
 
-          {/* New key reveal */}
-          {mcpNewFullKey && (
-            <div className="rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 p-4 mb-3 space-y-2">
-              <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Your new API key</p>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-9 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-background px-3 flex items-center overflow-hidden">
-                  <span className="text-sm font-mono select-all truncate">{mcpNewFullKey}</span>
-                </div>
-                <Button
+          {/* New credentials reveal */}
+          {mcpNewCreds && (
+            <div className="rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 p-4 mb-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Your MCP credentials</p>
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9 gap-1.5 shrink-0"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(mcpNewFullKey);
-                    setMcpCopiedKey(true);
-                    setTimeout(() => setMcpCopiedKey(false), 2000);
-                  }}
+                  onClick={() => setMcpShowSecrets(!mcpShowSecrets)}
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
                 >
-                  {mcpCopiedKey ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-                  {mcpCopiedKey ? 'Copied!' : 'Copy'}
-                </Button>
+                  {mcpShowSecrets ? '🙈 Hide' : '👁 Show'}
+                </button>
               </div>
-              <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">This key won&apos;t be shown again. Copy it now and store it securely.</p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-xs"
-                onClick={() => { setMcpNewFullKey(null); setMcpShowForm(false); }}
-              >
+
+              {/* MCP URL */}
+              <CredentialRow label="MCP Server URL" value={MCP_ENDPOINT} show={true} onCopy={() => { setMcpCopiedField('url'); setTimeout(() => setMcpCopiedField(null), 2000); }} copied={mcpCopiedField === 'url'} />
+
+              {/* OAuth Client ID */}
+              <CredentialRow label="OAuth Client ID" value={mcpNewCreds.clientId} show={mcpShowSecrets} onCopy={() => { setMcpCopiedField('clientId'); setTimeout(() => setMcpCopiedField(null), 2000); }} copied={mcpCopiedField === 'clientId'} />
+
+              {/* OAuth Client Secret */}
+              <CredentialRow label="OAuth Client Secret" value={mcpNewCreds.clientSecret} show={mcpShowSecrets} onCopy={() => { setMcpCopiedField('secret'); setTimeout(() => setMcpCopiedField(null), 2000); }} copied={mcpCopiedField === 'secret'} />
+
+              {/* API Key (for direct Bearer auth) */}
+              <CredentialRow label="API Key (alternative)" value={mcpNewCreds.key} show={mcpShowSecrets} onCopy={() => { setMcpCopiedField('key'); setTimeout(() => setMcpCopiedField(null), 2000); }} copied={mcpCopiedField === 'key'} />
+
+              <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-2.5">
+                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">These credentials won&apos;t be shown again. Copy them now.</p>
+              </div>
+
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p className="font-medium">To connect in Claude:</p>
+                <ol className="list-decimal list-inside space-y-0.5">
+                  <li>Go to Claude → Settings → MCP Connectors → Add</li>
+                  <li>Name: <span className="font-mono">Chippi CRM</span></li>
+                  <li>Remote MCP server URL: <span className="font-mono">{MCP_ENDPOINT}</span></li>
+                  <li>OAuth Client ID: paste your Client ID</li>
+                  <li>OAuth Client Secret: paste your Client Secret</li>
+                </ol>
+              </div>
+
+              <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={() => { setMcpNewCreds(null); setMcpShowForm(false); setMcpShowSecrets(false); }}>
                 Dismiss
               </Button>
             </div>
           )}
 
           {/* Inline create form */}
-          {mcpShowForm && !mcpNewFullKey && (
+          {mcpShowForm && !mcpNewCreds && (
             <div className="rounded-lg border border-border bg-muted/20 p-3 mb-3 space-y-2">
               <Label htmlFor="mcp-key-name">Key name</Label>
               <div className="flex items-center gap-2">

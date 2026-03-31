@@ -5,17 +5,37 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import crypto from 'crypto';
+import { jwtVerify } from 'jose';
+
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.MCP_JWT_SECRET || process.env.CLERK_SECRET_KEY || 'chippi-mcp-secret-change-me'
+);
 
 // ---------------------------------------------------------------------------
-// Auth – validate Bearer token against hashed MCP API keys
+// Auth – validate Bearer token (supports both raw API keys and OAuth JWTs)
 // ---------------------------------------------------------------------------
 async function authenticateKey(req: NextRequest): Promise<{ spaceId: string; ip: string } | null> {
   const auth = req.headers.get('authorization');
   if (!auth?.startsWith('Bearer ')) return null;
-  const key = auth.slice(7);
-  if (key.length < 10 || key.length > 200) return null; // basic length check
-  const keyHash = crypto.createHash('sha256').update(key).digest('hex');
+  const token = auth.slice(7);
+  if (token.length < 10 || token.length > 2000) return null;
 
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+
+  // Try JWT first (OAuth flow)
+  if (token.includes('.')) {
+    try {
+      const { payload } = await jwtVerify(token, JWT_SECRET);
+      if (payload.spaceId && typeof payload.spaceId === 'string') {
+        return { spaceId: payload.spaceId, ip };
+      }
+    } catch {
+      // Not a valid JWT — fall through to API key check
+    }
+  }
+
+  // Fall back to raw API key hash lookup
+  const keyHash = crypto.createHash('sha256').update(token).digest('hex');
   const { data } = await supabase
     .from('McpApiKey')
     .select('spaceId')
@@ -24,9 +44,6 @@ async function authenticateKey(req: NextRequest): Promise<{ spaceId: string; ip:
 
   if (!data) return null;
 
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-
-  // Update last-used timestamp (non-blocking, with error logging)
   supabase
     .from('McpApiKey')
     .update({ lastUsedAt: new Date().toISOString() })

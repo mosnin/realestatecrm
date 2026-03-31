@@ -52,9 +52,15 @@ export async function POST(req: NextRequest) {
     // body may be empty — that's fine, use default name
   }
 
+  // Generate API key (for direct Bearer auth)
   const rawKey = `chippi_${crypto.randomBytes(24).toString('hex')}`;
   const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
   const keyPrefix = rawKey.slice(0, 12) + '...';
+
+  // Generate OAuth client credentials (for Claude MCP connector)
+  const clientId = `chippi_${crypto.randomBytes(16).toString('hex')}`;
+  const clientSecret = `cs_${crypto.randomBytes(32).toString('hex')}`;
+  const clientSecretHash = crypto.createHash('sha256').update(clientSecret).digest('hex');
 
   const { data, error } = await supabase
     .from('McpApiKey')
@@ -63,14 +69,23 @@ export async function POST(req: NextRequest) {
       name,
       keyHash,
       keyPrefix,
+      clientId,
+      clientSecretHash,
     })
-    .select('id, name, keyPrefix, createdAt')
+    .select('id, name, keyPrefix, createdAt, clientId')
     .single();
 
   if (error)
     return NextResponse.json({ error: 'Failed to create API key' }, { status: 500 });
 
-  return NextResponse.json({ ...data, key: rawKey }, { status: 201 });
+  return NextResponse.json({
+    ...data,
+    key: rawKey,
+    clientId,
+    clientSecret,
+    tokenUrl: 'https://my.usechippi.com/api/mcp/oauth/token',
+    mcpUrl: 'https://my.usechippi.com/api/mcp',
+  }, { status: 201 });
 }
 
 // DELETE /api/mcp-keys — revoke an API key by id (called from settings form)
