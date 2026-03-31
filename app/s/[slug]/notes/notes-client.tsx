@@ -12,6 +12,8 @@ import {
   Loader2,
   StickyNote,
   Download,
+  Menu,
+  ArrowLeft,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -69,6 +71,7 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
   const [loadingNote, setLoadingNote] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [creating, setCreating] = useState(false);
+  const [mobileSidebar, setMobileSidebar] = useState(true); // show sidebar by default on mobile when no note selected
 
   // Editor state
   const [title, setTitle] = useState('');
@@ -123,6 +126,7 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
       setLoadingNote(true);
       setActiveId(id);
       setSaveStatus('idle');
+      setMobileSidebar(false); // Switch to editor view on mobile
       try {
         const res = await fetch(`/api/notes/${id}`);
         if (!res.ok) throw new Error('Failed to load');
@@ -473,7 +477,11 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
   return (
     <div className="flex h-full">
       {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
-      <div className="hidden md:flex w-56 shrink-0 border-r bg-muted/30 flex-col">
+      <div className={cn(
+        'w-full md:w-56 shrink-0 border-r bg-muted/30 flex-col',
+        // Mobile: show sidebar when mobileSidebar is true, hide when editing
+        mobileSidebar ? 'flex md:flex' : 'hidden md:flex',
+      )}>
         <div className="px-3 py-3 border-b">
           <h2 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
             <StickyNote className="h-4 w-4" />
@@ -531,7 +539,20 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
       </div>
 
       {/* ── Editor ──────────────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={cn(
+        'flex-1 flex flex-col min-w-0',
+        mobileSidebar ? 'hidden md:flex' : 'flex',
+      )}>
+        {/* Mobile back button */}
+        <div className="md:hidden flex items-center gap-2 px-4 py-2 border-b">
+          <button
+            onClick={() => setMobileSidebar(true)}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft size={16} />
+            All notes
+          </button>
+        </div>
         {activeId && noteDetail ? (
           <>
             <div className="flex-1 overflow-auto px-8 py-6 lg:px-16 lg:py-10 max-w-3xl mx-auto w-full">
