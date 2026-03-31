@@ -203,7 +203,7 @@ export function Sidebar({
       <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0">
         {/* Logo */}
         <div className="px-5 pt-5 pb-4">
-          <BrandLogo className="h-4" alt="Chippi" />
+          <BrandLogo className="h-7" alt="Chippi" />
         </div>
 
         {/* Brokerage switcher */}
@@ -267,7 +267,7 @@ export function Sidebar({
     <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0">
       {/* Logo */}
       <div className="px-5 pt-5 pb-4">
-        <BrandLogo className="h-4" alt="Chippi" />
+        <BrandLogo className="h-7" alt="Chippi" />
       </div>
 
       {/* Workspace switcher */}
