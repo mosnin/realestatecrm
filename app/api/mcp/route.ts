@@ -3,15 +3,17 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { checkRateLimit } from '@/lib/rate-limit';
 import crypto from 'crypto';
 
 // ---------------------------------------------------------------------------
 // Auth – validate Bearer token against hashed MCP API keys
 // ---------------------------------------------------------------------------
-async function authenticateKey(req: NextRequest): Promise<string | null> {
+async function authenticateKey(req: NextRequest): Promise<{ spaceId: string; ip: string } | null> {
   const auth = req.headers.get('authorization');
   if (!auth?.startsWith('Bearer ')) return null;
   const key = auth.slice(7);
+  if (key.length < 10 || key.length > 200) return null; // basic length check
   const keyHash = crypto.createHash('sha256').update(key).digest('hex');
 
   const { data } = await supabase
@@ -22,14 +24,16 @@ async function authenticateKey(req: NextRequest): Promise<string | null> {
 
   if (!data) return null;
 
-  // Update last-used timestamp (fire-and-forget)
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+
+  // Update last-used timestamp (non-blocking, with error logging)
   supabase
     .from('McpApiKey')
     .update({ lastUsedAt: new Date().toISOString() })
     .eq('keyHash', keyHash)
-    .then(() => {});
+    .then(({ error }) => { if (error) console.error('[mcp] lastUsedAt update failed:', error.message); });
 
-  return data.spaceId;
+  return { spaceId: data.spaceId, ip };
 }
 
 // ---------------------------------------------------------------------------
@@ -51,7 +55,7 @@ function buildServer(spaceId: string): McpServer {
         .enum(['QUALIFICATION', 'TOUR', 'APPLICATION'])
         .optional()
         .describe('Filter by contact type'),
-      limit: z.number().optional().default(50).describe('Max results (default 50)'),
+      limit: z.number().int().positive().max(200).optional().default(50).describe('Max results (default 50)'),
     },
     async ({ query, type, limit }) => {
       let q = supabase
@@ -65,7 +69,7 @@ function buildServer(spaceId: string): McpServer {
       if (type) q = q.eq('type', type);
       const { data, error } = await q;
       if (error)
-        return { content: [{ type: 'text' as const, text: `Error: ${error.message}` }] };
+        return { content: [{ type: 'text' as const, text: 'Query failed' }] };
       return { content: [{ type: 'text' as const, text: JSON.stringify(data ?? [], null, 2) }] };
     },
   );
@@ -97,7 +101,7 @@ function buildServer(spaceId: string): McpServer {
         .enum(['active', 'won', 'lost', 'on_hold'])
         .optional()
         .describe('Filter by deal status'),
-      limit: z.number().optional().default(30).describe('Max results'),
+      limit: z.number().int().positive().max(200).optional().default(30).describe('Max results'),
     },
     async ({ status, limit }) => {
       let q = supabase
@@ -111,7 +115,7 @@ function buildServer(spaceId: string): McpServer {
       if (status) q = q.eq('status', status);
       const { data, error } = await q;
       if (error)
-        return { content: [{ type: 'text' as const, text: `Error: ${error.message}` }] };
+        return { content: [{ type: 'text' as const, text: 'Query failed' }] };
       return { content: [{ type: 'text' as const, text: JSON.stringify(data ?? [], null, 2) }] };
     },
   );
@@ -142,7 +146,7 @@ function buildServer(spaceId: string): McpServer {
       status: z
         .enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show'])
         .optional(),
-      limit: z.number().optional().default(20),
+      limit: z.number().int().positive().max(200).optional().default(20),
     },
     async ({ status, limit }) => {
       let q = supabase
@@ -156,7 +160,7 @@ function buildServer(spaceId: string): McpServer {
       if (status) q = q.eq('status', status);
       const { data, error } = await q;
       if (error)
-        return { content: [{ type: 'text' as const, text: `Error: ${error.message}` }] };
+        return { content: [{ type: 'text' as const, text: 'Query failed' }] };
       return { content: [{ type: 'text' as const, text: JSON.stringify(data ?? [], null, 2) }] };
     },
   );
@@ -165,7 +169,7 @@ function buildServer(spaceId: string): McpServer {
   server.tool(
     'list_notes',
     'List notes in the workspace.',
-    { limit: z.number().optional().default(20) },
+    { limit: z.number().int().positive().max(200).optional().default(20) },
     async ({ limit }) => {
       const { data, error } = await supabase
         .from('Note')
@@ -174,7 +178,7 @@ function buildServer(spaceId: string): McpServer {
         .order('updatedAt', { ascending: false })
         .limit(limit ?? 20);
       if (error)
-        return { content: [{ type: 'text' as const, text: `Error: ${error.message}` }] };
+        return { content: [{ type: 'text' as const, text: 'Query failed' }] };
       return { content: [{ type: 'text' as const, text: JSON.stringify(data ?? [], null, 2) }] };
     },
   );
@@ -302,7 +306,7 @@ function buildServer(spaceId: string): McpServer {
   server.tool(
     'list_calendar_events',
     'List custom calendar events.',
-    { limit: z.number().optional().default(20) },
+    { limit: z.number().int().positive().max(200).optional().default(20) },
     async ({ limit }) => {
       const { data } = await supabase
         .from('CalendarEvent')
@@ -324,10 +328,30 @@ function buildServer(spaceId: string): McpServer {
 // POST /api/mcp — Streamable HTTP MCP endpoint
 // ---------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
-  const spaceId = await authenticateKey(req);
-  if (!spaceId) {
+  // Rate limit by IP before auth to prevent brute-force
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const { allowed: ipAllowed } = await checkRateLimit(`mcp:ip:${ip}`, 60, 60);
+  if (!ipAllowed) {
+    return new Response(JSON.stringify({ error: 'Too many requests' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const authResult = await authenticateKey(req);
+  if (!authResult) {
     return new Response(JSON.stringify({ error: 'Invalid API key' }), {
       status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const { spaceId } = authResult;
+
+  // Rate limit by space after auth
+  const { allowed: spaceAllowed } = await checkRateLimit(`mcp:space:${spaceId}`, 120, 60);
+  if (!spaceAllowed) {
+    return new Response(JSON.stringify({ error: 'Too many requests' }), {
+      status: 429,
       headers: { 'Content-Type': 'application/json' },
     });
   }

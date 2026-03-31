@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { checkRateLimit } from '@/lib/rate-limit';
 import crypto from 'crypto';
 
 // GET /api/mcp-keys?slug=xxx — list all MCP API keys for the user's space
@@ -33,11 +34,19 @@ export async function POST(req: NextRequest) {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
 
+  // Rate limit: max 10 key generations per hour
+  const { allowed } = await checkRateLimit(`mcp:keygen:${userId}`, 10, 3600);
+  if (!allowed) return NextResponse.json({ error: 'Too many key generations. Try again later.' }, { status: 429 });
+
+  // Limit total keys per space to 20
+  const { count } = await supabase.from('McpApiKey').select('*', { count: 'exact', head: true }).eq('spaceId', space.id);
+  if ((count ?? 0) >= 20) return NextResponse.json({ error: 'Maximum 20 API keys per workspace' }, { status: 400 });
+
   let name = 'Default';
   try {
     const body = await req.json();
     if (body.name && typeof body.name === 'string') {
-      name = body.name.slice(0, 100);
+      name = body.name.replace(/[<>"]/g, '').slice(0, 100);
     }
   } catch {
     // body may be empty — that's fine, use default name
