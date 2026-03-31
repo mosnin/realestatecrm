@@ -42,7 +42,7 @@ export async function chatWithRAG(
 
   // ── Step 1: always load the user's full CRM data for this space ──────────
   // This guarantees the AI has context even when vectors haven't been populated yet.
-  const [{ data: allContacts }, { data: allDeals }] = await Promise.all([
+  const [{ data: allContacts }, { data: allDeals }, { data: allNotes }, { data: allTours }, calendarResult] = await Promise.all([
     supabase
       .from('Contact')
       .select('*')
@@ -55,6 +55,29 @@ export async function chatWithRAG(
       .eq('spaceId', spaceId)
       .order('createdAt', { ascending: false })
       .limit(50),
+    supabase
+      .from('Note')
+      .select('id, title, content, updatedAt')
+      .eq('spaceId', spaceId)
+      .order('updatedAt', { ascending: false })
+      .limit(20),
+    supabase
+      .from('Tour')
+      .select('id, guestName, guestEmail, propertyAddress, startsAt, endsAt, status')
+      .eq('spaceId', spaceId)
+      .in('status', ['scheduled', 'confirmed'])
+      .gte('startsAt', new Date(Date.now() - 7 * 86400000).toISOString())
+      .order('startsAt', { ascending: true })
+      .limit(30),
+    Promise.resolve(
+      supabase
+        .from('CalendarEvent')
+        .select('id, title, description, date, time')
+        .eq('spaceId', spaceId)
+        .gte('date', new Date().toISOString().slice(0, 10))
+        .order('date', { ascending: true })
+        .limit(20)
+    ).catch(() => ({ data: [] })),
   ]);
 
   // Fetch deal↔contact links scoped to this space's deal IDs only
@@ -128,10 +151,57 @@ export async function chatWithRAG(
     );
   }
 
+  // ── Notes context ──
+  const notes = (allNotes ?? []) as any[];
+  if (notes.length) {
+    contextBlocks.push(
+      'Notes:\n' +
+        notes
+          .map((n) => `- "${n.title}" (updated ${new Date(n.updatedAt).toLocaleDateString()}): ${(n.content ?? '').slice(0, 200)}${(n.content ?? '').length > 200 ? '...' : ''}`)
+          .join('\n')
+    );
+  }
+
+  // ── Upcoming tours context ──
+  const tours = (allTours ?? []) as any[];
+  if (tours.length) {
+    contextBlocks.push(
+      'Upcoming Tours:\n' +
+        tours
+          .map((t) => `- ${t.guestName} | ${t.propertyAddress ?? 'No address'} | ${new Date(t.startsAt).toLocaleDateString()} ${new Date(t.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} | Status: ${t.status}`)
+          .join('\n')
+    );
+  }
+
+  // ── Follow-ups due ──
+  const followUps = contacts.filter((c) => c.followUpAt);
+  if (followUps.length) {
+    contextBlocks.push(
+      'Follow-ups Due:\n' +
+        followUps
+          .slice(0, 20)
+          .map((c) => `- ${c.name} | Due: ${new Date(c.followUpAt).toLocaleDateString()} | ${c.phone ?? c.email ?? ''}`)
+          .join('\n')
+    );
+  }
+
+  // ── Calendar events ──
+  const calEvents = (calendarResult?.data ?? []) as any[];
+  if (calEvents.length) {
+    contextBlocks.push(
+      'Calendar Events:\n' +
+        calEvents
+          .map((e) => `- ${e.title} | ${e.date}${e.time ? ` at ${e.time}` : ''}${e.description ? ` — ${e.description}` : ''}`)
+          .join('\n')
+    );
+  }
+
   const systemPrompt = [
     `You are an intelligent real estate CRM assistant for the workspace "${spaceName}".`,
-    `You help the agent manage clients through qualification, tour, and application stages, plus real estate deals.`,
+    `Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.`,
+    `You help the agent manage clients through qualification, tour, and application stages, plus real estate deals, notes, tours, and follow-ups.`,
     `Only reference data that appears in the CRM context below. Never fabricate client names, deal values, or contact details.`,
+    `When asked about "recent" activity, prioritize items with the most recent dates.`,
     ``,
     `## Editing CRM Data`,
     `When the user asks you to update, change, or edit a contact or deal, propose the change using this exact format:`,

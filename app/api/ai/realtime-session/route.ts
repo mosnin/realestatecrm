@@ -27,10 +27,10 @@ export async function POST(req: Request) {
   if (!space) return NextResponse.json({ error: 'No workspace' }, { status: 403 });
 
   // Build CRM context for the voice session
-  const [{ data: contacts }, { data: deals }] = await Promise.all([
+  const [{ data: contacts }, { data: deals }, { data: notes }, { data: tours }, calResult] = await Promise.all([
     supabase
       .from('Contact')
-      .select('id, name, type, email, phone, budget, leadScore, scoreLabel, notes, tags')
+      .select('id, name, type, email, phone, budget, leadScore, scoreLabel, notes, tags, followUpAt')
       .eq('spaceId', space.id)
       .order('createdAt', { ascending: false })
       .limit(50),
@@ -40,26 +40,72 @@ export async function POST(req: Request) {
       .eq('spaceId', space.id)
       .order('createdAt', { ascending: false })
       .limit(30),
+    supabase
+      .from('Note')
+      .select('title, content')
+      .eq('spaceId', space.id)
+      .order('updatedAt', { ascending: false })
+      .limit(10),
+    supabase
+      .from('Tour')
+      .select('guestName, propertyAddress, startsAt, status')
+      .eq('spaceId', space.id)
+      .in('status', ['scheduled', 'confirmed'])
+      .gte('startsAt', new Date().toISOString())
+      .order('startsAt', { ascending: true })
+      .limit(15),
+    Promise.resolve(
+      supabase
+        .from('CalendarEvent')
+        .select('title, date, time, description')
+        .eq('spaceId', space.id)
+        .gte('date', new Date().toISOString().slice(0, 10))
+        .order('date', { ascending: true })
+        .limit(10)
+    ).catch(() => ({ data: [] })),
   ]);
 
   const contactCtx = (contacts ?? []).map((c: any) =>
-    `- ${c.name} (${c.type}) | Score: ${c.scoreLabel ?? 'unscored'} | ${c.phone ?? ''} | ${c.email ?? ''} | Budget: ${c.budget != null ? `$${c.budget}` : 'N/A'}`
+    `- ${c.name} (${c.type}) | Score: ${c.scoreLabel ?? 'unscored'} | ${c.phone ?? ''} | ${c.email ?? ''} | Budget: ${c.budget != null ? `$${c.budget}` : 'N/A'}${c.followUpAt ? ` | Follow-up: ${new Date(c.followUpAt).toLocaleDateString()}` : ''}`
   ).join('\n');
 
   const dealCtx = (deals ?? []).map((d: any) =>
     `- ${d.title} | Stage: ${d.DealStage?.name ?? 'N/A'} | Value: ${d.value != null ? `$${d.value}` : 'N/A'} | ${d.address ?? ''}`
   ).join('\n');
 
+  const noteCtx = (notes ?? []).map((n: any) =>
+    `- "${n.title}": ${(n.content ?? '').slice(0, 150)}${(n.content ?? '').length > 150 ? '...' : ''}`
+  ).join('\n');
+
+  const tourCtx = (tours ?? []).map((t: any) =>
+    `- ${t.guestName} | ${t.propertyAddress ?? 'No address'} | ${new Date(t.startsAt).toLocaleDateString()} | ${t.status}`
+  ).join('\n');
+
+  const calCtx = ((calResult?.data ?? []) as any[]).map((e: any) =>
+    `- ${e.title} | ${e.date}${e.time ? ` at ${e.time}` : ''}`
+  ).join('\n');
+
+  const followUpCtx = (contacts ?? []).filter((c: any) => c.followUpAt).slice(0, 10).map((c: any) =>
+    `- ${c.name} | Due: ${new Date(c.followUpAt).toLocaleDateString()} | ${c.phone ?? c.email ?? ''}`
+  ).join('\n');
+
   const instructions = [
     `You are Chip, an intelligent voice assistant for the real estate CRM workspace "${space.name}".`,
-    `You help the agent manage their rental leads, deals, tours, and follow-ups through natural conversation.`,
+    `Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.`,
+    `You help the agent manage their rental leads, deals, tours, notes, calendar, and follow-ups through natural conversation.`,
     `Be concise and conversational — you're speaking, not writing. Keep responses under 3 sentences unless asked for detail.`,
     `Only reference data from the CRM context below. Never fabricate names, numbers, or details.`,
+    `When asked about "recent" data, reference contacts and deals with the most recent createdAt dates.`,
     ``,
     contactCtx ? `Contacts:\n${contactCtx}` : 'No contacts yet.',
     ``,
     dealCtx ? `Deals:\n${dealCtx}` : 'No deals yet.',
-  ].join('\n');
+    ``,
+    tourCtx ? `Upcoming Tours:\n${tourCtx}` : '',
+    followUpCtx ? `\nFollow-ups Due:\n${followUpCtx}` : '',
+    noteCtx ? `\nNotes:\n${noteCtx}` : '',
+    calCtx ? `\nCalendar Events:\n${calCtx}` : '',
+  ].filter(Boolean).join('\n');
 
   // Mint ephemeral token from OpenAI
   const apiKey = process.env.OPENAI_API_KEY;
