@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { getSpaceForUser } from '@/lib/space';
+import crypto from 'crypto';
 import { audit } from '@/lib/audit';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
 

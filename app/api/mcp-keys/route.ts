@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
   if (error)
     return NextResponse.json({ error: 'Failed to load API keys' }, { status: 500 });
-  return NextResponse.json(data ?? []);
+  return NextResponse.json({ keys: data ?? [] });
 }
 
 // POST /api/mcp-keys — generate a new MCP API key (returns the full key ONCE)
@@ -71,4 +71,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to create API key' }, { status: 500 });
 
   return NextResponse.json({ ...data, key: rawKey }, { status: 201 });
+}
+
+// DELETE /api/mcp-keys — revoke an API key by id (called from settings form)
+export async function DELETE(req: NextRequest) {
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+  const { userId } = authResult;
+
+  const space = await getSpaceForUser(userId);
+  if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
+
+  try {
+    const { id } = await req.json();
+    if (!id || typeof id !== 'string') return NextResponse.json({ error: 'id required' }, { status: 400 });
+
+    // Verify key belongs to this space
+    const { data: existing } = await supabase
+      .from('McpApiKey')
+      .select('id')
+      .eq('id', id)
+      .eq('spaceId', space.id)
+      .maybeSingle();
+
+    if (!existing) return NextResponse.json({ error: 'API key not found' }, { status: 404 });
+
+    const { error } = await supabase.from('McpApiKey').delete().eq('id', id);
+    if (error) return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  }
 }
