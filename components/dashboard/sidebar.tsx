@@ -20,6 +20,10 @@ import {
   PhoneIncoming,
   BarChart3,
   Clock,
+  Trophy,
+  FileText,
+  Megaphone,
+  MessageCircle,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -39,6 +43,10 @@ const brokerTeamNavItems = [
   { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
   { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
   { href: '/broker/response-times', label: 'Response Times', icon: Clock, exact: false, adminOnly: false },
+  { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
+  { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
+  { href: '/broker/announcements', label: 'Announcements', icon: Megaphone, exact: false, adminOnly: false },
+  { href: '/broker/chat', label: 'Team Chat', icon: MessageCircle, exact: false, adminOnly: false },
   { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
   { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false, adminOnly: true },
   { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },

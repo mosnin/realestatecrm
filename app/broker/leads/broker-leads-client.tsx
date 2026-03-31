@@ -470,6 +470,21 @@ function AssignedLeadItem({
           </div>
         </div>
 
+        {/* Notes toggle (when no progress expand) */}
+        {!progress && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowNotes(!showNotes);
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:bg-muted transition-colors"
+            title="Notes"
+          >
+            <MessageSquare size={13} />
+            {showNotes ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+          </button>
+        )}
+
         {/* Score */}
         <div className="flex items-center gap-2 flex-shrink-0">
           {(progress?.currentScore ?? lead.leadScore) != null && (

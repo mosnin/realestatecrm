@@ -12,7 +12,6 @@ import {
   publicApplicationSchema,
 } from '@/lib/public-application';
 import { notifyNewLead } from '@/lib/notify';
-import { autoAssignLead } from '@/lib/auto-assign';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
 

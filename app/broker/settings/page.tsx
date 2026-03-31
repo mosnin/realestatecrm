@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { BrokerageSettingsForm } from '@/components/broker/settings-form';
 import { InviteCodeCard } from '@/components/broker/invite-code-card';
+import { getAutoAssignSettings } from '@/lib/auto-assign';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Settings — Broker Dashboard' };
@@ -13,6 +14,7 @@ export default async function BrokerSettingsPage() {
 
   const { brokerage, membership } = ctx;
   const canEdit = membership.role === 'broker_owner' || membership.role === 'broker_admin';
+  const autoAssign = await getAutoAssignSettings(brokerage.id);
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -31,6 +33,8 @@ export default async function BrokerSettingsPage() {
             logoUrl={brokerage.logoUrl}
             joinCode={brokerage.joinCode}
             isOwner={canEdit}
+            autoAssignEnabled={autoAssign.enabled}
+            autoAssignMethod={autoAssign.method}
           />
         </CardContent>
       </Card>
