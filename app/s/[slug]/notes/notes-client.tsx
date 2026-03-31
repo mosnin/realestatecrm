@@ -289,7 +289,7 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
 
     const before = content.slice(0, mentionStart);
     const after = content.slice(textarea.selectionStart);
-    const mentionText = `[@${mention.label}](${mention.kind}:${mention.id})`;
+    const mentionText = `@${mention.label}`;
     const newContent = before + mentionText + ' ' + after;
 
     setContent(newContent);
@@ -316,34 +316,26 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const renderContent = () => {
-    if (!content) return null;
-    // Parse mentions to render styled pills in preview
-    const parts = content.split(/(\[@[^\]]+\]\([^)]+\))/g);
-    return parts.map((part, i) => {
-      const match = part.match(/\[@([^\]]+)\]\((contact|deal):([^)]+)\)/);
-      if (match) {
-        const [, label, kind, id] = match;
-        const href =
-          kind === 'contact' ? `/s/${slug}/contacts/${id}` : `/s/${slug}/deals/${id}`;
-        return (
-          <a
-            key={i}
-            href={href}
-            className="inline-flex items-center rounded-md bg-primary/10 px-1.5 py-0.5 text-sm font-medium text-primary hover:bg-primary/20 transition-colors"
-          >
-            @{label}
-          </a>
-        );
-      }
-      return <span key={i}>{part}</span>;
-    });
-  };
+  // Build a lookup of known names → { kind, id, href }
+  const mentionLookup = useMemo(() => {
+    const map = new Map<string, { kind: string; id: string; href: string }>();
+    for (const c of contacts) {
+      map.set(c.name.toLowerCase(), { kind: 'contact', id: c.id, href: `/s/${slug}/contacts/${c.id}` });
+    }
+    for (const d of deals) {
+      map.set(d.title.toLowerCase(), { kind: 'deal', id: d.id, href: `/s/${slug}/deals/${d.id}` });
+    }
+    return map;
+  }, [contacts, deals, slug]);
+
+  // This is no longer used for display (textarea shows raw text)
+  // but kept for potential future use
+  const renderContent = () => null;
 
   return (
     <div className="flex h-full">
       {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
-      <div className="w-56 shrink-0 border-r bg-muted/30 flex flex-col">
+      <div className="hidden md:flex w-56 shrink-0 border-r bg-muted/30 flex-col">
         <div className="px-3 py-3 border-b">
           <h2 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
             <StickyNote className="h-4 w-4" />
@@ -414,17 +406,14 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
                 className="w-full text-2xl font-bold bg-transparent border-none outline-none placeholder:text-muted-foreground/40 mb-4"
               />
 
-              {/* Content area with mention support */}
+              {/* Content area — clean textarea, mentions stored as plain @Name */}
               <div className="relative">
                 <textarea
                   ref={contentRef}
                   value={content}
                   onChange={handleContentInput}
                   onKeyDown={handleContentKeyDown}
-                  onBlur={() => {
-                    // Delay closing so clicks on mention items register
-                    setTimeout(() => closeMention(), 200);
-                  }}
+                  onBlur={() => setTimeout(() => closeMention(), 200)}
                   placeholder="Start writing... Type @ to mention a contact or deal"
                   className="w-full min-h-[50vh] text-base bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/40 leading-relaxed"
                 />
@@ -471,15 +460,7 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
                 )}
               </div>
 
-              {/* Rendered content preview (mentions as pills) */}
-              {content && /\[@[^\]]+\]\([^)]+\)/.test(content) && (
-                <div className="mt-6 pt-6 border-t">
-                  <p className="text-xs text-muted-foreground mb-2 font-medium">Preview</p>
-                  <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {renderContent()}
-                  </div>
-                </div>
-              )}
+              {/* No preview needed — mentions render inline above */}
             </div>
 
             {/* Save status bar */}
