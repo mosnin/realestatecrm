@@ -55,20 +55,28 @@ export async function POST(req: NextRequest) {
   if (grantType === 'authorization_code') {
     const { code, code_verifier, client_id, client_secret, redirect_uri } = params;
 
+    console.log('[mcp/token] authorization_code grant', { code: code?.slice(0, 8), hasVerifier: !!code_verifier, client_id, redirect_uri });
+
     if (!code || !code_verifier) {
+      console.error('[mcp/token] missing code or code_verifier');
       return NextResponse.json({ error: 'invalid_request', error_description: 'code and code_verifier required' }, { status: 400 });
     }
 
     // Look up the authorization code
-    const { data: authCode } = await supabase
+    const { data: authCode, error: codeError } = await supabase
       .from('McpAuthCode')
       .select('*')
       .eq('code', code)
       .maybeSingle();
 
+    if (codeError) {
+      console.error('[mcp/token] code lookup error:', codeError);
+    }
     if (!authCode) {
+      console.error('[mcp/token] code not found in DB');
       return NextResponse.json({ error: 'invalid_grant', error_description: 'Invalid or expired code' }, { status: 400 });
     }
+    console.log('[mcp/token] code found, spaceId:', authCode.spaceId, 'expires:', authCode.expiresAt);
 
     // Check expiration
     if (new Date(authCode.expiresAt) < new Date()) {
@@ -82,6 +90,7 @@ export async function POST(req: NextRequest) {
       .update(code_verifier)
       .digest('base64url');
 
+    console.log('[mcp/token] PKCE check:', { expected: expectedChallenge.slice(0, 10), stored: authCode.codeChallenge?.slice(0, 10), match: expectedChallenge === authCode.codeChallenge });
     if (expectedChallenge !== authCode.codeChallenge) {
       await supabase.from('McpAuthCode').delete().eq('code', code);
       return NextResponse.json({ error: 'invalid_grant', error_description: 'PKCE verification failed' }, { status: 400 });

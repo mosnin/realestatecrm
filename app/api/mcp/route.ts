@@ -355,11 +355,18 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  const BASE_URL = process.env.NEXT_PUBLIC_ROOT_DOMAIN
+    ? `https://${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`
+    : 'https://my.usechippi.com';
+
   const authResult = await authenticateKey(req);
   if (!authResult) {
-    return new Response(JSON.stringify({ error: 'Invalid API key' }), {
+    return new Response(JSON.stringify({ error: 'invalid_token' }), {
       status: 401,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'WWW-Authenticate': `Bearer resource_metadata="${BASE_URL}/.well-known/oauth-protected-resource"`,
+      },
     });
   }
   const { spaceId } = authResult;
@@ -402,8 +409,25 @@ export async function POST(req: NextRequest) {
 // GET /api/mcp — required by MCP spec for SSE stream (return 405 in stateless)
 // DELETE /api/mcp — session termination (no-op in stateless)
 // ---------------------------------------------------------------------------
-export async function GET() {
-  return new Response(JSON.stringify({ error: 'SSE not supported in stateless mode' }), {
+export async function GET(req: NextRequest) {
+  const BASE_URL = process.env.NEXT_PUBLIC_ROOT_DOMAIN
+    ? `https://${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`
+    : 'https://my.usechippi.com';
+
+  // If no auth, return 401 with resource metadata link (MCP OAuth discovery)
+  const auth = req.headers.get('authorization');
+  if (!auth) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: {
+        'Content-Type': 'application/json',
+        'WWW-Authenticate': `Bearer resource_metadata="${BASE_URL}/.well-known/oauth-protected-resource"`,
+      },
+    });
+  }
+
+  // If auth provided, return 405 (no SSE in stateless mode)
+  return new Response(JSON.stringify({ error: 'SSE not supported — use POST for JSON-RPC' }), {
     status: 405,
     headers: { 'Content-Type': 'application/json' },
   });
