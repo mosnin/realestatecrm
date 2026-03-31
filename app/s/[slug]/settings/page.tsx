@@ -2,11 +2,11 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
-import { SettingsForm } from './settings-form';
+import { GeneralSettingsForm } from './general-settings-form';
 import type { SpaceSetting } from '@/lib/types';
 
-export default async function SettingsPage({
-  params
+export default async function GeneralSettingsPage({
+  params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
@@ -18,17 +18,16 @@ export default async function SettingsPage({
   if (!space) notFound();
 
   let settings: SpaceSetting | null = null;
-  let userEmail = '';
   try {
-    const [{ data, error }, { data: userRow }] = await Promise.all([
-      supabase.from('SpaceSetting').select('*').eq('spaceId', space.id).maybeSingle(),
-      supabase.from('User').select('email').eq('id', space.ownerId).maybeSingle(),
-    ]);
+    const { data, error } = await supabase
+      .from('SpaceSetting')
+      .select('*')
+      .eq('spaceId', space.id)
+      .maybeSingle();
     if (error) throw error;
     settings = (data as SpaceSetting) ?? null;
-    userEmail = userRow?.email ?? '';
   } catch (err) {
-    console.error('[settings] DB queries failed', err);
+    console.error('[settings/general] DB query failed', err);
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <div className="text-center space-y-4 p-8">
@@ -41,12 +40,12 @@ export default async function SettingsPage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">Manage your profile, connections, AI, and billing preferences</p>
+        <h1 className="text-xl font-semibold tracking-tight">General</h1>
+        <p className="text-muted-foreground text-sm">Workspace name, slug, and contact information</p>
       </div>
-      <SettingsForm space={space} settings={settings} userEmail={userEmail} />
+      <GeneralSettingsForm space={space} settings={settings} />
     </div>
   );
 }

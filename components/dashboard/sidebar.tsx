@@ -25,6 +25,17 @@ import {
   Megaphone,
   MessageCircle,
   DollarSign,
+  ArrowLeft,
+  Settings,
+  User,
+  Bell,
+  Puzzle,
+  Palette,
+  Type,
+  ListChecks,
+  CreditCard,
+  Key,
+  Shuffle,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -76,6 +87,24 @@ const brokerNavSections = [
 ];
 // Flat list for backward compat
 const brokerTeamNavItems = brokerNavSections.flatMap(s => s.items);
+
+const brokerSettingsNavSections = [
+  {
+    label: 'Brokerage',
+    items: [
+      { href: '/broker/settings', label: 'General', icon: Settings, exact: true },
+      { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
+      { href: '/broker/settings/mcp', label: 'MCP', icon: Key, exact: false },
+    ],
+  },
+  {
+    label: 'Lead Management',
+    items: [
+      { href: '/broker/settings/auto-assignment', label: 'Auto-Assignment', icon: Shuffle, exact: false },
+      { href: '/broker/commissions', label: 'Commission Rates', icon: DollarSign, exact: false },
+    ],
+  },
+];
 
 // ── Section label ──────────────────────────────────────────────────────────
 
@@ -304,6 +333,93 @@ export function Sidebar({
     );
   }
 
+  // ── Detect settings pages ──
+  const isOnSettingsPage =
+    pathname.startsWith(`${base}/settings`) ||
+    pathname.startsWith(`${base}/profile`) ||
+    pathname.startsWith(`${base}/configure`) ||
+    pathname.startsWith(`${base}/billing`);
+
+  const settingsNavSections = [
+    {
+      label: 'Settings',
+      items: [
+        { href: `${base}/settings`, label: 'General', icon: Settings, exact: true },
+        { href: `${base}/settings/profile`, label: 'Profile', icon: User, exact: false },
+        { href: `${base}/settings/notifications`, label: 'Notifications', icon: Bell, exact: false },
+        { href: `${base}/settings/integrations`, label: 'Integrations', icon: Puzzle, exact: false },
+      ],
+    },
+    {
+      label: 'Intake Form',
+      items: [
+        { href: `${base}/settings/appearance`, label: 'Appearance', icon: Palette, exact: false },
+        { href: `${base}/settings/content`, label: 'Content', icon: Type, exact: false },
+        { href: `${base}/settings/form-fields`, label: 'Form Fields', icon: ListChecks, exact: false },
+      ],
+    },
+    {
+      label: 'Account',
+      items: [
+        { href: `${base}/billing`, label: 'Billing', icon: CreditCard, exact: false },
+      ],
+    },
+  ];
+
+  // ── Settings sidebar ──
+  if (isOnSettingsPage) {
+    return (
+      <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0">
+        {/* Logo */}
+        <div className="px-5 pt-5 pb-4">
+          <BrandLogo className="h-7" alt="Chippi" />
+        </div>
+
+        {/* Back to dashboard */}
+        <div className="px-3 pb-1">
+          <Link
+            href={base}
+            className="group flex items-center gap-2 h-9 px-2.5 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <ArrowLeft size={14} className="flex-shrink-0" />
+            <span>Back to dashboard</span>
+          </Link>
+        </div>
+
+        {/* Settings nav */}
+        <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
+          {settingsNavSections.map((section) => (
+            <div key={section.label}>
+              <SectionLabel>{section.label}</SectionLabel>
+              {section.items.map((item) => {
+                const isActive = item.exact
+                  ? pathname === item.href
+                  : pathname.startsWith(item.href);
+                return (
+                  <NavItem
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    icon={item.icon}
+                    isActive={isActive}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        {/* User */}
+        <div className="mx-4 mt-2 border-t border-border" />
+        <UserFooter
+          href={`${base}/settings/profile`}
+          displayName={displayName}
+          imageUrl={user?.imageUrl}
+        />
+      </aside>
+    );
+  }
+
   // ── Standard workspace sidebar ──
   return (
     <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0">
@@ -399,10 +515,9 @@ export function Sidebar({
         </div>
       )}
 
-      {/* Settings section */}
+      {/* Settings */}
       <div className="mx-4 border-t border-border" />
       <div className="px-3 space-y-0.5">
-        <SectionLabel>Settings</SectionLabel>
         {secondaryNavItems.map((item) => {
           const href = `${base}${item.href}`;
           const isActive = pathname.startsWith(href);
@@ -421,7 +536,7 @@ export function Sidebar({
       {/* User */}
       <div className="mx-4 mt-2 border-t border-border" />
       <UserFooter
-        href={`${base}/profile`}
+        href={`${base}/settings/profile`}
         displayName={displayName}
         imageUrl={user?.imageUrl}
       />

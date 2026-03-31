@@ -29,10 +29,7 @@ export const primaryNavItems = [
 ] as const;
 
 export const secondaryNavItems = [
-  { href: '/profile', label: 'Profile', icon: User },
   { href: '/settings', label: 'Settings', icon: Settings },
-  { href: '/configure', label: 'Configure', icon: SlidersHorizontal },
-  { href: '/billing', label: 'Billing', icon: CreditCard },
 ] as const;
 
 /** Primary items with shorter labels for the mobile bottom bar. */
