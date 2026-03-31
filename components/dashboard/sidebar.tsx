@@ -265,6 +265,62 @@ export function Sidebar({
 
   const isOnBrokerPage = pathname.startsWith('/broker');
 
+  const isOnBrokerSettings = pathname.startsWith('/broker/settings');
+
+  // ── Broker settings sub-nav ──
+  if (isBroker && (isOnBrokerPage || isBrokerOnly) && isOnBrokerSettings) {
+    return (
+      <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0">
+        {/* Logo */}
+        <div className="px-5 pt-5 pb-4">
+          <BrandLogo className="h-7" alt="Chippi" />
+        </div>
+
+        {/* Back to dashboard */}
+        <div className="px-3 pb-1">
+          <Link
+            href="/broker"
+            className="group flex items-center gap-2 h-9 px-2.5 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <ArrowLeft size={14} className="flex-shrink-0" />
+            <span>Back to dashboard</span>
+          </Link>
+        </div>
+
+        {/* Settings sub-nav */}
+        <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
+          {brokerSettingsNavSections.map((section) => (
+            <div key={section.label}>
+              <SectionLabel>{section.label}</SectionLabel>
+              {section.items.map((item) => {
+                const isActive = item.exact
+                  ? pathname === item.href
+                  : pathname.startsWith(item.href);
+                return (
+                  <NavItem
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    icon={item.icon}
+                    isActive={isActive}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        {/* User */}
+        <div className="mx-4 border-t border-border" />
+        <UserFooter
+          href={slug ? `${base}/profile` : '/broker/settings'}
+          displayName={displayName}
+          imageUrl={user?.imageUrl}
+        />
+      </aside>
+    );
+  }
+
   // ── Broker sidebar ──
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
