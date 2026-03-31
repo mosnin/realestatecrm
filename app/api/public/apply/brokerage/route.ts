@@ -286,19 +286,7 @@ export async function POST(req: NextRequest) {
         console.error('[apply/brokerage] notification failed', { contactId: contact.id, err });
       }
 
-      // Auto-assign to a realtor if enabled
-      try {
-        const assignedTo = await autoAssignLead(brokerage.id, contact.id, space.id);
-        if (assignedTo) {
-          console.info('[apply/brokerage] auto-assigned lead', {
-            contactId: contact.id,
-            assignedTo,
-            brokerageId: brokerage.id,
-          });
-        }
-      } catch (err) {
-        console.error('[apply/brokerage] auto-assign failed', { contactId: contact.id, err });
-      }
+      // Lead sits in broker's space until manually assigned via /broker/leads
     })();
 
     // Return immediately

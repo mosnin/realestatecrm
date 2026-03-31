@@ -7,16 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-type DistributionMethod = 'round-robin' | 'score-based' | 'workload-balanced';
-
 interface SettingsFormProps {
   name: string;
   websiteUrl: string | null;
   logoUrl: string | null;
   joinCode: string | null;
   isOwner: boolean;
-  autoAssignEnabled?: boolean;
-  autoAssignMethod?: DistributionMethod;
 }
 
 export function BrokerageSettingsForm({
@@ -25,14 +21,10 @@ export function BrokerageSettingsForm({
   logoUrl: initialLogo,
   joinCode,
   isOwner,
-  autoAssignEnabled: initialAutoAssign = false,
-  autoAssignMethod: initialMethod = 'round-robin',
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [websiteUrl, setWebsiteUrl] = useState(initialWebsite ?? '');
   const [logoUrl, setLogoUrl] = useState(initialLogo ?? '');
-  const [autoAssignEnabled, setAutoAssignEnabled] = useState(initialAutoAssign);
-  const [autoAssignMethod, setAutoAssignMethod] = useState<DistributionMethod>(initialMethod);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -50,8 +42,6 @@ export function BrokerageSettingsForm({
           name: name.trim(),
           websiteUrl: websiteUrl.trim() || null,
           logoUrl: logoUrl.trim() || null,
-          autoAssignEnabled,
-          autoAssignMethod,
         }),
       });
       const data = await res.json();
@@ -127,57 +117,7 @@ export function BrokerageSettingsForm({
       )}
 
       {/* ── Lead Distribution ─────────────────────────────────────────── */}
-      <div className="pt-3 border-t border-border mt-2">
-        <p className="text-sm font-semibold mb-3">Lead Distribution</p>
-
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <Label htmlFor="auto-assign-toggle">Auto-assign new leads</Label>
-            <p className="text-xs text-muted-foreground">
-              Automatically distribute incoming leads to realtors
-            </p>
-          </div>
-          <button
-            id="auto-assign-toggle"
-            type="button"
-            role="switch"
-            aria-checked={autoAssignEnabled}
-            disabled={!isOwner}
-            onClick={() => setAutoAssignEnabled(!autoAssignEnabled)}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-              autoAssignEnabled ? 'bg-primary' : 'bg-muted'
-            }`}
-          >
-            <span
-              className={`pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${
-                autoAssignEnabled ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
-        </div>
-
-        {autoAssignEnabled && (
-          <div className="space-y-1.5">
-            <Label htmlFor="distribution-method">Distribution method</Label>
-            <select
-              id="distribution-method"
-              value={autoAssignMethod}
-              onChange={(e) => setAutoAssignMethod(e.target.value as DistributionMethod)}
-              disabled={!isOwner}
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="round-robin">Round-robin</option>
-              <option value="score-based">Score-based (highest score gets best agent)</option>
-              <option value="workload-balanced">Workload-balanced (fewest active leads)</option>
-            </select>
-            <p className="text-xs text-muted-foreground">
-              {autoAssignMethod === 'round-robin' && 'Leads are distributed evenly across all realtors in order.'}
-              {autoAssignMethod === 'score-based' && 'Hot leads (score 70+) go to top-performing realtors. Others use round-robin.'}
-              {autoAssignMethod === 'workload-balanced' && 'Each new lead goes to the realtor with the fewest active leads.'}
-            </p>
-          </div>
-        )}
-      </div>
+      {/* Lead distribution is handled manually via /broker/leads */}
 
       {logoUrl && /^https?:\/\/.+/i.test(logoUrl) && (
         <div className="rounded-lg border border-border p-3">
