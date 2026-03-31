@@ -18,6 +18,7 @@ import {
   Building2,
   Globe,
   CalendarDays,
+  Link2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
@@ -171,6 +172,31 @@ export default async function BrokerOverviewPage() {
             className="inline-flex items-center gap-1.5 text-xs font-medium bg-primary text-primary-foreground px-3 py-2 rounded-lg hover:bg-primary/90 transition-colors"
           >
             <Plus size={13} /> Invite
+          </Link>
+        </div>
+      </div>
+
+      {/* ── Brokerage Intake Link ── */}
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Link2 size={16} className="text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Brokerage Intake Form</p>
+            <p className="text-xs text-muted-foreground">Share this link to receive leads directly into your brokerage pipeline</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <code className="flex-1 sm:flex-none text-xs font-mono bg-card border rounded-lg px-3 py-2 truncate max-w-[280px]">
+            {`${process.env.NEXT_PUBLIC_ROOT_DOMAIN ? `https://${process.env.NEXT_PUBLIC_ROOT_DOMAIN}` : 'https://my.usechippi.com'}/apply/b/${brokerage.id}`}
+          </code>
+          <Link
+            href={`/apply/b/${brokerage.id}`}
+            target="_blank"
+            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline flex-shrink-0"
+          >
+            Preview <ArrowRight size={12} />
           </Link>
         </div>
       </div>

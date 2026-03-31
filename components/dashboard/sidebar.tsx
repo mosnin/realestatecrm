@@ -75,7 +75,6 @@ const brokerAdminNavSections = [
     label: 'Tools',
     items: [
       { href: '/broker/analytics', label: 'Analytics', icon: BarChart3, exact: false, adminOnly: false },
-      { href: '/broker/commissions', label: 'Commissions', icon: DollarSign, exact: false, adminOnly: false },
       { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
       { href: '/broker/chat', label: 'Team Chat', icon: MessageCircle, exact: false, adminOnly: false },
       { href: '/broker/announcements', label: 'Announcements', icon: Megaphone, exact: false, adminOnly: false },
