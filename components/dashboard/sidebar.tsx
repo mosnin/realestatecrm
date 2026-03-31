@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
@@ -36,6 +37,8 @@ import {
   CreditCard,
   Key,
   Shuffle,
+  Plus,
+  Check,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -47,6 +50,7 @@ interface SidebarProps {
   isBrokerOnly?: boolean;
   brokerageName?: string | null;
   brokerageRole?: string | null;
+  brokerageMemberships?: { id: string; name: string; role: string }[];
 }
 
 const brokerAdminNavSections = [
@@ -188,37 +192,115 @@ function NavItem({
 // ── Workspace switcher ─────────────────────────────────────────────────────
 
 function WorkspaceSwitcher({
-  href,
-  name,
-  icon: Icon,
-  subtitle,
+  currentName,
+  currentSubtitle,
+  currentIcon: Icon,
+  slug,
+  spaceName,
+  brokerageMemberships,
+  isOnBrokerPage,
 }: {
-  href: string;
-  name: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  subtitle?: string;
+  currentName: string;
+  currentSubtitle: string;
+  currentIcon: React.ComponentType<{ size?: number; className?: string }>;
+  slug: string;
+  spaceName: string;
+  brokerageMemberships: { id: string; name: string; role: string }[];
+  isOnBrokerPage: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on click outside
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
   return (
-    <Link
-      href={href}
-      className="group flex items-center gap-2.5 mx-3 px-2.5 py-2 rounded-md border border-border/60 bg-muted/30 hover:bg-muted hover:border-border transition-all"
-    >
-      <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-        <Icon size={14} className="text-primary" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold truncate text-foreground leading-tight">
-          {name}
-        </p>
-        {subtitle && (
-          <p className="text-[11px] text-muted-foreground leading-tight">{subtitle}</p>
-        )}
-      </div>
-      <ChevronsUpDown
-        size={13}
-        className="text-muted-foreground/40 flex-shrink-0 group-hover:text-muted-foreground transition-colors"
-      />
-    </Link>
+    <div ref={ref} className="relative mx-3">
+      {/* Trigger button */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md border border-border/60 bg-muted/30 hover:bg-muted hover:border-border transition-all text-left"
+      >
+        <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <Icon size={14} className="text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold truncate text-foreground leading-tight">{currentName}</p>
+          <p className="text-[11px] text-muted-foreground leading-tight">{currentSubtitle}</p>
+        </div>
+        <ChevronsUpDown size={13} className="text-muted-foreground/40 flex-shrink-0" />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border bg-popover shadow-lg overflow-hidden">
+          {/* Personal workspace */}
+          <Link
+            href={`/s/${slug}`}
+            onClick={() => setOpen(false)}
+            className={cn(
+              'flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted transition-colors',
+              !isOnBrokerPage && 'bg-primary/5'
+            )}
+          >
+            <Briefcase size={14} className="text-primary flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium truncate">{spaceName}</p>
+              <p className="text-[10px] text-muted-foreground">Realtor Dashboard</p>
+            </div>
+            {!isOnBrokerPage && <Check size={14} className="text-primary flex-shrink-0" />}
+          </Link>
+
+          {/* Brokerages */}
+          {brokerageMemberships.length > 0 && (
+            <>
+              <div className="border-t border-border" />
+              <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">Brokerages</p>
+              {brokerageMemberships.map((b) => (
+                <Link
+                  key={b.id}
+                  href="/broker"
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    'flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted transition-colors',
+                    isOnBrokerPage && 'bg-primary/5'
+                  )}
+                >
+                  <Building2 size={14} className="text-primary flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{b.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{b.role === 'broker_owner' ? 'Owner' : b.role === 'broker_admin' ? 'Admin' : 'Member'}</p>
+                  </div>
+                  {isOnBrokerPage && <Check size={14} className="text-primary flex-shrink-0" />}
+                </Link>
+              ))}
+            </>
+          )}
+
+          {/* Create brokerage option */}
+          {brokerageMemberships.length === 0 && (
+            <>
+              <div className="border-t border-border" />
+              <Link
+                href="/brokerage"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <Plus size={14} className="flex-shrink-0" />
+                <span>Create or join a brokerage</span>
+              </Link>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -274,6 +356,7 @@ export function Sidebar({
   isBrokerOnly = false,
   brokerageName = null,
   brokerageRole = null,
+  brokerageMemberships = [],
 }: SidebarProps) {
   const pathname = usePathname();
   const base = `/s/${slug}`;
@@ -352,10 +435,13 @@ export function Sidebar({
 
         {/* Brokerage switcher */}
         <WorkspaceSwitcher
-          href="/broker"
-          name={brokerageName ?? 'Brokerage'}
-          icon={Building2}
-          subtitle="Brokerage Dashboard"
+          currentName={brokerageName ?? 'Brokerage'}
+          currentSubtitle="Brokerage Dashboard"
+          currentIcon={Building2}
+          slug={slug}
+          spaceName={spaceName}
+          brokerageMemberships={brokerageMemberships}
+          isOnBrokerPage={isOnBrokerPage}
         />
 
         {/* Team nav — organized into sections */}
@@ -379,24 +465,6 @@ export function Sidebar({
             );
           })}
         </nav>
-
-        {/* Switch to personal workspace */}
-        {!isBrokerOnly && slug && (
-          <>
-            <div className="mx-4 border-t border-border" />
-            <div className="px-3 py-1">
-              <SectionLabel>Personal workspace</SectionLabel>
-              <Link
-                href={base}
-                className="group relative flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <Briefcase size={16} className="flex-shrink-0 text-muted-foreground/60 group-hover:text-foreground" />
-                <span className="flex-1 truncate">{spaceName}</span>
-                <ChevronRight size={13} className="text-muted-foreground/40 flex-shrink-0" />
-              </Link>
-            </div>
-          </>
-        )}
 
         {/* User */}
         <div className="mx-4 border-t border-border" />
@@ -506,10 +574,13 @@ export function Sidebar({
 
       {/* Workspace switcher */}
       <WorkspaceSwitcher
-        href={`${base}/settings`}
-        name={spaceName}
-        icon={Briefcase}
-        subtitle="Realtor Dashboard"
+        currentName={spaceName}
+        currentSubtitle="Realtor Dashboard"
+        currentIcon={Briefcase}
+        slug={slug}
+        spaceName={spaceName}
+        brokerageMemberships={brokerageMemberships}
+        isOnBrokerPage={isOnBrokerPage}
       />
 
       {/* Primary nav */}
@@ -563,33 +634,7 @@ export function Sidebar({
           );
         })}
 
-        {/* Switch to brokerage dashboard */}
-        {isBroker && (
-          <>
-            <SectionLabel>Brokerage</SectionLabel>
-            <Link
-              href="/broker"
-              className="group relative flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <Building2 size={16} className="flex-shrink-0 text-muted-foreground/60 group-hover:text-foreground" />
-              <span className="flex-1 truncate">{brokerageName ?? 'Brokerage'}</span>
-              <ChevronRight size={13} className="text-muted-foreground/40 flex-shrink-0" />
-            </Link>
-          </>
-        )}
       </nav>
-
-      {/* Join or create a brokerage */}
-      {!isBroker && !brokerageName && (
-        <div className="px-3 pb-1">
-          <NavItem
-            href="/brokerage"
-            label="Join or create a team"
-            icon={Building2}
-            isActive={pathname.startsWith('/brokerage')}
-          />
-        </div>
-      )}
 
       {/* Settings */}
       <div className="mx-4 border-t border-border" />

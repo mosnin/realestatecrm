@@ -133,33 +133,27 @@ export default async function DashboardLayout({
     overdueFollowUpCount = 0;
   }
 
-  // Check broker context and brokerage membership for sidebar
+  // Check broker context and brokerage memberships for sidebar
   let isBroker = false;
   let brokerageName: string | null = null;
   let brokerageRole: string | null = null;
+  let brokerageMemberships: { id: string; name: string; role: string }[] = [];
   try {
-    const ctx = await getBrokerContext();
-    if (ctx) {
-      isBroker = true;
-      brokerageName = ctx.brokerage.name;
-      brokerageRole = ctx.membership.role;
-    } else {
-      // Not a broker — check if they're a realtor_member of a brokerage
-      const { data: membership } = await supabase
-        .from('BrokerageMembership')
-        .select('role, brokerageId')
-        .eq('userId', dbUser.id)
-        .eq('role', 'realtor_member')
-        .maybeSingle();
-      if (membership) {
-        const { data: brokerage } = await supabase
-          .from('Brokerage')
-          .select('name')
-          .eq('id', membership.brokerageId)
-          .maybeSingle();
-        brokerageName = brokerage?.name ?? null;
-        brokerageRole = 'realtor_member';
-      }
+    const { data: memberships } = await supabase
+      .from('BrokerageMembership')
+      .select('brokerageId, role, Brokerage(id, name)')
+      .eq('userId', dbUser.id);
+
+    brokerageMemberships = (memberships ?? []).map((m: any) => ({
+      id: Array.isArray(m.Brokerage) ? m.Brokerage[0]?.id : m.Brokerage?.id,
+      name: Array.isArray(m.Brokerage) ? m.Brokerage[0]?.name : m.Brokerage?.name,
+      role: m.role,
+    })).filter(m => m.id && m.name);
+
+    if (brokerageMemberships.length > 0) {
+      isBroker = brokerageMemberships.some(m => m.role === 'broker_owner' || m.role === 'broker_admin');
+      brokerageName = brokerageMemberships[0].name;
+      brokerageRole = brokerageMemberships[0].role;
     }
   } catch {
     isBroker = false;
@@ -167,7 +161,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
-      <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} overdueFollowUpCount={overdueFollowUpCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} />
+      <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} overdueFollowUpCount={overdueFollowUpCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
         <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
