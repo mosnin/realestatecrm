@@ -12,10 +12,12 @@ export function ApplicationFormLoader({
   slug,
   businessName,
   customization,
+  brokerageId,
 }: {
   slug: string;
   businessName: string;
   customization?: IntakeCustomization;
+  brokerageId?: string;
 }) {
-  return <ApplicationForm slug={slug} businessName={businessName} customization={customization} />;
+  return <ApplicationForm slug={slug} businessName={businessName} customization={customization} brokerageId={brokerageId} />;
 }

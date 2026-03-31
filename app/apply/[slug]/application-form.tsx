@@ -219,10 +219,12 @@ export function ApplicationForm({
   slug,
   businessName,
   customization,
+  brokerageId,
 }: {
   slug: string;
   businessName: string;
   customization?: IntakeCustomization;
+  brokerageId?: string;
 }) {
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1);
@@ -367,6 +369,10 @@ export function ApplicationForm({
       leaseTermPreference: get('intent'),
       completedSteps: STEPS.map((s) => s.id),
     };
+
+    if (brokerageId) {
+      payload.brokerageId = brokerageId;
+    }
 
     try {
       const response = await fetch('/api/public/apply', {
