@@ -54,7 +54,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
           <SheetTrigger className="md:hidden">
             <MenuToggleIcon open={open} className="size-5 text-muted-foreground" duration={400} />
           </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
+          <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border flex flex-col overflow-hidden">
             <SheetHeader className="px-4 py-5 border-b border-sidebar-border">
               <SheetTitle className="flex items-center gap-2.5 text-sidebar-foreground">
                 <BrandLogo className="h-5" alt="Chippi" />
@@ -95,7 +95,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                 )}
               </div>
             </SheetHeader>
-            <nav className="flex-1 px-3 pt-4 pb-2 space-y-0.5">
+            <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-2 space-y-0.5">
               {!isBrokerOnly && (
                 <>
                   <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">

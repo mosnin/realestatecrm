@@ -15,10 +15,19 @@ export default async function PublicBookingPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  const [{ data: settingsData }, { data: ownerData }] = await Promise.all([
+  const [{ data: settingsData }, { data: customSettings }, { data: ownerData }] = await Promise.all([
     supabase
       .from('SpaceSetting')
       .select('tourBookingPageTitle, tourBookingPageIntro, businessName, tourDuration, timezone, logoUrl, realtorPhotoUrl')
+      .eq('spaceId', space.id)
+      .maybeSingle(),
+    supabase
+      .from('SpaceSetting')
+      .select(
+        'intakeAccentColor, intakeFont, intakeDarkMode, ' +
+        'intakeHeaderBgColor, intakeHeaderGradient, ' +
+        'intakeFooterLinks, bio, socialLinks'
+      )
       .eq('spaceId', space.id)
       .maybeSingle(),
     supabase
@@ -28,7 +37,8 @@ export default async function PublicBookingPage({
       .maybeSingle(),
   ]);
 
-  const settings = settingsData as {
+  const allSettings = { ...((settingsData ?? {}) as any), ...((customSettings ?? {}) as any) };
+  const settings = allSettings as {
     tourBookingPageTitle: string | null;
     tourBookingPageIntro: string | null;
     businessName: string | null;
@@ -36,6 +46,14 @@ export default async function PublicBookingPage({
     timezone: string | null;
     logoUrl: string | null;
     realtorPhotoUrl: string | null;
+    intakeAccentColor: string | null;
+    intakeFont: string | null;
+    intakeDarkMode: boolean | null;
+    intakeHeaderBgColor: string | null;
+    intakeHeaderGradient: string | null;
+    intakeFooterLinks: { label: string; url: string }[] | null;
+    bio: string | null;
+    socialLinks: Record<string, string> | null;
   } | null;
 
   const pageTitle = settings?.tourBookingPageTitle || 'Book a Tour';
@@ -47,6 +65,17 @@ export default async function PublicBookingPage({
   const agentPhoto = settings?.realtorPhotoUrl || ownerData?.avatar || null;
   const logoUrl = settings?.logoUrl || null;
 
+  const customization = {
+    accentColor: settings?.intakeAccentColor || '#ff964f',
+    font: settings?.intakeFont || 'system',
+    darkMode: settings?.intakeDarkMode || false,
+    headerBgColor: settings?.intakeHeaderBgColor || null,
+    headerGradient: settings?.intakeHeaderGradient || null,
+    footerLinks: settings?.intakeFooterLinks || [],
+    bio: settings?.bio || null,
+    socialLinks: settings?.socialLinks || null,
+  };
+
   return (
     <PublicPageShell
       logoUrl={logoUrl}
@@ -57,8 +86,9 @@ export default async function PublicBookingPage({
       pageTitle={pageTitle}
       pageIntro={pageIntro}
       trustLine={`Your information is shared only with ${agentName} and used solely for scheduling.`}
+      customization={customization}
     >
-      <BookingForm slug={slug} duration={duration} businessName={businessName} timezone={timezone} />
+      <BookingForm slug={slug} duration={duration} businessName={businessName} timezone={timezone} accentColor={customization.accentColor} />
     </PublicPageShell>
   );
 }
