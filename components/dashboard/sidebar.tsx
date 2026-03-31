@@ -17,6 +17,7 @@ import {
   Briefcase,
   ChevronsUpDown,
   ArrowLeftRight,
+  PhoneIncoming,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -32,6 +33,7 @@ interface SidebarProps {
 
 const brokerTeamNavItems = [
   { href: '/broker', label: 'Team Overview', icon: LayoutDashboard, exact: true },
+  { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false },
   { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
   { href: '/broker/members', label: 'Members', icon: Users, exact: false },
   { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },

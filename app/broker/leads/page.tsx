@@ -14,13 +14,13 @@ export default async function BrokerLeadsPage() {
     redirect('/');
   }
 
-  const { brokerage, dbUserId } = ctx;
+  const { brokerage } = ctx;
 
-  // Find the broker owner's space
+  // Find the broker owner's space (using brokerage.ownerId to match the assign-lead API)
   const { data: ownerSpace } = await supabase
     .from('Space')
     .select('id')
-    .eq('ownerId', dbUserId)
+    .eq('ownerId', brokerage.ownerId)
     .maybeSingle();
 
   const brokerSpaceId = ownerSpace?.id ?? null;
@@ -29,7 +29,7 @@ export default async function BrokerLeadsPage() {
   const { data: unassignedRaw } = brokerSpaceId
     ? await supabase
         .from('Contact')
-        .select('id, name, email, phone, budget, scoreLabel, leadScore, tags, createdAt, applicationData')
+        .select('id, name, email, phone, budget, scoreLabel, leadScore, tags, createdAt, notes, applicationData')
         .eq('spaceId', brokerSpaceId)
         .contains('tags', ['brokerage-lead'])
         .not('tags', 'cs', '["assigned"]')
@@ -106,10 +106,24 @@ export default async function BrokerLeadsPage() {
     applicationData: Record<string, unknown> | null;
   };
 
+  // Build a map of userId -> realtor name for resolving assignments
+  const realtorNameMap = new Map<string, string>();
+  for (const m of members) {
+    realtorNameMap.set(m.userId, m.User?.name ?? m.User?.email ?? 'Unknown');
+  }
+
   function toLeadRow(c: RawContact): LeadRow {
     const moveTiming = c.applicationData?.targetMoveInDate as string | undefined;
-    // Try to extract assigned realtor name from notes (format: "Assigned to: Name")
-    const assignedMatch = c.notes?.match(/Assigned to: (.+?)(?:\n|$)/);
+    // Try to extract assigned realtor from notes
+    // Format from API: "--- Assigned to realtor (userId) on date by assignerId ---"
+    const realtorIdMatch = c.notes?.match(/Assigned to realtor \(([^)]+)\)/);
+    const assignedName = realtorIdMatch?.[1]
+      ? realtorNameMap.get(realtorIdMatch[1]) ?? 'Realtor'
+      : null;
+    // Try to extract assignment date
+    const dateMatch = c.notes?.match(/Assigned to realtor .+ on (\S+)/);
+    const assignedAt = dateMatch?.[1] ?? (c.tags.includes('assigned') ? c.createdAt : null);
+
     return {
       id: c.id,
       name: c.name,
@@ -120,8 +134,8 @@ export default async function BrokerLeadsPage() {
       leadScore: c.leadScore,
       moveTiming: moveTiming ?? null,
       createdAt: c.createdAt,
-      assignedTo: assignedMatch?.[1] ?? null,
-      assignedAt: c.tags.includes('assigned') ? c.createdAt : null,
+      assignedTo: assignedName,
+      assignedAt,
     };
   }
 
