@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Issue JWT
-    const expiresIn = 3600;
+    const expiresIn = 30 * 24 * 3600; // 30 days
     const token = await new SignJWT({ spaceId: authCode.spaceId, sub: authCode.clientId })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
 
     supabase.from('McpApiKey').update({ lastUsedAt: new Date().toISOString() }).eq('clientId', client_id).then(() => {});
 
-    const expiresIn = 3600;
+    const expiresIn = 30 * 24 * 3600; // 30 days
     const token = await new SignJWT({ spaceId: key.spaceId, sub: client_id })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()

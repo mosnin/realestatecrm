@@ -33,7 +33,7 @@ const isFullyPublicRoute = createRouteMatcher([
   '/status/(.*)',
   '/api/webhooks/(.*)',
   '/api/mcp',
-  '/api/mcp/oauth/(.*)',
+  '/api/mcp/oauth/token',
   '/.well-known/(.*)',
 ]);
 
