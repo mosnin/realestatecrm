@@ -39,7 +39,7 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
   if (!process.env.RESEND_API_KEY) return;
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
+  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
 
   const { toEmail, spaceName, spaceSlug, contactId, name, phone, email, leadScore, scoreLabel, scoreSummary, applicationData: app } = params;
 
@@ -129,7 +129,7 @@ export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<
   if (!process.env.RESEND_API_KEY) return;
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
+  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
 
   const { toEmail, spaceName, spaceSlug, contacts } = params;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
@@ -205,7 +205,7 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
   if (!process.env.RESEND_API_KEY) return;
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
+  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
 
   const { toEmail, fromName, replyTo, subject, body } = params;
 
@@ -253,7 +253,7 @@ export async function sendNewDealNotification(params: NewDealEmailParams): Promi
   if (!process.env.RESEND_API_KEY) return;
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
+  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
 
   const { toEmail, spaceName, spaceSlug, dealTitle, dealValue, dealAddress, dealPriority, contactNames } = params;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
@@ -318,7 +318,7 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
   if (!process.env.RESEND_API_KEY) return;
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
+  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
 
   const { toEmail, brokerageName, inviterName, roleToAssign, token } = params;
@@ -381,7 +381,7 @@ export async function sendWelcomeEmail(params: {
   if (!process.env.RESEND_API_KEY) return;
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@updates.yourdomain.com';
+  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
 
   const { toEmail, userName, spaceName, spaceSlug } = params;
   const name = esc(userName) || 'there';
