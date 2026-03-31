@@ -39,7 +39,7 @@ const isFullyPublicRoute = createRouteMatcher([
 
 // Routes that should NEVER be passed as redirect_url after login.
 // Only actual dashboard pages (/s/...) are valid post-login destinations.
-const SAFE_REDIRECT_PREFIXES = ['/s/', '/broker', '/admin', '/authorize'];
+const SAFE_REDIRECT_PREFIXES = ['/s/', '/broker', '/admin', '/authorize', '/invite/'];
 
 export default clerkMiddleware(async (auth, request) => {
   const { pathname } = request.nextUrl;

@@ -85,9 +85,16 @@ const roleBadge = (role: string) =>
                 <div key={inv.id} className="rounded-xl border border-border bg-card px-4 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate">{inv.email}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold truncate">{inv.email}</p>
+                        <span
+                          className={`inline-flex text-[10px] font-semibold rounded-full px-1.5 py-0.5 flex-shrink-0 ${roleBadge(inv.roleToAssign)}`}
+                        >
+                          {roleLabel(inv.roleToAssign)}
+                        </span>
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        {roleLabel(inv.roleToAssign)} · Sent {sentAt}
+                        Sent {sentAt}
                         {inv.status === 'pending' && ` · Expires ${expiresAt}`}
                       </p>
                     </div>
