@@ -49,7 +49,7 @@ interface SidebarProps {
   brokerageRole?: string | null;
 }
 
-const brokerNavSections = [
+const brokerAdminNavSections = [
   {
     label: 'Overview',
     items: [
@@ -85,6 +85,27 @@ const brokerNavSections = [
     ],
   },
 ];
+
+const brokerMemberNavSections = [
+  {
+    label: 'My Work',
+    items: [
+      { href: '/broker', label: 'My Dashboard', icon: LayoutDashboard, exact: true, adminOnly: false },
+      { href: '/broker/my-leads', label: 'My Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
+    ],
+  },
+  {
+    label: 'Team',
+    items: [
+      { href: '/broker/announcements', label: 'Announcements', icon: Megaphone, exact: false, adminOnly: false },
+      { href: '/broker/chat', label: 'Team Chat', icon: MessageCircle, exact: false, adminOnly: false },
+      { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
+      { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
+    ],
+  },
+];
+
+const brokerNavSections = brokerAdminNavSections;
 // Flat list for backward compat
 const brokerTeamNavItems = brokerNavSections.flatMap(s => s.items);
 
@@ -340,7 +361,7 @@ export function Sidebar({
 
         {/* Team nav — organized into sections */}
         <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
-          {brokerNavSections.map((section) => {
+          {(brokerageRole === 'realtor_member' ? brokerMemberNavSections : brokerAdminNavSections).map((section) => {
             const visibleItems = section.items.filter(
               (item) => !item.adminOnly || brokerageRole === 'broker_owner' || brokerageRole === 'broker_admin'
             );
@@ -350,7 +371,7 @@ export function Sidebar({
                 <SectionLabel>{section.label}</SectionLabel>
                 {visibleItems.map((item) => {
                   const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-                  const highlightBadge = 'highlight' in item && item.highlight && !isActive ? (
+                  const highlightBadge = 'highlight' in item && (item as any).highlight && !isActive ? (
                     <span className="inline-flex h-2 w-2 rounded-full bg-primary shrink-0" />
                   ) : undefined;
                   return <NavItem key={item.href} href={item.href} label={item.label} icon={item.icon} isActive={isActive} badge={highlightBadge} />;
