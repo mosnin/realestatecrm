@@ -382,27 +382,18 @@ export async function POST(req: NextRequest) {
 
   const server = buildServer(spaceId);
 
+  const transport = new WebStandardStreamableHTTPServerTransport({
+    sessionIdGenerator: undefined, // stateless
+    enableJsonResponse: true,
+  });
+
+  await server.connect(transport);
+
   try {
-    const transport = new WebStandardStreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // stateless
-      enableJsonResponse: true,
-    });
-
-    await server.connect(transport);
-
-    // Convert NextRequest to standard Request for the SDK
-    const standardReq = new Request(req.url, {
-      method: req.method,
-      headers: req.headers,
-      body: req.body,
-      // @ts-ignore - duplex needed for streaming
-      duplex: 'half',
-    });
-
-    const response = await transport.handleRequest(standardReq);
+    const response = await transport.handleRequest(req as unknown as Request);
     return response;
   } catch (err: any) {
-    console.error('[mcp] transport error:', err?.message, err?.stack);
+    console.error('[mcp] error:', err);
     return new Response(
       JSON.stringify({
         jsonrpc: '2.0',
