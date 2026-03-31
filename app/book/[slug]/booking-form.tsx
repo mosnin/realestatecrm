@@ -15,6 +15,7 @@ interface BookingFormProps {
   duration: number;
   businessName: string;
   timezone: string;
+  accentColor?: string;
 }
 
 interface DaySlots {
@@ -31,7 +32,7 @@ interface PropertyProfile {
 
 type Step = 'property' | 'date' | 'details' | 'confirmed';
 
-export function BookingForm({ slug, duration: defaultDuration, businessName, timezone }: BookingFormProps) {
+export function BookingForm({ slug, duration: defaultDuration, businessName, timezone, accentColor = '#ff964f' }: BookingFormProps) {
   const confettiRef = useRef<ConfettiRef>(null);
   const [step, setStep] = useState<Step>('date');
   const [slots, setSlots] = useState<DaySlots[]>([]);
@@ -197,7 +198,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-8 text-center space-y-4"
+        className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-lg p-8 text-center space-y-4"
       >
         <motion.div
           initial={{ scale: 0 }}
@@ -232,7 +233,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
     // Property selection step
     if (step === 'property' && properties.length > 0) {
       return (
-        <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-6 space-y-5">
+        <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-lg p-6 space-y-5">
           <p className="text-xs font-medium text-muted-foreground">Which property are you interested in?</p>
           <div className="space-y-2">
             {properties.map((p) => (
@@ -266,7 +267,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
 
     if (step === 'details') {
       return (
-        <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-6 space-y-5">
+        <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-lg p-6 space-y-5">
           <button
             type="button"
             onClick={() => setStep('date')}
@@ -328,6 +329,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
             disabled={submitting || !guestName.trim() || !guestEmail.trim()}
             className="w-full"
             size="lg"
+            style={{ backgroundColor: accentColor, borderColor: accentColor }}
           >
             {submitting ? (
               <><Loader2 size={16} className="mr-2 animate-spin" /> Booking...</>
@@ -339,7 +341,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
 
     // Date + time selection step
     return (
-      <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-6 space-y-5">
+      <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-lg p-6 space-y-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Clock size={14} />
@@ -392,7 +394,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                   <Label htmlFor="waitlistEmail">Your email</Label>
                   <Input id="waitlistEmail" type="email" value={waitlistEmail} onChange={(e) => setWaitlistEmail(e.target.value)} placeholder="jane@example.com" />
                 </div>
-                <Button onClick={handleWaitlistSubmit} disabled={waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim() || !waitlistDate} className="w-full">
+                <Button onClick={handleWaitlistSubmit} disabled={waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim() || !waitlistDate} className="w-full" style={{ backgroundColor: accentColor, borderColor: accentColor }}>
                   {waitlistSubmitting ? 'Joining...' : 'Join Waitlist'}
                 </Button>
               </div>
@@ -417,9 +419,10 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                     className={cn(
                       'flex-shrink-0 px-3 py-2 rounded-xl border text-center transition-all min-w-[80px]',
                       selectedDate === s.date
-                        ? 'border-primary bg-primary/10 text-primary font-semibold'
-                        : 'border-border hover:border-primary/40 hover:bg-accent/30'
+                        ? 'font-semibold'
+                        : 'border-border hover:bg-accent/30'
                     )}
+                    style={selectedDate === s.date ? { borderColor: accentColor, backgroundColor: `${accentColor}15`, color: accentColor } : {}}
                   >
                     <div className="text-[10px] uppercase tracking-wider opacity-70">
                       {new Date(s.date + 'T12:00:00').toLocaleDateString([], { weekday: 'short' })}
@@ -444,9 +447,10 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                       className={cn(
                         'px-3 py-2 rounded-lg border text-sm transition-all',
                         selectedTime === t
-                          ? 'border-primary bg-primary text-primary-foreground font-semibold'
-                          : 'border-border hover:border-primary/40 hover:bg-accent/30'
+                          ? 'text-white font-semibold'
+                          : 'border-border hover:bg-accent/30'
                       )}
+                      style={selectedTime === t ? { borderColor: accentColor, backgroundColor: accentColor } : {}}
                     >
                       {formatTime(t)}
                     </button>
@@ -456,7 +460,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
             )}
 
             {selectedTime && (
-              <Button onClick={() => setStep('details')} className="w-full" size="lg">
+              <Button onClick={() => setStep('details')} className="w-full" size="lg" style={{ backgroundColor: accentColor, borderColor: accentColor }}>
                 Continue
                 <ChevronRight size={16} className="ml-1" />
               </Button>
