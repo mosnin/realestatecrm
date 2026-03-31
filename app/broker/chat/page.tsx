@@ -2,7 +2,7 @@ import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { TeamChatClient } from './team-chat-client';
-import type { ChatContact } from './team-chat-client';
+import type { ChatContact, TeamMember } from './team-chat-client';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Team Chat — Broker Dashboard' };
@@ -38,5 +38,38 @@ export default async function TeamChatPage() {
     contacts = (data ?? []) as ChatContact[];
   }
 
-  return <TeamChatClient contacts={contacts} />;
+  // Fetch team members for @ mentions and slash commands
+  const { data: memberships } = await supabase
+    .from('BrokerageMembership')
+    .select('userId, role')
+    .eq('brokerageId', brokerage.id);
+
+  let teamMembers: TeamMember[] = [];
+  if (memberships?.length) {
+    const userIds = memberships.map((m) => m.userId);
+    const { data: users } = await supabase
+      .from('User')
+      .select('id, name, email')
+      .in('id', userIds);
+
+    const roleMap = new Map(
+      memberships.map((m) => [m.userId, m.role as string]),
+    );
+
+    teamMembers = (users ?? []).map((u) => ({
+      id: u.id,
+      name: u.name ?? u.email ?? 'Unknown',
+      email: u.email ?? null,
+      role: roleMap.get(u.id) ?? 'realtor_member',
+    }));
+  }
+
+  return (
+    <TeamChatClient
+      contacts={contacts}
+      teamMembers={teamMembers}
+      brokerageId={brokerage.id}
+      currentUserId={ctx.dbUserId}
+    />
+  );
 }
