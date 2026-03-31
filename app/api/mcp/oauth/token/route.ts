@@ -10,8 +10,8 @@ const JWT_SECRET = new TextEncoder().encode(
 
 /**
  * POST /api/mcp/oauth/token
- * Handles two grant types:
- * 1. authorization_code (with PKCE) — Claude's MCP connector flow
+ * Handles:
+ * 1. authorization_code (with PKCE) — Claude's MCP connector
  * 2. client_credentials — direct API usage
  */
 export async function POST(req: NextRequest) {
@@ -21,91 +21,113 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'rate_limit_exceeded' }, { status: 429 });
   }
 
-  // Parse request body (supports form-urlencoded and JSON)
+  // Parse body — support form-urlencoded (standard) and JSON
   let params: Record<string, string> = {};
-  const contentType = req.headers.get('content-type') ?? '';
-  if (contentType.includes('application/x-www-form-urlencoded')) {
-    const text = await req.text();
-    const urlParams = new URLSearchParams(text);
-    urlParams.forEach((v, k) => { params[k] = v; });
-  } else {
-    try {
-      params = await req.json();
-    } catch {
-      return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
+  try {
+    const contentType = req.headers.get('content-type') ?? '';
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+      const text = await req.text();
+      const urlParams = new URLSearchParams(text);
+      urlParams.forEach((v, k) => { params[k] = v; });
+    } else {
+      const body = await req.text();
+      // Try JSON first, fall back to form-urlencoded
+      try {
+        params = JSON.parse(body);
+      } catch {
+        const urlParams = new URLSearchParams(body);
+        urlParams.forEach((v, k) => { params[k] = v; });
+      }
     }
+  } catch (err) {
+    console.error('[mcp/token] body parse error:', err);
+    return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
 
-  // Also extract credentials from Basic auth header
+  // Extract from Basic auth header
   const authHeader = req.headers.get('authorization');
   if (authHeader?.startsWith('Basic ')) {
     try {
-      const decoded = atob(authHeader.slice(6));
+      const decoded = Buffer.from(authHeader.slice(6), 'base64').toString();
       const colonIdx = decoded.indexOf(':');
       if (colonIdx > 0) {
-        params.client_id = params.client_id || decoded.slice(0, colonIdx);
-        params.client_secret = params.client_secret || decoded.slice(colonIdx + 1);
+        if (!params.client_id) params.client_id = decoded.slice(0, colonIdx);
+        if (!params.client_secret) params.client_secret = decoded.slice(colonIdx + 1);
       }
     } catch { /* ignore */ }
   }
 
   const grantType = params.grant_type;
+  console.log('[mcp/token] request:', { grantType, hasCode: !!params.code, hasVerifier: !!params.code_verifier, hasClientId: !!params.client_id, hasClientSecret: !!params.client_secret });
 
-  // ── Authorization Code Grant (Claude's MCP connector flow) ──
+  // ── Authorization Code Grant (Claude PKCE flow) ──
   if (grantType === 'authorization_code') {
-    const { code, code_verifier, client_id, client_secret, redirect_uri } = params;
+    const { code, code_verifier, redirect_uri } = params;
 
-    console.log('[mcp/token] authorization_code grant', { code: code?.slice(0, 8), hasVerifier: !!code_verifier, client_id, redirect_uri });
-
-    if (!code || !code_verifier) {
-      console.error('[mcp/token] missing code or code_verifier');
-      return NextResponse.json({ error: 'invalid_request', error_description: 'code and code_verifier required' }, { status: 400 });
+    if (!code) {
+      console.error('[mcp/token] missing code');
+      return NextResponse.json({ error: 'invalid_request', error_description: 'code is required' }, { status: 400 });
+    }
+    if (!code_verifier) {
+      console.error('[mcp/token] missing code_verifier');
+      return NextResponse.json({ error: 'invalid_request', error_description: 'code_verifier is required' }, { status: 400 });
     }
 
-    // Look up the authorization code
-    const { data: authCode, error: codeError } = await supabase
+    // Look up auth code
+    const { data: authCode, error: codeErr } = await supabase
       .from('McpAuthCode')
       .select('*')
       .eq('code', code)
       .maybeSingle();
 
-    if (codeError) {
-      console.error('[mcp/token] code lookup error:', codeError);
+    if (codeErr) {
+      console.error('[mcp/token] DB error looking up code:', codeErr.message, codeErr.code);
+      // Table might not exist
+      if (codeErr.code === '42P01' || codeErr.message?.includes('does not exist')) {
+        return NextResponse.json({ error: 'server_error', error_description: 'Auth code table not configured. Run the migration.' }, { status: 500 });
+      }
+      return NextResponse.json({ error: 'server_error' }, { status: 500 });
     }
+
     if (!authCode) {
-      console.error('[mcp/token] code not found in DB');
-      return NextResponse.json({ error: 'invalid_grant', error_description: 'Invalid or expired code' }, { status: 400 });
+      console.error('[mcp/token] code not found:', code.slice(0, 8) + '...');
+      return NextResponse.json({ error: 'invalid_grant', error_description: 'Invalid or expired authorization code' }, { status: 400 });
     }
+
     console.log('[mcp/token] code found, spaceId:', authCode.spaceId, 'expires:', authCode.expiresAt);
 
-    // Check expiration
+    // Check expiry
     if (new Date(authCode.expiresAt) < new Date()) {
+      console.error('[mcp/token] code expired');
       await supabase.from('McpAuthCode').delete().eq('code', code);
-      return NextResponse.json({ error: 'invalid_grant', error_description: 'Code expired' }, { status: 400 });
+      return NextResponse.json({ error: 'invalid_grant', error_description: 'Authorization code expired' }, { status: 400 });
     }
 
-    // Verify PKCE code_challenge
+    // Verify PKCE
     const expectedChallenge = crypto
       .createHash('sha256')
       .update(code_verifier)
       .digest('base64url');
 
-    console.log('[mcp/token] PKCE check:', { expected: expectedChallenge.slice(0, 10), stored: authCode.codeChallenge?.slice(0, 10), match: expectedChallenge === authCode.codeChallenge });
+    console.log('[mcp/token] PKCE:', { expected: expectedChallenge.slice(0, 12), stored: authCode.codeChallenge?.slice(0, 12), match: expectedChallenge === authCode.codeChallenge });
+
     if (expectedChallenge !== authCode.codeChallenge) {
+      console.error('[mcp/token] PKCE mismatch');
       await supabase.from('McpAuthCode').delete().eq('code', code);
       return NextResponse.json({ error: 'invalid_grant', error_description: 'PKCE verification failed' }, { status: 400 });
     }
 
-    // Verify redirect_uri matches
+    // Verify redirect_uri if provided
     if (redirect_uri && redirect_uri !== authCode.redirectUri) {
+      console.error('[mcp/token] redirect_uri mismatch:', { expected: authCode.redirectUri, got: redirect_uri });
       await supabase.from('McpAuthCode').delete().eq('code', code);
       return NextResponse.json({ error: 'invalid_grant', error_description: 'redirect_uri mismatch' }, { status: 400 });
     }
 
-    // Delete the code (single-use)
+    // Delete code (single-use)
     await supabase.from('McpAuthCode').delete().eq('code', code);
 
-    // Update last used on the MCP key
+    // Update last used
     if (authCode.clientId) {
       supabase.from('McpApiKey').update({ lastUsedAt: new Date().toISOString() }).eq('clientId', authCode.clientId).then(() => {});
     }
@@ -118,6 +140,8 @@ export async function POST(req: NextRequest) {
       .setExpirationTime(`${expiresIn}s`)
       .sign(JWT_SECRET);
 
+    console.log('[mcp/token] SUCCESS — issued JWT for space:', authCode.spaceId);
+
     return NextResponse.json({
       access_token: token,
       token_type: 'bearer',
@@ -125,7 +149,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // ── Client Credentials Grant (direct API) ──
+  // ── Client Credentials Grant ──
   if (grantType === 'client_credentials' || !grantType) {
     const { client_id, client_secret } = params;
 
@@ -153,12 +177,9 @@ export async function POST(req: NextRequest) {
       .setExpirationTime(`${expiresIn}s`)
       .sign(JWT_SECRET);
 
-    return NextResponse.json({
-      access_token: token,
-      token_type: 'bearer',
-      expires_in: expiresIn,
-    });
+    return NextResponse.json({ access_token: token, token_type: 'bearer', expires_in: expiresIn });
   }
 
+  console.error('[mcp/token] unsupported grant_type:', grantType);
   return NextResponse.json({ error: 'unsupported_grant_type' }, { status: 400 });
 }
