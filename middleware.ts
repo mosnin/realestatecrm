@@ -28,6 +28,7 @@ const isAdminRoute = createRouteMatcher([
 // lookup entirely so these routes aren't blocked by the auth round-trip.
 const isFullyPublicRoute = createRouteMatcher([
   '/apply/(.*)',
+  '/apply/b/(.*)',
   '/book/(.*)',
   '/status/(.*)',
   '/api/webhooks/(.*)',

@@ -1,0 +1,143 @@
+import { notFound } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { PublicPageShell } from '@/components/public-page-shell';
+import { ApplicationFormLoader } from '@/app/apply/[slug]/application-form-loader';
+
+// Cache this page for 60 seconds — it's public and rarely changes.
+export const revalidate = 60;
+
+export default async function BrokerageApplyPage({
+  params,
+}: {
+  params: Promise<{ brokerageId: string }>;
+}) {
+  const { brokerageId } = await params;
+
+  // 1. Look up the brokerage
+  const { data: brokerage } = await supabase
+    .from('Brokerage')
+    .select('id, name, status, logoUrl')
+    .eq('id', brokerageId)
+    .maybeSingle();
+
+  if (!brokerage || brokerage.status === 'suspended') notFound();
+
+  // 2. Find the broker_owner via BrokerageMembership
+  const { data: ownerMembership } = await supabase
+    .from('BrokerageMembership')
+    .select('userId')
+    .eq('brokerageId', brokerage.id)
+    .eq('role', 'broker_owner')
+    .maybeSingle();
+
+  if (!ownerMembership) notFound();
+
+  // 3. Get the broker_owner's Space for branding
+  const { data: space } = await supabase
+    .from('Space')
+    .select('id, slug, name, ownerId')
+    .eq('ownerId', ownerMembership.userId)
+    .maybeSingle();
+
+  if (!space) notFound();
+
+  // 4. Parallel queries for settings and owner info
+  const [{ data: coreSettings }, { data: customSettings }, { data: ownerData }] = await Promise.all([
+    supabase
+      .from('SpaceSetting')
+      .select('intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl')
+      .eq('spaceId', space.id)
+      .maybeSingle(),
+    supabase
+      .from('SpaceSetting')
+      .select(
+        'intakeAccentColor, intakeBorderRadius, intakeFont, intakeDarkMode, ' +
+        'intakeHeaderBgColor, intakeHeaderGradient, intakeVideoUrl, ' +
+        'intakeDisclaimerText, intakeThankYouTitle, intakeThankYouMessage, ' +
+        'intakeFooterLinks, intakeDisabledSteps, intakeCustomQuestions, ' +
+        'intakeFaviconUrl, bio, socialLinks'
+      )
+      .eq('spaceId', space.id)
+      .maybeSingle()
+      .then(r => r),
+    supabase
+      .from('User')
+      .select('name, avatar')
+      .eq('id', space.ownerId)
+      .maybeSingle(),
+  ]);
+
+  const settingsData = { ...((coreSettings ?? {}) as any), ...((customSettings ?? {}) as any) };
+  const settings = settingsData as {
+    intakePageTitle: string | null;
+    intakePageIntro: string | null;
+    businessName: string | null;
+    logoUrl: string | null;
+    realtorPhotoUrl: string | null;
+    intakeAccentColor: string | null;
+    intakeBorderRadius: string | null;
+    intakeFont: string | null;
+    intakeDarkMode: boolean | null;
+    intakeHeaderBgColor: string | null;
+    intakeHeaderGradient: string | null;
+    intakeVideoUrl: string | null;
+    intakeDisclaimerText: string | null;
+    intakeThankYouTitle: string | null;
+    intakeThankYouMessage: string | null;
+    intakeFooterLinks: { label: string; url: string }[] | null;
+    intakeDisabledSteps: number[] | null;
+    intakeCustomQuestions: { id: string; label: string; type: string; required?: boolean }[] | null;
+    intakeFaviconUrl: string | null;
+    bio: string | null;
+    socialLinks: Record<string, string> | null;
+  } | null;
+
+  // Use brokerage name for title, fall back to space settings
+  const pageTitle = `${brokerage.name} Rental Application`;
+  const pageIntro = settings?.intakePageIntro || "Share your rental preferences and we'll follow up with next steps.";
+  const businessName = brokerage.name;
+  const agentName = ownerData?.name || businessName;
+  const agentPhoto = settings?.realtorPhotoUrl || ownerData?.avatar || null;
+  // Prefer brokerage logo, fall back to space logo
+  const logoUrl = brokerage.logoUrl || settings?.logoUrl || null;
+
+  const customization = {
+    accentColor: settings?.intakeAccentColor || '#ff964f',
+    borderRadius: settings?.intakeBorderRadius || 'rounded',
+    font: settings?.intakeFont || 'system',
+    darkMode: settings?.intakeDarkMode || false,
+    headerBgColor: settings?.intakeHeaderBgColor || null,
+    headerGradient: settings?.intakeHeaderGradient || null,
+    videoUrl: settings?.intakeVideoUrl || null,
+    disclaimerText: settings?.intakeDisclaimerText || null,
+    thankYouTitle: settings?.intakeThankYouTitle || null,
+    thankYouMessage: settings?.intakeThankYouMessage || null,
+    footerLinks: settings?.intakeFooterLinks || [],
+    disabledSteps: settings?.intakeDisabledSteps || [],
+    customQuestions: settings?.intakeCustomQuestions || [],
+    faviconUrl: settings?.intakeFaviconUrl || null,
+    bio: settings?.bio || null,
+    socialLinks: settings?.socialLinks || null,
+  };
+
+  return (
+    <PublicPageShell
+      logoUrl={logoUrl}
+      businessName={businessName}
+      agentName={agentName}
+      agentPhone={null}
+      agentPhoto={agentPhoto}
+      pageTitle={pageTitle}
+      pageIntro={pageIntro}
+      trustLine={`Your information is shared only with ${agentName} and used solely for rental inquiries.`}
+      customization={customization}
+    >
+      <ApplicationFormLoader
+        slug={space.slug}
+        businessName={businessName}
+        customization={customization}
+        brokerageId={brokerage.id}
+      />
+    </PublicPageShell>
+  );
+}
