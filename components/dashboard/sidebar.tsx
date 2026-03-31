@@ -24,6 +24,7 @@ import {
   FileText,
   Megaphone,
   MessageCircle,
+  DollarSign,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -37,20 +38,44 @@ interface SidebarProps {
   brokerageRole?: string | null;
 }
 
-const brokerTeamNavItems = [
-  { href: '/broker', label: 'Team Overview', icon: LayoutDashboard, exact: true, adminOnly: false },
-  { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
-  { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
-  { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
-  { href: '/broker/response-times', label: 'Response Times', icon: Clock, exact: false, adminOnly: false },
-  { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
-  { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
-  { href: '/broker/announcements', label: 'Announcements', icon: Megaphone, exact: false, adminOnly: false },
-  { href: '/broker/chat', label: 'Team Chat', icon: MessageCircle, exact: false, adminOnly: false },
-  { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
-  { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false, adminOnly: true },
-  { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
+const brokerNavSections = [
+  {
+    label: 'Overview',
+    items: [
+      { href: '/broker', label: 'Dashboard', icon: LayoutDashboard, exact: true, adminOnly: false },
+      { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
+      { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
+    ],
+  },
+  {
+    label: 'Team',
+    items: [
+      { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
+      { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
+      { href: '/broker/response-times', label: 'Response', icon: Clock, exact: false, adminOnly: false },
+      { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
+      { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false, adminOnly: true, highlight: true },
+    ],
+  },
+  {
+    label: 'Tools',
+    items: [
+      { href: '/broker/analytics', label: 'Analytics', icon: BarChart3, exact: false, adminOnly: false },
+      { href: '/broker/commissions', label: 'Commissions', icon: DollarSign, exact: false, adminOnly: false },
+      { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
+      { href: '/broker/chat', label: 'Team Chat', icon: MessageCircle, exact: false, adminOnly: false },
+      { href: '/broker/announcements', label: 'Announcements', icon: Megaphone, exact: false, adminOnly: false },
+    ],
+  },
+  {
+    label: 'Admin',
+    items: [
+      { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
+    ],
+  },
 ];
+// Flat list for backward compat
+const brokerTeamNavItems = brokerNavSections.flatMap(s => s.items);
 
 // ── Section label ──────────────────────────────────────────────────────────
 
@@ -225,26 +250,27 @@ export function Sidebar({
           href="/broker"
           name={brokerageName ?? 'Brokerage'}
           icon={Building2}
-          subtitle={brokerageRole === 'broker_owner' ? 'Owner' : brokerageRole === 'broker_admin' ? 'Admin' : 'Member'}
+          subtitle="Brokerage Dashboard"
         />
 
-        {/* Team nav */}
+        {/* Team nav — organized into sections */}
         <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
-          <SectionLabel>Team</SectionLabel>
-          {brokerTeamNavItems
-            .filter((item) => !item.adminOnly || brokerageRole === 'broker_owner' || brokerageRole === 'broker_admin')
-            .map((item) => {
-            const isActive = item.exact
-              ? pathname === item.href
-              : pathname.startsWith(item.href);
+          {brokerNavSections.map((section) => {
+            const visibleItems = section.items.filter(
+              (item) => !item.adminOnly || brokerageRole === 'broker_owner' || brokerageRole === 'broker_admin'
+            );
+            if (visibleItems.length === 0) return null;
             return (
-              <NavItem
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                icon={item.icon}
-                isActive={isActive}
-              />
+              <div key={section.label}>
+                <SectionLabel>{section.label}</SectionLabel>
+                {visibleItems.map((item) => {
+                  const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                  const highlightBadge = 'highlight' in item && item.highlight && !isActive ? (
+                    <span className="inline-flex h-2 w-2 rounded-full bg-primary shrink-0" />
+                  ) : undefined;
+                  return <NavItem key={item.href} href={item.href} label={item.label} icon={item.icon} isActive={isActive} badge={highlightBadge} />;
+                })}
+              </div>
             );
           })}
         </nav>
@@ -291,6 +317,7 @@ export function Sidebar({
         href={`${base}/settings`}
         name={spaceName}
         icon={Briefcase}
+        subtitle="Realtor Dashboard"
       />
 
       {/* Primary nav */}
