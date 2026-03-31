@@ -63,7 +63,6 @@ const brokerAdminNavSections = [
     items: [
       { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
       { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
-      { href: '/broker/response-times', label: 'Response', icon: Clock, exact: false, adminOnly: false },
       { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
       { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false, adminOnly: true, highlight: true },
     ],
