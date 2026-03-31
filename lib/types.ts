@@ -312,3 +312,14 @@ export type Tour = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type Note = {
+  id: string;
+  spaceId: string;
+  title: string;
+  content: string;
+  icon: string | null;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+};

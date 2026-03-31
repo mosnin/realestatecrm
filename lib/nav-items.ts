@@ -11,6 +11,7 @@ import {
   CreditCard,
   CalendarDays,
   Clock,
+  FileText,
 } from 'lucide-react';
 
 export const primaryNavItems = [
@@ -20,6 +21,7 @@ export const primaryNavItems = [
   { href: '/deals', label: 'Deals', icon: Briefcase },
   { href: '/follow-ups', label: 'Follow-ups', icon: Clock },
   { href: '/tours', label: 'Tours', icon: CalendarDays },
+  { href: '/notes', label: 'Notes', icon: FileText },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/ai', label: 'Chip', icon: Sparkles },
 ] as const;
