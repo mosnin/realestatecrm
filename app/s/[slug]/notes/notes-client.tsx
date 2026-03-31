@@ -11,6 +11,7 @@ import {
   Check,
   Loader2,
   StickyNote,
+  Download,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -79,6 +80,13 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
   const [mentionIndex, setMentionIndex] = useState(0);
   const [mentionPos, setMentionPos] = useState<{ top: number; left: number } | null>(null);
   const [mentionStart, setMentionStart] = useState<number | null>(null);
+
+  // Slash command state
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashQuery, setSlashQuery] = useState('');
+  const [slashIndex, setSlashIndex] = useState(0);
+  const [slashStart, setSlashStart] = useState<number | null>(null);
+  const [slashPos, setSlashPos] = useState<{ top: number; left: number } | null>(null);
 
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -226,21 +234,18 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
 
   const handleContentKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (mentionOpen) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setMentionIndex((i) => Math.min(i + 1, filteredMentions.length - 1));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setMentionIndex((i) => Math.max(i - 1, 0));
-      } else if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault();
-        if (filteredMentions[mentionIndex]) {
-          insertMention(filteredMentions[mentionIndex]);
-        }
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        closeMention();
-      }
+      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex((i) => Math.min(i + 1, filteredMentions.length - 1)); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex((i) => Math.max(i - 1, 0)); }
+      else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); if (filteredMentions[mentionIndex]) insertMention(filteredMentions[mentionIndex]); }
+      else if (e.key === 'Escape') { e.preventDefault(); closeMention(); }
+      return;
+    }
+    if (slashOpen) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSlashIndex((i) => Math.min(i + 1, filteredSlashCommands.length - 1)); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); setSlashIndex((i) => Math.max(i - 1, 0)); }
+      else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); if (filteredSlashCommands[slashIndex]) insertSlashCommand(filteredSlashCommands[slashIndex]); }
+      else if (e.key === 'Escape') { e.preventDefault(); closeSlash(); }
+      return;
     }
   };
 
@@ -280,6 +285,24 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
     }
 
     closeMention();
+
+    // Detect / slash command (at start of line)
+    const slashIdx = textBefore.lastIndexOf('/');
+    if (slashIdx >= 0) {
+      const charBeforeSlash = slashIdx > 0 ? textBefore[slashIdx - 1] : '\n';
+      const slashQuery = textBefore.slice(slashIdx + 1);
+      if ((charBeforeSlash === '\n' || slashIdx === 0) && !/\s/.test(slashQuery)) {
+        setSlashOpen(true);
+        setSlashQuery(slashQuery);
+        setSlashIndex(0);
+        setSlashStart(slashIdx);
+        const lines = textBefore.split('\n');
+        const lineNum = lines.length - 1;
+        setSlashPos({ top: (lineNum + 1) * 24 + 4, left: 0 });
+        return;
+      }
+    }
+    closeSlash();
   };
 
   const insertMention = (mention: MentionOption) => {
@@ -314,6 +337,58 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
     setMentionPos(null);
   };
 
+  // ── Slash commands ────────────────────────────────────────────────────────
+  const SLASH_COMMANDS = [
+    { id: 'heading', label: 'Heading', desc: 'Large section heading', insert: '## ' },
+    { id: 'subheading', label: 'Sub-heading', desc: 'Smaller heading', insert: '### ' },
+    { id: 'bullet', label: 'Bullet list', desc: 'Create a bullet list', insert: '- ' },
+    { id: 'numbered', label: 'Numbered list', desc: 'Create a numbered list', insert: '1. ' },
+    { id: 'checkbox', label: 'Checkbox', desc: 'To-do item', insert: '- [ ] ' },
+    { id: 'divider', label: 'Divider', desc: 'Horizontal line', insert: '\n---\n' },
+    { id: 'quote', label: 'Quote', desc: 'Block quote', insert: '> ' },
+    { id: 'code', label: 'Code block', desc: 'Fenced code block', insert: '```\n\n```' },
+    { id: 'table', label: 'Table', desc: 'Insert a table', insert: '| Column 1 | Column 2 | Column 3 |\n| --- | --- | --- |\n| | | |\n' },
+    { id: 'image', label: 'Image', desc: 'Embed an image by URL', insert: '![alt text](https://)' },
+    { id: 'link', label: 'Link', desc: 'Insert a hyperlink', insert: '[link text](https://)' },
+    { id: 'callout', label: 'Callout', desc: 'Highlighted note block', insert: '> 💡 ' },
+    { id: 'date', label: 'Today\'s date', desc: 'Insert current date', insert: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) },
+  ];
+
+  const filteredSlashCommands = SLASH_COMMANDS.filter(
+    (c) => c.label.toLowerCase().includes(slashQuery.toLowerCase()) || c.id.includes(slashQuery.toLowerCase()),
+  );
+
+  const insertSlashCommand = (cmd: typeof SLASH_COMMANDS[0]) => {
+    if (slashStart === null) return;
+    const textarea = contentRef.current;
+    if (!textarea) return;
+
+    const before = content.slice(0, slashStart);
+    const after = content.slice(textarea.selectionStart);
+    const newContent = before + cmd.insert + after;
+
+    setContent(newContent);
+    closeSlash();
+    if (activeId) autoSave(activeId, { title, content: newContent });
+
+    requestAnimationFrame(() => {
+      if (contentRef.current) {
+        const cursorOffset = cmd.insert.includes('```') ? cmd.insert.indexOf('\n') + 1 : cmd.insert.length;
+        const pos = before.length + cursorOffset;
+        contentRef.current.focus();
+        contentRef.current.setSelectionRange(pos, pos);
+      }
+    });
+  };
+
+  const closeSlash = () => {
+    setSlashOpen(false);
+    setSlashQuery('');
+    setSlashIndex(0);
+    setSlashStart(null);
+    setSlashPos(null);
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   // Build a lookup of known names → { kind, id, href }
@@ -328,9 +403,72 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
     return map;
   }, [contacts, deals, slug]);
 
-  // This is no longer used for display (textarea shows raw text)
-  // but kept for potential future use
-  const renderContent = () => null;
+  // Render content with @mentions highlighted as bold orange links
+  const renderHighlightedContent = useCallback((text: string) => {
+    if (!text) return null;
+    // Match @Name patterns (word chars, spaces, hyphens, apostrophes after @)
+    const parts = text.split(/(@[\w][\w\s\-']*[\w])/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('@')) {
+        const name = part.slice(1);
+        const match = mentionLookup.get(name.toLowerCase());
+        if (match) {
+          return (
+            <a
+              key={i}
+              href={match.href}
+              className="font-bold text-primary hover:underline cursor-pointer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {part}
+            </a>
+          );
+        }
+      }
+      return <span key={i}>{part}</span>;
+    });
+  }, [mentionLookup]);
+
+  // Export note as Markdown
+  const exportMarkdown = useCallback(() => {
+    const md = `# ${title}\n\n${content}`;
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title || 'note'}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [title, content]);
+
+  // Export note as PDF (uses browser print)
+  const exportPDF = useCallback(() => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${title || 'Note'}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; }
+            h1 { font-size: 28px; margin-bottom: 24px; }
+            .content { font-size: 15px; line-height: 1.8; white-space: pre-wrap; }
+            .mention { font-weight: 700; color: #ff964f; }
+          </style>
+        </head>
+        <body>
+          <h1>${title || 'Untitled'}</h1>
+          <div class="content">${content.replace(/@([\w][\w\s\-']*[\w])/g, (match) => {
+            const name = match.slice(1);
+            const found = mentionLookup.get(name.toLowerCase());
+            return found ? `<span class="mention">${match}</span>` : match;
+          })}</div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  }, [title, content, mentionLookup]);
 
   return (
     <div className="flex h-full">
@@ -406,16 +544,30 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
                 className="w-full text-2xl font-bold bg-transparent border-none outline-none placeholder:text-muted-foreground/40 mb-4"
               />
 
-              {/* Content area — clean textarea, mentions stored as plain @Name */}
-              <div className="relative">
+              {/* Content area — textarea with highlighted mention overlay */}
+              <div className="relative min-h-[50vh]">
+                {/* Highlighted overlay (shows formatted @mentions in orange bold) */}
+                <div
+                  className="absolute inset-0 text-base leading-relaxed whitespace-pre-wrap break-words pointer-events-none"
+                  aria-hidden
+                >
+                  {content ? renderHighlightedContent(content) : (
+                    <span className="text-muted-foreground/40">Start writing... Type @ to mention a contact or deal</span>
+                  )}
+                  {/* Extra space so overlay matches textarea height */}
+                  <span className="invisible">.</span>
+                </div>
+
+                {/* Actual textarea — transparent text, visible caret */}
                 <textarea
                   ref={contentRef}
                   value={content}
                   onChange={handleContentInput}
                   onKeyDown={handleContentKeyDown}
                   onBlur={() => setTimeout(() => closeMention(), 200)}
-                  placeholder="Start writing... Type @ to mention a contact or deal"
-                  className="w-full min-h-[50vh] text-base bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/40 leading-relaxed"
+                  placeholder=""
+                  className="relative w-full min-h-[50vh] text-base bg-transparent border-none outline-none resize-none leading-relaxed text-transparent caret-foreground"
+                  spellCheck={false}
                 />
 
                 {/* Mention dropdown */}
@@ -460,11 +612,53 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
                 )}
               </div>
 
-              {/* No preview needed — mentions render inline above */}
+                {/* Slash command dropdown */}
+                {slashOpen && slashPos && filteredSlashCommands.length > 0 && (
+                  <div
+                    className="absolute z-50 w-72 max-h-64 overflow-auto rounded-lg border bg-popover shadow-lg"
+                    style={{ top: slashPos.top, left: slashPos.left }}
+                  >
+                    <div className="px-3 py-1.5 border-b">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Insert block</p>
+                    </div>
+                    {filteredSlashCommands.map((cmd, i) => (
+                      <button
+                        key={cmd.id}
+                        className={cn(
+                          'w-full text-left px-3 py-2 text-sm flex flex-col transition-colors',
+                          i === slashIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
+                        )}
+                        onMouseDown={(e) => { e.preventDefault(); insertSlashCommand(cmd); }}
+                        onMouseEnter={() => setSlashIndex(i)}
+                      >
+                        <span className="font-medium">{cmd.label}</span>
+                        <span className="text-xs text-muted-foreground">{cmd.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
             </div>
 
-            {/* Save status bar */}
-            <div className="shrink-0 border-t px-4 py-1.5 flex items-center justify-end">
+            {/* Status bar with export buttons */}
+            <div className="shrink-0 border-t px-4 py-1.5 flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={exportMarkdown}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
+                  title="Export as Markdown"
+                >
+                  <Download className="h-3 w-3" />
+                  .md
+                </button>
+                <button
+                  onClick={exportPDF}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
+                  title="Export as PDF"
+                >
+                  <Download className="h-3 w-3" />
+                  .pdf
+                </button>
+              </div>
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 {saveStatus === 'saving' && (
                   <>
