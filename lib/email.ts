@@ -36,7 +36,10 @@ export interface NewLeadEmailParams {
 }
 
 export async function sendNewLeadNotification(params: NewLeadEmailParams): Promise<void> {
-  if (!process.env.RESEND_API_KEY) return;
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('[email] RESEND_API_KEY not set — skipping email');
+    return;
+  }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
@@ -110,12 +113,18 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
   const safeSubjectName = name.replace(/[\r\n\t]/g, ' ').slice(0, 200);
   const safeScoreLabel = (scoreLabel ?? '').replace(/[\r\n\t]/g, ' ');
 
-  await resend.emails.send({
-    from: FROM,
-    to: toEmail,
-    subject: `New lead: ${safeSubjectName}${leadScore != null ? ` · ${Math.round(leadScore)} ${safeScoreLabel}` : ''}`,
-    html,
-  });
+  try {
+    console.log('[email] Sending new lead notification to:', toEmail, 'from:', FROM);
+    const result = await resend.emails.send({
+      from: FROM,
+      to: toEmail,
+      subject: `New lead: ${safeSubjectName}${leadScore != null ? ` · ${Math.round(leadScore)} ${safeScoreLabel}` : ''}`,
+      html,
+    });
+    console.log('[email] Send result:', JSON.stringify(result));
+  } catch (err) {
+    console.error('[email] SEND FAILED:', err);
+  }
 }
 
 export interface FollowUpDigestParams {
@@ -126,7 +135,7 @@ export interface FollowUpDigestParams {
 }
 
 export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<void> {
-  if (!process.env.RESEND_API_KEY) return;
+  if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
@@ -202,7 +211,7 @@ export interface SendEmailFromCRMParams {
 }
 
 export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<void> {
-  if (!process.env.RESEND_API_KEY) return;
+  if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
@@ -250,7 +259,7 @@ export interface NewDealEmailParams {
 }
 
 export async function sendNewDealNotification(params: NewDealEmailParams): Promise<void> {
-  if (!process.env.RESEND_API_KEY) return;
+  if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
@@ -315,7 +324,7 @@ export interface BrokerageInvitationEmailParams {
 }
 
 export async function sendBrokerageInvitation(params: BrokerageInvitationEmailParams): Promise<void> {
-  if (!process.env.RESEND_API_KEY) return;
+  if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
@@ -378,7 +387,7 @@ export async function sendWelcomeEmail(params: {
   spaceName?: string | null;
   spaceSlug?: string | null;
 }): Promise<void> {
-  if (!process.env.RESEND_API_KEY) return;
+  if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';

@@ -95,7 +95,9 @@ export interface NotifyNewLeadParams {
  */
 export async function notifyNewLead(params: NotifyNewLeadParams): Promise<void> {
   const info = await getSpaceOwnerInfo(params.spaceId);
-  if (!info || !info.notifyNewLeads) return;
+  if (!info) { console.warn('[notify] No space owner info found for spaceId:', params.spaceId); return; }
+  if (!info.notifyNewLeads) { console.warn('[notify] notifyNewLeads is disabled for space:', params.spaceId); return; }
+  console.log('[notify] Sending new lead notification to:', info.ownerEmail, 'emailEnabled:', info.emailEnabled, 'smsEnabled:', info.smsEnabled);
 
   const promises: Promise<unknown>[] = [];
 
