@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2, Copy, Check, Trash2, Plus, Key } from 'lucide-react';
 import type { Space } from '@/lib/types';
 
 type UserSettings = {
@@ -88,6 +88,74 @@ export function SettingsForm({ space, settings, userEmail }: SettingsFormProps) 
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  // MCP / Integrations state
+  type McpKey = { id: string; name: string; keyPrefix: string; lastUsedAt: string | null; createdAt: string };
+  const [mcpKeys, setMcpKeys] = useState<McpKey[]>([]);
+  const [mcpKeysLoading, setMcpKeysLoading] = useState(true);
+  const [mcpNewKeyName, setMcpNewKeyName] = useState('');
+  const [mcpCreating, setMcpCreating] = useState(false);
+  const [mcpNewFullKey, setMcpNewFullKey] = useState<string | null>(null);
+  const [mcpShowForm, setMcpShowForm] = useState(false);
+  const [mcpCopiedEndpoint, setMcpCopiedEndpoint] = useState(false);
+  const [mcpCopiedKey, setMcpCopiedKey] = useState(false);
+  const [mcpDeletingId, setMcpDeletingId] = useState<string | null>(null);
+
+  const MCP_ENDPOINT = 'https://my.usechippi.com/api/mcp';
+
+  useEffect(() => {
+    fetch(`/api/mcp-keys?slug=${encodeURIComponent(space.slug)}`)
+      .then((r) => r.json())
+      .then((d) => setMcpKeys(d.keys ?? []))
+      .catch(() => setMcpKeys([]))
+      .finally(() => setMcpKeysLoading(false));
+  }, [space.slug]);
+
+  async function handleCreateMcpKey() {
+    if (!mcpNewKeyName.trim()) return;
+    setMcpCreating(true);
+    try {
+      const res = await fetch('/api/mcp-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: space.slug, name: mcpNewKeyName.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMcpNewFullKey(data.key);
+        setMcpKeys((prev) => [{ id: data.id, name: data.name, keyPrefix: data.keyPrefix, lastUsedAt: null, createdAt: data.createdAt }, ...prev]);
+        setMcpNewKeyName('');
+      } else {
+        alert(data.error ?? 'Failed to create API key.');
+      }
+    } catch {
+      alert('Network error. Please try again.');
+    } finally {
+      setMcpCreating(false);
+    }
+  }
+
+  async function handleDeleteMcpKey(id: string) {
+    if (!confirm('Are you sure you want to delete this API key? Any integrations using it will stop working.')) return;
+    setMcpDeletingId(id);
+    try {
+      const res = await fetch('/api/mcp-keys', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: space.slug, id }),
+      });
+      if (res.ok) {
+        setMcpKeys((prev) => prev.filter((k) => k.id !== id));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? 'Failed to delete key.');
+      }
+    } catch {
+      alert('Network error. Please try again.');
+    } finally {
+      setMcpDeletingId(null);
+    }
+  }
 
   const anyChannelOn = notifications || smsNotifications;
 
