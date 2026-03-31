@@ -1,8 +1,10 @@
 import { getBrokerContext } from '@/lib/permissions';
+import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { BrokerageSettingsForm } from '@/components/broker/settings-form';
 import { InviteCodeCard } from '@/components/broker/invite-code-card';
+import { BrokerageMcpSection } from './mcp-section';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Settings — Broker Dashboard' };
@@ -13,6 +15,17 @@ export default async function BrokerSettingsPage() {
 
   const { brokerage, membership } = ctx;
   const canEdit = membership.role === 'broker_owner' || membership.role === 'broker_admin';
+
+  // Find the broker owner's space slug for MCP key management
+  let brokerSpaceSlug: string | null = null;
+  if (canEdit) {
+    const { data: ownerSpace } = await supabase
+      .from('Space')
+      .select('slug')
+      .eq('ownerId', brokerage.ownerId)
+      .maybeSingle();
+    brokerSpaceSlug = ownerSpace?.slug ?? null;
+  }
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -45,6 +58,10 @@ export default async function BrokerSettingsPage() {
           </div>
           <InviteCodeCard isOwner={canEdit} />
         </>
+      )}
+
+      {canEdit && brokerSpaceSlug && (
+        <BrokerageMcpSection slug={brokerSpaceSlug} />
       )}
 
       {!canEdit && (
