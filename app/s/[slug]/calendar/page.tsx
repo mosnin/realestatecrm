@@ -74,6 +74,26 @@ export default async function CalendarPage({
     followUpAt: string;
   }[];
 
+  // Fetch custom calendar events (table may not exist yet)
+  let customEvents: {
+    id: string;
+    title: string;
+    description: string | null;
+    date: string;
+    time: string | null;
+    color: string;
+  }[] = [];
+
+  try {
+    const { data } = await supabase
+      .from('CalendarEvent')
+      .select('id, title, description, date, time, color')
+      .eq('spaceId', space.id);
+    customEvents = (data ?? []) as typeof customEvents;
+  } catch {
+    // CalendarEvent table may not exist yet — ignore
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -87,6 +107,7 @@ export default async function CalendarPage({
         tours={tours}
         contactFollowUps={contactFollowUps}
         dealFollowUps={dealFollowUps}
+        customEvents={customEvents}
       />
     </div>
   );
