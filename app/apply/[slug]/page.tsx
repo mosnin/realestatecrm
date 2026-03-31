@@ -36,8 +36,7 @@ export default async function PublicApplyPage({
       )
       .eq('spaceId', space.id)
       .maybeSingle()
-      .then(r => r) // always resolve, even on column-not-found errors
-      .catch(() => ({ data: null })) as any,
+      .then(r => r),
     supabase
       .from('User')
       .select('name, avatar')
@@ -45,7 +44,7 @@ export default async function PublicApplyPage({
       .maybeSingle(),
   ]);
 
-  const settingsData = { ...(coreSettings || {}), ...(customSettings || {}) };
+  const settingsData = { ...((coreSettings ?? {}) as any), ...((customSettings ?? {}) as any) };
   const settings = settingsData as {
     intakePageTitle: string | null;
     intakePageIntro: string | null;

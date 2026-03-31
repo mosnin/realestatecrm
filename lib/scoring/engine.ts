@@ -63,6 +63,37 @@ export type ScoringEngineResult = {
   dataCompleteness: number; // 0-1
 };
 
+// ── Range string parser ───────────────────────────────────────────────
+
+/**
+ * Parse a budget/income range string (e.g. "$1,500 - $2,000", "Under $1,500",
+ * "$5,000+") into a numeric midpoint. Returns null if unparseable.
+ */
+export function parseRangeMidpoint(range: string): number | null {
+  if (!range) return null;
+  if (range.includes('+')) {
+    const num = parseInt(range.replace(/[^0-9]/g, ''));
+    return num || null;
+  }
+  if (range.toLowerCase().includes('under')) {
+    const num = parseInt(range.replace(/[^0-9]/g, ''));
+    return num ? num * 0.75 : null;
+  }
+  const nums = range.match(/[\d,]+/g)?.map(n => parseInt(n.replace(/,/g, ''))) || [];
+  if (nums.length >= 2) return (nums[0] + nums[1]) / 2;
+  if (nums.length === 1) return nums[0];
+  return null;
+}
+
+/**
+ * Resolve a value that may be a number or range string into a number.
+ */
+function resolveNumericValue(value: number | string | undefined | null): number {
+  if (value == null) return 0;
+  if (typeof value === 'number') return value;
+  return parseRangeMidpoint(value) ?? 0;
+}
+
 // ── Tier thresholds ────────────────────────────────────────────────────────
 
 const TIER_THRESHOLDS = {
@@ -141,10 +172,10 @@ function scoreAffordability(input: ScoringInput): CategoryResult {
   const signals: string[] = [];
   let rawScore = 0.3; // baseline for minimal data
 
-  const income = app?.monthlyGrossIncome ?? 0;
+  const income = resolveNumericValue(app?.monthlyGrossIncome);
   const additionalIncome = app?.additionalIncome ?? 0;
   const totalIncome = income + additionalIncome;
-  const rent = app?.monthlyRent ?? input.budget ?? 0;
+  const rent = resolveNumericValue(app?.monthlyRent) || (input.budget ?? 0);
 
   if (totalIncome > 0 && rent > 0) {
     const ratio = totalIncome / rent;
@@ -195,28 +226,51 @@ function scoreMoveInUrgency(input: ScoringInput): CategoryResult {
   let rawScore = 0.3;
 
   if (app?.targetMoveInDate) {
-    const target = new Date(app.targetMoveInDate);
-    const now = new Date();
-    const daysUntilMove = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const moveIn = app.targetMoveInDate;
 
-    if (daysUntilMove <= 0) {
-      rawScore = 0.95;
-      signals.push('Immediate move-in needed (date has passed or is today)');
-    } else if (daysUntilMove <= 14) {
+    // Handle new simplified form values
+    if (moveIn.toLowerCase() === 'asap') {
       rawScore = 1.0;
-      signals.push(`Urgent: moving in ${daysUntilMove} days`);
-    } else if (daysUntilMove <= 30) {
+      signals.push('Immediate move-in: ASAP');
+    } else if (moveIn.toLowerCase().includes('within 30') || moveIn.toLowerCase().includes('30 day')) {
       rawScore = 0.85;
-      signals.push(`Near-term: moving in ${daysUntilMove} days (~1 month)`);
-    } else if (daysUntilMove <= 60) {
-      rawScore = 0.65;
-      signals.push(`Medium-term: moving in ${daysUntilMove} days (~2 months)`);
-    } else if (daysUntilMove <= 90) {
-      rawScore = 0.45;
-      signals.push(`Longer-term: moving in ${daysUntilMove} days (~3 months)`);
+      signals.push('Near-term: within 30 days');
+    } else if (moveIn.toLowerCase().includes('1-2 month') || moveIn.toLowerCase().includes('1–2 month')) {
+      rawScore = 0.6;
+      signals.push('Medium-term: 1-2 months');
+    } else if (moveIn.toLowerCase().includes('just browsing') || moveIn.toLowerCase().includes('browsing')) {
+      rawScore = 0.15;
+      signals.push('Just browsing — low urgency');
     } else {
-      rawScore = 0.25;
-      signals.push(`Far out: moving in ${daysUntilMove} days (${Math.round(daysUntilMove / 30)} months)`);
+      // Try parsing as a date (old form format)
+      const target = new Date(moveIn);
+      if (!isNaN(target.getTime())) {
+        const now = new Date();
+        const daysUntilMove = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (daysUntilMove <= 0) {
+          rawScore = 0.95;
+          signals.push('Immediate move-in needed (date has passed or is today)');
+        } else if (daysUntilMove <= 14) {
+          rawScore = 1.0;
+          signals.push(`Urgent: moving in ${daysUntilMove} days`);
+        } else if (daysUntilMove <= 30) {
+          rawScore = 0.85;
+          signals.push(`Near-term: moving in ${daysUntilMove} days (~1 month)`);
+        } else if (daysUntilMove <= 60) {
+          rawScore = 0.65;
+          signals.push(`Medium-term: moving in ${daysUntilMove} days (~2 months)`);
+        } else if (daysUntilMove <= 90) {
+          rawScore = 0.45;
+          signals.push(`Longer-term: moving in ${daysUntilMove} days (~3 months)`);
+        } else {
+          rawScore = 0.25;
+          signals.push(`Far out: moving in ${daysUntilMove} days (${Math.round(daysUntilMove / 30)} months)`);
+        }
+      } else {
+        rawScore = 0.4;
+        signals.push(`Move-in timing: "${moveIn}"`);
+      }
     }
   } else {
     signals.push('No move-in date provided');
@@ -245,20 +299,30 @@ function scoreEmploymentStability(input: ScoringInput): CategoryResult {
   let rawScore = 0.2;
 
   if (app?.employmentStatus) {
-    switch (app.employmentStatus) {
+    const status = app.employmentStatus;
+    switch (status) {
       case 'employed':
+      case 'Full-time employed':
         rawScore = 0.9;
-        signals.push('Employed');
+        signals.push(status === 'Full-time employed' ? 'Full-time employed' : 'Employed');
         if (app.employerOrSource) {
           rawScore = 1.0;
           signals.push(`Employer: ${app.employerOrSource}`);
         }
         break;
       case 'self-employed':
+      case 'Self-employed':
         rawScore = 0.75;
         signals.push('Self-employed');
         if (app.employerOrSource) {
           signals.push(`Source: ${app.employerOrSource}`);
+        }
+        break;
+      case 'Part-time employed':
+        rawScore = 0.6;
+        signals.push('Part-time employed');
+        if (app.employerOrSource) {
+          signals.push(`Employer: ${app.employerOrSource}`);
         }
         break;
       case 'retired':
@@ -266,16 +330,18 @@ function scoreEmploymentStability(input: ScoringInput): CategoryResult {
         signals.push('Retired — fixed income likely');
         break;
       case 'student':
+      case 'Student':
         rawScore = 0.4;
         signals.push('Student — may need co-signer or guarantor');
         break;
       case 'unemployed':
+      case 'Not currently employed':
         rawScore = 0.15;
-        signals.push('Unemployed — verify alternative income sources');
+        signals.push(status === 'Not currently employed' ? 'Not currently employed — verify alternative income sources' : 'Unemployed — verify alternative income sources');
         break;
       default:
         rawScore = 0.3;
-        signals.push(`Employment status: ${app.employmentStatus}`);
+        signals.push(`Employment status: ${status}`);
     }
   } else {
     signals.push('Employment status not provided');
@@ -587,8 +653,8 @@ function computeRiskPenalties(input: ScoringInput): RiskPenalty[] {
   }
 
   // Income way below threshold
-  const income = (app.monthlyGrossIncome ?? 0) + (app.additionalIncome ?? 0);
-  const rent = app.monthlyRent ?? 0;
+  const income = resolveNumericValue(app.monthlyGrossIncome) + (app.additionalIncome ?? 0);
+  const rent = resolveNumericValue(app.monthlyRent);
   if (income > 0 && rent > 0 && income / rent < 1.5) {
     penalties.push({
       flag: 'severe_affordability_gap',
@@ -723,6 +789,14 @@ export function computeLeadScore(input: ScoringInput): ScoringEngineResult {
   const riskPenalties = computeRiskPenalties(input);
   for (const penalty of riskPenalties) {
     baseScore *= penalty.multiplier;
+  }
+
+  // 3b. Intent signal from lease term preference (new simplified form)
+  const intent = input.applicationData?.leaseTermPreference;
+  if (intent === 'Yes, ready now') {
+    baseScore = Math.min(1.0, baseScore + 0.05); // hot signal boost
+  } else if (intent === 'Just exploring') {
+    baseScore *= 0.9; // slight dampening for exploratory leads
   }
 
   // 4. Scale to 0-100 and clamp

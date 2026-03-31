@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { DateWheelPicker } from '@/components/ui/date-wheel-picker';
 import {
   CheckCircle2,
   Loader2,
@@ -17,28 +16,24 @@ import {
   Home,
   User,
   MapPin,
-  Users,
   DollarSign,
-  History,
-  ShieldCheck,
   FileText,
-  PenLine,
-  Upload,
-  X,
+  Clock,
+  TrendingUp,
+  Briefcase,
 } from 'lucide-react';
 
 // ── Step config ──
 const ALL_STEPS = [
-  { id: 1, label: 'Property', icon: Home },
-  { id: 2, label: 'About You', icon: User },
-  { id: 3, label: 'Housing', icon: MapPin },
-  { id: 4, label: 'Household', icon: Users },
-  { id: 5, label: 'Income', icon: DollarSign },
-  { id: 6, label: 'History', icon: History },
-  { id: 7, label: 'Screening', icon: ShieldCheck },
+  { id: 1, label: 'Basics', icon: User },
+  { id: 2, label: 'Timing', icon: Clock },
+  { id: 3, label: 'Location', icon: MapPin },
+  { id: 4, label: 'Budget', icon: DollarSign },
+  { id: 5, label: 'Income', icon: TrendingUp },
+  { id: 6, label: 'Work', icon: Briefcase },
+  { id: 7, label: 'Home', icon: Home },
   { id: 8, label: 'Details', icon: FileText },
-  { id: 9, label: 'Documents', icon: Upload },
-  { id: 10, label: 'Submit', icon: PenLine },
+  { id: 9, label: 'Ready?', icon: CheckCircle2 },
 ] as const;
 
 type FormData = Record<string, string>;
@@ -92,138 +87,6 @@ function clearDraft(slug: string) {
   try {
     localStorage.removeItem(getStorageKey(slug));
   } catch {}
-}
-
-function safeParseDate(raw: string): Date | undefined {
-  if (!raw) return undefined;
-  const d = new Date(raw);
-  return isNaN(d.getTime()) ? undefined : d;
-}
-
-// ── Select component (inline, lightweight) ──
-function SelectField({
-  id,
-  label,
-  value,
-  onChange,
-  options,
-  placeholder,
-  required,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-  placeholder?: string;
-  required?: boolean;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>
-        {label} {required && <span className="text-destructive">*</span>}
-      </Label>
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
-      >
-        <option value="">{placeholder ?? 'Select...'}</option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-// ── Toggle pill for yes/no ──
-function ToggleField({
-  id,
-  label,
-  value,
-  onChange,
-  description,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  description?: string;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      {description && (
-        <p className="text-xs text-muted-foreground">{description}</p>
-      )}
-      <div className="flex gap-2 mt-1">
-        <button
-          type="button"
-          onClick={() => onChange(value === 'true' ? '' : 'true')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-            value === 'true'
-              ? 'bg-primary text-primary-foreground border-primary'
-              : 'bg-background border-border text-muted-foreground hover:bg-muted'
-          }`}
-        >
-          Yes
-        </button>
-        <button
-          type="button"
-          onClick={() => onChange(value === 'false' ? '' : 'false')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-            value === 'false'
-              ? 'bg-primary text-primary-foreground border-primary'
-              : 'bg-background border-border text-muted-foreground hover:bg-muted'
-          }`}
-        >
-          No
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ── Field wrapper ──
-function Field({
-  id,
-  label,
-  required,
-  type = 'text',
-  placeholder,
-  value,
-  onChange,
-  error,
-}: {
-  id: string;
-  label: string;
-  required?: boolean;
-  type?: string;
-  placeholder?: string;
-  value: string;
-  onChange: (v: string) => void;
-  error?: string;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>
-        {label} {required && <span className="text-destructive">*</span>}
-      </Label>
-      <Input
-        id={id}
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={error ? 'border-destructive' : ''}
-      />
-      {error && <p className="text-xs text-destructive">{error}</p>}
-    </div>
-  );
 }
 
 // ── Progress bar ──
@@ -313,6 +176,45 @@ function toEmbedUrl(url: string): string | null {
   }
 }
 
+// ── Step header ──
+function StepHeader({ title, description }: { title: string; description?: string }) {
+  return (
+    <div className="space-y-1.5">
+      <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+      {description && <p className="text-sm text-muted-foreground">{description}</p>}
+    </div>
+  );
+}
+
+// ── Selection card (radio-style pill) ──
+function SelectionCard({
+  label,
+  selected,
+  onClick,
+  accentColor,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+  accentColor: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'w-full text-left px-4 py-3.5 rounded-xl border transition-all text-sm',
+        selected
+          ? 'border-2 shadow-sm font-medium'
+          : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+      )}
+      style={selected ? { borderColor: accentColor, backgroundColor: `${accentColor}08` } : undefined}
+    >
+      {label}
+    </button>
+  );
+}
+
 export function ApplicationForm({
   slug,
   businessName,
@@ -323,7 +225,7 @@ export function ApplicationForm({
   customization?: IntakeCustomization;
 }) {
   const [step, setStep] = useState(1);
-  const [direction, setDirection] = useState(1); // 1 = forward, -1 = backward
+  const [direction, setDirection] = useState(1);
   const [data, setData] = useState<FormData>(() => loadDraft(slug));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -339,27 +241,18 @@ export function ApplicationForm({
     scoreDetails?: Record<string, unknown> | null;
     applicationRef?: string;
   } | null>(null);
-  const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const submissionLockRef = useRef(false);
 
   const get = useCallback((key: string) => data[key] ?? '', [data]);
 
   const disabledSteps = customization?.disabledSteps ?? [];
 
-  // Conditional logic: determine which steps to show based on answers
-  const STEPS = ALL_STEPS.filter((s) => {
-    // Skip rental history (step 6) if they own their home
-    if (s.id === 6 && data.currentHousingStatus === 'own') return false;
-    // Skip steps disabled by customization
-    if (disabledSteps.includes(s.id)) return false;
-    return true;
-  });
+  const STEPS = ALL_STEPS.filter((s) => !disabledSteps.includes(s.id));
 
-  // Map display index to actual step id
   const currentStepIndex = STEPS.findIndex((s) => s.id === step);
   const totalSteps = STEPS.length;
 
-  // Debounce localStorage saves to avoid jank on every keystroke
+  // Debounce localStorage saves
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedSave = useCallback(
     (d: FormData) => {
@@ -392,25 +285,41 @@ export function ApplicationForm({
   function validateStep(s: number): boolean {
     const errs: Record<string, string> = {};
 
-    if (s === 2) {
-      if (!get('legalName').trim()) errs.legalName = 'Full name is required';
-      if (!get('phone').trim()) errs.phone = 'Phone number is required';
+    if (s === 1) {
+      if (!get('name').trim()) errs.name = 'Full name is required';
       const email = get('email').trim();
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = 'Invalid email';
+      if (!email) errs.email = 'Email is required';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = 'Invalid email';
+    }
+
+    if (s === 2) {
+      if (!get('moveTiming')) errs.moveTiming = 'Please select when you plan to move';
+    }
+
+    if (s === 3) {
+      if (!get('location').trim()) errs.location = 'Please enter your desired location';
+    }
+
+    if (s === 4) {
+      if (!get('budget')) errs.budget = 'Please select your budget';
+    }
+
+    if (s === 5) {
+      if (!get('income')) errs.income = 'Please select your income range';
+    }
+
+    if (s === 6) {
+      if (!get('employment')) errs.employment = 'Please select your work situation';
     }
 
     if (s === 7) {
-      const score = Number(get('creditScore'));
-      if (!get('creditScore').trim() || isNaN(score) || score < 300 || score > 850) {
-        errs.creditScore = 'Please enter a valid credit score between 300 and 850';
-      }
+      if (!get('occupants').trim()) errs.occupants = 'Please enter the number of occupants';
     }
 
-    if (s === 10) {
-      if (!get('truthfulnessCertification') || get('truthfulnessCertification') !== 'true')
-        errs.truthfulnessCertification = 'Please certify the information is accurate';
-      if (!get('electronicSignature')?.trim())
-        errs.electronicSignature = 'Please type your full name as signature';
+    // Step 8: no validation (optional)
+
+    if (s === 9) {
+      if (!get('intent')) errs.intent = 'Please select your readiness level';
     }
 
     setErrors(errs);
@@ -444,68 +353,19 @@ export function ApplicationForm({
 
     const payload: Record<string, unknown> = {
       slug,
-      // Step 1
-      propertyAddress: get('propertyAddress'),
-      unitType: get('unitType'),
-      targetMoveInDate: get('targetMoveInDate'),
-      monthlyRent: get('monthlyRent'),
-      leaseTermPreference: get('leaseTermPreference'),
-      numberOfOccupants: get('numberOfOccupants'),
-      // Step 2
-      legalName: get('legalName'),
+      legalName: get('name'),
       email: get('email'),
       phone: get('phone'),
-      dateOfBirth: get('dateOfBirth'),
-      // Step 3
-      currentAddress: get('currentAddress'),
-      currentHousingStatus: get('currentHousingStatus'),
-      currentMonthlyPayment: get('currentMonthlyPayment'),
-      lengthOfResidence: get('lengthOfResidence'),
-      reasonForMoving: get('reasonForMoving'),
-      // Step 4
-      adultsOnApplication: get('adultsOnApplication'),
-      childrenOrDependents: get('childrenOrDependents'),
-      coRenters: get('coRenters'),
-      emergencyContactName: get('emergencyContactName'),
-      emergencyContactPhone: get('emergencyContactPhone'),
-      // Step 5
-      employmentStatus: get('employmentStatus'),
-      employerOrSource: get('employerOrSource'),
-      monthlyGrossIncome: get('monthlyGrossIncome'),
-      additionalIncome: get('additionalIncome'),
-      // Step 6
-      currentLandlordName: get('currentLandlordName'),
-      currentLandlordPhone: get('currentLandlordPhone'),
-      previousLandlordName: get('previousLandlordName'),
-      previousLandlordPhone: get('previousLandlordPhone'),
-      currentRentPaid: get('currentRentPaid'),
-      latePayments: get('latePayments'),
-      leaseViolations: get('leaseViolations'),
-      permissionToContactReferences: get('permissionToContactReferences'),
-      // Step 7
-      creditScore: get('creditScore'),
-      priorEvictions: get('priorEvictions'),
-      outstandingBalances: get('outstandingBalances'),
-      bankruptcy: get('bankruptcy'),
-      backgroundAcknowledgment: get('backgroundAcknowledgment'),
-      smoking: get('smoking'),
-      hasPets: get('hasPets'),
-      petDetails: get('petDetails'),
-      // Step 8
-      additionalNotes: get('additionalNotes'),
-      // Step 9
-      consentToScreening: get('consentToScreening'),
-      truthfulnessCertification: get('truthfulnessCertification'),
-      electronicSignature: get('electronicSignature'),
-      completedSteps: ALL_STEPS.map((s) => s.id),
-      // Include custom question answers
-      ...(customization?.customQuestions?.length
-        ? {
-            customAnswers: Object.fromEntries(
-              customization.customQuestions.map((q) => [q.id, get(`custom_${q.id}`)])
-            ),
-          }
-        : {}),
+      targetMoveInDate: get('moveTiming'),
+      propertyAddress: get('location'),
+      monthlyRent: get('budget'),
+      monthlyGrossIncome: get('income'),
+      employmentStatus: get('employment'),
+      numberOfOccupants: get('occupants'),
+      hasPets: get('hasPets') === 'yes',
+      additionalNotes: get('notes'),
+      leaseTermPreference: get('intent'),
+      completedSteps: STEPS.map((s) => s.id),
     };
 
     try {
@@ -537,8 +397,7 @@ export function ApplicationForm({
     }
   }
 
-  // ── Success screen ──
-  // Processing overlay
+  // ── Processing overlay ──
   if (submitting) {
     return (
       <motion.div
@@ -559,411 +418,345 @@ export function ApplicationForm({
     );
   }
 
+  // ── Success screen ──
   if (submitted) {
     return (
       <>
-      <Confetti ref={confettiRef} manualstart className="pointer-events-none fixed inset-0 z-[9999] w-full h-full" />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="rounded-xl bg-card border border-border/60 shadow-sm p-6 md:p-8 text-center space-y-5"
-      >
+        <Confetti ref={confettiRef} manualstart className="pointer-events-none fixed inset-0 z-[9999] w-full h-full" />
         <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 15 }}
-          className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="rounded-xl bg-card border border-border/60 shadow-sm p-6 md:p-8 text-center space-y-5"
         >
-          <CheckCircle2 size={28} className="text-green-600 dark:text-green-400" />
-        </motion.div>
-        <div className="space-y-1.5">
-          <h2 className="text-xl font-semibold text-foreground">
-            {customization?.thankYouTitle || 'Application received'}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {customization?.thankYouMessage || `${businessName} will review your application and follow up shortly.`}
-          </p>
-        </div>
-        {scoreState?.id && stagedFiles.length > 0 && (
-          <UploadProgressWidget contactId={scoreState.id} stagedFiles={stagedFiles} />
-        )}
-        {scoreState?.applicationRef && (
-          <a
-            href={`/apply/${slug}/status?ref=${scoreState.applicationRef}`}
-            className="inline-flex items-center gap-2 text-sm text-primary font-medium hover:underline"
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 15 }}
+            className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto"
           >
-            Track your application status →
-          </a>
-        )}
-        {scoreState?.scoringStatus === 'scored' && scoreState.scoreSummary && (
-          <div className="rounded-xl border border-border bg-muted/30 p-4 text-left space-y-3">
-            <div className="flex items-center gap-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Initial assessment
-              </p>
-              {scoreState.leadScore != null && (
-                <span
-                  className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-0.5 uppercase ${
-                    scoreState.scoreLabel === 'hot'
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
-                      : scoreState.scoreLabel === 'warm'
-                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-                        : 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400'
-                  }`}
-                >
-                  {scoreState.scoreLabel}
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-foreground leading-relaxed">{scoreState.scoreSummary}</p>
+            <CheckCircle2 size={28} className="text-green-600 dark:text-green-400" />
+          </motion.div>
+          <div className="space-y-1.5">
+            <h2 className="text-xl font-semibold text-foreground">
+              {customization?.thankYouTitle || 'Application received'}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {customization?.thankYouMessage || `${businessName} will review your application and follow up shortly.`}
+            </p>
           </div>
-        )}
-      </motion.div>
+          {scoreState?.applicationRef && (
+            <a
+              href={`/apply/${slug}/status?ref=${scoreState.applicationRef}`}
+              className="inline-flex items-center gap-2 text-sm text-primary font-medium hover:underline"
+            >
+              Track your application status &rarr;
+            </a>
+          )}
+          {scoreState?.scoringStatus === 'scored' && scoreState.scoreSummary && (
+            <div className="rounded-xl border border-border bg-muted/30 p-4 text-left space-y-3">
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Initial assessment
+                </p>
+                {scoreState.leadScore != null && (
+                  <span
+                    className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-0.5 uppercase ${
+                      scoreState.scoreLabel === 'hot'
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                        : scoreState.scoreLabel === 'warm'
+                          ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                          : 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400'
+                    }`}
+                  >
+                    {scoreState.scoreLabel}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-foreground leading-relaxed">{scoreState.scoreSummary}</p>
+            </div>
+          )}
+        </motion.div>
       </>
     );
   }
 
+  const radiusClass = RADIUS_CLASS_MAP[customization?.borderRadius || 'rounded'] || 'rounded-xl';
+  const fontClass = FONT_CLASS_MAP[customization?.font || 'system'] || '';
+  const accentColor = customization?.accentColor || '#ff964f';
+  const embedUrl = customization?.videoUrl ? toEmbedUrl(customization.videoUrl) : null;
+
   // ── Step content renderer ──
   function renderStep() {
     switch (step) {
+      // ── Step 1: Basic Info ──
       case 1:
         return (
-          <div className="space-y-5">
+          <div className="space-y-4">
             <StepHeader
-              title="Property details"
-              description="Which property are you interested in?"
+              title="Let's start with the basics"
+              description="We just need a few details to get going."
             />
-            <Field id="propertyAddress" label="Property address or listing" value={get('propertyAddress')} onChange={(v) => set('propertyAddress', v)} placeholder="123 Main St, Apt 4B" />
-            <Field id="unitType" label="Unit or bedroom type" value={get('unitType')} onChange={(v) => set('unitType', v)} placeholder="e.g. 2BR / 1BA" />
             <div className="space-y-1.5">
-              <Label>Target move-in date</Label>
-              <div className="rounded-lg border border-input bg-background p-3">
-                <DateWheelPicker
-                  value={safeParseDate(get('targetMoveInDate'))}
-                  onChange={(date) =>
-                    set(
-                      'targetMoveInDate',
-                      date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-                    )
-                  }
-                  minYear={new Date().getFullYear()}
-                  maxYear={new Date().getFullYear() + 2}
-                  size="sm"
-                />
-              </div>
-              {get('targetMoveInDate') && (
-                <p className="text-xs text-muted-foreground">
-                  Selected: {get('targetMoveInDate')}
-                </p>
-              )}
+              <Label htmlFor="name">
+                Full Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Alex Johnson"
+                value={get('name')}
+                onChange={(e) => set('name', e.target.value)}
+                className={cn('h-12 rounded-xl', errors.name && 'border-destructive')}
+              />
+              {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field id="monthlyRent" label="Monthly rent" value={get('monthlyRent')} onChange={(v) => set('monthlyRent', v)} placeholder="e.g. 2500" type="text" />
-              <SelectField id="leaseTermPreference" label="Lease term" value={get('leaseTermPreference')} onChange={(v) => set('leaseTermPreference', v)} options={[{ value: '12 months', label: '12 months' }, { value: '6 months', label: '6 months' }, { value: 'Month-to-month', label: 'Month-to-month' }, { value: 'Other', label: 'Other' }]} />
+            <div className="space-y-1.5">
+              <Label htmlFor="email">
+                Email <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="alex@email.com"
+                value={get('email')}
+                onChange={(e) => set('email', e.target.value)}
+                className={cn('h-12 rounded-xl', errors.email && 'border-destructive')}
+              />
+              {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
             </div>
-            <Field id="numberOfOccupants" label="Number of occupants" value={get('numberOfOccupants')} onChange={(v) => set('numberOfOccupants', v)} placeholder="e.g. 2" type="text" />
+            <div className="space-y-1.5">
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="(555) 123-4567"
+                value={get('phone')}
+                onChange={(e) => set('phone', e.target.value)}
+                className="h-12 rounded-xl"
+              />
+            </div>
           </div>
         );
 
+      // ── Step 2: Move Timing ──
       case 2:
         return (
-          <div className="space-y-5">
-            <StepHeader
-              title="About you"
-              description="Basic contact and identification info."
-            />
-            <Field id="legalName" label="Legal full name" required value={get('legalName')} onChange={(v) => set('legalName', v)} placeholder="Alex Johnson" error={errors.legalName} />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field id="email" label="Email" value={get('email')} onChange={(v) => set('email', v)} placeholder="alex@email.com" type="email" error={errors.email} />
-              <Field id="phone" label="Mobile phone" required value={get('phone')} onChange={(v) => set('phone', v)} placeholder="(555) 123-4567" type="tel" error={errors.phone} />
+          <div className="space-y-4">
+            <StepHeader title="When are you planning to move?" />
+            <div className="space-y-2.5">
+              {[
+                { value: 'asap', label: 'ASAP (within 2 weeks)' },
+                { value: '30days', label: 'Within 30 days' },
+                { value: '1-2months', label: '1-2 months' },
+                { value: 'browsing', label: 'Just browsing' },
+              ].map((option) => (
+                <SelectionCard
+                  key={option.value}
+                  label={option.label}
+                  selected={get('moveTiming') === option.value}
+                  onClick={() => set('moveTiming', option.value)}
+                  accentColor={accentColor}
+                />
+              ))}
             </div>
-            <Field id="dateOfBirth" label="Date of birth" value={get('dateOfBirth')} onChange={(v) => set('dateOfBirth', v)} placeholder="MM/DD/YYYY" />
+            {errors.moveTiming && <p className="text-xs text-destructive">{errors.moveTiming}</p>}
           </div>
         );
 
+      // ── Step 3: Location ──
       case 3:
         return (
-          <div className="space-y-5">
-            <StepHeader
-              title="Current living situation"
-              description="Where are you living now?"
-            />
-            <Field id="currentAddress" label="Current address" value={get('currentAddress')} onChange={(v) => set('currentAddress', v)} placeholder="456 Oak Ave, Unit 2" />
-            <SelectField id="currentHousingStatus" label="Do you own, rent, or live rent-free?" value={get('currentHousingStatus')} onChange={(v) => set('currentHousingStatus', v)} options={[{ value: 'rent', label: 'Rent' }, { value: 'own', label: 'Own' }, { value: 'rent-free', label: 'Live rent-free' }]} />
-            {get('currentHousingStatus') === 'rent' && (
-              <Field id="currentMonthlyPayment" label="Current monthly payment" value={get('currentMonthlyPayment')} onChange={(v) => set('currentMonthlyPayment', v)} placeholder="e.g. 1800" />
-            )}
-            <Field id="lengthOfResidence" label="How long have you lived there?" value={get('lengthOfResidence')} onChange={(v) => set('lengthOfResidence', v)} placeholder="e.g. 2 years" />
-            <Field id="reasonForMoving" label="Reason for moving" value={get('reasonForMoving')} onChange={(v) => set('reasonForMoving', v)} placeholder="e.g. Relocating for work" />
+          <div className="space-y-4">
+            <StepHeader title="Where are you looking to live?" />
+            <div className="space-y-1.5">
+              <Input
+                id="location"
+                type="text"
+                placeholder="e.g., Downtown Miami, Brickell"
+                value={get('location')}
+                onChange={(e) => set('location', e.target.value)}
+                className={cn('h-12 rounded-xl', errors.location && 'border-destructive')}
+              />
+              {errors.location && <p className="text-xs text-destructive">{errors.location}</p>}
+            </div>
           </div>
         );
 
+      // ── Step 4: Budget ──
       case 4:
         return (
-          <div className="space-y-5">
-            <StepHeader
-              title="Household"
-              description="Who will be living in the unit?"
-            />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field id="adultsOnApplication" label="Adults on application" value={get('adultsOnApplication')} onChange={(v) => set('adultsOnApplication', v)} placeholder="e.g. 2" type="text" />
-              <Field id="childrenOrDependents" label="Children or dependents" value={get('childrenOrDependents')} onChange={(v) => set('childrenOrDependents', v)} placeholder="e.g. 1" type="text" />
+          <div className="space-y-4">
+            <StepHeader title="What's your monthly rent budget?" />
+            <div className="space-y-2.5">
+              {[
+                { value: 'under_1500', label: 'Under $1,500' },
+                { value: '1500_2000', label: '$1,500 - $2,000' },
+                { value: '2000_2500', label: '$2,000 - $2,500' },
+                { value: '2500_3500', label: '$2,500 - $3,500' },
+                { value: '3500_plus', label: '$3,500+' },
+              ].map((option) => (
+                <SelectionCard
+                  key={option.value}
+                  label={option.label}
+                  selected={get('budget') === option.value}
+                  onClick={() => set('budget', option.value)}
+                  accentColor={accentColor}
+                />
+              ))}
             </div>
-            <Field id="coRenters" label="Roommates or co-renters" value={get('coRenters')} onChange={(v) => set('coRenters', v)} placeholder="Names of any co-applicants" />
-            <div className="border-t border-border/50 pt-4 space-y-4">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Emergency contact</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field id="emergencyContactName" label="Name" value={get('emergencyContactName')} onChange={(v) => set('emergencyContactName', v)} placeholder="Jane Johnson" />
-                <Field id="emergencyContactPhone" label="Phone" value={get('emergencyContactPhone')} onChange={(v) => set('emergencyContactPhone', v)} placeholder="(555) 987-6543" type="tel" />
-              </div>
-            </div>
+            {errors.budget && <p className="text-xs text-destructive">{errors.budget}</p>}
           </div>
         );
 
+      // ── Step 5: Income ──
       case 5:
         return (
-          <div className="space-y-5">
-            <StepHeader
-              title="Income"
-              description="Help us verify you can comfortably afford the rent."
-            />
-            <SelectField id="employmentStatus" label="Employment status" value={get('employmentStatus')} onChange={(v) => set('employmentStatus', v)} options={[{ value: 'employed', label: 'Employed' }, { value: 'self-employed', label: 'Self-employed' }, { value: 'unemployed', label: 'Unemployed' }, { value: 'retired', label: 'Retired' }, { value: 'student', label: 'Student' }]} />
-            {(get('employmentStatus') === 'employed' || get('employmentStatus') === 'self-employed') && (
-              <Field id="employerOrSource" label="Employer or income source" value={get('employerOrSource')} onChange={(v) => set('employerOrSource', v)} placeholder="e.g. Acme Corp" />
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field id="monthlyGrossIncome" label="Monthly gross income" value={get('monthlyGrossIncome')} onChange={(v) => set('monthlyGrossIncome', v)} placeholder="e.g. 6000" />
-              <Field id="additionalIncome" label="Additional income" value={get('additionalIncome')} onChange={(v) => set('additionalIncome', v)} placeholder="e.g. 500" />
+          <div className="space-y-4">
+            <StepHeader title="What's your estimated monthly income?" />
+            <div className="space-y-2.5">
+              {[
+                { value: 'under_2000', label: 'Under $2,000' },
+                { value: '2000_3000', label: '$2,000 - $3,000' },
+                { value: '3000_4000', label: '$3,000 - $4,000' },
+                { value: '4000_6000', label: '$4,000 - $6,000' },
+                { value: '6000_plus', label: '$6,000+' },
+              ].map((option) => (
+                <SelectionCard
+                  key={option.value}
+                  label={option.label}
+                  selected={get('income') === option.value}
+                  onClick={() => set('income', option.value)}
+                  accentColor={accentColor}
+                />
+              ))}
             </div>
+            {errors.income && <p className="text-xs text-destructive">{errors.income}</p>}
           </div>
         );
 
+      // ── Step 6: Employment ──
       case 6:
         return (
-          <div className="space-y-5">
-            <StepHeader
-              title="Rental history"
-              description="References from current or previous landlords."
-            />
-            <div className="space-y-4">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Current landlord</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field id="currentLandlordName" label="Name" value={get('currentLandlordName')} onChange={(v) => set('currentLandlordName', v)} placeholder="Landlord name" />
-                <Field id="currentLandlordPhone" label="Phone" value={get('currentLandlordPhone')} onChange={(v) => set('currentLandlordPhone', v)} placeholder="(555) 000-0000" type="tel" />
-              </div>
+          <div className="space-y-4">
+            <StepHeader title="What's your current work situation?" />
+            <div className="space-y-2.5">
+              {[
+                { value: 'full-time', label: 'Full-time employed' },
+                { value: 'self-employed', label: 'Self-employed' },
+                { value: 'part-time', label: 'Part-time employed' },
+                { value: 'student', label: 'Student' },
+                { value: 'not-employed', label: 'Not currently employed' },
+              ].map((option) => (
+                <SelectionCard
+                  key={option.value}
+                  label={option.label}
+                  selected={get('employment') === option.value}
+                  onClick={() => set('employment', option.value)}
+                  accentColor={accentColor}
+                />
+              ))}
             </div>
-            <div className="border-t border-border/50 pt-4 space-y-4">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Previous landlord</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field id="previousLandlordName" label="Name" value={get('previousLandlordName')} onChange={(v) => set('previousLandlordName', v)} placeholder="Previous landlord name" />
-                <Field id="previousLandlordPhone" label="Phone" value={get('previousLandlordPhone')} onChange={(v) => set('previousLandlordPhone', v)} placeholder="(555) 000-0000" type="tel" />
-              </div>
-            </div>
-            <Field id="currentRentPaid" label="Current rent paid" value={get('currentRentPaid')} onChange={(v) => set('currentRentPaid', v)} placeholder="e.g. 1800" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <ToggleField id="latePayments" label="Any late payments?" value={get('latePayments')} onChange={(v) => set('latePayments', v)} />
-              <ToggleField id="leaseViolations" label="Any lease violations?" value={get('leaseViolations')} onChange={(v) => set('leaseViolations', v)} />
-            </div>
-            <ToggleField id="permissionToContactReferences" label="May we contact your references?" value={get('permissionToContactReferences')} onChange={(v) => set('permissionToContactReferences', v)} />
+            {errors.employment && <p className="text-xs text-destructive">{errors.employment}</p>}
           </div>
         );
 
+      // ── Step 7: Household ──
       case 7:
         return (
-          <div className="space-y-5">
-            <StepHeader
-              title="Screening questions"
-              description="Quick questions to help us process your application."
-            />
-            {/* Credit score */}
+          <div className="space-y-4">
+            <StepHeader title="Tell us about your household" />
             <div className="space-y-1.5">
-              <Label htmlFor="creditScore" className="text-sm font-medium">
-                Credit score <span className="text-destructive">*</span>
+              <Label htmlFor="occupants">
+                How many people will be living in the home? <span className="text-destructive">*</span>
               </Label>
-              <p className="text-xs text-muted-foreground">
-                Your approximate credit score (300-850). You can find this on Credit Karma or your bank app.
-              </p>
               <Input
-                id="creditScore"
+                id="occupants"
                 type="number"
-                inputMode="numeric"
-                min={300}
-                max={850}
-                placeholder="e.g. 720"
-                value={get('creditScore') ?? ''}
-                onChange={(e) => set('creditScore', e.target.value)}
-                required
+                min={1}
+                placeholder="e.g., 2"
+                value={get('occupants')}
+                onChange={(e) => set('occupants', e.target.value)}
+                className={cn('h-12 rounded-xl', errors.occupants && 'border-destructive')}
               />
-              {get('creditScore') && (
-                <p className={cn(
-                  'text-xs font-medium',
-                  Number(get('creditScore')) >= 750 ? 'text-emerald-600' :
-                  Number(get('creditScore')) >= 670 ? 'text-primary' :
-                  Number(get('creditScore')) >= 580 ? 'text-amber-600' : 'text-destructive'
-                )}>
-                  {Number(get('creditScore')) >= 750 ? 'Excellent' :
-                   Number(get('creditScore')) >= 670 ? 'Good' :
-                   Number(get('creditScore')) >= 580 ? 'Fair' : 'Needs improvement'}
-                </p>
-              )}
-              {errors.creditScore && (
-                <p className="text-xs text-destructive">{errors.creditScore}</p>
-              )}
+              {errors.occupants && <p className="text-xs text-destructive">{errors.occupants}</p>}
             </div>
-            <div className="space-y-4">
-              <ToggleField id="priorEvictions" label="Any prior evictions?" value={get('priorEvictions')} onChange={(v) => set('priorEvictions', v)} />
-              <ToggleField id="outstandingBalances" label="Outstanding balances owed to a landlord?" value={get('outstandingBalances')} onChange={(v) => set('outstandingBalances', v)} />
-              <ToggleField id="bankruptcy" label="Filed for bankruptcy in the last 7 years?" value={get('bankruptcy')} onChange={(v) => set('bankruptcy', v)} />
-              <ToggleField id="backgroundAcknowledgment" label="Acknowledge background check may be conducted?" value={get('backgroundAcknowledgment')} onChange={(v) => set('backgroundAcknowledgment', v)} description="Where legally permitted" />
-            </div>
-            <div className="border-t border-border/50 pt-4 space-y-4">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Lifestyle</p>
-              <ToggleField id="smoking" label="Do you smoke?" value={get('smoking')} onChange={(v) => set('smoking', v)} />
-              <ToggleField id="hasPets" label="Do you have pets?" value={get('hasPets')} onChange={(v) => set('hasPets', v)} />
-              {get('hasPets') === 'true' && (
-                <Field id="petDetails" label="Pet details" value={get('petDetails')} onChange={(v) => set('petDetails', v)} placeholder="e.g. 1 dog, 30 lbs, Labrador" />
-              )}
+            <div className="space-y-1.5">
+              <Label>Do you have pets?</Label>
+              <div className="flex gap-3 mt-1">
+                <button
+                  type="button"
+                  onClick={() => set('hasPets', 'yes')}
+                  className={cn(
+                    'flex-1 px-4 py-3 rounded-xl border transition-all text-sm font-medium',
+                    get('hasPets') === 'yes'
+                      ? 'border-2 shadow-sm'
+                      : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                  )}
+                  style={get('hasPets') === 'yes' ? { borderColor: accentColor, backgroundColor: `${accentColor}08` } : undefined}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => set('hasPets', 'no')}
+                  className={cn(
+                    'flex-1 px-4 py-3 rounded-xl border transition-all text-sm font-medium',
+                    get('hasPets') === 'no'
+                      ? 'border-2 shadow-sm'
+                      : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                  )}
+                  style={get('hasPets') === 'no' ? { borderColor: accentColor, backgroundColor: `${accentColor}08` } : undefined}
+                >
+                  No
+                </button>
+              </div>
             </div>
           </div>
         );
 
+      // ── Step 8: Additional Info (Optional) ──
       case 8:
         return (
-          <div className="space-y-5">
+          <div className="space-y-4">
             <StepHeader
-              title="Additional details"
-              description="Anything else we should know about your application?"
+              title="Anything we should know?"
+              description="This step is optional. Share anything that might help."
             />
             <div className="space-y-1.5">
-              <Label htmlFor="additionalNotes">Notes or special requests</Label>
               <Textarea
-                id="additionalNotes"
-                value={get('additionalNotes')}
-                onChange={(e) => set('additionalNotes', e.target.value)}
-                placeholder="Parking needs, accessibility requirements, move-in flexibility, etc."
+                id="notes"
+                value={get('notes')}
+                onChange={(e) => set('notes', e.target.value)}
+                placeholder="Special requirements, preferences, questions..."
                 rows={5}
+                className="rounded-xl"
               />
             </div>
-            {/* Custom questions from SpaceSetting */}
-            {customization?.customQuestions && customization.customQuestions.length > 0 && (
-              <div className="border-t border-border/50 pt-4 space-y-4">
-                {customization.customQuestions.map((q) => (
-                  q.type === 'textarea' ? (
-                    <div key={q.id} className="space-y-1.5">
-                      <Label htmlFor={`custom_${q.id}`}>
-                        {q.label} {q.required && <span className="text-destructive">*</span>}
-                      </Label>
-                      <Textarea
-                        id={`custom_${q.id}`}
-                        value={get(`custom_${q.id}`)}
-                        onChange={(e) => set(`custom_${q.id}`, e.target.value)}
-                        rows={3}
-                      />
-                    </div>
-                  ) : q.type === 'yesno' ? (
-                    <ToggleField
-                      key={q.id}
-                      id={`custom_${q.id}`}
-                      label={q.label}
-                      value={get(`custom_${q.id}`)}
-                      onChange={(v) => set(`custom_${q.id}`, v)}
-                    />
-                  ) : (
-                    <Field
-                      key={q.id}
-                      id={`custom_${q.id}`}
-                      label={q.label}
-                      required={q.required}
-                      value={get(`custom_${q.id}`)}
-                      onChange={(v) => set(`custom_${q.id}`, v)}
-                    />
-                  )
-                ))}
-              </div>
-            )}
           </div>
         );
 
+      // ── Step 9: Intent ──
       case 9:
         return (
-          <div className="space-y-5">
-            <StepHeader
-              title="Supporting documents"
-              description="Optionally upload ID, pay stubs, proof of income, or pet records."
-            />
-            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">
-                Uploading documents is optional but helps speed up the review process. You can always provide these later.
-              </p>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {['Photo ID', 'Pay stubs', 'Proof of income', 'Pet records', 'Employment letter', 'Bank statements'].map((label) => (
-                  <span key={label} className="inline-flex items-center px-2 py-0.5 rounded-md bg-background border border-border text-[11px] text-muted-foreground">
-                    {label}
-                  </span>
-                ))}
-              </div>
+          <div className="space-y-4">
+            <StepHeader title="If you find the right place, are you ready to move forward?" />
+            <div className="space-y-2.5">
+              {[
+                { value: 'ready', label: 'Yes, ready now' },
+                { value: 'maybe', label: 'Maybe' },
+                { value: 'exploring', label: 'Just exploring' },
+              ].map((option) => (
+                <SelectionCard
+                  key={option.value}
+                  label={option.label}
+                  selected={get('intent') === option.value}
+                  onClick={() => set('intent', option.value)}
+                  accentColor={accentColor}
+                />
+              ))}
             </div>
-            <StagedFilePicker
-              files={stagedFiles}
-              onAdd={(file) => setStagedFiles((prev) => [...prev, file])}
-              onRemove={(index) => setStagedFiles((prev) => prev.filter((_, i) => i !== index))}
-            />
-          </div>
-        );
-
-      case 10:
-        return (
-          <div className="space-y-5">
-            <StepHeader
-              title="Review and submit"
-              description="Please confirm and sign your application."
-            />
-            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
-              <p className="text-sm font-medium text-foreground">Application summary</p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                {get('legalName') && <SummaryRow label="Name" value={get('legalName')} />}
-                {get('phone') && <SummaryRow label="Phone" value={get('phone')} />}
-                {get('email') && <SummaryRow label="Email" value={get('email')} />}
-                {get('propertyAddress') && <SummaryRow label="Property" value={get('propertyAddress')} />}
-                {get('targetMoveInDate') && <SummaryRow label="Move-in" value={get('targetMoveInDate')} />}
-                {get('monthlyRent') && <SummaryRow label="Rent" value={`$${get('monthlyRent')}`} />}
-                {get('employmentStatus') && <SummaryRow label="Employment" value={get('employmentStatus')} />}
-                {get('monthlyGrossIncome') && <SummaryRow label="Income" value={`$${get('monthlyGrossIncome')}/mo`} />}
-                {get('creditScore') && <SummaryRow label="Credit score" value={get('creditScore')} />}
-                {get('hasPets') && <SummaryRow label="Pets" value={get('hasPets') === 'true' ? `Yes${get('petDetails') ? ` — ${get('petDetails')}` : ''}` : 'No'} />}
-                {stagedFiles.length > 0 && <SummaryRow label="Documents" value={`${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`} />}
-              </div>
-            </div>
-
-            <ToggleField id="consentToScreening" label="I consent to background and credit screening" value={get('consentToScreening')} onChange={(v) => set('consentToScreening', v)} />
-
-            <div className="space-y-1.5">
-              <ToggleField
-                id="truthfulnessCertification"
-                label="I certify that the information provided is accurate and complete"
-                value={get('truthfulnessCertification')}
-                onChange={(v) => set('truthfulnessCertification', v)}
-              />
-              {errors.truthfulnessCertification && (
-                <p className="text-xs text-destructive">{errors.truthfulnessCertification}</p>
-              )}
-            </div>
-
-            <Field
-              id="electronicSignature"
-              label="Electronic signature (type your full name)"
-              required
-              value={get('electronicSignature')}
-              onChange={(v) => set('electronicSignature', v)}
-              placeholder="Alex Johnson"
-              error={errors.electronicSignature}
-            />
-
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {customization?.disclaimerText ||
-                `By submitting, you agree to share this information with ${businessName} for the purpose of evaluating your rental application.`}
-            </p>
+            {errors.intent && <p className="text-xs text-destructive">{errors.intent}</p>}
           </div>
         );
 
@@ -971,11 +764,6 @@ export function ApplicationForm({
         return null;
     }
   }
-
-  const radiusClass = RADIUS_CLASS_MAP[customization?.borderRadius || 'rounded'] || 'rounded-xl';
-  const fontClass = FONT_CLASS_MAP[customization?.font || 'system'] || '';
-  const accentColor = customization?.accentColor || '#ff964f';
-  const embedUrl = customization?.videoUrl ? toEmbedUrl(customization.videoUrl) : null;
 
   return (
     <div
@@ -1072,197 +860,5 @@ export function ApplicationForm({
         </div>
       </div>
     </div>
-  );
-}
-
-// ── Staged file picker (pre-submission — files held in memory) ──
-function StagedFilePicker({
-  files,
-  onAdd,
-  onRemove,
-}: {
-  files: File[];
-  onAdd: (file: File) => void;
-  onRemove: (index: number) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [error, setError] = useState('');
-
-  const MAX_FILE_SIZE = 10 * 1024 * 1024;
-  const ALLOWED_EXTS = '.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx';
-
-  function validate(file: File): boolean {
-    if (file.size > MAX_FILE_SIZE) {
-      setError('File too large (max 10MB)');
-      return false;
-    }
-    if (files.length >= 10) {
-      setError('Maximum 10 files allowed');
-      return false;
-    }
-    setError('');
-    return true;
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file && validate(file)) onAdd(file);
-  }
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file && validate(file)) onAdd(file);
-    if (inputRef.current) inputRef.current.value = '';
-  }
-
-  function formatSize(bytes: number) {
-    if (bytes < 1024) return `${bytes}B`;
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-  }
-
-  return (
-    <div className="space-y-3">
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
-        onClick={() => inputRef.current?.click()}
-        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
-          dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30 hover:bg-muted/30'
-        }`}
-      >
-        <input
-          ref={inputRef}
-          type="file"
-          className="hidden"
-          accept={ALLOWED_EXTS}
-          onChange={handleChange}
-        />
-        <Upload size={24} className="mx-auto text-muted-foreground mb-2" />
-        <p className="text-sm font-medium">Drop files here or click to upload</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          PDF, images, or Word documents (max 10MB each)
-        </p>
-      </div>
-
-      {error && <p className="text-xs text-destructive">{error}</p>}
-
-      {files.length > 0 && (
-        <div className="space-y-1.5">
-          {files.map((file, i) => (
-            <div key={`${file.name}-${i}`} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
-              <FileText size={14} className="text-muted-foreground flex-shrink-0" />
-              <span className="text-xs font-medium truncate flex-1">{file.name}</span>
-              <span className="text-[10px] text-muted-foreground">{formatSize(file.size)}</span>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onRemove(i); }}
-                className="text-muted-foreground hover:text-destructive transition-colors"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ))}
-          <p className="text-xs text-muted-foreground">
-            {files.length} file{files.length !== 1 ? 's' : ''} ready — will upload when you submit.
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Upload progress display (post-submission) ──
-function UploadProgressWidget({
-  contactId,
-  stagedFiles,
-}: {
-  contactId: string;
-  stagedFiles: File[];
-}) {
-  const [status, setStatus] = useState<Record<number, 'pending' | 'uploading' | 'done' | 'error'>>({});
-  const startedRef = useRef(false);
-
-  function formatSize(bytes: number) {
-    if (bytes < 1024) return `${bytes}B`;
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-  }
-
-  // Upload all files sequentially on mount
-  useEffect(() => {
-    if (startedRef.current || stagedFiles.length === 0) return;
-    startedRef.current = true;
-
-    const initial: Record<number, 'pending'> = {};
-    stagedFiles.forEach((_, i) => { initial[i] = 'pending'; });
-    setStatus(initial);
-
-    (async () => {
-      for (let i = 0; i < stagedFiles.length; i++) {
-        setStatus((prev) => ({ ...prev, [i]: 'uploading' }));
-        try {
-          const formData = new FormData();
-          formData.append('contactId', contactId);
-          formData.append('file', stagedFiles[i]);
-          formData.append('uploadedBy', 'guest');
-          const res = await fetch('/api/documents', { method: 'POST', body: formData });
-          setStatus((prev) => ({ ...prev, [i]: res.ok ? 'done' : 'error' }));
-        } catch {
-          setStatus((prev) => ({ ...prev, [i]: 'error' }));
-        }
-      }
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  if (stagedFiles.length === 0) return null;
-
-  return (
-    <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-        Uploading documents
-      </p>
-      <div className="space-y-1.5">
-        {stagedFiles.map((file, i) => (
-          <div key={i} className="flex items-center gap-2 text-xs">
-            {status[i] === 'uploading' ? (
-              <Loader2 size={12} className="animate-spin text-primary flex-shrink-0" />
-            ) : status[i] === 'done' ? (
-              <CheckCircle2 size={12} className="text-emerald-500 flex-shrink-0" />
-            ) : status[i] === 'error' ? (
-              <X size={12} className="text-destructive flex-shrink-0" />
-            ) : (
-              <Upload size={12} className="text-muted-foreground flex-shrink-0" />
-            )}
-            <span className="truncate flex-1">{file.name}</span>
-            <span className="text-[10px] text-muted-foreground">{formatSize(file.size)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Tiny helpers ──
-function StepHeader({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="space-y-1">
-      <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-      <p className="text-sm text-muted-foreground">{description}</p>
-    </div>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <>
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-foreground font-medium truncate">{value}</span>
-    </>
   );
 }

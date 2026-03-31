@@ -146,13 +146,13 @@ export type ApplicationData = {
   propertyAddress?: string;
   unitType?: string;
   targetMoveInDate?: string;
-  monthlyRent?: number;
+  monthlyRent?: number | string;
   leaseTermPreference?: string;
   numberOfOccupants?: number;
   // Step 2: Applicant Basics
   legalName: string;
   email?: string;
-  phone: string;
+  phone?: string;
   dateOfBirth?: string;
   // Step 3: Current Living Situation
   currentAddress?: string;
@@ -167,9 +167,9 @@ export type ApplicationData = {
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   // Step 5: Income
-  employmentStatus?: 'employed' | 'self-employed' | 'unemployed' | 'retired' | 'student' | '';
+  employmentStatus?: 'employed' | 'self-employed' | 'unemployed' | 'retired' | 'student' | 'Full-time employed' | 'Self-employed' | 'Part-time employed' | 'Student' | 'Not currently employed' | '';
   employerOrSource?: string;
-  monthlyGrossIncome?: number;
+  monthlyGrossIncome?: number | string;
   additionalIncome?: number;
   // Step 6: Rental History
   currentLandlordName?: string;

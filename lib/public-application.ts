@@ -39,11 +39,22 @@ export const publicApplicationSchema = z.object({
   propertyAddress: optStr,
   unitType: optStr,
   targetMoveInDate: optStr,
-  monthlyRent: optNum,
+  monthlyRent: z
+    .union([z.number(), z.string(), z.null(), z.undefined()])
+    .transform((v) => {
+      if (v == null || v === '') return undefined;
+      // Accept both numeric values (old form) and range strings (new form)
+      if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
+      // If it's a range string like "$1,500 - $2,000", keep as string
+      if (typeof v === 'string' && /[\$,]/.test(v)) return v;
+      // Try to parse as number for backward compatibility
+      const p = Number.parseFloat(String(v));
+      return Number.isFinite(p) ? p : v;
+    }),
   leaseTermPreference: optStr,
   numberOfOccupants: optNum,
 
-  // Step 2: Applicant Basics (name + phone required)
+  // Step 2: Applicant Basics (name + phone required for old form; email required for new form)
   legalName: z.string().trim().min(1, 'Full name is required').max(120),
   email: z
     .string()
@@ -53,7 +64,13 @@ export const publicApplicationSchema = z.object({
     .optional()
     .or(z.literal(''))
     .transform((v) => (v ? v : undefined)),
-  phone: z.string().trim().min(1, 'Phone is required').max(40),
+  phone: z
+    .string()
+    .trim()
+    .max(40)
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v ? v : undefined)),
   dateOfBirth: optStr,
 
   // Step 3: Current Living Situation
@@ -75,11 +92,26 @@ export const publicApplicationSchema = z.object({
 
   // Step 5: Income
   employmentStatus: z
-    .enum(['employed', 'self-employed', 'unemployed', 'retired', 'student', ''])
+    .union([
+      z.enum(['employed', 'self-employed', 'unemployed', 'retired', 'student', '']),
+      z.enum(['Full-time employed', 'Self-employed', 'Part-time employed', 'Student', 'Not currently employed']),
+      z.string().max(100),
+    ])
     .optional()
     .transform((v) => (v === '' ? undefined : v)),
   employerOrSource: optStr,
-  monthlyGrossIncome: optNum,
+  monthlyGrossIncome: z
+    .union([z.number(), z.string(), z.null(), z.undefined()])
+    .transform((v) => {
+      if (v == null || v === '') return undefined;
+      // Accept both numeric values (old form) and range strings (new form)
+      if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
+      // If it's a range string like "$3,000 - $4,000", keep as string
+      if (typeof v === 'string' && /[\$,]/.test(v)) return v;
+      // Try to parse as number for backward compatibility
+      const p = Number.parseFloat(String(v));
+      return Number.isFinite(p) ? p : v;
+    }),
   additionalIncome: optNum,
 
   // Step 6: Rental History
@@ -126,9 +158,9 @@ export function normalizePhone(input: string) {
   return input.replace(/\D/g, '');
 }
 
-export function applicationFingerprintKey(input: Pick<PublicApplicationInput, 'slug' | 'legalName' | 'phone'> & { email?: string | null }) {
+export function applicationFingerprintKey(input: Pick<PublicApplicationInput, 'slug' | 'legalName'> & { phone?: string | null; email?: string | null }) {
   const normalizedName = input.legalName.trim().toLowerCase();
-  const normalizedPhone = normalizePhone(input.phone);
+  const normalizedPhone = input.phone ? normalizePhone(input.phone) : '';
   const normalizedEmail = (input.email ?? '').trim().toLowerCase();
   return `${input.slug}:${normalizedName}:${normalizedPhone}:${normalizedEmail}`;
 }

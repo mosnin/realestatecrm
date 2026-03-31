@@ -27,6 +27,8 @@ import {
   Bookmark,
   X,
   CheckSquare,
+  Zap,
+  Calendar,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -489,7 +491,14 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
             const isNew = newLeadIds.has(lead.id);
             const app = lead.applicationData as ApplicationData | null;
             const details = lead.scoreDetails as LeadScoreDetails | null;
-            const budget = app?.monthlyRent ?? lead.budget;
+            const rawBudget = app?.monthlyRent ?? lead.budget;
+            const budgetDisplay = typeof rawBudget === 'string' ? rawBudget : rawBudget != null ? `${formatMoney(rawBudget)}/mo` : null;
+            const incomeDisplay = typeof app?.monthlyGrossIncome === 'string' ? app.monthlyGrossIncome : app?.monthlyGrossIncome != null ? `${formatMoney(app.monthlyGrossIncome)} income` : null;
+            const intentLabel = app?.leaseTermPreference;
+            const intentBadge = intentLabel === 'Yes, ready now' ? { text: 'Ready now', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300' }
+              : intentLabel === 'Maybe' ? { text: 'Maybe', cls: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300' }
+              : intentLabel === 'Just exploring' ? { text: 'Exploring', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300' }
+              : null;
             const tierKey = getTierKey(lead);
             const tier = TIERS[tierKey];
             const riskFlags = (details?.riskFlags ?? []).filter((f) => f !== 'none');
@@ -531,6 +540,12 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                         {isNew && (
                           <span className="inline-flex text-[10px] font-bold text-primary bg-primary/10 rounded-md px-2 py-0.5 flex-shrink-0">
                             NEW
+                          </span>
+                        )}
+                        {intentBadge && (
+                          <span className={cn('inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5 flex-shrink-0', intentBadge.cls)}>
+                            <Zap size={9} />
+                            {intentBadge.text}
                           </span>
                         )}
                       </div>
@@ -579,16 +594,20 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                 <div className="px-4 pb-3 flex flex-wrap gap-1.5">
                   {lead.phone && <QChip icon={Phone} label={lead.phone} href={`tel:${lead.phone}`} />}
                   {lead.email && <QChip icon={Mail} label={lead.email} href={`mailto:${lead.email}`} />}
-                  {budget != null && <QChip icon={DollarSign} label={`${formatMoney(budget)}/mo`} highlight />}
+                  {budgetDisplay && <QChip icon={DollarSign} label={budgetDisplay} highlight />}
                   {app?.employmentStatus && <QChip icon={Briefcase} label={app.employmentStatus} />}
-                  {app?.monthlyGrossIncome != null && (
-                    <QChip icon={DollarSign} label={`${formatMoney(app.monthlyGrossIncome)} income`} />
+                  {incomeDisplay && (
+                    <QChip icon={DollarSign} label={incomeDisplay} />
                   )}
-                  {(app?.adultsOnApplication != null) && (
+                  {app?.targetMoveInDate && <QChip icon={Calendar} label={app.targetMoveInDate} />}
+                  {(app?.numberOfOccupants != null) && (
+                    <QChip icon={Users} label={`${app.numberOfOccupants} occupant${app.numberOfOccupants !== 1 ? 's' : ''}`} />
+                  )}
+                  {(app?.numberOfOccupants == null && app?.adultsOnApplication != null) && (
                     <QChip icon={Users} label={`${app.adultsOnApplication} adult${app.adultsOnApplication !== 1 ? 's' : ''}${(app.childrenOrDependents ?? 0) > 0 ? ` · ${app.childrenOrDependents} child${app.childrenOrDependents !== 1 ? 'ren' : ''}` : ''}`} />
                   )}
                   {app?.hasPets && <QChip icon={PawPrint} label={app.petDetails ?? 'Has pets'} />}
-                  {lead.preferences && <QChip icon={MapPin} label={lead.preferences} />}
+                  {(app?.propertyAddress || lead.preferences) && <QChip icon={MapPin} label={app?.propertyAddress ?? lead.preferences ?? ''} />}
                 </div>
 
                 {/* Explanation tags */}
@@ -696,7 +715,8 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                 {filtered.map((lead) => {
                   const isNew = newLeadIds.has(lead.id);
                   const app = lead.applicationData as ApplicationData | null;
-                  const budget = app?.monthlyRent ?? lead.budget;
+                  const rawBudget = app?.monthlyRent ?? lead.budget;
+                  const budgetDisplay = typeof rawBudget === 'string' ? rawBudget : rawBudget != null ? `${formatMoney(rawBudget)}/mo` : null;
                   const tierKey = getTierKey(lead);
                   const tier = TIERS[tierKey];
                   const score = lead.leadScore != null ? Math.round(lead.leadScore) : null;
@@ -755,7 +775,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                         </div>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">
-                        {budget != null ? `${formatMoney(budget)}/mo` : '—'}
+                        {budgetDisplay ?? '—'}
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
                         {timeAgo(new Date(lead.createdAt))}
