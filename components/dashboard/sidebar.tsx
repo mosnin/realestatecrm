@@ -241,22 +241,24 @@ function WorkspaceSwitcher({
       {/* Dropdown */}
       {open && (
         <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border bg-popover shadow-lg overflow-hidden">
-          {/* Personal workspace */}
-          <Link
-            href={`/s/${slug}`}
-            onClick={() => setOpen(false)}
-            className={cn(
-              'flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted transition-colors',
-              !isOnBrokerPage && 'bg-primary/5'
-            )}
-          >
-            <Briefcase size={14} className="text-primary flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">{spaceName}</p>
-              <p className="text-[10px] text-muted-foreground">Realtor Dashboard</p>
-            </div>
-            {!isOnBrokerPage && <Check size={14} className="text-primary flex-shrink-0" />}
-          </Link>
+          {/* Personal workspace — only show if user has a space */}
+          {slug && (
+            <Link
+              href={`/s/${slug}`}
+              onClick={() => setOpen(false)}
+              className={cn(
+                'flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted transition-colors',
+                !isOnBrokerPage && 'bg-primary/5'
+              )}
+            >
+              <Briefcase size={14} className="text-primary flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{spaceName}</p>
+                <p className="text-[10px] text-muted-foreground">Realtor Dashboard</p>
+              </div>
+              {!isOnBrokerPage && <Check size={14} className="text-primary flex-shrink-0" />}
+            </Link>
+          )}
 
           {/* Brokerages */}
           {brokerageMemberships.length > 0 && (
@@ -284,8 +286,8 @@ function WorkspaceSwitcher({
             </>
           )}
 
-          {/* Create brokerage option */}
-          {brokerageMemberships.length === 0 && (
+          {/* Create brokerage option — only when not in any brokerage */}
+          {brokerageMemberships.length === 0 && !isOnBrokerPage && (
             <>
               <div className="border-t border-border" />
               <Link

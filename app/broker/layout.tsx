@@ -69,6 +69,7 @@ export default async function BrokerLayout({ children }: { children: React.React
         isBrokerOnly={isBrokerOnly}
         brokerageName={ctx.brokerage.name}
         brokerageRole={ctx.membership.role}
+        brokerageMemberships={[{ id: ctx.brokerage.id, name: ctx.brokerage.name, role: ctx.membership.role }]}
       />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header slug={slug} spaceName={spaceName} title={spaceName} isBroker={true} isBrokerOnly={isBrokerOnly} brokerageName={ctx.brokerage.name} />
