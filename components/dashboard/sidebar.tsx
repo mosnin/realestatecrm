@@ -31,6 +31,7 @@ import {
   User,
   Bell,
   Puzzle,
+  Shield,
   Palette,
   Type,
   ListChecks,
@@ -491,6 +492,7 @@ export function Sidebar({
         { href: `${base}/settings/profile`, label: 'Profile', icon: User, exact: false },
         { href: `${base}/settings/notifications`, label: 'Notifications', icon: Bell, exact: false },
         { href: `${base}/settings/integrations`, label: 'Integrations', icon: Puzzle, exact: false },
+        { href: `${base}/settings/legal`, label: 'Legal', icon: Shield, exact: false },
       ],
     },
     {

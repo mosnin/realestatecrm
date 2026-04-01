@@ -36,6 +36,22 @@ export async function PATCH(req: NextRequest) {
   const rawKey = typeof body.anthropicApiKey === 'string' ? body.anthropicApiKey.trim() : '';
   const anthropicApiKey = rawKey === '' || rawKey.startsWith('sk-ant-') ? (rawKey || null) : null;
 
+  // Legal & compliance fields
+  const rawPrivacyPolicyUrl = typeof body.privacyPolicyUrl === 'string' ? body.privacyPolicyUrl.trim().slice(0, 500) : undefined;
+  const consentCheckboxLabel = typeof body.consentCheckboxLabel === 'string' ? body.consentCheckboxLabel.trim().slice(0, 500) : undefined;
+
+  // Validate privacy policy URL if provided
+  if (rawPrivacyPolicyUrl !== undefined && rawPrivacyPolicyUrl !== null && rawPrivacyPolicyUrl !== '') {
+    try {
+      const purl = new URL(rawPrivacyPolicyUrl);
+      if (purl.protocol !== 'https:') {
+        return NextResponse.json({ error: 'Privacy policy URL must use HTTPS' }, { status: 400 });
+      }
+    } catch {
+      return NextResponse.json({ error: 'Privacy policy URL is not a valid URL' }, { status: 400 });
+    }
+  }
+
   const { data: spaceRows, error: spaceError } = await supabase
     .from('Space')
     .select('id, slug, name, emoji, createdAt, ownerId')
@@ -50,7 +66,8 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const updateFields: Record<string, unknown> = { name };
+  const updateFields: Record<string, unknown> = {};
+  if (name) updateFields.name = name;
   if (emoji !== undefined) updateFields.emoji = emoji;
 
   // Handle slug change
@@ -72,17 +89,23 @@ export async function PATCH(req: NextRequest) {
     updateFields.slug = sanitized;
   }
 
-  const { data: updatedRows, error: updateError } = await supabase
-    .from('Space')
-    .update(updateFields)
-    .eq('slug', slug)
-    .select('id, slug, name, emoji, createdAt, ownerId');
-  if (updateError) {
-    const errMsg = updateError.message || '';
-    if (errMsg.includes('duplicate key') || errMsg.includes('unique') || updateError.code === '23505') {
-      return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
+  let updatedRows: any[];
+  if (Object.keys(updateFields).length > 0) {
+    const { data, error: updateError } = await supabase
+      .from('Space')
+      .update(updateFields)
+      .eq('slug', slug)
+      .select('id, slug, name, emoji, createdAt, ownerId');
+    if (updateError) {
+      const errMsg = updateError.message || '';
+      if (errMsg.includes('duplicate key') || errMsg.includes('unique') || updateError.code === '23505') {
+        return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
+      }
+      throw updateError;
     }
-    throw updateError;
+    updatedRows = data!;
+  } else {
+    updatedRows = [space];
   }
 
   const { error: settingsError } = await supabase
@@ -105,6 +128,8 @@ export async function PATCH(req: NextRequest) {
         ...(bio !== undefined && { bio }),
         ...(socialLinks !== undefined && { socialLinks }),
         ...(logoUrl !== undefined && { logoUrl }),
+        ...(rawPrivacyPolicyUrl !== undefined && { privacyPolicyUrl: rawPrivacyPolicyUrl || null }),
+        ...(consentCheckboxLabel !== undefined && { consentCheckboxLabel: consentCheckboxLabel || null }),
       },
       { onConflict: 'spaceId' }
     )

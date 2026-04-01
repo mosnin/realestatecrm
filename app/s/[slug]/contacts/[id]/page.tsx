@@ -19,6 +19,7 @@ import {
   Calendar,
   CalendarDays,
   CalendarPlus,
+  ShieldCheck,
 } from 'lucide-react';
 import type { Contact, ApplicationData, LeadScoreDetails } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
@@ -532,6 +533,63 @@ export default async function ClientDetailPage({
                     </Badge>
                   ))}
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Consent Record ── */}
+      {contact.consentGiven != null && (
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
+            <ShieldCheck size={14} className="text-muted-foreground" />
+            <h2 className="text-sm font-semibold">Privacy Consent</h2>
+          </div>
+          <div className="px-4 sm:px-6 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Consent Given</p>
+              <p className="text-sm font-medium text-foreground">
+                {contact.consentGiven ? (
+                  <span className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 size={14} /> Yes
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-destructive">
+                    <XCircle size={14} /> No
+                  </span>
+                )}
+              </p>
+            </div>
+            {contact.consentTimestamp && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Timestamp</p>
+                <p className="text-sm text-foreground">
+                  {new Date(contact.consentTimestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                </p>
+              </div>
+            )}
+            {contact.consentIp && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">IP Address</p>
+                <p className="text-sm text-foreground font-mono">
+                  {contact.consentIp !== 'unknown'
+                    ? contact.consentIp.replace(/\d+\.\d+\.\d+\.(\d+)/, '*.*.*.$1')
+                    : 'unknown'}
+                </p>
+              </div>
+            )}
+            {contact.consentPrivacyPolicyUrl && (
+              <div className="sm:col-span-2">
+                <p className="text-xs text-muted-foreground mb-1">Privacy Policy URL (at time of consent)</p>
+                <a
+                  href={contact.consentPrivacyPolicyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary hover:underline break-all"
+                >
+                  {contact.consentPrivacyPolicyUrl}
+                </a>
               </div>
             )}
           </div>

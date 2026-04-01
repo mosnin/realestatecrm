@@ -55,6 +55,8 @@ export interface IntakeCustomization {
   faviconUrl: string | null;
   bio: string | null;
   socialLinks: Record<string, string> | null;
+  privacyPolicyUrl: string | null;
+  consentCheckboxLabel: string | null;
 }
 
 const STORAGE_KEY_PREFIX = 'chippi_apply_';
@@ -322,6 +324,12 @@ export function ApplicationForm({
 
     if (s === 9) {
       if (!get('intent')) errs.intent = 'Please select your readiness level';
+      if (customization?.privacyPolicyUrl && get('privacyConsent') !== 'true') {
+        errs.privacyConsent = 'You must agree to the privacy policy';
+      }
+      if (get('chippiTosConsent') !== 'true') {
+        errs.chippiTosConsent = 'You must agree to Chippi\'s Terms of Service and Privacy Policy';
+      }
     }
 
     setErrors(errs);
@@ -368,6 +376,7 @@ export function ApplicationForm({
       additionalNotes: get('notes'),
       leaseTermPreference: get('intent'),
       completedSteps: STEPS.map((s) => s.id),
+      privacyConsent: get('privacyConsent') === 'true',
     };
 
     if (brokerageId) {
@@ -763,6 +772,52 @@ export function ApplicationForm({
               ))}
             </div>
             {errors.intent && <p className="text-xs text-destructive">{errors.intent}</p>}
+            {/* Privacy consent — shows if realtor has a privacy policy URL set */}
+            {customization?.privacyPolicyUrl && (
+              <div className="flex items-start gap-3 mt-4 p-3 rounded-lg border border-border bg-muted/30">
+                <input
+                  type="checkbox"
+                  id="privacy-consent"
+                  checked={get('privacyConsent') === 'true'}
+                  onChange={(e) => set('privacyConsent', e.target.checked ? 'true' : 'false')}
+                  className="mt-0.5 rounded border-border cursor-pointer"
+                  required
+                />
+                <label htmlFor="privacy-consent" className="text-sm text-foreground leading-snug cursor-pointer">
+                  {customization.consentCheckboxLabel || (
+                    <>
+                      I agree to {businessName}&apos;s{' '}
+                      <a href={customization.privacyPolicyUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
+                        Privacy Policy
+                      </a>
+                    </>
+                  )}
+                </label>
+              </div>
+            )}
+            {/* Chippi TOS + Privacy — always shown */}
+            <div className="flex items-start gap-3 mt-2 p-3 rounded-lg border border-border bg-muted/30">
+              <input
+                type="checkbox"
+                id="chippi-tos"
+                checked={get('chippiTosConsent') === 'true'}
+                onChange={(e) => set('chippiTosConsent', e.target.checked ? 'true' : 'false')}
+                className="mt-0.5 rounded border-border cursor-pointer"
+                required
+              />
+              <label htmlFor="chippi-tos" className="text-sm text-muted-foreground leading-snug cursor-pointer">
+                I agree to Chippi&apos;s{' '}
+                <a href="https://usechippi.com/legal/terms" target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
+                  Terms of Service
+                </a>{' '}
+                and{' '}
+                <a href="https://usechippi.com/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
+                  Privacy Policy
+                </a>
+              </label>
+            </div>
+            {errors.privacyConsent && <p className="text-xs text-destructive mt-1">{errors.privacyConsent}</p>}
+            {errors.chippiTosConsent && <p className="text-xs text-destructive mt-1">{errors.chippiTosConsent}</p>}
           </div>
         );
 

@@ -32,7 +32,7 @@ export default async function PublicApplyPage({
         'intakeHeaderBgColor, intakeHeaderGradient, intakeVideoUrl, ' +
         'intakeDisclaimerText, intakeThankYouTitle, intakeThankYouMessage, ' +
         'intakeFooterLinks, intakeDisabledSteps, intakeCustomQuestions, ' +
-        'intakeFaviconUrl, bio, socialLinks'
+        'intakeFaviconUrl, bio, socialLinks, privacyPolicyUrl, consentCheckboxLabel'
       )
       .eq('spaceId', space.id)
       .maybeSingle()
@@ -67,6 +67,8 @@ export default async function PublicApplyPage({
     intakeFaviconUrl: string | null;
     bio: string | null;
     socialLinks: Record<string, string> | null;
+    privacyPolicyUrl: string | null;
+    consentCheckboxLabel: string | null;
   } | null;
 
   const pageTitle = settings?.intakePageTitle || 'Rental Application';
@@ -93,6 +95,8 @@ export default async function PublicApplyPage({
     faviconUrl: settings?.intakeFaviconUrl || null,
     bio: settings?.bio || null,
     socialLinks: settings?.socialLinks || null,
+    privacyPolicyUrl: settings?.privacyPolicyUrl || null,
+    consentCheckboxLabel: settings?.consentCheckboxLabel || null,
   };
 
   return (

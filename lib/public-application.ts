@@ -148,6 +148,9 @@ export const publicApplicationSchema = z.object({
   truthfulnessCertification: optBool,
   electronicSignature: optStr,
 
+  // Privacy consent
+  privacyConsent: optBool,
+
   // Meta
   completedSteps: z.array(z.number()).optional(),
 });

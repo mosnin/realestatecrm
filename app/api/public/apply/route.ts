@@ -114,6 +114,19 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Fetch privacy policy URL from space settings for consent snapshot
+    let spacePrivacyPolicyUrl: string | null = null;
+    try {
+      const { data: spaceSetting } = await supabase
+        .from('SpaceSetting')
+        .select('privacyPolicyUrl')
+        .eq('spaceId', space.id)
+        .maybeSingle();
+      spacePrivacyPolicyUrl = spaceSetting?.privacyPolicyUrl ?? null;
+    } catch (err) {
+      console.warn('[apply] failed to fetch space privacy policy URL', { spaceId: space.id, err });
+    }
+
     // Build structured application data
     const applicationData = buildApplicationData(payload);
 
@@ -149,6 +162,10 @@ export async function POST(req: NextRequest) {
         applicationData,
         applicationRef,
         applicationStatus: 'received',
+        consentGiven: payload.privacyConsent === true,
+        consentTimestamp: payload.privacyConsent === true ? new Date().toISOString() : null,
+        consentIp: payload.privacyConsent === true ? ip : null,
+        consentPrivacyPolicyUrl: payload.privacyConsent === true ? spacePrivacyPolicyUrl : null,
       })
       .select();
     if (insertError) throw insertError;
