@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
 import { BackgroundPlus } from '@/components/ui/background-plus';
+import { BorderBeam } from '@/components/ui/border-beam';
 
 function BillingRequiredContent() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -116,7 +117,8 @@ function BillingRequiredContent() {
         </div>
 
         {/* Split alert card */}
-        <Card className="rounded-3xl border border-amber-300/50 shadow-xl overflow-hidden p-0">
+        <Card className="relative rounded-3xl border border-amber-300/50 shadow-xl overflow-hidden p-0">
+          <BorderBeam lightColor="#ff964f" lightWidth={300} duration={8} borderWidth={2} />
           <div className="flex flex-col md:flex-row">
             {/* Left side — Status & Action */}
             <div className="flex flex-col justify-center gap-6 bg-amber-50 dark:bg-amber-950/20 p-8 md:p-10 md:w-5/12">

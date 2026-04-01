@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronRight, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronRight, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, CheckIcon } from 'lucide-react';
 import { GlobalSearch } from './global-search';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
@@ -308,7 +308,14 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
         >
           {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
         </Button>
-        <UserButton />
+        <div className="relative">
+          <div className="[&_.cl-userButtonTrigger]:ring-2 [&_.cl-userButtonTrigger]:ring-blue-500 [&_.cl-userButtonTrigger]:ring-offset-2 [&_.cl-userButtonTrigger]:ring-offset-background [&_.cl-userButtonTrigger]:rounded-full">
+            <UserButton />
+          </div>
+          <span className="absolute -right-0.5 -bottom-0.5 inline-flex size-3.5 items-center justify-center rounded-full bg-blue-500 ring-2 ring-background">
+            <CheckIcon className="size-2 text-white" />
+          </span>
+        </div>
       </div>
     </header>
   );

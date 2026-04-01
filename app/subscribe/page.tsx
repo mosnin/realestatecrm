@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Check, Loader2 } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
 import { BackgroundPlus } from '@/components/ui/background-plus';
+import { BorderBeam } from '@/components/ui/border-beam';
 
 function SubscribeContent() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -76,7 +77,8 @@ function SubscribeContent() {
         </div>
 
         {/* Split pricing card */}
-        <Card className="rounded-3xl border border-border shadow-xl overflow-hidden p-0">
+        <Card className="relative rounded-3xl border border-border shadow-xl overflow-hidden p-0">
+          <BorderBeam lightColor="#ff964f" lightWidth={300} duration={8} borderWidth={2} />
           <div className="flex flex-col md:flex-row">
             {/* Left side — Plan & Price */}
             <div className="flex flex-col justify-center gap-6 bg-primary/5 p-8 md:p-10 md:w-5/12">
