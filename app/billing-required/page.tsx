@@ -13,6 +13,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
+import { BackgroundPlus } from '@/components/ui/background-plus';
 
 function BillingRequiredContent() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -106,8 +107,9 @@ function BillingRequiredContent() {
   ];
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-3xl space-y-6">
+    <div className="relative flex min-h-screen items-center justify-center bg-background px-4 overflow-hidden">
+      <BackgroundPlus plusColor="#ff964f" plusSize={60} />
+      <div className="relative z-10 w-full max-w-3xl space-y-6">
         {/* Branding */}
         <div className="flex justify-center">
           <BrandLogo className="h-8" />
