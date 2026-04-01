@@ -538,29 +538,6 @@ export function ApplicationForm({
               Track your application status &rarr;
             </a>
           )}
-          {scoreState?.scoringStatus === 'scored' && scoreState.scoreSummary && (
-            <div className="rounded-xl border border-border bg-muted/30 p-4 text-left space-y-3">
-              <div className="flex items-center gap-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Initial assessment
-                </p>
-                {scoreState.leadScore != null && (
-                  <span
-                    className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-0.5 uppercase ${
-                      scoreState.scoreLabel === 'hot'
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
-                        : scoreState.scoreLabel === 'warm'
-                          ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-                          : 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400'
-                    }`}
-                  >
-                    {scoreState.scoreLabel}
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-foreground leading-relaxed">{scoreState.scoreSummary}</p>
-            </div>
-          )}
         </motion.div>
       </>
     );

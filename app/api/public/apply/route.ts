@@ -99,11 +99,7 @@ export async function POST(req: NextRequest) {
           {
             success: true,
             id: duplicate.id,
-            scoringStatus: duplicate.scoringStatus,
-            leadScore: duplicate.leadScore,
-            scoreLabel: duplicate.scoreLabel,
-            scoreSummary: duplicate.scoreSummary,
-            scoreDetails: duplicate.scoreDetails,
+            applicationRef,
           },
           { status: 200 }
         );
@@ -277,11 +273,6 @@ export async function POST(req: NextRequest) {
         success: true,
         id: contact.id,
         applicationRef,
-        scoringStatus: scoring.scoringStatus,
-        leadScore: scoring.leadScore,
-        scoreLabel: scoring.scoreLabel,
-        scoreSummary: scoring.scoreSummary,
-        scoreDetails: scoring.scoreDetails,
       },
       { status: 201 }
     );
