@@ -112,29 +112,48 @@ export default async function DashboardLayout({
   if (!dbUser.space || dbUser.space.id !== space.id) notFound();
 
   // ── Subscription gate — redirect to standalone pages ────────────────
-  // Always allow billing and settings pages so users can manage their subscription
+  // Exempt billing and settings pages so users can manage their subscription.
+  // Use x-pathname from middleware; fall back to checking if the request
+  // is for a known-exempt sub-path via the referer or just allow through
+  // (the billing/settings pages themselves are safe to render).
   const headersList = await headers();
-  const currentPath = headersList.get('x-pathname') ?? '';
-  const isExemptPath = currentPath.endsWith('/billing') || currentPath.includes('/settings');
+  // x-pathname is set by our middleware; x-invoke-path is set by Next.js internally
+  const currentPath = headersList.get('x-pathname')
+    || headersList.get('x-invoke-path')
+    || headersList.get('x-matched-path')
+    || headersList.get('next-url')
+    || '';
+  const isExemptPath =
+    currentPath.includes('/billing') ||
+    currentPath.includes('/settings');
 
   if (!dbUser.isPlatformAdmin && !isExemptPath) {
     try {
-      const { data: subData } = await supabase
+      const { data: subData, error: subError } = await supabase
         .from('Space')
         .select('stripeSubscriptionStatus, stripeSubscriptionId')
         .eq('id', space.id)
         .maybeSingle();
+
+      if (subError) {
+        console.error('[layout] Subscription check query failed:', subError);
+        // Fail secure — redirect to subscribe rather than granting access
+        redirect(`/subscribe?slug=${slug}`);
+      }
+
       const status = subData?.stripeSubscriptionStatus ?? 'inactive';
       if (status !== 'active' && status !== 'trialing') {
-        // Had a subscription that failed/canceled → billing-required page
         if (subData?.stripeSubscriptionId && (status === 'past_due' || status === 'canceled' || status === 'unpaid')) {
           redirect(`/billing-required?slug=${slug}&reason=${status}`);
         }
-        // Never subscribed → subscribe/trial page
         redirect(`/subscribe?slug=${slug}`);
       }
-    } catch {
-      // If stripe columns don't exist yet, don't gate
+    } catch (err: any) {
+      // Next.js redirect() throws a special error — re-throw it
+      if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err;
+      // Fail secure: if anything goes wrong checking subscription, block access
+      console.error('[layout] Subscription gate error:', err);
+      redirect(`/subscribe?slug=${slug}`);
     }
   }
 

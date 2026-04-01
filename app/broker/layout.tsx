@@ -49,26 +49,49 @@ export default async function BrokerLayout({ children }: { children: React.React
   // Subscription gate — redirect to standalone pages
   // Exempt billing and settings pages so users can manage their subscription
   const brokerHeaders = await headers();
-  const brokerPath = brokerHeaders.get('x-pathname') ?? '';
-  const isBrokerExempt = brokerPath.endsWith('/billing') || brokerPath.includes('/settings');
+  const brokerPath = brokerHeaders.get('x-pathname')
+    || brokerHeaders.get('x-invoke-path')
+    || brokerHeaders.get('x-matched-path')
+    || brokerHeaders.get('next-url')
+    || '';
+  const isBrokerExempt =
+    brokerPath.includes('/billing') ||
+    brokerPath.includes('/settings');
 
-  if (!isPlatformAdmin && !isBrokerExempt && spaceRow) {
-    try {
-      const { data: subData } = await supabase
-        .from('Space')
-        .select('stripeSubscriptionStatus, stripeSubscriptionId')
-        .eq('id', spaceRow.id)
-        .maybeSingle();
-      const status = subData?.stripeSubscriptionStatus ?? 'inactive';
-      if (status !== 'active' && status !== 'trialing') {
-        if (subData?.stripeSubscriptionId && (status === 'past_due' || status === 'canceled' || status === 'unpaid')) {
-          redirect(`/billing-required?slug=${slug}&reason=${status}`);
+  if (!isPlatformAdmin && !isBrokerExempt) {
+    // Gate applies whether they have a personal space or not
+    if (spaceRow) {
+      try {
+        const { data: subData, error: subError } = await supabase
+          .from('Space')
+          .select('stripeSubscriptionStatus, stripeSubscriptionId')
+          .eq('id', spaceRow.id)
+          .maybeSingle();
+
+        if (subError) {
+          console.error('[broker-layout] Subscription check query failed:', subError);
+          redirect(`/subscribe?slug=${slug}`);
         }
+
+        const status = subData?.stripeSubscriptionStatus ?? 'inactive';
+        if (status !== 'active' && status !== 'trialing') {
+          if (subData?.stripeSubscriptionId && (status === 'past_due' || status === 'canceled' || status === 'unpaid')) {
+            redirect(`/billing-required?slug=${slug}&reason=${status}`);
+          }
+          redirect(`/subscribe?slug=${slug}`);
+        }
+      } catch (err: any) {
+        // Next.js redirect() throws a special error — re-throw it
+        if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err;
+        console.error('[broker-layout] Subscription gate error:', err);
         redirect(`/subscribe?slug=${slug}`);
       }
-    } catch {
-      // If stripe columns don't exist yet, don't gate
+    } else if (!isBrokerOnly) {
+      // No space and not broker-only — shouldn't be here
+      redirect('/setup');
     }
+    // Broker-only accounts without a space: brokerage billing is separate
+    // They don't have a personal subscription to gate on
   }
 
   let unreadLeadCount = 0;
