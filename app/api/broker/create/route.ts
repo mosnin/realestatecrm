@@ -17,16 +17,43 @@ export async function POST(req: Request) {
   const { allowed } = await checkRateLimit(`broker:create:${clerkId}`, 3, 86400);
   if (!allowed) return NextResponse.json({ error: 'Too many attempts. Try again tomorrow.' }, { status: 429 });
 
-  let name: string;
+  let body: Record<string, unknown>;
   try {
-    ({ name } = await req.json());
+    body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
+  const { name, logoUrl, websiteUrl, officeAddress, officePhone, agentCount, brokerageType, primaryMarket, commissionStructure, geographicCoverage } = body as {
+    name?: string;
+    logoUrl?: string;
+    websiteUrl?: string;
+    officeAddress?: string;
+    officePhone?: string;
+    agentCount?: string;
+    brokerageType?: string;
+    primaryMarket?: string;
+    commissionStructure?: string;
+    geographicCoverage?: string;
+  };
+
   const trimmedName = (typeof name === 'string' ? name : '').trim();
   if (!trimmedName || trimmedName.length > 120) {
     return NextResponse.json({ error: 'Brokerage name required (max 120 chars)' }, { status: 400 });
+  }
+
+  // Validate enum fields
+  const validBrokerageTypes = ['independent', 'franchise', 'virtual'];
+  const validMarkets = ['residential_rental', 'commercial', 'mixed'];
+  const validCommissions = ['flat_fee', 'percentage_split', 'hybrid'];
+  if (brokerageType && !validBrokerageTypes.includes(brokerageType)) {
+    return NextResponse.json({ error: `Invalid brokerageType. Must be one of: ${validBrokerageTypes.join(', ')}` }, { status: 400 });
+  }
+  if (primaryMarket && !validMarkets.includes(primaryMarket)) {
+    return NextResponse.json({ error: `Invalid primaryMarket. Must be one of: ${validMarkets.join(', ')}` }, { status: 400 });
+  }
+  if (commissionStructure && !validCommissions.includes(commissionStructure)) {
+    return NextResponse.json({ error: `Invalid commissionStructure. Must be one of: ${validCommissions.join(', ')}` }, { status: 400 });
   }
 
   // Resolve internal user id
@@ -51,6 +78,15 @@ export async function POST(req: Request) {
   const { data: brokerageId, error: rpcError } = await supabase.rpc('create_brokerage_with_owner', {
     p_name: trimmedName,
     p_owner_id: user.id,
+    p_logo_url: logoUrl ? String(logoUrl).slice(0, 500) : null,
+    p_website_url: websiteUrl ? String(websiteUrl).slice(0, 500) : null,
+    p_office_address: officeAddress ? String(officeAddress).slice(0, 500) : null,
+    p_office_phone: officePhone ? String(officePhone).slice(0, 40) : null,
+    p_agent_count: agentCount ? String(agentCount).slice(0, 20) : null,
+    p_brokerage_type: brokerageType || null,
+    p_primary_market: primaryMarket || null,
+    p_commission_structure: commissionStructure || null,
+    p_geographic_coverage: geographicCoverage ? String(geographicCoverage).slice(0, 500) : null,
   });
   if (rpcError || !brokerageId) {
     console.error('[broker/create] rpc failed', rpcError);

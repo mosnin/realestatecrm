@@ -212,7 +212,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'create_space') {
-      const { slug, intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl, intakeAccentColor, intakeBorderRadius, intakeFont, intakeFooterLinks, bio, socialLinks, intakeDisabledSteps, intakeCustomQuestions } = body as {
+      const {
+        slug, intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl,
+        intakeAccentColor, intakeBorderRadius, intakeFont, intakeFooterLinks, bio, socialLinks,
+        intakeDisabledSteps, intakeCustomQuestions,
+        // Enhanced onboarding fields (User record)
+        phone, websiteUrl, mlsId, brokerageAffiliation,
+        preferredNotification, timezone, referralSource, biggestPainPoint,
+      } = body as {
         slug: string;
         intakePageTitle: string;
         intakePageIntro: string;
@@ -224,9 +231,17 @@ export async function POST(req: NextRequest) {
         intakeFont?: 'system' | 'serif' | 'mono';
         intakeFooterLinks?: { label: string; url: string }[];
         bio?: string | null;
-        socialLinks?: { instagram?: string; linkedin?: string; facebook?: string };
+        socialLinks?: { instagram?: string; linkedin?: string; facebook?: string; tiktok?: string };
         intakeDisabledSteps?: string[];
         intakeCustomQuestions?: { id: string; label: string; placeholder?: string; required?: boolean }[];
+        phone?: string;
+        websiteUrl?: string;
+        mlsId?: string;
+        brokerageAffiliation?: string;
+        preferredNotification?: 'email' | 'sms' | 'both';
+        timezone?: string;
+        referralSource?: string;
+        biggestPainPoint?: string;
       };
 
       if (!slug) return NextResponse.json({ error: 'Slug is required' }, { status: 400 });
@@ -234,6 +249,29 @@ export async function POST(req: NextRequest) {
       const sanitized = normalizeSlug(slug);
       if (!isValidSlug(slug) || sanitized !== slug) {
         return NextResponse.json({ error: 'Only lowercase letters, numbers, and hyphens allowed' }, { status: 400 });
+      }
+
+      // Build enhanced User updates
+      const userUpdates: Record<string, unknown> = {};
+      if (phone) userUpdates.phone = String(phone).slice(0, 40);
+      if (bio) userUpdates.bio = String(bio).slice(0, 500);
+      if (socialLinks && typeof socialLinks === 'object') userUpdates.socialLinks = socialLinks;
+      if (websiteUrl) userUpdates.websiteUrl = String(websiteUrl).slice(0, 500);
+      if (mlsId) userUpdates.mlsId = String(mlsId).slice(0, 50);
+      if (brokerageAffiliation) userUpdates.brokerageAffiliation = String(brokerageAffiliation).slice(0, 200);
+      if (preferredNotification) userUpdates.preferredNotification = preferredNotification;
+      if (timezone) userUpdates.timezone = timezone;
+      if (referralSource) userUpdates.referralSource = String(referralSource).slice(0, 100);
+      if (biggestPainPoint) userUpdates.biggestPainPoint = String(biggestPainPoint).slice(0, 100);
+
+      if (Object.keys(userUpdates).length > 0) {
+        const { error: userUpdateErr } = await supabase
+          .from('User')
+          .update(userUpdates)
+          .eq('id', user.id);
+        if (userUpdateErr) {
+          console.error('[onboarding] User enhanced fields update failed:', userUpdateErr);
+        }
       }
 
       if (space) {
@@ -256,6 +294,8 @@ export async function POST(req: NextRequest) {
               ...(socialLinks !== undefined && { socialLinks }),
               ...(intakeDisabledSteps !== undefined && { intakeDisabledSteps }),
               ...(intakeCustomQuestions !== undefined && { intakeCustomQuestions }),
+              ...((preferredNotification === 'sms' || preferredNotification === 'both') && { smsNotifications: true }),
+              ...(timezone && { timezone }),
             },
             { onConflict: 'spaceId' }
           )
@@ -332,6 +372,8 @@ export async function POST(req: NextRequest) {
           businessName: businessName || '',
           ...(logoUrl !== undefined && { logoUrl }),
           ...(realtorPhotoUrl !== undefined && { realtorPhotoUrl }),
+          ...((preferredNotification === 'sms' || preferredNotification === 'both') && { smsNotifications: true }),
+          ...(timezone && { timezone }),
         });
       if (settingsInsertErr) {
         console.error('[onboarding] SpaceSetting insert failed:', settingsInsertErr);

@@ -177,10 +177,13 @@ export default async function SetupPage() {
 
   const email = clerkUser?.emailAddresses?.[0]?.emailAddress ?? '';
 
+  const userImageUrl = clerkUser?.imageUrl ?? '';
+
   return (
     <CreateWorkspaceForm
       defaultName={resolvedUser?.name ?? ''}
       userEmail={email}
+      userImageUrl={userImageUrl}
     />
   );
 }

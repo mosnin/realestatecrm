@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BrandLogo } from '@/components/brand-logo';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, Loader2, AlertCircle, Users, UserCircle, ArrowLeft, Building2, LogOut, Instagram, Linkedin, Facebook, Image } from 'lucide-react';
+import { CheckCircle2, Loader2, AlertCircle, Users, UserCircle, ArrowLeft, Building2, LogOut, Instagram, Linkedin, Facebook, Image, Phone, Globe, MapPin } from 'lucide-react';
 import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
 import { useClerk } from '@clerk/nextjs';
 import { toast } from 'sonner';
@@ -28,6 +28,20 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
   const [saving, setSaving] = useState(false);
   const confettiRef = useRef<ConfettiRef>(null);
   const [error, setError] = useState('');
+
+  // Broker onboarding step: 0 = basic info, 1 = brokerage details, 2 = team info, 3 = business model
+  const [brokerStep, setBrokerStep] = useState(0);
+
+  // Broker-specific fields
+  const [brokerLogoUrl, setBrokerLogoUrl] = useState('');
+  const [brokerWebsiteUrl, setBrokerWebsiteUrl] = useState('');
+  const [officeAddress, setOfficeAddress] = useState('');
+  const [officePhone, setOfficePhone] = useState('');
+  const [agentCount, setAgentCount] = useState('');
+  const [brokerageType, setBrokerageType] = useState('');
+  const [primaryMarket, setPrimaryMarket] = useState('');
+  const [commissionStructure, setCommissionStructure] = useState('');
+  const [geographicCoverage, setGeographicCoverage] = useState('');
 
   // Personalize step state
   const [resolvedSlug, setResolvedSlug] = useState('');
@@ -72,12 +86,50 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
     return () => clearTimeout(timer);
   }, [slug, checkSlug, needsWorkspace]);
 
-  const canSubmit = !saving && (() => {
-    if (role === 'broker_only') return brokerageName.trim().length > 0;
-    if (!businessName.trim() || slug.length < 3 || slugAvailable !== true) return false;
-    if (role === 'broker') return brokerageName.trim().length > 0;
+  const isBrokerRole = role === 'broker_only' || role === 'broker';
+  const brokerTotalSteps = 4; // 0=basic, 1=brokerage details, 2=team info, 3=business model
+
+  const canAdvanceBrokerStep = (() => {
+    if (!isBrokerRole) return false;
+    if (brokerStep === 0) {
+      if (role === 'broker_only') return brokerageName.trim().length > 0;
+      if (role === 'broker') return brokerageName.trim().length > 0 && businessName.trim().length > 0 && slug.length >= 3 && slugAvailable === true;
+    }
+    // Steps 1-3 have no required fields (all optional)
     return true;
   })();
+
+  const canSubmit = !saving && (() => {
+    if (isBrokerRole) {
+      return brokerStep === brokerTotalSteps - 1 && canAdvanceBrokerStep;
+    }
+    if (!businessName.trim() || slug.length < 3 || slugAvailable !== true) return false;
+    return true;
+  })();
+
+  function handleBrokerNext(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canAdvanceBrokerStep) return;
+    if (brokerStep < brokerTotalSteps - 1) {
+      setBrokerStep(brokerStep + 1);
+      return;
+    }
+    // On the last step, trigger actual submit
+    handleSubmit(e);
+  }
+
+  const brokerCreateBody = () => ({
+    name: brokerageName.trim(),
+    logoUrl: brokerLogoUrl.trim() || undefined,
+    websiteUrl: brokerWebsiteUrl.trim() || undefined,
+    officeAddress: officeAddress.trim() || undefined,
+    officePhone: officePhone.trim() || undefined,
+    agentCount: agentCount || undefined,
+    brokerageType: brokerageType || undefined,
+    primaryMarket: primaryMarket || undefined,
+    commissionStructure: commissionStructure || undefined,
+    geographicCoverage: geographicCoverage.trim() || undefined,
+  });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -119,7 +171,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
         const brokerRes = await fetch('/api/broker/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: brokerageName.trim() }),
+          body: JSON.stringify(brokerCreateBody()),
         });
         const brokerData = await brokerRes.json().catch(() => ({}));
         if (!brokerRes.ok) throw new Error(brokerData.error || 'Failed to create brokerage.');
@@ -187,7 +239,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
         const brokerRes = await fetch('/api/broker/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: brokerageName.trim() }),
+          body: JSON.stringify(brokerCreateBody()),
         });
         const brokerData = await brokerRes.json().catch(() => ({}));
         if (!brokerRes.ok) throw new Error(brokerData.error || 'Failed to create brokerage.');
@@ -453,7 +505,16 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
 
         <div className="flex items-center justify-between mb-4">
           <button
-            onClick={() => { setRole('choose'); setError(''); }}
+            onClick={() => {
+              if (isBrokerRole && brokerStep > 0) {
+                setBrokerStep(brokerStep - 1);
+                setError('');
+              } else {
+                setRole('choose');
+                setBrokerStep(0);
+                setError('');
+              }
+            }}
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft size={14} /> Back
@@ -472,20 +533,45 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
             <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary mb-3">
               {role === 'broker_only' ? <Building2 size={10} /> : role === 'broker' ? <Users size={10} /> : <UserCircle size={10} />}
               {role === 'broker_only' ? 'Broker setup' : role === 'broker' ? 'Broker + workspace setup' : 'Realtor setup'}
+              {isBrokerRole && (
+                <span className="ml-1 text-[10px] font-medium text-muted-foreground">
+                  Step {brokerStep + 1} of {brokerTotalSteps}
+                </span>
+              )}
             </div>
+            {isBrokerRole && (
+              <div className="flex gap-1 mb-4">
+                {Array.from({ length: brokerTotalSteps }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`h-1 flex-1 rounded-full transition-colors ${i <= brokerStep ? 'bg-primary' : 'bg-muted'}`}
+                  />
+                ))}
+              </div>
+            )}
             <h1 className="text-xl font-bold">
-              {role === 'broker_only'
-                ? 'Create your brokerage'
-                : role === 'broker'
-                  ? 'Set up your brokerage'
-                  : 'Create your workspace'}
+              {!isBrokerRole
+                ? 'Create your workspace'
+                : brokerStep === 0
+                  ? role === 'broker_only' ? 'Create your brokerage' : 'Set up your brokerage'
+                  : brokerStep === 1
+                    ? 'Brokerage details'
+                    : brokerStep === 2
+                      ? 'Team info'
+                      : 'Business model'}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {role === 'broker_only'
-                ? 'Set up your brokerage to manage your team of realtors.'
-                : role === 'broker'
-                  ? 'Create your brokerage and personal workspace in one step.'
-                  : 'Give your workspace a name and we\'ll generate your intake link.'}
+              {!isBrokerRole
+                ? 'Give your workspace a name and we\'ll generate your intake link.'
+                : brokerStep === 0
+                  ? role === 'broker_only'
+                    ? 'Set up your brokerage to manage your team of realtors.'
+                    : 'Create your brokerage and personal workspace in one step.'
+                  : brokerStep === 1
+                    ? 'Add your brokerage logo, website, and office info.'
+                    : brokerStep === 2
+                      ? 'Tell us about your team and market focus.'
+                      : 'How does your brokerage operate?'}
             </p>
           </div>
 
