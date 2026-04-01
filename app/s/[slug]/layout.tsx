@@ -32,7 +32,7 @@ export default async function DashboardLayout({
   try {
     const { data: row, error } = await supabase
       .from('User')
-      .select('id, onboard')
+      .select('id, onboard, platformRole')
       .eq('clerkId', userId)
       .maybeSingle();
     if (error) throw error;
@@ -45,6 +45,7 @@ export default async function DashboardLayout({
       dbUser = {
         id: row.id as string,
         onboard: row.onboard as boolean,
+        isPlatformAdmin: row.platformRole === 'admin',
         space: spaceRow ? { id: spaceRow.id as string } : null,
       };
     } else {
