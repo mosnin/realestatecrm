@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronRight } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronRight, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings } from 'lucide-react';
 import { GlobalSearch } from './global-search';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
@@ -156,29 +156,76 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
               </div>
             )}
             <div className="px-3 pb-4 space-y-0.5 border-t border-sidebar-border pt-3">
-              <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                Account
-              </p>
-              {secondaryNavItems.map((item) => {
-                const href = `${base}${item.href}`;
-                const isActive = pathname.startsWith(href);
-                return (
+              {(pathname.startsWith(`${base}/settings`) || pathname.startsWith(`${base}/billing`)) ? (
+                <>
                   <Link
-                    key={item.href}
-                    href={href}
+                    href={base}
                     onClick={() => setOpen(false)}
-                    className={cn(
-                      'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
-                      isActive
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                    )}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-2"
                   >
-                    <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
-                    {item.label}
+                    <ArrowLeft size={14} /> Back to dashboard
                   </Link>
-                );
-              })}
+                  {[
+                    { label: 'Settings', items: [
+                      { href: `${base}/settings`, label: 'General', icon: Settings },
+                      { href: `${base}/settings/profile`, label: 'Profile', icon: User },
+                      { href: `${base}/settings/notifications`, label: 'Notifications', icon: Bell },
+                      { href: `${base}/settings/integrations`, label: 'Integrations', icon: Plug },
+                      { href: `${base}/settings/legal`, label: 'Legal', icon: Shield },
+                    ]},
+                    { label: 'Intake Form', items: [
+                      { href: `${base}/settings/appearance`, label: 'Appearance', icon: Palette },
+                      { href: `${base}/settings/content`, label: 'Content', icon: FileText },
+                      { href: `${base}/settings/form-fields`, label: 'Form Fields', icon: ListChecks },
+                    ]},
+                    { label: 'Account', items: [
+                      { href: `${base}/billing`, label: 'Billing', icon: CreditCard },
+                    ]},
+                  ].map((section) => (
+                    <div key={section.label}>
+                      <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{section.label}</p>
+                      {section.items.map((item) => {
+                        const isActive = item.href === `${base}/settings` ? pathname === item.href : pathname.startsWith(item.href);
+                        return (
+                          <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
+                            className={cn('group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                              isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                            )}>
+                            <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
+                            {item.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                    Account
+                  </p>
+                  {secondaryNavItems.map((item) => {
+                    const href = `${base}${item.href}`;
+                    const isActive = pathname.startsWith(href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={href}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                          'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                          isActive
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                        )}
+                      >
+                        <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </>
+              )}
               <div className="flex items-center gap-2 px-3 pt-3">
                 <BrandLogo className="h-4" alt="Chippi" />
               </div>
