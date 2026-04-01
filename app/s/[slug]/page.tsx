@@ -110,7 +110,7 @@ export default async function DashboardPage({
 
   const stats = [
     { label: 'New leads', value: newLeadCount, sub: 'unread', icon: PhoneIncoming, accent: newLeadCount > 0, href: `/s/${slug}/leads` },
-    { label: 'Total leads', value: totalLeads, sub: 'all time', icon: TrendingUp, accent: false, href: `/s/${slug}/leads` },
+    { label: 'Total leads', value: totalLeads, sub: `${rentalLeadCount} rental, ${buyerLeadCount} buyer`, icon: TrendingUp, accent: false, href: `/s/${slug}/leads` },
     { label: 'Clients', value: contactCount, sub: 'in CRM', icon: Users, accent: false, href: `/s/${slug}/contacts` },
     { label: 'Active deals', value: dealCount, sub: formatCurrency(totalValue), icon: Briefcase, accent: false, href: `/s/${slug}/deals` },
     { label: 'Tours', value: upcomingTourCount, sub: upcomingTourCount > 0 ? 'scheduled' : 'none', icon: CalendarDays, accent: upcomingTourCount > 0, href: `/s/${slug}/tours` },

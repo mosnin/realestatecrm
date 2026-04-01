@@ -43,6 +43,7 @@ export async function POST(
     phone: contact.phone ?? '',
     budget: contact.budget,
     applicationData: contact.applicationData,
+    leadType: contact.leadType,
   });
 
   const { error: updateError } = await supabase

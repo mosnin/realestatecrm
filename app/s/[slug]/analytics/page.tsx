@@ -180,7 +180,7 @@ export default async function AnalyticsPage({
     (l) => l.applicationData?.monthlyGrossIncome != null && l.applicationData?.monthlyRent != null,
   );
   const affordabilityPasses = affordabilityLeads.filter(
-    (l) => (l.applicationData!.monthlyGrossIncome ?? 0) >= (l.applicationData!.monthlyRent ?? 0) * 3,
+    (l) => Number(l.applicationData!.monthlyGrossIncome ?? 0) >= Number(l.applicationData!.monthlyRent ?? 0) * 3,
   ).length;
   const affordabilityBuckets = affordabilityLeads.length > 0
     ? [

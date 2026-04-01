@@ -197,6 +197,7 @@ export async function POST(req: NextRequest) {
           phone: payload.phone,
           budget: payload.monthlyRent ?? null,
           applicationData,
+          leadType: payload.leadType ?? 'rental',
         });
 
         const { error: scoreUpdateError } = await supabase

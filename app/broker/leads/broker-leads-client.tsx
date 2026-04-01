@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Search, UserPlus, Check, PhoneIncoming, Users, CalendarClock, Handshake, ArrowRight, Clock, MessageSquare, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Search, UserPlus, Check, PhoneIncoming, Users, CalendarClock, Handshake, ArrowRight, Clock, MessageSquare, ChevronDown, ChevronUp, Loader2, Home, Key } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCompact } from '@/lib/formatting';
 
@@ -19,6 +19,7 @@ export interface LeadRow {
   budget: number | null;
   scoreLabel: string | null;
   leadScore: number | null;
+  leadType: 'rental' | 'buyer' | null;
   moveTiming: string | null;
   createdAt: string;
   assignedTo: string | null;
@@ -66,6 +67,23 @@ function scoreBadge(label: string | null) {
   return (
     <Badge variant="secondary" className={className}>
       {label}
+    </Badge>
+  );
+}
+
+function leadTypeBadge(leadType: 'rental' | 'buyer' | null) {
+  if (leadType === 'buyer') {
+    return (
+      <Badge variant="secondary" className="bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400">
+        <Key size={10} className="mr-1" />
+        Buyer
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="secondary" className="bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400">
+      <Home size={10} className="mr-1" />
+      Rental
     </Badge>
   );
 }
@@ -318,6 +336,7 @@ function LeadItem({
         <div className="flex-1 min-w-0 space-y-0.5">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium truncate">{lead.name || 'Unnamed'}</p>
+            {leadTypeBadge(lead.leadType)}
             {scoreBadge(lead.scoreLabel)}
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
@@ -438,6 +457,7 @@ function AssignedLeadItem({
         <div className="flex-1 min-w-0 space-y-0.5">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium truncate">{lead.name || 'Unnamed'}</p>
+            {leadTypeBadge(lead.leadType)}
             {progress ? stageBadge(progress.currentStage) : scoreBadge(lead.scoreLabel)}
             {progress?.hasDeal && (
               <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
@@ -582,6 +602,17 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
   const [unassigned, setUnassigned] = useState(unassignedLeads);
   const [assigned, setAssigned] = useState(assignedLeads);
   const [tab, setTab] = useState('unassigned');
+  const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'rental' | 'buyer'>('all');
+
+  const filteredUnassigned = useMemo(() => {
+    if (leadTypeFilter === 'all') return unassigned;
+    return unassigned.filter((l) => (l.leadType ?? 'rental') === leadTypeFilter);
+  }, [unassigned, leadTypeFilter]);
+
+  const filteredAssigned = useMemo(() => {
+    if (leadTypeFilter === 'all') return assigned;
+    return assigned.filter((l) => (l.leadType ?? 'rental') === leadTypeFilter);
+  }, [assigned, leadTypeFilter]);
 
   function handleAssigned(leadId: string, realtor: RealtorOption) {
     const lead = unassigned.find((l) => l.id === leadId);
