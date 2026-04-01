@@ -6,7 +6,22 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Building2, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LeadsGlobe } from '@/components/ui/leads-globe';
+import { Globe } from '@/components/ui/cobe-globe';
+
+const leadMarkers = [
+  { id: "hot-lead", location: [40.7, -74.0] as [number, number], label: "Hot Lead" },
+  { id: "new-renter", location: [34.05, -118.24] as [number, number], label: "New Renter" },
+  { id: "pre-approved", location: [41.88, -87.63] as [number, number], label: "Pre-approved" },
+  { id: "tour-booked", location: [29.76, -95.37] as [number, number], label: "Tour Booked" },
+  { id: "buyer-lead", location: [33.45, -112.07] as [number, number], label: "Buyer Lead" },
+  { id: "warm-lead", location: [47.61, -122.33] as [number, number], label: "Warm Lead" },
+];
+
+const leadArcs = [
+  { id: "nyc-la", from: [40.7, -74.0] as [number, number], to: [34.05, -118.24] as [number, number] },
+  { id: "chi-hou", from: [41.88, -87.63] as [number, number], to: [29.76, -95.37] as [number, number] },
+  { id: "sea-phx", from: [47.61, -122.33] as [number, number], to: [33.45, -112.07] as [number, number] },
+];
 
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -110,11 +125,12 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
       </div>
 
       {/* ── Right decorative panel ── */}
-      <div className="hidden lg:relative lg:flex lg:flex-1 lg:flex-col lg:items-center lg:justify-center overflow-hidden bg-white dark:bg-slate-950">
-        {/* Grid lines */}
-        <div className="absolute inset-0 z-0 h-full w-full bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] bg-[size:6rem_4rem] dark:bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)]" />
-        {/* Orange radial glow */}
-        <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_600px_at_50%_300px,#ffe0c2,transparent)] dark:bg-[radial-gradient(circle_600px_at_50%_300px,#7c2d12,transparent)]" />
+      <div className="hidden lg:relative lg:flex lg:flex-1 lg:flex-col lg:items-center lg:justify-center overflow-hidden">
+        {/* Grid + subtle orange glow background */}
+        <div className="absolute inset-0 h-full w-full bg-white bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] bg-[size:6rem_4rem]">
+          <div className="absolute bottom-0 left-0 right-0 top-0 bg-[radial-gradient(circle_500px_at_50%_200px,#ffe8d6,transparent)]" />
+        </div>
+
         {/* Catchy heading */}
         <div className="relative z-10 text-center px-8 -mt-8">
           <p className="text-sm font-medium uppercase tracking-widest text-primary mb-3">
@@ -129,9 +145,20 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
           </p>
         </div>
 
-        {/* Globe */}
+        {/* Globe — exact cobe-globe component, orange markers */}
         <div className="relative z-10 w-full max-w-[480px] mt-2">
-          <LeadsGlobe />
+          <Globe
+            markers={leadMarkers}
+            arcs={leadArcs}
+            markerColor={[1, 0.59, 0.31]}
+            baseColor={[1, 1, 1]}
+            arcColor={[1, 0.59, 0.31]}
+            glowColor={[0.94, 0.93, 0.91]}
+            dark={0}
+            mapBrightness={10}
+            markerSize={0.025}
+            markerElevation={0.01}
+          />
         </div>
       </div>
     </main>
