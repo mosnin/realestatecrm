@@ -29,7 +29,7 @@ export default async function BrokerLeadsPage() {
   const { data: unassignedRaw } = brokerSpaceId
     ? await supabase
         .from('Contact')
-        .select('id, name, email, phone, budget, scoreLabel, leadScore, tags, createdAt, notes, applicationData')
+        .select('id, name, email, phone, budget, scoreLabel, leadScore, leadType, tags, createdAt, notes, applicationData')
         .eq('spaceId', brokerSpaceId)
         .contains('tags', ['brokerage-lead'])
         .not('tags', 'cs', '["assigned"]')
@@ -41,7 +41,7 @@ export default async function BrokerLeadsPage() {
   const { data: assignedRaw } = brokerSpaceId
     ? await supabase
         .from('Contact')
-        .select('id, name, email, phone, budget, scoreLabel, leadScore, tags, createdAt, notes, applicationData, applicationStatusNote')
+        .select('id, name, email, phone, budget, scoreLabel, leadScore, leadType, tags, createdAt, notes, applicationData, applicationStatusNote')
         .eq('spaceId', brokerSpaceId)
         .contains('tags', ['assigned'])
         .order('createdAt', { ascending: false })
@@ -226,6 +226,7 @@ export default async function BrokerLeadsPage() {
       budget: c.budget,
       scoreLabel: c.scoreLabel,
       leadScore: c.leadScore,
+      leadType: (c as any).leadType ?? 'rental',
       moveTiming: moveTiming ?? null,
       createdAt: c.createdAt,
       assignedTo: assignedName,
