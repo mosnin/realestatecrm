@@ -149,7 +149,9 @@ export async function POST(req: NextRequest) {
         name: payload.legalName,
         email: payload.email ?? null,
         phone: payload.phone,
-        budget: payload.monthlyRent ?? payload.monthlyGrossIncome ?? null,
+        budget: payload.leadType === 'buyer'
+          ? (payload.buyerBudget ?? payload.monthlyGrossIncome ?? null)
+          : (payload.monthlyRent ?? payload.monthlyGrossIncome ?? null),
         preferences: payload.propertyAddress ?? null,
         address: payload.currentAddress ?? null,
         notes: noteParts.length > 0 ? noteParts.join('\n') : null,
@@ -178,72 +180,69 @@ export async function POST(req: NextRequest) {
       slug: payload.slug,
     });
 
-    // ── Defer AI scoring + email notification ─────────────────────────────
-    // Use a promise we'll pass to waitUntil so Vercel keeps the function alive
-    const backgroundWork = (async () => {
-      let scoring: LeadScoringResult = {
-        scoringStatus: 'failed',
-        leadScore: null,
-        scoreLabel: 'unscored',
-        scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
-        scoreDetails: null,
-      };
+    // ── AI scoring + notification (both awaited before response) ───────────
+    // On Vercel serverless the function is killed after the response is sent,
+    // so all important work must complete before we return.
+    let scoring: LeadScoringResult = {
+      scoringStatus: 'failed',
+      leadScore: null,
+      scoreLabel: 'unscored',
+      scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
+      scoreDetails: null,
+    };
 
-      try {
-        scoring = await scoreLeadApplication({
+    try {
+      scoring = await scoreLeadApplication({
+        contactId: contact.id,
+        name: payload.legalName,
+        email: payload.email ?? null,
+        phone: payload.phone,
+        budget: (payload.leadType === 'buyer')
+          ? (payload.buyerBudget ?? null)
+          : (payload.monthlyRent ?? null),
+        applicationData,
+        leadType: payload.leadType ?? 'rental',
+      });
+
+      const { error: scoreUpdateError } = await supabase
+        .from('Contact')
+        .update({
+          scoringStatus: scoring.scoringStatus,
+          leadScore: scoring.leadScore,
+          scoreLabel: scoring.scoreLabel,
+          scoreSummary: scoring.scoreSummary,
+          scoreDetails: scoring.scoreDetails,
+          updatedAt: new Date().toISOString(),
+        })
+        .eq('id', contact.id);
+      if (scoreUpdateError) {
+        console.error('[apply] scoring update failed', { contactId: contact.id, scoreUpdateError });
+      } else {
+        console.info('[apply] scoring persisted', {
           contactId: contact.id,
-          name: payload.legalName,
-          email: payload.email ?? null,
-          phone: payload.phone,
-          budget: payload.monthlyRent ?? null,
-          applicationData,
-          leadType: payload.leadType ?? 'rental',
+          scoringStatus: scoring.scoringStatus,
+          scoreLabel: scoring.scoreLabel,
         });
-
-        const { error: scoreUpdateError } = await supabase
+      }
+    } catch (error) {
+      console.error('[apply] scoring failed', { contactId: contact.id, error });
+      try {
+        await supabase
           .from('Contact')
           .update({
-            scoringStatus: scoring.scoringStatus,
-            leadScore: scoring.leadScore,
-            scoreLabel: scoring.scoreLabel,
-            scoreSummary: scoring.scoreSummary,
-            scoreDetails: scoring.scoreDetails,
+            scoringStatus: 'failed',
+            leadScore: null,
+            scoreLabel: 'unscored',
+            scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
             updatedAt: new Date().toISOString(),
           })
           .eq('id', contact.id);
-        if (scoreUpdateError) {
-          console.error('[apply] scoring update failed', { contactId: contact.id, scoreUpdateError });
-        } else {
-          console.info('[apply] scoring persisted', {
-            contactId: contact.id,
-            scoringStatus: scoring.scoringStatus,
-            scoreLabel: scoring.scoreLabel,
-          });
-        }
-      } catch (error) {
-        console.error('[apply] scoring failed', { contactId: contact.id, error });
-        try {
-          await supabase
-            .from('Contact')
-            .update({
-              scoringStatus: 'failed',
-              leadScore: null,
-              scoreLabel: 'unscored',
-              scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
-              updatedAt: new Date().toISOString(),
-            })
-            .eq('id', contact.id);
-        } catch (fallbackErr) {
-          console.error('[apply] fallback scoring state failed', { contactId: contact.id, fallbackErr });
-        }
+      } catch (fallbackErr) {
+        console.error('[apply] fallback scoring state failed', { contactId: contact.id, fallbackErr });
       }
+    }
 
-      // Notification already sent before response — skip here
-    })();
-
-    // Send notification IMMEDIATELY before returning response.
-    // On Vercel serverless, the function is killed after response —
-    // any void/background promises may never execute.
+    // Send notification with scoring results included
     try {
       console.log('[apply] Sending notification for contact:', contact.id, 'spaceId:', space.id);
       await notifyNewLead({
@@ -252,9 +251,9 @@ export async function POST(req: NextRequest) {
         name: payload.legalName,
         phone: payload.phone ?? null,
         email: payload.email ?? null,
-        leadScore: null,
-        scoreLabel: 'unscored',
-        scoreSummary: null,
+        leadScore: scoring.leadScore,
+        scoreLabel: scoring.scoreLabel,
+        scoreSummary: scoring.scoreSummary,
         applicationData,
       });
       console.log('[apply] Notification dispatched');
@@ -262,19 +261,16 @@ export async function POST(req: NextRequest) {
       console.error('[apply] Notification failed:', notifyErr);
     }
 
-    // Background scoring — best effort, may not complete on Vercel
-    backgroundWork.catch((err: unknown) => console.error('[apply] scoring failed:', err));
-
     return NextResponse.json(
       {
         success: true,
         id: contact.id,
         applicationRef,
-        scoringStatus: 'pending',
-        leadScore: null,
-        scoreLabel: 'unscored',
-        scoreSummary: null,
-        scoreDetails: null,
+        scoringStatus: scoring.scoringStatus,
+        leadScore: scoring.leadScore,
+        scoreLabel: scoring.scoreLabel,
+        scoreSummary: scoring.scoreSummary,
+        scoreDetails: scoring.scoreDetails,
       },
       { status: 201 }
     );

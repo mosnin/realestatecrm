@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     // ── Look up the Brokerage ──────────────────────────────────────────────
     const { data: brokerage, error: brokerageError } = await supabase
       .from('Brokerage')
-      .select('id, name, ownerId, status')
+      .select('id, name, ownerId, status, privacyPolicyHtml')
       .eq('id', payload.brokerageId)
       .maybeSingle();
     if (brokerageError) throw brokerageError;
@@ -153,6 +153,19 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Fetch privacy policy URL from space settings for consent snapshot
+    let spacePrivacyPolicyUrl: string | null = null;
+    try {
+      const { data: spaceSetting } = await supabase
+        .from('SpaceSetting')
+        .select('privacyPolicyUrl')
+        .eq('spaceId', space.id)
+        .maybeSingle();
+      spacePrivacyPolicyUrl = spaceSetting?.privacyPolicyUrl ?? null;
+    } catch (err) {
+      console.warn('[apply/brokerage] failed to fetch space privacy policy URL', { spaceId: space.id, err });
+    }
+
     // ── Build application data ─────────────────────────────────────────────
     const applicationData = buildApplicationData({
       ...payload,
@@ -177,7 +190,9 @@ export async function POST(req: NextRequest) {
         name: payload.legalName,
         email: payload.email ?? null,
         phone: payload.phone ?? null,
-        budget: payload.monthlyRent ?? payload.monthlyGrossIncome ?? null,
+        budget: payload.leadType === 'buyer'
+          ? (payload.buyerBudget ?? payload.monthlyGrossIncome ?? null)
+          : (payload.monthlyRent ?? payload.monthlyGrossIncome ?? null),
         preferences: payload.propertyAddress ?? null,
         address: payload.currentAddress ?? null,
         notes: noteParts.length > 0 ? noteParts.join('\n') : null,
@@ -194,6 +209,10 @@ export async function POST(req: NextRequest) {
         },
         applicationRef,
         applicationStatus: 'received',
+        consentGiven: payload.privacyConsent === true,
+        consentTimestamp: payload.privacyConsent === true ? new Date().toISOString() : null,
+        consentIp: payload.privacyConsent === true ? ip : null,
+        consentPrivacyPolicyUrl: payload.privacyConsent === true ? spacePrivacyPolicyUrl : null,
       })
       .select();
     if (insertError) throw insertError;
@@ -220,7 +239,7 @@ export async function POST(req: NextRequest) {
         name: payload.legalName,
         email: payload.email ?? null,
         phone: payload.phone ?? null,
-        budget: payload.monthlyRent ?? null,
+        budget: (payload.leadType === 'buyer' ? (payload.buyerBudget ?? null) : (payload.monthlyRent ?? null)),
         applicationData,
         leadType: payload.leadType ?? 'rental',
       });

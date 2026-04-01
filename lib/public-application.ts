@@ -47,6 +47,17 @@ export const publicApplicationSchema = z.object({
   bathrooms: optStr,
   mustHaves: optStr,
   firstTimeBuyer: optStr,
+  buyerBudget: z
+    .union([z.number(), z.string(), z.null(), z.undefined()])
+    .transform((v) => {
+      if (v == null || v === '') return undefined;
+      if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
+      if (typeof v === 'string' && /[\$,]/.test(v)) return v;
+      const p = Number.parseFloat(String(v));
+      return Number.isFinite(p) ? p : v;
+    }),
+  housingSituation: optStr,
+  buyerTimeline: optStr,
 
   // Step 1: Property Selection
   propertyAddress: optStr,
@@ -237,6 +248,9 @@ export function buildApplicationData(input: PublicApplicationInput) {
     bathrooms: input.bathrooms,
     mustHaves: input.mustHaves,
     firstTimeBuyer: input.firstTimeBuyer,
+    buyerBudget: input.buyerBudget,
+    housingSituation: input.housingSituation,
+    buyerTimeline: input.buyerTimeline,
     consentToScreening: input.consentToScreening,
     truthfulnessCertification: input.truthfulnessCertification,
     electronicSignature: input.electronicSignature,

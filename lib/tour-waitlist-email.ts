@@ -11,7 +11,11 @@ export async function sendEmail(to: string, subject: string, html: string) {
     const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
     const safeSubject = subject.replace(/[\r\n\t]/g, ' ').slice(0, 200);
     const result = await resend.emails.send({ from: FROM, to, subject: safeSubject, html });
-    console.log(`[waitlist-email] Sent "${subject}" to ${to}`, JSON.stringify(result));
+    if (result.error) {
+      console.error(`[waitlist-email] Resend API error for "${subject}" to ${to}:`, JSON.stringify(result.error));
+    } else {
+      console.log(`[waitlist-email] Sent "${subject}" to ${to}`, JSON.stringify(result.data));
+    }
   } catch (err) {
     console.error('[waitlist-email] Send failed:', err);
   }

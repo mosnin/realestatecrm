@@ -463,6 +463,7 @@ function scoreApplicationCompleteness(input: ScoringInput): CategoryResult {
     };
   }
 
+  // Use rental-specific fields for completeness check (buyer has its own path via scoreBuyerCompleteness)
   const fields = [
     app.creditScore, app.propertyAddress, app.unitType, app.targetMoveInDate, app.monthlyRent,
     app.leaseTermPreference, app.numberOfOccupants, app.dateOfBirth,
@@ -684,7 +685,11 @@ function computeDataCompleteness(input: ScoringInput): number {
   const app = input.applicationData;
   if (!app) return 0.1;
 
-  // Weight critical fields higher for confidence calculation
+  if (input.leadType === 'buyer') {
+    return computeBuyerDataCompleteness(input);
+  }
+
+  // Rental lead: weight critical fields higher for confidence calculation
   const criticalFields = [
     app.creditScore, app.monthlyGrossIncome, app.employmentStatus, app.monthlyRent,
     app.priorEvictions, app.outstandingBalances, app.bankruptcy,
@@ -702,6 +707,31 @@ function computeDataCompleteness(input: ScoringInput): number {
   const secondaryFilled = secondaryFields.filter((v) => v != null && v !== '').length;
 
   // Critical fields count 2x for confidence
+  const totalWeight = criticalFields.length * 2 + secondaryFields.length;
+  const filledWeight = criticalFilled * 2 + secondaryFilled;
+
+  return Math.min(1.0, filledWeight / totalWeight);
+}
+
+function computeBuyerDataCompleteness(input: ScoringInput): number {
+  const app = input.applicationData;
+  if (!app) return 0.1;
+
+  const criticalFields = [
+    app.preApprovalStatus, app.buyerBudget || app.monthlyRent,
+    app.buyerTimeline || app.targetMoveInDate, app.employmentStatus,
+    app.monthlyGrossIncome, app.housingSituation || app.currentHousingStatus,
+  ];
+  const criticalFilled = criticalFields.filter((v) => v != null && v !== '').length;
+
+  const secondaryFields = [
+    app.preApprovalLender, app.preApprovalAmount,
+    app.firstTimeBuyer, app.propertyType, app.bedrooms, app.bathrooms,
+    app.mustHaves, app.employerOrSource, app.additionalIncome,
+    input.email, input.phone,
+  ];
+  const secondaryFilled = secondaryFields.filter((v) => v != null && v !== '').length;
+
   const totalWeight = criticalFields.length * 2 + secondaryFields.length;
   const filledWeight = criticalFilled * 2 + secondaryFilled;
 
@@ -743,9 +773,18 @@ function collectInsights(categories: CategoryResult[], penalties: RiskPenalty[],
     }
   }
 
-  // Missing information
+  // Missing information — lead-type-aware
   if (!app) {
     missingInformation.push('Full application data');
+  } else if (input.leadType === 'buyer') {
+    if (!app.preApprovalStatus) missingInformation.push('Pre-approval status');
+    if (!app.buyerBudget && !app.monthlyRent && !input.budget) missingInformation.push('Purchase budget');
+    if (!app.buyerTimeline && !app.targetMoveInDate) missingInformation.push('Purchase timeline');
+    if (!app.monthlyGrossIncome) missingInformation.push('Monthly gross income');
+    if (!app.employmentStatus) missingInformation.push('Employment status');
+    if (!app.housingSituation && !app.currentHousingStatus) missingInformation.push('Current housing situation');
+    if (!app.propertyType) missingInformation.push('Desired property type');
+    if (!app.firstTimeBuyer) missingInformation.push('First-time buyer status');
   } else {
     if (!app.creditScore) missingInformation.push('Credit score');
     if (!app.monthlyGrossIncome) missingInformation.push('Monthly gross income');

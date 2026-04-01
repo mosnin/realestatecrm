@@ -46,7 +46,7 @@ async function notifySubscriptionChange(subscriptionId: string, newStatus: strin
 
     const domain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'my.usechippi.com';
 
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from: `Chippi <${FROM}>`,
       to: owner.email,
       subject: msg.subject,
@@ -58,6 +58,9 @@ async function notifySubscriptionChange(subscriptionId: string, newStatus: strin
   <p style="font-size:12px;color:#9ca3af;margin-top:20px">— The Chippi team</p>
 </div>`,
     });
+    if (result.error) {
+      console.error('[stripe-webhook] Resend API error:', JSON.stringify(result.error));
+    }
   } catch (err) {
     console.error('[stripe-webhook] subscription email failed:', err);
   }

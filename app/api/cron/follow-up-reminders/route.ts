@@ -75,15 +75,16 @@ export async function GET(req: NextRequest) {
 
       // SMS reminders (one per contact)
       if (setting?.smsNotifications && setting?.phoneNumber) {
-        for (const c of spaceContacts) {
+        const smsPromises = spaceContacts.map((c) =>
           sendSMS(
             followUpReminderSMS({
               spaceName: space.name,
               contactName: c.name,
-              phone: setting.phoneNumber,
+              phone: setting.phoneNumber!,
             })
-          ).catch((err) => console.error('[cron] SMS follow-up failed', err));
-        }
+          ).catch((err) => console.error('[cron] SMS follow-up failed', err))
+        );
+        await Promise.allSettled(smsPromises);
       }
 
       sent++;

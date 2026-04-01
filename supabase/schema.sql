@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS "Contact" (
   name            text NOT NULL,
   email           text,
   phone           text,
+  "leadType"      text NOT NULL DEFAULT 'rental' CHECK ("leadType" IN ('rental', 'buyer')),
   address         text,
   notes           text,
   budget          double precision,
@@ -119,6 +120,10 @@ CREATE TABLE IF NOT EXISTS "Contact" (
   "applicationRef"        text,
   "applicationStatus"     text,
   "applicationStatusNote" text,
+  "consentGiven"          boolean,
+  "consentTimestamp"      timestamptz,
+  "consentIp"             text,
+  "consentPrivacyPolicyUrl" text,
   "createdAt"     timestamptz NOT NULL DEFAULT now(),
   "updatedAt"     timestamptz NOT NULL DEFAULT now()
 );

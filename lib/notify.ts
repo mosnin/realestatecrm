@@ -57,13 +57,25 @@ async function getSpaceOwnerInfo(spaceId: string): Promise<SpaceOwnerInfo | null
     const { data: owner } = await supabase.from('User').select('email').eq('id', space.ownerId).maybeSingle();
     if (!owner?.email) return null;
 
+    const smsEnabled = settings?.smsNotifications ?? false;
+    const ownerPhone = settings?.phoneNumber ?? null;
+
+    // Log diagnostic info for SMS delivery issues
+    if (!settings) {
+      console.warn(`[notify] No SpaceSetting row found for spaceId ${spaceId} — SMS disabled by default`);
+    } else if (smsEnabled && !ownerPhone) {
+      console.warn(`[notify] SMS is enabled for spaceId ${spaceId} but no phone number is configured — SMS will be skipped`);
+    } else if (!smsEnabled) {
+      console.log(`[notify] SMS notifications are disabled for spaceId ${spaceId} (smsNotifications = false)`);
+    }
+
     return {
       ownerEmail: owner.email,
-      ownerPhone: settings?.phoneNumber ?? null,
+      ownerPhone,
       spaceName: space.name,
       spaceSlug: space.slug,
       emailEnabled: settings?.notifications ?? true,
-      smsEnabled: settings?.smsNotifications ?? false,
+      smsEnabled,
       notifyNewLeads: settings?.notifyNewLeads ?? true,
       notifyTourBookings: settings?.notifyTourBookings ?? true,
       notifyNewDeals: settings?.notifyNewDeals ?? true,

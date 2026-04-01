@@ -6,13 +6,33 @@
  * Gracefully no-ops when credentials are missing.
  */
 
+// Log a clear warning at module load time if Telnyx env vars are missing
+if (!process.env.TELNYX_API_KEY) {
+  console.warn('[sms] WARNING: TELNYX_API_KEY is not set — all SMS notifications will be skipped');
+}
+if (!process.env.TELNYX_FROM_NUMBER) {
+  console.warn('[sms] WARNING: TELNYX_FROM_NUMBER is not set — all SMS notifications will be skipped');
+} else if (!/^\+\d{10,15}$/.test(process.env.TELNYX_FROM_NUMBER)) {
+  console.warn(`[sms] WARNING: TELNYX_FROM_NUMBER "${process.env.TELNYX_FROM_NUMBER}" does not look like a valid E.164 phone number (expected +XXXXXXXXXXX)`);
+}
+
 let telnyxClient: any = null;
 
 async function getClient() {
-  if (!process.env.TELNYX_API_KEY) return null;
+  if (!process.env.TELNYX_API_KEY) {
+    console.warn('[sms] Cannot create Telnyx client — TELNYX_API_KEY is not set');
+    return null;
+  }
   if (!telnyxClient) {
-    const { Telnyx } = await import('telnyx');
-    telnyxClient = new Telnyx({ apiKey: process.env.TELNYX_API_KEY });
+    try {
+      const telnyx = await import('telnyx');
+      // The SDK exports both a default and named `Telnyx` constructor
+      const TelnyxConstructor = telnyx.Telnyx ?? telnyx.default;
+      telnyxClient = new TelnyxConstructor({ apiKey: process.env.TELNYX_API_KEY });
+    } catch (err) {
+      console.error('[sms] Failed to initialize Telnyx SDK:', err);
+      return null;
+    }
   }
   return telnyxClient;
 }
@@ -54,6 +74,7 @@ export async function sendSMS(params: SendSMSParams): Promise<boolean> {
   }
 
   try {
+    console.log(`[sms] Sending to ${toNumber} from ${fromNumber} (body length: ${params.body.length})`);
     const response = await client.messages.send({
       from: fromNumber,
       to: toNumber,
@@ -67,6 +88,8 @@ export async function sendSMS(params: SendSMSParams): Promise<boolean> {
       status: err?.statusCode ?? err?.status,
       code: err?.code,
       errors: err?.errors ?? err?.rawErrors,
+      // Include the full error for debugging in non-production
+      ...(process.env.NODE_ENV !== 'production' && { fullError: err }),
     });
     return false;
   }

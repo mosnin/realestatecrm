@@ -89,8 +89,12 @@ async function sendEmail(to: string, subject: string, html: string) {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
     const safeSubject = subject.replace(/[\r\n\t]/g, ' ').slice(0, 200);
-    await resend.emails.send({ from: FROM, to, subject: safeSubject, html });
-    console.log(`[tour-email] Sent "${subject}" to ${to}`);
+    const result = await resend.emails.send({ from: FROM, to, subject: safeSubject, html });
+    if (result.error) {
+      console.error(`[tour-email] Resend API error for "${subject}" to ${to}:`, JSON.stringify(result.error));
+    } else {
+      console.log(`[tour-email] Sent "${subject}" to ${to}`, JSON.stringify(result.data));
+    }
   } catch (err) {
     console.error('[tour-email] Send failed:', err);
   }

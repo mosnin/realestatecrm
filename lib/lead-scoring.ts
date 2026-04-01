@@ -68,7 +68,7 @@ export async function scoreLeadApplication(input: {
     // ── Step 3: Assemble LeadScoreDetails (same shape as before) ────────────
     const summary = enhancement?.summary ?? deriveSummary(engineResult, input.name);
     const explanationTags = enhancement?.explanationTags ?? deriveExplanationTags(engineResult);
-    const recommendedNextAction = enhancement?.recommendedNextAction ?? deriveNextAction(engineResult);
+    const recommendedNextAction = enhancement?.recommendedNextAction ?? deriveNextAction(engineResult, input.leadType);
     const leadState = enhancement?.leadState ?? deriveLeadState(engineResult, input.leadType);
 
     const qualificationStatus = engineResult.priorityTier === 'hot' || engineResult.priorityTier === 'warm'

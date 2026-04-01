@@ -25,16 +25,17 @@ export async function PATCH(req: NextRequest) {
 
   // Sanitize and cap all free-text fields to prevent storage DoS and injection
   const name            = typeof body.name            === 'string' ? body.name.slice(0, 100)            : '';
-  const phoneNumber     = typeof body.phoneNumber     === 'string' ? body.phoneNumber.slice(0, 50)       : null;
-  const myConnections   = typeof body.myConnections   === 'string' ? body.myConnections.slice(0, 500)    : null;
-  const aiPersonalization = typeof body.aiPersonalization === 'string' ? body.aiPersonalization.slice(0, 1000) : null;
-  const billingSettings = typeof body.billingSettings === 'string' ? body.billingSettings.slice(0, 2000) : null;
+  // phoneNumber: use undefined (not null) when absent so we can skip it in the upsert
+  const phoneNumber     = typeof body.phoneNumber     === 'string' ? body.phoneNumber.slice(0, 50)       : undefined;
+  const myConnections   = typeof body.myConnections   === 'string' ? body.myConnections.slice(0, 500)    : undefined;
+  const aiPersonalization = typeof body.aiPersonalization === 'string' ? body.aiPersonalization.slice(0, 1000) : undefined;
+  const billingSettings = typeof body.billingSettings === 'string' ? body.billingSettings.slice(0, 2000) : undefined;
   const bio             = typeof body.bio             === 'string' ? body.bio.slice(0, 500)             : undefined;
   const socialLinks     = body.socialLinks && typeof body.socialLinks === 'object' ? body.socialLinks    : undefined;
   const logoUrl         = typeof body.logoUrl         === 'string' ? body.logoUrl.slice(0, 500)         : undefined;
   // Anthropic key: validate prefix format; reject anything that looks wrong
-  const rawKey = typeof body.anthropicApiKey === 'string' ? body.anthropicApiKey.trim() : '';
-  const anthropicApiKey = rawKey === '' || rawKey.startsWith('sk-ant-') ? (rawKey || null) : null;
+  const rawKey = typeof body.anthropicApiKey === 'string' ? body.anthropicApiKey.trim() : undefined;
+  const anthropicApiKey = rawKey === undefined ? undefined : (rawKey === '' || rawKey.startsWith('sk-ant-') ? (rawKey || null) : null);
 
   // Legal & compliance fields
   const rawPrivacyPolicyUrl = typeof body.privacyPolicyUrl === 'string' ? body.privacyPolicyUrl.trim().slice(0, 500) : undefined;
@@ -112,32 +113,34 @@ export async function PATCH(req: NextRequest) {
     updatedRows = [space];
   }
 
+  // Only include fields that were actually provided in the request body
+  // to prevent partial saves (e.g., notifications page) from wiping out
+  // fields managed by other forms (e.g., phone number from general settings).
+  const settingsPayload: Record<string, unknown> = {
+    id: crypto.randomUUID(),
+    spaceId: space.id,
+  };
+  if (typeof notifications === 'boolean') settingsPayload.notifications = notifications;
+  if (typeof smsNotifications === 'boolean') settingsPayload.smsNotifications = smsNotifications;
+  if (typeof notifyNewLeads === 'boolean') settingsPayload.notifyNewLeads = notifyNewLeads;
+  if (typeof notifyTourBookings === 'boolean') settingsPayload.notifyTourBookings = notifyTourBookings;
+  if (typeof notifyNewDeals === 'boolean') settingsPayload.notifyNewDeals = notifyNewDeals;
+  if (typeof notifyFollowUps === 'boolean') settingsPayload.notifyFollowUps = notifyFollowUps;
+  if (phoneNumber !== undefined) settingsPayload.phoneNumber = phoneNumber;
+  if (myConnections !== undefined) settingsPayload.myConnections = myConnections;
+  if (aiPersonalization !== undefined) settingsPayload.aiPersonalization = aiPersonalization;
+  if (billingSettings !== undefined) settingsPayload.billingSettings = billingSettings;
+  if (anthropicApiKey !== undefined) settingsPayload.anthropicApiKey = anthropicApiKey || null;
+  if (bio !== undefined) settingsPayload.bio = bio;
+  if (socialLinks !== undefined) settingsPayload.socialLinks = socialLinks;
+  if (logoUrl !== undefined) settingsPayload.logoUrl = logoUrl;
+  if (rawPrivacyPolicyUrl !== undefined) settingsPayload.privacyPolicyUrl = rawPrivacyPolicyUrl || null;
+  if (consentCheckboxLabel !== undefined) settingsPayload.consentCheckboxLabel = consentCheckboxLabel || null;
+  if (privacyPolicyHtml !== undefined) settingsPayload.privacyPolicyHtml = privacyPolicyHtml || null;
+
   const { error: settingsError } = await supabase
     .from('SpaceSetting')
-    .upsert(
-      {
-        id: crypto.randomUUID(),
-        spaceId: space.id,
-        notifications,
-        smsNotifications: typeof smsNotifications === 'boolean' ? smsNotifications : false,
-        notifyNewLeads: typeof notifyNewLeads === 'boolean' ? notifyNewLeads : true,
-        notifyTourBookings: typeof notifyTourBookings === 'boolean' ? notifyTourBookings : true,
-        notifyNewDeals: typeof notifyNewDeals === 'boolean' ? notifyNewDeals : true,
-        notifyFollowUps: typeof notifyFollowUps === 'boolean' ? notifyFollowUps : true,
-        phoneNumber,
-        myConnections,
-        aiPersonalization,
-        billingSettings,
-        anthropicApiKey: anthropicApiKey || null,
-        ...(bio !== undefined && { bio }),
-        ...(socialLinks !== undefined && { socialLinks }),
-        ...(logoUrl !== undefined && { logoUrl }),
-        ...(rawPrivacyPolicyUrl !== undefined && { privacyPolicyUrl: rawPrivacyPolicyUrl || null }),
-        ...(consentCheckboxLabel !== undefined && { consentCheckboxLabel: consentCheckboxLabel || null }),
-        ...(privacyPolicyHtml !== undefined && { privacyPolicyHtml: privacyPolicyHtml || null }),
-      },
-      { onConflict: 'spaceId' }
-    )
+    .upsert(settingsPayload, { onConflict: 'spaceId' })
     .select();
   if (settingsError) throw settingsError;
 

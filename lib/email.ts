@@ -121,7 +121,11 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
       subject: `New lead: ${safeSubjectName}${leadScore != null ? ` · ${Math.round(leadScore)} ${safeScoreLabel}` : ''}`,
       html,
     });
-    console.log('[email] Send result:', JSON.stringify(result));
+    if (result.error) {
+      console.error('[email] Resend API error (new lead):', JSON.stringify(result.error));
+    } else {
+      console.log('[email] Send result:', JSON.stringify(result.data));
+    }
   } catch (err) {
     console.error('[email] SEND FAILED:', err);
   }
@@ -202,7 +206,11 @@ export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<
       subject: `${contacts.length} follow-up${contacts.length !== 1 ? 's' : ''} due today — ${safeSpaceName}`,
       html,
     });
-    console.log('[email] sendFollowUpDigest result:', JSON.stringify(result));
+    if (result.error) {
+      console.error('[email] Resend API error (follow-up digest):', JSON.stringify(result.error));
+    } else {
+      console.log('[email] sendFollowUpDigest result:', JSON.stringify(result.data));
+    }
   } catch (err) {
     console.error('[email] sendFollowUpDigest FAILED:', err);
   }
@@ -253,7 +261,11 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
       subject: safeSubject,
       html,
     });
-    console.log('[email] sendEmailFromCRM result:', JSON.stringify(result));
+    if (result.error) {
+      console.error('[email] Resend API error (CRM email):', JSON.stringify(result.error));
+    } else {
+      console.log('[email] sendEmailFromCRM result:', JSON.stringify(result.data));
+    }
   } catch (err) {
     console.error('[email] sendEmailFromCRM FAILED:', err);
   }
@@ -327,7 +339,11 @@ export async function sendNewDealNotification(params: NewDealEmailParams): Promi
       subject: `New deal: ${safeDealTitle}${dealValue != null ? ` · ${fmt(dealValue)}` : ''}`,
       html,
     });
-    console.log('[email] sendNewDealNotification result:', JSON.stringify(result));
+    if (result.error) {
+      console.error('[email] Resend API error (new deal):', JSON.stringify(result.error));
+    } else {
+      console.log('[email] sendNewDealNotification result:', JSON.stringify(result.data));
+    }
   } catch (err) {
     console.error('[email] sendNewDealNotification FAILED:', err);
   }
@@ -397,7 +413,11 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
       subject: `You're invited to join ${brokerageName.replace(/[\r\n\t]/g, ' ').slice(0, 100)} on Chippi`,
       html,
     });
-    console.log('[email] sendBrokerageInvitation result:', JSON.stringify(result));
+    if (result.error) {
+      console.error('[email] Resend API error (brokerage invitation):', JSON.stringify(result.error));
+    } else {
+      console.log('[email] sendBrokerageInvitation result:', JSON.stringify(result.data));
+    }
   } catch (err) {
     console.error('[email] sendBrokerageInvitation FAILED:', err);
   }
@@ -473,7 +493,11 @@ export async function sendWelcomeEmail(params: {
       subject: `Welcome to Chippi — your workspace is ready`,
       html,
     });
-    console.log('[email] sendWelcomeEmail result:', JSON.stringify(result));
+    if (result.error) {
+      console.error('[email] Resend API error (welcome email):', JSON.stringify(result.error));
+    } else {
+      console.log('[email] sendWelcomeEmail result:', JSON.stringify(result.data));
+    }
   } catch (err) {
     console.error('[email] sendWelcomeEmail FAILED:', err);
   }
