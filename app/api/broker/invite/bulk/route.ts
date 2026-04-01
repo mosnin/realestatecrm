@@ -132,14 +132,18 @@ export async function POST(req: Request) {
       continue;
     }
 
-    // Send email (non-blocking)
-    sendBrokerageInvitation({
-      toEmail: email,
-      brokerageName: brokerage.name,
-      inviterName,
-      roleToAssign: roleToAssign as 'broker_admin' | 'realtor_member',
-      token: invitation.token,
-    }).catch((err) => console.error('[broker/invite/bulk] email failed', err));
+    // Send email — must await so Vercel doesn't kill the function before delivery
+    try {
+      await sendBrokerageInvitation({
+        toEmail: email,
+        brokerageName: brokerage.name,
+        inviterName,
+        roleToAssign: roleToAssign as 'broker_admin' | 'realtor_member',
+        token: invitation.token,
+      });
+    } catch (err) {
+      console.error('[broker/invite/bulk] email failed', err);
+    }
 
     results.push({ email, status: 'sent' });
     sentCount++;

@@ -259,13 +259,17 @@ export async function notifyNewContact(params: NotifyNewContactParams): Promise<
   if (!info || !info.notifyNewLeads) return;
 
   if (info.smsEnabled && info.ownerPhone) {
-    sendSMS(
-      newLeadSMS({
-        spaceName: info.spaceName,
-        leadName: params.contactName,
-        leadPhone: params.contactPhone,
-        phone: info.ownerPhone,
-      })
-    ).catch((err) => console.error('[notify] contact SMS failed', err));
+    try {
+      await sendSMS(
+        newLeadSMS({
+          spaceName: info.spaceName,
+          leadName: params.contactName,
+          leadPhone: params.contactPhone,
+          phone: info.ownerPhone,
+        })
+      );
+    } catch (err) {
+      console.error('[notify] contact SMS failed', err);
+    }
   }
 }

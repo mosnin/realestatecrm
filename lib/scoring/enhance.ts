@@ -17,13 +17,24 @@ export type AIEnhancement = {
   leadState: string;
 };
 
-const LEAD_STATES = [
+const RENTAL_LEAD_STATES = [
   'high_priority_qualified_renter',
   'qualified_low_urgency',
   'incomplete_application',
   'needs_additional_info',
   'likely_unqualified',
 ] as const;
+
+const BUYER_LEAD_STATES = [
+  'high_priority_qualified_buyer',
+  'qualified_buyer_low_urgency',
+  'pre_approved_ready',
+  'incomplete_application',
+  'needs_additional_info',
+  'likely_unqualified',
+] as const;
+
+type LeadType = 'rental' | 'buyer';
 
 async function getOpenAIClient(): Promise<InstanceType<typeof OpenAI>> {
   if (!process.env.OPENAI_API_KEY) {
@@ -37,17 +48,27 @@ async function getOpenAIClient(): Promise<InstanceType<typeof OpenAI>> {
 
 export async function enhanceWithAI(
   engineResult: ScoringEngineResult,
-  input: { name: string; applicationData: ApplicationData | null },
+  input: { name: string; applicationData: ApplicationData | null; leadType?: LeadType },
 ): Promise<AIEnhancement | null> {
   try {
     const openai = await getOpenAIClient();
+    const leadType = input.leadType ?? 'rental';
+    const isBuyer = leadType === 'buyer';
+    const validStates = isBuyer ? BUYER_LEAD_STATES : RENTAL_LEAD_STATES;
 
     // Build a compact context from the engine's deterministic analysis
     const categoryBreakdown = engineResult.categories
       .map((c) => `${c.category}: ${Math.round(c.rawScore * 100)}/100 (weight ${Math.round(c.weight * 100)}%) — ${c.signals[0] ?? 'no signal'}`)
       .join('\n');
 
+    // Include lead-type-specific fields in the prompt so the AI can give
+    // contextually relevant summaries and action recommendations.
+    const leadTypeContext = isBuyer
+      ? buildBuyerContext(input.applicationData)
+      : buildRentalContext(input.applicationData);
+
     const prompt = [
+      `Lead type: ${leadType.toUpperCase()}`,
       `Deterministic score: ${engineResult.score}/100 (${engineResult.priorityTier})`,
       `Confidence: ${Math.round(engineResult.confidence * 100)}%`,
       '',
@@ -60,7 +81,28 @@ export async function enhanceWithAI(
       engineResult.missingInformation.length > 0 ? `Missing: ${engineResult.missingInformation.join('; ')}` : '',
       '',
       `Applicant: ${input.name}`,
+      '',
+      `Key ${leadType} details:`,
+      leadTypeContext,
     ].filter(Boolean).join('\n');
+
+    const systemPrompt = isBuyer
+      ? [
+          'You summarize pre-computed lead scoring results for a real estate CRM (BUYER leads).',
+          'You do NOT compute scores. The score is already determined.',
+          'Your job: write a concise summary (under 200 chars), 2-4 explanation tags,',
+          'a specific recommended next action, and classify the lead state.',
+          'Focus on purchase readiness: pre-approval status, budget, timeline, financing.',
+          'Be direct and actionable. Tags should be 2-3 words each (e.g., "Pre-approved", "Low budget", "ASAP timeline").',
+        ].join(' ')
+      : [
+          'You summarize pre-computed lead scoring results for a real estate CRM (RENTAL leads).',
+          'You do NOT compute scores. The score is already determined.',
+          'Your job: write a concise summary (under 200 chars), 2-4 explanation tags,',
+          'a specific recommended next action, and classify the lead state.',
+          'Focus on rental readiness: income-to-rent ratio, credit, employment, rental history, screening flags.',
+          'Be direct and actionable. Tags should be 2-3 words each (e.g., "Strong income", "Eviction risk").',
+        ].join(' ');
 
     const response = await openai.chat.completions.create({
       model: 'gpt-5.4-mini',
@@ -80,7 +122,7 @@ export async function enhanceWithAI(
               recommendedNextAction: { type: 'string' },
               leadState: {
                 type: 'string',
-                enum: [...LEAD_STATES],
+                enum: [...validStates],
               },
             },
             required: ['summary', 'explanationTags', 'recommendedNextAction', 'leadState'],
@@ -88,16 +130,7 @@ export async function enhanceWithAI(
         },
       },
       messages: [
-        {
-          role: 'system',
-          content: [
-            'You summarize pre-computed lead scoring results for a real estate rental CRM.',
-            'You do NOT compute scores. The score is already determined.',
-            'Your job: write a concise summary (under 200 chars), 2-4 explanation tags,',
-            'a specific recommended next action, and classify the lead state.',
-            'Be direct and actionable. Tags should be 2-3 words each (e.g., "Strong income", "Eviction risk").',
-          ].join(' '),
-        },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt },
       ],
     });
@@ -111,9 +144,9 @@ export async function enhanceWithAI(
       summary: (parsed.summary ?? '').slice(0, 200),
       explanationTags: (parsed.explanationTags ?? []).slice(0, 5),
       recommendedNextAction: parsed.recommendedNextAction ?? 'Review application details',
-      leadState: LEAD_STATES.includes(parsed.leadState as typeof LEAD_STATES[number])
+      leadState: (validStates as readonly string[]).includes(parsed.leadState)
         ? parsed.leadState
-        : deriveLeadState(engineResult),
+        : deriveLeadState(engineResult, leadType),
     };
   } catch (error) {
     console.warn('[scoring/enhance] AI enhancement failed, using deterministic fallback', { error });
@@ -122,11 +155,73 @@ export async function enhanceWithAI(
 }
 
 /**
+ * Build context string with buyer-specific fields for the AI prompt.
+ */
+function buildBuyerContext(app: ApplicationData | null): string {
+  if (!app) return 'No application data available.';
+  const lines: string[] = [];
+  if (app.preApprovalStatus) lines.push(`Pre-approval: ${app.preApprovalStatus}`);
+  if (app.preApprovalLender) lines.push(`Lender: ${app.preApprovalLender}`);
+  if (app.preApprovalAmount) lines.push(`Pre-approval amount: ${app.preApprovalAmount}`);
+  if (app.buyerBudget) lines.push(`Purchase budget: ${app.buyerBudget}`);
+  if (app.buyerTimeline) lines.push(`Timeline to buy: ${app.buyerTimeline}`);
+  if (app.housingSituation) lines.push(`Current housing: ${app.housingSituation}`);
+  if (app.firstTimeBuyer) lines.push(`First-time buyer: ${app.firstTimeBuyer}`);
+  if (app.propertyType) lines.push(`Property type: ${app.propertyType}`);
+  if (app.bedrooms) lines.push(`Bedrooms: ${app.bedrooms}`);
+  if (app.bathrooms) lines.push(`Bathrooms: ${app.bathrooms}`);
+  if (app.mustHaves) {
+    const items = Array.isArray(app.mustHaves) ? app.mustHaves.join(', ') : app.mustHaves;
+    lines.push(`Must-haves: ${items}`);
+  }
+  if (app.employmentStatus) lines.push(`Employment: ${app.employmentStatus}`);
+  if (app.monthlyGrossIncome) lines.push(`Monthly income: ${app.monthlyGrossIncome}`);
+  return lines.length > 0 ? lines.join('\n') : 'Minimal application data provided.';
+}
+
+/**
+ * Build context string with rental-specific fields for the AI prompt.
+ */
+function buildRentalContext(app: ApplicationData | null): string {
+  if (!app) return 'No application data available.';
+  const lines: string[] = [];
+  if (app.monthlyRent) lines.push(`Monthly budget/rent: ${app.monthlyRent}`);
+  if (app.targetMoveInDate) lines.push(`Move-in date: ${app.targetMoveInDate}`);
+  if (app.employmentStatus) lines.push(`Employment: ${app.employmentStatus}`);
+  if (app.monthlyGrossIncome) lines.push(`Monthly income: ${app.monthlyGrossIncome}`);
+  if (app.additionalIncome) lines.push(`Additional income: $${app.additionalIncome}/mo`);
+  if (app.creditScore) lines.push(`Credit score: ${app.creditScore}`);
+  if (app.currentHousingStatus) lines.push(`Current housing: ${app.currentHousingStatus}`);
+  if (app.currentLandlordName) lines.push(`Current landlord: ${app.currentLandlordName}`);
+  if (app.latePayments != null) lines.push(`Late payments: ${app.latePayments ? 'yes' : 'no'}`);
+  if (app.leaseViolations != null) lines.push(`Lease violations: ${app.leaseViolations ? 'yes' : 'no'}`);
+  if (app.priorEvictions != null) lines.push(`Prior evictions: ${app.priorEvictions ? 'yes' : 'no'}`);
+  if (app.bankruptcy != null) lines.push(`Bankruptcy: ${app.bankruptcy ? 'yes' : 'no'}`);
+  if (app.outstandingBalances != null) lines.push(`Outstanding balances: ${app.outstandingBalances ? 'yes' : 'no'}`);
+  if (app.hasPets != null) lines.push(`Pets: ${app.hasPets ? `yes${app.petDetails ? ` (${app.petDetails})` : ''}` : 'no'}`);
+  if (app.numberOfOccupants) lines.push(`Occupants: ${app.numberOfOccupants}`);
+  if (app.reasonForMoving) lines.push(`Reason for moving: ${app.reasonForMoving}`);
+  if (app.lengthOfResidence) lines.push(`Length at current address: ${app.lengthOfResidence}`);
+  return lines.length > 0 ? lines.join('\n') : 'Minimal application data provided.';
+}
+
+/**
  * Deterministic fallback for lead state when AI is unavailable
  */
-export function deriveLeadState(result: ScoringEngineResult): string {
+export function deriveLeadState(result: ScoringEngineResult, leadType?: LeadType): string {
   if (result.dataCompleteness < 0.3) return 'incomplete_application';
   if (result.missingInformation.length >= 3) return 'needs_additional_info';
+
+  if (leadType === 'buyer') {
+    if (result.priorityTier === 'hot') return 'high_priority_qualified_buyer';
+    // Check if pre-approval signal is present in strengths
+    const hasPreApproval = result.strengths.some((s) => s.toLowerCase().includes('pre-approved'));
+    if (hasPreApproval && result.priorityTier === 'warm') return 'pre_approved_ready';
+    if (result.priorityTier === 'warm') return 'qualified_buyer_low_urgency';
+    return 'likely_unqualified';
+  }
+
+  // Rental (default)
   if (result.priorityTier === 'hot') return 'high_priority_qualified_renter';
   if (result.priorityTier === 'warm') return 'qualified_low_urgency';
   return 'likely_unqualified';

@@ -140,7 +140,7 @@ export async function PATCH(
       tourId: data.id,
       slug: spaceRow?.slug ?? '',
     };
-    sendTourFollowUp(emailData).catch(console.error);
+    try { await sendTourFollowUp(emailData); } catch (e) { console.error('[tours] follow-up email failed:', e); }
   }
 
   return NextResponse.json(data);

@@ -62,13 +62,14 @@ export async function scoreLeadApplication(input: {
     const enhancement = await enhanceWithAI(engineResult, {
       name: input.name,
       applicationData: input.applicationData,
+      leadType: input.leadType,
     });
 
     // ── Step 3: Assemble LeadScoreDetails (same shape as before) ────────────
     const summary = enhancement?.summary ?? deriveSummary(engineResult, input.name);
     const explanationTags = enhancement?.explanationTags ?? deriveExplanationTags(engineResult);
     const recommendedNextAction = enhancement?.recommendedNextAction ?? deriveNextAction(engineResult);
-    const leadState = enhancement?.leadState ?? deriveLeadState(engineResult);
+    const leadState = enhancement?.leadState ?? deriveLeadState(engineResult, input.leadType);
 
     const qualificationStatus = engineResult.priorityTier === 'hot' || engineResult.priorityTier === 'warm'
       ? 'qualified'
@@ -117,7 +118,16 @@ export async function scoreLeadApplication(input: {
   }
 }
 
-function deriveNextAction(result: ReturnType<typeof computeLeadScore>): string {
+function deriveNextAction(result: ReturnType<typeof computeLeadScore>, leadType?: 'rental' | 'buyer'): string {
+  if (leadType === 'buyer') {
+    if (result.priorityTier === 'hot') return 'Schedule showing or buyer consultation within 2 hours';
+    if (result.priorityTier === 'warm') return 'Send property listings and follow up within 24 hours';
+    if (result.missingInformation.length >= 3) return 'Request pre-approval and buyer preferences';
+    if (result.priorityTier === 'cold') return 'Add to nurture campaign with market updates';
+    return 'Review buyer profile for qualification';
+  }
+
+  // Rental (default)
   if (result.priorityTier === 'hot') return 'Schedule tour or call within 2 hours';
   if (result.priorityTier === 'warm') return 'Send follow-up within 24 hours';
   if (result.missingInformation.length >= 3) return 'Request additional application details';
