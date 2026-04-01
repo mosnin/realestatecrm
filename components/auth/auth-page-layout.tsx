@@ -110,7 +110,7 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
       </div>
 
       {/* ── Right decorative panel ── */}
-      <div className="hidden lg:relative lg:flex lg:flex-1 lg:flex-col lg:items-center lg:justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-white to-orange-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <div className="hidden lg:relative lg:flex lg:flex-1 lg:flex-col lg:items-center lg:justify-center overflow-hidden bg-gradient-to-br from-orange-50 via-orange-100/60 to-amber-50 dark:from-orange-950/40 dark:via-slate-900 dark:to-slate-950">
         {/* Catchy heading */}
         <div className="relative z-10 text-center px-8 -mt-8">
           <p className="text-sm font-medium uppercase tracking-widest text-primary mb-3">
