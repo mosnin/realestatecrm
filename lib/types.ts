@@ -120,6 +120,7 @@ export type Contact = {
   name: string;
   email: string | null;
   phone: string | null;
+  leadType: 'rental' | 'buyer';
   address: string | null;
   notes: string | null;
   budget: number | null;
@@ -261,6 +262,7 @@ export type DealStage = {
   name: string;
   color: string;
   position: number;
+  pipelineType: 'rental' | 'buyer';
 };
 
 export type DealContact = {
