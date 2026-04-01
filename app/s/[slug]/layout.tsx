@@ -8,6 +8,7 @@ import { DashboardFooter } from '@/components/dashboard/footer';
 import { supabase } from '@/lib/supabase';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 import { getBrokerContext } from '@/lib/permissions';
+import { SubscriptionGate } from '@/components/billing/subscription-gate';
 import { LiveNotifications } from '@/components/dashboard/live-notifications';
 
 
@@ -110,6 +111,23 @@ export default async function DashboardLayout({
   // Without this check any logged-in user could visit /s/<other-user-slug>.
   if (!dbUser.space || dbUser.space.id !== space.id) notFound();
 
+  // ── Subscription gate ──────────────────────────────────────────────────
+  let requiresSubscription = false;
+  if (!dbUser.isPlatformAdmin) {
+    try {
+      const { data: subData } = await supabase
+        .from('Space')
+        .select('stripeSubscriptionStatus')
+        .eq('id', space.id)
+        .maybeSingle();
+      const status = subData?.stripeSubscriptionStatus ?? 'inactive';
+      requiresSubscription = status !== 'active' && status !== 'trialing';
+    } catch {
+      // If stripe columns don't exist yet, don't gate
+      requiresSubscription = false;
+    }
+  }
+
   let unreadLeadCount = 0;
   let overdueFollowUpCount = 0;
   try {
@@ -167,7 +185,11 @@ export default async function DashboardLayout({
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
         <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
           <LiveNotifications spaceId={space.id} slug={slug} />
-          {children}
+          {requiresSubscription ? (
+            <SubscriptionGate slug={slug}>{children}</SubscriptionGate>
+          ) : (
+            children
+          )}
           <DashboardFooter />
         </main>
       </div>

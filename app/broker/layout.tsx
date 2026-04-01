@@ -6,6 +6,7 @@ import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
 import { DashboardFooter } from '@/components/dashboard/footer';
 import { supabase } from '@/lib/supabase';
+import { SubscriptionGate } from '@/components/billing/subscription-gate';
 
 export const metadata = { title: 'Broker Dashboard — Chippi' };
 
@@ -30,15 +31,32 @@ export default async function BrokerLayout({ children }: { children: React.React
   // Check if this is a broker-only account (no personal workspace)
   const { data: userRow } = await supabase
     .from('User')
-    .select('accountType')
+    .select('accountType, platformRole')
     .eq('id', ctx.dbUserId)
     .maybeSingle();
 
   const isBrokerOnly = userRow?.accountType === 'broker_only';
+  const isPlatformAdmin = userRow?.platformRole === 'admin';
 
   // If they have no space and are NOT broker-only, send to setup
   if (!spaceRow && !isBrokerOnly) {
     redirect('/setup');
+  }
+
+  // Subscription check for broker dashboard
+  let requiresSubscription = false;
+  if (!isPlatformAdmin && spaceRow) {
+    try {
+      const { data: subData } = await supabase
+        .from('Space')
+        .select('stripeSubscriptionStatus')
+        .eq('id', spaceRow.id)
+        .maybeSingle();
+      const status = subData?.stripeSubscriptionStatus ?? 'inactive';
+      requiresSubscription = status !== 'active' && status !== 'trialing';
+    } catch {
+      requiresSubscription = false;
+    }
   }
 
   const slug = spaceRow?.slug as string ?? '';
@@ -74,7 +92,11 @@ export default async function BrokerLayout({ children }: { children: React.React
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header slug={slug} spaceName={spaceName} title={spaceName} isBroker={true} isBrokerOnly={isBrokerOnly} brokerageName={ctx.brokerage.name} />
         <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
-          {children}
+          {requiresSubscription ? (
+            <SubscriptionGate slug={slug}>{children}</SubscriptionGate>
+          ) : (
+            children
+          )}
           <DashboardFooter />
         </main>
       </div>
