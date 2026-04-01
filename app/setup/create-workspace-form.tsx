@@ -65,6 +65,8 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
   const [linkedin, setLinkedin] = useState('');
   const [facebook, setFacebook] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [brokerLogoUploading, setBrokerLogoUploading] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
 
   const needsWorkspace = role === 'realtor' || role === 'broker';
@@ -415,29 +417,50 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="logoUrl">Logo <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <div className="relative">
-                  <Image size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="logoUrl"
-                    value={logoUrl}
-                    onChange={(e) => setLogoUrl(e.target.value)}
-                    placeholder="Paste your logo URL (optional)"
-                    className="pl-9"
-                  />
-                </div>
-                {logoUrl.trim() && (
-                  <div className="mt-2 rounded-lg border border-border bg-muted/30 p-3 flex items-center justify-center">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={logoUrl.trim()}
-                      alt="Logo preview"
-                      className="max-h-16 max-w-full object-contain"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      onLoad={(e) => { (e.target as HTMLImageElement).style.display = 'block'; }}
-                    />
+                <Label>Logo <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <div
+                  className="relative flex items-center gap-3 rounded-lg border-2 border-dashed border-border p-3 hover:border-primary/50 transition-colors cursor-pointer"
+                  onClick={() => document.getElementById('onboard-logo-upload')?.click()}
+                >
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo preview" className="h-10 max-w-[100px] object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  ) : (
+                    <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                      <Image size={16} className="text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{logoUrl ? 'Change logo' : 'Upload logo'}</p>
+                    <p className="text-xs text-muted-foreground">PNG, JPG, WebP. Max 2MB.</p>
                   </div>
-                )}
+                  {logoUploading && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
+                </div>
+                <input
+                  id="onboard-logo-upload"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 2 * 1024 * 1024) { toast.error('File must be under 2MB'); return; }
+                    setLogoUploading(true);
+                    try {
+                      const formData = new FormData();
+                      formData.append('file', file);
+                      formData.append('type', 'logo');
+                      const res = await fetch('/api/upload/onboarding', { method: 'POST', body: formData });
+                      const data = await res.json();
+                      if (res.ok && data.url) {
+                        setLogoUrl(data.url);
+                        toast.success('Logo uploaded');
+                      } else {
+                        toast.error(data.error || 'Upload failed');
+                      }
+                    } catch { toast.error('Upload failed'); }
+                    finally { setLogoUploading(false); }
+                  }}
+                />
               </div>
 
               <Button type="submit" className="w-full" disabled={savingProfile} size="lg">
@@ -891,29 +914,50 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
             {isBrokerRole && brokerStep === 1 && (
               <>
                 <div className="space-y-1.5">
-                  <Label htmlFor="brokerLogoUrl">Brokerage logo URL <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                  <div className="relative">
-                    <Image size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="brokerLogoUrl"
-                      value={brokerLogoUrl}
-                      onChange={(e) => setBrokerLogoUrl(e.target.value)}
-                      placeholder="https://example.com/logo.png"
-                      className="pl-9"
-                    />
-                  </div>
-                  {brokerLogoUrl.trim() && (
-                    <div className="mt-2 rounded-lg border border-border bg-muted/30 p-3 flex items-center justify-center">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={brokerLogoUrl.trim()}
-                        alt="Brokerage logo preview"
-                        className="max-h-16 max-w-full object-contain"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        onLoad={(e) => { (e.target as HTMLImageElement).style.display = 'block'; }}
-                      />
+                  <Label>Brokerage logo <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <div
+                    className="relative flex items-center gap-3 rounded-lg border-2 border-dashed border-border p-3 hover:border-primary/50 transition-colors cursor-pointer"
+                    onClick={() => document.getElementById('broker-logo-onboard-upload')?.click()}
+                  >
+                    {brokerLogoUrl ? (
+                      <img src={brokerLogoUrl} alt="Brokerage logo preview" className="h-10 max-w-[100px] object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                        <Image size={16} className="text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{brokerLogoUrl ? 'Change logo' : 'Upload logo'}</p>
+                      <p className="text-xs text-muted-foreground">PNG, JPG, WebP. Max 2MB.</p>
                     </div>
-                  )}
+                    {brokerLogoUploading && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
+                  </div>
+                  <input
+                    id="broker-logo-onboard-upload"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 2 * 1024 * 1024) { toast.error('File must be under 2MB'); return; }
+                      setBrokerLogoUploading(true);
+                      try {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        formData.append('type', 'broker_logo');
+                        const res = await fetch('/api/upload/onboarding', { method: 'POST', body: formData });
+                        const data = await res.json();
+                        if (res.ok && data.url) {
+                          setBrokerLogoUrl(data.url);
+                          toast.success('Logo uploaded');
+                        } else {
+                          toast.error(data.error || 'Upload failed');
+                        }
+                      } catch { toast.error('Upload failed'); }
+                      finally { setBrokerLogoUploading(false); }
+                    }}
+                  />
                 </div>
 
                 <div className="space-y-1.5">

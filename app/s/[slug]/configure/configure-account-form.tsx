@@ -407,43 +407,46 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
           />
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="logoUrl">Logo URL</Label>
-              <Input
-                id="logoUrl"
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="https://example.com/logo.png"
-              />
-              <p className="text-xs text-muted-foreground">
-                Your company logo — displayed on intake and booking pages. Use a direct image URL.
-              </p>
-              {logoUrl && (
-                <div className="mt-2 p-3 rounded-lg bg-muted/30 border border-border">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2">Preview</p>
-                  <img src={logoUrl} alt="Logo preview" className="h-10 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              <Label>Logo</Label>
+              <div
+                className="relative flex items-center gap-4 rounded-lg border-2 border-dashed border-border p-4 hover:border-primary/50 transition-colors cursor-pointer"
+                onClick={() => logoInputRef.current?.click()}
+              >
+                {logoPreview || logoUrl ? (
+                  <img src={logoPreview || logoUrl} alt="Logo preview" className="h-10 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                ) : (
+                  <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                    <Upload size={18} className="text-muted-foreground" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{logoUrl ? 'Change logo' : 'Upload logo'}</p>
+                  <p className="text-xs text-muted-foreground">PNG, JPG, WebP, or SVG. Max 2MB.</p>
                 </div>
-              )}
+              </div>
+              <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={handleLogoUpload} />
+              <p className="text-xs text-muted-foreground">Your company logo — displayed on intake and booking pages.</p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="realtorPhotoUrl">Profile photo URL</Label>
-              <Input
-                id="realtorPhotoUrl"
-                value={realtorPhotoUrl}
-                onChange={(e) => setRealtorPhotoUrl(e.target.value)}
-                placeholder="https://example.com/headshot.jpg"
-              />
-              <p className="text-xs text-muted-foreground">
-                Your professional headshot — shown on public pages alongside your name and phone number.
-              </p>
-              {realtorPhotoUrl && (
-                <div className="mt-2 flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                  <img src={realtorPhotoUrl} alt="Photo preview" className="w-12 h-12 rounded-full object-cover ring-2 ring-border" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                  <div>
-                    <p className="text-sm font-medium">{name || 'Your Name'}</p>
-                    <p className="text-xs text-muted-foreground">{phone || 'Your phone'}</p>
+              <Label>Profile photo</Label>
+              <div
+                className="relative flex items-center gap-4 rounded-lg border-2 border-dashed border-border p-4 hover:border-primary/50 transition-colors cursor-pointer"
+                onClick={() => photoInputRef.current?.click()}
+              >
+                {photoPreview || realtorPhotoUrl ? (
+                  <img src={photoPreview || realtorPhotoUrl} alt="Photo preview" className="w-12 h-12 rounded-full object-cover ring-2 ring-border" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                    <Upload size={18} className="text-muted-foreground" />
                   </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{realtorPhotoUrl ? 'Change photo' : 'Upload photo'}</p>
+                  <p className="text-xs text-muted-foreground">PNG, JPG, or WebP. Max 2MB.</p>
                 </div>
-              )}
+              </div>
+              <input ref={photoInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handlePhotoUpload} />
+              <p className="text-xs text-muted-foreground">Your professional headshot — shown on public pages alongside your name and phone number.</p>
             </div>
           </div>
         </section>

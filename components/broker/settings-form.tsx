@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Loader2, CheckCircle2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface SettingsFormProps {
@@ -25,6 +25,7 @@ export function BrokerageSettingsForm({
   const [name, setName] = useState(initialName);
   const [websiteUrl, setWebsiteUrl] = useState(initialWebsite ?? '');
   const [logoUrl, setLogoUrl] = useState(initialLogo ?? '');
+  const [logoUploading, setLogoUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -87,14 +88,50 @@ export function BrokerageSettingsForm({
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="logo-url">Logo URL</Label>
-        <Input
-          id="logo-url"
-          value={logoUrl}
-          onChange={(e) => setLogoUrl(e.target.value)}
-          placeholder="https://example.com/logo.png"
-          maxLength={500}
+        <Label>Logo</Label>
+        <div
+          className={`relative flex items-center gap-4 rounded-lg border-2 border-dashed border-border p-4 hover:border-primary/50 transition-colors ${isOwner ? 'cursor-pointer' : 'opacity-60'}`}
+          onClick={() => isOwner && document.getElementById('broker-logo-upload')?.click()}
+        >
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo preview" className="h-10 max-w-[120px] object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          ) : (
+            <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+              <Upload size={18} className="text-muted-foreground" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">{logoUrl ? 'Change logo' : 'Upload logo'}</p>
+            <p className="text-xs text-muted-foreground">PNG, JPG, WebP, or SVG. Max 2MB.</p>
+          </div>
+          {logoUploading && <Loader2 size={16} className="animate-spin text-muted-foreground" />}
+        </div>
+        <input
+          id="broker-logo-upload"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+          className="hidden"
           disabled={!isOwner}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            if (file.size > 2 * 1024 * 1024) { toast.error('File must be under 2MB'); return; }
+            setLogoUploading(true);
+            try {
+              const formData = new FormData();
+              formData.append('file', file);
+              formData.append('type', 'logo');
+              const res = await fetch('/api/upload', { method: 'POST', body: formData });
+              const data = await res.json();
+              if (res.ok && data.url) {
+                setLogoUrl(data.url);
+                toast.success('Logo uploaded');
+              } else {
+                toast.error(data.error || 'Upload failed');
+              }
+            } catch { toast.error('Upload failed'); }
+            finally { setLogoUploading(false); }
+          }}
         />
         <p className="text-xs text-muted-foreground">Optional. Displayed on invite pages and emails.</p>
       </div>
@@ -118,18 +155,6 @@ export function BrokerageSettingsForm({
 
       {/* ── Lead Distribution ─────────────────────────────────────────── */}
       {/* Lead distribution is handled manually via /broker/leads */}
-
-      {logoUrl && /^https?:\/\/.+/i.test(logoUrl) && (
-        <div className="rounded-lg border border-border p-3">
-          <p className="text-xs text-muted-foreground mb-2">Logo preview</p>
-          <img
-            src={logoUrl}
-            alt="Brokerage logo"
-            className="h-12 max-w-[200px] object-contain"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-          />
-        </div>
-      )}
 
       {isOwner && (
         <Button type="submit" size="sm" disabled={saving || !name.trim()}>

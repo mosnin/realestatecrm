@@ -8,7 +8,6 @@ import { DashboardFooter } from '@/components/dashboard/footer';
 import { supabase } from '@/lib/supabase';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 import { getBrokerContext } from '@/lib/permissions';
-import { SubscriptionGate } from '@/components/billing/subscription-gate';
 import { LiveNotifications } from '@/components/dashboard/live-notifications';
 
 
@@ -111,20 +110,25 @@ export default async function DashboardLayout({
   // Without this check any logged-in user could visit /s/<other-user-slug>.
   if (!dbUser.space || dbUser.space.id !== space.id) notFound();
 
-  // ── Subscription gate ──────────────────────────────────────────────────
-  let requiresSubscription = false;
+  // ── Subscription gate — redirect to standalone pages ────────────────
   if (!dbUser.isPlatformAdmin) {
     try {
       const { data: subData } = await supabase
         .from('Space')
-        .select('stripeSubscriptionStatus')
+        .select('stripeSubscriptionStatus, stripeSubscriptionId')
         .eq('id', space.id)
         .maybeSingle();
       const status = subData?.stripeSubscriptionStatus ?? 'inactive';
-      requiresSubscription = status !== 'active' && status !== 'trialing';
+      if (status !== 'active' && status !== 'trialing') {
+        // Had a subscription that failed/canceled → billing-required page
+        if (subData?.stripeSubscriptionId && (status === 'past_due' || status === 'canceled' || status === 'unpaid')) {
+          redirect(`/billing-required?slug=${slug}&reason=${status}`);
+        }
+        // Never subscribed → subscribe/trial page
+        redirect(`/subscribe?slug=${slug}`);
+      }
     } catch {
       // If stripe columns don't exist yet, don't gate
-      requiresSubscription = false;
     }
   }
 
@@ -185,11 +189,7 @@ export default async function DashboardLayout({
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
         <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
           <LiveNotifications spaceId={space.id} slug={slug} />
-          {requiresSubscription ? (
-            <SubscriptionGate slug={slug}>{children}</SubscriptionGate>
-          ) : (
-            children
-          )}
+          {children}
           <DashboardFooter />
         </main>
       </div>

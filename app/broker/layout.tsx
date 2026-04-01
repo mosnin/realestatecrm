@@ -6,7 +6,6 @@ import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
 import { DashboardFooter } from '@/components/dashboard/footer';
 import { supabase } from '@/lib/supabase';
-import { SubscriptionGate } from '@/components/billing/subscription-gate';
 
 export const metadata = { title: 'Broker Dashboard — Chippi' };
 
@@ -43,19 +42,23 @@ export default async function BrokerLayout({ children }: { children: React.React
     redirect('/setup');
   }
 
-  // Subscription check for broker dashboard
-  let requiresSubscription = false;
+  // Subscription gate — redirect to standalone pages
   if (!isPlatformAdmin && spaceRow) {
     try {
       const { data: subData } = await supabase
         .from('Space')
-        .select('stripeSubscriptionStatus')
+        .select('stripeSubscriptionStatus, stripeSubscriptionId')
         .eq('id', spaceRow.id)
         .maybeSingle();
       const status = subData?.stripeSubscriptionStatus ?? 'inactive';
-      requiresSubscription = status !== 'active' && status !== 'trialing';
+      if (status !== 'active' && status !== 'trialing') {
+        if (subData?.stripeSubscriptionId && (status === 'past_due' || status === 'canceled' || status === 'unpaid')) {
+          redirect(`/billing-required?slug=${slug}&reason=${status}`);
+        }
+        redirect(`/subscribe?slug=${slug}`);
+      }
     } catch {
-      requiresSubscription = false;
+      // If stripe columns don't exist yet, don't gate
     }
   }
 
@@ -92,11 +95,7 @@ export default async function BrokerLayout({ children }: { children: React.React
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header slug={slug} spaceName={spaceName} title={spaceName} isBroker={true} isBrokerOnly={isBrokerOnly} brokerageName={ctx.brokerage.name} />
         <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
-          {requiresSubscription ? (
-            <SubscriptionGate slug={slug}>{children}</SubscriptionGate>
-          ) : (
-            children
-          )}
+          {children}
           <DashboardFooter />
         </main>
       </div>

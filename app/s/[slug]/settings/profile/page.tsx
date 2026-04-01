@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserButton } from '@clerk/nextjs';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ProfileSettingsPage() {
@@ -23,6 +23,7 @@ export default function ProfileSettingsPage() {
   const [phone, setPhone] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [realtorPhotoUrl, setRealtorPhotoUrl] = useState('');
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -181,14 +182,51 @@ export default function ProfileSettingsPage() {
               <Textarea id="bio" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="A short bio shown on your intake page..." rows={3} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="realtorPhotoUrl">Profile photo URL</Label>
-              <Input id="realtorPhotoUrl" value={realtorPhotoUrl} onChange={(e) => setRealtorPhotoUrl(e.target.value)} placeholder="https://example.com/headshot.jpg" />
-              <p className="text-xs text-muted-foreground">Your professional headshot shown on public pages.</p>
-              {realtorPhotoUrl && (
-                <div className="mt-2 flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                  <img src={realtorPhotoUrl} alt="Photo preview" className="w-12 h-12 rounded-full object-cover ring-2 ring-border" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              <Label>Profile photo</Label>
+              <div
+                className="relative flex items-center gap-4 rounded-lg border-2 border-dashed border-border p-4 hover:border-primary/50 transition-colors cursor-pointer"
+                onClick={() => document.getElementById('photo-upload')?.click()}
+              >
+                {realtorPhotoUrl ? (
+                  <img src={realtorPhotoUrl} alt="Photo preview" className="w-14 h-14 rounded-full object-cover ring-2 ring-border" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                ) : (
+                  <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
+                    <Upload size={20} className="text-muted-foreground" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{realtorPhotoUrl ? 'Change photo' : 'Upload photo'}</p>
+                  <p className="text-xs text-muted-foreground">PNG, JPG, or WebP. Max 2MB.</p>
                 </div>
-              )}
+                {photoUploading && <Loader2 size={16} className="animate-spin text-muted-foreground" />}
+              </div>
+              <input
+                id="photo-upload"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 2 * 1024 * 1024) { toast.error('File must be under 2MB'); return; }
+                  setPhotoUploading(true);
+                  try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('type', 'photo');
+                    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    if (res.ok && data.url) {
+                      setRealtorPhotoUrl(data.url);
+                      toast.success('Photo uploaded');
+                    } else {
+                      toast.error(data.error || 'Upload failed');
+                    }
+                  } catch { toast.error('Upload failed'); }
+                  finally { setPhotoUploading(false); }
+                }}
+              />
+              <p className="text-xs text-muted-foreground">Your professional headshot shown on public pages.</p>
             </div>
             <div className="space-y-2">
               <Label>Social links</Label>
