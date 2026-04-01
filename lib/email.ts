@@ -194,12 +194,18 @@ export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<
 </html>`;
 
   const safeSpaceName = spaceName.replace(/[\r\n\t]/g, ' ').slice(0, 100);
-  await resend.emails.send({
-    from: FROM,
-    to: toEmail,
-    subject: `${contacts.length} follow-up${contacts.length !== 1 ? 's' : ''} due today — ${safeSpaceName}`,
-    html,
-  });
+  try {
+    console.log('[email] Sending sendFollowUpDigest to:', toEmail, 'from:', FROM);
+    const result = await resend.emails.send({
+      from: FROM,
+      to: toEmail,
+      subject: `${contacts.length} follow-up${contacts.length !== 1 ? 's' : ''} due today — ${safeSpaceName}`,
+      html,
+    });
+    console.log('[email] sendFollowUpDigest result:', JSON.stringify(result));
+  } catch (err) {
+    console.error('[email] sendFollowUpDigest FAILED:', err);
+  }
 }
 
 export interface SendEmailFromCRMParams {
@@ -238,13 +244,19 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
 </html>`;
 
   const safeSubject = subject.replace(/[\r\n\t]/g, ' ').slice(0, 200);
-  await resend.emails.send({
-    from: `${fromName.replace(/[\r\n\t<>"]/g, ' ').slice(0, 100)} <${FROM}>`,
-    to: toEmail,
-    replyTo: replyTo ?? undefined,
-    subject: safeSubject,
-    html,
-  });
+  try {
+    console.log('[email] Sending sendEmailFromCRM to:', toEmail, 'from:', FROM);
+    const result = await resend.emails.send({
+      from: `${fromName.replace(/[\r\n\t<>"]/g, ' ').slice(0, 100)} <${FROM}>`,
+      to: toEmail,
+      replyTo: replyTo ?? undefined,
+      subject: safeSubject,
+      html,
+    });
+    console.log('[email] sendEmailFromCRM result:', JSON.stringify(result));
+  } catch (err) {
+    console.error('[email] sendEmailFromCRM FAILED:', err);
+  }
 }
 
 export interface NewDealEmailParams {
@@ -307,12 +319,18 @@ export async function sendNewDealNotification(params: NewDealEmailParams): Promi
 </html>`;
 
   const safeDealTitle = dealTitle.replace(/[\r\n\t]/g, ' ').slice(0, 200);
-  await resend.emails.send({
-    from: FROM,
-    to: toEmail,
-    subject: `New deal: ${safeDealTitle}${dealValue != null ? ` · ${fmt(dealValue)}` : ''}`,
-    html,
-  });
+  try {
+    console.log('[email] Sending sendNewDealNotification to:', toEmail, 'from:', FROM);
+    const result = await resend.emails.send({
+      from: FROM,
+      to: toEmail,
+      subject: `New deal: ${safeDealTitle}${dealValue != null ? ` · ${fmt(dealValue)}` : ''}`,
+      html,
+    });
+    console.log('[email] sendNewDealNotification result:', JSON.stringify(result));
+  } catch (err) {
+    console.error('[email] sendNewDealNotification FAILED:', err);
+  }
 }
 
 export interface BrokerageInvitationEmailParams {
@@ -371,12 +389,18 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
 </body>
 </html>`;
 
-  await resend.emails.send({
-    from: FROM,
-    to: toEmail,
-    subject: `You're invited to join ${brokerageName.replace(/[\r\n\t]/g, ' ').slice(0, 100)} on Chippi`,
-    html,
-  });
+  try {
+    console.log('[email] Sending sendBrokerageInvitation to:', toEmail, 'from:', FROM);
+    const result = await resend.emails.send({
+      from: FROM,
+      to: toEmail,
+      subject: `You're invited to join ${brokerageName.replace(/[\r\n\t]/g, ' ').slice(0, 100)} on Chippi`,
+      html,
+    });
+    console.log('[email] sendBrokerageInvitation result:', JSON.stringify(result));
+  } catch (err) {
+    console.error('[email] sendBrokerageInvitation FAILED:', err);
+  }
 }
 
 // ── Welcome email ────────────────────────────────────────────────────────────
@@ -441,10 +465,16 @@ export async function sendWelcomeEmail(params: {
   </p>
 </div>`;
 
-  await resend.emails.send({
-    from: `Chippi <${FROM}>`,
-    to: toEmail,
-    subject: `Welcome to Chippi — your workspace is ready`,
-    html,
-  });
+  try {
+    console.log('[email] Sending sendWelcomeEmail to:', toEmail, 'from:', FROM);
+    const result = await resend.emails.send({
+      from: `Chippi <${FROM}>`,
+      to: toEmail,
+      subject: `Welcome to Chippi — your workspace is ready`,
+      html,
+    });
+    console.log('[email] sendWelcomeEmail result:', JSON.stringify(result));
+  } catch (err) {
+    console.error('[email] sendWelcomeEmail FAILED:', err);
+  }
 }
