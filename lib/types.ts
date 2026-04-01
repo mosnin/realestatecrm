@@ -207,6 +207,13 @@ export type ApplicationData = {
   submittedAt?: string;
   completionPercentage?: number;
   completedSteps?: number[];
+  // Buyer-specific fields
+  preApprovalStatus?: string;
+  preApprovalLender?: string;
+  preApprovalAmount?: string;
+  propertyType?: string;
+  bedrooms?: string;
+  bathrooms?: string;
 };
 
 export type LeadScoreDetails = {

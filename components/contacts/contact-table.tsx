@@ -57,6 +57,7 @@ type Client = {
   notes: string | null;
   tags: string[];
   followUpAt: string | null;
+  leadType: 'rental' | 'buyer';
 };
 
 const STAGES = CONTACT_STAGES;
@@ -74,6 +75,7 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [contacts, setContacts] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
+  const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'rental' | 'buyer'>('all');
   const [tagFilter, setTagFilter] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);

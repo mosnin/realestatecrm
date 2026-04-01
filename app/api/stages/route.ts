@@ -11,13 +11,42 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
+  // Filter by pipelineType if provided
+  const pipelineType = req.nextUrl.searchParams.get('pipelineType');
+
   // Get stages
-  const { data: stageRows, error: stageError } = await supabase
+  let stageQuery = supabase
     .from('DealStage')
     .select('*')
-    .eq('spaceId', space.id)
-    .order('position', { ascending: true });
+    .eq('spaceId', space.id);
+  if (pipelineType === 'rental' || pipelineType === 'buyer') {
+    stageQuery = stageQuery.eq('pipelineType', pipelineType);
+  }
+  let { data: stageRows, error: stageError } = await stageQuery.order('position', { ascending: true });
   if (stageError) throw stageError;
+
+  // Auto-create default buyer stages if buyer pipeline is empty
+  if (pipelineType === 'buyer' && stageRows.length === 0) {
+    const defaultBuyerStages = [
+      { name: 'New Lead', color: '#6b7280', position: 0, pipelineType: 'buyer' as const },
+      { name: 'Pre-Approved', color: '#3b82f6', position: 1, pipelineType: 'buyer' as const },
+      { name: 'Showings', color: '#8b5cf6', position: 2, pipelineType: 'buyer' as const },
+      { name: 'Offer Made', color: '#f59e0b', position: 3, pipelineType: 'buyer' as const },
+      { name: 'Under Contract', color: '#f97316', position: 4, pipelineType: 'buyer' as const },
+      { name: 'Closing', color: '#10b981', position: 5, pipelineType: 'buyer' as const },
+    ];
+    const inserts = defaultBuyerStages.map((s) => ({
+      id: crypto.randomUUID(),
+      spaceId: space.id,
+      ...s,
+    }));
+    const { data: createdStages, error: createError } = await supabase
+      .from('DealStage')
+      .insert(inserts)
+      .select();
+    if (createError) throw createError;
+    stageRows = (createdStages || []).sort((a: any, b: any) => a.position - b.position);
+  }
 
   // Get deals
   const { data: dealRows, error: dealError } = await supabase

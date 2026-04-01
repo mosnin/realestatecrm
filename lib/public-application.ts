@@ -35,6 +35,19 @@ export const publicApplicationSchema = z.object({
     .transform((value) => normalizeSlug(value))
     .refine((value) => value.length >= 3, { message: 'Invalid slug' }),
 
+  // Lead type: rental or buyer
+  leadType: z.enum(['rental', 'buyer']).optional().default('rental'),
+
+  // Buyer-specific fields
+  preApprovalStatus: optStr,
+  preApprovalLender: optStr,
+  preApprovalAmount: optStr,
+  propertyType: optStr,
+  bedrooms: optStr,
+  bathrooms: optStr,
+  mustHaves: optStr,
+  firstTimeBuyer: optStr,
+
   // Step 1: Property Selection
   propertyAddress: optStr,
   unitType: optStr,
@@ -171,6 +184,7 @@ export function applicationFingerprintKey(input: Pick<PublicApplicationInput, 's
 /** Build the structured applicationData JSON from the validated input */
 export function buildApplicationData(input: PublicApplicationInput) {
   return {
+    leadType: input.leadType,
     propertyAddress: input.propertyAddress,
     unitType: input.unitType,
     targetMoveInDate: input.targetMoveInDate,
@@ -212,6 +226,14 @@ export function buildApplicationData(input: PublicApplicationInput) {
     hasPets: input.hasPets,
     petDetails: input.petDetails,
     additionalNotes: input.additionalNotes,
+    preApprovalStatus: input.preApprovalStatus,
+    preApprovalLender: input.preApprovalLender,
+    preApprovalAmount: input.preApprovalAmount,
+    propertyType: input.propertyType,
+    bedrooms: input.bedrooms,
+    bathrooms: input.bathrooms,
+    mustHaves: input.mustHaves,
+    firstTimeBuyer: input.firstTimeBuyer,
     consentToScreening: input.consentToScreening,
     truthfulnessCertification: input.truthfulnessCertification,
     electronicSignature: input.electronicSignature,

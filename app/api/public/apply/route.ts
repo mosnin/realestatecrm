@@ -155,6 +155,7 @@ export async function POST(req: NextRequest) {
         notes: noteParts.length > 0 ? noteParts.join('\n') : null,
         type: 'QUALIFICATION',
         properties: [],
+        leadType: payload.leadType ?? 'rental',
         tags: ['application-link', 'new-lead'],
         scoringStatus: 'pending',
         scoreLabel: 'unscored',

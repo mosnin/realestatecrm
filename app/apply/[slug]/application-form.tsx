@@ -21,18 +21,33 @@ import {
   Clock,
   TrendingUp,
   Briefcase,
+  Key,
+  ListChecks,
 } from 'lucide-react';
 
 // ── Step config ──
-const ALL_STEPS = [
-  { id: 1, label: 'Basics', icon: User },
-  { id: 2, label: 'Timing', icon: Clock },
-  { id: 3, label: 'Location', icon: MapPin },
-  { id: 4, label: 'Budget', icon: DollarSign },
-  { id: 5, label: 'Income', icon: TrendingUp },
-  { id: 6, label: 'Work', icon: Briefcase },
-  { id: 7, label: 'Home', icon: Home },
-  { id: 8, label: 'Details', icon: FileText },
+const RENTAL_STEPS = [
+  { id: 1, label: 'Start', icon: Home },
+  { id: 2, label: 'Basics', icon: User },
+  { id: 3, label: 'Timing', icon: Clock },
+  { id: 4, label: 'Location', icon: MapPin },
+  { id: 5, label: 'Budget', icon: DollarSign },
+  { id: 6, label: 'Income', icon: TrendingUp },
+  { id: 7, label: 'Work', icon: Briefcase },
+  { id: 8, label: 'Home', icon: Home },
+  { id: 9, label: 'Details', icon: FileText },
+  { id: 10, label: 'Ready?', icon: CheckCircle2 },
+] as const;
+
+const BUYER_STEPS = [
+  { id: 1, label: 'Start', icon: Home },
+  { id: 2, label: 'Basics', icon: User },
+  { id: 3, label: 'Budget', icon: DollarSign },
+  { id: 4, label: 'Pre-Approval', icon: CheckCircle2 },
+  { id: 5, label: 'Property', icon: Home },
+  { id: 6, label: 'Features', icon: ListChecks },
+  { id: 7, label: 'Timeline', icon: Clock },
+  { id: 8, label: 'About You', icon: User },
   { id: 9, label: 'Ready?', icon: CheckCircle2 },
 ] as const;
 
@@ -250,7 +265,9 @@ export function ApplicationForm({
   const get = useCallback((key: string) => data[key] ?? '', [data]);
 
   const disabledSteps = customization?.disabledSteps ?? [];
+  const leadType = get('leadType');
 
+  const ALL_STEPS = leadType === 'buyer' ? BUYER_STEPS : RENTAL_STEPS;
   const STEPS = ALL_STEPS.filter((s) => !disabledSteps.includes(s.id));
 
   const currentStepIndex = STEPS.findIndex((s) => s.id === step);
@@ -290,45 +307,73 @@ export function ApplicationForm({
     const errs: Record<string, string> = {};
 
     if (s === 1) {
-      if (!get('name').trim()) errs.name = 'Full name is required';
-      const email = get('email').trim();
-      if (!email) errs.email = 'Email is required';
-      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = 'Invalid email';
+      if (!get('leadType')) errs.leadType = 'Please select rent or buy';
     }
 
-    if (s === 2) {
-      if (!get('moveTiming')) errs.moveTiming = 'Please select when you plan to move';
-    }
-
-    if (s === 3) {
-      if (!get('location').trim()) errs.location = 'Please enter your desired location';
-    }
-
-    if (s === 4) {
-      if (!get('budget')) errs.budget = 'Please select your budget';
-    }
-
-    if (s === 5) {
-      if (!get('income')) errs.income = 'Please select your income range';
-    }
-
-    if (s === 6) {
-      if (!get('employment')) errs.employment = 'Please select your work situation';
-    }
-
-    if (s === 7) {
-      if (!get('occupants').trim()) errs.occupants = 'Please enter the number of occupants';
-    }
-
-    // Step 8: no validation (optional)
-
-    if (s === 9) {
-      if (!get('intent')) errs.intent = 'Please select your readiness level';
-      if (customization?.privacyPolicyUrl && get('privacyConsent') !== 'true') {
-        errs.privacyConsent = 'You must agree to the privacy policy';
+    if (leadType === 'buyer') {
+      // Buyer flow validation
+      if (s === 2) {
+        if (!get('name').trim()) errs.name = 'Full name is required';
+        const email = get('email').trim();
+        if (!email) errs.email = 'Email is required';
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = 'Invalid email';
       }
-      if (get('chippiTosConsent') !== 'true') {
-        errs.chippiTosConsent = 'You must agree to Chippi\'s Terms of Service and Privacy Policy';
+      if (s === 3) {
+        if (!get('buyerBudget')) errs.buyerBudget = 'Please select your budget';
+      }
+      // Step 4 (Pre-Approval): no required fields
+      if (s === 5) {
+        if (!get('propertyType')) errs.propertyType = 'Please select a property type';
+      }
+      // Step 6 (Features): no required fields
+      if (s === 7) {
+        if (!get('buyerTimeline')) errs.buyerTimeline = 'Please select your timeline';
+      }
+      // Step 8 (About You): no required fields
+      if (s === 9) {
+        if (!get('intent')) errs.intent = 'Please select your readiness level';
+        if (customization?.privacyPolicyUrl && get('privacyConsent') !== 'true') {
+          errs.privacyConsent = 'You must agree to the privacy policy';
+        }
+        if (get('chippiTosConsent') !== 'true') {
+          errs.chippiTosConsent = 'You must agree to Chippi\'s Terms of Service and Privacy Policy';
+        }
+      }
+    } else {
+      // Rental flow validation
+      if (s === 2) {
+        if (!get('name').trim()) errs.name = 'Full name is required';
+        const email = get('email').trim();
+        if (!email) errs.email = 'Email is required';
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = 'Invalid email';
+      }
+      if (s === 3) {
+        if (!get('moveTiming')) errs.moveTiming = 'Please select when you plan to move';
+      }
+      if (s === 4) {
+        if (!get('location').trim()) errs.location = 'Please enter your desired location';
+      }
+      if (s === 5) {
+        if (!get('budget')) errs.budget = 'Please select your budget';
+      }
+      if (s === 6) {
+        if (!get('income')) errs.income = 'Please select your income range';
+      }
+      if (s === 7) {
+        if (!get('employment')) errs.employment = 'Please select your work situation';
+      }
+      if (s === 8) {
+        if (!get('occupants').trim()) errs.occupants = 'Please enter the number of occupants';
+      }
+      // Step 9: no validation (optional details)
+      if (s === 10) {
+        if (!get('intent')) errs.intent = 'Please select your readiness level';
+        if (customization?.privacyPolicyUrl && get('privacyConsent') !== 'true') {
+          errs.privacyConsent = 'You must agree to the privacy policy';
+        }
+        if (get('chippiTosConsent') !== 'true') {
+          errs.chippiTosConsent = 'You must agree to Chippi\'s Terms of Service and Privacy Policy';
+        }
       }
     }
 
@@ -361,23 +406,47 @@ export function ApplicationForm({
     setSubmitting(true);
     setSubmitError('');
 
-    const payload: Record<string, unknown> = {
-      slug,
-      legalName: get('name'),
-      email: get('email'),
-      phone: get('phone'),
-      targetMoveInDate: get('moveTiming'),
-      propertyAddress: get('location'),
-      monthlyRent: get('budget'),
-      monthlyGrossIncome: get('income'),
-      employmentStatus: get('employment'),
-      numberOfOccupants: get('occupants'),
-      hasPets: get('hasPets') === 'yes',
-      additionalNotes: get('notes'),
-      leaseTermPreference: get('intent'),
-      completedSteps: STEPS.map((s) => s.id),
-      privacyConsent: get('privacyConsent') === 'true',
-    };
+    const payload: Record<string, unknown> = leadType === 'buyer'
+      ? {
+          slug,
+          leadType: 'buyer',
+          legalName: get('name'),
+          email: get('email'),
+          phone: get('phone'),
+          monthlyRent: get('buyerBudget'),
+          preApprovalStatus: get('preApproval'),
+          preApprovalLender: get('lender'),
+          preApprovalAmount: get('preApprovalAmount'),
+          propertyType: get('propertyType'),
+          bedrooms: get('bedrooms'),
+          bathrooms: get('bathrooms'),
+          mustHaves: get('mustHaves'),
+          targetMoveInDate: get('buyerTimeline'),
+          currentHousingStatus: get('housingSituation'),
+          firstTimeBuyer: get('firstTimeBuyer'),
+          leaseTermPreference: get('intent'),
+          additionalNotes: get('notes'),
+          privacyConsent: get('privacyConsent') === 'true',
+          completedSteps: STEPS.map((s) => s.id),
+        }
+      : {
+          slug,
+          leadType: 'rental',
+          legalName: get('name'),
+          email: get('email'),
+          phone: get('phone'),
+          targetMoveInDate: get('moveTiming'),
+          propertyAddress: get('location'),
+          monthlyRent: get('budget'),
+          monthlyGrossIncome: get('income'),
+          employmentStatus: get('employment'),
+          numberOfOccupants: get('occupants'),
+          hasPets: get('hasPets') === 'yes',
+          additionalNotes: get('notes'),
+          leaseTermPreference: get('intent'),
+          completedSteps: STEPS.map((s) => s.id),
+          privacyConsent: get('privacyConsent') === 'true',
+        };
 
     if (brokerageId) {
       payload.brokerageId = brokerageId;
