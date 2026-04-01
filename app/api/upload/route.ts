@@ -43,6 +43,33 @@ export async function POST(req: NextRequest) {
     const fileName = `${space.id}/${type}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
     const bucket = 'branding';
 
+    // Ensure the storage bucket exists — create it if missing
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    if (listError) {
+      console.error('[upload] failed to list buckets:', listError);
+      return NextResponse.json(
+        { error: 'Could not verify storage configuration. Check your Supabase service role key.' },
+        { status: 500 },
+      );
+    }
+    if (!buckets?.find((b: { name: string }) => b.name === bucket)) {
+      const { error: createError } = await supabase.storage.createBucket(bucket, {
+        public: true,
+      });
+      if (createError) {
+        console.error('[upload] failed to create bucket:', createError);
+        return NextResponse.json(
+          {
+            error:
+              'Storage bucket "branding" does not exist and could not be created automatically. ' +
+              'Please create a PUBLIC bucket named "branding" in your Supabase Dashboard → Storage.',
+          },
+          { status: 500 },
+        );
+      }
+      console.log('[upload] created public storage bucket "branding"');
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const { error: uploadError } = await supabase.storage
@@ -54,10 +81,10 @@ export async function POST(req: NextRequest) {
 
     if (uploadError) {
       console.error('[upload] storage error:', uploadError);
-      const msg = uploadError.message?.includes('not found')
-        ? 'Storage bucket "branding" not configured. Create it in Supabase Dashboard → Storage.'
-        : uploadError.message || 'Upload failed';
-      return NextResponse.json({ error: msg }, { status: 500 });
+      return NextResponse.json(
+        { error: uploadError.message || 'Upload failed' },
+        { status: 500 },
+      );
     }
 
     const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(fileName);

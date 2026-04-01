@@ -31,30 +31,43 @@ export async function sendSMS(params: SendSMSParams): Promise<boolean> {
   const fromNumber = process.env.TELNYX_FROM_NUMBER;
 
   if (!client || !fromNumber) {
-    console.log(`[sms] (skipped) No Telnyx credentials. To: ${params.to}`);
+    console.log(
+      `[sms] (skipped) Missing Telnyx credentials — TELNYX_API_KEY: ${process.env.TELNYX_API_KEY ? 'set' : 'MISSING'}, TELNYX_FROM_NUMBER: ${fromNumber ? 'set' : 'MISSING'}. To: ${params.to}`,
+    );
     return false;
   }
 
   // Basic phone validation — must look like a phone number
   const cleaned = params.to.replace(/[^\d+]/g, '');
   if (cleaned.length < 10) {
-    console.warn(`[sms] Invalid phone number: ${params.to}`);
+    console.warn(`[sms] Invalid phone number (too short after cleaning): "${params.to}" -> "${cleaned}"`);
     return false;
   }
 
   // Ensure E.164 format
   const toNumber = cleaned.startsWith('+') ? cleaned : `+1${cleaned}`;
 
+  // Validate E.164 format: + followed by 10-15 digits
+  if (!/^\+\d{10,15}$/.test(toNumber)) {
+    console.warn(`[sms] Phone number not valid E.164 format: "${toNumber}" (original: "${params.to}")`);
+    return false;
+  }
+
   try {
-    await client.messages.send({
+    const response = await client.messages.send({
       from: fromNumber,
       to: toNumber,
       text: params.body,
     });
-    console.log(`[sms] Sent to ${toNumber}`);
+    console.log(`[sms] Sent to ${toNumber} (message id: ${response?.data?.id ?? 'unknown'})`);
     return true;
-  } catch (err) {
-    console.error('[sms] Send failed:', err);
+  } catch (err: any) {
+    console.error(`[sms] Send failed to ${toNumber}:`, {
+      message: err?.message,
+      status: err?.statusCode ?? err?.status,
+      code: err?.code,
+      errors: err?.errors ?? err?.rawErrors,
+    });
     return false;
   }
 }
@@ -82,7 +95,7 @@ export function tourConfirmationSMS(p: { guestName: string; guestPhone: string; 
   const prop = p.property ? ` at ${p.property}` : '';
   return {
     to: p.guestPhone,
-    body: `Hi ${p.guestName}! Your tour with ${p.businessName}${prop} is confirmed for ${p.date} at ${p.time}. Reply to this message if you need to reschedule.`,
+    body: `Hi ${p.guestName}! Your tour with ${p.businessName}${prop} is confirmed for ${p.date} at ${p.time}. Contact your agent if you need to reschedule.`,
   };
 }
 

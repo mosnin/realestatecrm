@@ -55,7 +55,11 @@ export default function AppearanceSettingsPage() {
     formData.append('file', file);
     formData.append('type', type);
     const res = await fetch('/api/upload', { method: 'POST', body: formData });
-    if (!res.ok) { toast.error('Upload failed'); return null; }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || 'Upload failed');
+      return null;
+    }
     const { url } = await res.json();
     return url;
   }
@@ -67,6 +71,7 @@ export default function AppearanceSettingsPage() {
     setLogoPreview(URL.createObjectURL(file));
     const url = await handleUpload(file, 'logo');
     if (url) { setLogoUrl(url); setLogoPreview(url); }
+    else { setLogoPreview(''); }
   }
 
   async function handleFaviconUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -76,6 +81,7 @@ export default function AppearanceSettingsPage() {
     setFaviconPreview(URL.createObjectURL(file));
     const url = await handleUpload(file, 'favicon');
     if (url) { setIntakeFaviconUrl(url); setFaviconPreview(url); }
+    else { setFaviconPreview(''); }
   }
 
   async function handleSave(e: React.FormEvent) {

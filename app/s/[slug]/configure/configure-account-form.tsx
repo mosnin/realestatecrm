@@ -120,7 +120,11 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
     formData.append('file', file);
     formData.append('type', type);
     const res = await fetch('/api/upload', { method: 'POST', body: formData });
-    if (!res.ok) { toast.error('Upload failed'); return null; }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || 'Upload failed');
+      return null;
+    }
     const { url } = await res.json();
     return url;
   }
@@ -132,6 +136,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
     setLogoPreview(URL.createObjectURL(file));
     const url = await handleUpload(file, 'logo');
     if (url) { setLogoUrl(url); setLogoPreview(url); }
+    else { setLogoPreview(''); }
   }
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -141,6 +146,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
     setPhotoPreview(URL.createObjectURL(file));
     const url = await handleUpload(file, 'photo');
     if (url) { setRealtorPhotoUrl(url); setPhotoPreview(url); }
+    else { setPhotoPreview(''); }
   }
 
   async function handleFaviconUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -150,6 +156,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
     setFaviconPreview(URL.createObjectURL(file));
     const url = await handleUpload(file, 'favicon');
     if (url) { setIntakeFaviconUrl(url); setFaviconPreview(url); }
+    else { setFaviconPreview(''); }
   }
 
   function getVideoEmbedUrl(url: string): string | null {
