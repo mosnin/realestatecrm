@@ -53,7 +53,8 @@ CREATE TABLE IF NOT EXISTS "Space" (
     CHECK ("stripeSubscriptionStatus" IN (
       'active', 'trialing', 'past_due', 'canceled', 'unpaid', 'inactive'
     )),
-  "stripePeriodEnd"           timestamptz
+  "stripePeriodEnd"           timestamptz,
+  "trialUsedAt"               timestamptz
 );
 
 CREATE TABLE IF NOT EXISTS "SpaceSetting" (

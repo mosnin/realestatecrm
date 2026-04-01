@@ -11,6 +11,7 @@ function SubscribeContent() {
   const searchParams = useSearchParams();
   const slug = searchParams.get('slug') ?? '';
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   // Redirect unauthenticated users
   if (isLoaded && !isSignedIn) {
@@ -20,6 +21,7 @@ function SubscribeContent() {
 
   async function handleStartTrial() {
     setLoading(true);
+    setError('');
     try {
       const res = await fetch('/api/billing/checkout', {
         method: 'POST',
@@ -29,12 +31,15 @@ function SubscribeContent() {
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
+      } else if (data.redirect) {
+        // Server says go to billing instead (e.g. existing subscription with issues)
+        window.location.href = data.redirect;
       } else {
-        alert(data.error || 'Failed to start checkout');
+        setError(data.error || 'Failed to start checkout');
         setLoading(false);
       }
     } catch {
-      alert('Something went wrong. Please try again.');
+      setError('Something went wrong. Please try again.');
       setLoading(false);
     }
   }
@@ -94,6 +99,13 @@ function SubscribeContent() {
               </div>
             ))}
           </div>
+
+          {/* Error */}
+          {error && (
+            <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
 
           {/* CTA */}
           <Button

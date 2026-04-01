@@ -118,14 +118,28 @@ export async function POST(req: NextRequest) {
           session.subscription as string,
         );
 
+        const updateData: Record<string, unknown> = {
+          stripeCustomerId: session.customer as string,
+          stripeSubscriptionId: subscription.id,
+          stripeSubscriptionStatus: mapStatus(subscription.status),
+          stripePeriodEnd: getPeriodEnd(subscription),
+        };
+
+        // Track trial usage — only set once, never reset
+        if (subscription.status === 'trialing') {
+          const { data: existing } = await supabase
+            .from('Space')
+            .select('trialUsedAt')
+            .eq('id', spaceId)
+            .maybeSingle();
+          if (!existing?.trialUsedAt) {
+            updateData.trialUsedAt = new Date().toISOString();
+          }
+        }
+
         await supabase
           .from('Space')
-          .update({
-            stripeCustomerId: session.customer as string,
-            stripeSubscriptionId: subscription.id,
-            stripeSubscriptionStatus: mapStatus(subscription.status),
-            stripePeriodEnd: getPeriodEnd(subscription),
-          })
+          .update(updateData)
           .eq('id', spaceId);
         break;
       }
@@ -168,16 +182,29 @@ export async function POST(req: NextRequest) {
 
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice;
-        const subId =
-          typeof invoice.parent?.subscription_details?.subscription === 'string'
-            ? invoice.parent.subscription_details.subscription
-            : invoice.parent?.subscription_details?.subscription?.id;
+        // Extract subscription ID — try multiple locations for robustness
+        let subId: string | undefined;
+        const invoiceAny = invoice as any;
+        if (typeof invoiceAny.subscription === 'string') {
+          subId = invoiceAny.subscription;
+        } else if (typeof invoiceAny.subscription === 'object' && invoiceAny.subscription?.id) {
+          subId = invoiceAny.subscription.id;
+        } else if (typeof invoice.parent?.subscription_details?.subscription === 'string') {
+          subId = invoice.parent.subscription_details.subscription;
+        } else if (invoice.parent?.subscription_details?.subscription && typeof invoice.parent.subscription_details.subscription === 'object') {
+          subId = (invoice.parent.subscription_details.subscription as any).id;
+        }
+
         if (subId) {
           await supabase
             .from('Space')
             .update({ stripeSubscriptionStatus: 'past_due' })
             .eq('stripeSubscriptionId', subId);
           try { await notifySubscriptionChange(subId, 'past_due'); } catch (e) { console.error('[stripe-webhook] past_due notification failed:', e); }
+        } else {
+          console.warn('[stripe-webhook] invoice.payment_failed: could not extract subscription ID', {
+            invoiceId: invoice.id,
+          });
         }
         break;
       }

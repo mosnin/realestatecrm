@@ -64,7 +64,7 @@ export default async function BrokerLayout({ children }: { children: React.React
       try {
         const { data: subData, error: subError } = await supabase
           .from('Space')
-          .select('stripeSubscriptionStatus, stripeSubscriptionId')
+          .select('stripeSubscriptionStatus, stripeSubscriptionId, trialUsedAt')
           .eq('id', spaceRow.id)
           .maybeSingle();
 
@@ -75,7 +75,7 @@ export default async function BrokerLayout({ children }: { children: React.React
 
         const status = subData?.stripeSubscriptionStatus ?? 'inactive';
         if (status !== 'active' && status !== 'trialing') {
-          if (subData?.stripeSubscriptionId && (status === 'past_due' || status === 'canceled' || status === 'unpaid')) {
+          if (subData?.stripeSubscriptionId || subData?.trialUsedAt) {
             redirect(`/billing-required?slug=${slug}&reason=${status}`);
           }
           redirect(`/subscribe?slug=${slug}`);

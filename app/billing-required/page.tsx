@@ -12,6 +12,7 @@ function BillingRequiredContent() {
   const slug = searchParams.get('slug') ?? '';
   const reason = searchParams.get('reason') ?? 'past_due';
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   // Redirect unauthenticated users
   if (isLoaded && !isSignedIn) {
@@ -28,9 +29,11 @@ function BillingRequiredContent() {
   }
 
   const isCanceled = reason === 'canceled';
+  const isInactive = reason === 'inactive';
 
   async function handleManageBilling() {
     setLoading(true);
+    setError('');
     try {
       const res = await fetch('/api/billing/portal', {
         method: 'POST',
@@ -41,12 +44,33 @@ function BillingRequiredContent() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        // Fallback to billing page
-        window.location.href = slug ? `/s/${slug}/billing` : '/setup';
+        setError(data.error || 'Could not open billing portal. Try the billing settings link below.');
         setLoading(false);
       }
     } catch {
-      window.location.href = slug ? `/s/${slug}/billing` : '/setup';
+      setError('Something went wrong. Try the billing settings link below.');
+      setLoading(false);
+    }
+  }
+
+  async function handleResubscribe() {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setError(data.error || 'Could not start checkout.');
+        setLoading(false);
+      }
+    } catch {
+      setError('Something went wrong. Please try again.');
       setLoading(false);
     }
   }
@@ -66,31 +90,57 @@ function BillingRequiredContent() {
               <AlertTriangle size={26} className="text-amber-600 dark:text-amber-400" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight">
-              {isCanceled ? 'Subscription canceled' : 'Payment issue'}
+              {isCanceled ? 'Subscription canceled' : isInactive ? 'Subscription expired' : 'Payment issue'}
             </h1>
             <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
               {isCanceled
-                ? 'Your subscription has been canceled. Reactivate to regain access to your dashboard and all your data.'
+                ? 'Your subscription has been canceled. Resubscribe to regain access to your dashboard and all your data.'
+                : isInactive
+                ? 'Your subscription has expired. Resubscribe to continue using Chippi.'
                 : 'There was an issue processing your payment. Please update your billing information to continue using Chippi.'}
             </p>
           </div>
 
+          {/* Error */}
+          {error && (
+            <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+
           {/* Action buttons */}
           <div className="space-y-3">
-            <Button
-              onClick={handleManageBilling}
-              disabled={loading || !slug}
-              size="lg"
-              className="w-full rounded-full text-base font-semibold gap-2"
-            >
-              {loading ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <CreditCard size={18} />
-              )}
-              {loading ? 'Redirecting...' : 'Update billing'}
-              {!loading && <ArrowRight size={16} />}
-            </Button>
+            {(isCanceled || isInactive) ? (
+              <Button
+                onClick={handleResubscribe}
+                disabled={loading || !slug}
+                size="lg"
+                className="w-full rounded-full text-base font-semibold gap-2"
+              >
+                {loading ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <CreditCard size={18} />
+                )}
+                {loading ? 'Redirecting...' : 'Resubscribe'}
+                {!loading && <ArrowRight size={16} />}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleManageBilling}
+                disabled={loading || !slug}
+                size="lg"
+                className="w-full rounded-full text-base font-semibold gap-2"
+              >
+                {loading ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <CreditCard size={18} />
+                )}
+                {loading ? 'Redirecting...' : 'Update payment method'}
+                {!loading && <ArrowRight size={16} />}
+              </Button>
+            )}
 
             <a
               href={slug ? `/s/${slug}/billing` : '/setup'}

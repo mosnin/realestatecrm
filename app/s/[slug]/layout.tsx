@@ -131,7 +131,7 @@ export default async function DashboardLayout({
     try {
       const { data: subData, error: subError } = await supabase
         .from('Space')
-        .select('stripeSubscriptionStatus, stripeSubscriptionId')
+        .select('stripeSubscriptionStatus, stripeSubscriptionId, trialUsedAt')
         .eq('id', space.id)
         .maybeSingle();
 
@@ -143,9 +143,11 @@ export default async function DashboardLayout({
 
       const status = subData?.stripeSubscriptionStatus ?? 'inactive';
       if (status !== 'active' && status !== 'trialing') {
-        if (subData?.stripeSubscriptionId && (status === 'past_due' || status === 'canceled' || status === 'unpaid')) {
+        // If they ever had a subscription (ID exists OR trial was used), show billing page
+        if (subData?.stripeSubscriptionId || subData?.trialUsedAt) {
           redirect(`/billing-required?slug=${slug}&reason=${status}`);
         }
+        // Never subscribed → show trial signup
         redirect(`/subscribe?slug=${slug}`);
       }
     } catch (err: any) {

@@ -20,13 +20,26 @@ export async function POST(req: NextRequest) {
     // Fetch Stripe columns separately (getSpaceFromSlug doesn't include them)
     const { data: stripeData, error: stripeQueryErr } = await supabase
       .from('Space')
-      .select('stripeCustomerId, stripeSubscriptionId, stripeSubscriptionStatus, stripePeriodEnd, ownerId')
+      .select('stripeCustomerId, stripeSubscriptionId, stripeSubscriptionStatus, stripePeriodEnd, trialUsedAt, ownerId')
       .eq('id', space.id)
       .single();
 
     if (stripeQueryErr) {
       console.error('[checkout] Stripe column query failed:', stripeQueryErr.message, stripeQueryErr.code);
-      // If columns don't exist, continue without them
+    }
+
+    // Block if user already has an active or trialing subscription
+    const currentStatus = stripeData?.stripeSubscriptionStatus;
+    if (currentStatus === 'active' || currentStatus === 'trialing') {
+      return NextResponse.json({ error: 'You already have an active subscription.' }, { status: 400 });
+    }
+
+    // If they have a failed/past_due subscription, direct them to billing portal instead
+    if (stripeData?.stripeSubscriptionId && (currentStatus === 'past_due' || currentStatus === 'unpaid')) {
+      return NextResponse.json({
+        error: 'You have an existing subscription with a payment issue. Please update your payment method in billing settings.',
+        redirect: `/s/${slug}/billing`,
+      }, { status: 400 });
     }
 
     let stripe;
@@ -70,15 +83,21 @@ export async function POST(req: NextRequest) {
         .eq('id', space.id);
     }
 
-    console.log('[checkout] Creating checkout session, customer:', customerId, 'price:', priceId);
+    // Only grant a 7-day trial if the user has never used one before
+    const hasUsedTrial = !!stripeData?.trialUsedAt;
+    const subscriptionData: Record<string, unknown> = {
+      metadata: { spaceId: space.id },
+    };
+    if (!hasUsedTrial) {
+      subscriptionData.trial_period_days = 7;
+    }
+
+    console.log('[checkout] Creating checkout session, customer:', customerId, 'price:', priceId, 'trial:', !hasUsedTrial);
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-      subscription_data: {
-        trial_period_days: 7,
-        metadata: { spaceId: space.id },
-      },
+      subscription_data: subscriptionData,
       success_url: `${appUrl}/s/${slug}/billing?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/s/${slug}/billing`,
       metadata: { spaceId: space.id },
