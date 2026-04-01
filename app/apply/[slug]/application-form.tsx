@@ -453,7 +453,8 @@ export function ApplicationForm({
     }
 
     try {
-      const response = await fetch('/api/public/apply', {
+      const endpoint = brokerageId ? '/api/public/apply/brokerage' : '/api/public/apply';
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

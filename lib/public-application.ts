@@ -89,7 +89,10 @@ export const publicApplicationSchema = z.object({
   // Step 3: Current Living Situation
   currentAddress: optStr,
   currentHousingStatus: z
-    .enum(['own', 'rent', 'rent-free', ''])
+    .union([
+      z.enum(['own', 'rent', 'rent-free', '']),
+      z.string().max(100),
+    ])
     .optional()
     .transform((v) => (v === '' ? undefined : v)),
   currentMonthlyPayment: optNum,
