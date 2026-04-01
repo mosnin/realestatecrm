@@ -81,8 +81,8 @@ export async function POST(req: NextRequest) {
 
     const { Resend } = await import('resend');
     const resend = new Resend(process.env.RESEND_API_KEY);
-    const FROM =
-      process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
+    const rawFrom = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
+    const FROM = rawFrom.includes('@') ? rawFrom : `notifications@${rawFrom}`;
 
     // Truncate the message preview for email
     const preview =

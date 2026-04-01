@@ -1,5 +1,17 @@
 import type { ApplicationData } from '@/lib/types';
 
+/**
+ * Normalize RESEND_FROM_EMAIL — if someone sets it to just a domain like
+ * "alerts.usechippi.com" instead of "notifications@alerts.usechippi.com",
+ * fix it automatically.
+ */
+function getFromAddress(): string {
+  const raw = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
+  if (raw.includes('@')) return raw;
+  // It's just a domain — prepend "notifications@"
+  return `notifications@${raw}`;
+}
+
 /** Escape characters that have special meaning in HTML to prevent XSS. */
 function esc(value: string | null | undefined): string {
   if (!value) return '';
@@ -43,7 +55,7 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
   }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
+  const FROM = getFromAddress();
   console.log('[EMAIL-DEBUG] 2. Resend initialized, API key prefix:', process.env.RESEND_API_KEY?.slice(0, 8));
 
   const { toEmail, spaceName, spaceSlug, contactId, name, phone, email, leadScore, scoreLabel, scoreSummary, applicationData: app } = params;
@@ -146,7 +158,7 @@ export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<
   if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
+  const FROM = getFromAddress();
 
   const { toEmail, spaceName, spaceSlug, contacts } = params;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
@@ -232,7 +244,7 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
   if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
+  const FROM = getFromAddress();
 
   const { toEmail, fromName, replyTo, subject, body } = params;
 
@@ -290,7 +302,7 @@ export async function sendNewDealNotification(params: NewDealEmailParams): Promi
   if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
+  const FROM = getFromAddress();
 
   const { toEmail, spaceName, spaceSlug, dealTitle, dealValue, dealAddress, dealPriority, contactNames } = params;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
@@ -365,7 +377,7 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
   if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
+  const FROM = getFromAddress();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
 
   const { toEmail, brokerageName, inviterName, roleToAssign, token } = params;
@@ -438,7 +450,7 @@ export async function sendWelcomeEmail(params: {
   if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
+  const FROM = getFromAddress();
 
   const { toEmail, userName, spaceName, spaceSlug } = params;
   const name = esc(userName) || 'there';
