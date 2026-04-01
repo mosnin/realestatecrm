@@ -370,7 +370,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="bio">Bio</Label>
+                <Label htmlFor="bio">Bio <span className="text-muted-foreground font-normal">(optional)</span></Label>
                 <Textarea
                   id="bio"
                   value={bio}
@@ -382,7 +382,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
               </div>
 
               <div className="space-y-3">
-                <Label>Social links</Label>
+                <Label>Social links <span className="text-muted-foreground font-normal">(optional)</span></Label>
                 <div className="space-y-2">
                   <div className="relative">
                     <Instagram size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -415,7 +415,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="logoUrl">Logo</Label>
+                <Label htmlFor="logoUrl">Logo <span className="text-muted-foreground font-normal">(optional)</span></Label>
                 <div className="relative">
                   <Image size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -656,9 +656,9 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
             </p>
           </div>
 
-          <form onSubmit={isBrokerRole ? handleBrokerNext : handleSubmit} className="space-y-4">
-            {/* Realtor-only form (unchanged) */}
-            {role === 'realtor' && (
+          <form onSubmit={isBrokerRole ? handleBrokerNext : role === 'realtor' ? handleRealtorNext : handleSubmit} className="space-y-4">
+            {/* Realtor step 0: workspace info */}
+            {role === 'realtor' && realtorStep === 0 && (
               <>
                 <div className="space-y-1.5">
                   <Label htmlFor="businessName">Business or brand name</Label>
@@ -702,6 +702,119 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
                       chippi.com/apply/{slug}
                     </p>
                   )}
+                </div>
+              </>
+            )}
+
+            {/* Realtor step 1: Contact details */}
+            {role === 'realtor' && realtorStep === 1 && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="realtorPhone">Phone number <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <div className="relative">
+                    <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="realtorPhone"
+                      type="tel"
+                      value={realtorPhone}
+                      onChange={(e) => setRealtorPhone(e.target.value)}
+                      placeholder="(305) 555-0100"
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="realtorBio">Bio <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Textarea
+                    id="realtorBio"
+                    value={realtorBio}
+                    onChange={(e) => setRealtorBio(e.target.value)}
+                    placeholder="2-3 sentences about your specialties and experience"
+                    maxLength={500}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="realtorWebsite">Website URL <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <div className="relative">
+                    <Globe size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="realtorWebsite"
+                      value={realtorWebsite}
+                      onChange={(e) => setRealtorWebsite(e.target.value)}
+                      placeholder="https://prestonleasing.com"
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Realtor step 2: Preferences */}
+            {role === 'realtor' && realtorStep === 2 && (
+              <>
+                <div className="space-y-2">
+                  <Label>Timezone <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <div className="relative">
+                    <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <select
+                      value={timezone}
+                      onChange={(e) => setTimezone(e.target.value)}
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 pl-9 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="">Select timezone</option>
+                      <option value="Eastern">Eastern</option>
+                      <option value="Central">Central</option>
+                      <option value="Mountain">Mountain</option>
+                      <option value="Pacific">Pacific</option>
+                      <option value="Alaska">Alaska</option>
+                      <option value="Hawaii">Hawaii</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>How did you hear about Chippi? <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <div className="grid gap-2">
+                    {['Referral', 'Google', 'Social Media', 'Word of Mouth', 'Other'].map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setHearAbout(option)}
+                        className={cn(
+                          'w-full text-left px-4 py-3 rounded-xl border transition-all text-sm',
+                          hearAbout === option
+                            ? 'border-primary/40 bg-primary/5 font-medium shadow-sm'
+                            : 'border-border hover:border-primary/30 text-muted-foreground'
+                        )}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Biggest pain point? <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <div className="grid gap-2">
+                    {['Lead follow-up', 'Scheduling', 'Pipeline tracking', 'Paperwork'].map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setPainPoint(option)}
+                        className={cn(
+                          'w-full text-left px-4 py-3 rounded-xl border transition-all text-sm',
+                          painPoint === option
+                            ? 'border-primary/40 bg-primary/5 font-medium shadow-sm'
+                            : 'border-border hover:border-primary/30 text-muted-foreground'
+                        )}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </>
             )}
@@ -778,7 +891,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
             {isBrokerRole && brokerStep === 1 && (
               <>
                 <div className="space-y-1.5">
-                  <Label htmlFor="brokerLogoUrl">Brokerage logo URL</Label>
+                  <Label htmlFor="brokerLogoUrl">Brokerage logo URL <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <div className="relative">
                     <Image size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -804,7 +917,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="brokerWebsiteUrl">Website URL</Label>
+                  <Label htmlFor="brokerWebsiteUrl">Website URL <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <div className="relative">
                     <Globe size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -818,7 +931,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="officeAddress">Office address</Label>
+                  <Label htmlFor="officeAddress">Office address <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <div className="relative">
                     <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -832,7 +945,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="officePhone">Office phone</Label>
+                  <Label htmlFor="officePhone">Office phone <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <div className="relative">
                     <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -852,7 +965,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
             {isBrokerRole && brokerStep === 2 && (
               <>
                 <div className="space-y-2">
-                  <Label>Number of agents</Label>
+                  <Label>Number of agents <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { value: '1-5', label: '1 - 5' },
@@ -877,7 +990,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Brokerage type</Label>
+                  <Label>Brokerage type <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { value: 'independent', label: 'Independent' },
@@ -901,7 +1014,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Primary market</Label>
+                  <Label>Primary market <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { value: 'residential_rental', label: 'Residential Rental' },
@@ -930,7 +1043,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
             {isBrokerRole && brokerStep === 3 && (
               <>
                 <div className="space-y-2">
-                  <Label>Commission structure</Label>
+                  <Label>Commission structure <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { value: 'flat_fee', label: 'Flat fee' },
@@ -954,13 +1067,80 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="geographicCoverage">Geographic coverage</Label>
+                  <Label htmlFor="geographicCoverage">Geographic coverage <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <Input
                     id="geographicCoverage"
                     value={geographicCoverage}
                     onChange={(e) => setGeographicCoverage(e.target.value)}
                     placeholder="e.g., Miami-Dade, Broward County"
                   />
+                </div>
+              </>
+            )}
+
+            {/* Broker step 4: Preferences */}
+            {isBrokerRole && brokerStep === 4 && (
+              <>
+                <div className="space-y-2">
+                  <Label>Timezone <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <div className="relative">
+                    <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <select
+                      value={timezone}
+                      onChange={(e) => setTimezone(e.target.value)}
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 pl-9 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="">Select timezone</option>
+                      <option value="Eastern">Eastern</option>
+                      <option value="Central">Central</option>
+                      <option value="Mountain">Mountain</option>
+                      <option value="Pacific">Pacific</option>
+                      <option value="Alaska">Alaska</option>
+                      <option value="Hawaii">Hawaii</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>How did you hear about Chippi? <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <div className="grid gap-2">
+                    {['Referral', 'Google', 'Social Media', 'Word of Mouth', 'Other'].map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setHearAbout(option)}
+                        className={cn(
+                          'w-full text-left px-4 py-3 rounded-xl border transition-all text-sm',
+                          hearAbout === option
+                            ? 'border-primary/40 bg-primary/5 font-medium shadow-sm'
+                            : 'border-border hover:border-primary/30 text-muted-foreground'
+                        )}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Biggest pain point? <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <div className="grid gap-2">
+                    {['Lead follow-up', 'Scheduling', 'Pipeline tracking', 'Paperwork'].map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setPainPoint(option)}
+                        className={cn(
+                          'w-full text-left px-4 py-3 rounded-xl border transition-all text-sm',
+                          painPoint === option
+                            ? 'border-primary/40 bg-primary/5 font-medium shadow-sm'
+                            : 'border-border hover:border-primary/30 text-muted-foreground'
+                        )}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </>
             )}
@@ -972,8 +1152,15 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
               </div>
             )}
 
-            {/* Realtor submit */}
-            {role === 'realtor' && (
+            {/* Realtor next */}
+            {role === 'realtor' && realtorStep < realtorTotalSteps - 1 && (
+              <Button type="submit" className="w-full" disabled={!canAdvanceRealtorStep} size="lg">
+                Continue
+              </Button>
+            )}
+
+            {/* Realtor submit (final step) */}
+            {role === 'realtor' && realtorStep === realtorTotalSteps - 1 && (
               <Button type="submit" className="w-full" disabled={!canSubmit} size="lg">
                 {saving ? (
                   <>
