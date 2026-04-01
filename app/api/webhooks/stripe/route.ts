@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
+import { redis } from '@/lib/redis';
 
 /** Send a subscription status email to the space owner (non-blocking). */
 async function notifySubscriptionChange(subscriptionId: string, newStatus: string) {

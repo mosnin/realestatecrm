@@ -21,13 +21,13 @@ export function SubscriptionGate({
   const [loading, setLoading] = useState(false);
 
   // Always allow billing and settings pages
-  if (
+  const isExemptPath =
     pathname.endsWith('/billing') ||
     pathname.includes('/settings') ||
-    pathname === '/broker/billing'
-  ) {
-    return <>{children}</>;
-  }
+    pathname.startsWith('/broker/billing') ||
+    pathname.startsWith('/broker/settings');
+
+  if (isExemptPath) return <>{children}</>;
 
   async function handleStartTrial() {
     setLoading(true);

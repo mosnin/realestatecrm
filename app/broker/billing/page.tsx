@@ -15,12 +15,23 @@ export default async function BrokerBillingPage() {
   const ctx = await getBrokerMemberContext();
   if (!ctx) redirect('/setup');
 
-  // Find the broker owner's space for billing
-  const { data: spaceRow } = await supabase
+  // Find the user's own space for billing
+  const { data: ownSpaceRow } = await supabase
     .from('Space')
     .select('id, slug, name, stripeCustomerId, stripeSubscriptionId, stripeSubscriptionStatus, stripePeriodEnd')
     .eq('ownerId', ctx.dbUserId)
     .maybeSingle();
+
+  // If user has no personal space, find the brokerage owner's space
+  let spaceRow = ownSpaceRow;
+  if (!spaceRow) {
+    const { data: ownerSpace } = await supabase
+      .from('Space')
+      .select('id, slug, name, stripeCustomerId, stripeSubscriptionId, stripeSubscriptionStatus, stripePeriodEnd')
+      .eq('ownerId', ctx.brokerage.ownerId)
+      .maybeSingle();
+    spaceRow = ownerSpace;
+  }
 
   if (!spaceRow) {
     return (
@@ -28,6 +39,21 @@ export default async function BrokerBillingPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Billing</h1>
           <p className="text-muted-foreground">No workspace found for billing</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Only the broker_owner can manage billing. Others see a read-only message.
+  const isBrokerOwner = ctx.membership.role === 'broker_owner';
+  if (!isBrokerOwner) {
+    return (
+      <div className="space-y-6 max-w-3xl">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Billing</h1>
+          <p className="text-muted-foreground">
+            Billing is managed by the brokerage owner.
+          </p>
         </div>
       </div>
     );
