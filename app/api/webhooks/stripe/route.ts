@@ -95,6 +95,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
+  // Idempotency check — skip if already processed
+  const eventKey = `stripe:event:${event.id}`;
+  try {
+    const alreadyProcessed = await redis.get(eventKey);
+    if (alreadyProcessed) {
+      return NextResponse.json({ received: true });
+    }
+    await redis.set(eventKey, '1', { ex: 86400 }); // Expire after 24h
+  } catch {
+    // Redis unavailable — proceed anyway (best effort dedup)
+  }
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
