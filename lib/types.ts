@@ -109,6 +109,9 @@ export type SpaceSetting = {
   intakeRequiredFields: string[];
   intakeCustomQuestions: { id: string; label: string; placeholder?: string; required?: boolean }[];
   intakeStepOrder: string[];
+  // Legal & compliance
+  privacyPolicyUrl: string | null;
+  consentCheckboxLabel: string | null;
 };
 
 export type Contact = {
@@ -137,6 +140,11 @@ export type Contact = {
   applicationStatus: string | null;
   applicationStatusNote: string | null;
   applicationRef: string | null;
+  // Consent tracking (read-only after capture)
+  consentGiven: boolean | null;
+  consentTimestamp: Date | null;
+  consentIp: string | null;
+  consentPrivacyPolicyUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
