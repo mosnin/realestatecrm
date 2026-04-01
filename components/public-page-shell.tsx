@@ -156,26 +156,9 @@ export function PublicPageShell({
       {/* ── Page content ─────────────────────────────────────────────────── */}
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <div className="space-y-5">
-          {/* Agent bio card (if bio exists) */}
+          {/* Agent bio (if bio exists) — no photo/name since header already shows them */}
           {customization?.bio && (
-            <div className="flex items-start gap-3">
-              {agentPhoto && (
-                <div className="relative flex-shrink-0 hidden sm:block">
-                  <img
-                    src={agentPhoto}
-                    alt={agentName}
-                    className="w-10 h-10 rounded-full object-cover ring-2 ring-blue-500 ring-offset-2 ring-offset-background"
-                  />
-                  <span className="absolute -right-0.5 -bottom-0.5 inline-flex size-3.5 items-center justify-center rounded-full bg-blue-500 ring-1.5 ring-background">
-                    <CheckIcon className="size-2 text-white" />
-                  </span>
-                </div>
-              )}
-              <div>
-                <p className="text-sm font-medium text-foreground">{agentName}</p>
-                <p className="text-sm text-muted-foreground mt-0.5">{customization.bio}</p>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground">{customization.bio}</p>
           )}
 
           {/* Title area */}
