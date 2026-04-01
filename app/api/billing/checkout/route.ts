@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
 
     if (stripeQueryErr) {
       console.error('[checkout] Stripe column query failed:', stripeQueryErr.message, stripeQueryErr.code);
+      return NextResponse.json({ error: 'Failed to check subscription status. Please try again.' }, { status: 500 });
     }
 
     // Block if user already has an active or trialing subscription

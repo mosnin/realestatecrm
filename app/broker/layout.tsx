@@ -117,6 +117,8 @@ export default async function BrokerLayout({ children }: { children: React.React
       } catch (err: any) {
         if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err;
         console.error('[broker-layout] Broker-only subscription check error:', err);
+        // Fail secure — block access on error
+        redirect(`/subscribe?slug=${slug}`);
       }
     } else {
       // No space and not broker-only — shouldn't be here

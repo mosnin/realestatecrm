@@ -235,7 +235,10 @@ function mapStatus(
     case 'canceled':
       return 'canceled';
     case 'unpaid':
+    case 'incomplete_expired' as any:
       return 'unpaid';
+    case 'incomplete' as any:
+      return 'inactive';
     default:
       return 'inactive';
   }
