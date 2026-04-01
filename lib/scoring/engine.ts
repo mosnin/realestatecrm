@@ -767,7 +767,431 @@ function collectInsights(categories: CategoryResult[], penalties: RiskPenalty[],
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Main scoring function
+// Buyer scoring weights — must sum to 1.0
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const BUYER_WEIGHTS = {
+  preApproval: 0.30,
+  budgetAlignment: 0.20,
+  timelineUrgency: 0.15,
+  housingSituation: 0.10,
+  firstTimeBuyer: 0.05,
+  propertySpecificity: 0.10,
+  completeness: 0.10,
+} as const;
+
+export type BuyerScoringCategory = keyof typeof BUYER_WEIGHTS;
+
+// ── Buyer category scoring functions ─────────────────────────────────────
+
+function scoreBuyerPreApproval(input: ScoringInput): { rawScore: number; signals: string[] } {
+  const app = input.applicationData;
+  const status = app?.preApprovalStatus;
+  const signals: string[] = [];
+  let rawScore = 0.2;
+
+  if (status === 'yes') {
+    rawScore = 1.0;
+    signals.push('Pre-approved for mortgage');
+    if (app?.preApprovalLender) {
+      signals.push(`Lender: ${app.preApprovalLender}`);
+    }
+    if (app?.preApprovalAmount) {
+      signals.push(`Pre-approval amount: ${app.preApprovalAmount}`);
+    }
+  } else if (status === 'not-yet') {
+    rawScore = 0.5;
+    signals.push('Not yet pre-approved — in progress');
+  } else if (status === 'no') {
+    rawScore = 0.2;
+    signals.push('No pre-approval — early stage buyer');
+  } else {
+    signals.push('Pre-approval status not provided');
+  }
+
+  return { rawScore, signals };
+}
+
+function scoreBuyerBudgetAlignment(input: ScoringInput): { rawScore: number; signals: string[] } {
+  const app = input.applicationData;
+  const signals: string[] = [];
+
+  const budget = resolveNumericValue(app?.buyerBudget) || resolveNumericValue(app?.monthlyRent) || (input.budget ?? 0);
+
+  if (budget <= 0) {
+    signals.push('No buyer budget provided');
+    return { rawScore: 0.2, signals };
+  }
+
+  let rawScore: number;
+  if (budget >= 500000) {
+    rawScore = 1.0;
+    signals.push(`High budget: $${budget.toLocaleString()} — strong purchasing power`);
+  } else if (budget >= 350000) {
+    rawScore = 0.85;
+    signals.push(`Good budget: $${budget.toLocaleString()}`);
+  } else if (budget >= 200000) {
+    rawScore = 0.6;
+    signals.push(`Moderate budget: $${budget.toLocaleString()}`);
+  } else if (budget >= 100000) {
+    rawScore = 0.35;
+    signals.push(`Lower budget: $${budget.toLocaleString()} — limited inventory`);
+  } else {
+    rawScore = 0.15;
+    signals.push(`Very low budget: $${budget.toLocaleString()} — may be unrealistic in most markets`);
+  }
+
+  return { rawScore, signals };
+}
+
+function scoreBuyerTimeline(input: ScoringInput): { rawScore: number; signals: string[] } {
+  const app = input.applicationData;
+  const signals: string[] = [];
+  const timeline = app?.buyerTimeline || app?.targetMoveInDate;
+
+  if (!timeline) {
+    signals.push('No purchase timeline provided');
+    return { rawScore: 0.3, signals };
+  }
+
+  const lower = timeline.toLowerCase();
+  let rawScore: number;
+
+  if (lower === 'asap' || lower.includes('immediate')) {
+    rawScore = 1.0;
+    signals.push('ASAP timeline — ready to buy now');
+  } else if (lower === '1-3mo' || lower.includes('1-3') || lower.includes('1–3') || lower.includes('within 3')) {
+    rawScore = 0.8;
+    signals.push('1-3 month timeline — actively searching');
+  } else if (lower === '3-6mo' || lower.includes('3-6') || lower.includes('3–6') || lower.includes('within 6')) {
+    rawScore = 0.5;
+    signals.push('3-6 month timeline — planning phase');
+  } else if (lower === 'exploring' || lower.includes('browsing') || lower.includes('exploring') || lower.includes('just looking')) {
+    rawScore = 0.15;
+    signals.push('Exploring — no firm timeline');
+  } else {
+    rawScore = 0.4;
+    signals.push(`Purchase timeline: "${timeline}"`);
+  }
+
+  return { rawScore, signals };
+}
+
+function scoreBuyerHousingSituation(input: ScoringInput): { rawScore: number; signals: string[] } {
+  const app = input.applicationData;
+  const signals: string[] = [];
+  const situation = app?.housingSituation || app?.currentHousingStatus;
+
+  if (!situation) {
+    signals.push('Current housing situation not provided');
+    return { rawScore: 0.5, signals };
+  }
+
+  const lower = situation.toLowerCase();
+  let rawScore: number;
+
+  if (lower === 'renting' || lower === 'rent') {
+    rawScore = 0.9;
+    signals.push('Currently renting — motivated to buy');
+  } else if (lower === 'family' || lower === 'rent-free') {
+    rawScore = 0.8;
+    signals.push('Living with family — motivated to move');
+  } else if (lower === 'own-home' || lower === 'own') {
+    rawScore = 0.6;
+    signals.push('Currently owns home — upgrading or relocating');
+  } else {
+    rawScore = 0.5;
+    signals.push(`Housing situation: "${situation}"`);
+  }
+
+  return { rawScore, signals };
+}
+
+function scoreBuyerFirstTime(input: ScoringInput): { rawScore: number; signals: string[] } {
+  const app = input.applicationData;
+  const signals: string[] = [];
+  const firstTime = app?.firstTimeBuyer;
+
+  if (!firstTime) {
+    signals.push('First-time buyer status not provided');
+    return { rawScore: 0.5, signals };
+  }
+
+  let rawScore: number;
+
+  if (firstTime === 'yes') {
+    rawScore = 0.7;
+    signals.push('First-time buyer — eager but may need more guidance');
+  } else {
+    rawScore = 0.9;
+    signals.push('Experienced buyer — knows the process');
+  }
+
+  return { rawScore, signals };
+}
+
+function scoreBuyerPropertySpecificity(input: ScoringInput): { rawScore: number; signals: string[] } {
+  const app = input.applicationData;
+  const signals: string[] = [];
+  let specificityPoints = 0;
+  const maxPoints = 5;
+
+  if (app?.propertyType) {
+    specificityPoints++;
+    signals.push(`Property type: ${app.propertyType}`);
+  }
+
+  if (app?.bedrooms) {
+    specificityPoints++;
+    signals.push(`Bedrooms: ${app.bedrooms}`);
+  }
+
+  if (app?.bathrooms) {
+    specificityPoints++;
+    signals.push(`Bathrooms: ${app.bathrooms}`);
+  }
+
+  const mustHaves = app?.mustHaves;
+  if (mustHaves) {
+    const items = Array.isArray(mustHaves)
+      ? mustHaves
+      : mustHaves.split(',').map((s: string) => s.trim()).filter(Boolean);
+    if (items.length > 0) {
+      specificityPoints += Math.min(2, items.length); // up to 2 points for must-haves
+      signals.push(`Must-haves: ${items.join(', ')}`);
+    }
+  }
+
+  if (specificityPoints === 0) {
+    signals.push('No property preferences specified');
+  }
+
+  const rawScore = Math.min(1.0, specificityPoints / maxPoints);
+  return { rawScore, signals };
+}
+
+function scoreBuyerCompleteness(input: ScoringInput): { rawScore: number; signals: string[]; completeness: number } {
+  const app = input.applicationData;
+  const signals: string[] = [];
+
+  if (!app) {
+    return {
+      rawScore: 0.1,
+      signals: ['No application data — basic contact info only'],
+      completeness: 0.1,
+    };
+  }
+
+  const fields = [
+    app.preApprovalStatus,
+    app.buyerBudget || app.monthlyRent,
+    app.buyerTimeline || app.targetMoveInDate,
+    app.housingSituation || app.currentHousingStatus,
+    app.firstTimeBuyer,
+    app.propertyType,
+    app.bedrooms,
+    app.bathrooms,
+    app.mustHaves,
+    input.name,
+    input.email,
+    input.phone,
+    app.employmentStatus,
+    app.monthlyGrossIncome,
+  ];
+
+  const totalFields = fields.length;
+  const filled = fields.filter((v) => v != null && v !== '').length;
+  const completeness = filled / totalFields;
+
+  let rawScore: number;
+  if (completeness >= 0.9) {
+    rawScore = 1.0;
+    signals.push(`Excellent: ${Math.round(completeness * 100)}% complete (${filled}/${totalFields})`);
+  } else if (completeness >= 0.7) {
+    rawScore = 0.75;
+    signals.push(`Good: ${Math.round(completeness * 100)}% complete (${filled}/${totalFields})`);
+  } else if (completeness >= 0.5) {
+    rawScore = 0.5;
+    signals.push(`Partial: ${Math.round(completeness * 100)}% complete (${filled}/${totalFields})`);
+  } else {
+    rawScore = 0.2;
+    signals.push(`Incomplete: ${Math.round(completeness * 100)}% complete (${filled}/${totalFields})`);
+  }
+
+  return { rawScore, signals, completeness };
+}
+
+// ── Buyer risk penalties ──────────────────────────────────────────────────
+
+function computeBuyerRiskPenalties(input: ScoringInput): RiskPenalty[] {
+  const app = input.applicationData;
+  const penalties: RiskPenalty[] = [];
+
+  if (!app) return penalties;
+
+  // No pre-approval + ASAP timeline = risky
+  const timeline = (app.buyerTimeline || app.targetMoveInDate || '').toLowerCase();
+  const isAsap = timeline === 'asap' || timeline.includes('immediate');
+
+  if (app.preApprovalStatus !== 'yes' && isAsap) {
+    penalties.push({
+      flag: 'no_preapproval_urgent_timeline',
+      multiplier: 0.8,
+      description: 'No pre-approval with ASAP timeline — buyer may not be financially ready',
+    });
+  }
+
+  // Budget under $200K in expensive markets = cold signal
+  const budget = resolveNumericValue(app.buyerBudget) || resolveNumericValue(app.monthlyRent) || (input.budget ?? 0);
+  if (budget > 0 && budget < 200000) {
+    penalties.push({
+      flag: 'low_budget_market',
+      multiplier: 0.85,
+      description: `Budget $${budget.toLocaleString()} under $200K — limited options in most markets`,
+    });
+  }
+
+  return penalties;
+}
+
+// ── Buyer insights ────────────────────────────────────────────────────────
+
+function collectBuyerInsights(
+  categoryResults: { name: string; rawScore: number; signals: string[] }[],
+  penalties: RiskPenalty[],
+  input: ScoringInput,
+) {
+  const strengths: string[] = [];
+  const weaknesses: string[] = [];
+  const riskFlags: string[] = [];
+  const missingInformation: string[] = [];
+  const app = input.applicationData;
+
+  for (const cat of categoryResults) {
+    if (cat.rawScore >= 0.8) {
+      const topSignal = cat.signals[0];
+      if (topSignal) strengths.push(topSignal);
+    }
+    if (cat.rawScore <= 0.35) {
+      const topSignal = cat.signals[0];
+      if (topSignal) weaknesses.push(topSignal);
+    }
+  }
+
+  for (const penalty of penalties) {
+    riskFlags.push(penalty.description);
+  }
+
+  // Missing information
+  if (!app) {
+    missingInformation.push('Full application data');
+  } else {
+    if (!app.preApprovalStatus) missingInformation.push('Pre-approval status');
+    if (!app.buyerBudget && !app.monthlyRent && !input.budget) missingInformation.push('Buyer budget');
+    if (!app.buyerTimeline && !app.targetMoveInDate) missingInformation.push('Purchase timeline');
+    if (!app.housingSituation && !app.currentHousingStatus) missingInformation.push('Current housing situation');
+    if (!app.firstTimeBuyer) missingInformation.push('First-time buyer status');
+    if (!app.propertyType) missingInformation.push('Desired property type');
+    if (!app.bedrooms) missingInformation.push('Bedroom preferences');
+    if (!app.bathrooms) missingInformation.push('Bathroom preferences');
+  }
+
+  return {
+    strengths: strengths.slice(0, 5),
+    weaknesses: weaknesses.slice(0, 5),
+    riskFlags: riskFlags.slice(0, 5),
+    missingInformation: missingInformation.slice(0, 5),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Buyer scoring — main function
+// ═══════════════════════════════════════════════════════════════════════════
+
+function computeBuyerScore(input: ScoringInput): ScoringEngineResult {
+  // 1. Compute all buyer category sub-scores
+  const preApproval = scoreBuyerPreApproval(input);
+  const budgetAlignment = scoreBuyerBudgetAlignment(input);
+  const timeline = scoreBuyerTimeline(input);
+  const housing = scoreBuyerHousingSituation(input);
+  const firstTime = scoreBuyerFirstTime(input);
+  const specificity = scoreBuyerPropertySpecificity(input);
+  const completenessResult = scoreBuyerCompleteness(input);
+
+  const buyerCategories = [
+    { name: 'preApproval', ...preApproval },
+    { name: 'budgetAlignment', ...budgetAlignment },
+    { name: 'timelineUrgency', ...timeline },
+    { name: 'housingSituation', ...housing },
+    { name: 'firstTimeBuyer', ...firstTime },
+    { name: 'propertySpecificity', ...specificity },
+    { name: 'completeness', ...completenessResult },
+  ];
+
+  // 2. Map to CategoryResult[] for compatibility with existing types
+  // Use 'creditScore' etc. as placeholder categories to satisfy the type system,
+  // but include the real buyer category name in signals
+  const categoryMapping: ScoringCategory[] = [
+    'creditScore',           // preApproval
+    'affordability',         // budgetAlignment
+    'moveInUrgency',         // timelineUrgency
+    'householdFit',          // housingSituation
+    'applicationCompleteness', // firstTimeBuyer
+    'rentalHistory',         // propertySpecificity
+    'screeningFlags',        // completeness
+  ];
+
+  const categories: CategoryResult[] = buyerCategories.map((cat, i) => {
+    const mappedCategory = categoryMapping[i];
+    const weight = Object.values(BUYER_WEIGHTS)[i];
+    return {
+      category: mappedCategory,
+      rawScore: cat.rawScore,
+      weight,
+      weightedScore: cat.rawScore * weight,
+      signals: [`[${cat.name}] `, ...cat.signals],
+    };
+  });
+
+  // 3. Sum weighted scores -> base score 0-1
+  let baseScore = categories.reduce((sum, cat) => sum + cat.weightedScore, 0);
+
+  // 4. Apply buyer risk penalties
+  const riskPenalties = computeBuyerRiskPenalties(input);
+  for (const penalty of riskPenalties) {
+    baseScore *= penalty.multiplier;
+  }
+
+  // 5. Scale to 0-100 and clamp
+  const finalScore = Math.max(0, Math.min(100, Math.round(baseScore * 100)));
+
+  // 6. Confidence from data completeness
+  const dataCompleteness = completenessResult.completeness;
+  const confidence = Math.round(dataCompleteness * 100) / 100;
+
+  // 7. Collect insights
+  const { strengths, weaknesses, riskFlags, missingInformation } = collectBuyerInsights(
+    buyerCategories,
+    riskPenalties,
+    input,
+  );
+
+  return {
+    score: finalScore,
+    priorityTier: assignTier(finalScore),
+    confidence,
+    categories,
+    riskPenalties,
+    strengths,
+    weaknesses,
+    riskFlags,
+    missingInformation,
+    dataCompleteness,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Main scoring function (rental — default path)
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function computeLeadScore(input: ScoringInput): ScoringEngineResult {

@@ -710,6 +710,89 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
           </div>
         </div>
       )}
+
+      {/* ── Buyer ── */}
+      {tab === 'Buyer' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard label="Buyer leads" value={data.buyerLeadCount} sub="all time" />
+            <StatCard label="Rental leads" value={data.rentalLeadCount} sub="all time" />
+            <StatCard
+              label="Buyer share"
+              value={data.totalLeads > 0 ? `${Math.round((data.buyerLeadCount / data.totalLeads) * 100)}%` : '—'}
+              sub="of total leads"
+            />
+            <StatCard
+              label="Total leads"
+              value={data.totalLeads}
+              sub="buyer + rental"
+            />
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            {/* Buyer vs Rental breakdown */}
+            <ChartSection title="Leads by type" sub="Buyer vs rental lead distribution">
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { label: 'Buyer', count: data.buyerLeadCount },
+                      { label: 'Rental', count: data.rentalLeadCount },
+                    ]}
+                    dataKey="count"
+                    nameKey="label"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={3}
+                  >
+                    <Cell fill="#3b82f6" />
+                    <Cell fill="#10b981" />
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartSection>
+
+            {/* Buyer budget distribution */}
+            {data.buyerBudgetDistribution.length > 0 && (
+              <ChartSection title="Buyer budget distribution" sub="Budget ranges across buyer leads">
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={data.buyerBudgetDistribution} barSize={28}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" width={28} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Bar dataKey="count" name="Buyers" radius={[4, 4, 0, 0]}>
+                      {data.buyerBudgetDistribution.map((entry) => {
+                        const colors: Record<string, string> = {
+                          'Under $200K': '#94a3b8',
+                          '$200K–$400K': '#3b82f6',
+                          '$400K–$600K': '#10b981',
+                          '$600K–$800K': '#f59e0b',
+                          '$800K–$1M': '#f97316',
+                          'Over $1M': '#ef4444',
+                        };
+                        return <Cell key={entry.label} fill={colors[entry.label] ?? '#94a3b8'} />;
+                      })}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartSection>
+            )}
+          </div>
+
+          {data.buyerLeadCount === 0 && (
+            <div className="rounded-lg border border-border bg-card px-6 py-12 text-center">
+              <p className="text-sm text-muted-foreground">
+                No buyer leads yet. Buyer analytics will appear here once buyer leads are added.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

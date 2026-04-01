@@ -215,7 +215,7 @@ export async function chatWithRAG(
     `<<ACTION>>{"type":"update_contact","id":"<contact-id>","summary":"<short description of what changes>","changes":{"field":"value"}}<</ACTION>>`,
     `<<ACTION>>{"type":"update_deal","id":"<deal-id>","summary":"<short description of what changes>","changes":{"field":"value"}}<</ACTION>>`,
     ``,
-    `Editable contact fields: name, email, phone, address, notes, budget (number), preferences, type (QUALIFICATION|TOUR|APPLICATION), tags (array of strings), sourceLabel.`,
+    `Editable contact fields: name, email, phone, address, notes, budget (number), preferences, type (QUALIFICATION|TOUR|APPLICATION), leadType (rental|buyer), tags (array of strings), sourceLabel.`,
     `Editable deal fields: title, description, address, value (number), priority (LOW|MEDIUM|HIGH), status (active|won|lost|on_hold), closeDate (ISO date string).`,
     ``,
     `IMPORTANT RULES:`,

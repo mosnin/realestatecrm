@@ -35,6 +35,7 @@ export async function scoreLeadApplication(input: {
   phone: string;
   budget: number | null;
   applicationData: ApplicationData | null;
+  leadType?: 'rental' | 'buyer';
 }): Promise<LeadScoringResult> {
   console.info('[lead-scoring] start (v2 proprietary engine)', { contactId: input.contactId });
 
@@ -46,6 +47,7 @@ export async function scoreLeadApplication(input: {
       phone: input.phone,
       budget: input.budget,
       applicationData: input.applicationData,
+      leadType: input.leadType,
     });
 
     console.info('[lead-scoring] engine score computed', {

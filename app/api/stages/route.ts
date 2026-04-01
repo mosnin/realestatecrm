@@ -22,8 +22,9 @@ export async function GET(req: NextRequest) {
   if (pipelineType === 'rental' || pipelineType === 'buyer') {
     stageQuery = stageQuery.eq('pipelineType', pipelineType);
   }
-  let { data: stageRows, error: stageError } = await stageQuery.order('position', { ascending: true });
+  const { data: stageData, error: stageError } = await stageQuery.order('position', { ascending: true });
   if (stageError) throw stageError;
+  let stageRows = stageData || [];
 
   // Auto-create default buyer stages if buyer pipeline is empty
   if (pipelineType === 'buyer' && stageRows.length === 0) {

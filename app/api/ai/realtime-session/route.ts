@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   const [{ data: contacts }, { data: deals }, { data: notes }, { data: tours }, calResult] = await Promise.all([
     supabase
       .from('Contact')
-      .select('id, name, type, email, phone, budget, leadScore, scoreLabel, notes, tags, followUpAt')
+      .select('id, name, type, leadType, email, phone, budget, leadScore, scoreLabel, notes, tags, followUpAt')
       .eq('spaceId', space.id)
       .order('createdAt', { ascending: false })
       .limit(50),
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
   ]);
 
   const contactCtx = (contacts ?? []).map((c: any) =>
-    `- ${c.name} (${c.type}) | Score: ${c.scoreLabel ?? 'unscored'} | ${c.phone ?? ''} | ${c.email ?? ''} | Budget: ${c.budget != null ? `$${c.budget}` : 'N/A'}${c.followUpAt ? ` | Follow-up: ${new Date(c.followUpAt).toLocaleDateString()}` : ''}`
+    `- ${c.name} (${(c.leadType ?? 'rental').toUpperCase()}) | ${c.type} | Score: ${c.scoreLabel ?? 'unscored'} | ${c.phone ?? ''} | ${c.email ?? ''} | Budget: ${c.budget != null ? `$${c.budget}` : 'N/A'}${c.followUpAt ? ` | Follow-up: ${new Date(c.followUpAt).toLocaleDateString()}` : ''}`
   ).join('\n');
 
   const dealCtx = (deals ?? []).map((d: any) =>
@@ -92,7 +92,8 @@ export async function POST(req: Request) {
   const instructions = [
     `You are Chip, an intelligent voice assistant for the real estate CRM workspace "${space.name}".`,
     `Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.`,
-    `You help the agent manage their rental leads, deals, tours, notes, calendar, and follow-ups through natural conversation.`,
+    `You help the agent manage their rental and buyer leads, deals, tours, notes, calendar, and follow-ups through natural conversation.`,
+    `Buyer stages: Lead → Pre-Approved → Showings → Offer → Under Contract → Closing. Rental stages: Qualification → Tour → Application.`,
     `Be concise and conversational — you're speaking, not writing. Keep responses under 3 sentences unless asked for detail.`,
     `Only reference data from the CRM context below. Never fabricate names, numbers, or details.`,
     `When asked about "recent" data, reference contacts and deals with the most recent createdAt dates.`,
