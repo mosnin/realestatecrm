@@ -178,9 +178,9 @@ export async function POST(req: NextRequest) {
       slug: payload.slug,
     });
 
-    // ── Defer AI scoring + email notification to after response ─────────────
-    // This avoids the 5-15s AI scoring latency blocking the user's submission.
-    void (async () => {
+    // ── Defer AI scoring + email notification ─────────────────────────────
+    // Use a promise we'll pass to waitUntil so Vercel keeps the function alive
+    const backgroundWork = (async () => {
       let scoring: LeadScoringResult = {
         scoringStatus: 'failed',
         leadScore: null,
@@ -238,26 +238,33 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Email + SMS notification via unified dispatcher
-      // (handles channel toggles, per-event toggles, owner lookup)
-      try {
-        await notifyNewLead({
-          spaceId: space.id,
-          contactId: contact.id,
-          name: payload.legalName,
-          phone: payload.phone,
-          email: payload.email,
-          leadScore: scoring.leadScore,
-          scoreLabel: scoring.scoreLabel,
-          scoreSummary: scoring.scoreSummary,
-          applicationData,
-        });
-      } catch (err) {
-        console.error('[apply] notification failed', { contactId: contact.id, err });
-      }
+      // Notification already sent before response — skip here
     })();
 
-    // Return immediately — scoring happens in the background
+    // Send notification IMMEDIATELY before returning response.
+    // On Vercel serverless, the function is killed after response —
+    // any void/background promises may never execute.
+    try {
+      console.log('[apply] Sending notification for contact:', contact.id, 'spaceId:', space.id);
+      await notifyNewLead({
+        spaceId: space.id,
+        contactId: contact.id,
+        name: payload.legalName,
+        phone: payload.phone ?? null,
+        email: payload.email ?? null,
+        leadScore: null,
+        scoreLabel: 'unscored',
+        scoreSummary: null,
+        applicationData,
+      });
+      console.log('[apply] Notification dispatched');
+    } catch (notifyErr) {
+      console.error('[apply] Notification failed:', notifyErr);
+    }
+
+    // Background scoring — best effort, may not complete on Vercel
+    backgroundWork.catch((err: unknown) => console.error('[apply] scoring failed:', err));
+
     return NextResponse.json(
       {
         success: true,
