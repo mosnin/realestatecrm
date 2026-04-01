@@ -10,17 +10,17 @@ import { Globe } from '@/components/ui/cobe-globe';
 
 const leadMarkers = [
   { id: "hot-lead", location: [40.7, -74.0] as [number, number], label: "Hot Lead" },
-  { id: "new-renter", location: [34.05, -118.24] as [number, number], label: "New Renter" },
-  { id: "pre-approved", location: [41.88, -87.63] as [number, number], label: "Pre-approved" },
-  { id: "tour-booked", location: [29.76, -95.37] as [number, number], label: "Tour Booked" },
-  { id: "buyer-lead", location: [33.45, -112.07] as [number, number], label: "Buyer Lead" },
-  { id: "warm-lead", location: [47.61, -122.33] as [number, number], label: "Warm Lead" },
+  { id: "new-renter", location: [51.5, -0.13] as [number, number], label: "New Renter" },
+  { id: "pre-approved", location: [35.68, 139.65] as [number, number], label: "Pre-approved" },
+  { id: "tour-booked", location: [-33.87, 151.21] as [number, number], label: "Tour Booked" },
+  { id: "buyer-lead", location: [-23.55, -46.63] as [number, number], label: "Buyer Lead" },
+  { id: "warm-lead", location: [25.2, 55.27] as [number, number], label: "Warm Lead" },
 ];
 
 const leadArcs = [
-  { id: "nyc-la", from: [40.7, -74.0] as [number, number], to: [34.05, -118.24] as [number, number] },
-  { id: "chi-hou", from: [41.88, -87.63] as [number, number], to: [29.76, -95.37] as [number, number] },
-  { id: "sea-phx", from: [47.61, -122.33] as [number, number], to: [33.45, -112.07] as [number, number] },
+  { id: "nyc-london", from: [40.7, -74.0] as [number, number], to: [51.5, -0.13] as [number, number] },
+  { id: "london-tokyo", from: [51.5, -0.13] as [number, number], to: [35.68, 139.65] as [number, number] },
+  { id: "nyc-saopaulo", from: [40.7, -74.0] as [number, number], to: [-23.55, -46.63] as [number, number] },
 ];
 
 // ═════════════════════════════════════════════════════════════════════════════
