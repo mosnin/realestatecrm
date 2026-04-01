@@ -555,9 +555,13 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
               if (isBrokerRole && brokerStep > 0) {
                 setBrokerStep(brokerStep - 1);
                 setError('');
+              } else if (role === 'realtor' && realtorStep > 0) {
+                setRealtorStep(realtorStep - 1);
+                setError('');
               } else {
                 setRole('choose');
                 setBrokerStep(0);
+                setRealtorStep(0);
                 setError('');
               }
             }}
@@ -584,6 +588,11 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
                   Step {brokerStep + 1} of {brokerTotalSteps}
                 </span>
               )}
+              {role === 'realtor' && (
+                <span className="ml-1 text-[10px] font-medium text-muted-foreground">
+                  Step {realtorStep + 1} of {realtorTotalSteps}
+                </span>
+              )}
             </div>
             {isBrokerRole && (
               <div className="flex gap-1 mb-4">
@@ -595,29 +604,55 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
                 ))}
               </div>
             )}
+            {role === 'realtor' && (
+              <div className="flex gap-1 mb-4">
+                {Array.from({ length: realtorTotalSteps }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`h-1 flex-1 rounded-full transition-colors ${i <= realtorStep ? 'bg-primary' : 'bg-muted'}`}
+                  />
+                ))}
+              </div>
+            )}
             <h1 className="text-xl font-bold">
-              {!isBrokerRole
-                ? 'Create your workspace'
-                : brokerStep === 0
-                  ? role === 'broker_only' ? 'Create your brokerage' : 'Set up your brokerage'
-                  : brokerStep === 1
-                    ? 'Brokerage details'
-                    : brokerStep === 2
-                      ? 'Team info'
-                      : 'Business model'}
+              {role === 'realtor'
+                ? realtorStep === 0
+                  ? 'Create your workspace'
+                  : realtorStep === 1
+                    ? 'Contact details'
+                    : 'Preferences'
+                : isBrokerRole
+                  ? brokerStep === 0
+                    ? role === 'broker_only' ? 'Create your brokerage' : 'Set up your brokerage'
+                    : brokerStep === 1
+                      ? 'Brokerage details'
+                      : brokerStep === 2
+                        ? 'Team info'
+                        : brokerStep === 3
+                          ? 'Business model'
+                          : 'Preferences'
+                  : 'Create your workspace'}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {!isBrokerRole
-                ? 'Give your workspace a name and we\'ll generate your intake link.'
-                : brokerStep === 0
-                  ? role === 'broker_only'
-                    ? 'Set up your brokerage to manage your team of realtors.'
-                    : 'Create your brokerage and personal workspace in one step.'
-                  : brokerStep === 1
-                    ? 'Add your brokerage logo, website, and office info.'
-                    : brokerStep === 2
-                      ? 'Tell us about your team and market focus.'
-                      : 'How does your brokerage operate?'}
+              {role === 'realtor'
+                ? realtorStep === 0
+                  ? 'Give your workspace a name and we\'ll generate your intake link.'
+                  : realtorStep === 1
+                    ? 'Help clients reach you with a few contact details.'
+                    : 'A couple quick questions to tailor your experience.'
+                : isBrokerRole
+                  ? brokerStep === 0
+                    ? role === 'broker_only'
+                      ? 'Set up your brokerage to manage your team of realtors.'
+                      : 'Create your brokerage and personal workspace in one step.'
+                    : brokerStep === 1
+                      ? 'Add your brokerage logo, website, and office info.'
+                      : brokerStep === 2
+                        ? 'Tell us about your team and market focus.'
+                        : brokerStep === 3
+                          ? 'How does your brokerage operate?'
+                          : 'A couple quick questions to tailor your experience.'
+                  : 'Give your workspace a name and we\'ll generate your intake link.'}
             </p>
           </div>
 
