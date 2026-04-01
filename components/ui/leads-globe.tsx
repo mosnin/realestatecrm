@@ -3,21 +3,6 @@
 import { useEffect, useRef, useCallback } from "react"
 import createGlobe from "cobe"
 
-const LEAD_MARKERS = [
-  { id: "lead-nyc", location: [40.7, -74.0] as [number, number], label: "Hot Lead" },
-  { id: "lead-la", location: [34.05, -118.24] as [number, number], label: "New Renter" },
-  { id: "lead-chi", location: [41.88, -87.63] as [number, number], label: "Pre-approved" },
-  { id: "lead-hou", location: [29.76, -95.37] as [number, number], label: "Tour Booked" },
-  { id: "lead-phx", location: [33.45, -112.07] as [number, number], label: "Buyer Lead" },
-  { id: "lead-sea", location: [47.61, -122.33] as [number, number], label: "Warm Lead" },
-]
-
-const LEAD_ARCS = [
-  { from: [40.7, -74.0] as [number, number], to: [34.05, -118.24] as [number, number] },
-  { from: [41.88, -87.63] as [number, number], to: [29.76, -95.37] as [number, number] },
-  { from: [47.61, -122.33] as [number, number], to: [33.45, -112.07] as [number, number] },
-]
-
 export function LeadsGlobe({ className }: { className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pointerInteracting = useRef<{ x: number; y: number } | null>(null)
@@ -71,10 +56,12 @@ export function LeadsGlobe({ className }: { className?: string }) {
       const width = canvas.offsetWidth
       if (width === 0 || globe) return
 
+      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+
       globe = createGlobe(canvas, {
-        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
-        width,
-        height: width,
+        devicePixelRatio: dpr,
+        width: width * dpr,
+        height: width * dpr,
         phi: 0,
         theta: 0.2,
         dark: 0,
@@ -82,29 +69,23 @@ export function LeadsGlobe({ className }: { className?: string }) {
         mapSamples: 16000,
         mapBrightness: 10,
         baseColor: [1, 1, 1],
-        markerColor: [1, 0.59, 0.31], // Chippi orange #ff964f
-        glowColor: [0.98, 0.95, 0.90],
-        markers: LEAD_MARKERS.map((m) => ({
-          location: m.location,
-          size: 0.06,
-        })),
+        markerColor: [1, 0.59, 0.31],
+        glowColor: [0.94, 0.93, 0.91],
+        markers: [
+          { location: [40.7, -74.0], size: 0.06 },
+          { location: [34.05, -118.24], size: 0.06 },
+          { location: [41.88, -87.63], size: 0.06 },
+          { location: [29.76, -95.37], size: 0.06 },
+          { location: [33.45, -112.07], size: 0.06 },
+          { location: [47.61, -122.33], size: 0.06 },
+        ],
         onRender: (state) => {
           if (!isPausedRef.current) phi += 0.003
           state.phi = phi + phiOffsetRef.current + dragOffset.current.phi
           state.theta = 0.2 + thetaOffsetRef.current + dragOffset.current.theta
-          state.width = canvas.offsetWidth * Math.min(window.devicePixelRatio || 1, 2)
-          state.height = canvas.offsetWidth * Math.min(window.devicePixelRatio || 1, 2)
         },
       })
 
-      function animate() {
-        if (globe) {
-          // @ts-expect-error cobe internal
-          globe.update?.()
-        }
-        animationId = requestAnimationFrame(animate)
-      }
-      // The cobe library handles its own animation via onRender, no need for manual animate loop
       setTimeout(() => {
         if (canvas) canvas.style.opacity = "1"
       }, 100)
@@ -141,10 +122,10 @@ export function LeadsGlobe({ className }: { className?: string }) {
           transition: "opacity 1.2s ease",
           borderRadius: "50%",
           touchAction: "none",
+          contain: "layout paint size",
         }}
       />
 
-      {/* Lead tags floating around the globe */}
       <div className="absolute top-[10%] left-[6%]">
         <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-900/90 px-2.5 py-1 text-[11px] font-medium text-white shadow-lg backdrop-blur-sm">
           <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
