@@ -1,4 +1,5 @@
 import { BrandLogo } from '@/components/brand-logo';
+import { CheckIcon } from 'lucide-react';
 
 interface ShellCustomization {
   accentColor?: string;
@@ -95,15 +96,20 @@ export function PublicPageShell({
             {/* Left: agent branding */}
             <div className="flex items-center gap-3 min-w-0">
               {agentPhoto && (
-                <img
-                  src={agentPhoto}
-                  alt={agentName}
-                  width={36}
-                  height={36}
-                  loading="eager"
-                  decoding="async"
-                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover flex-shrink-0 ring-2 ring-border"
-                />
+                <div className="relative flex-shrink-0">
+                  <img
+                    src={agentPhoto}
+                    alt={agentName}
+                    width={36}
+                    height={36}
+                    loading="eager"
+                    decoding="async"
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover ring-2 ring-blue-500 ring-offset-2 ring-offset-background"
+                  />
+                  <span className="absolute -right-0.5 -bottom-0.5 inline-flex size-3.5 items-center justify-center rounded-full bg-blue-500 ring-1.5 ring-background">
+                    <CheckIcon className="size-2 text-white" />
+                  </span>
+                </div>
               )}
               <div className="min-w-0">
                 {logoUrl ? (
@@ -154,11 +160,16 @@ export function PublicPageShell({
           {customization?.bio && (
             <div className="flex items-start gap-3">
               {agentPhoto && (
-                <img
-                  src={agentPhoto}
-                  alt={agentName}
-                  className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-border hidden sm:block"
-                />
+                <div className="relative flex-shrink-0 hidden sm:block">
+                  <img
+                    src={agentPhoto}
+                    alt={agentName}
+                    className="w-10 h-10 rounded-full object-cover ring-2 ring-blue-500 ring-offset-2 ring-offset-background"
+                  />
+                  <span className="absolute -right-0.5 -bottom-0.5 inline-flex size-3.5 items-center justify-center rounded-full bg-blue-500 ring-1.5 ring-background">
+                    <CheckIcon className="size-2 text-white" />
+                  </span>
+                </div>
               )}
               <div>
                 <p className="text-sm font-medium text-foreground">{agentName}</p>

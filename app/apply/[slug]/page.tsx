@@ -4,6 +4,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { PublicPageShell } from '@/components/public-page-shell';
 import { FormUnavailable } from '@/components/form-unavailable';
 import { ApplicationFormLoader } from './application-form-loader';
+import { clerkClient } from '@clerk/nextjs/server';
 
 // Cache this page for 60 seconds — it's public and rarely changes.
 // Eliminates cold-start latency for repeat visitors and crawlers.
@@ -40,7 +41,7 @@ export default async function PublicApplyPage({
       .then(r => r),
     supabase
       .from('User')
-      .select('name, avatar')
+      .select('name, avatar, clerkId')
       .eq('id', space.ownerId)
       .maybeSingle(),
   ]);
@@ -76,7 +77,22 @@ export default async function PublicApplyPage({
   const pageIntro = settings?.intakePageIntro || "Share your rental preferences and we'll follow up with next steps.";
   const businessName = settings?.businessName || space.name;
   const agentName = ownerData?.name || businessName;
-  const agentPhoto = settings?.realtorPhotoUrl || ownerData?.avatar || null;
+
+  // Get agent photo: SpaceSetting > User.avatar > Clerk profile photo
+  let agentPhoto = settings?.realtorPhotoUrl || ownerData?.avatar || null;
+  if (!agentPhoto && ownerData?.clerkId) {
+    try {
+      const clerk = await clerkClient();
+      const clerkUser = await clerk.users.getUser(ownerData.clerkId);
+      if (clerkUser?.imageUrl) {
+        agentPhoto = clerkUser.imageUrl;
+        // Backfill to DB so we don't fetch from Clerk every time
+        await supabase.from('User').update({ avatar: clerkUser.imageUrl }).eq('id', space.ownerId);
+      }
+    } catch {
+      // Clerk fetch failed — continue without photo
+    }
+  }
   const logoUrl = settings?.logoUrl || null;
 
   // Gate on subscription status — only pause forms for explicitly failed billing
