@@ -426,7 +426,7 @@ export function ApplicationForm({
           firstTimeBuyer: get('firstTimeBuyer'),
           leaseTermPreference: get('intent'),
           additionalNotes: get('notes'),
-          privacyConsent: get('privacyConsent') === 'true',
+          ...(customization?.privacyPolicyUrl ? { privacyConsent: get('privacyConsent') === 'true' } : {}),
           completedSteps: STEPS.map((s) => s.id),
         }
       : {
@@ -445,7 +445,7 @@ export function ApplicationForm({
           additionalNotes: get('notes'),
           leaseTermPreference: get('intent'),
           completedSteps: STEPS.map((s) => s.id),
-          privacyConsent: get('privacyConsent') === 'true',
+          ...(customization?.privacyPolicyUrl ? { privacyConsent: get('privacyConsent') === 'true' } : {}),
         };
 
     if (brokerageId) {

@@ -36,6 +36,7 @@ export interface NewLeadEmailParams {
 }
 
 export async function sendNewLeadNotification(params: NewLeadEmailParams): Promise<void> {
+  console.log('[EMAIL-DEBUG] 1. sendNewLeadNotification called');
   if (!process.env.RESEND_API_KEY) {
     console.warn('[email] RESEND_API_KEY not set — skipping email');
     return;
@@ -43,6 +44,7 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
+  console.log('[EMAIL-DEBUG] 2. Resend initialized, API key prefix:', process.env.RESEND_API_KEY?.slice(0, 8));
 
   const { toEmail, spaceName, spaceSlug, contactId, name, phone, email, leadScore, scoreLabel, scoreSummary, applicationData: app } = params;
 
@@ -114,6 +116,7 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
   const safeScoreLabel = (scoreLabel ?? '').replace(/[\r\n\t]/g, ' ');
 
   try {
+    console.log('[EMAIL-DEBUG] 3. About to call resend.emails.send, to:', toEmail, 'from:', FROM);
     console.log('[email] Sending new lead notification to:', toEmail, 'from:', FROM);
     const result = await resend.emails.send({
       from: FROM,
@@ -121,6 +124,7 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
       subject: `New lead: ${safeSubjectName}${leadScore != null ? ` · ${Math.round(leadScore)} ${safeScoreLabel}` : ''}`,
       html,
     });
+    console.log('[EMAIL-DEBUG] 4. Send result:', JSON.stringify(result));
     if (result.error) {
       console.error('[email] Resend API error (new lead):', JSON.stringify(result.error));
     } else {

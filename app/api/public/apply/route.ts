@@ -15,12 +15,14 @@ import { notifyNewLead } from '@/lib/notify';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
+  console.log('[APPLY-DEBUG] 1. Route handler entered');
   // ── IP-based rate limiting (10 submissions / IP / hour) ──────────────────
   const ip =
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     req.headers.get('x-real-ip') ??
     'unknown';
   const { allowed } = await checkRateLimit(`apply:rl:${ip}`, 10, 3600);
+  console.log('[APPLY-DEBUG] 2. Rate limit passed');
   if (!allowed) {
     return NextResponse.json(
       { error: 'Too many submissions. Please try again later.' },
@@ -45,11 +47,13 @@ export async function POST(req: NextRequest) {
   }
 
   const payload = parsed.data;
+  console.log('[APPLY-DEBUG] 3. Body parsed, slug:', payload.slug);
   const fingerprint = applicationFingerprintKey(payload);
   const idempotencyKey = `apply:idempotency:${fingerprint}`;
 
   try {
     const space = await getSpaceFromSlug(payload.slug);
+    console.log('[APPLY-DEBUG] 4. Space found:', space?.id);
     if (!space) {
       return NextResponse.json({ error: 'Space not found' }, { status: 404 });
     }
@@ -165,7 +169,7 @@ export async function POST(req: NextRequest) {
         applicationData,
         applicationRef,
         applicationStatus: 'received',
-        consentGiven: payload.privacyConsent === true,
+        consentGiven: payload.privacyConsent === true ? true : payload.privacyConsent === false ? false : null,
         consentTimestamp: payload.privacyConsent === true ? new Date().toISOString() : null,
         consentIp: payload.privacyConsent === true ? ip : null,
         consentPrivacyPolicyUrl: payload.privacyConsent === true ? spacePrivacyPolicyUrl : null,
@@ -173,6 +177,7 @@ export async function POST(req: NextRequest) {
       .select();
     if (insertError) throw insertError;
     const contact = contacts![0] as Contact;
+    console.log('[APPLY-DEBUG] 5. Contact created:', contact?.id);
 
     console.info('[apply] submission persisted', {
       contactId: contact.id,
@@ -191,6 +196,7 @@ export async function POST(req: NextRequest) {
       scoreDetails: null,
     };
 
+    console.log('[APPLY-DEBUG] 6. Starting scoring');
     try {
       scoring = await scoreLeadApplication({
         contactId: contact.id,
@@ -242,9 +248,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    console.log('[APPLY-DEBUG] 7. Scoring complete:', scoring?.scoringStatus);
+
     // Send notification with scoring results included
     try {
       console.log('[apply] Sending notification for contact:', contact.id, 'spaceId:', space.id);
+      console.log('[APPLY-DEBUG] 8. About to call notifyNewLead');
       await notifyNewLead({
         spaceId: space.id,
         contactId: contact.id,
@@ -256,11 +265,13 @@ export async function POST(req: NextRequest) {
         scoreSummary: scoring.scoreSummary,
         applicationData,
       });
+      console.log('[APPLY-DEBUG] 9. notifyNewLead returned');
       console.log('[apply] Notification dispatched');
     } catch (notifyErr) {
       console.error('[apply] Notification failed:', notifyErr);
     }
 
+    console.log('[APPLY-DEBUG] 10. Returning response');
     return NextResponse.json(
       {
         success: true,

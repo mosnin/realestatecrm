@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
         },
         applicationRef,
         applicationStatus: 'received',
-        consentGiven: payload.privacyConsent === true,
+        consentGiven: payload.privacyConsent === true ? true : payload.privacyConsent === false ? false : null,
         consentTimestamp: payload.privacyConsent === true ? new Date().toISOString() : null,
         consentIp: payload.privacyConsent === true ? ip : null,
         consentPrivacyPolicyUrl: payload.privacyConsent === true ? spacePrivacyPolicyUrl : null,
