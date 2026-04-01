@@ -631,30 +631,48 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
   }
 
   return (
+    <div className="space-y-4">
+    {/* Lead type filter */}
+    <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5 w-fit">
+      {(['all', 'rental', 'buyer'] as const).map((lt) => (
+        <button
+          key={lt}
+          onClick={() => setLeadTypeFilter(lt)}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+            leadTypeFilter === lt
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          {lt === 'all' ? 'All' : lt === 'rental' ? 'Rental' : 'Buyer'}
+        </button>
+      ))}
+    </div>
+
     <Tabs value={tab} onValueChange={setTab}>
       <TabsList>
         <TabsTrigger value="unassigned" className="gap-1.5">
           <PhoneIncoming size={14} />
           Unassigned
-          {unassigned.length > 0 && (
+          {filteredUnassigned.length > 0 && (
             <span className="ml-1 inline-flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-semibold tabular-nums">
-              {unassigned.length}
+              {filteredUnassigned.length}
             </span>
           )}
         </TabsTrigger>
         <TabsTrigger value="assigned" className="gap-1.5">
           <Users size={14} />
           Assigned
-          {assigned.length > 0 && (
+          {filteredAssigned.length > 0 && (
             <span className="ml-1 inline-flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full bg-muted text-muted-foreground text-[10px] font-semibold tabular-nums">
-              {assigned.length}
+              {filteredAssigned.length}
             </span>
           )}
         </TabsTrigger>
       </TabsList>
 
       <TabsContent value="unassigned">
-        {unassigned.length === 0 ? (
+        {filteredUnassigned.length === 0 ? (
           <Card>
             <CardContent className="px-5 py-10 text-center space-y-2">
               <p className="text-sm text-muted-foreground">No unassigned leads.</p>
@@ -673,7 +691,7 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
                 <div className="flex-shrink-0 w-24 text-right">Created</div>
                 <div className="flex-shrink-0 w-20" />
               </div>
-              {unassigned.map((lead) => (
+              {filteredUnassigned.map((lead) => (
                 <LeadItem
                   key={lead.id}
                   lead={lead}
@@ -687,7 +705,7 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
       </TabsContent>
 
       <TabsContent value="assigned">
-        {assigned.length === 0 ? (
+        {filteredAssigned.length === 0 ? (
           <Card>
             <CardContent className="px-5 py-10 text-center space-y-2">
               <p className="text-sm text-muted-foreground">No assigned leads yet.</p>
@@ -702,7 +720,7 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
                 <div className="flex-shrink-0 w-20 text-right">Score</div>
                 <div className="flex-shrink-0 w-4" />
               </div>
-              {assigned.map((lead) => (
+              {filteredAssigned.map((lead) => (
                 <AssignedLeadItem
                   key={lead.id}
                   lead={lead}
@@ -714,5 +732,6 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
         )}
       </TabsContent>
     </Tabs>
+    </div>
   );
 }

@@ -65,25 +65,27 @@ function buildServer(spaceId: string): McpServer {
   // ── list_contacts ──
   server.tool(
     'list_contacts',
-    'List contacts in your CRM. Optionally filter by type or search query.',
+    'List contacts in your CRM. Optionally filter by type, lead type, or search query.',
     {
       query: z.string().optional().describe('Search by name, email, or phone'),
       type: z
         .enum(['QUALIFICATION', 'TOUR', 'APPLICATION'])
         .optional()
         .describe('Filter by contact type'),
+      leadType: z.enum(['rental', 'buyer']).optional().describe('Filter by lead type'),
       limit: z.number().int().positive().max(200).optional().default(50).describe('Max results (default 50)'),
     },
-    async ({ query, type, limit }) => {
+    async ({ query, type, leadType, limit }) => {
       let q = supabase
         .from('Contact')
         .select(
-          'id, name, email, phone, type, leadScore, scoreLabel, budget, followUpAt, tags, createdAt',
+          'id, name, email, phone, type, leadType, leadScore, scoreLabel, budget, followUpAt, tags, createdAt',
         )
         .eq('spaceId', spaceId)
         .order('createdAt', { ascending: false })
         .limit(limit ?? 50);
       if (type) q = q.eq('type', type);
+      if (leadType) q = q.eq('leadType', leadType);
       const { data, error } = await q;
       if (error)
         return { content: [{ type: 'text' as const, text: 'Query failed' }] };
@@ -265,7 +267,7 @@ function buildServer(spaceId: string): McpServer {
     {},
     async () => {
       const now = new Date().toISOString();
-      const [contactCount, dealAgg, tourCount, followUpCount] = await Promise.all([
+      const [contactCount, dealAgg, tourCount, followUpCount, buyerLeadCount] = await Promise.all([
         supabase
           .from('Contact')
           .select('*', { count: 'exact', head: true })
@@ -297,6 +299,12 @@ function buildServer(spaceId: string): McpServer {
           .not('followUpAt', 'is', null)
           .lte('followUpAt', now)
           .then((r) => r.count ?? 0),
+        supabase
+          .from('Contact')
+          .select('*', { count: 'exact', head: true })
+          .eq('spaceId', spaceId)
+          .eq('leadType', 'buyer')
+          .then((r) => r.count ?? 0),
       ]);
       return {
         content: [
@@ -305,6 +313,8 @@ function buildServer(spaceId: string): McpServer {
             text: JSON.stringify(
               {
                 totalContacts: contactCount,
+                buyerLeads: buyerLeadCount,
+                rentalLeads: (contactCount as number) - (buyerLeadCount as number),
                 activeDeals: dealAgg.count,
                 pipelineValue: dealAgg.totalValue,
                 upcomingTours: tourCount,

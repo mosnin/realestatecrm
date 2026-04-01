@@ -24,6 +24,13 @@ export interface AgentFunnelData {
   tourToApp: number;
   appToDeal: number;
   overallConversion: number;
+  // Buyer funnel counts
+  buyerLeads?: number;
+  buyerPreApproved?: number;
+  buyerShowings?: number;
+  buyerOffers?: number;
+  buyerUnderContract?: number;
+  buyerClosed?: number;
 }
 
 interface Props {
@@ -127,9 +134,42 @@ function AgentFunnelCard({ agent }: { agent: AgentFunnelData }) {
 
 // ── Main component ───────────────────────────────────────────────────────────
 
+function BuyerFunnelCard({ agent }: { agent: AgentFunnelData }) {
+  const maxVal = agent.buyerLeads ?? 0;
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
+            {initials(agent.name)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold truncate">{agent.name}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{agent.email}</p>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <p className="text-lg font-bold tabular-nums text-primary">{maxVal > 0 ? Math.round(((agent.buyerClosed ?? 0) / maxVal) * 100) : 0}%</p>
+            <p className="text-[10px] text-muted-foreground">Lead-to-Close</p>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <FunnelBar label="Leads" value={agent.buyerLeads ?? 0} maxValue={maxVal} color="bg-violet-500/60" />
+          <FunnelBar label="Pre-Approved" value={agent.buyerPreApproved ?? 0} maxValue={maxVal} color="bg-blue-500/60" />
+          <FunnelBar label="Showings" value={agent.buyerShowings ?? 0} maxValue={maxVal} color="bg-purple-500/60" />
+          <FunnelBar label="Offers" value={agent.buyerOffers ?? 0} maxValue={maxVal} color="bg-amber-500/60" />
+          <FunnelBar label="Under Contract" value={agent.buyerUnderContract ?? 0} maxValue={maxVal} color="bg-cyan-500/60" />
+          <FunnelBar label="Closed" value={agent.buyerClosed ?? 0} maxValue={maxVal} color="bg-emerald-500/60" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function AnalyticsClient({ agents }: Props) {
   const [view, setView] = useState<'funnel' | 'table'>('funnel');
   const [sortBy, setSortBy] = useState<'name' | 'leads' | 'conversion'>('leads');
+  const [leadType, setLeadType] = useState<'rental' | 'buyer'>('rental');
 
   const sorted = useMemo(() => {
     const copy = [...agents];
@@ -161,19 +201,61 @@ export function AnalyticsClient({ agents }: Props) {
     };
   }, [agents]);
 
+  const buyerTeamTotals = useMemo(() => {
+    const t = agents.reduce(
+      (acc, a) => ({
+        buyerLeads: acc.buyerLeads + (a.buyerLeads ?? 0),
+        buyerPreApproved: acc.buyerPreApproved + (a.buyerPreApproved ?? 0),
+        buyerShowings: acc.buyerShowings + (a.buyerShowings ?? 0),
+        buyerOffers: acc.buyerOffers + (a.buyerOffers ?? 0),
+        buyerUnderContract: acc.buyerUnderContract + (a.buyerUnderContract ?? 0),
+        buyerClosed: acc.buyerClosed + (a.buyerClosed ?? 0),
+      }),
+      { buyerLeads: 0, buyerPreApproved: 0, buyerShowings: 0, buyerOffers: 0, buyerUnderContract: 0, buyerClosed: 0 }
+    );
+    return t;
+  }, [agents]);
+
   return (
     <div className="space-y-6">
+      {/* Lead type toggle */}
+      <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5 w-fit">
+        <button
+          onClick={() => setLeadType('rental')}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+            leadType === 'rental' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Rental
+        </button>
+        <button
+          onClick={() => setLeadType('buyer')}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+            leadType === 'buyer' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Buyer
+        </button>
+      </div>
+
       {/* Team overview funnel */}
       <Card>
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <TrendingUp size={16} className="text-primary" />
-              <h2 className="text-sm font-semibold">Team Conversion Funnel</h2>
+              <h2 className="text-sm font-semibold">Team {leadType === 'buyer' ? 'Buyer' : 'Rental'} Conversion Funnel</h2>
             </div>
-            <p className="text-lg font-bold tabular-nums text-primary">{teamTotals.overallConversion}% overall</p>
+            {leadType === 'rental' ? (
+              <p className="text-lg font-bold tabular-nums text-primary">{teamTotals.overallConversion}% overall</p>
+            ) : (
+              <p className="text-lg font-bold tabular-nums text-primary">
+                {buyerTeamTotals.buyerLeads > 0 ? Math.round((buyerTeamTotals.buyerClosed / buyerTeamTotals.buyerLeads) * 100) : 0}% overall
+              </p>
+            )}
           </div>
 
+          {leadType === 'rental' ? (
           <div className="space-y-2">
             <FunnelBar label="Total Leads" value={teamTotals.totalLeads} maxValue={teamTotals.totalLeads} color="bg-violet-500/60" />
             <div className="flex items-center gap-1 pl-28">
@@ -193,6 +275,46 @@ export function AnalyticsClient({ agents }: Props) {
             <FunnelBar label="Deals" value={teamTotals.totalDeals} maxValue={teamTotals.totalLeads} color="bg-cyan-500/60" />
             <FunnelBar label="Won" value={teamTotals.wonDeals} maxValue={teamTotals.totalLeads} color="bg-emerald-500/60" />
           </div>
+          ) : (
+          <div className="space-y-2">
+            <FunnelBar label="Leads" value={buyerTeamTotals.buyerLeads} maxValue={buyerTeamTotals.buyerLeads} color="bg-violet-500/60" />
+            <div className="flex items-center gap-1 pl-28">
+              <ArrowRight size={10} className="text-muted-foreground/40" />
+              <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
+                {buyerTeamTotals.buyerLeads > 0 ? Math.round((buyerTeamTotals.buyerPreApproved / buyerTeamTotals.buyerLeads) * 100) : 0}%
+              </span>
+            </div>
+            <FunnelBar label="Pre-Approved" value={buyerTeamTotals.buyerPreApproved} maxValue={buyerTeamTotals.buyerLeads} color="bg-blue-500/60" />
+            <div className="flex items-center gap-1 pl-28">
+              <ArrowRight size={10} className="text-muted-foreground/40" />
+              <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
+                {buyerTeamTotals.buyerPreApproved > 0 ? Math.round((buyerTeamTotals.buyerShowings / buyerTeamTotals.buyerPreApproved) * 100) : 0}%
+              </span>
+            </div>
+            <FunnelBar label="Showings" value={buyerTeamTotals.buyerShowings} maxValue={buyerTeamTotals.buyerLeads} color="bg-purple-500/60" />
+            <div className="flex items-center gap-1 pl-28">
+              <ArrowRight size={10} className="text-muted-foreground/40" />
+              <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
+                {buyerTeamTotals.buyerShowings > 0 ? Math.round((buyerTeamTotals.buyerOffers / buyerTeamTotals.buyerShowings) * 100) : 0}%
+              </span>
+            </div>
+            <FunnelBar label="Offers" value={buyerTeamTotals.buyerOffers} maxValue={buyerTeamTotals.buyerLeads} color="bg-amber-500/60" />
+            <div className="flex items-center gap-1 pl-28">
+              <ArrowRight size={10} className="text-muted-foreground/40" />
+              <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
+                {buyerTeamTotals.buyerOffers > 0 ? Math.round((buyerTeamTotals.buyerUnderContract / buyerTeamTotals.buyerOffers) * 100) : 0}%
+              </span>
+            </div>
+            <FunnelBar label="Under Contract" value={buyerTeamTotals.buyerUnderContract} maxValue={buyerTeamTotals.buyerLeads} color="bg-cyan-500/60" />
+            <div className="flex items-center gap-1 pl-28">
+              <ArrowRight size={10} className="text-muted-foreground/40" />
+              <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
+                {buyerTeamTotals.buyerUnderContract > 0 ? Math.round((buyerTeamTotals.buyerClosed / buyerTeamTotals.buyerUnderContract) * 100) : 0}%
+              </span>
+            </div>
+            <FunnelBar label="Closed" value={buyerTeamTotals.buyerClosed} maxValue={buyerTeamTotals.buyerLeads} color="bg-emerald-500/60" />
+          </div>
+          )}
         </CardContent>
       </Card>
 
@@ -233,9 +355,13 @@ export function AnalyticsClient({ agents }: Props) {
       {/* Funnel view */}
       {view === 'funnel' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {sorted.map((agent) => (
-            <AgentFunnelCard key={agent.userId} agent={agent} />
-          ))}
+          {sorted.map((agent) =>
+            leadType === 'buyer' ? (
+              <BuyerFunnelCard key={agent.userId} agent={agent} />
+            ) : (
+              <AgentFunnelCard key={agent.userId} agent={agent} />
+            )
+          )}
           {sorted.length === 0 && (
             <Card className="md:col-span-2">
               <CardContent className="py-12 text-center">

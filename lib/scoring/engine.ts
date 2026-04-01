@@ -1,7 +1,7 @@
 /**
  * Chippi Proprietary Lead Scoring Engine
  *
- * Deterministic, weighted scoring system for renter leasing leads.
+ * Deterministic, weighted scoring system for rental and buyer leads.
  * Produces consistent scores across runs — no LLM dependency for the score itself.
  *
  * Architecture:

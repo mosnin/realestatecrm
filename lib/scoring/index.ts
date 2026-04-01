@@ -10,6 +10,6 @@
  *   3. If AI fails, deterministic fallbacks produce the same output shape
  */
 
-export { computeLeadScore, DEFAULT_WEIGHTS } from './engine';
+export { computeLeadScore, DEFAULT_WEIGHTS, BUYER_WEIGHTS } from './engine';
 export type { ScoringEngineResult, ScoringInput, CategoryResult, ScoringWeights } from './engine';
 export { enhanceWithAI } from './enhance';
