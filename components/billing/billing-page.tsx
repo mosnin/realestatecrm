@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -23,8 +23,16 @@ import {
   Briefcase,
   ArrowRight,
   AlertCircle,
+  AlertTriangle,
   Download,
+  DownloadCloud,
   RefreshCw,
+  Clock,
+  HelpCircle,
+  FileText,
+  RotateCcw,
+  Handshake,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -41,10 +49,28 @@ interface BillingPageProps {
   cardBrand?: string;
   /** Mock invoices — replaced by real Stripe data once live */
   invoices?: Invoice[];
+  /** ISO date string for trial start */
+  trialStart?: string;
+  /** ISO date string for trial end */
+  trialEnd?: string;
+  /** Number of trial days (default 7) */
+  trialDays?: number;
+  /** Usage stats for current billing period */
+  usageStats?: {
+    contacts: number;
+    deals: number;
+    tours: number;
+  };
+  /** ISO date string for when canceled access ends */
+  canceledAccessEnd?: string;
+  /** Support email or URL */
+  supportUrl?: string;
 }
 
 interface Invoice {
   id: string;
+  /** Display-friendly invoice number, e.g. "INV-0042" */
+  number?: string;
   date: string;
   amount: string;
   status: 'paid' | 'open' | 'void';
@@ -129,11 +155,36 @@ export function BillingPage({
   cardLast4,
   cardBrand = 'Visa',
   invoices = [],
+  trialStart,
+  trialEnd,
+  trialDays = 7,
+  usageStats,
+  canceledAccessEnd,
+  supportUrl = 'mailto:support@chippi.com',
 }: BillingPageProps) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [canceling, setCanceling] = useState(false);
 
   const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
+
+  // ── Trial progress calculation ────────────────────────────────────────────
+  const trialInfo = useMemo(() => {
+    if (subscriptionStatus !== 'trialing') return null;
+    const now = new Date();
+    const end = trialEnd ? new Date(trialEnd) : null;
+    const start = trialStart ? new Date(trialStart) : null;
+    if (!end) return null;
+
+    const msLeft = end.getTime() - now.getTime();
+    const daysLeft = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
+    const totalDays = start
+      ? Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+      : trialDays;
+    const daysPassed = totalDays - daysLeft;
+    const progressPercent = Math.min(100, Math.max(0, (daysPassed / totalDays) * 100));
+
+    return { daysLeft, totalDays, daysPassed, progressPercent, endDate: end };
+  }, [subscriptionStatus, trialStart, trialEnd, trialDays]);
 
   // ── Handlers (wired to Stripe once live) ──────────────────────────────────
 
@@ -182,6 +233,101 @@ export function BillingPage({
 
   return (
     <div className="space-y-5 max-w-2xl">
+
+      {/* ── Past-due warning banner ── */}
+      {subscriptionStatus === 'past_due' && (
+        <div className="rounded-lg border border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/40 px-5 py-4 flex items-start gap-3">
+          <AlertTriangle size={18} className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+              Your payment failed
+            </p>
+            <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-0.5">
+              Please update your payment method to avoid losing access.
+            </p>
+          </div>
+          <Button
+            onClick={handleManage}
+            size="sm"
+            variant="destructive"
+            className="flex-shrink-0 gap-1.5"
+          >
+            <CreditCard size={13} />
+            Update payment
+          </Button>
+        </div>
+      )}
+
+      {/* ── Canceled access banner ── */}
+      {subscriptionStatus === 'canceled' && (
+        <div className="rounded-lg border border-border bg-muted/30 px-5 py-4 flex items-start gap-3">
+          <AlertCircle size={18} className="text-muted-foreground flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">Your subscription has been canceled</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {canceledAccessEnd ? (
+                <>
+                  You have access until{' '}
+                  <span className="font-medium text-foreground">
+                    {new Date(canceledAccessEnd).toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </span>
+                  . After that, your workspace will be read-only.
+                </>
+              ) : (
+                'Your workspace will become read-only once your current period ends.'
+              )}
+            </p>
+          </div>
+          <Button
+            onClick={handleSubscribe}
+            size="sm"
+            className="flex-shrink-0 gap-1.5"
+          >
+            <RotateCcw size={13} />
+            Resubscribe
+          </Button>
+        </div>
+      )}
+
+      {/* ── Trial countdown banner ── */}
+      {subscriptionStatus === 'trialing' && trialInfo && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 px-5 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <Clock size={16} className="text-blue-600 dark:text-blue-400" />
+              <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                {trialInfo.daysLeft} {trialInfo.daysLeft === 1 ? 'day' : 'days'} left in your trial
+              </p>
+            </div>
+            <p className="text-xs text-blue-600/70 dark:text-blue-400/70 flex-shrink-0">
+              Ends{' '}
+              {trialInfo.endDate.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+            </p>
+          </div>
+          {/* Progress bar */}
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] text-blue-600/60 dark:text-blue-400/60">
+                Day {trialInfo.daysPassed} of {trialInfo.totalDays}
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-blue-200/60 dark:bg-blue-900/40 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-blue-500 dark:bg-blue-400 transition-all duration-500"
+                style={{ width: `${trialInfo.progressPercent}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Current plan ── */}
       <SectionBlock
@@ -247,6 +393,44 @@ export function BillingPage({
           )}
         </div>
       </SectionBlock>
+
+      {/* ── Usage summary ── */}
+      {isActive && usageStats && (
+        <SectionBlock
+          title="Usage this month"
+          description="Activity across your workspace this billing period"
+        >
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-center">
+              <div className="flex items-center justify-center mb-2">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Users size={14} className="text-primary" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold tabular-nums">{usageStats.contacts.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Contacts</p>
+            </div>
+            <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-center">
+              <div className="flex items-center justify-center mb-2">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Handshake size={14} className="text-primary" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold tabular-nums">{usageStats.deals.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Deals</p>
+            </div>
+            <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-center">
+              <div className="flex items-center justify-center mb-2">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <MapPin size={14} className="text-primary" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold tabular-nums">{usageStats.tours.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Tours</p>
+            </div>
+          </div>
+        </SectionBlock>
+      )}
 
       {/* ── What's included ── */}
       <SectionBlock
@@ -318,58 +502,103 @@ export function BillingPage({
       </SectionBlock>
 
       {/* ── Billing history ── */}
-      <SectionBlock
-        title="Billing history"
-        description="Past invoices and receipts"
-      >
-        {invoices.length > 0 ? (
-          <div className="space-y-1 -mx-1">
-            {/* Table header */}
-            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">
-              <span>Date</span>
-              <span className="text-right">Amount</span>
-              <span className="text-right">Status</span>
-              <span />
-            </div>
-            {invoices.map((inv) => (
-              <div
-                key={inv.id}
-                className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/40 transition-colors items-center"
-              >
-                <span className="text-sm">{inv.date}</span>
-                <span className="text-sm font-medium tabular-nums text-right">{inv.amount}</span>
-                <div className="flex justify-end">
-                  <InvoiceStatusBadge status={inv.status} />
-                </div>
-                {inv.pdf ? (
-                  <a
-                    href={inv.pdf}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-end"
-                  >
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                      <Download size={13} />
-                    </Button>
-                  </a>
-                ) : (
-                  <div className="w-7" />
-                )}
-              </div>
-            ))}
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="px-6 py-4 border-b border-border bg-muted/20 flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-sm">Billing history</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Past invoices and receipts</p>
           </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-3">
-              <AlertCircle size={18} className="text-muted-foreground/50" />
+          {invoices.length > 0 && invoices.some((inv) => inv.pdf) && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                invoices.forEach((inv) => {
+                  if (inv.pdf) window.open(inv.pdf, '_blank');
+                });
+              }}
+            >
+              <DownloadCloud size={13} />
+              Download all
+            </Button>
+          )}
+        </div>
+        <div className="px-6 py-5">
+          {invoices.length > 0 ? (
+            <div className="space-y-1 -mx-1">
+              {/* Table header */}
+              <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-3 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+                <span>Invoice</span>
+                <span>Date</span>
+                <span className="text-right">Amount</span>
+                <span className="text-right">Status</span>
+                <span />
+              </div>
+              {invoices.map((inv) => (
+                <div
+                  key={inv.id}
+                  className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/40 transition-colors items-center"
+                >
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {inv.number || inv.id}
+                  </span>
+                  <span className="text-sm">{inv.date}</span>
+                  <span className="text-sm font-medium tabular-nums text-right">{inv.amount}</span>
+                  <div className="flex justify-end">
+                    <InvoiceStatusBadge status={inv.status} />
+                  </div>
+                  {inv.pdf ? (
+                    <a
+                      href={inv.pdf}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-end"
+                    >
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                        <Download size={13} />
+                      </Button>
+                    </a>
+                  ) : (
+                    <div className="w-7" />
+                  )}
+                </div>
+              ))}
             </div>
-            <p className="text-sm font-medium text-muted-foreground">No invoices yet</p>
-            <p className="text-xs text-muted-foreground/60 mt-1">
-              Your billing history will appear here once you subscribe
+          ) : (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="w-12 h-12 rounded-full bg-muted/60 flex items-center justify-center mb-3">
+                <FileText size={20} className="text-muted-foreground/40" />
+              </div>
+              <p className="text-sm font-medium text-muted-foreground">No invoices yet</p>
+              <p className="text-xs text-muted-foreground/60 mt-1 max-w-[220px]">
+                Once you subscribe, your invoices and receipts will appear here for easy download.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Need help? footer ── */}
+      <div className="rounded-lg border border-dashed border-border px-5 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+            <HelpCircle size={16} className="text-muted-foreground" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">Need help with billing?</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Our support team is here to help with any questions.
             </p>
           </div>
-        )}
-      </SectionBlock>
+        </div>
+        <a href={supportUrl} target="_blank" rel="noopener noreferrer">
+          <Button variant="outline" size="sm" className="gap-1.5">
+            Contact support
+            <ArrowRight size={13} />
+          </Button>
+        </a>
+      </div>
 
       {/* ── Cancel confirmation dialog ── */}
       <Dialog open={cancelDialogOpen} onOpenChange={(o) => !o && setCancelDialogOpen(false)}>
