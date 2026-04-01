@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { Sidebar } from '@/components/dashboard/sidebar';
@@ -111,7 +112,12 @@ export default async function DashboardLayout({
   if (!dbUser.space || dbUser.space.id !== space.id) notFound();
 
   // ── Subscription gate — redirect to standalone pages ────────────────
-  if (!dbUser.isPlatformAdmin) {
+  // Always allow billing and settings pages so users can manage their subscription
+  const headersList = await headers();
+  const currentPath = headersList.get('x-pathname') ?? '';
+  const isExemptPath = currentPath.endsWith('/billing') || currentPath.includes('/settings');
+
+  if (!dbUser.isPlatformAdmin && !isExemptPath) {
     try {
       const { data: subData } = await supabase
         .from('Space')

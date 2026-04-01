@@ -638,40 +638,6 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
             description="Customize the visual appearance of your intake page."
           />
           <div className="space-y-4">
-            {/* Logo Upload */}
-            <div className="space-y-2">
-              <Label>Logo</Label>
-              <p className="text-xs text-muted-foreground">Upload your business logo (PNG, JPEG, or SVG, max 2MB)</p>
-              <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-primary/50 transition-colors cursor-pointer" onClick={() => logoInputRef.current?.click()}>
-                {logoPreview ? (
-                  <img src={logoPreview} alt="Logo" className="h-16 mx-auto object-contain" />
-                ) : (
-                  <div className="space-y-1">
-                    <Upload size={24} className="mx-auto text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Click to upload</p>
-                  </div>
-                )}
-                <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
-              </div>
-            </div>
-
-            {/* Profile Photo Upload */}
-            <div className="space-y-2">
-              <Label>Profile photo</Label>
-              <p className="text-xs text-muted-foreground">Upload your professional headshot (PNG, JPEG, or SVG, max 2MB)</p>
-              <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-primary/50 transition-colors cursor-pointer" onClick={() => photoInputRef.current?.click()}>
-                {photoPreview ? (
-                  <img src={photoPreview} alt="Profile photo" className="h-16 mx-auto object-contain rounded-full" />
-                ) : (
-                  <div className="space-y-1">
-                    <Upload size={24} className="mx-auto text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Click to upload</p>
-                  </div>
-                )}
-                <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-              </div>
-            </div>
-
             {/* Header Background */}
             <div className="space-y-2">
               <Label>Header background</Label>
@@ -730,7 +696,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
                     <p className="text-xs text-muted-foreground">Click to upload</p>
                   </div>
                 )}
-                <input ref={faviconInputRef} type="file" accept="image/*" className="hidden" onChange={handleFaviconUpload} />
+                <input ref={faviconInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={handleFaviconUpload} />
               </div>
             </div>
           </div>

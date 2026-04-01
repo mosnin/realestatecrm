@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, CreditCard, Loader2, ArrowRight } from 'lucide-react';
 
-export default function BillingRequiredPage() {
+function BillingRequiredContent() {
   const { isSignedIn, isLoaded } = useAuth();
   const searchParams = useSearchParams();
   const slug = searchParams.get('slug') ?? '';
@@ -110,5 +110,17 @@ export default function BillingRequiredPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function BillingRequiredPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <BillingRequiredContent />
+    </Suspense>
   );
 }

@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { auth } from '@clerk/nextjs/server';
 import { getBrokerMemberContext } from '@/lib/permissions';
 import { Sidebar } from '@/components/dashboard/sidebar';
@@ -42,8 +43,16 @@ export default async function BrokerLayout({ children }: { children: React.React
     redirect('/setup');
   }
 
+  const slug = spaceRow?.slug as string ?? '';
+  const spaceName = (spaceRow?.name as string) ?? ctx.brokerage.name;
+
   // Subscription gate — redirect to standalone pages
-  if (!isPlatformAdmin && spaceRow) {
+  // Exempt billing and settings pages so users can manage their subscription
+  const brokerHeaders = await headers();
+  const brokerPath = brokerHeaders.get('x-pathname') ?? '';
+  const isBrokerExempt = brokerPath.endsWith('/billing') || brokerPath.includes('/settings');
+
+  if (!isPlatformAdmin && !isBrokerExempt && spaceRow) {
     try {
       const { data: subData } = await supabase
         .from('Space')
@@ -61,9 +70,6 @@ export default async function BrokerLayout({ children }: { children: React.React
       // If stripe columns don't exist yet, don't gate
     }
   }
-
-  const slug = spaceRow?.slug as string ?? '';
-  const spaceName = (spaceRow?.name as string) ?? ctx.brokerage.name;
 
   let unreadLeadCount = 0;
   if (spaceRow) {

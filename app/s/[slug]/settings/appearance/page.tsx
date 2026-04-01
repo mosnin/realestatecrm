@@ -200,7 +200,7 @@ export default function AppearanceSettingsPage() {
                     <p className="text-sm text-muted-foreground">Click to upload</p>
                   </div>
                 )}
-                <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={handleLogoUpload} />
               </div>
             </div>
 
@@ -247,7 +247,7 @@ export default function AppearanceSettingsPage() {
                     <p className="text-xs text-muted-foreground">Click to upload</p>
                   </div>
                 )}
-                <input ref={faviconInputRef} type="file" accept="image/*" className="hidden" onChange={handleFaviconUpload} />
+                <input ref={faviconInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={handleFaviconUpload} />
               </div>
             </div>
           </div>

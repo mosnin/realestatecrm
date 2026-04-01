@@ -121,7 +121,8 @@ export function BrokerageSettingsForm({
               const formData = new FormData();
               formData.append('file', file);
               formData.append('type', 'logo');
-              const res = await fetch('/api/upload', { method: 'POST', body: formData });
+              // Use onboarding upload endpoint — broker-only accounts may not have a Space
+              const res = await fetch('/api/upload/onboarding', { method: 'POST', body: formData });
               const data = await res.json();
               if (res.ok && data.url) {
                 setLogoUrl(data.url);
