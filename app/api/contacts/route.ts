@@ -92,14 +92,16 @@ export async function POST(req: NextRequest) {
   // Async vectorization — don't block the response
   syncContact(contact as Contact).catch(console.error);
 
-  // SMS notification for new leads (non-blocking)
-  notifyNewContact({
-    spaceId: space.id,
-    contactName: name,
-    contactPhone: phone || null,
-    contactEmail: email || null,
-    tags: tagsVal,
-  }).catch(console.error);
+  // SMS notification for new leads
+  try {
+    await notifyNewContact({
+      spaceId: space.id,
+      contactName: name,
+      contactPhone: phone || null,
+      contactEmail: email || null,
+      tags: tagsVal,
+    });
+  } catch (e) { console.error('[contacts] notification failed:', e); }
 
   return NextResponse.json(contact, { status: 201 });
 }

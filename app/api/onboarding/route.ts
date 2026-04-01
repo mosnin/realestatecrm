@@ -451,13 +451,15 @@ export async function POST(req: NextRequest) {
         .eq('id', user.id);
       if (error) throw error;
 
-      // Send welcome email (non-blocking)
-      sendWelcomeEmail({
-        toEmail: user.email,
-        userName: user.name,
-        spaceName: space?.name ?? null,
-        spaceSlug: space?.slug ?? null,
-      }).catch((err) => console.error('[onboarding] welcome email failed', err));
+      // Send welcome email
+      try {
+        await sendWelcomeEmail({
+          toEmail: user.email,
+          userName: user.name,
+          spaceName: space?.name ?? null,
+          spaceSlug: space?.slug ?? null,
+        });
+      } catch (e) { console.error('[onboarding] welcome email failed:', e); }
 
       return NextResponse.json({ success: true, onboard: true, onboardingCompletedAt: completedAt.toISOString() });
     }

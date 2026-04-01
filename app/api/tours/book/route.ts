@@ -141,25 +141,27 @@ export async function POST(req: NextRequest) {
     tourId: tour.id,
     slug,
   };
-  sendTourConfirmation(emailData).catch(console.error);
+  try { await sendTourConfirmation(emailData); } catch (e) { console.error('[tours] confirmation email failed:', e); }
 
-  // Send SMS confirmation to guest (non-blocking)
+  // Send SMS confirmation to guest
   if (tour.guestPhone) {
     const d = new Date(tour.startsAt);
-    sendSMS(
-      tourConfirmationSMS({
-        guestName: tour.guestName,
-        guestPhone: tour.guestPhone,
-        businessName: settingsFull?.businessName || space.name,
-        date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-        property: tour.propertyAddress,
-      })
-    ).catch(console.error);
+    try {
+      await sendSMS(
+        tourConfirmationSMS({
+          guestName: tour.guestName,
+          guestPhone: tour.guestPhone,
+          businessName: settingsFull?.businessName || space.name,
+          date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+          property: tour.propertyAddress,
+        })
+      );
+    } catch (e) { console.error('[tours] SMS confirmation failed:', e); }
   }
 
   // Notify the space owner (email + SMS via unified dispatcher)
-  notifyNewTour({ spaceId: space.id, tourData: emailData }).catch(console.error);
+  try { await notifyNewTour({ spaceId: space.id, tourData: emailData }); } catch (e) { console.error('[tours] owner notification failed:', e); }
 
   return NextResponse.json(tour, { status: 201 });
 }

@@ -135,8 +135,8 @@ export async function POST(req: NextRequest) {
             .update(updateData)
             .eq('stripeSubscriptionId', subscription.id);
         }
-        // Notify owner of status change (non-blocking)
-        notifySubscriptionChange(subscription.id, newStatus).catch(console.error);
+        // Notify owner of status change
+        try { await notifySubscriptionChange(subscription.id, newStatus); } catch (e) { console.error('[stripe-webhook] subscription notification failed:', e); }
         break;
       }
 
@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
             stripePeriodEnd: getPeriodEnd(subscription),
           })
           .eq('stripeSubscriptionId', subscription.id);
-        notifySubscriptionChange(subscription.id, 'canceled').catch(console.error);
+        try { await notifySubscriptionChange(subscription.id, 'canceled'); } catch (e) { console.error('[stripe-webhook] canceled notification failed:', e); }
         break;
       }
 
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
             .from('Space')
             .update({ stripeSubscriptionStatus: 'past_due' })
             .eq('stripeSubscriptionId', subId);
-          notifySubscriptionChange(subId, 'past_due').catch(console.error);
+          try { await notifySubscriptionChange(subId, 'past_due'); } catch (e) { console.error('[stripe-webhook] past_due notification failed:', e); }
         }
         break;
       }

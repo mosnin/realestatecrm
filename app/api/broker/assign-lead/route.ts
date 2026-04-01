@@ -193,24 +193,22 @@ export async function POST(req: NextRequest) {
       assignedBy: dbUserId,
     });
 
-    // ── Notify the realtor (non-blocking) ────────────────────────────────
-    void (async () => {
-      try {
-        await notifyNewLead({
-          spaceId: realtorSpace.id,
-          contactId: newContactId,
-          name: contact.name,
-          phone: contact.phone,
-          email: contact.email,
-          leadScore: contact.leadScore,
-          scoreLabel: contact.scoreLabel,
-          scoreSummary: contact.scoreSummary,
-          applicationData: contact.applicationData,
-        });
-      } catch (err) {
-        console.error('[assign-lead] notification failed', { newContactId, err });
-      }
-    })();
+    // ── Notify the realtor ─────────────────────────────────────────────
+    try {
+      await notifyNewLead({
+        spaceId: realtorSpace.id,
+        contactId: newContactId,
+        name: contact.name,
+        phone: contact.phone,
+        email: contact.email,
+        leadScore: contact.leadScore,
+        scoreLabel: contact.scoreLabel,
+        scoreSummary: contact.scoreSummary,
+        applicationData: contact.applicationData,
+      });
+    } catch (e) {
+      console.error('[assign-lead] notification failed:', { newContactId, e });
+    }
 
     return NextResponse.json(
       {

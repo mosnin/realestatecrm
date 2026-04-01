@@ -192,14 +192,16 @@ export async function POST(req: NextRequest) {
 
   syncDeal(deal).catch(console.error);
 
-  // Email + SMS notification for new deal (non-blocking)
-  notifyNewDeal({
-    spaceId: space.id,
-    dealTitle: title,
-    dealValue: valueVal,
-    dealAddress: address || null,
-    dealPriority: priority || null,
-  }).catch(console.error);
+  // Email + SMS notification for new deal
+  try {
+    await notifyNewDeal({
+      spaceId: space.id,
+      dealTitle: title,
+      dealValue: valueVal,
+      dealAddress: address || null,
+      dealPriority: priority || null,
+    });
+  } catch (e) { console.error('[deals] notification failed:', e); }
 
   return NextResponse.json(deal, { status: 201 });
 }

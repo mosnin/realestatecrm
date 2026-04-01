@@ -205,92 +205,87 @@ export async function POST(req: NextRequest) {
       brokerageId: brokerage.id,
     });
 
-    // ── Defer AI scoring + notification to after response ──────────────────
-    void (async () => {
-      let scoring: LeadScoringResult = {
-        scoringStatus: 'failed',
-        leadScore: null,
-        scoreLabel: 'unscored',
-        scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
-        scoreDetails: null,
-      };
+    // ── AI scoring + notification (awaited before response) ─────────────────
+    let scoring: LeadScoringResult = {
+      scoringStatus: 'failed',
+      leadScore: null,
+      scoreLabel: 'unscored',
+      scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
+      scoreDetails: null,
+    };
 
-      try {
-        scoring = await scoreLeadApplication({
-          contactId: contact.id,
-          name: payload.legalName,
-          email: payload.email ?? null,
-          phone: payload.phone ?? null,
-          budget: payload.monthlyRent ?? null,
-          applicationData,
-          leadType: payload.leadType ?? 'rental',
-        });
+    try {
+      scoring = await scoreLeadApplication({
+        contactId: contact.id,
+        name: payload.legalName,
+        email: payload.email ?? null,
+        phone: payload.phone ?? null,
+        budget: payload.monthlyRent ?? null,
+        applicationData,
+        leadType: payload.leadType ?? 'rental',
+      });
 
-        const { error: scoreUpdateError } = await supabase
-          .from('Contact')
-          .update({
-            scoringStatus: scoring.scoringStatus,
-            leadScore: scoring.leadScore,
-            scoreLabel: scoring.scoreLabel,
-            scoreSummary: scoring.scoreSummary,
-            scoreDetails: scoring.scoreDetails,
-            updatedAt: new Date().toISOString(),
-          })
-          .eq('id', contact.id);
-        if (scoreUpdateError) {
-          console.error('[apply/brokerage] scoring update failed', {
-            contactId: contact.id,
-            scoreUpdateError,
-          });
-        } else {
-          console.info('[apply/brokerage] scoring persisted', {
-            contactId: contact.id,
-            scoringStatus: scoring.scoringStatus,
-            scoreLabel: scoring.scoreLabel,
-          });
-        }
-      } catch (error) {
-        console.error('[apply/brokerage] scoring failed', { contactId: contact.id, error });
-        try {
-          await supabase
-            .from('Contact')
-            .update({
-              scoringStatus: 'failed',
-              leadScore: null,
-              scoreLabel: 'unscored',
-              scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
-              updatedAt: new Date().toISOString(),
-            })
-            .eq('id', contact.id);
-        } catch (fallbackErr) {
-          console.error('[apply/brokerage] fallback scoring state failed', {
-            contactId: contact.id,
-            fallbackErr,
-          });
-        }
-      }
-
-      // Notify the broker owner
-      try {
-        await notifyNewLead({
-          spaceId: space.id,
-          contactId: contact.id,
-          name: payload.legalName,
-          phone: payload.phone,
-          email: payload.email,
+      const { error: scoreUpdateError } = await supabase
+        .from('Contact')
+        .update({
+          scoringStatus: scoring.scoringStatus,
           leadScore: scoring.leadScore,
           scoreLabel: scoring.scoreLabel,
           scoreSummary: scoring.scoreSummary,
-          applicationData,
+          scoreDetails: scoring.scoreDetails,
+          updatedAt: new Date().toISOString(),
+        })
+        .eq('id', contact.id);
+      if (scoreUpdateError) {
+        console.error('[apply/brokerage] scoring update failed', {
+          contactId: contact.id,
+          scoreUpdateError,
         });
-      } catch (err) {
-        console.error('[apply/brokerage] notification failed', { contactId: contact.id, err });
+      } else {
+        console.info('[apply/brokerage] scoring persisted', {
+          contactId: contact.id,
+          scoringStatus: scoring.scoringStatus,
+          scoreLabel: scoring.scoreLabel,
+        });
       }
+    } catch (error) {
+      console.error('[apply/brokerage] scoring failed', { contactId: contact.id, error });
+      try {
+        await supabase
+          .from('Contact')
+          .update({
+            scoringStatus: 'failed',
+            leadScore: null,
+            scoreLabel: 'unscored',
+            scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
+            updatedAt: new Date().toISOString(),
+          })
+          .eq('id', contact.id);
+      } catch (fallbackErr) {
+        console.error('[apply/brokerage] fallback scoring state failed', {
+          contactId: contact.id,
+          fallbackErr,
+        });
+      }
+    }
 
-      // Lead sits in broker's space until manually assigned via /broker/leads
-    })();
+    // Notify the broker owner
+    try {
+      await notifyNewLead({
+        spaceId: space.id,
+        contactId: contact.id,
+        name: payload.legalName,
+        phone: payload.phone,
+        email: payload.email,
+        leadScore: scoring.leadScore,
+        scoreLabel: scoring.scoreLabel,
+        scoreSummary: scoring.scoreSummary,
+        applicationData,
+      });
+    } catch (err) {
+      console.error('[apply/brokerage] notification failed', { contactId: contact.id, err });
+    }
 
-    // Return immediately
     return NextResponse.json(
       {
         success: true,
