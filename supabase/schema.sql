@@ -90,7 +90,9 @@ CREATE TABLE IF NOT EXISTS "SpaceSetting" (
   "tourBookingPageTitle" text,
   "tourBookingPageIntro" text,
   "tourBufferMinutes"    integer NOT NULL DEFAULT 0,
-  "tourBlockedDates"     text[] NOT NULL DEFAULT '{}'
+  "tourBlockedDates"     text[] NOT NULL DEFAULT '{}',
+  "privacyPolicyUrl"     text,
+  "consentCheckboxLabel" text
 );
 
 CREATE TABLE IF NOT EXISTS "Contact" (
@@ -327,6 +329,10 @@ ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "stageChangedAt"        timestamp
 ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "applicationRef"        text;
 ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "applicationStatus"     text;
 ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "applicationStatusNote" text;
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "consentGiven"          boolean;
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "consentTimestamp"      timestamptz;
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "consentIp"             text;
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "consentPrivacyPolicyUrl" text;
 
 ALTER TABLE "Tour" ADD COLUMN IF NOT EXISTS "manageToken"       text;
 ALTER TABLE "Tour" ADD COLUMN IF NOT EXISTS "propertyProfileId" text REFERENCES "TourPropertyProfile"(id) ON DELETE SET NULL;
@@ -357,6 +363,8 @@ ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "notifyTourBookings" boolean
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "notifyNewDeals"     boolean NOT NULL DEFAULT true;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "notifyFollowUps"    boolean NOT NULL DEFAULT true;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "privacyPolicyHtml"  text;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "privacyPolicyUrl"  text;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "consentCheckboxLabel" text;
 
 ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "privacyPolicyHtml"    text;
 

@@ -7,6 +7,45 @@ import crypto from 'crypto';
 import { audit } from '@/lib/audit';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
 
+export async function GET(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const slug = req.nextUrl.searchParams.get('slug');
+  if (!slug) return NextResponse.json({ error: 'Missing slug' }, { status: 400 });
+
+  const userSpace = await getSpaceForUser(userId);
+  if (!userSpace || userSpace.slug !== slug) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const [{ data: settings }, { data: owner }] = await Promise.all([
+    supabase
+      .from('SpaceSetting')
+      .select('notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, phoneNumber')
+      .eq('spaceId', userSpace.id)
+      .maybeSingle(),
+    supabase
+      .from('User')
+      .select('email')
+      .eq('id', userSpace.ownerId)
+      .maybeSingle(),
+  ]);
+
+  return NextResponse.json({
+    settings: {
+      notifications: settings?.notifications ?? true,
+      smsNotifications: settings?.smsNotifications ?? false,
+      notifyNewLeads: settings?.notifyNewLeads ?? true,
+      notifyTourBookings: settings?.notifyTourBookings ?? true,
+      notifyNewDeals: settings?.notifyNewDeals ?? true,
+      notifyFollowUps: settings?.notifyFollowUps ?? true,
+      phoneNumber: settings?.phoneNumber ?? '',
+    },
+    ownerEmail: owner?.email ?? '',
+  });
+}
+
 export async function PATCH(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
