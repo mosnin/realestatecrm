@@ -39,6 +39,10 @@ export async function PATCH(req: NextRequest) {
   // Legal & compliance fields
   const rawPrivacyPolicyUrl = typeof body.privacyPolicyUrl === 'string' ? body.privacyPolicyUrl.trim().slice(0, 500) : undefined;
   const consentCheckboxLabel = typeof body.consentCheckboxLabel === 'string' ? body.consentCheckboxLabel.trim().slice(0, 500) : undefined;
+  // Privacy Policy HTML (rich text content, capped at 100KB)
+  const privacyPolicyHtml = body.privacyPolicyHtml !== undefined
+    ? (typeof body.privacyPolicyHtml === 'string' ? body.privacyPolicyHtml.slice(0, 100_000) : null)
+    : undefined;
 
   // Validate privacy policy URL if provided
   if (rawPrivacyPolicyUrl !== undefined && rawPrivacyPolicyUrl !== null && rawPrivacyPolicyUrl !== '') {
@@ -130,6 +134,7 @@ export async function PATCH(req: NextRequest) {
         ...(logoUrl !== undefined && { logoUrl }),
         ...(rawPrivacyPolicyUrl !== undefined && { privacyPolicyUrl: rawPrivacyPolicyUrl || null }),
         ...(consentCheckboxLabel !== undefined && { consentCheckboxLabel: consentCheckboxLabel || null }),
+        ...(privacyPolicyHtml !== undefined && { privacyPolicyHtml: privacyPolicyHtml || null }),
       },
       { onConflict: 'spaceId' }
     )

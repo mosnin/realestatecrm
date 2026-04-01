@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { PublicPageShell } from '@/components/public-page-shell';
+import { FormUnavailable } from '@/components/form-unavailable';
 import { ApplicationFormLoader } from './application-form-loader';
 
 // Cache this page for 60 seconds — it's public and rarely changes.
@@ -77,6 +78,12 @@ export default async function PublicApplyPage({
   const agentName = ownerData?.name || businessName;
   const agentPhoto = settings?.realtorPhotoUrl || ownerData?.avatar || null;
   const logoUrl = settings?.logoUrl || null;
+
+  // Gate on subscription status — show paused page if not active/trialing
+  const status = space.stripeSubscriptionStatus;
+  if (status !== 'active' && status !== 'trialing') {
+    return <FormUnavailable agentName={agentName} />;
+  }
 
   const customization = {
     accentColor: settings?.intakeAccentColor || '#ff964f',

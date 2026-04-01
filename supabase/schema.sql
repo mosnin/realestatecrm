@@ -351,6 +351,9 @@ ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "notifyNewLeads"     boolean
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "notifyTourBookings" boolean NOT NULL DEFAULT true;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "notifyNewDeals"     boolean NOT NULL DEFAULT true;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "notifyFollowUps"    boolean NOT NULL DEFAULT true;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "privacyPolicyHtml"  text;
+
+ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "privacyPolicyHtml"    text;
 
 -- ============================================================
 -- Indexes

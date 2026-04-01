@@ -3,6 +3,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { BookingForm } from './booking-form';
 import { PublicPageShell } from '@/components/public-page-shell';
+import { FormUnavailable } from '@/components/form-unavailable';
 
 export const revalidate = 60;
 
@@ -64,6 +65,12 @@ export default async function PublicBookingPage({
   const agentName = ownerData?.name || businessName;
   const agentPhoto = settings?.realtorPhotoUrl || ownerData?.avatar || null;
   const logoUrl = settings?.logoUrl || null;
+
+  // Gate on subscription status — show paused page if not active/trialing
+  const subStatus = space.stripeSubscriptionStatus;
+  if (subStatus !== 'active' && subStatus !== 'trialing') {
+    return <FormUnavailable agentName={agentName} />;
+  }
 
   const customization = {
     accentColor: settings?.intakeAccentColor || '#ff964f',

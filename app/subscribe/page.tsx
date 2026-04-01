@@ -4,7 +4,8 @@ import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Sparkles, CheckCircle2, Loader2, Shield, Zap } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Check, ArrowRight, Loader2, Zap, Shield } from 'lucide-react';
 
 function SubscribeContent() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -65,74 +66,90 @@ function SubscribeContent() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-lg space-y-6">
-        {/* Logo / Branding */}
+      <div className="w-full max-w-3xl space-y-6">
+        {/* Branding */}
         <div className="text-center">
           <h2 className="text-lg font-semibold text-primary tracking-tight">Chippi</h2>
         </div>
 
-        {/* Main card */}
-        <div className="rounded-2xl border border-border bg-card shadow-lg p-8 text-center space-y-6">
-          <div className="space-y-2">
-            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-              <Sparkles size={26} className="text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight">Start your free trial</h1>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
-              Get full access to everything in Chippi for 7 days. No credit card required to start.
-            </p>
-          </div>
-
-          {/* Price */}
-          <div className="flex items-end justify-center gap-1">
-            <span className="text-4xl font-bold">$97</span>
-            <span className="text-muted-foreground text-lg mb-1">/month</span>
-          </div>
-          <p className="text-xs text-muted-foreground -mt-4">after 7-day free trial &middot; cancel anytime</p>
-
-          {/* Features */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
-            {features.map((f) => (
-              <div key={f} className="flex items-center gap-2 text-sm">
-                <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />
-                <span>{f}</span>
+        {/* Split pricing card */}
+        <Card className="rounded-3xl border border-border shadow-xl overflow-hidden p-0">
+          <div className="flex flex-col md:flex-row">
+            {/* Left side — Plan & Price */}
+            <div className="flex flex-col justify-center gap-6 bg-primary/5 p-8 md:p-10 md:w-5/12">
+              <div className="space-y-1">
+                <p className="text-sm font-medium uppercase tracking-widest text-primary">
+                  Chippi Pro
+                </p>
+                <div className="flex items-end gap-1">
+                  <span className="text-5xl font-bold tracking-tight">$97</span>
+                  <span className="text-muted-foreground text-lg mb-1">/mo</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  after 7-day free trial &middot; cancel anytime
+                </p>
               </div>
-            ))}
-          </div>
 
-          {/* Error */}
-          {error && (
-            <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-              {error}
+              {/* Error */}
+              {error && (
+                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                  {error}
+                </div>
+              )}
+
+              {/* CTA */}
+              <Button
+                onClick={handleStartTrial}
+                disabled={loading || !slug}
+                size="lg"
+                className="w-full rounded-full text-base font-semibold gap-2"
+              >
+                {loading ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <Zap size={18} />
+                )}
+                {loading ? 'Redirecting to checkout...' : 'Start 7-day free trial'}
+                {!loading && <ArrowRight size={16} />}
+              </Button>
+
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Shield size={12} /> No credit card upfront
+                </span>
+                <span>Cancel anytime</span>
+              </div>
             </div>
-          )}
 
-          {/* CTA */}
-          <Button
-            onClick={handleStartTrial}
-            disabled={loading || !slug}
-            size="lg"
-            className="w-full rounded-full text-base font-semibold gap-2"
-          >
-            {loading ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : (
-              <Zap size={18} />
-            )}
-            {loading ? 'Redirecting to checkout...' : 'Start 7-day free trial'}
-            {!loading && <ArrowRight size={16} />}
-          </Button>
-
-          <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><Shield size={12} /> No credit card upfront</span>
-            <span>Cancel anytime</span>
+            {/* Right side — Features */}
+            <div className="flex flex-col justify-center gap-6 p-8 md:p-10 md:w-7/12">
+              <p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+                Everything you need
+              </p>
+              <ul className="grid grid-cols-1 gap-3">
+                {features.map((f) => (
+                  <li key={f} className="flex items-center gap-3 text-sm">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                      <Check size={12} className="text-primary" />
+                    </span>
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground">
+                Built for realtors and brokerages of all sizes
+              </p>
+            </div>
           </div>
-        </div>
+        </Card>
 
         {/* Already subscribed? */}
         <p className="text-center text-xs text-muted-foreground">
           Already subscribed?{' '}
-          <a href={slug ? `/s/${slug}/billing` : '#'} className="text-primary underline hover:text-primary/80">
+          <a
+            href={slug ? `/s/${slug}/billing` : '#'}
+            className="text-primary underline hover:text-primary/80"
+          >
             Manage billing
           </a>
         </p>
@@ -143,11 +160,13 @@ function SubscribeContent() {
 
 export default function SubscribePage() {
   return (
-    <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
       <SubscribeContent />
     </Suspense>
   );

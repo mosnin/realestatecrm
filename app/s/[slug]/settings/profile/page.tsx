@@ -9,8 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserButton } from '@clerk/nextjs';
-import { Loader2, Upload } from 'lucide-react';
+import { Loader2, Upload, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { generatePrivacyPolicy } from '@/lib/privacy-policy-template';
 
 export default function ProfileSettingsPage() {
   const params = useParams<{ slug: string }>();
@@ -23,6 +25,7 @@ export default function ProfileSettingsPage() {
   const [phone, setPhone] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [realtorPhotoUrl, setRealtorPhotoUrl] = useState('');
+  const [privacyPolicyHtml, setPrivacyPolicyHtml] = useState('');
   const [photoUploading, setPhotoUploading] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -50,6 +53,7 @@ export default function ProfileSettingsPage() {
         setPhone(s.phoneNumber ?? '');
         setBusinessName(s.businessName ?? '');
         setRealtorPhotoUrl(s.realtorPhotoUrl ?? '');
+        setPrivacyPolicyHtml(s.privacyPolicyHtml ?? '');
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -83,6 +87,7 @@ export default function ProfileSettingsPage() {
           bio: bio.trim() || null,
           socialLinks,
           realtorPhotoUrl: realtorPhotoUrl.trim() || null,
+          privacyPolicyHtml: privacyPolicyHtml || null,
         }),
       });
       if (!res.ok) {
@@ -234,6 +239,40 @@ export default function ProfileSettingsPage() {
               <Input value={socialLinks.linkedin || ''} onChange={(e) => setSocialLinks({ ...socialLinks, linkedin: e.target.value })} placeholder="LinkedIn URL" />
               <Input value={socialLinks.facebook || ''} onChange={(e) => setSocialLinks({ ...socialLinks, facebook: e.target.value })} placeholder="Facebook URL" />
             </div>
+          </div>
+        </div>
+
+        {/* Privacy Policy */}
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="px-6 py-4 border-b border-border bg-muted/20">
+            <p className="font-semibold text-sm">Privacy Policy</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Displayed on your intake page. Protects you and your clients.</p>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>Privacy policy content</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const name = businessName || `${firstName} ${lastName}`.trim() || 'Our Office';
+                  setPrivacyPolicyHtml(generatePrivacyPolicy(name, 'realtor'));
+                  toast.success('Privacy policy template generated');
+                }}
+              >
+                <Sparkles size={14} className="mr-1.5" />
+                Generate template
+              </Button>
+            </div>
+            <RichTextEditor
+              value={privacyPolicyHtml}
+              onChange={setPrivacyPolicyHtml}
+              placeholder="Enter your privacy policy here or click 'Generate template' to start with a comprehensive template..."
+            />
+            <p className="text-xs text-muted-foreground">
+              This privacy policy will be linked on your intake forms. You are responsible for ensuring it complies with applicable laws in your jurisdiction.
+            </p>
           </div>
         </div>
 

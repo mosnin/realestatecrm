@@ -127,7 +127,7 @@ export default async function DashboardLayout({
     currentPath.includes('/billing') ||
     currentPath.includes('/settings');
 
-  if (!dbUser.isPlatformAdmin && !isExemptPath) {
+  if (!dbUser.isPlatformAdmin) {
     try {
       const { data: subData, error: subError } = await supabase
         .from('Space')
@@ -142,13 +142,20 @@ export default async function DashboardLayout({
       }
 
       const status = subData?.stripeSubscriptionStatus ?? 'inactive';
+      const hasSubscriptionHistory = !!(subData?.stripeSubscriptionId || subData?.trialUsedAt);
+
       if (status !== 'active' && status !== 'trialing') {
-        // If they ever had a subscription (ID exists OR trial was used), show billing page
-        if (subData?.stripeSubscriptionId || subData?.trialUsedAt) {
+        // If on an exempt path (billing/settings) AND user has subscription history,
+        // allow access so they can manage their billing/resubscribe.
+        // Users with NO subscription history must NOT access exempt paths.
+        if (isExemptPath && hasSubscriptionHistory) {
+          // Allow through — user had a subscription before and needs billing access
+        } else if (hasSubscriptionHistory) {
           redirect(`/billing-required?slug=${slug}&reason=${status}`);
+        } else {
+          // Never subscribed → show trial signup (even for billing/settings paths)
+          redirect(`/subscribe?slug=${slug}`);
         }
-        // Never subscribed → show trial signup
-        redirect(`/subscribe?slug=${slug}`);
       }
     } catch (err: any) {
       // Next.js redirect() throws a special error — re-throw it

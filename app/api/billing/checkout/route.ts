@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
       line_items: [{ price: priceId, quantity: 1 }],
       subscription_data: subscriptionData,
       success_url: `${appUrl}/s/${slug}/billing?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/s/${slug}/billing`,
+      cancel_url: `${appUrl}/subscribe?slug=${slug}`,
       metadata: { spaceId: space.id },
     });
 

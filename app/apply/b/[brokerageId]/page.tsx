@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { PublicPageShell } from '@/components/public-page-shell';
+import { FormUnavailable } from '@/components/form-unavailable';
 import { ApplicationFormLoader } from '@/app/apply/[slug]/application-form-loader';
 
 // Cache this page for 60 seconds — it's public and rarely changes.
@@ -35,7 +36,7 @@ export default async function BrokerageApplyPage({
   // 3. Get the broker_owner's Space for branding
   const { data: space } = await supabase
     .from('Space')
-    .select('id, slug, name, ownerId')
+    .select('id, slug, name, ownerId, stripeSubscriptionStatus')
     .eq('ownerId', ownerMembership.userId)
     .maybeSingle();
 
@@ -100,6 +101,12 @@ export default async function BrokerageApplyPage({
   const agentPhoto = settings?.realtorPhotoUrl || ownerData?.avatar || null;
   // Prefer brokerage logo, fall back to space logo
   const logoUrl = brokerage.logoUrl || settings?.logoUrl || null;
+
+  // Gate on subscription status — show paused page if not active/trialing
+  const status = (space as any).stripeSubscriptionStatus as string | undefined;
+  if (status !== 'active' && status !== 'trialing') {
+    return <FormUnavailable agentName={agentName} />;
+  }
 
   const customization = {
     accentColor: settings?.intakeAccentColor || '#ff964f',

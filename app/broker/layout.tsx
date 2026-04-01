@@ -47,18 +47,19 @@ export default async function BrokerLayout({ children }: { children: React.React
   const spaceName = (spaceRow?.name as string) ?? ctx.brokerage.name;
 
   // Subscription gate — redirect to standalone pages
-  // Exempt billing and settings pages so users can manage their subscription
+  // Only exempt billing/settings paths for users with subscription history;
+  // users with NO subscription history should always be redirected to /subscribe.
   const brokerHeaders = await headers();
   const brokerPath = brokerHeaders.get('x-pathname')
     || brokerHeaders.get('x-invoke-path')
     || brokerHeaders.get('x-matched-path')
     || brokerHeaders.get('next-url')
     || '';
-  const isBrokerExempt =
+  const isBillingOrSettings =
     brokerPath.includes('/billing') ||
     brokerPath.includes('/settings');
 
-  if (!isPlatformAdmin && !isBrokerExempt) {
+  if (!isPlatformAdmin) {
     // Gate applies whether they have a personal space or not
     if (spaceRow) {
       try {
@@ -73,9 +74,13 @@ export default async function BrokerLayout({ children }: { children: React.React
           redirect(`/subscribe?slug=${slug}`);
         }
 
+        const hasSubscriptionHistory = !!(subData?.stripeSubscriptionId || subData?.trialUsedAt);
+        // Only exempt billing/settings for users with subscription history
+        const isBrokerExempt = isBillingOrSettings && hasSubscriptionHistory;
+
         const status = subData?.stripeSubscriptionStatus ?? 'inactive';
-        if (status !== 'active' && status !== 'trialing') {
-          if (subData?.stripeSubscriptionId || subData?.trialUsedAt) {
+        if (status !== 'active' && status !== 'trialing' && !isBrokerExempt) {
+          if (hasSubscriptionHistory) {
             redirect(`/billing-required?slug=${slug}&reason=${status}`);
           }
           redirect(`/subscribe?slug=${slug}`);
@@ -86,12 +91,37 @@ export default async function BrokerLayout({ children }: { children: React.React
         console.error('[broker-layout] Subscription gate error:', err);
         redirect(`/subscribe?slug=${slug}`);
       }
-    } else if (!isBrokerOnly) {
+    } else if (isBrokerOnly) {
+      // Broker-only accounts: check the brokerage owner's Space subscription
+      try {
+        const { data: ownerSpace } = await supabase
+          .from('Space')
+          .select('slug, stripeSubscriptionStatus, stripeSubscriptionId, trialUsedAt')
+          .eq('ownerId', ctx.brokerage.ownerId)
+          .maybeSingle();
+
+        if (ownerSpace) {
+          const ownerStatus = ownerSpace.stripeSubscriptionStatus ?? 'inactive';
+          const ownerSlug = ownerSpace.slug ?? '';
+          const ownerHasHistory = !!(ownerSpace.stripeSubscriptionId || ownerSpace.trialUsedAt);
+          const isBrokerOnlyExempt = isBillingOrSettings && ownerHasHistory;
+
+          if (ownerStatus !== 'active' && ownerStatus !== 'trialing' && !isBrokerOnlyExempt) {
+            if (ownerHasHistory) {
+              redirect(`/billing-required?slug=${ownerSlug}&reason=${ownerStatus}`);
+            }
+            redirect(`/subscribe?slug=${ownerSlug}`);
+          }
+        }
+        // If no owner space found, allow through (brokerage may manage billing differently)
+      } catch (err: any) {
+        if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err;
+        console.error('[broker-layout] Broker-only subscription check error:', err);
+      }
+    } else {
       // No space and not broker-only — shouldn't be here
       redirect('/setup');
     }
-    // Broker-only accounts without a space: brokerage billing is separate
-    // They don't have a personal subscription to gate on
   }
 
   let unreadLeadCount = 0;

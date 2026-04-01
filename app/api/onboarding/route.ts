@@ -227,7 +227,7 @@ export async function POST(req: NextRequest) {
       const {
         slug, intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl,
         intakeAccentColor, intakeBorderRadius, intakeFont, intakeFooterLinks, bio, socialLinks,
-        intakeDisabledSteps, intakeCustomQuestions,
+        intakeDisabledSteps, intakeCustomQuestions, privacyPolicyHtml,
         // Enhanced onboarding fields (User record)
         phone, websiteUrl, mlsId, brokerageAffiliation,
         preferredNotification, timezone, referralSource, biggestPainPoint,
@@ -246,6 +246,7 @@ export async function POST(req: NextRequest) {
         socialLinks?: { instagram?: string; linkedin?: string; facebook?: string; tiktok?: string };
         intakeDisabledSteps?: string[];
         intakeCustomQuestions?: { id: string; label: string; placeholder?: string; required?: boolean }[];
+        privacyPolicyHtml?: string | null;
         phone?: string;
         websiteUrl?: string;
         mlsId?: string;
@@ -306,6 +307,7 @@ export async function POST(req: NextRequest) {
               ...(socialLinks !== undefined && { socialLinks }),
               ...(intakeDisabledSteps !== undefined && { intakeDisabledSteps }),
               ...(intakeCustomQuestions !== undefined && { intakeCustomQuestions }),
+              ...(privacyPolicyHtml !== undefined && { privacyPolicyHtml }),
               ...((preferredNotification === 'sms' || preferredNotification === 'both') && { smsNotifications: true }),
               ...(timezone && { timezone }),
             },

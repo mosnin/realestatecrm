@@ -22,6 +22,7 @@ export async function GET() {
     websiteUrl: ctx.brokerage.websiteUrl,
     logoUrl: ctx.brokerage.logoUrl,
     status: ctx.brokerage.status,
+    privacyPolicyHtml: ctx.brokerage.privacyPolicyHtml ?? null,
   });
 }
 
@@ -84,7 +85,16 @@ export async function PATCH(req: Request) {
     }
   }
 
-  // Auto-assign settings (stored in Redis, not in DB)
+  // Privacy Policy HTML
+  if (body.privacyPolicyHtml !== undefined) {
+    if (body.privacyPolicyHtml === null || body.privacyPolicyHtml === '') {
+      updates.privacyPolicyHtml = null;
+    } else if (typeof body.privacyPolicyHtml === 'string') {
+      // Cap at 100KB to prevent storage abuse
+      updates.privacyPolicyHtml = body.privacyPolicyHtml.slice(0, 100_000);
+    }
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
   }

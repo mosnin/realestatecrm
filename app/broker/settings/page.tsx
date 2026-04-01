@@ -29,6 +29,7 @@ export default async function BrokerSettingsPage() {
             websiteUrl={brokerage.websiteUrl}
             logoUrl={brokerage.logoUrl}
             joinCode={brokerage.joinCode}
+            privacyPolicyHtml={brokerage.privacyPolicyHtml ?? null}
             isOwner={canEdit}
           />
         </CardContent>

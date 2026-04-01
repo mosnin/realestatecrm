@@ -29,6 +29,7 @@ export type Brokerage = {
   websiteUrl: string | null;
   logoUrl: string | null;
   joinCode: string | null;
+  privacyPolicyHtml: string | null;
   createdAt: Date;
 };
 
@@ -111,6 +112,7 @@ export type SpaceSetting = {
   intakeStepOrder: string[];
   // Legal & compliance
   privacyPolicyUrl: string | null;
+  privacyPolicyHtml: string | null;
   consentCheckboxLabel: string | null;
 };
 

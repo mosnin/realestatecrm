@@ -6,7 +6,7 @@ export async function getSpaceFromSlug(inputSlug: string): Promise<Space | null>
   const slug = normalizeSlug(inputSlug);
   const { data, error } = await supabase
     .from('Space')
-    .select('id, slug, name, emoji, ownerId, brokerageId, createdAt')
+    .select('id, slug, name, emoji, ownerId, brokerageId, createdAt, stripeSubscriptionStatus')
     .eq('slug', slug)
     .limit(1)
     .maybeSingle();

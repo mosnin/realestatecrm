@@ -4,14 +4,17 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, CheckCircle2, Upload } from 'lucide-react';
+import { Loader2, CheckCircle2, Upload, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { generatePrivacyPolicy } from '@/lib/privacy-policy-template';
 
 interface SettingsFormProps {
   name: string;
   websiteUrl: string | null;
   logoUrl: string | null;
   joinCode: string | null;
+  privacyPolicyHtml: string | null;
   isOwner: boolean;
 }
 
@@ -20,11 +23,13 @@ export function BrokerageSettingsForm({
   websiteUrl: initialWebsite,
   logoUrl: initialLogo,
   joinCode,
+  privacyPolicyHtml: initialPrivacyPolicy,
   isOwner,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [websiteUrl, setWebsiteUrl] = useState(initialWebsite ?? '');
   const [logoUrl, setLogoUrl] = useState(initialLogo ?? '');
+  const [privacyPolicyHtml, setPrivacyPolicyHtml] = useState(initialPrivacyPolicy ?? '');
   const [logoUploading, setLogoUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -43,6 +48,7 @@ export function BrokerageSettingsForm({
           name: name.trim(),
           websiteUrl: websiteUrl.trim() || null,
           logoUrl: logoUrl.trim() || null,
+          privacyPolicyHtml: privacyPolicyHtml || null,
         }),
       });
       const data = await res.json();
@@ -153,6 +159,39 @@ export function BrokerageSettingsForm({
           </p>
         </div>
       )}
+
+      {/* ── Privacy Policy ──────────────────────────────────────────── */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <Label>Privacy Policy</Label>
+            <p className="text-xs text-muted-foreground mt-0.5">Displayed on intake pages for realtors under your brokerage.</p>
+          </div>
+          {isOwner && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPrivacyPolicyHtml(generatePrivacyPolicy(name, 'brokerage'));
+                toast.success('Privacy policy template generated');
+              }}
+            >
+              <Sparkles size={14} className="mr-1.5" />
+              Generate template
+            </Button>
+          )}
+        </div>
+        <RichTextEditor
+          value={privacyPolicyHtml}
+          onChange={setPrivacyPolicyHtml}
+          placeholder="Enter your brokerage privacy policy here or click 'Generate template' to start..."
+          disabled={!isOwner}
+        />
+        <p className="text-xs text-muted-foreground">
+          You are responsible for ensuring this privacy policy complies with applicable laws in your jurisdiction.
+        </p>
+      </div>
 
       {/* ── Lead Distribution ─────────────────────────────────────────── */}
       {/* Lead distribution is handled manually via /broker/leads */}
