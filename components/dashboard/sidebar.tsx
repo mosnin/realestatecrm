@@ -128,6 +128,12 @@ const brokerSettingsNavSections = [
       { href: '/broker/commissions', label: 'Commission Rates', icon: DollarSign, exact: false },
     ],
   },
+  {
+    label: 'Account',
+    items: [
+      { href: '/broker/billing', label: 'Billing', icon: CreditCard, exact: false },
+    ],
+  },
 ];
 
 // ── Section label ──────────────────────────────────────────────────────────

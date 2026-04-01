@@ -23,7 +23,8 @@ export function SubscriptionGate({
   // Always allow billing and settings pages
   if (
     pathname.endsWith('/billing') ||
-    pathname.includes('/settings')
+    pathname.includes('/settings') ||
+    pathname === '/broker/billing'
   ) {
     return <>{children}</>;
   }
@@ -117,7 +118,7 @@ export function SubscriptionGate({
         {/* Already subscribed? */}
         <p className="text-center text-xs text-muted-foreground">
           Already subscribed?{' '}
-          <a href={`/s/${slug}/billing`} className="text-primary underline hover:text-primary/80">
+          <a href={pathname.startsWith('/broker') ? '/broker/billing' : `/s/${slug}/billing`} className="text-primary underline hover:text-primary/80">
             Manage billing
           </a>
         </p>
