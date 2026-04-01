@@ -439,6 +439,92 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
   }
 }
 
+// ── Application confirmation email (sent to the applicant) ──────────────────
+
+export interface ApplicationConfirmationParams {
+  toEmail: string;
+  applicantName: string;
+  businessName: string;
+  slug: string;
+  applicationRef: string;
+  leadType: 'rental' | 'buyer';
+  /** Optional custom message from SpaceSetting.intakeConfirmationEmail */
+  customMessage?: string | null;
+}
+
+export async function sendApplicationConfirmation(params: ApplicationConfirmationParams): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('[email] RESEND_API_KEY not set — skipping applicant confirmation');
+    return;
+  }
+  const { Resend } = await import('resend');
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const FROM = getFromAddress();
+
+  const { toEmail, applicantName, businessName, slug, applicationRef, leadType, customMessage } = params;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const statusUrl = `${appUrl}/apply/${encodeURIComponent(slug)}/status?ref=${encodeURIComponent(applicationRef)}`;
+
+  const safeBusinessName = esc(businessName);
+  const safeName = esc(applicantName);
+  const typeLabel = leadType === 'buyer' ? 'buyer' : 'rental';
+
+  const bodyParagraph = customMessage
+    ? esc(customMessage)
+    : `We&#x27;ve received your ${typeLabel} application and will review it shortly. You don&#x27;t need to do anything else right now.`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
+        <!-- Header -->
+        <tr><td style="background:#0f172a;padding:20px 28px">
+          <p style="margin:0;color:#ffffff;font-size:20px;font-weight:700">${safeBusinessName}</p>
+        </td></tr>
+        <!-- Body -->
+        <tr><td style="padding:24px 28px">
+          <p style="margin:0 0 16px;font-size:18px;font-weight:700;color:#111827">Thank you for your application, ${safeName}</p>
+          <p style="margin:0 0 20px;font-size:14px;color:#374151;line-height:1.6">${bodyParagraph}</p>
+          <!-- CTA -->
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr><td>
+              <a href="${statusUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 22px;border-radius:8px">Track your application status &rarr;</a>
+            </td></tr>
+          </table>
+        </td></tr>
+        <!-- Footer -->
+        <tr><td style="padding:16px 28px;border-top:1px solid #f1f5f9">
+          <p style="margin:0;font-size:11px;color:#9ca3af">This email was sent by ${safeBusinessName} via Chippi</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const safeSubjectBiz = businessName.replace(/[\r\n\t]/g, ' ').slice(0, 150);
+
+  try {
+    console.log('[email] Sending application confirmation to:', toEmail, 'from:', FROM);
+    const result = await resend.emails.send({
+      from: `${businessName.replace(/[\r\n\t<>"]/g, ' ').slice(0, 100)} <${FROM}>`,
+      to: toEmail,
+      subject: `Application received — ${safeSubjectBiz}`,
+      html,
+    });
+    if (result.error) {
+      console.error('[email] Resend API error (application confirmation):', JSON.stringify(result.error));
+    } else {
+      console.log('[email] sendApplicationConfirmation result:', JSON.stringify(result.data));
+    }
+  } catch (err) {
+    console.error('[email] sendApplicationConfirmation FAILED:', err);
+  }
+}
+
 // ── Welcome email ────────────────────────────────────────────────────────────
 
 export async function sendWelcomeEmail(params: {

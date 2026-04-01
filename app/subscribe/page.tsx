@@ -5,7 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Check, ArrowRight, Loader2, Zap, Shield } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
+import { BrandLogo } from '@/components/brand-logo';
 
 function SubscribeContent() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -68,8 +69,8 @@ function SubscribeContent() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-3xl space-y-6">
         {/* Branding */}
-        <div className="text-center">
-          <h2 className="text-lg font-semibold text-primary tracking-tight">Chippi</h2>
+        <div className="flex justify-center">
+          <BrandLogo className="h-8" />
         </div>
 
         {/* Split pricing card */}
@@ -102,23 +103,15 @@ function SubscribeContent() {
                 onClick={handleStartTrial}
                 disabled={loading || !slug}
                 size="lg"
-                className="w-full rounded-full text-base font-semibold gap-2"
+                className="w-full rounded-full text-base font-semibold"
               >
-                {loading ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <Zap size={18} />
-                )}
+                {loading ? <Loader2 size={18} className="animate-spin mr-2" /> : null}
                 {loading ? 'Redirecting to checkout...' : 'Start 7-day free trial'}
-                {!loading && <ArrowRight size={16} />}
               </Button>
 
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Shield size={12} /> No credit card upfront
-                </span>
-                <span>Cancel anytime</span>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                No credit card upfront &middot; Cancel anytime
+              </p>
             </div>
 
             {/* Right side — Features */}

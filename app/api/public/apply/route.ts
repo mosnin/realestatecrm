@@ -12,6 +12,7 @@ import {
   publicApplicationSchema,
 } from '@/lib/public-application';
 import { notifyNewLead } from '@/lib/notify';
+import { sendApplicationConfirmation } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
@@ -114,17 +115,21 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Fetch privacy policy URL from space settings for consent snapshot
+    // Fetch space settings for consent snapshot + applicant confirmation email
     let spacePrivacyPolicyUrl: string | null = null;
+    let spaceBusinessName: string | null = null;
+    let intakeConfirmationEmail: string | null = null;
     try {
       const { data: spaceSetting } = await supabase
         .from('SpaceSetting')
-        .select('privacyPolicyUrl')
+        .select('privacyPolicyUrl, businessName, intakeConfirmationEmail')
         .eq('spaceId', space.id)
         .maybeSingle();
       spacePrivacyPolicyUrl = spaceSetting?.privacyPolicyUrl ?? null;
+      spaceBusinessName = spaceSetting?.businessName ?? null;
+      intakeConfirmationEmail = spaceSetting?.intakeConfirmationEmail ?? null;
     } catch (err) {
-      console.warn('[apply] failed to fetch space privacy policy URL', { spaceId: space.id, err });
+      console.warn('[apply] failed to fetch space settings', { spaceId: space.id, err });
     }
 
     // Build structured application data
@@ -246,26 +251,39 @@ export async function POST(req: NextRequest) {
 
     console.log('[APPLY-DEBUG] 7. Scoring complete:', scoring?.scoringStatus);
 
-    // Send notification with scoring results included
-    try {
-      console.log('[apply] Sending notification for contact:', contact.id, 'spaceId:', space.id);
-      console.log('[APPLY-DEBUG] 8. About to call notifyNewLead');
-      await notifyNewLead({
-        spaceId: space.id,
-        contactId: contact.id,
-        name: payload.legalName,
-        phone: payload.phone ?? null,
-        email: payload.email ?? null,
-        leadScore: scoring.leadScore,
-        scoreLabel: scoring.scoreLabel,
-        scoreSummary: scoring.scoreSummary,
-        applicationData,
-      });
-      console.log('[APPLY-DEBUG] 9. notifyNewLead returned');
-      console.log('[apply] Notification dispatched');
-    } catch (notifyErr) {
-      console.error('[apply] Notification failed:', notifyErr);
-    }
+    // Send realtor notification + applicant confirmation email in parallel
+    const businessName = spaceBusinessName || space.name;
+
+    const realtorNotification = notifyNewLead({
+      spaceId: space.id,
+      contactId: contact.id,
+      name: payload.legalName,
+      phone: payload.phone ?? null,
+      email: payload.email ?? null,
+      leadScore: scoring.leadScore,
+      scoreLabel: scoring.scoreLabel,
+      scoreSummary: scoring.scoreSummary,
+      applicationData,
+    }).catch((notifyErr) => {
+      console.error('[apply] Realtor notification failed:', notifyErr);
+    });
+
+    const applicantConfirmation = payload.email
+      ? sendApplicationConfirmation({
+          toEmail: payload.email,
+          applicantName: payload.legalName,
+          businessName,
+          slug: payload.slug,
+          applicationRef,
+          leadType: payload.leadType ?? 'rental',
+          customMessage: intakeConfirmationEmail,
+        }).catch((confirmErr) => {
+          console.error('[apply] Applicant confirmation email failed:', confirmErr);
+        })
+      : Promise.resolve();
+
+    await Promise.all([realtorNotification, applicantConfirmation]);
+    console.log('[apply] Notifications dispatched');
 
     console.log('[APPLY-DEBUG] 10. Returning response');
     return NextResponse.json(

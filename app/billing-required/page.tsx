@@ -7,13 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
   AlertTriangle,
-  CreditCard,
   Loader2,
-  ArrowRight,
   Check,
   XCircle,
   Clock,
 } from 'lucide-react';
+import { BrandLogo } from '@/components/brand-logo';
 
 function BillingRequiredContent() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -110,8 +109,8 @@ function BillingRequiredContent() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-3xl space-y-6">
         {/* Branding */}
-        <div className="text-center">
-          <h2 className="text-lg font-semibold text-primary tracking-tight">Chippi</h2>
+        <div className="flex justify-center">
+          <BrandLogo className="h-8" />
         </div>
 
         {/* Split alert card */}
@@ -142,30 +141,20 @@ function BillingRequiredContent() {
                   onClick={handleResubscribe}
                   disabled={loading || !slug}
                   size="lg"
-                  className="w-full rounded-full text-base font-semibold gap-2"
+                  className="w-full rounded-full text-base font-semibold"
                 >
-                  {loading ? (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    <CreditCard size={18} />
-                  )}
+                  {loading ? <Loader2 size={18} className="animate-spin mr-2" /> : null}
                   {loading ? 'Redirecting...' : 'Resubscribe'}
-                  {!loading && <ArrowRight size={16} />}
                 </Button>
               ) : (
                 <Button
                   onClick={handleManageBilling}
                   disabled={loading || !slug}
                   size="lg"
-                  className="w-full rounded-full text-base font-semibold gap-2"
+                  className="w-full rounded-full text-base font-semibold"
                 >
-                  {loading ? (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    <CreditCard size={18} />
-                  )}
+                  {loading ? <Loader2 size={18} className="animate-spin mr-2" /> : null}
                   {loading ? 'Redirecting...' : 'Update payment method'}
-                  {!loading && <ArrowRight size={16} />}
                 </Button>
               )}
 

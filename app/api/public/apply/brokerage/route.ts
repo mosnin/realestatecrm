@@ -12,6 +12,7 @@ import {
   publicApplicationSchema,
 } from '@/lib/public-application';
 import { notifyNewLead } from '@/lib/notify';
+import { sendApplicationConfirmation } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
 
@@ -149,17 +150,21 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Fetch privacy policy URL from space settings for consent snapshot
+    // Fetch space settings for consent snapshot + applicant confirmation email
     let spacePrivacyPolicyUrl: string | null = null;
+    let spaceBusinessName: string | null = null;
+    let intakeConfirmationEmail: string | null = null;
     try {
       const { data: spaceSetting } = await supabase
         .from('SpaceSetting')
-        .select('privacyPolicyUrl')
+        .select('privacyPolicyUrl, businessName, intakeConfirmationEmail')
         .eq('spaceId', space.id)
         .maybeSingle();
       spacePrivacyPolicyUrl = spaceSetting?.privacyPolicyUrl ?? null;
+      spaceBusinessName = spaceSetting?.businessName ?? null;
+      intakeConfirmationEmail = spaceSetting?.intakeConfirmationEmail ?? null;
     } catch (err) {
-      console.warn('[apply/brokerage] failed to fetch space privacy policy URL', { spaceId: space.id, err });
+      console.warn('[apply/brokerage] failed to fetch space settings', { spaceId: space.id, err });
     }
 
     // ── Build application data ─────────────────────────────────────────────
@@ -284,22 +289,39 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Notify the broker owner
-    try {
-      await notifyNewLead({
-        spaceId: space.id,
-        contactId: contact.id,
-        name: payload.legalName,
-        phone: payload.phone,
-        email: payload.email,
-        leadScore: scoring.leadScore,
-        scoreLabel: scoring.scoreLabel,
-        scoreSummary: scoring.scoreSummary,
-        applicationData,
-      });
-    } catch (err) {
-      console.error('[apply/brokerage] notification failed', { contactId: contact.id, err });
-    }
+    // Send broker notification + applicant confirmation email in parallel
+    const businessName = spaceBusinessName || brokerage.name || space.name;
+
+    const brokerNotification = notifyNewLead({
+      spaceId: space.id,
+      contactId: contact.id,
+      name: payload.legalName,
+      phone: payload.phone,
+      email: payload.email,
+      leadScore: scoring.leadScore,
+      scoreLabel: scoring.scoreLabel,
+      scoreSummary: scoring.scoreSummary,
+      applicationData,
+    }).catch((err) => {
+      console.error('[apply/brokerage] broker notification failed', { contactId: contact.id, err });
+    });
+
+    const applicantConfirmation = payload.email
+      ? sendApplicationConfirmation({
+          toEmail: payload.email,
+          applicantName: payload.legalName,
+          businessName,
+          slug: `brokerage:${payload.brokerageId}`,
+          applicationRef,
+          leadType: payload.leadType ?? 'rental',
+          customMessage: intakeConfirmationEmail,
+        }).catch((confirmErr) => {
+          console.error('[apply/brokerage] applicant confirmation email failed', { contactId: contact.id, confirmErr });
+        })
+      : Promise.resolve();
+
+    await Promise.all([brokerNotification, applicantConfirmation]);
+    console.log('[apply/brokerage] notifications dispatched');
 
     return NextResponse.json(
       {
