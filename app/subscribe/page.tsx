@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
@@ -13,9 +13,18 @@ import { BorderBeam } from '@/components/ui/border-beam';
 function SubscribeContent() {
   const { isSignedIn, isLoaded } = useAuth();
   const searchParams = useSearchParams();
-  const slug = searchParams.get('slug') ?? '';
+  const [slug, setSlug] = useState(searchParams.get('slug') ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // If no slug in URL, fetch it from the user's space
+  useEffect(() => {
+    if (slug || !isLoaded || !isSignedIn) return;
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(d => { if (d.slug) setSlug(d.slug); })
+      .catch(() => {});
+  }, [slug, isLoaded, isSignedIn]);
 
   // Redirect unauthenticated users
   if (isLoaded && !isSignedIn) {

@@ -53,7 +53,7 @@ export function BorderBeam({
       }
       ref={pathRef}
       className={cn(
-        `absolute z-0 h-full w-full rounded-[inherit]`,
+        `absolute z-0 h-full w-full rounded-[inherit] pointer-events-none`,
         `after:absolute after:inset-[var(--border-width)] after:rounded-[inherit] after:content-['']`,
         "border-[length:var(--border-width)] ![mask-clip:padding-box,border-box]",
         "![mask-composite:intersect] [mask:linear-gradient(transparent,transparent),linear-gradient(red,red)]",
