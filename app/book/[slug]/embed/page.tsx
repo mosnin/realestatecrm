@@ -27,9 +27,10 @@ export default async function EmbedBookingPage({
   const duration = (settingsData as any)?.tourDuration || 30;
   const timezone = (settingsData as any)?.timezone || 'America/New_York';
 
-  // Gate on subscription status — show paused page if not active/trialing
+  // Gate on subscription status — only pause forms for explicitly failed billing
   const subStatus = space.stripeSubscriptionStatus;
-  if (subStatus !== 'active' && subStatus !== 'trialing') {
+  const formPaused = subStatus === 'past_due' || subStatus === 'canceled' || subStatus === 'unpaid';
+  if (formPaused) {
     return (
       <html>
         <body style={{ margin: 0, padding: 16, fontFamily: 'system-ui, sans-serif', background: 'transparent' }}>

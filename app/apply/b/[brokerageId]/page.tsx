@@ -102,9 +102,10 @@ export default async function BrokerageApplyPage({
   // Prefer brokerage logo, fall back to space logo
   const logoUrl = brokerage.logoUrl || settings?.logoUrl || null;
 
-  // Gate on subscription status — show paused page if not active/trialing
+  // Gate on subscription status — only pause forms for explicitly failed billing
   const status = (space as any).stripeSubscriptionStatus as string | undefined;
-  if (status !== 'active' && status !== 'trialing') {
+  const formPaused = status === 'past_due' || status === 'canceled' || status === 'unpaid';
+  if (formPaused) {
     return <FormUnavailable agentName={agentName} />;
   }
 

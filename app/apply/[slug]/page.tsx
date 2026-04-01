@@ -79,9 +79,10 @@ export default async function PublicApplyPage({
   const agentPhoto = settings?.realtorPhotoUrl || ownerData?.avatar || null;
   const logoUrl = settings?.logoUrl || null;
 
-  // Gate on subscription status — show paused page if not active/trialing
+  // Gate on subscription status — only pause forms for explicitly failed billing
   const status = space.stripeSubscriptionStatus;
-  if (status !== 'active' && status !== 'trialing') {
+  const formPaused = status === 'past_due' || status === 'canceled' || status === 'unpaid';
+  if (formPaused) {
     return <FormUnavailable agentName={agentName} />;
   }
 

@@ -66,9 +66,10 @@ export default async function PublicBookingPage({
   const agentPhoto = settings?.realtorPhotoUrl || ownerData?.avatar || null;
   const logoUrl = settings?.logoUrl || null;
 
-  // Gate on subscription status — show paused page if not active/trialing
+  // Gate on subscription status — only pause forms for explicitly failed billing
   const subStatus = space.stripeSubscriptionStatus;
-  if (subStatus !== 'active' && subStatus !== 'trialing') {
+  const formPaused = subStatus === 'past_due' || subStatus === 'canceled' || subStatus === 'unpaid';
+  if (formPaused) {
     return <FormUnavailable agentName={agentName} />;
   }
 
