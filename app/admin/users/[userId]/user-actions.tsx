@@ -23,6 +23,7 @@ import {
   CreditCard,
   Gift,
   Clock,
+  DollarSign,
   ShieldBan,
   ShieldCheck,
 } from 'lucide-react';
@@ -87,6 +88,11 @@ export function UserActions({
   const [suspendLoading, setSuspendLoading] = useState(false);
   const [suspendResult, setSuspendResult] = useState<string | null>(null);
   const [suspendOpen, setSuspendOpen] = useState(false);
+  const [compLoading, setCompLoading] = useState(false);
+  const [compResult, setCompResult] = useState<string | null>(null);
+  const [refundLoading, setRefundLoading] = useState(false);
+  const [refundResult, setRefundResult] = useState<string | null>(null);
+  const [refundOpen, setRefundOpen] = useState(false);
 
   async function handlePasswordReset() {
     setResetLoading(true);
@@ -172,6 +178,53 @@ export function UserActions({
     const fourteenDays = new Date();
     fourteenDays.setDate(fourteenDays.getDate() + 14);
     handleUpdateSubscription('trialing', fourteenDays.toISOString());
+  }
+
+  async function handleCompFreeMonth() {
+    setCompLoading(true);
+    setCompResult(null);
+    try {
+      const res = await fetch('/api/admin/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'comp_free_month', userId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCompResult(`Free month granted. Active until ${new Date(data.periodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.`);
+        router.refresh();
+      } else {
+        setCompResult(data.error || 'Failed to comp free month.');
+      }
+    } catch {
+      setCompResult('Network error. Try again.');
+    } finally {
+      setCompLoading(false);
+    }
+  }
+
+  async function handleRefund() {
+    setRefundLoading(true);
+    setRefundResult(null);
+    try {
+      const res = await fetch('/api/admin/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'issue_refund', userId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRefundResult(`Refund issued. Refund ID: ${data.refundId}, Amount: $${(data.amount / 100).toFixed(2)}.`);
+        setRefundOpen(false);
+        router.refresh();
+      } else {
+        setRefundResult(data.error || 'Refund failed.');
+      }
+    } catch {
+      setRefundResult('Network error. Try again.');
+    } finally {
+      setRefundLoading(false);
+    }
   }
 
   async function handleSuspendToggle() {
@@ -392,6 +445,78 @@ export function UserActions({
 
               {subResult && (
                 <p className="text-xs text-muted-foreground">{subResult}</p>
+              )}
+
+              <div className="border-t border-border" />
+
+              {/* Billing actions */}
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-1.5">
+                    <DollarSign size={13} />
+                    Billing
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Comp a free month or issue a refund for the last payment.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    onClick={handleCompFreeMonth}
+                    variant="outline"
+                    size="sm"
+                    disabled={compLoading}
+                    className="gap-1.5"
+                  >
+                    <Gift size={14} />
+                    {compLoading ? 'Processing...' : 'Comp free month'}
+                  </Button>
+
+                  <Dialog open={refundOpen} onOpenChange={setRefundOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-destructive hover:text-destructive"
+                      >
+                        <CreditCard size={14} />
+                        Issue refund
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Issue refund</DialogTitle>
+                        <DialogDescription>
+                          Refund the user&apos;s last payment? This will issue a full refund via Stripe.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => setRefundOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={handleRefund}
+                          disabled={refundLoading}
+                        >
+                          <CreditCard size={14} />
+                          {refundLoading ? 'Processing...' : 'Confirm refund'}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+
+              {compResult && (
+                <p className="text-xs text-muted-foreground">{compResult}</p>
+              )}
+              {refundResult && (
+                <p className="text-xs text-muted-foreground">{refundResult}</p>
               )}
             </>
           )}

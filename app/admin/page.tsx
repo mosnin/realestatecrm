@@ -352,7 +352,10 @@ export default async function AdminOverviewPage() {
       </div>
 
       {/* ── Quick Actions ────────────────────────────────────────────── */}
-      <div className="flex flex-wrap gap-2">
+      <Card className="rounded-xl border bg-card">
+        <CardContent className="px-5 py-4">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Actions</p>
+          <div className="flex flex-wrap gap-2">
         <Link href="/admin/users">
           <Button variant="outline" size="sm" className="gap-1.5">
             <Users size={14} />
@@ -377,7 +380,9 @@ export default async function AdminOverviewPage() {
             View spaces
           </Button>
         </Link>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ── Platform Overview ────────────────────────────────────────── */}
       <div className="space-y-3">
@@ -419,13 +424,13 @@ export default async function AdminOverviewPage() {
           ].map(({ label, value, sub, icon: Icon, color, accent }) => (
             <Card
               key={label}
-              className={`rounded-xl border bg-card ${
+              className={`rounded-xl border bg-card h-full ${
                 accent
                   ? 'border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-500/5'
                   : ''
               }`}
             >
-              <CardContent className="p-6">
+              <CardContent className="p-6 h-full flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground font-medium">{label}</p>
@@ -496,8 +501,8 @@ export default async function AdminOverviewPage() {
               color: 'text-rose-500',
             },
           ].map(({ label, value, sub, icon: Icon, color }) => (
-            <Card key={label} className="rounded-xl border bg-card">
-              <CardContent className="p-6">
+            <Card key={label} className="rounded-xl border bg-card h-full">
+              <CardContent className="p-6 h-full flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground font-medium">{label}</p>
@@ -534,8 +539,8 @@ export default async function AdminOverviewPage() {
               color: 'text-rose-500',
             },
           ].map(({ label, value, sub, icon: Icon, color }) => (
-            <Card key={label} className="rounded-xl border bg-card">
-              <CardContent className="p-6">
+            <Card key={label} className="rounded-xl border bg-card h-full">
+              <CardContent className="p-6 h-full flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground font-medium">{label}</p>
@@ -856,6 +861,13 @@ export default async function AdminOverviewPage() {
             </Card>
           )}
         </div>
+      </div>
+
+      {/* ── Last updated ────────────────────────────────────────────── */}
+      <div className="pt-4 border-t border-border">
+        <p className="text-xs text-muted-foreground text-center">
+          Last updated: {now.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
+        </p>
       </div>
     </div>
   );

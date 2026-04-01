@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   const { action } = body;
 
-  const ALLOWED_ACTIONS = ['send_password_reset', 'repair_onboarding', 'update_subscription', 'suspend_user', 'unsuspend_user'];
+  const ALLOWED_ACTIONS = ['send_password_reset', 'repair_onboarding', 'update_subscription', 'suspend_user', 'unsuspend_user', 'comp_free_month', 'issue_refund'];
   if (!ALLOWED_ACTIONS.includes(action as string)) {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   }
@@ -274,6 +274,56 @@ export async function POST(req: NextRequest) {
         success: true,
         message: `User ${target.email} has been unsuspended. They can now sign in again.`,
       });
+    }
+
+    // ── Comp free month ─────────────────────────────────────────────────
+    if (action === 'comp_free_month') {
+      const { userId: targetUserId } = body as { userId: string };
+      if (!targetUserId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
+
+      const { data: space } = await supabase
+        .from('Space')
+        .select('id')
+        .eq('ownerId', targetUserId)
+        .maybeSingle();
+
+      if (!space) return NextResponse.json({ error: 'No workspace found' }, { status: 404 });
+
+      const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      await supabase.from('Space').update({
+        stripeSubscriptionStatus: 'active',
+        stripePeriodEnd: periodEnd,
+      }).eq('id', space.id);
+
+      logAdminAction({ actor: admin.userId, action: 'comp_free_month', target: targetUserId, details: { periodEnd } });
+      return NextResponse.json({ success: true, periodEnd });
+    }
+
+    // ── Issue refund ──────────────────────────────────────────────────────
+    if (action === 'issue_refund') {
+      const { userId: targetUserId, invoiceId } = body as { userId: string; invoiceId?: string };
+      const { data: space } = await supabase
+        .from('Space')
+        .select('id, stripeCustomerId')
+        .eq('ownerId', targetUserId)
+        .maybeSingle();
+
+      if (!space?.stripeCustomerId) return NextResponse.json({ error: 'No Stripe customer' }, { status: 404 });
+
+      const stripe = (await import('@/lib/stripe')).getStripe();
+
+      let targetInvoice = invoiceId;
+      if (!targetInvoice) {
+        // Find the last paid invoice
+        const invoices = await stripe.invoices.list({ customer: space.stripeCustomerId, status: 'paid', limit: 1 });
+        targetInvoice = invoices.data[0]?.id;
+      }
+
+      if (!targetInvoice) return NextResponse.json({ error: 'No paid invoices to refund' }, { status: 404 });
+
+      const refund = await stripe.refunds.create({ invoice: targetInvoice });
+      logAdminAction({ actor: admin.userId, action: 'issue_refund', target: targetUserId, details: { invoiceId: targetInvoice, refundId: refund.id, amount: refund.amount } });
+      return NextResponse.json({ success: true, refundId: refund.id, amount: refund.amount });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
