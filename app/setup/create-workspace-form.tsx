@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BrandLogo } from '@/components/brand-logo';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, Loader2, AlertCircle, Users, UserCircle, ArrowLeft, Building2, LogOut, Instagram, Linkedin, Facebook, Image, Phone, Globe, MapPin } from 'lucide-react';
+import { CheckCircle2, Loader2, AlertCircle, Users, UserCircle, ArrowLeft, Building2, LogOut, Instagram, Linkedin, Facebook, Image, Phone, Globe, MapPin, Clock } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
 import { useClerk } from '@clerk/nextjs';
 import { toast } from 'sonner';
@@ -15,7 +16,7 @@ import { toast } from 'sonner';
 type SetupRole = 'choose' | 'realtor' | 'broker' | 'broker_only';
 type SetupStep = 'choose' | 'create' | 'personalize';
 
-export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: string; userEmail: string }) {
+export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { defaultName: string; userEmail: string; userImageUrl?: string }) {
   const { signOut } = useClerk();
   const router = useRouter();
   const [role, setRole] = useState<SetupRole>('choose');
@@ -42,6 +43,20 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
   const [primaryMarket, setPrimaryMarket] = useState('');
   const [commissionStructure, setCommissionStructure] = useState('');
   const [geographicCoverage, setGeographicCoverage] = useState('');
+
+  // Realtor additional fields
+  const [realtorPhone, setRealtorPhone] = useState('');
+  const [realtorBio, setRealtorBio] = useState('');
+  const [realtorWebsite, setRealtorWebsite] = useState('');
+
+  // Realtor multi-step: 0 = workspace info, 1 = contact details, 2 = preferences
+  const [realtorStep, setRealtorStep] = useState(0);
+  const realtorTotalSteps = 3;
+
+  // Shared preferences (both roles)
+  const [timezone, setTimezone] = useState('');
+  const [hearAbout, setHearAbout] = useState('');
+  const [painPoint, setPainPoint] = useState('');
 
   // Personalize step state
   const [resolvedSlug, setResolvedSlug] = useState('');
@@ -575,38 +590,19 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {(role === 'broker' || role === 'broker_only') && (
-              <div className="space-y-1.5">
-                <Label htmlFor="brokerageName">Brokerage name</Label>
-                <Input
-                  id="brokerageName"
-                  value={brokerageName}
-                  onChange={(e) => setBrokerageName(e.target.value)}
-                  placeholder="e.g. Preston Realty Group"
-                  required
-                  autoFocus
-                  maxLength={120}
-                />
-                <p className="text-xs text-muted-foreground">
-                  The name your realtors will see when they join.
-                </p>
-              </div>
-            )}
-
-            {needsWorkspace && (
+          <form onSubmit={isBrokerRole ? handleBrokerNext : handleSubmit} className="space-y-4">
+            {/* Realtor-only form (unchanged) */}
+            {role === 'realtor' && (
               <>
                 <div className="space-y-1.5">
-                  <Label htmlFor="businessName">
-                    {role === 'broker' ? 'Your personal workspace name' : 'Business or brand name'}
-                  </Label>
+                  <Label htmlFor="businessName">Business or brand name</Label>
                   <Input
                     id="businessName"
                     value={businessName}
                     onChange={(e) => setBusinessName(e.target.value)}
                     placeholder="Preston Leasing"
                     required
-                    autoFocus={role === 'realtor'}
+                    autoFocus
                   />
                 </div>
 
@@ -644,6 +640,265 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
               </>
             )}
 
+            {/* Broker step 0: Basic info (brokerage name + workspace for "both") */}
+            {isBrokerRole && brokerStep === 0 && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="brokerageName">Brokerage name</Label>
+                  <Input
+                    id="brokerageName"
+                    value={brokerageName}
+                    onChange={(e) => setBrokerageName(e.target.value)}
+                    placeholder="e.g. Preston Realty Group"
+                    required
+                    autoFocus
+                    maxLength={120}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The name your realtors will see when they join.
+                  </p>
+                </div>
+
+                {role === 'broker' && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="businessName">Your personal workspace name</Label>
+                      <Input
+                        id="businessName"
+                        value={businessName}
+                        onChange={(e) => setBusinessName(e.target.value)}
+                        placeholder="Preston Leasing"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="slug">Intake link slug</Label>
+                      <div className="relative">
+                        <Input
+                          id="slug"
+                          value={slug}
+                          onChange={(e) =>
+                            setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
+                          }
+                          placeholder="preston-leasing"
+                          className="pr-8"
+                          required
+                        />
+                        {slug.length >= 3 && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            {checking ? (
+                              <Loader2 size={14} className="animate-spin text-muted-foreground" />
+                            ) : slugAvailable === true ? (
+                              <CheckCircle2 size={14} className="text-green-500 dark:text-green-400" />
+                            ) : slugAvailable === false ? (
+                              <span className="text-red-500 dark:text-red-400 text-xs font-medium">taken</span>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+                      {slug.length >= 3 && (
+                        <p className="text-xs text-muted-foreground break-all">
+                          chippi.com/apply/{slug}
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Broker step 1: Brokerage details */}
+            {isBrokerRole && brokerStep === 1 && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="brokerLogoUrl">Brokerage logo URL</Label>
+                  <div className="relative">
+                    <Image size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="brokerLogoUrl"
+                      value={brokerLogoUrl}
+                      onChange={(e) => setBrokerLogoUrl(e.target.value)}
+                      placeholder="https://example.com/logo.png"
+                      className="pl-9"
+                    />
+                  </div>
+                  {brokerLogoUrl.trim() && (
+                    <div className="mt-2 rounded-lg border border-border bg-muted/30 p-3 flex items-center justify-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={brokerLogoUrl.trim()}
+                        alt="Brokerage logo preview"
+                        className="max-h-16 max-w-full object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        onLoad={(e) => { (e.target as HTMLImageElement).style.display = 'block'; }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="brokerWebsiteUrl">Website URL</Label>
+                  <div className="relative">
+                    <Globe size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="brokerWebsiteUrl"
+                      value={brokerWebsiteUrl}
+                      onChange={(e) => setBrokerWebsiteUrl(e.target.value)}
+                      placeholder="https://prestonrealty.com"
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="officeAddress">Office address</Label>
+                  <div className="relative">
+                    <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="officeAddress"
+                      value={officeAddress}
+                      onChange={(e) => setOfficeAddress(e.target.value)}
+                      placeholder="123 Main St, Suite 100, Miami, FL 33130"
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="officePhone">Office phone</Label>
+                  <div className="relative">
+                    <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="officePhone"
+                      type="tel"
+                      value={officePhone}
+                      onChange={(e) => setOfficePhone(e.target.value)}
+                      placeholder="(305) 555-0100"
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Broker step 2: Team info */}
+            {isBrokerRole && brokerStep === 2 && (
+              <>
+                <div className="space-y-2">
+                  <Label>Number of agents</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { value: '1-5', label: '1 - 5' },
+                      { value: '5-15', label: '5 - 15' },
+                      { value: '15-50', label: '15 - 50' },
+                      { value: '50+', label: '50+' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setAgentCount(opt.value)}
+                        className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-all ${
+                          agentCount === opt.value
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-card text-foreground hover:border-primary/30'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Brokerage type</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'independent', label: 'Independent' },
+                      { value: 'franchise', label: 'Franchise' },
+                      { value: 'virtual', label: 'Virtual' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setBrokerageType(opt.value)}
+                        className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-all ${
+                          brokerageType === opt.value
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-card text-foreground hover:border-primary/30'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Primary market</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'residential_rental', label: 'Residential Rental' },
+                      { value: 'commercial', label: 'Commercial' },
+                      { value: 'mixed', label: 'Mixed' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setPrimaryMarket(opt.value)}
+                        className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-all ${
+                          primaryMarket === opt.value
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-card text-foreground hover:border-primary/30'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Broker step 3: Business model */}
+            {isBrokerRole && brokerStep === 3 && (
+              <>
+                <div className="space-y-2">
+                  <Label>Commission structure</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'flat_fee', label: 'Flat fee' },
+                      { value: 'percentage_split', label: 'Percentage split' },
+                      { value: 'hybrid', label: 'Hybrid' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setCommissionStructure(opt.value)}
+                        className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-all ${
+                          commissionStructure === opt.value
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-card text-foreground hover:border-primary/30'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="geographicCoverage">Geographic coverage</Label>
+                  <Input
+                    id="geographicCoverage"
+                    value={geographicCoverage}
+                    onChange={(e) => setGeographicCoverage(e.target.value)}
+                    placeholder="e.g., Miami-Dade, Broward County"
+                  />
+                </div>
+              </>
+            )}
+
             {error && (
               <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5">
                 <AlertCircle size={14} className="text-destructive flex-shrink-0 mt-0.5" />
@@ -651,26 +906,47 @@ export function CreateWorkspaceForm({ defaultName, userEmail }: { defaultName: s
               </div>
             )}
 
-            <Button type="submit" className="w-full" disabled={!canSubmit} size="lg">
-              {saving ? (
-                <>
-                  <Loader2 size={16} className="mr-2 animate-spin" />
-                  {role === 'broker_only' ? 'Creating brokerage...' : role === 'broker' ? 'Setting up...' : 'Creating...'}
-                </>
-              ) : role === 'broker_only' ? (
-                <>
-                  <Building2 size={16} className="mr-2" />
-                  Create brokerage
-                </>
-              ) : role === 'broker' ? (
-                <>
-                  <Users size={16} className="mr-2" />
-                  Create brokerage & workspace
-                </>
-              ) : (
-                'Create workspace'
-              )}
-            </Button>
+            {/* Realtor submit */}
+            {role === 'realtor' && (
+              <Button type="submit" className="w-full" disabled={!canSubmit} size="lg">
+                {saving ? (
+                  <>
+                    <Loader2 size={16} className="mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create workspace'
+                )}
+              </Button>
+            )}
+
+            {/* Broker next / submit */}
+            {isBrokerRole && brokerStep < brokerTotalSteps - 1 && (
+              <Button type="submit" className="w-full" disabled={!canAdvanceBrokerStep} size="lg">
+                Continue
+              </Button>
+            )}
+
+            {isBrokerRole && brokerStep === brokerTotalSteps - 1 && (
+              <Button type="submit" className="w-full" disabled={!canSubmit} size="lg">
+                {saving ? (
+                  <>
+                    <Loader2 size={16} className="mr-2 animate-spin" />
+                    {role === 'broker_only' ? 'Creating brokerage...' : 'Setting up...'}
+                  </>
+                ) : role === 'broker_only' ? (
+                  <>
+                    <Building2 size={16} className="mr-2" />
+                    Create brokerage
+                  </>
+                ) : (
+                  <>
+                    <Users size={16} className="mr-2" />
+                    Create brokerage & workspace
+                  </>
+                )}
+              </Button>
+            )}
           </form>
         </div>
       </div>

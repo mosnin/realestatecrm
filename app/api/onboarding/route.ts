@@ -102,6 +102,17 @@ export async function POST(req: NextRequest) {
 
     if (existingData) {
       user = existingData as User;
+      // Backfill avatar from Clerk if not yet saved
+      if (!user.avatar) {
+        const clerkUser = await currentUser();
+        if (clerkUser?.imageUrl) {
+          await supabase
+            .from('User')
+            .update({ avatar: clerkUser.imageUrl })
+            .eq('id', user.id);
+          user = { ...user, avatar: clerkUser.imageUrl };
+        }
+      }
     } else {
       const clerkUser = await currentUser();
       const { data: insertedData, error: insertError } = await supabase
@@ -112,6 +123,7 @@ export async function POST(req: NextRequest) {
             clerkId: userId,
             email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? '',
             name: clerkUser?.fullName ?? clerkUser?.firstName ?? null,
+            avatar: clerkUser?.imageUrl ?? null,
             onboardingStartedAt: new Date().toISOString(),
             onboard: false,
           },
