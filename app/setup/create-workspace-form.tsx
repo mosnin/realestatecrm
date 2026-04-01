@@ -102,7 +102,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
   }, [slug, checkSlug, needsWorkspace]);
 
   const isBrokerRole = role === 'broker_only' || role === 'broker';
-  const brokerTotalSteps = 4; // 0=basic, 1=brokerage details, 2=team info, 3=business model
+  const brokerTotalSteps = 5; // 0=basic, 1=brokerage details, 2=team info, 3=business model, 4=preferences
 
   const canAdvanceBrokerStep = (() => {
     if (!isBrokerRole) return false;
@@ -114,9 +114,21 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
     return true;
   })();
 
+  const canAdvanceRealtorStep = (() => {
+    if (role !== 'realtor') return false;
+    if (realtorStep === 0) {
+      return businessName.trim().length > 0 && slug.length >= 3 && slugAvailable === true;
+    }
+    // Steps 1-2 have no required fields (all optional)
+    return true;
+  })();
+
   const canSubmit = !saving && (() => {
     if (isBrokerRole) {
       return brokerStep === brokerTotalSteps - 1 && canAdvanceBrokerStep;
+    }
+    if (role === 'realtor') {
+      return realtorStep === realtorTotalSteps - 1 && canAdvanceRealtorStep;
     }
     if (!businessName.trim() || slug.length < 3 || slugAvailable !== true) return false;
     return true;
@@ -127,6 +139,17 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
     if (!canAdvanceBrokerStep) return;
     if (brokerStep < brokerTotalSteps - 1) {
       setBrokerStep(brokerStep + 1);
+      return;
+    }
+    // On the last step, trigger actual submit
+    handleSubmit(e);
+  }
+
+  function handleRealtorNext(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canAdvanceRealtorStep) return;
+    if (realtorStep < realtorTotalSteps - 1) {
+      setRealtorStep(realtorStep + 1);
       return;
     }
     // On the last step, trigger actual submit
@@ -164,6 +187,9 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
             name: defaultName,
             phone: '',
             businessName: brokerageName.trim(),
+            timezone: timezone || undefined,
+            hearAbout: hearAbout || undefined,
+            painPoint: painPoint || undefined,
           }),
         });
         if (!profileRes.ok) {
@@ -205,8 +231,13 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
         body: JSON.stringify({
           action: 'save_profile',
           name: defaultName,
-          phone: '',
+          phone: role === 'realtor' ? realtorPhone.trim() : '',
           businessName,
+          bio: role === 'realtor' ? realtorBio.trim() || undefined : undefined,
+          websiteUrl: role === 'realtor' ? realtorWebsite.trim() || undefined : undefined,
+          timezone: timezone || undefined,
+          hearAbout: hearAbout || undefined,
+          painPoint: painPoint || undefined,
         }),
       });
       if (!profileRes2.ok) {
