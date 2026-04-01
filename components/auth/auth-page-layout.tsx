@@ -110,7 +110,11 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
       </div>
 
       {/* ── Right decorative panel ── */}
-      <div className="hidden lg:relative lg:flex lg:flex-1 lg:flex-col lg:items-center lg:justify-center overflow-hidden bg-gradient-to-br from-orange-50 via-orange-100/60 to-amber-50 dark:from-orange-950/40 dark:via-slate-900 dark:to-slate-950">
+      <div className="hidden lg:relative lg:flex lg:flex-1 lg:flex-col lg:items-center lg:justify-center overflow-hidden">
+        {/* Grid + radial gradient background */}
+        <div className="absolute inset-0 -z-10 h-full w-full bg-white bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] bg-[size:6rem_4rem] dark:bg-slate-950 dark:bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)]">
+          <div className="absolute bottom-0 left-0 right-0 top-0 bg-[radial-gradient(circle_600px_at_50%_300px,#ffe0c2,transparent)] dark:bg-[radial-gradient(circle_600px_at_50%_300px,#7c2d12,transparent)]" />
+        </div>
         {/* Catchy heading */}
         <div className="relative z-10 text-center px-8 -mt-8">
           <p className="text-sm font-medium uppercase tracking-widest text-primary mb-3">
