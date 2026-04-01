@@ -117,6 +117,7 @@ export type ScoringInput = {
   phone: string;
   budget: number | null;
   applicationData: ApplicationData | null;
+  leadType?: 'rental' | 'buyer';
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -770,6 +771,10 @@ function collectInsights(categories: CategoryResult[], penalties: RiskPenalty[],
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function computeLeadScore(input: ScoringInput): ScoringEngineResult {
+  if (input.leadType === 'buyer') {
+    return computeBuyerScore(input);
+  }
+
   // 1. Compute all category sub-scores
   const categories: CategoryResult[] = [
     scoreCreditScore(input),

@@ -29,6 +29,10 @@ import {
   CheckSquare,
   Zap,
   Calendar,
+  Home,
+  BedDouble,
+  Bath,
+  ShieldCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -138,6 +142,7 @@ interface LeadsViewProps {
 export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewProps) {
   const [leads, setLeads] = useState<Contact[]>(initialLeads);
   const [tierFilter, setTierFilter] = useState<TierFilter>('all');
+  const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'rental' | 'buyer'>('all');
   const [sort, setSort] = useState<'newest' | 'score' | 'followup'>('newest');
   const [view, setView] = useState<'card' | 'list'>('card');
   const [convertTarget, setConvertTarget] = useState<Contact | null>(null);
@@ -195,6 +200,9 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
 
   const filtered = useMemo(() => {
     let list = tierFilter === 'all' ? leads : leads.filter((l) => getTierKey(l) === tierFilter);
+    if (leadTypeFilter !== 'all') {
+      list = list.filter((l) => l.leadType === leadTypeFilter);
+    }
     if (sort === 'score') {
       list = [...list].sort((a, b) => (b.leadScore ?? -1) - (a.leadScore ?? -1));
     } else if (sort === 'followup') {
@@ -205,7 +213,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
       });
     }
     return list;
-  }, [leads, tierFilter, sort]);
+  }, [leads, tierFilter, leadTypeFilter, sort]);
 
   function handleConverted(leadId: string) {
     setLeads((prev) => prev.filter((l) => l.id !== leadId));
@@ -353,6 +361,30 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                   tierFilter === key ? 'opacity-80' : 'opacity-60',
                 )}>
                   {leads.filter((l) => getTierKey(l) === key).length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Lead type filter */}
+        <div className="flex gap-1">
+          {(['all', 'rental', 'buyer'] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setLeadTypeFilter(key)}
+              className={cn(
+                'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                leadTypeFilter === key
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
+              )}
+            >
+              {key === 'all' ? 'All' : key === 'rental' ? 'Rental' : 'Buyer'}
+              {key !== 'all' && (
+                <span className={cn('ml-1 tabular-nums', leadTypeFilter === key ? 'opacity-80' : 'opacity-60')}>
+                  {leads.filter((l) => l.leadType === key).length}
                 </span>
               )}
             </button>
@@ -592,21 +624,54 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
 
                 {/* Key qualification data */}
                 <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+                  {lead.leadType === 'buyer' && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300">
+                      <Home size={9} />
+                      Buyer
+                    </span>
+                  )}
                   {lead.phone && <QChip icon={Phone} label={lead.phone} href={`tel:${lead.phone}`} />}
                   {lead.email && <QChip icon={Mail} label={lead.email} href={`mailto:${lead.email}`} />}
-                  {budgetDisplay && <QChip icon={DollarSign} label={budgetDisplay} highlight />}
-                  {app?.employmentStatus && <QChip icon={Briefcase} label={app.employmentStatus} />}
-                  {incomeDisplay && (
-                    <QChip icon={DollarSign} label={incomeDisplay} />
+                  {lead.leadType === 'buyer' ? (
+                    <>
+                      {/* Buyer-specific fields */}
+                      {budgetDisplay && <QChip icon={DollarSign} label={`Budget: ${budgetDisplay}`} highlight />}
+                      {app?.preApprovalStatus && (
+                        <span className={cn(
+                          'inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5',
+                          app.preApprovalStatus === 'Pre-Approved' || app.preApprovalStatus === 'Yes'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
+                            : app.preApprovalStatus === 'Not Yet' || app.preApprovalStatus === 'In Progress'
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300',
+                        )}>
+                          <ShieldCheck size={9} />
+                          {app.preApprovalStatus === 'Yes' ? 'Pre-Approved' : app.preApprovalStatus}
+                        </span>
+                      )}
+                      {app?.preApprovalAmount && <QChip icon={DollarSign} label={`Approved: ${app.preApprovalAmount}`} />}
+                      {app?.propertyType && <QChip icon={Home} label={app.propertyType} />}
+                      {app?.bedrooms && <QChip icon={BedDouble} label={`${app.bedrooms} bed`} />}
+                      {app?.bathrooms && <QChip icon={Bath} label={`${app.bathrooms} bath`} />}
+                      {app?.employmentStatus && <QChip icon={Briefcase} label={app.employmentStatus} />}
+                      {incomeDisplay && <QChip icon={DollarSign} label={incomeDisplay} />}
+                    </>
+                  ) : (
+                    <>
+                      {/* Rental-specific fields */}
+                      {budgetDisplay && <QChip icon={DollarSign} label={budgetDisplay} highlight />}
+                      {app?.employmentStatus && <QChip icon={Briefcase} label={app.employmentStatus} />}
+                      {incomeDisplay && <QChip icon={DollarSign} label={incomeDisplay} />}
+                      {app?.targetMoveInDate && <QChip icon={Calendar} label={app.targetMoveInDate} />}
+                      {(app?.numberOfOccupants != null) && (
+                        <QChip icon={Users} label={`${app.numberOfOccupants} occupant${app.numberOfOccupants !== 1 ? 's' : ''}`} />
+                      )}
+                      {(app?.numberOfOccupants == null && app?.adultsOnApplication != null) && (
+                        <QChip icon={Users} label={`${app.adultsOnApplication} adult${app.adultsOnApplication !== 1 ? 's' : ''}${(app.childrenOrDependents ?? 0) > 0 ? ` · ${app.childrenOrDependents} child${app.childrenOrDependents !== 1 ? 'ren' : ''}` : ''}`} />
+                      )}
+                      {app?.hasPets && <QChip icon={PawPrint} label={app.petDetails ?? 'Has pets'} />}
+                    </>
                   )}
-                  {app?.targetMoveInDate && <QChip icon={Calendar} label={app.targetMoveInDate} />}
-                  {(app?.numberOfOccupants != null) && (
-                    <QChip icon={Users} label={`${app.numberOfOccupants} occupant${app.numberOfOccupants !== 1 ? 's' : ''}`} />
-                  )}
-                  {(app?.numberOfOccupants == null && app?.adultsOnApplication != null) && (
-                    <QChip icon={Users} label={`${app.adultsOnApplication} adult${app.adultsOnApplication !== 1 ? 's' : ''}${(app.childrenOrDependents ?? 0) > 0 ? ` · ${app.childrenOrDependents} child${app.childrenOrDependents !== 1 ? 'ren' : ''}` : ''}`} />
-                  )}
-                  {app?.hasPets && <QChip icon={PawPrint} label={app.petDetails ?? 'Has pets'} />}
                   {(app?.propertyAddress || lead.preferences) && <QChip icon={MapPin} label={app?.propertyAddress ?? lead.preferences ?? ''} />}
                 </div>
 

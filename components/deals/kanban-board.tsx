@@ -59,9 +59,10 @@ function formatCurrency(n: number | null) {
 
 interface KanbanBoardProps {
   slug: string;
+  pipelineType: 'rental' | 'buyer';
 }
 
-export function KanbanBoard({ slug }: KanbanBoardProps) {
+export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   const [stages, setStages] = useState<StageWithDeals[]>([]);
   const [contacts, setContacts] = useState<Pick<Contact, 'id' | 'name'>[]>([]);
   const [addDealOpen, setAddDealOpen] = useState(false);
@@ -79,12 +80,12 @@ export function KanbanBoard({ slug }: KanbanBoardProps) {
 
   const fetchData = useCallback(async () => {
     const [stagesRes, contactsRes] = await Promise.all([
-      fetch(`/api/stages?slug=${slug}`),
+      fetch(`/api/stages?slug=${slug}&pipelineType=${pipelineType}`),
       fetch(`/api/contacts?slug=${slug}`),
     ]);
     if (stagesRes.ok) setStages(await stagesRes.json());
     if (contactsRes.ok) setContacts(await contactsRes.json());
-  }, [slug]);
+  }, [slug, pipelineType]);
 
   useEffect(() => {
     fetchData();

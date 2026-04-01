@@ -59,7 +59,7 @@ export default async function AnalyticsPage({
   const [contactsRes, dealsRes, stagesRes, toursRes] = await Promise.all([
     supabase
       .from('Contact')
-      .select('id, type, tags, leadScore, scoreLabel, scoringStatus, createdAt, applicationData, scoreDetails')
+      .select('id, type, tags, leadScore, scoreLabel, scoringStatus, createdAt, applicationData, scoreDetails, leadType')
       .eq('spaceId', space.id),
     supabase
       .from('Deal')
@@ -85,6 +85,7 @@ export default async function AnalyticsPage({
     createdAt: string;
     applicationData: ApplicationData | null;
     scoreDetails: LeadScoreDetails | null;
+    leadType: 'rental' | 'buyer';
   }[];
 
   const deals = (dealsRes.data ?? []) as {
@@ -289,6 +290,35 @@ export default async function AnalyticsPage({
   const toursConvertedToDeals = deals.filter((d: any) => d.sourceTourId != null).length;
   const tourConversionRate = completedTours > 0 ? Math.round((toursConvertedToDeals / completedTours) * 100) : 0;
 
+  // Lead type breakdown
+  const buyerLeads = leads.filter((l) => l.leadType === 'buyer');
+  const rentalLeads = leads.filter((l) => l.leadType === 'rental');
+
+  // Buyer budget distribution
+  const buyerBudgetBuckets: Record<string, number> = {
+    'Under $200K': 0,
+    '$200K–$400K': 0,
+    '$400K–$600K': 0,
+    '$600K–$800K': 0,
+    '$800K–$1M': 0,
+    'Over $1M': 0,
+  };
+  for (const l of buyerLeads) {
+    const app = l.applicationData;
+    const raw = app?.preApprovalAmount ?? app?.monthlyRent;
+    const budget = typeof raw === 'string' ? parseFloat(raw.replace(/[^0-9.]/g, '')) : (typeof raw === 'number' ? raw : null);
+    if (budget == null || isNaN(budget)) continue;
+    if (budget < 200000) buyerBudgetBuckets['Under $200K']++;
+    else if (budget < 400000) buyerBudgetBuckets['$200K–$400K']++;
+    else if (budget < 600000) buyerBudgetBuckets['$400K–$600K']++;
+    else if (budget < 800000) buyerBudgetBuckets['$600K–$800K']++;
+    else if (budget < 1000000) buyerBudgetBuckets['$800K–$1M']++;
+    else buyerBudgetBuckets['Over $1M']++;
+  }
+  const buyerBudgetDistribution = Object.entries(buyerBudgetBuckets)
+    .filter(([, count]) => count > 0)
+    .map(([label, count]) => ({ label, count }));
+
   data = {
     totalLeads: leads.length,
     totalContacts: contacts.length,
@@ -317,6 +347,11 @@ export default async function AnalyticsPage({
     completedTours,
     toursConvertedToDeals,
     tourConversionRate,
+
+    // lead type breakdown
+    buyerLeadCount: buyerLeads.length,
+    rentalLeadCount: rentalLeads.length,
+    buyerBudgetDistribution,
   };
   } catch (err) {
     console.error('[analytics] DB queries failed', err);

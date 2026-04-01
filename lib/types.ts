@@ -208,12 +208,17 @@ export type ApplicationData = {
   completionPercentage?: number;
   completedSteps?: number[];
   // Buyer-specific fields
-  preApprovalStatus?: string;
+  preApprovalStatus?: 'yes' | 'no' | 'not-yet' | string;
   preApprovalLender?: string;
   preApprovalAmount?: string;
   propertyType?: string;
-  bedrooms?: string;
-  bathrooms?: string;
+  bedrooms?: number | string;
+  bathrooms?: number | string;
+  mustHaves?: string | string[];
+  firstTimeBuyer?: 'yes' | 'no' | string;
+  buyerBudget?: number | string;
+  housingSituation?: 'renting' | 'own-home' | 'family' | string;
+  buyerTimeline?: 'asap' | '1-3mo' | '3-6mo' | 'exploring' | string;
 };
 
 export type LeadScoreDetails = {

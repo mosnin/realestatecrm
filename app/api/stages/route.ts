@@ -48,13 +48,19 @@ export async function GET(req: NextRequest) {
     stageRows = (createdStages || []).sort((a: any, b: any) => a.position - b.position);
   }
 
-  // Get deals
-  const { data: dealRows, error: dealError } = await supabase
-    .from('Deal')
-    .select('*')
-    .eq('spaceId', space.id)
-    .order('position', { ascending: true });
-  if (dealError) throw dealError;
+  // Get deals – only for the stages in the current result set
+  const stageIds = stageRows.map((r: any) => r.id);
+  let dealRows: any[] = [];
+  if (stageIds.length > 0) {
+    const { data, error: dealError } = await supabase
+      .from('Deal')
+      .select('*')
+      .eq('spaceId', space.id)
+      .in('stageId', stageIds)
+      .order('position', { ascending: true });
+    if (dealError) throw dealError;
+    dealRows = data || [];
+  }
 
   const dealIds = dealRows.map((r: any) => r.id);
 
@@ -102,7 +108,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { slug, name, color } = await req.json();
+  const { slug, name, color, pipelineType } = await req.json();
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
@@ -112,12 +118,16 @@ export async function POST(req: NextRequest) {
   const HEX_COLOR = /^#[0-9a-f]{6}$/i;
   const safeColor = typeof color === 'string' && HEX_COLOR.test(color) ? color : '#6366f1';
 
-  const { data: lastStageRows, error: lastStageError } = await supabase
+  const safePipelineType = pipelineType === 'buyer' ? 'buyer' : 'rental';
+
+  let lastStageQuery = supabase
     .from('DealStage')
     .select('position')
     .eq('spaceId', space.id)
+    .eq('pipelineType', safePipelineType)
     .order('position', { ascending: false })
     .limit(1);
+  const { data: lastStageRows, error: lastStageError } = await lastStageQuery;
   if (lastStageError) throw lastStageError;
   const lastPosition = lastStageRows.length > 0 ? lastStageRows[0].position : -1;
 
@@ -128,6 +138,7 @@ export async function POST(req: NextRequest) {
     name,
     color: safeColor,
     position: lastPosition + 1,
+    pipelineType: safePipelineType,
   }).select().single();
   if (insertError) throw insertError;
 

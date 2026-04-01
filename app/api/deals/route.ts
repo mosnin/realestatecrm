@@ -94,17 +94,42 @@ export async function POST(req: NextRequest) {
   // Verify the target stage belongs to this space (prevents cross-space stage injection)
   const { data: stageCheck, error: stageCheckErr } = await supabase
     .from('DealStage')
-    .select('id')
+    .select('id, pipelineType')
     .eq('id', stageId)
     .eq('spaceId', space.id)
     .maybeSingle();
   if (stageCheckErr) throw stageCheckErr;
   if (!stageCheck) return NextResponse.json({ error: 'Invalid stage' }, { status: 400 });
 
+  // If contacts include a buyer, auto-assign to buyer pipeline first stage
+  let finalStageId = stageId;
+  if (contactIds?.length && stageCheck.pipelineType !== 'buyer') {
+    const { data: buyerContacts } = await supabase
+      .from('Contact')
+      .select('id, leadType')
+      .in('id', contactIds)
+      .eq('spaceId', space.id)
+      .eq('leadType', 'buyer')
+      .limit(1);
+    if (buyerContacts && buyerContacts.length > 0) {
+      // Find the first buyer pipeline stage for this space
+      const { data: buyerStage } = await supabase
+        .from('DealStage')
+        .select('id')
+        .eq('spaceId', space.id)
+        .eq('pipelineType', 'buyer')
+        .order('position', { ascending: true })
+        .limit(1);
+      if (buyerStage && buyerStage.length > 0) {
+        finalStageId = buyerStage[0].id;
+      }
+    }
+  }
+
   const { data: lastDealRows, error: lastDealError } = await supabase
     .from('Deal')
     .select('position')
-    .eq('stageId', stageId)
+    .eq('stageId', finalStageId)
     .order('position', { ascending: false })
     .limit(1);
   if (lastDealError) throw lastDealError;
@@ -131,7 +156,7 @@ export async function POST(req: NextRequest) {
     address: address || null,
     priority: priority || 'MEDIUM',
     closeDate: closeDateVal,
-    stageId,
+    stageId: finalStageId,
     position: lastPosition + 1,
   }).select().single();
   if (dealError) throw dealError;
@@ -156,7 +181,7 @@ export async function POST(req: NextRequest) {
   const { data: stageRow, error: stageError } = await supabase
     .from('DealStage')
     .select('*')
-    .eq('id', stageId)
+    .eq('id', finalStageId)
     .single();
   if (stageError && stageError.code !== 'PGRST116') throw stageError;
 

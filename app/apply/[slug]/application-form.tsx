@@ -570,61 +570,473 @@ export function ApplicationForm({
   const accentColor = customization?.accentColor || '#ff964f';
   const embedUrl = customization?.videoUrl ? toEmbedUrl(customization.videoUrl) : null;
 
+  // ── Shared step renderers ──
+  function renderBasicsStep() {
+    return (
+      <div className="space-y-4">
+        <StepHeader
+          title="Let's start with the basics"
+          description="We just need a few details to get going."
+        />
+        <div className="space-y-1.5">
+          <Label htmlFor="name">
+            Full Name <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="name"
+            type="text"
+            placeholder="Alex Johnson"
+            value={get('name')}
+            onChange={(e) => set('name', e.target.value)}
+            className={cn('h-12 rounded-xl', errors.name && 'border-destructive')}
+          />
+          {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="email">
+            Email <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="alex@email.com"
+            value={get('email')}
+            onChange={(e) => set('email', e.target.value)}
+            className={cn('h-12 rounded-xl', errors.email && 'border-destructive')}
+          />
+          {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="phone">Phone</Label>
+          <Input
+            id="phone"
+            type="tel"
+            placeholder="(555) 123-4567"
+            value={get('phone')}
+            onChange={(e) => set('phone', e.target.value)}
+            className="h-12 rounded-xl"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  function renderIntentStep() {
+    return (
+      <div className="space-y-4">
+        <StepHeader title="If you find the right place, are you ready to move forward?" />
+        <div className="space-y-2.5">
+          {[
+            { value: 'ready', label: 'Yes, ready now' },
+            { value: 'maybe', label: 'Maybe' },
+            { value: 'exploring', label: 'Just exploring' },
+          ].map((option) => (
+            <SelectionCard
+              key={option.value}
+              label={option.label}
+              selected={get('intent') === option.value}
+              onClick={() => set('intent', option.value)}
+              accentColor={accentColor}
+            />
+          ))}
+        </div>
+        {errors.intent && <p className="text-xs text-destructive">{errors.intent}</p>}
+        {/* Privacy consent -- shows if realtor has a privacy policy URL set */}
+        {customization?.privacyPolicyUrl && (
+          <div className="flex items-start gap-3 mt-4 p-3 rounded-lg border border-border bg-muted/30">
+            <input
+              type="checkbox"
+              id="privacy-consent"
+              checked={get('privacyConsent') === 'true'}
+              onChange={(e) => set('privacyConsent', e.target.checked ? 'true' : 'false')}
+              className="mt-0.5 rounded border-border cursor-pointer"
+              required
+            />
+            <label htmlFor="privacy-consent" className="text-sm text-foreground leading-snug cursor-pointer">
+              {customization.consentCheckboxLabel || (
+                <>
+                  I agree to {businessName}&apos;s{' '}
+                  <a href={customization.privacyPolicyUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
+                    Privacy Policy
+                  </a>
+                </>
+              )}
+            </label>
+          </div>
+        )}
+        {/* Chippi TOS + Privacy -- always shown */}
+        <div className="flex items-start gap-3 mt-2 p-3 rounded-lg border border-border bg-muted/30">
+          <input
+            type="checkbox"
+            id="chippi-tos"
+            checked={get('chippiTosConsent') === 'true'}
+            onChange={(e) => set('chippiTosConsent', e.target.checked ? 'true' : 'false')}
+            className="mt-0.5 rounded border-border cursor-pointer"
+            required
+          />
+          <label htmlFor="chippi-tos" className="text-sm text-muted-foreground leading-snug cursor-pointer">
+            I agree to Chippi&apos;s{' '}
+            <a href="https://usechippi.com/legal/terms" target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
+              Terms of Service
+            </a>{' '}
+            and{' '}
+            <a href="https://usechippi.com/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
+              Privacy Policy
+            </a>
+          </label>
+        </div>
+        {errors.privacyConsent && <p className="text-xs text-destructive mt-1">{errors.privacyConsent}</p>}
+        {errors.chippiTosConsent && <p className="text-xs text-destructive mt-1">{errors.chippiTosConsent}</p>}
+      </div>
+    );
+  }
+
   // ── Step content renderer ──
   function renderStep() {
-    switch (step) {
-      // ── Step 1: Basic Info ──
-      case 1:
-        return (
-          <div className="space-y-4">
-            <StepHeader
-              title="Let's start with the basics"
-              description="We just need a few details to get going."
-            />
-            <div className="space-y-1.5">
-              <Label htmlFor="name">
-                Full Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="Alex Johnson"
-                value={get('name')}
-                onChange={(e) => set('name', e.target.value)}
-                className={cn('h-12 rounded-xl', errors.name && 'border-destructive')}
-              />
-              {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="email">
-                Email <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="alex@email.com"
-                value={get('email')}
-                onChange={(e) => set('email', e.target.value)}
-                className={cn('h-12 rounded-xl', errors.email && 'border-destructive')}
-              />
-              {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="(555) 123-4567"
-                value={get('phone')}
-                onChange={(e) => set('phone', e.target.value)}
-                className="h-12 rounded-xl"
-              />
-            </div>
+    // ── Step 1: Getting Started (shared) ──
+    if (step === 1) {
+      return (
+        <div className="space-y-4">
+          <StepHeader
+            title="Getting Started"
+            description="What are you looking for?"
+          />
+          {errors.leadType && <p className="text-xs text-destructive">{errors.leadType}</p>}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => set('leadType', 'rental')}
+              className={cn(
+                'w-full flex items-center gap-4 px-5 py-5 rounded-xl border-2 transition-all text-left',
+                get('leadType') === 'rental'
+                  ? 'shadow-sm font-medium'
+                  : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+              )}
+              style={get('leadType') === 'rental' ? { borderColor: accentColor, backgroundColor: `${accentColor}08` } : undefined}
+            >
+              <Home size={24} className="flex-shrink-0" style={get('leadType') === 'rental' ? { color: accentColor } : undefined} />
+              <span className="text-sm">I&apos;m looking to <strong>rent</strong></span>
+            </button>
+            <button
+              type="button"
+              onClick={() => set('leadType', 'buyer')}
+              className={cn(
+                'w-full flex items-center gap-4 px-5 py-5 rounded-xl border-2 transition-all text-left',
+                get('leadType') === 'buyer'
+                  ? 'shadow-sm font-medium'
+                  : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+              )}
+              style={get('leadType') === 'buyer' ? { borderColor: accentColor, backgroundColor: `${accentColor}08` } : undefined}
+            >
+              <Key size={24} className="flex-shrink-0" style={get('leadType') === 'buyer' ? { color: accentColor } : undefined} />
+              <span className="text-sm">I&apos;m looking to <strong>buy</strong></span>
+            </button>
           </div>
-        );
+        </div>
+      );
+    }
 
-      // ── Step 2: Move Timing ──
+    // ── Buyer flow ──
+    if (leadType === 'buyer') {
+      switch (step) {
+        case 2:
+          return renderBasicsStep();
+
+        // ── Step 3: Buyer Budget ──
+        case 3:
+          return (
+            <div className="space-y-4">
+              <StepHeader title="What's your budget?" />
+              <div className="space-y-2.5">
+                {[
+                  { value: 'under_200k', label: 'Under $200K' },
+                  { value: '200k_350k', label: '$200K - $350K' },
+                  { value: '350k_500k', label: '$350K - $500K' },
+                  { value: '500k_750k', label: '$500K - $750K' },
+                  { value: '750k_1m', label: '$750K - $1M' },
+                  { value: '1m_plus', label: '$1M+' },
+                ].map((option) => (
+                  <SelectionCard
+                    key={option.value}
+                    label={option.label}
+                    selected={get('buyerBudget') === option.value}
+                    onClick={() => set('buyerBudget', option.value)}
+                    accentColor={accentColor}
+                  />
+                ))}
+              </div>
+              {errors.buyerBudget && <p className="text-xs text-destructive">{errors.buyerBudget}</p>}
+            </div>
+          );
+
+        // ── Step 4: Pre-Approval ──
+        case 4:
+          return (
+            <div className="space-y-4">
+              <StepHeader title="Are you pre-approved for a mortgage?" />
+              <div className="space-y-2.5">
+                {[
+                  { value: 'yes', label: 'Yes' },
+                  { value: 'no', label: 'No' },
+                  { value: 'not-yet', label: 'Not yet' },
+                ].map((option) => (
+                  <SelectionCard
+                    key={option.value}
+                    label={option.label}
+                    selected={get('preApproval') === option.value}
+                    onClick={() => set('preApproval', option.value)}
+                    accentColor={accentColor}
+                  />
+                ))}
+              </div>
+              {get('preApproval') === 'yes' && (
+                <div className="space-y-3 pt-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="lender">Lender name</Label>
+                    <Input
+                      id="lender"
+                      type="text"
+                      placeholder="e.g., Chase, Wells Fargo"
+                      value={get('lender')}
+                      onChange={(e) => set('lender', e.target.value)}
+                      className="h-12 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="preApprovalAmount">Pre-approval amount</Label>
+                    <Input
+                      id="preApprovalAmount"
+                      type="text"
+                      placeholder="e.g., $400,000"
+                      value={get('preApprovalAmount')}
+                      onChange={(e) => set('preApprovalAmount', e.target.value)}
+                      className="h-12 rounded-xl"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+
+        // ── Step 5: Property Preferences ──
+        case 5:
+          return (
+            <div className="space-y-5">
+              <StepHeader title="What type of property are you looking for?" />
+              <div className="space-y-2.5">
+                {[
+                  { value: 'single-family', label: 'Single Family' },
+                  { value: 'condo', label: 'Condo / Apartment' },
+                  { value: 'townhouse', label: 'Townhouse' },
+                  { value: 'multi-family', label: 'Multi-Family' },
+                ].map((option) => (
+                  <SelectionCard
+                    key={option.value}
+                    label={option.label}
+                    selected={get('propertyType') === option.value}
+                    onClick={() => set('propertyType', option.value)}
+                    accentColor={accentColor}
+                  />
+                ))}
+              </div>
+              {errors.propertyType && <p className="text-xs text-destructive">{errors.propertyType}</p>}
+
+              <div className="space-y-2">
+                <Label>Bedrooms needed</Label>
+                <div className="flex gap-2 flex-wrap">
+                  {['1', '2', '3', '4', '5+'].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => set('bedrooms', val)}
+                      className={cn(
+                        'px-4 py-2.5 rounded-xl border transition-all text-sm font-medium',
+                        get('bedrooms') === val
+                          ? 'border-2 shadow-sm'
+                          : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                      )}
+                      style={get('bedrooms') === val ? { borderColor: accentColor, backgroundColor: `${accentColor}08` } : undefined}
+                    >
+                      {val}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Bathrooms needed</Label>
+                <div className="flex gap-2 flex-wrap">
+                  {['1', '2', '3+'].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => set('bathrooms', val)}
+                      className={cn(
+                        'px-4 py-2.5 rounded-xl border transition-all text-sm font-medium',
+                        get('bathrooms') === val
+                          ? 'border-2 shadow-sm'
+                          : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                      )}
+                      style={get('bathrooms') === val ? { borderColor: accentColor, backgroundColor: `${accentColor}08` } : undefined}
+                    >
+                      {val}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+
+        // ── Step 6: Must-Haves ──
+        case 6: {
+          const mustHaveOptions = [
+            'Garage', 'Yard', 'Pool', 'Updated Kitchen', 'Home Office',
+            'Storage', 'Washer/Dryer', 'Pet-Friendly', 'Accessibility Features',
+          ];
+          const currentMustHaves = get('mustHaves') ? get('mustHaves').split(',') : [];
+          const toggleMustHave = (item: string) => {
+            const updated = currentMustHaves.includes(item)
+              ? currentMustHaves.filter((i) => i !== item)
+              : [...currentMustHaves, item];
+            set('mustHaves', updated.filter(Boolean).join(','));
+          };
+          return (
+            <div className="space-y-4">
+              <StepHeader title="Any must-haves?" description="Select all that apply." />
+              <div className="grid grid-cols-2 gap-2.5">
+                {mustHaveOptions.map((item) => {
+                  const isChecked = currentMustHaves.includes(item);
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => toggleMustHave(item)}
+                      className={cn(
+                        'flex items-center gap-2.5 px-3.5 py-3 rounded-xl border transition-all text-sm text-left',
+                        isChecked
+                          ? 'border-2 shadow-sm font-medium'
+                          : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                      )}
+                      style={isChecked ? { borderColor: accentColor, backgroundColor: `${accentColor}08` } : undefined}
+                    >
+                      <div
+                        className={cn(
+                          'w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all',
+                          isChecked ? 'border-0' : 'border-muted-foreground/40',
+                        )}
+                        style={isChecked ? { backgroundColor: accentColor } : undefined}
+                      >
+                        {isChecked && <CheckCircle2 size={12} className="text-white" />}
+                      </div>
+                      {item}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+
+        // ── Step 7: Buyer Timeline ──
+        case 7:
+          return (
+            <div className="space-y-4">
+              <StepHeader title="When do you want to close?" />
+              <div className="space-y-2.5">
+                {[
+                  { value: 'asap', label: 'ASAP (within 30 days)' },
+                  { value: '1-3months', label: '1-3 months' },
+                  { value: '3-6months', label: '3-6 months' },
+                  { value: 'exploring', label: 'Just exploring' },
+                ].map((option) => (
+                  <SelectionCard
+                    key={option.value}
+                    label={option.label}
+                    selected={get('buyerTimeline') === option.value}
+                    onClick={() => set('buyerTimeline', option.value)}
+                    accentColor={accentColor}
+                  />
+                ))}
+              </div>
+              {errors.buyerTimeline && <p className="text-xs text-destructive">{errors.buyerTimeline}</p>}
+            </div>
+          );
+
+        // ── Step 8: About You ──
+        case 8:
+          return (
+            <div className="space-y-5">
+              <StepHeader title="Tell us about you" />
+              <div className="space-y-2">
+                <Label>Current housing situation</Label>
+                <div className="space-y-2.5">
+                  {[
+                    { value: 'renting', label: 'Currently renting' },
+                    { value: 'own', label: 'Own a home' },
+                    { value: 'family', label: 'Living with family' },
+                    { value: 'other', label: 'Other' },
+                  ].map((option) => (
+                    <SelectionCard
+                      key={option.value}
+                      label={option.label}
+                      selected={get('housingSituation') === option.value}
+                      onClick={() => set('housingSituation', option.value)}
+                      accentColor={accentColor}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>First-time buyer?</Label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => set('firstTimeBuyer', 'yes')}
+                    className={cn(
+                      'flex-1 px-4 py-3 rounded-xl border transition-all text-sm font-medium',
+                      get('firstTimeBuyer') === 'yes'
+                        ? 'border-2 shadow-sm'
+                        : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                    )}
+                    style={get('firstTimeBuyer') === 'yes' ? { borderColor: accentColor, backgroundColor: `${accentColor}08` } : undefined}
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => set('firstTimeBuyer', 'no')}
+                    className={cn(
+                      'flex-1 px-4 py-3 rounded-xl border transition-all text-sm font-medium',
+                      get('firstTimeBuyer') === 'no'
+                        ? 'border-2 shadow-sm'
+                        : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                    )}
+                    style={get('firstTimeBuyer') === 'no' ? { borderColor: accentColor, backgroundColor: `${accentColor}08` } : undefined}
+                  >
+                    No
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+
+        // ── Step 9: Intent + Consent (buyer) ──
+        case 9:
+          return renderIntentStep();
+
+        default:
+          return null;
+      }
+    }
+
+    // ── Rental flow ──
+    switch (step) {
+      // ── Step 2: Basic Info ──
       case 2:
+        return renderBasicsStep();
+
+      // ── Step 3: Move Timing ──
+      case 3:
         return (
           <div className="space-y-4">
             <StepHeader title="When are you planning to move?" />
@@ -648,8 +1060,8 @@ export function ApplicationForm({
           </div>
         );
 
-      // ── Step 3: Location ──
-      case 3:
+      // ── Step 4: Location ──
+      case 4:
         return (
           <div className="space-y-4">
             <StepHeader title="Where are you looking to live?" />
@@ -667,8 +1079,8 @@ export function ApplicationForm({
           </div>
         );
 
-      // ── Step 4: Budget ──
-      case 4:
+      // ── Step 5: Budget ──
+      case 5:
         return (
           <div className="space-y-4">
             <StepHeader title="What's your monthly rent budget?" />
@@ -693,8 +1105,8 @@ export function ApplicationForm({
           </div>
         );
 
-      // ── Step 5: Income ──
-      case 5:
+      // ── Step 6: Income ──
+      case 6:
         return (
           <div className="space-y-4">
             <StepHeader title="What's your estimated monthly income?" />
@@ -719,8 +1131,8 @@ export function ApplicationForm({
           </div>
         );
 
-      // ── Step 6: Employment ──
-      case 6:
+      // ── Step 7: Employment ──
+      case 7:
         return (
           <div className="space-y-4">
             <StepHeader title="What's your current work situation?" />
@@ -745,8 +1157,8 @@ export function ApplicationForm({
           </div>
         );
 
-      // ── Step 7: Household ──
-      case 7:
+      // ── Step 8: Household ──
+      case 8:
         return (
           <div className="space-y-4">
             <StepHeader title="Tell us about your household" />
@@ -799,8 +1211,8 @@ export function ApplicationForm({
           </div>
         );
 
-      // ── Step 8: Additional Info (Optional) ──
-      case 8:
+      // ── Step 9: Additional Info (Optional) ──
+      case 9:
         return (
           <div className="space-y-4">
             <StepHeader
@@ -820,8 +1232,8 @@ export function ApplicationForm({
           </div>
         );
 
-      // ── Step 9: Intent ──
-      case 9:
+      // ── Step 10: Intent + Consent (rental) ──
+      case 10:
         return (
           <div className="space-y-4">
             <StepHeader title="If you find the right place, are you ready to move forward?" />

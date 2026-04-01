@@ -88,9 +88,14 @@ export interface AnalyticsData {
   completedTours: number;
   toursConvertedToDeals: number;
   tourConversionRate: number;
+
+  // lead type breakdown
+  buyerLeadCount: number;
+  rentalLeadCount: number;
+  buyerBudgetDistribution: LabelCount[];
 }
 
-const TABS = ['Overview', 'Leads', 'Qualification', 'Deals', 'Contacts'] as const;
+const TABS = ['Overview', 'Leads', 'Qualification', 'Deals', 'Contacts', 'Buyer'] as const;
 type Tab = (typeof TABS)[number];
 
 // ─── Stat card ─────────────────────────────────────────────────────────────

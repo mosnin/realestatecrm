@@ -277,10 +277,10 @@ export function ContactTable({ slug }: ContactTableProps) {
     new Set(contacts.flatMap((c) => c.tags.filter((t) => !SYSTEM_TAGS.has(t))))
   ).sort();
 
-  // Apply tag filter client-side
-  const visibleContacts = tagFilter
-    ? contacts.filter((c) => c.tags.includes(tagFilter))
-    : contacts;
+  // Apply tag + leadType filters client-side
+  const visibleContacts = contacts
+    .filter((c) => leadTypeFilter === 'all' || c.leadType === leadTypeFilter)
+    .filter((c) => !tagFilter || c.tags.includes(tagFilter));
 
   const contactViews = savedViews.filter((v) => v.page === 'contacts');
 
@@ -361,6 +361,31 @@ export function ContactTable({ slug }: ContactTableProps) {
           ))}
         </div>
       )}
+
+      {/* Lead type filter */}
+      <div className="flex gap-1 items-center">
+        <span className="text-xs text-muted-foreground mr-1">Lead type:</span>
+        {(['all', 'rental', 'buyer'] as const).map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setLeadTypeFilter(key)}
+            className={cn(
+              'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+              leadTypeFilter === key
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
+            )}
+          >
+            {key === 'all' ? 'All' : key === 'rental' ? 'Rental' : 'Buyer'}
+            {key !== 'all' && (
+              <span className={cn('ml-1 tabular-nums', leadTypeFilter === key ? 'opacity-80' : 'opacity-60')}>
+                {contacts.filter((c) => c.leadType === key).length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
 
       {/* Controls */}
       <div className="flex flex-col sm:flex-row gap-2.5">

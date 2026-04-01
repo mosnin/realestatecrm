@@ -1,4 +1,5 @@
 export { KanbanBoard } from './kanban-board';
+export { DealsPageClient } from './deals-page-client';
 export { DealPanel } from './deal-panel';
 export { DealCard } from './deal-card';
 export { DealForm } from './deal-form';

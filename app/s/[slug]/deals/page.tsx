@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getSpaceFromSlug } from '@/lib/space';
-import { KanbanBoard } from '@/components/deals/kanban-board';
+import { DealsPageClient } from '@/components/deals/deals-page-client';
 
 export default async function DealsPage({
   params
@@ -26,5 +26,5 @@ export default async function DealsPage({
   }
   if (!space) notFound();
 
-  return <KanbanBoard slug={slug} />;
+  return <DealsPageClient slug={slug} />;
 }

@@ -121,8 +121,11 @@ export async function chatWithRAG(
       'Contacts:\n' +
         sortedContacts
           .map(
-            (c) =>
-              `- [ID:${c.id}] ${c.name} (${c.type})${priorityContactIds.has(c.id) ? ' ★' : ''} | Score: ${c.leadScore ?? 'N/A'} (${c.scoreLabel ?? 'unscored'}) | ${c.email ?? ''} | ${c.phone ?? ''} | Budget: ${c.budget != null ? `$${c.budget}` : 'N/A'} | ${c.address ?? ''} | Tags: ${(c.tags ?? []).join(', ')} | Notes: ${c.notes ?? ''}`
+            (c) => {
+              const lt = (c.leadType === 'buyer' ? 'BUYER' : 'RENTAL');
+              const stageLabel = c.leadType === 'buyer' ? (c.type ?? '') : (c.type ?? '');
+              return `- [ID:${c.id}] ${c.name} (${lt} · ${stageLabel})${priorityContactIds.has(c.id) ? ' ★' : ''} | Score: ${c.leadScore ?? 'N/A'} (${c.scoreLabel ?? 'unscored'}) | ${c.email ?? ''} | ${c.phone ?? ''} | Budget: ${c.budget != null ? `$${c.budget}` : 'N/A'} | ${c.address ?? ''} | Tags: ${(c.tags ?? []).join(', ')} | Notes: ${c.notes ?? ''}`;
+            }
           )
           .join('\n')
     );
@@ -199,7 +202,10 @@ export async function chatWithRAG(
   const systemPrompt = [
     `You are an intelligent real estate CRM assistant for the workspace "${spaceName}".`,
     `Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.`,
-    `You help the agent manage clients through qualification, tour, and application stages, plus real estate deals, notes, tours, and follow-ups.`,
+    `You help the agent manage clients through rental qualification AND buyer purchase stages.`,
+    `Buyer stages: Lead → Pre-Approved → Showings → Offer → Under Contract → Closing`,
+    `Rental stages: Qualification → Tour → Application`,
+    `You also manage real estate deals, notes, tours, and follow-ups.`,
     `Only reference data that appears in the CRM context below. Never fabricate client names, deal values, or contact details.`,
     `When asked about "recent" activity, prioritize items with the most recent dates.`,
     ``,
