@@ -26,7 +26,7 @@ export default async function BrokerageInvitesPage({
       .eq('clerkId', userId)
       .maybeSingle();
     if (error) throw error;
-    userEmail = user?.email ?? null;
+    userEmail = user?.email?.toLowerCase() ?? null;
   } catch (err) {
     console.error('[settings/brokerage] Failed to fetch user', err);
     return (
@@ -67,7 +67,7 @@ export default async function BrokerageInvitesPage({
     const { data, error } = await supabase
       .from('Invitation')
       .select('id, email, roleToAssign, token, status, expiresAt, createdAt, Brokerage(id, name)')
-      .eq('email', userEmail)
+      .ilike('email', userEmail)
       .eq('status', 'pending')
       .order('createdAt', { ascending: false });
     if (error) throw error;

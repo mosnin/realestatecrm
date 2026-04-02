@@ -181,6 +181,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  const { brokerage } = ctx;
+
   const contactId = req.nextUrl.searchParams.get('contactId');
   if (!contactId) {
     return NextResponse.json({ error: 'contactId required' }, { status: 400 });
@@ -189,12 +191,47 @@ export async function GET(req: NextRequest) {
   try {
     const { data: contact } = await supabase
       .from('Contact')
-      .select('id, notes')
+      .select('id, notes, spaceId')
       .eq('id', contactId)
       .maybeSingle();
 
     if (!contact) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+    }
+
+    // Verify the contact belongs to the broker's space or a brokerage member's space
+    const { data: ownerSpace } = await supabase
+      .from('Space')
+      .select('id')
+      .eq('ownerId', brokerage.ownerId)
+      .maybeSingle();
+    const brokerSpaceId = ownerSpace?.id ?? null;
+
+    let authorized = false;
+
+    if (contact.spaceId === brokerSpaceId) {
+      authorized = true;
+    } else {
+      // Check if the contact's space belongs to a brokerage member
+      const { data: spaceOwner } = await supabase
+        .from('Space')
+        .select('ownerId')
+        .eq('id', contact.spaceId)
+        .maybeSingle();
+
+      if (spaceOwner) {
+        const { data: membership } = await supabase
+          .from('BrokerageMembership')
+          .select('id')
+          .eq('brokerageId', brokerage.id)
+          .eq('userId', spaceOwner.ownerId)
+          .maybeSingle();
+        if (membership) authorized = true;
+      }
+    }
+
+    if (!authorized) {
+      return NextResponse.json({ error: 'Not authorized to view notes for this contact' }, { status: 403 });
     }
 
     return NextResponse.json({ notes: contact.notes ?? '' });
