@@ -174,11 +174,13 @@ export default async function DashboardLayout({
         .from('Contact')
         .select('*', { count: 'exact', head: true })
         .eq('spaceId', space.id)
+        .is('brokerageId', null)
         .contains('tags', ['new-lead']),
       supabase
         .from('Contact')
         .select('*', { count: 'exact', head: true })
         .eq('spaceId', space.id)
+        .is('brokerageId', null)
         .not('followUpAt', 'is', null)
         .lte('followUpAt', new Date().toISOString()),
     ]);

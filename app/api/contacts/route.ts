@@ -19,7 +19,8 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('Contact')
     .select('*')
-    .eq('spaceId', space.id);
+    .eq('spaceId', space.id)
+    .is('brokerageId', null); // Exclude brokerage leads — those show on /broker/leads
 
   if (search) {
     // Cap length to prevent expensive full-table-scan patterns

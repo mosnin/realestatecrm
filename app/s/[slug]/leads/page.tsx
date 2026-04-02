@@ -25,6 +25,7 @@ export default async function LeadsPage({
       .from('Contact')
       .select('*')
       .eq('spaceId', space.id)
+      .is('brokerageId', null) // Exclude brokerage leads
       .contains('tags', ['application-link'])
       .order('createdAt', { ascending: false })
       .limit(100);
