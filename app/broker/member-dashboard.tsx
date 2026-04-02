@@ -186,7 +186,7 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
   }
 
   return (
-    <div className="space-y-6 max-w-[900px]">
+    <div className="space-y-6 w-full">
       {/* ── Welcome card ── */}
       <div className="rounded-xl bg-card border p-6">
         <h1 className="text-xl font-semibold">{`Welcome back, ${userName}`}</h1>

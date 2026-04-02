@@ -78,7 +78,7 @@ export default async function BrokerCommissionsPage() {
     });
 
   return (
-    <div className="space-y-6 max-w-[1120px]">
+    <div className="space-y-6 w-full">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Commissions</h1>
         <p className="text-sm text-muted-foreground mt-0.5">

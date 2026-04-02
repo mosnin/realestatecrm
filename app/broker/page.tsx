@@ -132,7 +132,7 @@ export default async function BrokerOverviewPage() {
   const hasSettings = !!(brokerage.name && (brokerage.logoUrl || brokerage.websiteUrl));
 
   return (
-    <div className="space-y-8 max-w-[1120px]">
+    <div className="space-y-8 w-full">
       {/* ── Page header (matching realtor dashboard) ── */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div className="flex items-center gap-4">
