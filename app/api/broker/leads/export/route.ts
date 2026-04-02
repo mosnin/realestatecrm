@@ -20,7 +20,7 @@ export async function GET() {
   // ── Fetch all member user IDs ──────────────────────────────────────────
   const { data: memberships } = await supabase
     .from('BrokerageMembership')
-    .select('userId, User!BrokerageMembership_userId_fkey(id, name, email)')
+    .select('userId')
     .eq('brokerageId', brokerage.id);
 
   const members = (memberships ?? []) as Array<{

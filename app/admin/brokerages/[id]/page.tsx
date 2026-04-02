@@ -53,7 +53,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
   const [membershipsRes, invitationsRes] = await Promise.all([
     supabase
       .from('BrokerageMembership')
-      .select('id, role, createdAt, userId, User(id, name, email, onboard), Space!Space_ownerId_fkey(id, slug)')
+      .select('id, role, createdAt, userId')
       .eq('brokerageId', id)
       .order('createdAt', { ascending: true }),
     supabase

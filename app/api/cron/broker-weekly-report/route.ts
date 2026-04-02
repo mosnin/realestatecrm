@@ -48,18 +48,20 @@ export async function GET(req: NextRequest) {
         // Fetch all members with their spaces
         const { data: memberships } = await supabase
           .from('BrokerageMembership')
-          .select('userId, role, User(id, name, email), Space!Space_ownerId_fkey(id, slug, name)')
+          .select('userId, role')
           .eq('brokerageId', brokerage.id)
           .order('createdAt', { ascending: true });
 
-        const members = ((memberships ?? []) as unknown as Array<{
-          userId: string;
-          role: string;
-          User: { id: string; name: string | null; email: string } | null;
-          Space: { id: string; slug: string; name: string } | null;
-        }>);
+        const rawMembers = (memberships ?? []) as Array<{ userId: string; role: string }>;
+        const memberUserIds = rawMembers.map((m) => m.userId).filter(Boolean);
+        let memberSpaces: any[] = [];
+        if (memberUserIds.length > 0) {
+          const { data } = await supabase.from('Space').select('id, ownerId, slug, name').in('ownerId', memberUserIds);
+          memberSpaces = data ?? [];
+        }
+        const spaceByOwner = new Map(memberSpaces.map((s: any) => [s.ownerId, s]));
 
-        const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
+        const spaceIds = memberSpaces.map((s: any) => s.id).filter(Boolean) as string[];
         if (spaceIds.length === 0) continue;
 
         // ── Gather stats for the past 7 days per space ──
