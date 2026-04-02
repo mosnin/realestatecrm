@@ -128,8 +128,36 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                   })}
                 </>
               )}
+              {isBroker && showBrokerMobileNavOnly && (
+                <>
+                  <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                    Team
+                  </p>
+                  {brokerMobileNavItems.map((item) => {
+                    const isActive = item.exact
+                      ? pathname === item.href
+                      : pathname.startsWith(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                          'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                          isActive
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                        )}
+                      >
+                        <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </>
+              )}
             </nav>
-            {isBroker && (
+            {isBroker && !showBrokerMobileNavOnly && (
               <div className="px-3 pb-2 space-y-0.5 border-t border-sidebar-border pt-3">
                 <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
                   Team
