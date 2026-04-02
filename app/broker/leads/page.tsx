@@ -34,18 +34,19 @@ export default async function BrokerLeadsPage() {
 
   console.log('[broker/leads] brokerSpaceId:', brokerSpaceId, 'allSpaceIds:', allSpaceIds.length);
 
-  // Query unassigned leads across ALL brokerage spaces — brokerage-lead OR imported tags, NOT assigned
-  const { data: unassignedRaw } = allSpaceIds.length > 0
+  // Query unassigned leads across ALL brokerage spaces
+  // Include leads tagged as brokerage-lead, imported, or new-lead (catch everything)
+  const { data: unassignedRaw, error: unassignedErr } = allSpaceIds.length > 0
     ? await supabase
         .from('Contact')
         .select('id, name, email, phone, budget, scoreLabel, leadScore, leadType, tags, createdAt, notes, applicationData')
         .in('spaceId', allSpaceIds)
-        .or('tags.cs.["brokerage-lead"],tags.cs.["imported"]')
         .not('tags', 'cs', '["assigned"]')
         .order('createdAt', { ascending: false })
         .limit(500)
-    : { data: [] };
-  console.log('[broker/leads] unassigned count:', (unassignedRaw ?? []).length);
+    : { data: [], error: null };
+  if (unassignedErr) console.error('[broker/leads] unassigned query error:', unassignedErr);
+  console.log('[broker/leads] unassigned count:', (unassignedRaw ?? []).length, 'spaceIds:', allSpaceIds);
 
   // Query assigned leads across ALL brokerage spaces
   const { data: assignedRaw } = allSpaceIds.length > 0
