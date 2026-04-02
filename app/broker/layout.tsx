@@ -60,8 +60,12 @@ export default async function BrokerLayout({ children }: { children: React.React
     brokerPath.includes('/billing') ||
     brokerPath.includes('/settings');
 
-  if (!isPlatformAdmin) {
-    // Gate applies whether they have a personal space or not
+  const isOwnerOfBrokerage = ctx.brokerage.ownerId === ctx.dbUserId;
+
+  if (!isPlatformAdmin && isOwnerOfBrokerage) {
+    // Only the brokerage OWNER is gated by subscription.
+    // Invited admins and members access the broker dashboard for free —
+    // billing is the owner's responsibility.
     if (spaceRow) {
       try {
         const { data: subData, error: subError } = await supabase
@@ -93,39 +97,32 @@ export default async function BrokerLayout({ children }: { children: React.React
         redirect(`/subscribe?slug=${slug}`);
       }
     } else if (isBrokerOnly) {
-      // Broker-only accounts (invited admins): check the brokerage owner's subscription
-      // Only block if the owner's billing has FAILED — don't block if owner hasn't subscribed yet
-      // (invited admins can't pay for someone else's subscription)
-      const isOwnerOfBrokerage = ctx.brokerage.ownerId === ctx.dbUserId;
-      if (isOwnerOfBrokerage) {
-        // Owner who chose broker_only: they need to subscribe
-        try {
-          const { data: ownerSpace } = await supabase
-            .from('Space')
-            .select('slug, stripeSubscriptionStatus, stripeSubscriptionId, trialUsedAt')
-            .eq('ownerId', ctx.brokerage.ownerId)
-            .maybeSingle();
+      // Broker-only owner without a personal space — check via owner's space
+      try {
+        const { data: ownerSpace } = await supabase
+          .from('Space')
+          .select('slug, stripeSubscriptionStatus, stripeSubscriptionId, trialUsedAt')
+          .eq('ownerId', ctx.brokerage.ownerId)
+          .maybeSingle();
 
-          if (ownerSpace) {
-            const ownerStatus = ownerSpace.stripeSubscriptionStatus ?? 'inactive';
-            const ownerSlug = ownerSpace.slug ?? '';
-            const ownerHasHistory = !!(ownerSpace.stripeSubscriptionId || ownerSpace.trialUsedAt);
-            const isBrokerOnlyExempt = isBillingOrSettings && ownerHasHistory;
+        if (ownerSpace) {
+          const ownerStatus = ownerSpace.stripeSubscriptionStatus ?? 'inactive';
+          const ownerSlug = ownerSpace.slug ?? '';
+          const ownerHasHistory = !!(ownerSpace.stripeSubscriptionId || ownerSpace.trialUsedAt);
+          const isBrokerOnlyExempt = isBillingOrSettings && ownerHasHistory;
 
-            if (ownerStatus !== 'active' && ownerStatus !== 'trialing' && !isBrokerOnlyExempt) {
-              if (ownerHasHistory) {
-                redirect(`/billing-required?slug=${ownerSlug}&reason=${ownerStatus}`);
-              }
-              redirect(`/subscribe?slug=${ownerSlug}`);
+          if (ownerStatus !== 'active' && ownerStatus !== 'trialing' && !isBrokerOnlyExempt) {
+            if (ownerHasHistory) {
+              redirect(`/billing-required?slug=${ownerSlug}&reason=${ownerStatus}`);
             }
+            redirect(`/subscribe?slug=${ownerSlug}`);
           }
-        } catch (err: any) {
-          if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err;
-          console.error('[broker-layout] Broker-only owner subscription check error:', err);
-          redirect(`/subscribe?slug=${slug}`);
         }
+      } catch (err: any) {
+        if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err;
+        console.error('[broker-layout] Broker-only owner subscription check error:', err);
+        redirect(`/subscribe?slug=${slug}`);
       }
-      // Invited admins (not the owner): allow through — billing is the owner's responsibility
     } else {
       // No space and not broker-only — shouldn't be here
       redirect('/setup');
