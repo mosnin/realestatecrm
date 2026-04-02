@@ -118,13 +118,22 @@ export async function POST(req: NextRequest) {
   // ── Fetch members & spaces for assignment ──────────────────────────────
   const { data: memberships } = await supabase
     .from('BrokerageMembership')
-    .select('userId, User!BrokerageMembership_userId_fkey(id, email)')
+    .select('userId')
     .eq('brokerageId', brokerage.id);
 
+  const memberUserIds = (memberships ?? []).map((m: any) => m.userId).filter(Boolean);
+  let memberUsers: any[] = [];
+  if (memberUserIds.length > 0) {
+    const { data } = await supabase.from('User').select('id, email').in('id', memberUserIds);
+    memberUsers = data ?? [];
+  }
+  const userEmailMap = new Map(memberUsers.map((u: any) => [u.id, u.email]));
+
   const membersByEmail: Record<string, string> = {};
-  for (const m of (memberships ?? []) as Array<{ userId: string; User: { id: string; email: string } | null }>) {
-    if (m.User?.email) {
-      membersByEmail[m.User.email.toLowerCase()] = m.userId;
+  for (const m of (memberships ?? []) as Array<{ userId: string }>) {
+    const email = userEmailMap.get(m.userId);
+    if (email) {
+      membersByEmail[email.toLowerCase()] = m.userId;
     }
   }
 
