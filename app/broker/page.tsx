@@ -347,10 +347,11 @@ export default async function BrokerOverviewPage() {
                       const space = m.Space;
                       const initials = (user?.name ?? user?.email ?? '?')
                         .split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
-                      const leads = space ? (leadsBySpace[space.id] ?? 0) : 0;
-                      const apps  = space ? (appsBySpace[space.id] ?? 0) : 0;
-                      const deals = space ? (dealsBySpace[space.id]?.count ?? 0) : 0;
-                      const pipeline = space ? (dealsBySpace[space.id]?.value ?? 0) : 0;
+                      const sid = space?.id ?? '';
+                      const leads = sid ? (leadsBySpace[sid] ?? 0) : 0;
+                      const apps  = sid ? (appsBySpace[sid] ?? 0) : 0;
+                      const deals = sid ? (dealsBySpace[sid]?.count ?? 0) : 0;
+                      const pipeline = sid ? (dealsBySpace[sid]?.value ?? 0) : 0;
 
                       return (
                         <tr key={m.id} className="hover:bg-muted/30 transition-colors group">

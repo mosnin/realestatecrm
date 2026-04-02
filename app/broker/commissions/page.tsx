@@ -47,7 +47,7 @@ export default async function BrokerCommissionsPage() {
   const agentData: AgentCommissionData[] = members
     .filter((m) => m.Space?.id)
     .map((m) => {
-      const sid = m.Space!.id;
+      const sid = m.Space?.id ?? '';
       const agentDeals = deals.filter((d) => d.spaceId === sid);
       const totalValue = agentDeals.reduce((sum, d) => sum + (d.value ?? 0), 0);
 

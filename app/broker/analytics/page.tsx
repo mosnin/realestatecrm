@@ -86,7 +86,7 @@ export default async function BrokerAnalyticsPage() {
   const agentData: AgentFunnelData[] = members
     .filter((m) => m.Space?.id)
     .map((m) => {
-      const sid = m.Space!.id;
+      const sid = m.Space?.id ?? '';
       const s = statsBySpace[sid] ?? { totalLeads: 0, qualification: 0, tour: 0, application: 0, activeDeals: 0, wonDeals: 0, lostDeals: 0, wonValue: 0 };
       const totalDeals = s.activeDeals + s.wonDeals + s.lostDeals;
 

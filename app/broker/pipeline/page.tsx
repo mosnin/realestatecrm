@@ -35,7 +35,7 @@ export default async function BrokerPipelinePage() {
   for (const m of members) {
     const name = m.User?.name ?? m.User?.email ?? 'Unknown';
     if (m.Space?.id) {
-      spaceToRealtor.set(m.Space.id, { userId: m.userId, name });
+      spaceToRealtor.set(m.Space?.id, { userId: m.userId, name });
     }
     realtors.push({ userId: m.userId, name });
   }

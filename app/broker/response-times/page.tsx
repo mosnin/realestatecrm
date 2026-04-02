@@ -50,7 +50,7 @@ export default async function BrokerResponseTimesPage() {
   const spaceToRealtor = new Map<string, { userId: string; name: string; email: string }>();
   for (const m of members) {
     if (m.Space?.id) {
-      spaceToRealtor.set(m.Space.id, {
+      spaceToRealtor.set(m.Space?.id, {
         userId: m.userId,
         name: m.User?.name ?? m.User?.email ?? 'Unknown',
         email: m.User?.email ?? '',

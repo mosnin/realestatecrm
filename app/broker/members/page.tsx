@@ -131,7 +131,7 @@ export default async function BrokerMembersPage() {
                         <div className="hidden sm:block text-right">
                           <p className="text-xs text-muted-foreground">Joined {joinedAt}</p>
                           {m.Space?.slug && (
-                            <p className="text-xs text-primary font-medium">/{m.Space.slug}</p>
+                            <p className="text-xs text-primary font-medium">/{m.Space?.slug}</p>
                           )}
                         </div>
                         <span className={`hidden sm:inline-flex text-xs font-medium rounded-full px-2.5 py-0.5 ${roleBadgeClass(m.role)}`}>

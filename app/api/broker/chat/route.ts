@@ -42,10 +42,8 @@ async function getOrCreateChatConversation(spaceId: string, brokerageId: string)
  * GET /api/broker/chat — get messages for the team chat
  */
 export async function GET(req: NextRequest) {
-  let ctx;
-  try {
-    ctx = await requireBroker();
-  } catch {
+  const ctx = await getBrokerMemberContext();
+  if (!ctx) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

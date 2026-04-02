@@ -76,7 +76,7 @@ export default async function BrokerLeadsPage() {
     name: m.User?.name ?? null,
     email: m.User?.email ?? '',
     spaceId: m.Space?.id ?? null,
-    leadCount: m.Space?.id ? (countBySpace[m.Space.id] ?? 0) : 0,
+    leadCount: m.Space?.id ? (countBySpace[m.Space?.id] ?? 0) : 0,
   }));
 
   type RawContact = {
