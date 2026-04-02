@@ -19,19 +19,10 @@ export default async function BrokerLeadsPage() {
 
   // 1. BROKERAGE LEADS — from brokerage intake form
   // Primary path: brokerageId is set.
-  const { data: brokerageUnassignedByBrokerageId } = await supabase
-    .from('Contact')
-    .select('id, name, email, phone, budget, scoreLabel, leadScore, leadType, tags, createdAt, notes, applicationData')
-    .eq('brokerageId', brokerage.id)
-    .not('tags', 'cs', '["assigned"]')
-    .order('createdAt', { ascending: false })
-    .limit(500);
-
-  const { data: brokerageAssignedByBrokerageId } = await supabase
+  const { data: brokerageAllByBrokerageId } = await supabase
     .from('Contact')
     .select('id, name, email, phone, budget, scoreLabel, leadScore, leadType, tags, createdAt, notes, applicationData, applicationStatusNote')
     .eq('brokerageId', brokerage.id)
-    .contains('tags', ['assigned'])
     .order('createdAt', { ascending: false })
     .limit(500);
 
@@ -47,55 +38,36 @@ export default async function BrokerLeadsPage() {
   const { data: brokerageUnassignedLegacy } = ownerSpaceIds.length > 0
     ? await supabase
         .from('Contact')
-        .select('id, name, email, phone, budget, scoreLabel, leadScore, leadType, tags, createdAt, notes, applicationData')
-        .in('spaceId', ownerSpaceIds)
-        .is('brokerageId', null)
-        .contains('tags', ['brokerage-lead'])
-        .not('tags', 'cs', '["assigned"]')
-        .order('createdAt', { ascending: false })
-        .limit(200)
-    : { data: [] };
-
-  const { data: brokerageAssignedLegacy } = ownerSpaceIds.length > 0
-    ? await supabase
-        .from('Contact')
         .select('id, name, email, phone, budget, scoreLabel, leadScore, leadType, tags, createdAt, notes, applicationData, applicationStatusNote')
         .in('spaceId', ownerSpaceIds)
         .is('brokerageId', null)
         .contains('tags', ['brokerage-lead'])
-        .contains('tags', ['assigned'])
         .order('createdAt', { ascending: false })
         .limit(200)
     : { data: [] };
-
-  const brokerageUnassigned = [
-    ...(brokerageUnassignedByBrokerageId ?? []),
+  const brokerageAll = [
+    ...(brokerageAllByBrokerageId ?? []),
     ...((brokerageUnassignedLegacy ?? []).filter(
-      (c: any) => !(brokerageUnassignedByBrokerageId ?? []).some((p: any) => p.id === c.id)
+      (c: any) => !(brokerageAllByBrokerageId ?? []).some((p: any) => p.id === c.id)
     )),
   ];
-
-  const brokerageAssigned = [
-    ...(brokerageAssignedByBrokerageId ?? []),
-    ...((brokerageAssignedLegacy ?? []).filter(
-      (c: any) => !(brokerageAssignedByBrokerageId ?? []).some((p: any) => p.id === c.id)
-    )),
-  ];
+  const brokerageUnassigned = brokerageAll.filter((c: any) => !(c.tags ?? []).includes('assigned'));
+  const brokerageAssigned = brokerageAll.filter((c: any) => (c.tags ?? []).includes('assigned'));
 
   // 2. MEMBER LEADS — from individual realtor intake forms, visible to admins
   const allMembers = await getBrokerageMembers(brokerage.id, { includeSpaceName: true });
   const memberSpaceIds = allMembers.map((m) => m.Space?.id).filter(Boolean) as string[];
 
-  const { data: memberUnassigned } = memberSpaceIds.length > 0
+  const { data: memberUnassignedRaw } = memberSpaceIds.length > 0
     ? await supabase
         .from('Contact')
         .select('id, name, email, phone, budget, scoreLabel, leadScore, leadType, tags, createdAt, notes, applicationData')
         .in('spaceId', memberSpaceIds)
         .is('brokerageId', null)
-        .not('tags', 'cs', '["assigned"]')
         .order('createdAt', { ascending: false })
         .limit(200)
     : { data: [] };
+  const memberUnassigned = (memberUnassignedRaw ?? []).filter((c: any) => !(c.tags ?? []).includes('assigned'));
 
   // Merge: brokerage leads first, then member leads
   const seenIds = new Set((brokerageUnassigned ?? []).map((c: any) => c.id));
