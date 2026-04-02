@@ -79,7 +79,7 @@ export async function POST(req: Request) {
     }
   }
 
-  // Idempotency: return existing pending invite for this email
+  // Idempotency: return existing pending invite for this email, but resend the email
   const { data: existing } = await supabase
     .from('Invitation')
     .select('*')
@@ -88,6 +88,18 @@ export async function POST(req: Request) {
     .eq('status', 'pending')
     .maybeSingle();
   if (existing) {
+    // Resend the invitation email (original may have failed or been missed)
+    try {
+      await sendBrokerageInvitation({
+        toEmail: trimmedEmail,
+        brokerageName: brokerage.name,
+        inviterName: (await supabase.from('User').select('name, email').eq('id', dbUserId).maybeSingle()).data?.name ?? 'Someone',
+        roleToAssign: existing.roleToAssign as 'broker_admin' | 'realtor_member',
+        token: existing.token,
+      });
+    } catch (err) {
+      console.error('[broker/invite] resend email failed for existing invite', err);
+    }
     return NextResponse.json({ invitation: existing, duplicate: true }, { status: 200 });
   }
 
