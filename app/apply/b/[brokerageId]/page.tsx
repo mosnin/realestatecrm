@@ -33,11 +33,12 @@ export default async function BrokerageApplyPage({
 
   if (!ownerMembership) notFound();
 
-  // 3. Get the broker_owner's Space for branding
+  // 3. Get the brokerage-linked owner Space for branding
   const { data: space } = await supabase
     .from('Space')
     .select('id, slug, name, ownerId, stripeSubscriptionStatus')
     .eq('ownerId', ownerMembership.userId)
+    .eq('brokerageId', brokerage.id)
     .maybeSingle();
 
   if (!space) notFound();

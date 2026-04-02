@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
-import { getSpaceByOwnerId } from '@/lib/space';
 import { scoreLeadApplication } from '@/lib/lead-scoring';
 import type { LeadScoringResult } from '@/lib/lead-scoring';
 import type { Contact } from '@/lib/types';
@@ -107,9 +106,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Brokerage is not accepting applications' }, { status: 403 });
     }
 
-    // ── Find the broker owner's Space ──────────────────────────────────────
-    // The brokerage.ownerId is the DB User.id of the broker_owner.
-    const space = await getSpaceByOwnerId(brokerage.ownerId);
+    // ── Find the brokerage-linked Space owned by the broker owner ──────────
+    // This prevents brokerage leads from being routed into the owner's
+    // personal realtor space when they have more than one space.
+    const { data: space, error: spaceError } = await supabase
+      .from('Space')
+      .select('id, slug, name, ownerId, brokerageId')
+      .eq('ownerId', brokerage.ownerId)
+      .eq('brokerageId', brokerage.id)
+      .limit(1)
+      .maybeSingle();
+    if (spaceError) throw spaceError;
     if (!space) {
       console.error('[apply/brokerage] broker owner has no space', {
         brokerageId: brokerage.id,
