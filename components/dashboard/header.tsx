@@ -31,6 +31,42 @@ const brokerMobileNavItems = [
   { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
 ];
 
+const brokerMobileNavSections = [
+  {
+    title: 'Overview',
+    items: [
+      { href: '/broker', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+      { href: '/broker/leads', label: 'Leads', icon: Briefcase, exact: false },
+      { href: '/broker/pipeline', label: 'Pipeline', icon: ListChecks, exact: false },
+    ],
+  },
+  {
+    title: 'Team',
+    items: [
+      { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
+      { href: '/broker/leaderboard', label: 'Leaderboard', icon: Users, exact: false },
+      { href: '/broker/members', label: 'Members', icon: Users, exact: false },
+      { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
+    ],
+  },
+  {
+    title: 'Tools',
+    items: [
+      { href: '/broker/analytics', label: 'Analytics', icon: Briefcase, exact: false },
+      { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false },
+      { href: '/broker/chat', label: 'Team Chat', icon: Bell, exact: false },
+      { href: '/broker/announcements', label: 'Announcements', icon: Plug, exact: false },
+    ],
+  },
+  {
+    title: 'Admin',
+    items: [
+      { href: '/broker/import-export', label: 'Import / Export', icon: ArrowLeftRight, exact: false },
+      { href: '/broker/settings', label: 'Settings', icon: Settings, exact: false },
+    ],
+  },
+];
+
 interface HeaderProps {
   slug: string;
   spaceName: string;
@@ -130,30 +166,34 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
               )}
               {isBroker && showBrokerMobileNavOnly && (
                 <>
-                  <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                    Team
-                  </p>
-                  {brokerMobileNavItems.map((item) => {
-                    const isActive = item.exact
-                      ? pathname === item.href
-                      : pathname.startsWith(item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setOpen(false)}
-                        className={cn(
-                          'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
-                          isActive
-                            ? 'bg-primary text-primary-foreground shadow-sm'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                        )}
-                      >
-                        <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
+                  {brokerMobileNavSections.map((section) => (
+                    <div key={section.title} className="pb-2">
+                      <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                        {section.title}
+                      </p>
+                      {section.items.map((item) => {
+                        const isActive = item.exact
+                          ? pathname === item.href
+                          : pathname.startsWith(item.href);
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setOpen(false)}
+                            className={cn(
+                              'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                              isActive
+                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                            )}
+                          >
+                            <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
+                            {item.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </>
               )}
             </nav>
