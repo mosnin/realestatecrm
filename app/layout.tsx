@@ -30,6 +30,10 @@ export const metadata: Metadata = {
     title: 'Chippi — AI-Powered CRM for Rental Agents',
     description: 'Score leads with AI, automate follow-ups, and manage your rental pipeline. Join 2,400+ agents closing leases faster.',
   },
+  icons: {
+    icon: '/chip-avatar.png',
+    apple: '/chip-avatar.png',
+  },
 };
 
 export default async function RootLayout({

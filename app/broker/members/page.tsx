@@ -11,7 +11,7 @@ export default async function BrokerMembersPage() {
   const ctx = await getBrokerContext();
   if (!ctx) redirect('/');
 
-  console.log('[broker/members] Loading members for brokerage:', ctx.brokerage.id);
+  try {
 
   const { data: memberships } = await supabase
     .from('BrokerageMembership')
@@ -173,4 +173,13 @@ export default async function BrokerMembersPage() {
       )}
     </div>
   );
+  } catch (err) {
+    console.error('[broker/members] Page render error:', err);
+    return (
+      <div className="p-8 text-center">
+        <h1 className="text-xl font-semibold">Something went wrong</h1>
+        <p className="text-sm text-muted-foreground mt-2">Unable to load members. Please try refreshing the page.</p>
+      </div>
+    );
+  }
 }

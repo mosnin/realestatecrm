@@ -97,9 +97,9 @@ export default async function BrokerageApplyPage({
   const pageTitle = `${brokerage.name} Rental Application`;
   const pageIntro = settings?.intakePageIntro || "Share your rental preferences and we'll follow up with next steps.";
   const businessName = brokerage.name;
-  const agentName = ownerData?.name || businessName;
-  const agentPhoto = settings?.realtorPhotoUrl || ownerData?.avatar || null;
-  // Prefer brokerage logo, fall back to space logo
+  const agentName = brokerage.name;
+  // For brokerage forms, use brokerage logo — NOT the owner's personal photo
+  const agentPhoto = brokerage.logoUrl || settings?.logoUrl || null;
   const logoUrl = brokerage.logoUrl || settings?.logoUrl || null;
 
   // Gate on subscription status — only pause forms for explicitly failed billing

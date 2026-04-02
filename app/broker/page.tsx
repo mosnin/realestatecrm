@@ -51,6 +51,16 @@ export default async function BrokerOverviewPage() {
 
   const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
 
+  // Ensure broker owner's space is included (brokerage leads are created there)
+  const { data: ownerSpaceRow } = await supabase
+    .from('Space')
+    .select('id')
+    .eq('ownerId', ctx.brokerage.ownerId)
+    .maybeSingle();
+  if (ownerSpaceRow?.id && !spaceIds.includes(ownerSpaceRow.id)) {
+    spaceIds.push(ownerSpaceRow.id);
+  }
+
   // Aggregate per-space stats + pending invitations in parallel
   const [applicationCountRes, leadCountRes, dealRows, wonDealRows, invitationsRes] = await Promise.all([
     spaceIds.length > 0

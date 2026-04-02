@@ -142,33 +142,17 @@ export function PublicPageShell({
 
       {/* ── Page content ─────────────────────────────────────────────────── */}
       <main className="max-w-2xl mx-auto px-3 sm:px-4 pt-5 sm:pt-8 pb-28">
-        {/* Agent info card — photo + name + bio in one clean block */}
+        {/* Title + intro */}
         <div className="mb-5 sm:mb-6">
-          <div className="flex items-start gap-3">
-            {agentPhoto && (
-              <div className="relative flex-shrink-0 hidden sm:block">
-                <img
-                  src={agentPhoto}
-                  alt={agentName}
-                  className="w-11 h-11 rounded-full object-cover ring-2 ring-blue-500 ring-offset-2 ring-offset-muted/50"
-                />
-                <span className="absolute -right-0.5 -bottom-0.5 inline-flex size-3.5 items-center justify-center rounded-full bg-blue-500 ring-1.5 ring-muted/50">
-                  <CheckIcon className="size-2 text-white" />
-                </span>
-              </div>
-            )}
-            <div className="min-w-0">
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
-                {pageTitle}
-              </h1>
-              {pageIntro && (
-                <p className="text-sm text-muted-foreground mt-0.5 max-w-md">{pageIntro}</p>
-              )}
-              {customization?.bio && (
-                <p className="text-xs text-muted-foreground/70 mt-1.5 max-w-md italic">{customization.bio}</p>
-              )}
-            </div>
-          </div>
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
+            {pageTitle}
+          </h1>
+          {pageIntro && (
+            <p className="text-sm text-muted-foreground mt-0.5 max-w-md">{pageIntro}</p>
+          )}
+          {customization?.bio && (
+            <p className="text-xs text-muted-foreground/70 mt-1.5 max-w-md italic">{customization.bio}</p>
+          )}
         </div>
 
         {/* Main form content */}
