@@ -113,6 +113,9 @@ export async function PATCH(req: NextRequest) {
   const updateFields: Record<string, unknown> = {};
   if (name) updateFields.name = name;
   if (emoji !== undefined) updateFields.emoji = emoji;
+  if (body.brokerageId && typeof body.brokerageId === 'string') {
+    updateFields.brokerageId = body.brokerageId;
+  }
 
   // Handle slug change
   const rawNewSlug = typeof body.newSlug === 'string' ? body.newSlug.trim() : '';

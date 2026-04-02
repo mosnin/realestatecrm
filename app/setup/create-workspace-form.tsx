@@ -282,7 +282,7 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
         throw new Error(d.error || 'Failed to complete onboarding.');
       }
 
-      // If broker role, also create the brokerage
+      // If broker role, also create the brokerage and link the space to it
       if (role === 'broker') {
         const brokerRes = await fetch('/api/broker/create', {
           method: 'POST',
@@ -291,6 +291,17 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
         });
         const brokerData = await brokerRes.json().catch(() => ({}));
         if (!brokerRes.ok) throw new Error(brokerData.error || 'Failed to create brokerage.');
+
+        // Link the personal workspace to the brokerage
+        const newBrokerageId = brokerData.brokerage?.id;
+        if (newBrokerageId && spaceData?.slug) {
+          await fetch('/api/spaces', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slug: spaceData.slug, brokerageId: newBrokerageId }),
+          }).catch(() => {}); // Non-fatal — space still works without link
+        }
+
         confettiRef.current?.fire({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
         await new Promise(r => setTimeout(r, 800));
         router.push('/broker');
