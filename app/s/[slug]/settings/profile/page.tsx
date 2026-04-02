@@ -74,8 +74,14 @@ export default function ProfileSettingsPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      // Update Clerk profile
-      await user!.update({ firstName, lastName });
+      // Update Clerk profile (firstName/lastName)
+      try {
+        await user!.update({ firstName, lastName });
+      } catch (clerkErr) {
+        // Clerk v7+ may reject first_name/last_name on certain API versions.
+        // The name is also saved to the DB via save_profile below, so this is non-fatal.
+        console.warn('[profile] Clerk user.update() failed, saving name to DB only:', clerkErr);
+      }
 
       // Update space settings (bio, social links, photo, phone, businessName)
       const res = await fetch('/api/onboarding', {

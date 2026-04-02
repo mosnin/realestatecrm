@@ -402,7 +402,7 @@ export default async function ClientDetailPage({
                   {app.propertyAddress && <Detail label="Address" value={app.propertyAddress} />}
                   {app.unitType && <Detail label="Unit type" value={app.unitType} />}
                   {app.targetMoveInDate && <Detail label="Move-in date" value={app.targetMoveInDate} />}
-                  {app.monthlyRent != null && <Detail label="Monthly rent" value={formatCurrency(app.monthlyRent)} />}
+                  {app.monthlyRent != null && <Detail label="Monthly rent" value={typeof app.monthlyRent === 'number' ? formatCurrency(app.monthlyRent) : String(app.monthlyRent)} />}
                   {app.leaseTermPreference && <Detail label="Lease term" value={app.leaseTermPreference} />}
                   {app.numberOfOccupants != null && <Detail label="Occupants" value={String(app.numberOfOccupants)} />}
                 </DetailGrid>
@@ -505,9 +505,11 @@ export default async function ClientDetailPage({
           <div className="px-4 sm:px-6 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             {contact.budget != null && (
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Monthly budget</p>
+                <p className="text-xs text-muted-foreground mb-1">Budget</p>
                 <p className="text-sm font-semibold text-foreground">
-                  {formatCurrency(contact.budget)}<span className="text-muted-foreground font-normal">/mo</span>
+                  {typeof contact.budget === 'number'
+                    ? <>{formatCurrency(contact.budget)}<span className="text-muted-foreground font-normal">/mo</span></>
+                    : String(contact.budget)}
                 </p>
               </div>
             )}

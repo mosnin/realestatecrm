@@ -413,7 +413,7 @@ export function ApplicationForm({
           legalName: get('name'),
           email: get('email'),
           phone: get('phone'),
-          monthlyRent: get('buyerBudget'),
+          buyerBudget: get('buyerBudget'),
           preApprovalStatus: get('preApproval'),
           preApprovalLender: get('lender'),
           preApprovalAmount: get('preApprovalAmount'),
@@ -869,7 +869,7 @@ export function ApplicationForm({
         case 6: {
           const mustHaveOptions = [
             'Garage', 'Yard', 'Pool', 'Updated Kitchen', 'Home Office',
-            'Storage', 'Washer/Dryer', 'Pet-Friendly', 'Accessibility Features',
+            'Storage', 'Washer/Dryer', 'Accessibility Features',
           ];
           const currentMustHaves = get('mustHaves') ? get('mustHaves').split(',') : [];
           const toggleMustHave = (item: string) => {

@@ -52,9 +52,9 @@ export const publicApplicationSchema = z.object({
     .transform((v) => {
       if (v == null || v === '') return undefined;
       if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
-      if (typeof v === 'string' && /[\$,]/.test(v)) return v;
-      const p = Number.parseFloat(String(v));
-      return Number.isFinite(p) ? p : v;
+      // Keep string values as-is (e.g. "1m_plus", "$1M+", "500k_750k")
+      if (typeof v === 'string') return v;
+      return undefined;
     }),
   housingSituation: optStr,
   buyerTimeline: optStr,
@@ -71,9 +71,14 @@ export const publicApplicationSchema = z.object({
       if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
       // If it's a range string like "$1,500 - $2,000", keep as string
       if (typeof v === 'string' && /[\$,]/.test(v)) return v;
-      // Try to parse as number for backward compatibility
-      const p = Number.parseFloat(String(v));
-      return Number.isFinite(p) ? p : v;
+      // Try to parse as number for backward compatibility, but only if
+      // the entire string is a valid number (avoid parseFloat("1m_plus") → 1)
+      if (typeof v === 'string') {
+        const trimmed = String(v).trim();
+        const p = Number(trimmed);
+        return Number.isFinite(p) ? p : trimmed;
+      }
+      return undefined;
     }),
   leaseTermPreference: optStr,
   numberOfOccupants: optNum,
@@ -135,9 +140,14 @@ export const publicApplicationSchema = z.object({
       if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
       // If it's a range string like "$3,000 - $4,000", keep as string
       if (typeof v === 'string' && /[\$,]/.test(v)) return v;
-      // Try to parse as number for backward compatibility
-      const p = Number.parseFloat(String(v));
-      return Number.isFinite(p) ? p : v;
+      // Try to parse as number for backward compatibility, but only if
+      // the entire string is a valid number (avoid parseFloat("1m_plus") → 1)
+      if (typeof v === 'string') {
+        const trimmed = String(v).trim();
+        const p = Number(trimmed);
+        return Number.isFinite(p) ? p : trimmed;
+      }
+      return undefined;
     }),
   additionalIncome: optNum,
 

@@ -48,7 +48,18 @@ export default function ProfilePage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await user!.update({ firstName, lastName });
+      try {
+        await user!.update({ firstName, lastName });
+      } catch (clerkErr) {
+        // Clerk v7+ may reject first_name/last_name on certain API versions.
+        console.warn('[profile] Clerk user.update() failed:', clerkErr);
+      }
+      // Also persist name to the DB so the app always has the latest value
+      await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save_profile', name: `${firstName} ${lastName}`.trim() }),
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } finally {
