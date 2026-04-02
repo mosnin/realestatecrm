@@ -387,8 +387,8 @@ export function ChatInterface({
           </div>
         ) : messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center gap-6 text-muted-foreground px-6">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-              <Sparkles size={36} className="text-primary" />
+            <div className="w-20 h-20 rounded-full overflow-hidden">
+              <img src="/chip-avatar.png" alt="Chip" className="w-full h-full object-cover" />
             </div>
             <div className="space-y-2">
               <p className="font-semibold text-foreground text-xl">Chip</p>
