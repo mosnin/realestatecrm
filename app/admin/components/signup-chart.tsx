@@ -36,13 +36,13 @@ export function SignupChart({ data }: SignupChartProps) {
             dataKey="label"
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+            tick={{ fontSize: 10, fill: 'currentColor' }}
             interval={Math.max(Math.floor(formatted.length / 6), 1)}
           />
           <YAxis
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+            tick={{ fontSize: 10, fill: 'currentColor' }}
             allowDecimals={false}
           />
           <Tooltip
