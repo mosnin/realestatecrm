@@ -173,7 +173,7 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
   // We look up spaces belonging to brokerage members with admin/owner roles
   const { data: brokerSpaces } = await supabase
     .from('BrokerageMembership')
-    .select('userId, User!BrokerageMembership_userId_fkey(id), Space!Space_ownerId_fkey(id)')
+    .select('userId, User!userId(id), Space!Space_ownerId_fkey(id)')
     .eq('brokerageId', brokerage.id)
     .in('role', ['broker_owner', 'broker_admin']);
 

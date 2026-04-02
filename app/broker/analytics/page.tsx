@@ -19,7 +19,7 @@ export default async function BrokerAnalyticsPage() {
   // Fetch all members with their spaces
   const { data: memberships } = await supabase
     .from('BrokerageMembership')
-    .select('userId, role, User!BrokerageMembership_userId_fkey(id, name, email), Space!Space_ownerId_fkey(id, slug, name)')
+    .select('userId, role, User!userId(id, name, email), Space!Space_ownerId_fkey(id, slug, name)')
     .eq('brokerageId', brokerage.id)
     .order('createdAt', { ascending: true });
 

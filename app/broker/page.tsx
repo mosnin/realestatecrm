@@ -1,5 +1,6 @@
 import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
+import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { redirect } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -48,9 +49,8 @@ export default async function BrokerOverviewPage() {
   // Fetch members with their user + space info
   const { data: memberships } = await supabase
     .from('BrokerageMembership')
-    .select('id, role, createdAt, userId, User!BrokerageMembership_userId_fkey(id, name, email, onboard), Space!Space_ownerId_fkey(id, slug, name)')
+    const members = await getBrokerageMembers(ctx.brokerage.id, { includeOnboard: true, includeSpaceName: true });
     .eq('brokerageId', brokerage.id)
-    .order('createdAt', { ascending: true });
 
   const members = (memberships ?? []) as unknown as Array<{
     id: string;

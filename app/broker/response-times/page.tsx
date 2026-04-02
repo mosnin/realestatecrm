@@ -20,7 +20,7 @@ export default async function BrokerResponseTimesPage() {
   const { data: memberships } = await supabase
     .from('BrokerageMembership')
     .select(
-      'id, role, userId, User!BrokerageMembership_userId_fkey(id, name, email), Space!Space_ownerId_fkey(id, slug, name)'
+      'id, role, userId, User!userId(id, name, email), Space!Space_ownerId_fkey(id, slug, name)'
     )
     .eq('brokerageId', brokerage.id)
     .eq('role', 'realtor_member')
