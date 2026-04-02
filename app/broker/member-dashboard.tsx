@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   PhoneIncoming,
@@ -171,15 +172,11 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
 
   // Filter announcements — find broker's space IDs to only show brokerage-related notes
   // We look up spaces belonging to brokerage members with admin/owner roles
-  const { data: brokerSpaces } = await supabase
-    .from('BrokerageMembership')
-    .select('userId, User!userId(id), Space!Space_ownerId_fkey(id)')
-    .eq('brokerageId', brokerage.id)
-    .in('role', ['broker_owner', 'broker_admin']);
-
+  const brokerMembers = await getBrokerageMembers(brokerage.id);
   const brokerSpaceIds = new Set(
-    (brokerSpaces ?? [])
-      .map((m: any) => m.Space?.id)
+    brokerMembers
+      .filter((m) => m.role === 'broker_owner' || m.role === 'broker_admin')
+      .map((m) => m.Space?.id)
       .filter(Boolean)
   );
 

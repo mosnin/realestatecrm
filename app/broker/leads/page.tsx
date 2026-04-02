@@ -1,6 +1,7 @@
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
+import { getBrokerageMembers } from '@/lib/brokerage-members';
 import type { Metadata } from 'next';
 import { BrokerLeadsClient, type LeadRow, type RealtorOption, type AssignedLeadProgress } from './broker-leads-client';
 
@@ -49,22 +50,8 @@ export default async function BrokerLeadsPage() {
     : { data: [] };
 
   // Query brokerage members (realtors)
-  const { data: memberships } = await supabase
-    .from('BrokerageMembership')
-    .select(
-      'id, role, userId, User!userId(id, name, email), Space!Space_ownerId_fkey(id, slug, name)'
-    )
-    .eq('brokerageId', brokerage.id)
-    .eq('role', 'realtor_member')
-    .order('createdAt', { ascending: true });
-
-  const members = (memberships ?? []) as unknown as Array<{
-    id: string;
-    role: string;
-    userId: string;
-    User: { id: string; name: string | null; email: string } | null;
-    Space: { id: string; slug: string; name: string } | null;
-  }>;
+  const allMembers = await getBrokerageMembers(brokerage.id, { includeSpaceName: true });
+  const members = allMembers.filter((m) => m.role === 'realtor_member');
 
   // Get lead counts per realtor space
   const realtorSpaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];

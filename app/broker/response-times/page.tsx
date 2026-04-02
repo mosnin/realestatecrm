@@ -1,6 +1,7 @@
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
+import { getBrokerageMembers } from '@/lib/brokerage-members';
 import type { Metadata } from 'next';
 import { ResponseTimesClient, type RealtorResponseData, type WaitingLead } from './response-times-client';
 
@@ -17,22 +18,8 @@ export default async function BrokerResponseTimesPage() {
   const { brokerage } = ctx;
 
   // Get all realtor members with their spaces
-  const { data: memberships } = await supabase
-    .from('BrokerageMembership')
-    .select(
-      'id, role, userId, User!userId(id, name, email), Space!Space_ownerId_fkey(id, slug, name)'
-    )
-    .eq('brokerageId', brokerage.id)
-    .eq('role', 'realtor_member')
-    .order('createdAt', { ascending: true });
-
-  const members = (memberships ?? []) as unknown as Array<{
-    id: string;
-    role: string;
-    userId: string;
-    User: { id: string; name: string | null; email: string } | null;
-    Space: { id: string; slug: string; name: string } | null;
-  }>;
+  const allMembers = await getBrokerageMembers(brokerage.id, { includeSpaceName: true });
+  const members = allMembers.filter((m) => m.role === 'realtor_member');
 
   const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
 

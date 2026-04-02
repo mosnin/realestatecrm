@@ -1,6 +1,7 @@
 import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
+import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { Card, CardContent } from '@/components/ui/card';
 import { PhoneIncoming, Users, Briefcase, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
@@ -16,22 +17,7 @@ export default async function BrokerRealtorsPage() {
 
   const { brokerage } = ctx;
 
-  const { data: memberships } = await supabase
-    .from('BrokerageMembership')
-    .select(
-      'id, role, createdAt, userId, User!userId(id, name, email, onboard), Space!Space_ownerId_fkey(id, slug, name)'
-    )
-    .eq('brokerageId', brokerage.id)
-    .order('createdAt', { ascending: true });
-
-  const members = (memberships ?? []) as Array<{
-    id: string;
-    role: string;
-    createdAt: string;
-    userId: string;
-    User: { id: string; name: string | null; email: string; onboard: boolean } | null;
-    Space: { id: string; slug: string; name: string } | null;
-  }>;
+  const members = await getBrokerageMembers(brokerage.id, { includeOnboard: true, includeSpaceName: true });
 
   const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
 

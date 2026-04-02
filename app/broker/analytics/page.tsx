@@ -1,6 +1,7 @@
 import { requireBroker } from '@/lib/permissions';
-import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
+import { getBrokerageMembers } from '@/lib/brokerage-members';
+import { supabase } from '@/lib/supabase';
 import type { Metadata } from 'next';
 import { AnalyticsClient, type AgentFunnelData } from './analytics-client';
 
@@ -17,18 +18,7 @@ export default async function BrokerAnalyticsPage() {
   const { brokerage } = ctx;
 
   // Fetch all members with their spaces
-  const { data: memberships } = await supabase
-    .from('BrokerageMembership')
-    .select('userId, role, User!userId(id, name, email), Space!Space_ownerId_fkey(id, slug, name)')
-    .eq('brokerageId', brokerage.id)
-    .order('createdAt', { ascending: true });
-
-  const members = ((memberships ?? []) as unknown as Array<{
-    userId: string;
-    role: string;
-    User: { id: string; name: string | null; email: string } | null;
-    Space: { id: string; slug: string; name: string } | null;
-  }>);
+  const members = await getBrokerageMembers(brokerage.id, { includeSpaceName: true });
 
   const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
 

@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
       address: address || null,
       notes: notes || null,
       type: 'QUALIFICATION',
-      tags: ['new-lead', 'imported'],
+      tags: ['new-lead', 'imported', 'brokerage-lead'],
       scoringStatus: 'pending',
       applicationData: Object.keys(applicationData).length > 0 ? applicationData : null,
       properties: [],
