@@ -17,14 +17,11 @@ import type { ApplicationData } from '@/lib/types';
 // ── Scoring weights — must sum to 1.0 ─────────────────────────────────────
 
 export const DEFAULT_WEIGHTS = {
-  creditScore: 0.20,
-  affordability: 0.25,
-  moveInUrgency: 0.10,
-  employmentStability: 0.12,
-  rentalHistory: 0.12,
-  screeningFlags: 0.10,
-  applicationCompleteness: 0.06,
-  householdFit: 0.05,
+  affordability: 0.30,
+  employmentStability: 0.20,
+  moveInUrgency: 0.20,
+  applicationCompleteness: 0.15,
+  householdFit: 0.15,
 } as const;
 
 export type ScoringWeights = typeof DEFAULT_WEIGHTS;
@@ -124,48 +121,52 @@ export type ScoringInput = {
 // Category scoring functions — each returns 0-1
 // ═══════════════════════════════════════════════════════════════════════════
 
-function scoreCreditScore(input: ScoringInput): CategoryResult {
-  const app = input.applicationData;
-  const signals: string[] = [];
-  let rawScore = 0.5; // neutral if not provided
+// Credit score is NOT collected on the intake form — this returns a neutral score.
+// Kept as a stub for type compatibility; not included in rental weight calculations.
+function scoreCreditScore(_input: ScoringInput): CategoryResult {
+  return {
+    category: 'affordability' as ScoringCategory, // placeholder category
+    rawScore: 1.0,
+    weight: 0,
+    weightedScore: 0,
+    signals: ['Credit score not collected — neutral'],
+  };
+}
 
-  const score = app?.creditScore;
+/**
+ * Parse the form's range-value strings into midpoint numbers.
+ * Handles: 'under_1500', '1500_2000', '3500_plus', '6000_plus', etc.
+ */
+function parseFormRange(value: string | number | undefined | null): number {
+  if (value == null) return 0;
+  if (typeof value === 'number') return value;
 
-  if (!score || typeof score !== 'number') {
-    signals.push('Credit score not provided — using neutral baseline');
-  } else if (score >= 780) {
-    rawScore = 1.0;
-    signals.push(`Exceptional credit score: ${score} (780+)`);
-  } else if (score >= 750) {
-    rawScore = 0.95;
-    signals.push(`Excellent credit score: ${score} (750-779)`);
-  } else if (score >= 720) {
-    rawScore = 0.85;
-    signals.push(`Very good credit score: ${score} (720-749)`);
-  } else if (score >= 670) {
-    rawScore = 0.70;
-    signals.push(`Good credit score: ${score} (670-719)`);
-  } else if (score >= 620) {
-    rawScore = 0.50;
-    signals.push(`Fair credit score: ${score} (620-669)`);
-  } else if (score >= 580) {
-    rawScore = 0.30;
-    signals.push(`Below average credit score: ${score} (580-619)`);
-  } else if (score >= 500) {
-    rawScore = 0.15;
-    signals.push(`Poor credit score: ${score} (500-579)`);
-  } else {
-    rawScore = 0.05;
-    signals.push(`Very poor credit score: ${score} (below 500)`);
+  const v = value.toLowerCase().trim();
+
+  // "under_X" → 75% of X
+  const underMatch = v.match(/^under[_\s](\d+)/);
+  if (underMatch) return parseInt(underMatch[1], 10) * 0.75;
+
+  // "X_plus" or "Xk_plus" → X * 1.25 (conservative upward estimate)
+  const plusMatch = v.match(/^(\d+)(?:k)?[_\s]?plus$/);
+  if (plusMatch) {
+    const num = parseInt(plusMatch[1], 10);
+    return (num < 100 ? num * 1000 : num) * 1.25;
   }
 
-  return {
-    category: 'creditScore',
-    rawScore,
-    weight: DEFAULT_WEIGHTS.creditScore,
-    weightedScore: rawScore * DEFAULT_WEIGHTS.creditScore,
-    signals,
-  };
+  // "X_Y" range → midpoint
+  const rangeMatch = v.match(/^(\d+)(?:k)?[_\s](\d+)(?:k)?$/);
+  if (rangeMatch) {
+    let low = parseInt(rangeMatch[1], 10);
+    let high = parseInt(rangeMatch[2], 10);
+    // Handle shorthand like '200k_350k' vs '1500_2000'
+    if (low < 100) low *= 1000;
+    if (high < 100) high *= 1000;
+    return (low + high) / 2;
+  }
+
+  // Fallback to existing parser for formatted strings like "$1,500 - $2,000"
+  return parseRangeMidpoint(value) ?? 0;
 }
 
 function scoreAffordability(input: ScoringInput): CategoryResult {
@@ -173,13 +174,11 @@ function scoreAffordability(input: ScoringInput): CategoryResult {
   const signals: string[] = [];
   let rawScore = 0.3; // baseline for minimal data
 
-  const income = resolveNumericValue(app?.monthlyGrossIncome);
-  const additionalIncome = app?.additionalIncome ?? 0;
-  const totalIncome = income + additionalIncome;
-  const rent = resolveNumericValue(app?.monthlyRent) || (input.budget ?? 0);
+  const income = parseFormRange(app?.monthlyGrossIncome);
+  const rent = parseFormRange(app?.monthlyRent) || (input.budget ?? 0);
 
-  if (totalIncome > 0 && rent > 0) {
-    const ratio = totalIncome / rent;
+  if (income > 0 && rent > 0) {
+    const ratio = income / rent;
 
     if (ratio >= 4.0) {
       rawScore = 1.0;
@@ -197,16 +196,12 @@ function scoreAffordability(input: ScoringInput): CategoryResult {
       rawScore = 0.1;
       signals.push(`Income-to-rent ratio ${ratio.toFixed(1)}x — likely unaffordable`);
     }
-
-    if (additionalIncome > 0) {
-      signals.push(`Additional income: $${additionalIncome.toLocaleString()}/mo`);
-    }
-  } else if (totalIncome > 0) {
+  } else if (income > 0) {
     rawScore = 0.5;
-    signals.push(`Income reported ($${totalIncome.toLocaleString()}/mo) but no target rent provided`);
+    signals.push(`Income reported but no target rent provided`);
   } else if (rent > 0) {
     rawScore = 0.25;
-    signals.push(`Target rent $${rent.toLocaleString()}/mo but no income reported`);
+    signals.push(`Target rent provided but no income reported`);
   } else {
     rawScore = 0.15;
     signals.push('No income or rent data provided');
@@ -227,24 +222,23 @@ function scoreMoveInUrgency(input: ScoringInput): CategoryResult {
   let rawScore = 0.3;
 
   if (app?.targetMoveInDate) {
-    const moveIn = app.targetMoveInDate;
+    const moveIn = app.targetMoveInDate.toLowerCase().trim();
 
-    // Handle new simplified form values
-    if (moveIn.toLowerCase() === 'asap') {
+    if (moveIn === 'asap') {
       rawScore = 1.0;
       signals.push('Immediate move-in: ASAP');
-    } else if (moveIn.toLowerCase().includes('within 30') || moveIn.toLowerCase().includes('30 day')) {
+    } else if (moveIn === '30days') {
       rawScore = 0.85;
       signals.push('Near-term: within 30 days');
-    } else if (moveIn.toLowerCase().includes('1-2 month') || moveIn.toLowerCase().includes('1–2 month')) {
+    } else if (moveIn === '1-2months') {
       rawScore = 0.6;
       signals.push('Medium-term: 1-2 months');
-    } else if (moveIn.toLowerCase().includes('just browsing') || moveIn.toLowerCase().includes('browsing')) {
+    } else if (moveIn === 'browsing') {
       rawScore = 0.15;
       signals.push('Just browsing — low urgency');
     } else {
-      // Try parsing as a date (old form format)
-      const target = new Date(moveIn);
+      // Fallback: try parsing as a date for legacy data
+      const target = new Date(app.targetMoveInDate);
       if (!isNaN(target.getTime())) {
         const now = new Date();
         const daysUntilMove = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -261,28 +255,17 @@ function scoreMoveInUrgency(input: ScoringInput): CategoryResult {
         } else if (daysUntilMove <= 60) {
           rawScore = 0.65;
           signals.push(`Medium-term: moving in ${daysUntilMove} days (~2 months)`);
-        } else if (daysUntilMove <= 90) {
-          rawScore = 0.45;
-          signals.push(`Longer-term: moving in ${daysUntilMove} days (~3 months)`);
         } else {
           rawScore = 0.25;
-          signals.push(`Far out: moving in ${daysUntilMove} days (${Math.round(daysUntilMove / 30)} months)`);
+          signals.push(`Far out: moving in ${daysUntilMove} days`);
         }
       } else {
         rawScore = 0.4;
-        signals.push(`Move-in timing: "${moveIn}"`);
+        signals.push(`Move-in timing: "${app.targetMoveInDate}"`);
       }
     }
   } else {
     signals.push('No move-in date provided');
-  }
-
-  if (app?.reasonForMoving) {
-    const urgent = /evict|emergency|immediate|asap|must move|lease ending|notice/i;
-    if (urgent.test(app.reasonForMoving)) {
-      rawScore = Math.min(1.0, rawScore + 0.15);
-      signals.push(`Urgent reason for moving: "${app.reasonForMoving}"`);
-    }
   }
 
   return {
@@ -300,58 +283,34 @@ function scoreEmploymentStability(input: ScoringInput): CategoryResult {
   let rawScore = 0.2;
 
   if (app?.employmentStatus) {
-    const status = app.employmentStatus;
+    const status = app.employmentStatus.toLowerCase().trim();
     switch (status) {
-      case 'employed':
-      case 'Full-time employed':
-        rawScore = 0.9;
-        signals.push(status === 'Full-time employed' ? 'Full-time employed' : 'Employed');
-        if (app.employerOrSource) {
-          rawScore = 1.0;
-          signals.push(`Employer: ${app.employerOrSource}`);
-        }
+      case 'full-time':
+        rawScore = 1.0;
+        signals.push('Full-time employed');
         break;
       case 'self-employed':
-      case 'Self-employed':
         rawScore = 0.75;
         signals.push('Self-employed');
-        if (app.employerOrSource) {
-          signals.push(`Source: ${app.employerOrSource}`);
-        }
         break;
-      case 'Part-time employed':
+      case 'part-time':
         rawScore = 0.6;
         signals.push('Part-time employed');
-        if (app.employerOrSource) {
-          signals.push(`Employer: ${app.employerOrSource}`);
-        }
-        break;
-      case 'retired':
-        rawScore = 0.7;
-        signals.push('Retired — fixed income likely');
         break;
       case 'student':
-      case 'Student':
         rawScore = 0.4;
         signals.push('Student — may need co-signer or guarantor');
         break;
-      case 'unemployed':
-      case 'Not currently employed':
+      case 'not-employed':
         rawScore = 0.15;
-        signals.push(status === 'Not currently employed' ? 'Not currently employed — verify alternative income sources' : 'Unemployed — verify alternative income sources');
+        signals.push('Not currently employed — verify alternative income sources');
         break;
       default:
         rawScore = 0.3;
-        signals.push(`Employment status: ${status}`);
+        signals.push(`Employment status: ${app.employmentStatus}`);
     }
   } else {
     signals.push('Employment status not provided');
-  }
-
-  // Bonus for additional income streams
-  if (app?.additionalIncome && app.additionalIncome > 0) {
-    rawScore = Math.min(1.0, rawScore + 0.1);
-    signals.push(`Additional income stream: $${app.additionalIncome}/mo`);
   }
 
   return {
@@ -363,90 +322,16 @@ function scoreEmploymentStability(input: ScoringInput): CategoryResult {
   };
 }
 
-function scoreRentalHistory(input: ScoringInput): CategoryResult {
-  const app = input.applicationData;
-  const signals: string[] = [];
-  let rawScore = 0.5; // neutral baseline
-
-  if (!app) {
-    signals.push('No application data — rental history unknown');
-    return {
-      category: 'rentalHistory',
-      rawScore: 0.3,
-      weight: DEFAULT_WEIGHTS.rentalHistory,
-      weightedScore: 0.3 * DEFAULT_WEIGHTS.rentalHistory,
-      signals,
-    };
-  }
-
-  // Positive: landlord references provided
-  let referencesProvided = 0;
-  if (app.currentLandlordName) { referencesProvided++; signals.push('Current landlord reference provided'); }
-  if (app.previousLandlordName) { referencesProvided++; signals.push('Previous landlord reference provided'); }
-  if (referencesProvided === 2) rawScore = 0.8;
-  else if (referencesProvided === 1) rawScore = 0.6;
-  else signals.push('No landlord references provided');
-
-  // Permission to contact
-  if (app.permissionToContactReferences === true) {
-    rawScore = Math.min(1.0, rawScore + 0.1);
-    signals.push('Gave permission to contact references');
-  } else if (app.permissionToContactReferences === false) {
-    rawScore = Math.max(0, rawScore - 0.15);
-    signals.push('Declined permission to contact references');
-  }
-
-  // Negative: late payments
-  if (app.latePayments === true) {
-    rawScore = Math.max(0, rawScore - 0.2);
-    signals.push('History of late payments');
-  } else if (app.latePayments === false) {
-    rawScore = Math.min(1.0, rawScore + 0.05);
-    signals.push('No late payment history');
-  }
-
-  // Negative: lease violations
-  if (app.leaseViolations === true) {
-    rawScore = Math.max(0, rawScore - 0.25);
-    signals.push('Prior lease violations');
-  } else if (app.leaseViolations === false) {
-    rawScore = Math.min(1.0, rawScore + 0.05);
-    signals.push('No lease violations');
-  }
-
-  // Length of residence stability
-  if (app.lengthOfResidence) {
-    const years = parseResidenceLength(app.lengthOfResidence);
-    if (years >= 2) {
-      rawScore = Math.min(1.0, rawScore + 0.1);
-      signals.push(`Stable: ${app.lengthOfResidence} at current address`);
-    } else if (years < 0.5) {
-      signals.push(`Short tenure: ${app.lengthOfResidence} — possible frequent mover`);
-    }
-  }
-
+// Rental history (landlord refs, late payments, lease violations) is NOT collected on the intake form.
+// Returns neutral score — not included in rental weight calculations.
+function scoreRentalHistory(_input: ScoringInput): CategoryResult {
   return {
-    category: 'rentalHistory',
-    rawScore: Math.max(0, Math.min(1.0, rawScore)),
-    weight: DEFAULT_WEIGHTS.rentalHistory,
-    weightedScore: Math.max(0, Math.min(1.0, rawScore)) * DEFAULT_WEIGHTS.rentalHistory,
-    signals,
+    category: 'affordability' as ScoringCategory, // placeholder
+    rawScore: 1.0,
+    weight: 0,
+    weightedScore: 0,
+    signals: ['Rental history not collected — neutral'],
   };
-}
-
-function parseResidenceLength(value: string): number {
-  const lower = value.toLowerCase();
-  const yearMatch = lower.match(/(\d+)\s*(?:year|yr)/);
-  const monthMatch = lower.match(/(\d+)\s*(?:month|mo)/);
-  let years = 0;
-  if (yearMatch) years += parseInt(yearMatch[1], 10);
-  if (monthMatch) years += parseInt(monthMatch[1], 10) / 12;
-  if (years === 0) {
-    // Try bare number (assume months)
-    const bare = parseInt(lower, 10);
-    if (!isNaN(bare)) years = bare > 24 ? bare / 12 : bare / 12;
-  }
-  return years;
 }
 
 function scoreApplicationCompleteness(input: ScoringInput): CategoryResult {
@@ -463,19 +348,19 @@ function scoreApplicationCompleteness(input: ScoringInput): CategoryResult {
     };
   }
 
-  // Use rental-specific fields for completeness check (buyer has its own path via scoreBuyerCompleteness)
+  // Only check fields that the rental intake form ACTUALLY collects
   const fields = [
-    app.creditScore, app.propertyAddress, app.unitType, app.targetMoveInDate, app.monthlyRent,
-    app.leaseTermPreference, app.numberOfOccupants, app.dateOfBirth,
-    app.currentAddress, app.currentHousingStatus, app.currentMonthlyPayment,
-    app.lengthOfResidence, app.reasonForMoving,
-    app.adultsOnApplication, app.childrenOrDependents,
-    app.employmentStatus, app.employerOrSource, app.monthlyGrossIncome,
-    app.currentLandlordName, app.currentRentPaid,
-    app.priorEvictions, app.outstandingBalances, app.bankruptcy,
-    app.smoking, app.hasPets,
-    app.consentToScreening, app.truthfulnessCertification, app.electronicSignature,
-    app.emergencyContactName, app.coRenters, app.additionalIncome,
+    input.name,                // legalName
+    input.email,               // email
+    input.phone,               // phone
+    app.targetMoveInDate,
+    app.propertyAddress,
+    app.monthlyRent,
+    app.monthlyGrossIncome,
+    app.employmentStatus,
+    app.numberOfOccupants,
+    app.hasPets,
+    app.leaseTermPreference,
   ];
 
   const totalFields = fields.length;
@@ -495,11 +380,6 @@ function scoreApplicationCompleteness(input: ScoringInput): CategoryResult {
   } else {
     rawScore = 0.2;
     signals.push(`Incomplete: ${Math.round(completeness * 100)}% complete (${filled}/${totalFields})`);
-  }
-
-  // Bonus for consents
-  if (app.consentToScreening && app.truthfulnessCertification && app.electronicSignature) {
-    signals.push('All consents signed');
   }
 
   return {
@@ -526,9 +406,9 @@ function scoreHouseholdFit(input: ScoringInput): CategoryResult {
     };
   }
 
-  const occupants = app.numberOfOccupants ?? ((app.adultsOnApplication ?? 1) + (app.childrenOrDependents ?? 0));
+  const occupants = app.numberOfOccupants;
 
-  if (occupants > 0) {
+  if (occupants != null && occupants > 0) {
     signals.push(`Total occupants: ${occupants}`);
     if (occupants <= 2) {
       rawScore = 0.9;
@@ -540,22 +420,15 @@ function scoreHouseholdFit(input: ScoringInput): CategoryResult {
       rawScore = 0.4;
       signals.push('Large household — may need specific unit type');
     }
+  } else {
+    signals.push('Number of occupants not provided');
   }
 
   if (app.hasPets === true) {
     rawScore = Math.max(0, rawScore - 0.1);
-    signals.push(`Has pets${app.petDetails ? `: ${app.petDetails}` : ''} — verify pet policy`);
+    signals.push('Has pets — verify pet policy');
   } else if (app.hasPets === false) {
     signals.push('No pets');
-  }
-
-  if (app.smoking === true) {
-    rawScore = Math.max(0, rawScore - 0.15);
-    signals.push('Smoker — verify smoking policy');
-  }
-
-  if (app.emergencyContactName) {
-    signals.push('Emergency contact provided');
   }
 
   return {
@@ -567,55 +440,15 @@ function scoreHouseholdFit(input: ScoringInput): CategoryResult {
   };
 }
 
-function scoreScreeningFlags(input: ScoringInput): CategoryResult {
-  const app = input.applicationData;
-  const signals: string[] = [];
-  let rawScore = 0.8; // assume clean unless flagged
-
-  if (!app) {
-    return {
-      category: 'screeningFlags',
-      rawScore: 0.4,
-      weight: DEFAULT_WEIGHTS.screeningFlags,
-      weightedScore: 0.4 * DEFAULT_WEIGHTS.screeningFlags,
-      signals: ['No screening data — flags unknown'],
-    };
-  }
-
-  // Each flag is a major deduction
-  if (app.priorEvictions === true) {
-    rawScore -= 0.4;
-    signals.push('CRITICAL: Prior evictions reported');
-  } else if (app.priorEvictions === false) {
-    signals.push('No prior evictions');
-  }
-
-  if (app.bankruptcy === true) {
-    rawScore -= 0.3;
-    signals.push('WARNING: Bankruptcy history');
-  } else if (app.bankruptcy === false) {
-    signals.push('No bankruptcy');
-  }
-
-  if (app.outstandingBalances === true) {
-    rawScore -= 0.25;
-    signals.push('WARNING: Outstanding balances reported');
-  } else if (app.outstandingBalances === false) {
-    signals.push('No outstanding balances');
-  }
-
-  // Clean slate bonus
-  if (app.priorEvictions === false && app.bankruptcy === false && app.outstandingBalances === false) {
-    rawScore = 1.0;
-    signals.push('Clean screening: no evictions, bankruptcy, or balances');
-  }
-
+// Screening flags (evictions, bankruptcy, outstanding balances) are NOT collected on the intake form.
+// Returns neutral score — not included in rental weight calculations.
+function scoreScreeningFlags(_input: ScoringInput): CategoryResult {
   return {
-    category: 'screeningFlags',
-    rawScore: Math.max(0, Math.min(1.0, rawScore)),
-    weight: DEFAULT_WEIGHTS.screeningFlags,
-    weightedScore: Math.max(0, Math.min(1.0, rawScore)) * DEFAULT_WEIGHTS.screeningFlags,
-    signals,
+    category: 'affordability' as ScoringCategory, // placeholder
+    rawScore: 1.0,
+    weight: 0,
+    weightedScore: 0,
+    signals: ['Screening flags not collected — neutral'],
   };
 }
 
@@ -629,48 +462,14 @@ function computeRiskPenalties(input: ScoringInput): RiskPenalty[] {
 
   if (!app) return penalties;
 
-  // Very poor credit score = severe risk
-  const creditScore = app.creditScore;
-  if (typeof creditScore === 'number' && creditScore < 580 && app.priorEvictions === true) {
-    penalties.push({
-      flag: 'poor_credit_with_evictions',
-      multiplier: 0.5,
-      description: `Credit score ${creditScore} combined with prior evictions — very high risk profile`,
-    });
-  } else if (typeof creditScore === 'number' && creditScore < 500) {
-    penalties.push({
-      flag: 'very_poor_credit',
-      multiplier: 0.7,
-      description: `Credit score ${creditScore} (below 500) — severe credit risk`,
-    });
-  }
-
-  // Eviction + outstanding balances = severe compound risk
-  if (app.priorEvictions === true && app.outstandingBalances === true) {
-    penalties.push({
-      flag: 'compound_financial_risk',
-      multiplier: 0.7,
-      description: 'Prior evictions combined with outstanding balances — high risk profile',
-    });
-  }
-
-  // Income way below threshold
-  const income = resolveNumericValue(app.monthlyGrossIncome) + (app.additionalIncome ?? 0);
-  const rent = resolveNumericValue(app.monthlyRent);
+  // Income way below threshold (using form range values)
+  const income = parseFormRange(app.monthlyGrossIncome);
+  const rent = parseFormRange(app.monthlyRent);
   if (income > 0 && rent > 0 && income / rent < 1.5) {
     penalties.push({
       flag: 'severe_affordability_gap',
       multiplier: 0.6,
-      description: `Income-to-rent ratio below 1.5x ($${income}/$${rent}) — severe affordability risk`,
-    });
-  }
-
-  // Refused screening consent
-  if (app.consentToScreening === false) {
-    penalties.push({
-      flag: 'screening_consent_refused',
-      multiplier: 0.5,
-      description: 'Applicant declined screening consent — cannot verify background',
+      description: `Income-to-rent ratio below 1.5x — severe affordability risk`,
     });
   }
 
@@ -689,53 +488,47 @@ function computeDataCompleteness(input: ScoringInput): number {
     return computeBuyerDataCompleteness(input);
   }
 
-  // Rental lead: weight critical fields higher for confidence calculation
-  const criticalFields = [
-    app.creditScore, app.monthlyGrossIncome, app.employmentStatus, app.monthlyRent,
-    app.priorEvictions, app.outstandingBalances, app.bankruptcy,
-    app.targetMoveInDate, app.currentLandlordName,
+  // Rental lead: only check fields the intake form actually collects
+  const fields = [
+    input.name,                // legalName
+    input.email,               // email
+    input.phone,               // phone
+    app.targetMoveInDate,
+    app.propertyAddress,
+    app.monthlyRent,
+    app.monthlyGrossIncome,
+    app.employmentStatus,
+    app.numberOfOccupants,
+    app.hasPets,
+    app.leaseTermPreference,
   ];
-  const criticalFilled = criticalFields.filter((v) => v != null && v !== '').length;
 
-  const secondaryFields = [
-    app.propertyAddress, app.unitType, app.leaseTermPreference,
-    app.currentAddress, app.currentHousingStatus, app.lengthOfResidence,
-    app.reasonForMoving, app.adultsOnApplication, app.employerOrSource,
-    app.additionalIncome, app.previousLandlordName, app.emergencyContactName,
-    app.smoking, app.hasPets, app.consentToScreening,
-  ];
-  const secondaryFilled = secondaryFields.filter((v) => v != null && v !== '').length;
-
-  // Critical fields count 2x for confidence
-  const totalWeight = criticalFields.length * 2 + secondaryFields.length;
-  const filledWeight = criticalFilled * 2 + secondaryFilled;
-
-  return Math.min(1.0, filledWeight / totalWeight);
+  const filled = fields.filter((v) => v != null && v !== '').length;
+  return Math.min(1.0, filled / fields.length);
 }
 
 function computeBuyerDataCompleteness(input: ScoringInput): number {
   const app = input.applicationData;
   if (!app) return 0.1;
 
-  const criticalFields = [
-    app.preApprovalStatus, app.buyerBudget || app.monthlyRent,
-    app.buyerTimeline || app.targetMoveInDate, app.employmentStatus,
-    app.monthlyGrossIncome, app.housingSituation || app.currentHousingStatus,
+  // Only check fields the buyer intake form actually collects
+  const fields = [
+    input.name,                                    // legalName
+    input.email,                                   // email
+    input.phone,                                   // phone
+    app.buyerBudget,
+    app.preApprovalStatus,
+    app.propertyType,
+    app.bedrooms,
+    app.bathrooms,
+    app.mustHaves,
+    app.buyerTimeline || app.targetMoveInDate,
+    app.housingSituation || app.currentHousingStatus,
+    app.firstTimeBuyer,
   ];
-  const criticalFilled = criticalFields.filter((v) => v != null && v !== '').length;
 
-  const secondaryFields = [
-    app.preApprovalLender, app.preApprovalAmount,
-    app.firstTimeBuyer, app.propertyType, app.bedrooms, app.bathrooms,
-    app.mustHaves, app.employerOrSource, app.additionalIncome,
-    input.email, input.phone,
-  ];
-  const secondaryFilled = secondaryFields.filter((v) => v != null && v !== '').length;
-
-  const totalWeight = criticalFields.length * 2 + secondaryFields.length;
-  const filledWeight = criticalFilled * 2 + secondaryFilled;
-
-  return Math.min(1.0, filledWeight / totalWeight);
+  const filled = fields.filter((v) => v != null && v !== '').length;
+  return Math.min(1.0, filled / fields.length);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -773,28 +566,28 @@ function collectInsights(categories: CategoryResult[], penalties: RiskPenalty[],
     }
   }
 
-  // Missing information — lead-type-aware
+  // Missing information — only flag fields the intake form actually collects
   if (!app) {
     missingInformation.push('Full application data');
   } else if (input.leadType === 'buyer') {
     if (!app.preApprovalStatus) missingInformation.push('Pre-approval status');
-    if (!app.buyerBudget && !app.monthlyRent && !input.budget) missingInformation.push('Purchase budget');
+    if (!app.buyerBudget) missingInformation.push('Buyer budget');
     if (!app.buyerTimeline && !app.targetMoveInDate) missingInformation.push('Purchase timeline');
-    if (!app.monthlyGrossIncome) missingInformation.push('Monthly gross income');
-    if (!app.employmentStatus) missingInformation.push('Employment status');
     if (!app.housingSituation && !app.currentHousingStatus) missingInformation.push('Current housing situation');
     if (!app.propertyType) missingInformation.push('Desired property type');
     if (!app.firstTimeBuyer) missingInformation.push('First-time buyer status');
+    if (!app.bedrooms) missingInformation.push('Bedroom preferences');
+    if (!app.bathrooms) missingInformation.push('Bathroom preferences');
   } else {
-    if (!app.creditScore) missingInformation.push('Credit score');
+    // Rental — only flag fields the rental form collects
     if (!app.monthlyGrossIncome) missingInformation.push('Monthly gross income');
     if (!app.employmentStatus) missingInformation.push('Employment status');
     if (!app.targetMoveInDate) missingInformation.push('Target move-in date');
     if (!app.monthlyRent && !input.budget) missingInformation.push('Target monthly rent');
-    if (!app.currentLandlordName && !app.previousLandlordName) missingInformation.push('Landlord references');
-    if (app.priorEvictions == null) missingInformation.push('Eviction history');
-    if (app.bankruptcy == null) missingInformation.push('Bankruptcy status');
-    if (app.outstandingBalances == null) missingInformation.push('Outstanding balances');
+    if (!app.propertyAddress) missingInformation.push('Property address');
+    if (app.numberOfOccupants == null) missingInformation.push('Number of occupants');
+    if (app.hasPets == null) missingInformation.push('Pet information');
+    if (!app.leaseTermPreference) missingInformation.push('Lease term preference');
   }
 
   return {
@@ -813,9 +606,8 @@ export const BUYER_WEIGHTS = {
   preApproval: 0.30,
   budgetAlignment: 0.20,
   timelineUrgency: 0.15,
+  propertySpecificity: 0.15,
   housingSituation: 0.10,
-  firstTimeBuyer: 0.05,
-  propertySpecificity: 0.10,
   completeness: 0.10,
 } as const;
 
@@ -855,7 +647,7 @@ function scoreBuyerBudgetAlignment(input: ScoringInput): { rawScore: number; sig
   const app = input.applicationData;
   const signals: string[] = [];
 
-  const budget = resolveNumericValue(app?.buyerBudget) || resolveNumericValue(app?.monthlyRent) || (input.budget ?? 0);
+  const budget = parseFormRange(app?.buyerBudget) || (input.budget ?? 0);
 
   if (budget <= 0) {
     signals.push('No buyer budget provided');
@@ -899,13 +691,13 @@ function scoreBuyerTimeline(input: ScoringInput): { rawScore: number; signals: s
   if (lower === 'asap' || lower.includes('immediate')) {
     rawScore = 1.0;
     signals.push('ASAP timeline — ready to buy now');
-  } else if (lower === '1-3mo' || lower.includes('1-3') || lower.includes('1–3') || lower.includes('within 3')) {
+  } else if (lower === '1-3months' || lower === '1-3mo' || lower.includes('1-3') || lower.includes('1–3')) {
     rawScore = 0.8;
     signals.push('1-3 month timeline — actively searching');
-  } else if (lower === '3-6mo' || lower.includes('3-6') || lower.includes('3–6') || lower.includes('within 6')) {
+  } else if (lower === '3-6months' || lower === '3-6mo' || lower.includes('3-6') || lower.includes('3–6')) {
     rawScore = 0.5;
     signals.push('3-6 month timeline — planning phase');
-  } else if (lower === 'exploring' || lower.includes('browsing') || lower.includes('exploring') || lower.includes('just looking')) {
+  } else if (lower === 'exploring' || lower.includes('browsing') || lower.includes('just looking')) {
     rawScore = 0.15;
     signals.push('Exploring — no firm timeline');
   } else {
@@ -1022,20 +814,18 @@ function scoreBuyerCompleteness(input: ScoringInput): { rawScore: number; signal
   }
 
   const fields = [
+    input.name,
+    input.email,
+    input.phone,
+    app.buyerBudget,
     app.preApprovalStatus,
-    app.buyerBudget || app.monthlyRent,
-    app.buyerTimeline || app.targetMoveInDate,
-    app.housingSituation || app.currentHousingStatus,
-    app.firstTimeBuyer,
     app.propertyType,
     app.bedrooms,
     app.bathrooms,
     app.mustHaves,
-    input.name,
-    input.email,
-    input.phone,
-    app.employmentStatus,
-    app.monthlyGrossIncome,
+    app.buyerTimeline || app.targetMoveInDate,
+    app.housingSituation || app.currentHousingStatus,
+    app.firstTimeBuyer,
   ];
 
   const totalFields = fields.length;
@@ -1081,7 +871,7 @@ function computeBuyerRiskPenalties(input: ScoringInput): RiskPenalty[] {
   }
 
   // Budget under $200K in expensive markets = cold signal
-  const budget = resolveNumericValue(app.buyerBudget) || resolveNumericValue(app.monthlyRent) || (input.budget ?? 0);
+  const budget = parseFormRange(app.buyerBudget) || (input.budget ?? 0);
   if (budget > 0 && budget < 200000) {
     penalties.push({
       flag: 'low_budget_market',
@@ -1121,18 +911,19 @@ function collectBuyerInsights(
     riskFlags.push(penalty.description);
   }
 
-  // Missing information
+  // Missing information — only flag fields the buyer form actually collects
   if (!app) {
     missingInformation.push('Full application data');
   } else {
     if (!app.preApprovalStatus) missingInformation.push('Pre-approval status');
-    if (!app.buyerBudget && !app.monthlyRent && !input.budget) missingInformation.push('Buyer budget');
+    if (!app.buyerBudget) missingInformation.push('Buyer budget');
     if (!app.buyerTimeline && !app.targetMoveInDate) missingInformation.push('Purchase timeline');
     if (!app.housingSituation && !app.currentHousingStatus) missingInformation.push('Current housing situation');
     if (!app.firstTimeBuyer) missingInformation.push('First-time buyer status');
     if (!app.propertyType) missingInformation.push('Desired property type');
     if (!app.bedrooms) missingInformation.push('Bedroom preferences');
     if (!app.bathrooms) missingInformation.push('Bathroom preferences');
+    if (!app.mustHaves) missingInformation.push('Must-have features');
   }
 
   return {
@@ -1152,32 +943,27 @@ function computeBuyerScore(input: ScoringInput): ScoringEngineResult {
   const preApproval = scoreBuyerPreApproval(input);
   const budgetAlignment = scoreBuyerBudgetAlignment(input);
   const timeline = scoreBuyerTimeline(input);
-  const housing = scoreBuyerHousingSituation(input);
-  const firstTime = scoreBuyerFirstTime(input);
   const specificity = scoreBuyerPropertySpecificity(input);
+  const housing = scoreBuyerHousingSituation(input);
   const completenessResult = scoreBuyerCompleteness(input);
 
   const buyerCategories = [
     { name: 'preApproval', ...preApproval },
     { name: 'budgetAlignment', ...budgetAlignment },
     { name: 'timelineUrgency', ...timeline },
-    { name: 'housingSituation', ...housing },
-    { name: 'firstTimeBuyer', ...firstTime },
     { name: 'propertySpecificity', ...specificity },
+    { name: 'housingSituation', ...housing },
     { name: 'completeness', ...completenessResult },
   ];
 
   // 2. Map to CategoryResult[] for compatibility with existing types
-  // Use 'creditScore' etc. as placeholder categories to satisfy the type system,
-  // but include the real buyer category name in signals
   const categoryMapping: ScoringCategory[] = [
-    'creditScore',           // preApproval
-    'affordability',         // budgetAlignment
-    'moveInUrgency',         // timelineUrgency
-    'householdFit',          // housingSituation
-    'applicationCompleteness', // firstTimeBuyer
-    'rentalHistory',         // propertySpecificity
-    'screeningFlags',        // completeness
+    'affordability',           // preApproval
+    'employmentStability',     // budgetAlignment
+    'moveInUrgency',           // timelineUrgency
+    'applicationCompleteness', // propertySpecificity
+    'householdFit',            // housingSituation
+    'affordability',           // completeness (reuse placeholder)
   ];
 
   const categories: CategoryResult[] = buyerCategories.map((cat, i) => {
@@ -1238,16 +1024,13 @@ export function computeLeadScore(input: ScoringInput): ScoringEngineResult {
     return computeBuyerScore(input);
   }
 
-  // 1. Compute all category sub-scores
+  // 1. Compute all category sub-scores (only categories with collected data)
   const categories: CategoryResult[] = [
-    scoreCreditScore(input),
     scoreAffordability(input),
-    scoreMoveInUrgency(input),
     scoreEmploymentStability(input),
-    scoreRentalHistory(input),
+    scoreMoveInUrgency(input),
     scoreApplicationCompleteness(input),
     scoreHouseholdFit(input),
-    scoreScreeningFlags(input),
   ];
 
   // 2. Sum weighted scores → base score 0-1
@@ -1259,11 +1042,11 @@ export function computeLeadScore(input: ScoringInput): ScoringEngineResult {
     baseScore *= penalty.multiplier;
   }
 
-  // 3b. Intent signal from lease term preference (new simplified form)
+  // 3b. Intent signal from lease term preference
   const intent = input.applicationData?.leaseTermPreference;
-  if (intent === 'Yes, ready now') {
+  if (intent === 'ready') {
     baseScore = Math.min(1.0, baseScore + 0.05); // hot signal boost
-  } else if (intent === 'Just exploring') {
+  } else if (intent === 'exploring') {
     baseScore *= 0.9; // slight dampening for exploratory leads
   }
 
