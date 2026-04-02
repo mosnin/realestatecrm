@@ -25,6 +25,7 @@ export default async function BrokerLeadsPage() {
     .maybeSingle();
 
   const brokerSpaceId = ownerSpace?.id ?? null;
+  console.log('[broker/leads] ownerId:', brokerage.ownerId, 'brokerSpaceId:', brokerSpaceId);
 
   // Query unassigned leads: contacts in broker's space with tag 'brokerage-lead' but NOT 'assigned'
   const { data: unassignedRaw } = brokerSpaceId
@@ -37,6 +38,21 @@ export default async function BrokerLeadsPage() {
         .order('createdAt', { ascending: false })
         .limit(500)
     : { data: [] };
+  console.log('[broker/leads] unassigned count:', (unassignedRaw ?? []).length);
+
+  // Debug: count ALL contacts in the owner's space regardless of tags
+  if (brokerSpaceId) {
+    const { count: totalInSpace } = await supabase
+      .from('Contact')
+      .select('*', { count: 'exact', head: true })
+      .eq('spaceId', brokerSpaceId);
+    const { count: brokerageTagged } = await supabase
+      .from('Contact')
+      .select('*', { count: 'exact', head: true })
+      .eq('spaceId', brokerSpaceId)
+      .contains('tags', ['brokerage-lead']);
+    console.log('[broker/leads] DEBUG total contacts in owner space:', totalInSpace, 'with brokerage-lead tag:', brokerageTagged);
+  }
 
   // Query assigned leads: contacts with tag 'assigned'
   const { data: assignedRaw } = brokerSpaceId
