@@ -45,6 +45,8 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
   const pathname = usePathname();
   const base = `/s/${slug}`;
   const { theme, toggleTheme } = useTheme();
+  const isOnBrokerPage = pathname.startsWith('/broker');
+  const showBrokerMobileNavOnly = isBroker && isOnBrokerPage;
 
   return (
     <header className="h-14 border-b border-border flex items-center justify-between px-4 md:px-6 bg-card sticky top-0 z-40 shadow-[0_1px_0_0_var(--border)]">
@@ -96,7 +98,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
               </div>
             </SheetHeader>
             <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-2 space-y-0.5">
-              {!isBrokerOnly && (
+              {!isBrokerOnly && !showBrokerMobileNavOnly && (
                 <>
                   <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
                     Workspace
@@ -156,7 +158,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
               </div>
             )}
             <div className="px-3 pb-4 space-y-0.5 border-t border-sidebar-border pt-3">
-              {(pathname.startsWith(`${base}/settings`) || pathname.startsWith(`${base}/billing`)) ? (
+              {!showBrokerMobileNavOnly && ((pathname.startsWith(`${base}/settings`) || pathname.startsWith(`${base}/billing`)) ? (
                 <>
                   <Link
                     href={base}
@@ -225,7 +227,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                     );
                   })}
                 </>
-              )}
+              ))}
               <div className="flex items-center gap-2 px-3 pt-3">
                 <BrandLogo className="h-4" alt="Chippi" />
               </div>
