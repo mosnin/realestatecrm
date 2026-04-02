@@ -119,7 +119,7 @@ export default async function PublicApplyPage({
     faviconUrl: settings?.intakeFaviconUrl || null,
     bio: settings?.bio || null,
     socialLinks: settings?.socialLinks || null,
-    privacyPolicyUrl: settings?.privacyPolicyUrl || (settingsData?.privacyPolicyHtml ? `/apply/${slug}/privacy` : null),
+    privacyPolicyUrl: settings?.privacyPolicyUrl || `/apply/${slug}/privacy`,
     consentCheckboxLabel: settings?.consentCheckboxLabel || null,
   };
 

@@ -56,7 +56,7 @@ export default async function BrokerageApplyPage({
         'intakeHeaderBgColor, intakeHeaderGradient, intakeVideoUrl, ' +
         'intakeDisclaimerText, intakeThankYouTitle, intakeThankYouMessage, ' +
         'intakeFooterLinks, intakeDisabledSteps, intakeCustomQuestions, ' +
-        'intakeFaviconUrl, bio, socialLinks'
+        'intakeFaviconUrl, bio, socialLinks, privacyPolicyUrl, consentCheckboxLabel'
       )
       .eq('spaceId', space.id)
       .maybeSingle()
@@ -126,6 +126,8 @@ export default async function BrokerageApplyPage({
     faviconUrl: settings?.intakeFaviconUrl || null,
     bio: settings?.bio || null,
     socialLinks: settings?.socialLinks || null,
+    privacyPolicyUrl: settings?.privacyPolicyUrl || `/apply/${(space as any).slug}/privacy`,
+    consentCheckboxLabel: settings?.consentCheckboxLabel || null,
   };
 
   return (

@@ -6,10 +6,10 @@ export function DashboardFooter() {
       <div className="border-t border-border/50 pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground/70">
         <p>© {new Date().getFullYear()} Chippi. All rights reserved.</p>
         <div className="flex items-center gap-4">
-          <Link href="/terms" className="hover:text-foreground transition-colors">
+          <Link href="/legal/terms" className="hover:text-foreground transition-colors">
             Terms of Service
           </Link>
-          <Link href="/privacy" className="hover:text-foreground transition-colors">
+          <Link href="/legal/privacy" className="hover:text-foreground transition-colors">
             Privacy Policy
           </Link>
         </div>

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
+import { generatePrivacyPolicy } from '@/lib/privacy-policy-template';
 import Link from 'next/link';
 
 export const revalidate = 300; // Cache 5 minutes
@@ -28,23 +29,8 @@ export default async function RealtorPrivacyPolicyPage({
   ]);
 
   const businessName = settings?.businessName || space.name;
-  const policyHtml = settings?.privacyPolicyHtml;
-
-  if (!policyHtml) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
-        <div className="text-center space-y-3 max-w-md">
-          <h1 className="text-xl font-semibold">{businessName}</h1>
-          <p className="text-sm text-muted-foreground">
-            No privacy policy has been published yet. Please contact {owner?.name || businessName} directly for information about how your data is handled.
-          </p>
-          <Link href={`/apply/${slug}`} className="text-sm text-primary underline">
-            Back to application
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // Use the realtor's custom policy, or auto-generate a comprehensive default
+  const policyHtml = settings?.privacyPolicyHtml || generatePrivacyPolicy(businessName, 'realtor');
 
   return (
     <div className="min-h-screen bg-background">
