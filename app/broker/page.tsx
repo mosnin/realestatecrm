@@ -47,19 +47,7 @@ export default async function BrokerOverviewPage() {
   const { brokerage } = ctx;
 
   // Fetch members with their user + space info
-  const { data: memberships } = await supabase
-    .from('BrokerageMembership')
-    const members = await getBrokerageMembers(ctx.brokerage.id, { includeOnboard: true, includeSpaceName: true });
-    .eq('brokerageId', brokerage.id)
-
-  const members = (memberships ?? []) as unknown as Array<{
-    id: string;
-    role: string;
-    createdAt: string;
-    userId: string;
-    User: { id: string; name: string | null; email: string; onboard: boolean } | null;
-    Space: { id: string; slug: string; name: string } | null;
-  }>;
+  const members = await getBrokerageMembers(ctx.brokerage.id, { includeOnboard: true, includeSpaceName: true });
 
   const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
 

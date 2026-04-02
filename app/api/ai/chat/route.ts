@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
     if (settingsError) throw settingsError;
 
-    const stream = await chatWithRAG(messages, space.id, space.name, (settings as any)?.anthropicApiKey);
+    const stream = await chatWithRAG(messages, space.id, space.name);
 
     // Collect the full response text to save to DB (non-blocking)
     const [streamForResponse, streamForSave] = stream.tee();

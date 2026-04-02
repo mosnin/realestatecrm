@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { embedText } from '@/lib/embeddings';
 import { searchVectors } from '@/lib/zilliz';
@@ -18,22 +17,17 @@ function textStream(message: string): ReadableStream {
   });
 }
 
-function looksLikeAnthropicKey(key?: string | null) {
-  return !!key && key.startsWith('sk-ant-');
-}
-
 export async function chatWithRAG(
   messages: ChatMessage[],
   spaceId: string,
   spaceName: string,
-  apiKey?: string | null
+  _apiKey?: string | null
 ): Promise<ReadableStream> {
-  const anthropicKey = apiKey || process.env.ANTHROPIC_API_KEY;
   const openAIKey = process.env.OPENAI_API_KEY;
 
-  if (!anthropicKey && !openAIKey) {
+  if (!openAIKey) {
     return textStream(
-      'No AI API key configured. Add ANTHROPIC_API_KEY or OPENAI_API_KEY in environment variables, or set a workspace key in Settings → AI.'
+      'No AI API key configured. Add OPENAI_API_KEY in your Vercel environment variables.'
     );
   }
 
@@ -230,82 +224,43 @@ export async function chatWithRAG(
   ]
     .join('\n');
 
-  // Prefer OpenAI when available, because embeddings already rely on it in this app
-  // and users may accidentally save non-Anthropic keys in workspace settings.
-  if (openAIKey) {
-    try {
-      const openai = new OpenAI({ apiKey: openAIKey });
-      const stream = await openai.chat.completions.create({
-        model: 'gpt-5.4-mini',
-        temperature: 0.2,
-        stream: true,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messages.map((m) => ({ role: m.role, content: m.content }))
-        ]
-      });
-
-      return new ReadableStream({
-        async start(controller) {
-          for await (const event of stream) {
-            const delta = event.choices[0]?.delta?.content;
-            if (delta) controller.enqueue(new TextEncoder().encode(delta));
-          }
-          controller.close();
-        }
-      });
-    } catch (error: any) {
-      console.error('[ai] OpenAI provider error:', {
-        message: error?.message,
-        status: error?.status,
-        code: error?.code,
-        type: error?.type,
-      });
-      if (!looksLikeAnthropicKey(anthropicKey)) {
-        const hint = error?.status === 401
-          ? 'The OpenAI API key appears to be invalid. Check your OPENAI_API_KEY environment variable.'
-          : error?.status === 429
-          ? 'AI rate limit reached. Please wait a moment and try again.'
-          : error?.status === 404
-          ? 'The AI model was not found. Your API key may not have access to gpt-5.4-mini.'
-          : error?.status === 500 || error?.status === 503
-          ? 'OpenAI is experiencing issues. Please try again in a moment.'
-          : `AI service error (${error?.status ?? 'unknown'}). Please try again.`;
-        return textStream(hint);
-      }
-      // Fall through to Anthropic
-    }
-  }
-
-  if (!looksLikeAnthropicKey(anthropicKey)) {
-    return textStream('AI provider error: no valid API key configured. Add one in Settings → AI.');
-  }
-
   try {
-    const anthropic = new Anthropic({ apiKey: anthropicKey });
-    const stream = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
-      stream: true
+    const openai = new OpenAI({ apiKey: openAIKey });
+    const stream = await openai.chat.completions.create({
+      model: 'gpt-5.4-mini',
+      temperature: 0.2,
+      stream: true,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages.map((m) => ({ role: m.role, content: m.content }))
+      ]
     });
 
     return new ReadableStream({
       async start(controller) {
         for await (const event of stream) {
-          if (
-            event.type === 'content_block_delta' &&
-            event.delta.type === 'text_delta'
-          ) {
-            controller.enqueue(new TextEncoder().encode(event.delta.text));
-          }
+          const delta = event.choices[0]?.delta?.content;
+          if (delta) controller.enqueue(new TextEncoder().encode(delta));
         }
         controller.close();
       }
     });
-  } catch (error) {
-    console.error('[ai] Anthropic provider error', error);
-    return textStream('AI provider is temporarily unavailable. Please try again in a moment.');
+  } catch (error: any) {
+    console.error('[ai] OpenAI error:', {
+      message: error?.message,
+      status: error?.status,
+      code: error?.code,
+      type: error?.type,
+    });
+    const hint = error?.status === 401
+      ? 'The OpenAI API key appears to be invalid. Check your OPENAI_API_KEY environment variable.'
+      : error?.status === 429
+      ? 'AI rate limit reached. Please wait a moment and try again.'
+      : error?.status === 404
+      ? 'The AI model was not found. Your API key may not have access to gpt-5.4-mini.'
+      : error?.status === 500 || error?.status === 503
+      ? 'OpenAI is experiencing issues. Please try again in a moment.'
+      : `AI service error (${error?.status ?? 'unknown'}). Please try again.`;
+    return textStream(hint);
   }
 }
