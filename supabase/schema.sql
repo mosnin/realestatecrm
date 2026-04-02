@@ -118,6 +118,7 @@ CREATE TABLE IF NOT EXISTS "Contact" (
   "followUpAt"            timestamptz,
   "lastContactedAt"       timestamptz,
   "sourceLabel"           text,
+  "brokerageId"           text REFERENCES "Brokerage"(id) ON DELETE SET NULL,
   "stageChangedAt"        timestamptz,
   "applicationRef"        text,
   "applicationStatus"     text,

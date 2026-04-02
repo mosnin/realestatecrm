@@ -226,6 +226,7 @@ export async function POST(req: NextRequest) {
     contactsToInsert.push({
       id: crypto.randomUUID(),
       spaceId: targetSpaceId,
+      brokerageId: brokerage.id,
       name,
       email: email || null,
       phone: phone || null,

@@ -216,6 +216,7 @@ export async function POST(req: NextRequest) {
       .insert({
         id: crypto.randomUUID(),
         spaceId: space.id,
+        brokerageId: brokerage.id,
         name: payload.legalName,
         email: payload.email ?? null,
         phone: payload.phone ?? null,

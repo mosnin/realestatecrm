@@ -17,49 +17,46 @@ export default async function BrokerLeadsPage() {
 
   const { brokerage } = ctx;
 
-  // Get ALL spaces in this brokerage (owner + all members)
+  // 1. BROKERAGE LEADS — from brokerage intake form, queried by brokerageId
+  const { data: brokerageUnassigned } = await supabase
+    .from('Contact')
+    .select('id, name, email, phone, budget, scoreLabel, leadScore, leadType, tags, createdAt, notes, applicationData')
+    .eq('brokerageId', brokerage.id)
+    .not('tags', 'cs', '["assigned"]')
+    .order('createdAt', { ascending: false })
+    .limit(500);
+
+  const { data: brokerageAssigned } = await supabase
+    .from('Contact')
+    .select('id, name, email, phone, budget, scoreLabel, leadScore, leadType, tags, createdAt, notes, applicationData, applicationStatusNote')
+    .eq('brokerageId', brokerage.id)
+    .contains('tags', ['assigned'])
+    .order('createdAt', { ascending: false })
+    .limit(500);
+
+  // 2. MEMBER LEADS — from individual realtor intake forms, visible to admins
   const allMembers = await getBrokerageMembers(brokerage.id, { includeSpaceName: true });
-  const allSpaceIds = allMembers.map((m) => m.Space?.id).filter(Boolean) as string[];
+  const memberSpaceIds = allMembers.map((m) => m.Space?.id).filter(Boolean) as string[];
 
-  // Also explicitly include the owner's space in case it's not in the members list
-  const { data: ownerSpace } = await supabase
-    .from('Space')
-    .select('id')
-    .eq('ownerId', brokerage.ownerId)
-    .maybeSingle();
-  const brokerSpaceId = ownerSpace?.id ?? null;
-  if (brokerSpaceId && !allSpaceIds.includes(brokerSpaceId)) {
-    allSpaceIds.push(brokerSpaceId);
-  }
-
-  console.log('[broker/leads] brokerSpaceId:', brokerSpaceId, 'allSpaceIds:', allSpaceIds.length);
-
-  // Query unassigned leads across ALL brokerage spaces
-  // Include leads tagged as brokerage-lead, imported, or new-lead (catch everything)
-  const { data: unassignedRaw, error: unassignedErr } = allSpaceIds.length > 0
+  const { data: memberUnassigned } = memberSpaceIds.length > 0
     ? await supabase
         .from('Contact')
         .select('id, name, email, phone, budget, scoreLabel, leadScore, leadType, tags, createdAt, notes, applicationData')
-        .in('spaceId', allSpaceIds)
+        .in('spaceId', memberSpaceIds)
+        .is('brokerageId', null)
         .not('tags', 'cs', '["assigned"]')
         .order('createdAt', { ascending: false })
-        .limit(500)
-    : { data: [], error: null };
-  if (unassignedErr) console.error('[broker/leads] unassigned query error:', unassignedErr);
-  console.log('[broker/leads] unassigned count:', (unassignedRaw ?? []).length, 'spaceIds:', allSpaceIds);
-
-  // Query assigned leads across ALL brokerage spaces
-  const { data: assignedRaw } = allSpaceIds.length > 0
-    ? await supabase
-        .from('Contact')
-        .select('id, name, email, phone, budget, scoreLabel, leadScore, leadType, tags, createdAt, notes, applicationData, applicationStatusNote')
-        .in('spaceId', allSpaceIds)
-        .contains('tags', ['assigned'])
-        .order('createdAt', { ascending: false })
-        .limit(500)
+        .limit(200)
     : { data: [] };
 
-  // Filter members to realtors only for assignment dropdown
+  // Merge: brokerage leads first, then member leads
+  const seenIds = new Set((brokerageUnassigned ?? []).map((c: any) => c.id));
+  const unassignedRaw = [
+    ...(brokerageUnassigned ?? []),
+    ...(memberUnassigned ?? []).filter((c: any) => !seenIds.has(c.id)),
+  ];
+
+  const assignedRaw = brokerageAssigned ?? [];
   const members = allMembers.filter((m) => m.role === 'realtor_member');
 
   // Get lead counts per realtor space
