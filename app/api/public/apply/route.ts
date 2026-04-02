@@ -111,6 +111,9 @@ export async function POST(req: NextRequest) {
       .limit(5);
     if (dupError) throw dupError;
 
+    // Generate a unique application reference for the status page
+    const applicationRef = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+
     if (existingRecentLeads?.length) {
       const normalizedPhone = normalizePhone(payload.phone);
       const normalizedEmail = (payload.email ?? '').trim().toLowerCase();
@@ -124,9 +127,6 @@ export async function POST(req: NextRequest) {
           (lead.email ?? '').trim().toLowerCase() === normalizedEmail;
         return phoneMatch || emailMatch;
       });
-
-      // Generate a unique application reference for the status page
-    const applicationRef = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
 
     if (duplicate) {
         return NextResponse.json(
