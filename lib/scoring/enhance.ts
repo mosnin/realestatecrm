@@ -105,9 +105,9 @@ export async function enhanceWithAI(
         ].join(' ');
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-5.4-mini',
+      model: 'gpt-4o-mini',
       temperature: 0,
-      max_completion_tokens: 300,
+      max_tokens: 300,
       response_format: {
         type: 'json_schema',
         json_schema: {
