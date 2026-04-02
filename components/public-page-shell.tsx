@@ -192,10 +192,23 @@ export function PublicPageShell({
           </div>
         )}
 
-        {/* Footer */}
-        <p className="text-center text-[11px] text-muted-foreground/50 mt-10 pb-6">
-          {trustLine}
-        </p>
+        {/* Legal footer */}
+        <div className="flex flex-col items-center gap-2 mt-10 pb-6">
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground/60">
+            <a href="/legal/terms" target="_blank" rel="noopener noreferrer" className="hover:text-foreground underline underline-offset-2">Terms</a>
+            <span>&middot;</span>
+            <a href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-foreground underline underline-offset-2">Privacy</a>
+            {agentPhone && (
+              <>
+                <span>&middot;</span>
+                <a href={`tel:${agentPhone}`} className="hover:text-foreground">{agentPhone}</a>
+              </>
+            )}
+          </div>
+          <p className="text-center text-[11px] text-muted-foreground/50">
+            {trustLine}
+          </p>
+        </div>
       </main>
     </div>
   );

@@ -24,7 +24,7 @@ export default async function PublicApplyPage({
   const [{ data: coreSettings }, { data: customSettings }, { data: ownerData }] = await Promise.all([
     supabase
       .from('SpaceSetting')
-      .select('intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl')
+      .select('intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl, privacyPolicyHtml')
       .eq('spaceId', space.id)
       .maybeSingle(),
     supabase
@@ -119,7 +119,7 @@ export default async function PublicApplyPage({
     faviconUrl: settings?.intakeFaviconUrl || null,
     bio: settings?.bio || null,
     socialLinks: settings?.socialLinks || null,
-    privacyPolicyUrl: settings?.privacyPolicyUrl || null,
+    privacyPolicyUrl: settings?.privacyPolicyUrl || (settingsData?.privacyPolicyHtml ? `/apply/${slug}/privacy` : null),
     consentCheckboxLabel: settings?.consentCheckboxLabel || null,
   };
 
