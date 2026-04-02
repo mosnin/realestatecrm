@@ -141,13 +141,23 @@ export async function GET(req: NextRequest) {
         let totalDealsClosed = 0;
         let totalClosedValue = 0;
 
-        for (const m of members) {
-          const sid = m.Space?.id;
+        // Batch-fetch user names for the report
+        let memberUsers: any[] = [];
+        if (memberUserIds.length > 0) {
+          const { data } = await supabase.from('User').select('id, name, email').in('id', memberUserIds);
+          memberUsers = data ?? [];
+        }
+        const userByIdMap = new Map(memberUsers.map((u: any) => [u.id, u]));
+
+        for (const m of rawMembers) {
+          const space = spaceByOwner.get(m.userId);
+          const sid = space?.id;
           if (!sid) continue;
+          const user = userByIdMap.get(m.userId);
 
           const row: AgentRow = {
-            name: m.User?.name ?? m.User?.email ?? 'Unknown',
-            email: m.User?.email ?? '',
+            name: user?.name ?? user?.email ?? 'Unknown',
+            email: user?.email ?? '',
             role: m.role === 'broker_owner' ? 'Owner' : m.role === 'broker_admin' ? 'Admin' : 'Realtor',
             newLeads: newLeadsBySpace[sid] ?? 0,
             contacted: contactedBySpace[sid] ?? 0,

@@ -63,7 +63,27 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
       .order('createdAt', { ascending: false }),
   ]);
 
-  const members = (membershipsRes.data ?? []) as Array<{
+  const rawMemberships = (membershipsRes.data ?? []) as Array<{ id: string; role: string; createdAt: string; userId: string }>;
+  const mUserIds = rawMemberships.map((m) => m.userId).filter(Boolean);
+
+  let mUsers: any[] = [];
+  let mSpaces: any[] = [];
+  if (mUserIds.length > 0) {
+    const [uRes, sRes] = await Promise.all([
+      supabase.from('User').select('id, name, email, onboard').in('id', mUserIds),
+      supabase.from('Space').select('id, slug, ownerId').in('ownerId', mUserIds),
+    ]);
+    mUsers = uRes.data ?? [];
+    mSpaces = sRes.data ?? [];
+  }
+  const mUserMap = new Map(mUsers.map((u: any) => [u.id, u]));
+  const mSpaceMap = new Map(mSpaces.map((s: any) => [s.ownerId, s]));
+
+  const members = rawMemberships.map((m) => ({
+    ...m,
+    User: mUserMap.get(m.userId) ?? null,
+    Space: mSpaceMap.get(m.userId) ?? null,
+  })) as Array<{
     id: string; role: string; createdAt: string; userId: string;
     User: { id: string; name: string | null; email: string; onboard: boolean } | null;
     Space: { id: string; slug: string } | null;
