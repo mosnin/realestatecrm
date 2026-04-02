@@ -26,6 +26,7 @@ import {
   Megaphone,
   MessageCircle,
   DollarSign,
+  Upload,
   ArrowLeft,
   Settings,
   User,
@@ -84,6 +85,7 @@ const brokerAdminNavSections = [
   {
     label: 'Admin',
     items: [
+      { href: '/broker/import-export', label: 'Import / Export', icon: Upload, exact: false, adminOnly: true },
       { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
     ],
   },
