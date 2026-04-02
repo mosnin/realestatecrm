@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 import { Building2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { AcceptButton } from './accept-button';
 
@@ -24,26 +25,40 @@ export default async function AcceptInvitationPage({ params }: Params) {
   // Auth: must be signed in to accept
   const { userId } = await auth();
   if (!userId) {
-    // Middleware already redirects unauthenticated users to /login/realtor with redirect_url set
     redirect(`/login/realtor?redirect_url=/invite/${token}`);
   }
 
-  // Fetch invitation details
+  // Fetch invitation directly from DB (avoids server-to-server HTTP which can fail on Vercel)
   let inv: InvitationDetail | null = null;
   let fetchError = '';
   try {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
-    const res = await fetch(`${appUrl}/api/invitations/${token}`, { cache: 'no-store' });
-    if (res.ok) {
-      inv = await res.json();
+    const { data, error } = await supabase
+      .from('Invitation')
+      .select('id, status, email, roleToAssign, expiresAt, brokerageId, Brokerage(name, logoUrl)')
+      .eq('token', token)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[invite] DB query failed:', error);
+      fetchError = 'Could not load invitation.';
+    } else if (!data) {
+      fetchError = 'Invitation not found or has expired.';
     } else {
-      const data = await res.json();
-      fetchError = data.error ?? 'Invitation not found.';
+      const brokerage = data.Brokerage as unknown as { name: string; logoUrl: string | null } | null;
+      inv = {
+        id: data.id,
+        status: data.status,
+        email: data.email,
+        roleToAssign: data.roleToAssign,
+        expiresAt: data.expiresAt,
+        brokerageName: brokerage?.name ?? '',
+        logoUrl: brokerage?.logoUrl ?? null,
+      };
     }
-  } catch {
+  } catch (err) {
+    console.error('[invite] Failed to load invitation:', err);
     fetchError = 'Could not load invitation.';
   }
-
   const isExpired = inv && new Date(inv.expiresAt) < new Date();
   const isExpiredOrInvalid = inv?.status === 'expired' || isExpired;
   const isAccepted = inv?.status === 'accepted';
