@@ -107,9 +107,12 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Find the brokerage-linked Space owned by the broker owner ──────────
-    // This prevents brokerage leads from being routed into the owner's
-    // personal realtor space when they have more than one space.
-    const { data: space, error: spaceError } = await supabase
+    // Prefer explicit brokerage linkage. For legacy data where brokerageId
+    // has not been backfilled yet, allow a safe fallback ONLY when the owner
+    // has exactly one space.
+    let space: { id: string; slug: string; name: string; ownerId: string; brokerageId: string | null } | null = null;
+
+    const { data: linkedSpace, error: spaceError } = await supabase
       .from('Space')
       .select('id, slug, name, ownerId, brokerageId')
       .eq('ownerId', brokerage.ownerId)
@@ -117,6 +120,27 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .maybeSingle();
     if (spaceError) throw spaceError;
+    space = linkedSpace;
+
+    if (!space) {
+      const { data: ownerSpaces, error: ownerSpacesError } = await supabase
+        .from('Space')
+        .select('id, slug, name, ownerId, brokerageId')
+        .eq('ownerId', brokerage.ownerId)
+        .order('createdAt', { ascending: true })
+        .limit(2);
+      if (ownerSpacesError) throw ownerSpacesError;
+      const fallbackSpace = ownerSpaces?.[0] ?? null;
+      if ((ownerSpaces ?? []).length === 1 && fallbackSpace) {
+        space = fallbackSpace;
+        console.warn('[apply/brokerage] using legacy owner-only space fallback', {
+          brokerageId: brokerage.id,
+          ownerId: brokerage.ownerId,
+          spaceId: space.id,
+        });
+      }
+    }
+
     if (!space) {
       console.error('[apply/brokerage] broker owner has no space', {
         brokerageId: brokerage.id,
