@@ -64,18 +64,18 @@ export default async function BrokerOverviewPage() {
   const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
 
   // Aggregate per-space stats + pending invitations in parallel
-  const [applicationRows, leadRows, dealRows, wonDealRows, invitationsRes] = await Promise.all([
+  const [applicationCountRes, leadCountRes, dealRows, wonDealRows, invitationsRes] = await Promise.all([
     spaceIds.length > 0
-      ? supabase.from('Contact').select('spaceId').in('spaceId', spaceIds).contains('tags', ['application-link']).limit(10000).then((r) => r.data ?? [])
+      ? supabase.from('Contact').select('*', { count: 'exact', head: true }).in('spaceId', spaceIds).contains('tags', ['application-link'])
+      : Promise.resolve({ count: 0 }),
+    spaceIds.length > 0
+      ? supabase.from('Contact').select('*', { count: 'exact', head: true }).in('spaceId', spaceIds).contains('tags', ['new-lead'])
+      : Promise.resolve({ count: 0 }),
+    spaceIds.length > 0
+      ? supabase.from('Deal').select('spaceId, value').in('spaceId', spaceIds).eq('status', 'active').then((r) => r.data ?? [])
       : Promise.resolve([]),
     spaceIds.length > 0
-      ? supabase.from('Contact').select('spaceId').in('spaceId', spaceIds).contains('tags', ['new-lead']).limit(10000).then((r) => r.data ?? [])
-      : Promise.resolve([]),
-    spaceIds.length > 0
-      ? supabase.from('Deal').select('spaceId, value').in('spaceId', spaceIds).eq('status', 'active').limit(10000).then((r) => r.data ?? [])
-      : Promise.resolve([]),
-    spaceIds.length > 0
-      ? supabase.from('Deal').select('spaceId, value').in('spaceId', spaceIds).eq('status', 'won').limit(10000).then((r) => r.data ?? [])
+      ? supabase.from('Deal').select('spaceId, value').in('spaceId', spaceIds).eq('status', 'won').then((r) => r.data ?? [])
       : Promise.resolve([]),
     supabase
       .from('Invitation')
@@ -84,6 +84,17 @@ export default async function BrokerOverviewPage() {
       .eq('status', 'pending')
       .order('createdAt', { ascending: false })
       .limit(6),
+  ]);
+
+  // Per-space lookup for deals (need actual rows for per-member breakdown in the table)
+  // For contacts we also need per-space counts for the table, so fetch those separately
+  const [applicationRows, leadRows] = await Promise.all([
+    spaceIds.length > 0
+      ? supabase.from('Contact').select('spaceId').in('spaceId', spaceIds).contains('tags', ['application-link']).then((r) => r.data ?? [])
+      : Promise.resolve([]),
+    spaceIds.length > 0
+      ? supabase.from('Contact').select('spaceId').in('spaceId', spaceIds).contains('tags', ['new-lead']).then((r) => r.data ?? [])
+      : Promise.resolve([]),
   ]);
 
   // Build per-space lookup maps
@@ -114,8 +125,8 @@ export default async function BrokerOverviewPage() {
 
   // Brokerage-wide totals
   const activeMembers = members.filter((m) => m.User?.onboard).length;
-  const totalApplications = Object.values(appsBySpace).reduce((a, b) => a + b, 0);
-  const totalLeads = Object.values(leadsBySpace).reduce((a, b) => a + b, 0);
+  const totalApplications = applicationCountRes.count ?? 0;
+  const totalLeads = leadCountRes.count ?? 0;
   const totalDeals = Object.values(dealsBySpace).reduce((a, b) => a + b.count, 0);
   const totalPipeline = Object.values(dealsBySpace).reduce((a, b) => a + b.value, 0);
   const wonDeals = (wonDealRows as { spaceId: string; value: number | null }[]);

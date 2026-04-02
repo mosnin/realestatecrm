@@ -9,8 +9,9 @@ import {
   Phone,
 } from 'lucide-react';
 import Link from 'next/link';
+import type { Metadata } from 'next';
 
-export const metadata = { title: 'My Leads — Chippi' };
+export const metadata: Metadata = { title: 'My Leads — Chippi' };
 
 export default async function MyLeadsPage() {
   const ctx = await getBrokerMemberContext();

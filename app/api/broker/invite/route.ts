@@ -42,8 +42,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Only the brokerage owner can invite admins' }, { status: 403 });
   }
 
-  // 20 invitations per broker per hour
-  const { allowed } = await checkRateLimit(`broker:invite:${ctx.dbUserId}`, 20, 3600);
+  // 100 invitations per broker per hour (shared budget with /api/broker/invite/bulk)
+  const { allowed } = await checkRateLimit(`broker:invite:${ctx.dbUserId}`, 100, 3600);
   if (!allowed) return NextResponse.json({ error: 'Too many invitations sent. Try again in an hour.' }, { status: 429 });
 
   const { brokerage, dbUserId } = ctx;

@@ -5,8 +5,9 @@ import { supabase } from '@/lib/supabase';
 import { BillingPage } from '@/components/billing/billing-page';
 import { getStripe } from '@/lib/stripe';
 import type Stripe from 'stripe';
+import type { Metadata } from 'next';
 
-export const metadata = { title: 'Billing — Broker Dashboard — Chippi' };
+export const metadata: Metadata = { title: 'Billing — Broker Dashboard — Chippi' };
 
 export default async function BrokerBillingPage() {
   const { userId } = await auth();
@@ -66,6 +67,7 @@ export default async function BrokerBillingPage() {
   let cardLast4: string | undefined;
   let cardBrand: string | undefined;
   let invoices: { id: string; date: string; amount: string; status: 'paid' | 'open' | 'void'; pdf?: string }[] = [];
+  let stripeError = false;
 
   if (spaceRow.stripeSubscriptionId) {
     try {
@@ -99,7 +101,27 @@ export default async function BrokerBillingPage() {
       }
     } catch (err) {
       console.error('[broker/billing] Stripe fetch failed:', err);
+      stripeError = true;
     }
+  }
+
+  if (stripeError) {
+    return (
+      <div className="space-y-6 max-w-3xl">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Billing</h1>
+          <p className="text-muted-foreground">Manage your subscription and payment details</p>
+        </div>
+        <div className="rounded-xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 p-6 text-center">
+          <p className="text-sm font-medium text-red-700 dark:text-red-400">
+            Unable to load billing information
+          </p>
+          <p className="text-xs text-red-600/80 dark:text-red-400/70 mt-1 max-w-[320px] mx-auto">
+            We couldn&apos;t retrieve your subscription details from Stripe. Please try again later or contact support if the issue persists.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -39,8 +39,37 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
     .maybeSingle();
 
   const userName = userRow?.name ?? userRow?.email ?? 'Realtor';
-  const spaceId = space?.id;
-  const spaceSlug = space?.slug;
+
+  if (!space) {
+    return (
+      <div className="space-y-6 w-full">
+        <div className="rounded-xl bg-card border p-6">
+          <h1 className="text-xl font-semibold">{`Welcome, ${userName}`}</h1>
+          <p className="text-sm text-muted-foreground">{`${brokerage.name} \u00B7 Realtor`}</p>
+        </div>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
+              <Briefcase size={20} className="text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-foreground">Set up your workspace</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-[280px] mx-auto">
+              You need to complete your workspace setup before you can view your dashboard and start tracking leads.
+            </p>
+            <Link
+              href="/setup"
+              className="inline-flex items-center gap-1.5 text-xs font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors mt-4"
+            >
+              Complete setup <ArrowRight size={12} />
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const spaceId = space.id;
+  const spaceSlug = space.slug;
 
   // ── Fetch stats in parallel ──
   const now = new Date().toISOString();

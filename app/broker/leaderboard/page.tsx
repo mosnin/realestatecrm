@@ -49,81 +49,86 @@ export default async function LeaderboardPage() {
   const stats: RealtorStats[] = [];
 
   for (const member of members) {
-    // User info
-    const { data: user } = await supabase
-      .from('User')
-      .select('name, email, avatar')
-      .eq('id', member.userId)
-      .maybeSingle();
+    try {
+      // User info
+      const { data: user } = await supabase
+        .from('User')
+        .select('name, email, avatar')
+        .eq('id', member.userId)
+        .maybeSingle();
 
-    if (!user) continue;
+      if (!user) continue;
 
-    // Realtor's space
-    const space = await getSpaceByOwnerId(member.userId);
-    if (!space) {
+      // Realtor's space
+      const space = await getSpaceByOwnerId(member.userId);
+      if (!space) {
+        stats.push({
+          userId: member.userId,
+          name: user.name ?? user.email ?? 'Unknown',
+          email: user.email ?? '',
+          avatar: user.avatar ?? null,
+          totalLeads: 0,
+          dealsClosed: 0,
+          pipelineValue: 0,
+          toursCompleted: 0,
+          conversionRate: 0,
+          badges: [],
+        });
+        continue;
+      }
+
+      // Fetch all count-only stats and pipeline data in parallel
+      const [totalLeadsRes, dealsClosedRes, activeDealsRes, toursCompletedRes] = await Promise.all([
+        // Count total leads
+        supabase
+          .from('Contact')
+          .select('*', { count: 'exact', head: true })
+          .eq('spaceId', space.id),
+        // Count deals won
+        supabase
+          .from('Deal')
+          .select('*', { count: 'exact', head: true })
+          .eq('spaceId', space.id)
+          .eq('status', 'won'),
+        // Pipeline value (need actual values for summing)
+        supabase
+          .from('Deal')
+          .select('value')
+          .eq('spaceId', space.id)
+          .eq('status', 'active'),
+        // Tours completed
+        supabase
+          .from('Tour')
+          .select('*', { count: 'exact', head: true })
+          .eq('spaceId', space.id)
+          .eq('status', 'completed'),
+      ]);
+
+      const pipelineValue = (activeDealsRes.data ?? []).reduce(
+        (sum, d) => sum + (d.value ?? 0),
+        0,
+      );
+
+      const leads = totalLeadsRes.count ?? 0;
+      const closed = dealsClosedRes.count ?? 0;
+      const conversionRate = leads > 0 ? Math.round((closed / leads) * 100) : 0;
+
       stats.push({
         userId: member.userId,
         name: user.name ?? user.email ?? 'Unknown',
         email: user.email ?? '',
         avatar: user.avatar ?? null,
-        totalLeads: 0,
-        dealsClosed: 0,
-        pipelineValue: 0,
-        toursCompleted: 0,
-        conversionRate: 0,
+        totalLeads: leads,
+        dealsClosed: closed,
+        pipelineValue,
+        toursCompleted: toursCompletedRes.count ?? 0,
+        conversionRate,
         badges: [],
       });
-      continue;
+    } catch (err) {
+      console.error(`[leaderboard] Failed to fetch stats for member ${member.userId}:`, err);
+      // Skip this member but continue processing others
     }
-
-    // Count total leads
-    const { count: totalLeads } = await supabase
-      .from('Contact')
-      .select('*', { count: 'exact', head: true })
-      .eq('spaceId', space.id);
-
-    // Count deals won
-    const { count: dealsClosed } = await supabase
-      .from('Deal')
-      .select('*', { count: 'exact', head: true })
-      .eq('spaceId', space.id)
-      .eq('status', 'won');
-
-    // Pipeline value (sum of active deal values)
-    const { data: activeDeals } = await supabase
-      .from('Deal')
-      .select('value')
-      .eq('spaceId', space.id)
-      .eq('status', 'active');
-
-    const pipelineValue = (activeDeals ?? []).reduce(
-      (sum, d) => sum + (d.value ?? 0),
-      0,
-    );
-
-    // Tours completed
-    const { count: toursCompleted } = await supabase
-      .from('Tour')
-      .select('*', { count: 'exact', head: true })
-      .eq('spaceId', space.id)
-      .eq('status', 'completed');
-
-    const leads = totalLeads ?? 0;
-    const closed = dealsClosed ?? 0;
-    const conversionRate = leads > 0 ? Math.round((closed / leads) * 100) : 0;
-
-    stats.push({
-      userId: member.userId,
-      name: user.name ?? user.email ?? 'Unknown',
-      email: user.email ?? '',
-      avatar: user.avatar ?? null,
-      totalLeads: leads,
-      dealsClosed: closed,
-      pipelineValue,
-      toursCompleted: toursCompleted ?? 0,
-      conversionRate,
-      badges: [],
-    });
   }
 
   // Compute badges

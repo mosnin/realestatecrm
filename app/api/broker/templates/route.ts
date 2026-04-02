@@ -18,6 +18,7 @@ type Template = {
   name: string;
   category: string;
   body: string;
+  createdBy: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -119,6 +120,7 @@ export async function POST(req: NextRequest) {
       name: parsed.data.name,
       category: parsed.data.category,
       body: parsed.data.body,
+      createdBy: ctx.dbUserId,
       createdAt: now,
       updatedAt: now,
     };
@@ -137,6 +139,15 @@ export async function POST(req: NextRequest) {
     console.error('[templates] POST error', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
+}
+
+/**
+ * Check if the current user is the template creator or a broker owner/admin.
+ */
+function canModifyTemplate(ctx: { dbUserId: string; membership: { role: string } }, template: Template): boolean {
+  if (template.createdBy === ctx.dbUserId) return true;
+  if (ctx.membership.role === 'broker_owner' || ctx.membership.role === 'broker_admin') return true;
+  return false;
 }
 
 /**
@@ -172,6 +183,10 @@ export async function PATCH(req: NextRequest) {
 
     if (idx === -1) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+    }
+
+    if (!canModifyTemplate(ctx, templates[idx])) {
+      return NextResponse.json({ error: 'Forbidden: you can only edit your own templates' }, { status: 403 });
     }
 
     const now = new Date().toISOString();
@@ -219,11 +234,17 @@ export async function DELETE(req: NextRequest) {
 
     const note = await getOrCreateTemplateNote(space.id);
     const templates = parseTemplates(note.content);
-    const filtered = templates.filter((t) => t.id !== templateId);
+    const target = templates.find((t) => t.id === templateId);
 
-    if (filtered.length === templates.length) {
+    if (!target) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 });
     }
+
+    if (!canModifyTemplate(ctx, target)) {
+      return NextResponse.json({ error: 'Forbidden: you can only delete your own templates' }, { status: 403 });
+    }
+
+    const filtered = templates.filter((t) => t.id !== templateId);
 
     const now = new Date().toISOString();
     const { error: updateError } = await supabase

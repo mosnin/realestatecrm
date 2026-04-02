@@ -7,8 +7,9 @@ import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
 import { DashboardFooter } from '@/components/dashboard/footer';
 import { supabase } from '@/lib/supabase';
+import type { Metadata } from 'next';
 
-export const metadata = { title: 'Broker Dashboard — Chippi' };
+export const metadata: Metadata = { title: 'Broker Dashboard — Chippi' };
 
 export default async function BrokerLayout({ children }: { children: React.ReactNode }) {
   const { userId } = await auth();
