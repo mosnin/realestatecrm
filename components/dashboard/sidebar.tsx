@@ -127,7 +127,6 @@ const brokerSettingsNavSections = [
     label: 'Lead Management',
     items: [
       { href: '/broker/settings/auto-assignment', label: 'Auto-Assignment', icon: Shuffle, exact: false },
-      { href: '/broker/settings/commissions', label: 'Commission Rates', icon: DollarSign, exact: false },
     ],
   },
   {
