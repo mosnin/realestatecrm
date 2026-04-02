@@ -127,17 +127,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Failed to create invitation' }, { status: 500 });
   }
 
+  console.log('[broker/invite] Invitation created:', { id: invitation.id, token: invitation.token?.slice(0, 8), email: trimmedEmail, role: roleToAssign });
+
   // Send email — must await before response returns so Vercel doesn't kill the function
   try {
-    await sendBrokerageInvitation({
+    console.log('[broker/invite] Sending email to:', trimmedEmail, 'token:', invitation.token?.slice(0, 8));
+    const emailResult = await sendBrokerageInvitation({
       toEmail: trimmedEmail,
       brokerageName: brokerage.name,
       inviterName,
       roleToAssign: roleToAssign as 'broker_admin' | 'realtor_member',
       token: invitation.token,
     });
+    console.log('[broker/invite] Email send completed for:', trimmedEmail);
   } catch (err) {
-    console.error('[broker/invite] email send failed', err);
+    console.error('[broker/invite] email send FAILED:', err instanceof Error ? err.message : err);
   }
 
   void audit({ actorClerkId: clerkId ?? null, action: 'CREATE', resource: 'Invitation', resourceId: invitation.id, metadata: { email: trimmedEmail, roleToAssign, brokerageId: brokerage.id } });
