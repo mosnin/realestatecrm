@@ -58,7 +58,7 @@ const roleBadge = (role: string) =>
       <Card>
         <CardContent className="px-5 py-4 space-y-3">
           <p className="text-sm font-medium">Send an email invitation</p>
-          <InviteForm />
+          <InviteForm isOwner={ctx.membership.role === 'broker_owner'} />
         </CardContent>
       </Card>
 

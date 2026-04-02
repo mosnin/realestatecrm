@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { RemoveMemberButton } from '@/components/broker/remove-member-button';
 import { ChangeRoleButton } from '@/components/broker/change-role-button';
-import { MembersSearch } from '@/components/broker/members-search';
+import { MembersRoleFilter } from '@/components/broker/members-role-filter';
 
 export default async function BrokerMembersPage() {
   const ctx = await getBrokerContext();
@@ -29,6 +29,20 @@ export default async function BrokerMembersPage() {
   const roleLabel = (role: string) =>
     role === 'broker_owner' ? 'Owner' : role === 'broker_admin' ? 'Admin' : 'Realtor';
 
+  const roleBadgeClass = (role: string) => {
+    switch (role) {
+      case 'broker_owner':
+        return 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15';
+      case 'broker_admin':
+        return 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15';
+      default:
+        return 'text-muted-foreground bg-muted';
+    }
+  };
+
+  const adminCount = members.filter((m) => m.role === 'broker_admin' || m.role === 'broker_owner').length;
+  const memberCount = members.filter((m) => m.role === 'realtor_member').length;
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -36,6 +50,10 @@ export default async function BrokerMembersPage() {
           <h1 className="text-xl font-semibold tracking-tight">Members</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {members.length} {members.length === 1 ? 'member' : 'members'} in {ctx.brokerage.name}
+            <span className="mx-1.5">·</span>
+            <span className="text-amber-600 dark:text-amber-400">{adminCount} {adminCount === 1 ? 'admin' : 'admins'}</span>
+            <span className="mx-1.5">·</span>
+            <span>{memberCount} {memberCount === 1 ? 'member' : 'members'}</span>
           </p>
         </div>
       </div>
@@ -56,8 +74,8 @@ export default async function BrokerMembersPage() {
           </CardContent>
         </Card>
       ) : (
-        <MembersSearch
-          members={members.map((m) => ({ id: m.id, name: m.User?.name ?? null, email: m.User?.email ?? null }))}
+        <MembersRoleFilter
+          members={members.map((m) => ({ id: m.id, name: m.User?.name ?? null, email: m.User?.email ?? null, role: m.role }))}
         >
           {(visibleIds) => (
             <div className="space-y-2">
@@ -65,6 +83,11 @@ export default async function BrokerMembersPage() {
                 const user = m.User;
                 const initials = ((user?.name ?? user?.email ?? '?').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2));
                 const joinedAt = new Date(m.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                // Owner can manage admins and members; admin can only manage members
+                const canManage =
+                  m.role !== 'broker_owner' &&
+                  (ctx.membership.role === 'broker_owner' ||
+                    (ctx.membership.role === 'broker_admin' && m.role === 'realtor_member'));
                 return (
                   <div key={m.id} className="rounded-xl border border-border bg-card px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
@@ -84,13 +107,7 @@ export default async function BrokerMembersPage() {
                             <p className="text-xs text-primary font-medium">/{m.Space.slug}</p>
                           )}
                         </div>
-                        <span className={`hidden sm:inline-flex text-xs font-medium rounded-full px-2.5 py-0.5 ${
-                          m.role === 'broker_owner'
-                            ? 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
-                            : m.role === 'broker_admin'
-                            ? 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15'
-                            : 'text-muted-foreground bg-muted'
-                        }`}>
+                        <span className={`hidden sm:inline-flex text-xs font-medium rounded-full px-2.5 py-0.5 ${roleBadgeClass(m.role)}`}>
                           {roleLabel(m.role)}
                         </span>
                         {user?.onboard ? (
@@ -102,7 +119,7 @@ export default async function BrokerMembersPage() {
                             <AlertCircle size={11} /> Pending
                           </span>
                         )}
-                        {m.role !== 'broker_owner' && (ctx.membership.role === 'broker_owner' || (ctx.membership.role === 'broker_admin' && m.role !== 'broker_admin')) && (
+                        {canManage && (
                           <>
                             <ChangeRoleButton
                               membershipId={m.id}
@@ -125,7 +142,7 @@ export default async function BrokerMembersPage() {
               )}
             </div>
           )}
-        </MembersSearch>
+        </MembersRoleFilter>
       )}
     </div>
   );
