@@ -18,13 +18,15 @@ export default async function BrokerLeadsPage() {
   const { brokerage } = ctx;
 
   // 1. BROKERAGE LEADS — from brokerage intake form, queried by brokerageId
-  const { data: brokerageUnassigned } = await supabase
+  console.log('[broker/leads] QUERYING brokerageId:', brokerage.id);
+  const { data: brokerageUnassigned, error: bqErr } = await supabase
     .from('Contact')
     .select('id, name, email, phone, budget, scoreLabel, leadScore, leadType, tags, createdAt, notes, applicationData')
     .eq('brokerageId', brokerage.id)
     .not('tags', 'cs', '["assigned"]')
     .order('createdAt', { ascending: false })
     .limit(500);
+  console.log('[broker/leads] RESULTS: count=', (brokerageUnassigned ?? []).length, 'error=', bqErr?.message ?? 'none');
 
   const { data: brokerageAssigned } = await supabase
     .from('Contact')

@@ -250,6 +250,12 @@ export async function POST(req: NextRequest) {
     if (insertError) throw insertError;
     const contact = contacts![0] as Contact;
 
+    console.info('[apply/brokerage] CONTACT CREATED', {
+      contactId: contact.id,
+      brokerageId: brokerage.id,
+      spaceId: space.id,
+      contactBrokerageId: (contact as any).brokerageId,
+    });
     console.info('[apply/brokerage] submission persisted', {
       contactId: contact.id,
       spaceId: space.id,
