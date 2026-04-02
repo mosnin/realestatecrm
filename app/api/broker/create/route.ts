@@ -65,6 +65,10 @@ export async function POST(req: Request) {
   if (userErr || !user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
   // Broker-only users are marked onboard during setup even without a Space
   if (!user.onboard) return NextResponse.json({ error: 'Complete onboarding first' }, { status: 403 });
+  // Only users who selected broker role during onboarding can create a brokerage
+  if (user.accountType === 'realtor') {
+    return NextResponse.json({ error: 'Upgrade to a broker account to create a brokerage' }, { status: 403 });
+  }
 
   // Check: does this user already own a brokerage?
   const { data: existing } = await supabase
