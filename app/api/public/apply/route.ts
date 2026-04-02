@@ -15,6 +15,36 @@ import { notifyNewLead } from '@/lib/notify';
 import { sendApplicationConfirmation } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 
+/** Parse budget/rent range strings like 'under_1500', '1500_2000', '1m_plus' to a midpoint number. */
+function parseBudgetToNumber(val: unknown): number | null {
+  if (val == null) return null;
+  if (typeof val === 'number') return val;
+  const s = String(val).toLowerCase().trim();
+  if (!s) return null;
+  // Try direct numeric parse first
+  const direct = Number(s);
+  if (!isNaN(direct) && direct > 0) return direct;
+  // Handle range strings: 'under_1500' -> 1250, '1500_2000' -> 1750, '3500_plus' -> 4000
+  const underMatch = s.match(/^under[_\s]?(\d+)/);
+  if (underMatch) return Math.round(Number(underMatch[1]) * 0.8);
+  const rangeMatch = s.match(/^(\d+)[k]?[_\s-]+(\d+)[k]?$/);
+  if (rangeMatch) {
+    let lo = Number(rangeMatch[1]);
+    let hi = Number(rangeMatch[2]);
+    // Handle 'k' suffix: 200k_350k
+    if (s.includes('k')) { lo *= 1000; hi *= 1000; }
+    return Math.round((lo + hi) / 2);
+  }
+  const plusMatch = s.match(/^(\d+)[k]?[_\s]?(?:plus|\+)$/);
+  if (plusMatch) {
+    let base = Number(plusMatch[1]);
+    if (s.includes('k') || s.includes('m')) base *= 1000;
+    if (s.startsWith('1m')) return 1250000;
+    return Math.round(base * 1.2);
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   console.log('[APPLY-DEBUG] 1. Route handler entered');
   // ── IP-based rate limiting (10 submissions / IP / hour) ──────────────────
@@ -154,9 +184,11 @@ export async function POST(req: NextRequest) {
         name: payload.legalName,
         email: payload.email ?? null,
         phone: payload.phone,
-        budget: payload.leadType === 'buyer'
-          ? (payload.buyerBudget ?? payload.monthlyGrossIncome ?? null)
-          : (payload.monthlyRent ?? payload.monthlyGrossIncome ?? null),
+        budget: parseBudgetToNumber(
+          payload.leadType === 'buyer'
+            ? (payload.buyerBudget ?? payload.monthlyGrossIncome ?? null)
+            : (payload.monthlyRent ?? payload.monthlyGrossIncome ?? null)
+        ),
         preferences: payload.propertyAddress ?? null,
         address: payload.currentAddress ?? null,
         notes: noteParts.length > 0 ? noteParts.join('\n') : null,

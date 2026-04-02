@@ -16,6 +16,33 @@ import { sendApplicationConfirmation } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
 
+/** Parse budget/rent range strings to a midpoint number for the DB. */
+function parseBudgetToNumber(val: unknown): number | null {
+  if (val == null) return null;
+  if (typeof val === 'number') return val;
+  const s = String(val).toLowerCase().trim();
+  if (!s) return null;
+  const direct = Number(s);
+  if (!isNaN(direct) && direct > 0) return direct;
+  const underMatch = s.match(/^under[_\s]?(\d+)/);
+  if (underMatch) return Math.round(Number(underMatch[1]) * 0.8);
+  const rangeMatch = s.match(/^(\d+)[k]?[_\s-]+(\d+)[k]?$/);
+  if (rangeMatch) {
+    let lo = Number(rangeMatch[1]);
+    let hi = Number(rangeMatch[2]);
+    if (s.includes('k')) { lo *= 1000; hi *= 1000; }
+    return Math.round((lo + hi) / 2);
+  }
+  const plusMatch = s.match(/^(\d+)[k]?[_\s]?(?:plus|\+)$/);
+  if (plusMatch) {
+    let base = Number(plusMatch[1]);
+    if (s.includes('k') || s.includes('m')) base *= 1000;
+    if (s.startsWith('1m')) return 1250000;
+    return Math.round(base * 1.2);
+  }
+  return null;
+}
+
 /**
  * Brokerage-specific intake schema.
  * Same as the regular application schema but uses `brokerageId` instead of `slug`.
@@ -191,9 +218,11 @@ export async function POST(req: NextRequest) {
         name: payload.legalName,
         email: payload.email ?? null,
         phone: payload.phone ?? null,
-        budget: payload.leadType === 'buyer'
-          ? (payload.buyerBudget ?? payload.monthlyGrossIncome ?? null)
-          : (payload.monthlyRent ?? payload.monthlyGrossIncome ?? null),
+        budget: parseBudgetToNumber(
+          payload.leadType === 'buyer'
+            ? (payload.buyerBudget ?? payload.monthlyGrossIncome ?? null)
+            : (payload.monthlyRent ?? payload.monthlyGrossIncome ?? null)
+        ),
         preferences: payload.propertyAddress ?? null,
         address: payload.currentAddress ?? null,
         notes: noteParts.length > 0 ? noteParts.join('\n') : null,
@@ -240,7 +269,7 @@ export async function POST(req: NextRequest) {
         name: payload.legalName,
         email: payload.email ?? null,
         phone: payload.phone ?? null,
-        budget: (payload.leadType === 'buyer' ? (payload.buyerBudget ?? null) : (payload.monthlyRent ?? null)),
+        budget: parseBudgetToNumber(payload.leadType === 'buyer' ? (payload.buyerBudget ?? null) : (payload.monthlyRent ?? null)),
         applicationData,
         leadType: payload.leadType ?? 'rental',
       });
