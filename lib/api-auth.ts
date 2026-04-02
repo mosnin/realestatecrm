@@ -48,7 +48,8 @@ export async function requireActiveSubscription(
 }
 
 /**
- * Verifies the calling user owns the given workspace slug.
+ * Verifies the calling user owns the given workspace slug, OR is a
+ * broker_owner/broker_admin of the brokerage that manages this space.
  * Returns { userId, space } or a 4xx NextResponse.
  */
 export async function requireSpaceOwner(
@@ -65,11 +66,43 @@ export async function requireSpaceOwner(
   ]);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
 
-  if (!userSpace || space.id !== userSpace.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  // Direct owner check
+  if (userSpace && space.id === userSpace.id) {
+    return { userId, space };
   }
 
-  return { userId, space };
+  // Broker owner/admin check — allow managing brokerage members' spaces
+  const { data: dbUser } = await supabase
+    .from('User')
+    .select('id')
+    .eq('clerkId', userId)
+    .maybeSingle();
+
+  if (dbUser) {
+    // Check if the space belongs to a brokerage the user is admin/owner of
+    const { data: membership } = await supabase
+      .from('BrokerageMembership')
+      .select('role, brokerageId')
+      .eq('userId', dbUser.id)
+      .in('role', ['broker_owner', 'broker_admin'])
+      .maybeSingle();
+
+    if (membership) {
+      // Check if the space's owner is a member of the same brokerage
+      const { data: spaceOwnerMembership } = await supabase
+        .from('BrokerageMembership')
+        .select('id')
+        .eq('brokerageId', membership.brokerageId)
+        .eq('userId', space.ownerId)
+        .maybeSingle();
+
+      if (spaceOwnerMembership) {
+        return { userId, space };
+      }
+    }
+  }
+
+  return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 }
 
 /**
