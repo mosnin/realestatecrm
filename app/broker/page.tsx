@@ -48,7 +48,7 @@ export default async function BrokerOverviewPage() {
   // Fetch members with their user + space info
   const { data: memberships } = await supabase
     .from('BrokerageMembership')
-    .select('id, role, createdAt, userId, User(id, name, email, onboard), Space!Space_ownerId_fkey(id, slug, name)')
+    .select('id, role, createdAt, userId, User!BrokerageMembership_userId_fkey(id, name, email, onboard), Space!Space_ownerId_fkey(id, slug, name)')
     .eq('brokerageId', brokerage.id)
     .order('createdAt', { ascending: true });
 

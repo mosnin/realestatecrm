@@ -13,7 +13,7 @@ export default async function BrokerMembersPage() {
 
   const { data: memberships } = await supabase
     .from('BrokerageMembership')
-    .select('id, role, createdAt, userId, User(id, name, email, onboard), Space!Space_ownerId_fkey(slug)')
+    .select('id, role, createdAt, userId, User!BrokerageMembership_userId_fkey(id, name, email, onboard), Space!Space_ownerId_fkey(slug)')
     .eq('brokerageId', ctx.brokerage.id)
     .order('createdAt', { ascending: true });
 
