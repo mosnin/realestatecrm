@@ -11,27 +11,31 @@ export default async function BrokerMembersPage() {
   const ctx = await getBrokerContext();
   if (!ctx) redirect('/');
 
+  console.log('[broker/members] Loading members for brokerage:', ctx.brokerage.id);
+
   const { data: memberships } = await supabase
     .from('BrokerageMembership')
     .select('id, role, createdAt, userId')
     .eq('brokerageId', ctx.brokerage.id)
     .order('createdAt', { ascending: true });
 
-  const rawMembers = memberships ?? [];
+  const rawMembers = (memberships ?? []) as Array<{ id: string; role: string; createdAt: string; userId: string }>;
   const userIds = rawMembers.map((m) => m.userId).filter(Boolean);
 
   // Batch-fetch users and spaces separately to avoid ambiguous FK joins
-  const [{ data: users }, { data: spaces }] = await Promise.all([
-    userIds.length > 0
-      ? supabase.from('User').select('id, name, email, onboard').in('id', userIds)
-      : Promise.resolve({ data: [] as any[] }),
-    userIds.length > 0
-      ? supabase.from('Space').select('ownerId, slug').in('ownerId', userIds)
-      : Promise.resolve({ data: [] as any[] }),
-  ]);
+  let users: any[] = [];
+  let spaces: any[] = [];
+  if (userIds.length > 0) {
+    const [userRes, spaceRes] = await Promise.all([
+      supabase.from('User').select('id, name, email, onboard').in('id', userIds),
+      supabase.from('Space').select('ownerId, slug').in('ownerId', userIds),
+    ]);
+    users = userRes.data ?? [];
+    spaces = spaceRes.data ?? [];
+  }
 
-  const userMap = new Map((users ?? []).map((u: any) => [u.id, u]));
-  const spaceMap = new Map((spaces ?? []).map((s: any) => [s.ownerId, s]));
+  const userMap = new Map(users.map((u: any) => [u.id, u]));
+  const spaceMap = new Map(spaces.map((s: any) => [s.ownerId, s]));
 
   const members = rawMembers.map((m) => ({
     id: m.id,
