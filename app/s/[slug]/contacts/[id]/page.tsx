@@ -415,7 +415,7 @@ export default async function ClientDetailPage({
                 <DetailGrid>
                   {app.employmentStatus && <Detail label="Employment" value={app.employmentStatus} />}
                   {app.employerOrSource && <Detail label="Employer" value={app.employerOrSource} />}
-                  {app.monthlyGrossIncome != null && <Detail label="Monthly gross" value={formatCurrency(app.monthlyGrossIncome)} />}
+                  {app.monthlyGrossIncome != null && <Detail label="Monthly gross" value={typeof app.monthlyGrossIncome === 'number' ? formatCurrency(app.monthlyGrossIncome) : String(app.monthlyGrossIncome)} />}
                   {app.additionalIncome != null && <Detail label="Additional" value={formatCurrency(app.additionalIncome)} />}
                 </DetailGrid>
               </CollapsibleSection>
