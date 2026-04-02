@@ -21,6 +21,7 @@ export function LiveNotifications({ spaceId, slug }: Props) {
     onEvent: (payload) => {
       const contact = payload.new as any;
       if (!contact?.name) return;
+      if (contact?.brokerageId) return; // Brokerage intake leads are broker-dashboard only
       toast.success(`New lead: ${contact.name}`, {
         description: contact.phone || contact.email || 'Just applied',
         icon: <PhoneIncoming size={16} />,
@@ -80,6 +81,7 @@ export function LiveNotifications({ spaceId, slug }: Props) {
     onEvent: (payload) => {
       const oldRecord = payload.old as any;
       const newRecord = payload.new as any;
+      if (newRecord?.brokerageId) return; // Brokerage intake leads are broker-dashboard only
       // Only notify when scoring completes
       if (oldRecord?.scoringStatus === 'pending' && newRecord?.scoringStatus === 'scored' && newRecord?.scoreLabel) {
         toast.info(`Lead scored: ${newRecord.name || 'Contact'}`, {
