@@ -98,8 +98,8 @@ export default async function BrokerageApplyPage({
   const pageIntro = settings?.intakePageIntro || "Share your rental preferences and we'll follow up with next steps.";
   const businessName = brokerage.name;
   const agentName = brokerage.name;
-  // For brokerage forms, use brokerage logo — NOT the owner's personal photo
-  const agentPhoto = brokerage.logoUrl || settings?.logoUrl || null;
+  // For brokerage forms, only show the logo — no circular avatar photo
+  const agentPhoto = null;
   const logoUrl = brokerage.logoUrl || settings?.logoUrl || null;
 
   // Gate on subscription status — only pause forms for explicitly failed billing
@@ -124,7 +124,7 @@ export default async function BrokerageApplyPage({
     disabledSteps: settings?.intakeDisabledSteps || [],
     customQuestions: settings?.intakeCustomQuestions || [],
     faviconUrl: settings?.intakeFaviconUrl || null,
-    bio: settings?.bio || null,
+    bio: null, // Don't show owner's personal bio on brokerage forms
     socialLinks: settings?.socialLinks || null,
     privacyPolicyUrl: settings?.privacyPolicyUrl || `/apply/${(space as any).slug}/privacy`,
     consentCheckboxLabel: settings?.consentCheckboxLabel || null,
