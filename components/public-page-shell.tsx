@@ -32,9 +32,8 @@ const FONT_CLASS_MAP: Record<string, string> = {
   mono: 'font-mono',
 };
 
-// Social platform SVG icons (inline, no external dependency)
 function SocialIcon({ platform }: { platform: string }) {
-  const size = 15;
+  const size = 14;
   switch (platform.toLowerCase()) {
     case 'linkedin':
       return (
@@ -73,143 +72,146 @@ export function PublicPageShell({
 }: PublicPageShellProps) {
   const fontClass = FONT_CLASS_MAP[customization?.font || 'system'] || '';
   const darkClass = customization?.darkMode ? 'dark' : '';
-
-  const headerStyle: React.CSSProperties = {};
-  if (customization?.headerGradient) {
-    headerStyle.background = customization.headerGradient;
-  } else if (customization?.headerBgColor) {
-    headerStyle.backgroundColor = customization.headerBgColor;
-  }
-
   const accentColor = customization?.accentColor || '#ff964f';
   const hasSocial = customization?.socialLinks && Object.values(customization.socialLinks).some(Boolean);
 
   return (
     <div
-      className={`min-h-screen bg-muted dark:bg-background ${fontClass} ${darkClass}`.trim()}
+      className={`min-h-screen bg-muted/50 dark:bg-background ${fontClass} ${darkClass}`.trim()}
       style={{ '--intake-accent': accentColor } as React.CSSProperties}
     >
-      {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <header className="bg-card border-b border-border" style={headerStyle}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-14 sm:h-16">
-            {/* Left: agent branding */}
-            <div className="flex items-center gap-3 min-w-0">
+      {/* ── Floating pill header ─────────────────────────────────────────── */}
+      <div className="sticky top-0 z-50 px-3 pt-3 sm:px-4 sm:pt-4">
+        <header className="max-w-2xl mx-auto rounded-full bg-card/95 backdrop-blur-md border border-border shadow-sm px-3 py-1.5 sm:px-4 sm:py-2">
+          <div className="flex items-center justify-between gap-2">
+            {/* Left: agent identity */}
+            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
               {agentPhoto && (
                 <div className="relative flex-shrink-0">
                   <img
                     src={agentPhoto}
                     alt={agentName}
-                    width={36}
-                    height={36}
+                    width={32}
+                    height={32}
                     loading="eager"
                     decoding="async"
-                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover ring-2 ring-blue-500 ring-offset-2 ring-offset-background"
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover ring-2 ring-blue-500 ring-offset-1 ring-offset-card"
                   />
-                  <span className="absolute -right-0.5 -bottom-0.5 inline-flex size-3.5 items-center justify-center rounded-full bg-blue-500 ring-1.5 ring-background">
-                    <CheckIcon className="size-2 text-white" />
+                  <span className="absolute -right-0.5 -bottom-0.5 inline-flex size-3 items-center justify-center rounded-full bg-blue-500 ring-1 ring-card">
+                    <CheckIcon className="size-1.5 text-white" />
                   </span>
                 </div>
               )}
               <div className="min-w-0">
                 {logoUrl ? (
-                  <img src={logoUrl} alt={businessName} width={112} height={28} loading="eager" decoding="async" className="h-6 sm:h-7 object-contain" />
+                  <img src={logoUrl} alt={businessName} width={100} height={24} loading="eager" decoding="async" className="h-5 sm:h-6 object-contain" />
                 ) : (
-                  <span className="text-sm sm:text-base font-semibold text-foreground truncate block">
-                    {businessName}
-                  </span>
+                  <span className="text-sm font-semibold text-foreground truncate block">{businessName}</span>
                 )}
               </div>
-              {/* Social icons inline with branding */}
-              {hasSocial && (
-                <div className="hidden sm:flex items-center gap-1.5 ml-1">
-                  {Object.entries(customization!.socialLinks!).map(([platform, url]) =>
-                    url ? (
-                      <a
-                        key={platform}
-                        href={url as string}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground/60 hover:text-foreground transition-colors"
-                        title={platform}
-                      >
-                        <SocialIcon platform={platform} />
-                      </a>
-                    ) : null
-                  )}
-                </div>
+            </div>
+
+            {/* Center: social icons (desktop only) */}
+            {hasSocial && (
+              <div className="hidden sm:flex items-center gap-1">
+                {Object.entries(customization!.socialLinks!).map(([platform, url]) =>
+                  url ? (
+                    <a
+                      key={platform}
+                      href={url as string}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground/50 hover:text-foreground transition-colors"
+                      title={platform}
+                    >
+                      <SocialIcon platform={platform} />
+                    </a>
+                  ) : null
+                )}
+              </div>
+            )}
+
+            {/* Right: Powered by Chippi */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <span className="text-[9px] sm:text-[10px] text-muted-foreground/40 hidden sm:inline">Powered by</span>
+              <BrandLogo className="h-3 sm:h-3.5 opacity-40" />
+            </div>
+          </div>
+        </header>
+      </div>
+
+      {/* ── Page content ─────────────────────────────────────────────────── */}
+      <main className="max-w-2xl mx-auto px-3 sm:px-4 pt-5 sm:pt-8 pb-28">
+        {/* Agent info card — photo + name + bio in one clean block */}
+        <div className="mb-5 sm:mb-6">
+          <div className="flex items-start gap-3">
+            {agentPhoto && (
+              <div className="relative flex-shrink-0 hidden sm:block">
+                <img
+                  src={agentPhoto}
+                  alt={agentName}
+                  className="w-11 h-11 rounded-full object-cover ring-2 ring-blue-500 ring-offset-2 ring-offset-muted/50"
+                />
+                <span className="absolute -right-0.5 -bottom-0.5 inline-flex size-3.5 items-center justify-center rounded-full bg-blue-500 ring-1.5 ring-muted/50">
+                  <CheckIcon className="size-2 text-white" />
+                </span>
+              </div>
+            )}
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
+                {pageTitle}
+              </h1>
+              {pageIntro && (
+                <p className="text-sm text-muted-foreground mt-0.5 max-w-md">{pageIntro}</p>
+              )}
+              {customization?.bio && (
+                <p className="text-xs text-muted-foreground/70 mt-1.5 max-w-md italic">{customization.bio}</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Main form content */}
+        {children}
+      </main>
+
+      {/* ── Floating pill footer ─────────────────────────────────────────── */}
+      <div className="fixed bottom-0 inset-x-0 z-50 px-3 pb-3 sm:px-4 sm:pb-4 pointer-events-none">
+        <footer className="max-w-2xl mx-auto rounded-full bg-card/95 backdrop-blur-md border border-border shadow-sm px-4 py-2 pointer-events-auto">
+          <div className="flex items-center justify-between gap-2 text-[10px] sm:text-[11px] text-muted-foreground/60">
+            {/* Left: legal links */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <a href="/legal/terms" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Terms</a>
+              <a href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Privacy</a>
+              {agentPhone && (
+                <a href={`tel:${agentPhone}`} className="hover:text-foreground hidden sm:inline">{agentPhone}</a>
               )}
             </div>
 
-            {/* Right: powered by Chippi (subtle) */}
-            <div className="flex items-center gap-1 flex-shrink-0 opacity-50 hover:opacity-80 transition-opacity">
-              <span className="text-[10px] text-muted-foreground hidden sm:inline">Powered by</span>
-              <BrandLogo className="h-3.5 sm:h-4" />
+            {/* Center: trust line (desktop only) */}
+            <span className="hidden md:inline text-center truncate max-w-xs">{trustLine}</span>
+
+            {/* Right: custom footer links or business name */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {customization?.footerLinks && customization.footerLinks.length > 0 ? (
+                customization.footerLinks.slice(0, 2).map((link) => (
+                  <a
+                    key={link.url}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-foreground transition-colors truncate max-w-[80px]"
+                  >
+                    {link.label}
+                  </a>
+                ))
+              ) : (
+                <span className="truncate">{businessName}</span>
+              )}
             </div>
           </div>
-        </div>
-      </header>
-
-      {/* ── Thin accent line ─────────────────────────────────────────────── */}
-      <div className="h-0.5" style={{ backgroundColor: accentColor }} />
-
-      {/* ── Page content ─────────────────────────────────────────────────── */}
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-        <div className="space-y-5">
-          {/* Agent bio (if bio exists) — no photo/name since header already shows them */}
-          {customization?.bio && (
-            <p className="text-sm text-muted-foreground">{customization.bio}</p>
-          )}
-
-          {/* Title area */}
-          <div>
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
-              {pageTitle}
-            </h1>
-            {pageIntro && (
-              <p className="text-sm text-muted-foreground mt-1 max-w-lg">{pageIntro}</p>
-            )}
-          </div>
-
-          {/* Main content */}
-          {children}
-        </div>
-
-        {/* Footer links */}
-        {customization?.footerLinks && customization.footerLinks.length > 0 && (
-          <div className="flex items-center justify-center gap-4 mt-6">
-            {customization.footerLinks.map((link) => (
-              <a
-                key={link.url}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-              >
-                {link.label}
-              </a>
-            ))}
-          </div>
-        )}
-
-        {/* Legal footer */}
-        <div className="flex flex-col items-center gap-2 mt-10 pb-6">
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground/60">
-            <a href="/legal/terms" target="_blank" rel="noopener noreferrer" className="hover:text-foreground underline underline-offset-2">Terms</a>
-            <span>&middot;</span>
-            <a href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-foreground underline underline-offset-2">Privacy</a>
-            {agentPhone && (
-              <>
-                <span>&middot;</span>
-                <a href={`tel:${agentPhone}`} className="hover:text-foreground">{agentPhone}</a>
-              </>
-            )}
-          </div>
-          <p className="text-center text-[11px] text-muted-foreground/50">
-            {trustLine}
-          </p>
-        </div>
-      </main>
+        </footer>
+      </div>
     </div>
   );
 }
@@ -227,25 +229,24 @@ export function PublicPageMinimalShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-muted dark:bg-background flex flex-col">
-      <header className="bg-card border-b border-border">
-        <div className="max-w-lg mx-auto px-4">
-          <div className="flex items-center justify-between h-14">
+    <div className="min-h-screen bg-muted/50 dark:bg-background flex flex-col">
+      <div className="px-3 pt-3 sm:px-4 sm:pt-4">
+        <header className="max-w-lg mx-auto rounded-full bg-card/95 backdrop-blur-md border border-border shadow-sm px-4 py-2">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
               {logoUrl ? (
-                <img src={logoUrl} alt={businessName} className="h-6 object-contain" />
+                <img src={logoUrl} alt={businessName} className="h-5 object-contain" />
               ) : (
                 <span className="text-sm font-semibold text-foreground truncate">{businessName}</span>
               )}
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0 opacity-50">
+            <div className="flex items-center gap-1 flex-shrink-0 opacity-40">
               <span className="text-[10px] text-muted-foreground hidden sm:inline">Powered by</span>
               <BrandLogo className="h-3.5" />
             </div>
           </div>
-        </div>
-      </header>
-      <div className="h-0.5 bg-primary" />
+        </header>
+      </div>
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
         {children}
       </div>
