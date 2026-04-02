@@ -1,4 +1,4 @@
-import { getBrokerContext } from '@/lib/permissions';
+import { getBrokerMemberContext } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceByOwnerId } from '@/lib/space';
@@ -21,7 +21,7 @@ export type RealtorStats = {
 };
 
 export default async function LeaderboardPage() {
-  const ctx = await getBrokerContext();
+  const ctx = await getBrokerMemberContext();
   if (!ctx) redirect('/');
 
   const { brokerage } = ctx;

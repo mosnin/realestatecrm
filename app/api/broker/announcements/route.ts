@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireBroker, canManageLeads } from '@/lib/permissions';
+import { requireBroker, canManageLeads, getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { getSpaceByOwnerId } from '@/lib/space';
 import { z } from 'zod';
@@ -15,10 +15,8 @@ const announcementSchema = z.object({
  * GET /api/broker/announcements — list all announcements (newest first)
  */
 export async function GET() {
-  let ctx;
-  try {
-    ctx = await requireBroker();
-  } catch {
+  const ctx = await getBrokerMemberContext();
+  if (!ctx) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

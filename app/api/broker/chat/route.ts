@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireBroker } from '@/lib/permissions';
+import { requireBroker, getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { getSpaceByOwnerId } from '@/lib/space';
 import { z } from 'zod';
@@ -109,10 +109,8 @@ export async function GET(req: NextRequest) {
  * POST /api/broker/chat — send a message to team chat
  */
 export async function POST(req: NextRequest) {
-  let ctx;
-  try {
-    ctx = await requireBroker();
-  } catch {
+  const ctx = await getBrokerMemberContext();
+  if (!ctx) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

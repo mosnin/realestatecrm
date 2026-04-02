@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
-import { getBrokerMemberContext } from '@/lib/permissions';
+import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { BillingPage } from '@/components/billing/billing-page';
 import { getStripe } from '@/lib/stripe';
@@ -13,7 +13,7 @@ export default async function BrokerBillingPage() {
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
 
-  const ctx = await getBrokerMemberContext();
+  const ctx = await getBrokerContext();
   if (!ctx) redirect('/setup');
 
   // Find the user's own space for billing
