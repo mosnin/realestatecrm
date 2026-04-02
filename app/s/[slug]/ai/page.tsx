@@ -27,6 +27,7 @@ export default async function AIPage({
       .from('Conversation')
       .select('*')
       .eq('spaceId', space.id)
+      .not('title', 'like', '[BROKERAGE_CHAT]%')
       .order('updatedAt', { ascending: false })
       .limit(50);
     conversations = (convData ?? []) as Conversation[];
