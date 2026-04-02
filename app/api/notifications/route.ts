@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
     .from('Contact')
     .select('*', { count: 'exact', head: true })
     .eq('spaceId', space.id)
+    .is('brokerageId', null)
     .contains('tags', ['new-lead']);
   if (newLeads && newLeads > 0) {
     notifications.push({

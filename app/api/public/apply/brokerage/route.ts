@@ -10,7 +10,7 @@ import {
   normalizePhone,
   publicApplicationSchema,
 } from '@/lib/public-application';
-import { notifyNewLead } from '@/lib/notify';
+import { notifyBroker } from '@/lib/broker-notify';
 import { sendApplicationConfirmation } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
@@ -351,21 +351,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Send broker notification + applicant confirmation email in parallel
+    // Send brokerage dashboard notification + applicant confirmation email in parallel
     const businessName = spaceBusinessName || brokerage.name || space.name;
 
-    const brokerNotification = notifyNewLead({
-      spaceId: space.id,
-      contactId: contact.id,
-      name: payload.legalName,
-      phone: payload.phone,
-      email: payload.email,
-      leadScore: scoring.leadScore,
-      scoreLabel: scoring.scoreLabel,
-      scoreSummary: scoring.scoreSummary,
-      applicationData,
+    const brokerNotification = notifyBroker({
+      brokerageId: brokerage.id,
+      type: 'lead_hot',
+      title: `New brokerage lead: ${payload.legalName}`,
+      body: payload.phone ?? payload.email ?? 'New application submitted',
+      metadata: {
+        contactId: contact.id,
+        leadScore: scoring.leadScore,
+        scoreLabel: scoring.scoreLabel,
+        source: 'brokerage-intake',
+      },
     }).catch((err) => {
-      console.error('[apply/brokerage] broker notification failed', { contactId: contact.id, err });
+      console.error('[apply/brokerage] brokerage notification failed', { contactId: contact.id, err });
     });
 
     const applicantConfirmation = payload.email
