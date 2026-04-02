@@ -231,7 +231,7 @@ export default async function DashboardPage({
                     <Link key={lead.id} href={`/s/${slug}/leads`} className="block">
                       <div className={`flex items-center gap-3 px-5 py-3.5 hover:bg-muted/40 transition-colors ${isNew ? 'bg-primary/[0.03]' : ''}`}>
                         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-                          {lead.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                          {lead.name?.split(' ')?.map((n: string) => n?.[0])?.join('')?.toUpperCase()?.slice(0, 2) || '??'}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">

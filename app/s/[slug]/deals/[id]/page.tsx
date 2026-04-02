@@ -141,7 +141,7 @@ export default async function DealDetailPage({
               {dealRow.value != null && (
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-md px-2.5 py-1">
                   <DollarSign size={11} />
-                  {dealRow.value.toLocaleString()}
+                  {dealRow.value?.toLocaleString() ?? '0'}
                 </span>
               )}
               <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-md ${priorityMeta.className}`}>
@@ -205,7 +205,7 @@ export default async function DealDetailPage({
                       className="flex items-center gap-2.5 group"
                     >
                       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs flex-shrink-0">
-                        {contact.name.charAt(0).toUpperCase()}
+                        {contact.name?.charAt(0)?.toUpperCase() || '?'}
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-medium group-hover:text-primary transition-colors truncate">{contact.name}</p>

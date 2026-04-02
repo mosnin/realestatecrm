@@ -4,9 +4,14 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { sendTourConfirmation, type TourEmailData } from '@/lib/tour-emails';
 import { notifyNewTour } from '@/lib/notify';
 import { sendSMS, tourConfirmationSMS } from '@/lib/sms';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 /** Public endpoint — guests book a tour without authentication. */
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const { allowed } = await checkRateLimit(`book:rl:${ip}`, 10, 3600);
+  if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+
   const body = await req.json();
   const { slug, guestName, guestEmail, guestPhone, propertyAddress, notes, startsAt, propertyProfileId } = body;
 

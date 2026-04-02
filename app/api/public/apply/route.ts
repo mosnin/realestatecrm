@@ -95,7 +95,10 @@ export async function POST(req: NextRequest) {
         return phoneMatch || emailMatch;
       });
 
-      if (duplicate) {
+      // Generate a unique application reference for the status page
+    const applicationRef = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+
+    if (duplicate) {
         return NextResponse.json(
           {
             success: true,
@@ -142,9 +145,6 @@ export async function POST(req: NextRequest) {
     if (payload.employmentStatus) noteParts.push(`Employment: ${payload.employmentStatus}`);
     if (payload.monthlyGrossIncome != null) noteParts.push(`Income: $${payload.monthlyGrossIncome}/mo`);
     if (payload.additionalNotes) noteParts.push(payload.additionalNotes);
-
-    // Generate a unique application reference for the status page
-    const applicationRef = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
 
     const { data: contacts, error: insertError } = await supabase
       .from('Contact')

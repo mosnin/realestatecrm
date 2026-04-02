@@ -74,8 +74,8 @@ export default async function ClientDetailPage({
             address: row.Deal.address,
             value: row.Deal.value,
             stage: {
-              name: row.Deal.DealStage.name,
-              color: row.Deal.DealStage.color,
+              name: row.Deal.DealStage?.name ?? 'Unknown',
+              color: row.Deal.DealStage?.color ?? '#94a3b8',
             },
           },
         })),

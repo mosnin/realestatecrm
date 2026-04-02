@@ -130,6 +130,8 @@ export async function POST(req: NextRequest) {
         return phoneMatch || emailMatch;
       });
 
+    const applicationRef = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+
       if (duplicate) {
         return NextResponse.json(
           {
@@ -179,8 +181,6 @@ export async function POST(req: NextRequest) {
     if (payload.employmentStatus) noteParts.push(`Employment: ${payload.employmentStatus}`);
     if (payload.monthlyGrossIncome != null) noteParts.push(`Income: $${payload.monthlyGrossIncome}/mo`);
     if (payload.additionalNotes) noteParts.push(payload.additionalNotes);
-
-    const applicationRef = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
 
     // ── Create Contact in the broker's space ───────────────────────────────
     const { data: contacts, error: insertError } = await supabase
