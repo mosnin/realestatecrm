@@ -58,23 +58,8 @@ export default async function BrokerLeadsPage() {
   const allMembers = await getBrokerageMembers(brokerage.id, { includeSpaceName: true });
   const memberSpaceIds = allMembers.map((m) => m.Space?.id).filter(Boolean) as string[];
 
-  const { data: memberUnassignedRaw } = memberSpaceIds.length > 0
-    ? await supabase
-        .from('Contact')
-        .select('id, name, email, phone, budget, scoreLabel, leadScore, leadType, tags, createdAt, notes, applicationData')
-        .in('spaceId', memberSpaceIds)
-        .is('brokerageId', null)
-        .order('createdAt', { ascending: false })
-        .limit(200)
-    : { data: [] };
-  const memberUnassigned = (memberUnassignedRaw ?? []).filter((c: any) => !(c.tags ?? []).includes('assigned'));
-
-  // Merge: brokerage leads first, then member leads
-  const seenIds = new Set((brokerageUnassigned ?? []).map((c: any) => c.id));
-  const unassignedRaw = [
-    ...(brokerageUnassigned ?? []),
-    ...(memberUnassigned ?? []).filter((c: any) => !seenIds.has(c.id)),
-  ];
+  // Brokerage leads list should only include leads captured via brokerage intake.
+  const unassignedRaw = brokerageUnassigned ?? [];
 
   const assignedRaw = brokerageAssigned ?? [];
   const members = allMembers.filter((m) => m.role === 'realtor_member');
