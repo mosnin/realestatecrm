@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireBroker } from '@/lib/permissions';
+import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { getSpaceByOwnerId } from '@/lib/space';
 import { z } from 'zod';
@@ -62,10 +62,8 @@ function parseTemplates(content: string): Template[] {
  * GET /api/broker/templates — list all templates
  */
 export async function GET() {
-  let ctx;
-  try {
-    ctx = await requireBroker();
-  } catch {
+  const ctx = await getBrokerMemberContext();
+  if (!ctx) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -89,10 +87,8 @@ export async function GET() {
  * POST /api/broker/templates — create a new template
  */
 export async function POST(req: NextRequest) {
-  let ctx;
-  try {
-    ctx = await requireBroker();
-  } catch {
+  const ctx = await getBrokerMemberContext();
+  if (!ctx) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -147,10 +143,8 @@ export async function POST(req: NextRequest) {
  * PATCH /api/broker/templates — update a template
  */
 export async function PATCH(req: NextRequest) {
-  let ctx;
-  try {
-    ctx = await requireBroker();
-  } catch {
+  const ctx = await getBrokerMemberContext();
+  if (!ctx) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -207,10 +201,8 @@ export async function PATCH(req: NextRequest) {
  * DELETE /api/broker/templates — delete a template by id (query param)
  */
 export async function DELETE(req: NextRequest) {
-  let ctx;
-  try {
-    ctx = await requireBroker();
-  } catch {
+  const ctx = await getBrokerMemberContext();
+  if (!ctx) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

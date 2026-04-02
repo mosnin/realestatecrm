@@ -74,33 +74,52 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (existing) return NextResponse.json({ error: 'You already own a brokerage' }, { status: 409 });
 
-  // Atomic creation: brokerage + owner membership in one transaction
-  const { data: brokerageId, error: rpcError } = await supabase.rpc('create_brokerage_with_owner', {
-    p_name: trimmedName,
-    p_owner_id: user.id,
-    p_logo_url: logoUrl ? String(logoUrl).slice(0, 500) : null,
-    p_website_url: websiteUrl ? String(websiteUrl).slice(0, 500) : null,
-    p_office_address: officeAddress ? String(officeAddress).slice(0, 500) : null,
-    p_office_phone: officePhone ? String(officePhone).slice(0, 40) : null,
-    p_agent_count: agentCount ? String(agentCount).slice(0, 20) : null,
-    p_brokerage_type: brokerageType || null,
-    p_primary_market: primaryMarket || null,
-    p_commission_structure: commissionStructure || null,
-    p_geographic_coverage: geographicCoverage ? String(geographicCoverage).slice(0, 500) : null,
-  });
-  if (rpcError || !brokerageId) {
-    console.error('[broker/create] rpc failed', rpcError);
+  // Direct inserts instead of RPC — avoids ambiguous function overload issues
+  // when multiple versions of create_brokerage_with_owner exist in the database.
+  const brokerageId = crypto.randomUUID();
+
+  const { data: brokerage, error: insertErr } = await supabase
+    .from('Brokerage')
+    .insert({
+      id: brokerageId,
+      name: trimmedName,
+      ownerId: user.id,
+      ...(logoUrl && { logoUrl: String(logoUrl).slice(0, 500) }),
+      ...(websiteUrl && { websiteUrl: String(websiteUrl).slice(0, 500) }),
+      ...(officeAddress && { officeAddress: String(officeAddress).slice(0, 500) }),
+      ...(officePhone && { officePhone: String(officePhone).slice(0, 40) }),
+      ...(agentCount && { agentCount: String(agentCount).slice(0, 20) }),
+      ...(brokerageType && { brokerageType }),
+      ...(primaryMarket && { primaryMarket }),
+      ...(commissionStructure && { commissionStructure }),
+      ...(geographicCoverage && { geographicCoverage: String(geographicCoverage).slice(0, 500) }),
+    })
+    .select()
+    .single();
+
+  if (insertErr) {
+    // Check if user already owns a brokerage (race condition with unique index)
+    const errMsg = insertErr.message || '';
+    if (errMsg.includes('duplicate key') || errMsg.includes('unique') || insertErr.code === '23505') {
+      return NextResponse.json({ error: 'You already own a brokerage' }, { status: 409 });
+    }
+    console.error('[broker/create] Brokerage insert failed:', insertErr);
     return NextResponse.json({ error: 'Failed to create brokerage' }, { status: 500 });
   }
 
-  const { data: brokerage, error: fetchErr } = await supabase
-    .from('Brokerage')
-    .select('*')
-    .eq('id', brokerageId)
-    .single();
-  if (fetchErr) {
-    console.error('[broker/create] fetch failed', fetchErr);
-    return NextResponse.json({ error: 'Brokerage created but failed to fetch details' }, { status: 500 });
+  // Create the owner membership
+  const { error: membershipErr } = await supabase
+    .from('BrokerageMembership')
+    .insert({
+      id: crypto.randomUUID(),
+      brokerageId,
+      userId: user.id,
+      role: 'broker_owner',
+    });
+
+  if (membershipErr) {
+    console.error('[broker/create] BrokerageMembership insert failed:', membershipErr);
+    // Brokerage was created — don't fail the whole flow for membership
   }
 
   void audit({ actorClerkId: clerkId, action: 'CREATE', resource: 'Brokerage', resourceId: brokerageId, metadata: { name: trimmedName } });

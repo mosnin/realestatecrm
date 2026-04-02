@@ -1,4 +1,4 @@
-import { requireBroker } from '@/lib/permissions';
+import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { TeamChatClient } from './team-chat-client';
@@ -8,10 +8,8 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = { title: 'Team Chat — Broker Dashboard' };
 
 export default async function TeamChatPage() {
-  let ctx;
-  try {
-    ctx = await requireBroker();
-  } catch {
+  const ctx = await getBrokerMemberContext();
+  if (!ctx) {
     redirect('/');
   }
 
