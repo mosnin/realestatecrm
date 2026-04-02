@@ -178,16 +178,19 @@ function NavItem({
       {isActive && (
         <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-primary" />
       )}
-      <Icon
-        size={16}
-        className={cn(
-          'flex-shrink-0 transition-colors',
-          isActive
-            ? 'text-primary'
-            : 'text-muted-foreground/60 group-hover:text-foreground',
-          isAI && !isActive && 'text-primary/50',
-        )}
-      />
+      {isAI ? (
+        <img src="/chip-avatar.png" alt="Chip" className="w-4 h-4 rounded-full flex-shrink-0" />
+      ) : (
+        <Icon
+          size={16}
+          className={cn(
+            'flex-shrink-0 transition-colors',
+            isActive
+              ? 'text-primary'
+              : 'text-muted-foreground/60 group-hover:text-foreground',
+          )}
+        />
+      )}
       <span className={cn('flex-1 truncate', isAI && !isActive && 'text-foreground/80')}>
         {label}
       </span>

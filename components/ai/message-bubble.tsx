@@ -111,7 +111,8 @@ export function MessageBubble({ role, content, onAction }: MessageBubbleProps) {
 
   if (!hasActions) {
     return (
-      <div className="flex justify-start">
+      <div className="flex justify-start gap-2">
+        <img src="/chip-avatar.png" alt="Chip" className="w-6 h-6 rounded-full flex-shrink-0 mt-1" />
         <div className="max-w-[85%] rounded-lg px-4 py-3 text-sm whitespace-pre-wrap bg-muted text-foreground rounded-bl-sm">
           {renderMarkdown(content)}
         </div>
@@ -120,7 +121,8 @@ export function MessageBubble({ role, content, onAction }: MessageBubbleProps) {
   }
 
   return (
-    <div className="flex justify-start">
+    <div className="flex justify-start gap-2">
+      <img src="/chip-avatar.png" alt="Chip" className="w-6 h-6 rounded-full flex-shrink-0 mt-1" />
       <div className="max-w-[85%]">
         {parts.map((part, i) =>
           part.type === 'text' ? (
