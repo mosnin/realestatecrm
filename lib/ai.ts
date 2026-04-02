@@ -255,14 +255,22 @@ export async function chatWithRAG(
         }
       });
     } catch (error: any) {
-      // Log full error server-side; never return internal details (API key snippets, rate limit info) to the client
-      console.error('[ai] OpenAI provider error', error?.message ?? error);
+      console.error('[ai] OpenAI provider error:', {
+        message: error?.message,
+        status: error?.status,
+        code: error?.code,
+        type: error?.type,
+      });
       if (!looksLikeAnthropicKey(anthropicKey)) {
         const hint = error?.status === 401
-          ? 'The OpenAI API key appears to be invalid. Check Settings → AI or your OPENAI_API_KEY environment variable.'
+          ? 'The OpenAI API key appears to be invalid. Check your OPENAI_API_KEY environment variable.'
+          : error?.status === 429
+          ? 'AI rate limit reached. Please wait a moment and try again.'
           : error?.status === 404
-          ? 'The OpenAI model was not found. The API key may not have access to the configured model.'
-          : 'AI provider is temporarily unavailable. Please try again in a moment.';
+          ? 'The AI model was not found. Your API key may not have access to gpt-5.4-mini.'
+          : error?.status === 500 || error?.status === 503
+          ? 'OpenAI is experiencing issues. Please try again in a moment.'
+          : `AI service error (${error?.status ?? 'unknown'}). Please try again.`;
         return textStream(hint);
       }
       // Fall through to Anthropic
