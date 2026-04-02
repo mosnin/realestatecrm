@@ -512,6 +512,12 @@ export function Sidebar({
       ],
     },
     {
+      label: 'Brokerage',
+      items: [
+        { href: `${base}/settings/brokerage`, label: 'Brokerage Invites', icon: Building2, exact: false },
+      ],
+    },
+    {
       label: 'Account',
       items: [
         { href: `${base}/billing`, label: 'Billing', icon: CreditCard, exact: false },

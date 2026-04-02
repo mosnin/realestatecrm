@@ -34,7 +34,8 @@ export function MembersRoleFilter({
     return new Set(
       members
         .filter((m) => {
-          if (activeTab !== 'all' && m.role !== activeTab) return false;
+          if (activeTab === 'broker_admin' && m.role !== 'broker_admin' && m.role !== 'broker_owner') return false;
+          if (activeTab !== 'all' && activeTab !== 'broker_admin' && m.role !== activeTab) return false;
           if (q) {
             return (
               (m.name ?? '').toLowerCase().includes(q) ||
