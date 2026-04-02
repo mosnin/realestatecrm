@@ -236,7 +236,7 @@ export async function chatWithRAG(
     try {
       const openai = new OpenAI({ apiKey: openAIKey });
       const stream = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5.4-mini',
         temperature: 0.2,
         stream: true,
         messages: [
