@@ -13,7 +13,10 @@ export default async function SignUpPage({
   const { intent, redirect_url } = await searchParams;
   const isBroker = intent === 'broker';
   const redirectIntent = isBroker ? 'broker' : 'realtor';
-  const signInUrl = isBroker ? '/login/broker' : '/login/realtor';
+  const signInBase = isBroker ? '/login/broker' : '/login/realtor';
+  const signInUrl = redirect_url?.startsWith('/invite/')
+    ? `${signInBase}?redirect_url=${encodeURIComponent(redirect_url)}`
+    : signInBase;
 
   // If there's a safe redirect_url (e.g. from an invitation link), honour it after sign-up.
   const postSignUpUrl = redirect_url?.startsWith('/invite/')

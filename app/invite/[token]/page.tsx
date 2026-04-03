@@ -25,7 +25,7 @@ export default async function AcceptInvitationPage({ params }: Params) {
   // Auth: must be signed in to accept
   const { userId } = await auth();
   if (!userId) {
-    redirect(`/login/realtor?redirect_url=/invite/${token}`);
+    redirect(`/sign-up?redirect_url=${encodeURIComponent(`/invite/${token}`)}`);
   }
 
   // Fetch invitation directly from DB (avoids server-to-server HTTP which can fail on Vercel)
