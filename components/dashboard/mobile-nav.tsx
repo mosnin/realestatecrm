@@ -4,15 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { mobileNavItems } from '@/lib/nav-items';
-import { LayoutDashboard, UserCircle, Users, Mail, Settings, Briefcase, Building2, PhoneIncoming, Trophy } from 'lucide-react';
+import { LayoutDashboard, UserCircle, Users, Briefcase, Building2, PhoneIncoming } from 'lucide-react';
 
 const brokerMobileItems = [
   { href: '/broker', label: 'Team', icon: LayoutDashboard, exact: true },
   { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false },
   { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
-  { href: '/broker/leaderboard', label: 'Board', icon: Trophy, exact: false },
   { href: '/broker/members', label: 'Members', icon: Users, exact: false },
-  { href: '/broker/settings', label: 'Settings', icon: Settings, exact: false },
 ];
 
 interface MobileNavProps {

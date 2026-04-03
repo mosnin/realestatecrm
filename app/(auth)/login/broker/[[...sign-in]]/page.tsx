@@ -5,7 +5,20 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Broker Sign In — Chippi' };
 
-export default function BrokerSignInPage() {
+export default async function BrokerSignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect_url?: string }>;
+}) {
+  const { redirect_url } = await searchParams;
+  const safeInviteRedirect = redirect_url?.startsWith('/invite/')
+    ? redirect_url
+    : null;
+  const postSignInUrl = safeInviteRedirect ?? '/auth/redirect?intent=broker';
+  const signUpUrl = safeInviteRedirect
+    ? `/sign-up?intent=broker&redirect_url=${encodeURIComponent(safeInviteRedirect)}`
+    : '/sign-up?intent=broker';
+
   return (
     <AuthPageLayout
       variant="broker"
@@ -16,13 +29,13 @@ export default function BrokerSignInPage() {
         <ThemedSignIn
           routing="path"
           path="/login/broker"
-          forceRedirectUrl="/auth/redirect?intent=broker"
-          signUpUrl="/sign-up?intent=broker"
+          forceRedirectUrl={postSignInUrl}
+          signUpUrl={signUpUrl}
         />
         <p className="text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{' '}
           <Link
-            href="/sign-up?intent=broker"
+            href={signUpUrl}
             className="font-medium text-primary underline underline-offset-4 hover:text-primary/80 transition-colors"
           >
             Sign up

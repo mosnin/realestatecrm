@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
-import { getSpaceByOwnerId } from '@/lib/space';
 import { scoreLeadApplication } from '@/lib/lead-scoring';
 import type { LeadScoringResult } from '@/lib/lead-scoring';
 import type { Contact } from '@/lib/types';
@@ -11,7 +10,7 @@ import {
   normalizePhone,
   publicApplicationSchema,
 } from '@/lib/public-application';
-import { notifyNewLead } from '@/lib/notify';
+import { notifyBroker } from '@/lib/broker-notify';
 import { sendApplicationConfirmation } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
@@ -107,9 +106,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Brokerage is not accepting applications' }, { status: 403 });
     }
 
-    // ── Find the broker owner's Space ──────────────────────────────────────
-    // The brokerage.ownerId is the DB User.id of the broker_owner.
-    const space = await getSpaceByOwnerId(brokerage.ownerId);
+    // ── Find the brokerage-linked Space owned by the broker owner ──────────
+    // Prefer explicit brokerage linkage. For legacy data where brokerageId
+    // has not been backfilled yet, allow a safe fallback ONLY when the owner
+    // has exactly one space.
+    let space: { id: string; slug: string; name: string; ownerId: string; brokerageId: string | null } | null = null;
+
+    const { data: linkedSpace, error: spaceError } = await supabase
+      .from('Space')
+      .select('id, slug, name, ownerId, brokerageId')
+      .eq('ownerId', brokerage.ownerId)
+      .eq('brokerageId', brokerage.id)
+      .limit(1)
+      .maybeSingle();
+    if (spaceError) throw spaceError;
+    space = linkedSpace;
+
+    if (!space) {
+      const { data: ownerSpaces, error: ownerSpacesError } = await supabase
+        .from('Space')
+        .select('id, slug, name, ownerId, brokerageId')
+        .eq('ownerId', brokerage.ownerId)
+        .order('createdAt', { ascending: true })
+        .limit(2);
+      if (ownerSpacesError) throw ownerSpacesError;
+      const fallbackSpace = ownerSpaces?.[0] ?? null;
+      if ((ownerSpaces ?? []).length === 1 && fallbackSpace) {
+        space = fallbackSpace;
+        console.warn('[apply/brokerage] using legacy owner-only space fallback', {
+          brokerageId: brokerage.id,
+          ownerId: brokerage.ownerId,
+          spaceId: space.id,
+        });
+      }
+    }
+
     if (!space) {
       console.error('[apply/brokerage] broker owner has no space', {
         brokerageId: brokerage.id,
@@ -320,21 +351,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Send broker notification + applicant confirmation email in parallel
+    // Send brokerage dashboard notification + applicant confirmation email in parallel
     const businessName = spaceBusinessName || brokerage.name || space.name;
 
-    const brokerNotification = notifyNewLead({
-      spaceId: space.id,
-      contactId: contact.id,
-      name: payload.legalName,
-      phone: payload.phone,
-      email: payload.email,
-      leadScore: scoring.leadScore,
-      scoreLabel: scoring.scoreLabel,
-      scoreSummary: scoring.scoreSummary,
-      applicationData,
+    const brokerNotification = notifyBroker({
+      brokerageId: brokerage.id,
+      type: 'lead_hot',
+      title: `New brokerage lead: ${payload.legalName}`,
+      body: payload.phone ?? payload.email ?? 'New application submitted',
+      metadata: {
+        contactId: contact.id,
+        leadScore: scoring.leadScore,
+        scoreLabel: scoring.scoreLabel,
+        source: 'brokerage-intake',
+      },
     }).catch((err) => {
-      console.error('[apply/brokerage] broker notification failed', { contactId: contact.id, err });
+      console.error('[apply/brokerage] brokerage notification failed', { contactId: contact.id, err });
     });
 
     const applicantConfirmation = payload.email
