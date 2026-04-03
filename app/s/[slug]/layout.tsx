@@ -229,7 +229,7 @@ export default async function DashboardLayout({
           {children}
           <DashboardFooter />
         </main>
-        <FloatingChatWidget />
+        <FloatingChatWidget slug={slug} />
       </div>
       <MobileNav slug={slug} isBroker={isBroker} />
     </div>
