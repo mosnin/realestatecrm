@@ -34,6 +34,19 @@ export default async function AuthRedirectPage({
     redirect('/setup');
   }
 
+  // If user already has broker-level membership, always route to /broker.
+  // This prevents invited broker_admin users from being pushed into setup/paywall
+  // when they authenticate through non-broker entry points.
+  const { data: brokerMembership } = await supabase
+    .from('BrokerageMembership')
+    .select('id')
+    .eq('userId', user.id)
+    .in('role', ['broker_owner', 'broker_admin'])
+    .maybeSingle();
+  if (brokerMembership) {
+    redirect('/broker');
+  }
+
   // Broker-only users always go to /broker
   if (user.accountType === 'broker_only') {
     redirect('/broker');

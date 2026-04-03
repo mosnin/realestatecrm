@@ -144,7 +144,7 @@ export async function POST(_req: Request, { params }: Params) {
   if (existingMembership) {
     // Mark accepted and return OK
     await supabase.from('Invitation').update({ status: 'accepted' }).eq('id', inv.id);
-    return NextResponse.json({ message: 'Already a member' }, { status: 200 });
+    return NextResponse.json({ message: 'Already a member', roleToAssign: inv.roleToAssign }, { status: 200 });
   }
 
   // Create membership

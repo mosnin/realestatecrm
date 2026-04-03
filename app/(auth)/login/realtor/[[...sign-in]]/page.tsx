@@ -35,7 +35,7 @@ export default async function RealtorSignInPage({
         <p className="text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{' '}
           <Link
-            href="/sign-up"
+            href={signUpUrl}
             className="font-medium text-primary underline underline-offset-4 hover:text-primary/80 transition-colors"
           >
             Sign up
