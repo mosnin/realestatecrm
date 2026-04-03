@@ -3,7 +3,6 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ChatInterface } from '@/components/ai/chat-interface';
-import { FloatingChatWidget } from '@/components/ui/floating-chat-widget-shadcnui';
 import type { Conversation } from '@/lib/types';
 
 export default async function AIPage({
@@ -60,7 +59,6 @@ export default async function AIPage({
         initialConversations={conversations}
         initialConversationId={initialConversationId}
       />
-      <FloatingChatWidget />
     </div>
   );
 }

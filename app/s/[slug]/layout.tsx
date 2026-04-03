@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 import { getBrokerContext } from '@/lib/permissions';
 import { LiveNotifications } from '@/components/dashboard/live-notifications';
+import { FloatingChatWidget } from '@/components/ui/floating-chat-widget-shadcnui';
 
 
 export default async function DashboardLayout({
@@ -228,6 +229,7 @@ export default async function DashboardLayout({
           {children}
           <DashboardFooter />
         </main>
+        <FloatingChatWidget />
       </div>
       <MobileNav slug={slug} isBroker={isBroker} />
     </div>
