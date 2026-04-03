@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { VoiceMode } from './voice-mode';
 import type { Conversation } from '@/lib/types';
 import type { CRMAction, ActionResult } from './action-card';
+import { useUser } from '@clerk/nextjs';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -32,6 +33,7 @@ export function ChatInterface({
   initialConversations,
   initialConversationId,
 }: ChatInterfaceProps) {
+  const { user } = useUser();
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(initialConversationId);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -295,6 +297,7 @@ export function ChatInterface({
   }, [slug, activeConversationId]);
 
   const atLimit = messages.length >= MESSAGE_LIMIT;
+  const userAvatarUrl = user?.imageUrl ?? null;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -419,7 +422,14 @@ export function ChatInterface({
               {messages.map((msg, i) =>
                 // Skip empty assistant placeholder — typing dots render below
                 msg.role === 'assistant' && !msg.content ? null : (
-                  <MessageBubble key={i} role={msg.role} content={msg.content} onAction={handleAction} />
+                  <MessageBubble
+                    key={i}
+                    role={msg.role}
+                    content={msg.content}
+                    onAction={handleAction}
+                    userAvatarUrl={userAvatarUrl}
+                    assistantAvatarUrl="/chip-avatar.png"
+                  />
                 )
               )}
               {isStreaming && (!messages[messages.length - 1]?.content) && (

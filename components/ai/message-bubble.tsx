@@ -6,14 +6,9 @@ interface MessageBubbleProps {
   role: 'user' | 'assistant';
   content: string;
   onAction?: (action: CRMAction) => Promise<ActionResult>;
+  userAvatarUrl?: string | null;
+  assistantAvatarUrl?: string;
 }
-
-// Match both <<ACTION>>...json...<</ACTION>> and <<ACTION>>...json...</ACTION>
-// LLMs may output either format despite being told the double-bracket version.
-const ACTION_REGEX = /<<ACTION>>([\s\S]*?)(?:<{2}\/ACTION>>|<\/ACTION>>?)/g;
-
-// Match already-applied actions (persisted after approval)
-const APPLIED_REGEX = /<<APPLIED>>([\s\S]*?)(?:<{2}\/APPLIED>>|<\/APPLIED>>?)/g;
 
 // Combined regex to match both ACTION and APPLIED blocks
 const BLOCK_REGEX = /<<(ACTION|APPLIED)>>([\s\S]*?)(?:<{2}\/\1>>|<\/\1>>?)/g;
@@ -93,15 +88,28 @@ function parseContent(content: string): ParsedPart[] {
   return parts;
 }
 
-export function MessageBubble({ role, content, onAction }: MessageBubbleProps) {
+export function MessageBubble({ role, content, onAction, userAvatarUrl, assistantAvatarUrl }: MessageBubbleProps) {
   const isUser = role === 'user';
+  const userAvatarSrc = userAvatarUrl ?? null;
+  const assistantAvatarSrc = assistantAvatarUrl ?? '/chip-avatar.png';
+
+  const Avatar = ({ src, alt, fallback }: { src?: string | null; alt: string; fallback: string }) => (
+    <div className="w-8 h-8 rounded-full overflow-hidden bg-muted flex items-center justify-center text-[10px] font-semibold text-muted-foreground flex-shrink-0 mt-1">
+      {src ? (
+        <img src={src} alt={alt} className="w-full h-full object-cover" />
+      ) : (
+        <span>{fallback}</span>
+      )}
+    </div>
+  );
 
   if (isUser) {
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-lg px-4 py-3 text-sm whitespace-pre-wrap bg-primary text-primary-foreground rounded-br-sm">
+      <div className="flex justify-end gap-2">
+        <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap bg-primary text-primary-foreground rounded-br-md shadow-sm">
           {content}
         </div>
+        <Avatar src={userAvatarSrc} alt="You" fallback="You" />
       </div>
     );
   }
@@ -112,8 +120,8 @@ export function MessageBubble({ role, content, onAction }: MessageBubbleProps) {
   if (!hasActions) {
     return (
       <div className="flex justify-start gap-2">
-        <img src="/chip-avatar.png" alt="Chip" className="w-6 h-6 rounded-full flex-shrink-0 mt-1" />
-        <div className="max-w-[85%] rounded-lg px-4 py-3 text-sm whitespace-pre-wrap bg-muted text-foreground rounded-bl-sm">
+        <Avatar src={assistantAvatarSrc} alt="Chip" fallback="AI" />
+        <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap bg-muted text-foreground rounded-bl-md border border-border/50">
           {renderMarkdown(content)}
         </div>
       </div>
@@ -122,12 +130,12 @@ export function MessageBubble({ role, content, onAction }: MessageBubbleProps) {
 
   return (
     <div className="flex justify-start gap-2">
-      <img src="/chip-avatar.png" alt="Chip" className="w-6 h-6 rounded-full flex-shrink-0 mt-1" />
-      <div className="max-w-[85%]">
+      <Avatar src={assistantAvatarSrc} alt="Chip" fallback="AI" />
+      <div className="max-w-[85%] space-y-2">
         {parts.map((part, i) =>
           part.type === 'text' ? (
             part.value.trim() ? (
-              <div key={i} className="rounded-lg px-4 py-3 text-sm whitespace-pre-wrap bg-muted text-foreground rounded-bl-sm">
+              <div key={i} className="rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap bg-muted text-foreground rounded-bl-md border border-border/50">
                 {renderMarkdown(part.value.trim())}
               </div>
             ) : null
