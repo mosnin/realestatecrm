@@ -27,6 +27,17 @@ interface ChatInterfaceProps {
 
 const MESSAGE_LIMIT = 50;
 
+
+function sanitizeMessages(input: Array<{ role: string; content: string }>): Message[] {
+  return input
+    .map((m) => {
+      const role = m.role === 'assistant' ? 'assistant' : m.role === 'user' ? 'user' : null;
+      if (!role) return null;
+      return { role, content: typeof m.content === 'string' ? m.content : String(m.content ?? '') };
+    })
+    .filter((m): m is Message => Boolean(m));
+}
+
 export function ChatInterface({
   slug,
   initialMessages,
@@ -55,7 +66,7 @@ export function ChatInterface({
       const res = await fetch(`/api/ai/messages?conversationId=${conversationId}`);
       if (res.ok) {
         const data = await res.json();
-        setMessages(data.map((m: any) => ({ role: m.role, content: m.content })));
+        setMessages(sanitizeMessages(data));
       }
     } finally {
       setLoadingMessages(false);
@@ -203,7 +214,7 @@ export function ChatInterface({
     }
 
     // Send fullMessage (with referencing prefix) to the API for context
-    const apiMessages: Message[] = [...messages, { role: 'user', content: fullMessage }];
+    const apiMessages: Message[] = sanitizeMessages([...messages, { role: 'user', content: fullMessage }]);
 
     try {
       const res = await fetch('/api/ai/chat', {

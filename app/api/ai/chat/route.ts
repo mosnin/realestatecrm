@@ -6,6 +6,21 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import type { SpaceSetting } from '@/lib/types';
 
+
+function sanitizeIncomingMessages(raw: any[]): Array<{ role: 'user' | 'assistant'; content: string }> {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((m) => {
+      const role = m?.role === 'assistant' ? 'assistant' : m?.role === 'user' ? 'user' : null;
+      if (!role) return null;
+      return {
+        role,
+        content: typeof m?.content === 'string' ? m.content : String(m?.content ?? ''),
+      };
+    })
+    .filter((m): m is { role: 'user' | 'assistant'; content: string } => Boolean(m));
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth();
@@ -17,7 +32,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'AI chat rate limit exceeded. Please wait before sending more messages.' }, { status: 429 });
     }
 
-    const { messages, slug, conversationId } = await req.json();
+    const { messages: rawMessages, slug, conversationId } = await req.json();
+    const messages = sanitizeIncomingMessages(rawMessages);
 
     const space = await getSpaceFromSlug(slug);
     if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
