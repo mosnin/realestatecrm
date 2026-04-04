@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { ChatInterface } from '@/components/ai/chat-interface';
@@ -24,6 +24,18 @@ export function FloatingChatWidget({ slug }: FloatingChatWidgetProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [initialMessages, setInitialMessages] = useState<ChatMessage[]>([]);
   const [initialConversationId, setInitialConversationId] = useState<string | null>(null);
+
+  // When the workspace slug changes, clear cached chat session state so
+  // we never reuse a conversationId from a different space.
+  useEffect(() => {
+    setIsOpen(false);
+    setLoading(false);
+    setBootstrapped(false);
+    setSessionKey((k) => k + 1);
+    setConversations([]);
+    setInitialMessages([]);
+    setInitialConversationId(null);
+  }, [slug]);
 
   const hydrateChat = useCallback(async () => {
     setLoading(true);
