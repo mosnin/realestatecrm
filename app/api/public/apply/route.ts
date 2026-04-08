@@ -213,6 +213,7 @@ export async function POST(req: NextRequest) {
     try {
       const rawConfig = await fetchFormConfig(space.id, space.brokerageId);
       if (rawConfig) {
+        // Re-validate the stored config to guard against corrupt data
         formConfig = formConfigSchema.parse(rawConfig);
       }
     } catch (err) {
