@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     const parsed = batchSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Invalid event data', issues: parsed.error.issues },
+        { error: 'Invalid event data' },
         { status: 400 },
       );
     }
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     const parsed = eventSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Invalid event data', issues: parsed.error.issues },
+        { error: 'Invalid event data' },
         { status: 400 },
       );
     }
@@ -82,7 +82,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Rate limit: 60 events per session per hour
-  const sessionId = events[0].sessionId;
+  // Truncate sessionId for rate limit key to prevent key-length manipulation
+  const sessionId = events[0].sessionId.slice(0, 64);
   const { allowed } = await checkRateLimit(
     `form-analytics:rl:${sessionId}`,
     60,

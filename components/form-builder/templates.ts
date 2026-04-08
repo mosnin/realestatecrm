@@ -155,7 +155,16 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
           label: "What's your current work situation?",
           required: true,
           position: 0,
-          scoring: { weight: 5 },
+          scoring: {
+            weight: 5,
+            mappings: [
+              { value: 'full-time', points: 10 },
+              { value: 'self-employed', points: 8 },
+              { value: 'part-time', points: 5 },
+              { value: 'student', points: 3 },
+              { value: 'not-employed', points: 1 },
+            ],
+          },
           options: [
             { value: 'full-time', label: 'Full-time employed' },
             { value: 'self-employed', label: 'Self-employed' },
@@ -226,7 +235,14 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
           label: 'If you find the right place, are you ready to move forward?',
           required: true,
           position: 0,
-          scoring: { weight: 9 },
+          scoring: {
+            weight: 9,
+            mappings: [
+              { value: 'ready', points: 10 },
+              { value: 'maybe', points: 5 },
+              { value: 'exploring', points: 2 },
+            ],
+          },
           options: [
             { value: 'ready', label: 'Yes, ready now', scoreValue: 10 },
             { value: 'maybe', label: 'Maybe', scoreValue: 5 },
@@ -315,7 +331,14 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
           label: 'Are you pre-approved for a mortgage?',
           required: false,
           position: 0,
-          scoring: { weight: 8 },
+          scoring: {
+            weight: 8,
+            mappings: [
+              { value: 'yes', points: 10 },
+              { value: 'not-yet', points: 4 },
+              { value: 'no', points: 2 },
+            ],
+          },
           options: [
             { value: 'yes', label: 'Yes' },
             { value: 'no', label: 'No' },

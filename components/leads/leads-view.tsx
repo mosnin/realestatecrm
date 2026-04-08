@@ -33,6 +33,8 @@ import {
   BedDouble,
   Bath,
   ShieldCheck,
+  Search,
+  ArrowUpDown,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
