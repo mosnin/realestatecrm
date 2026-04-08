@@ -11,7 +11,8 @@
 
 import { computeLeadScore } from '@/lib/scoring/engine';
 import { enhanceWithAI, deriveLeadState, deriveSummary, deriveExplanationTags } from '@/lib/scoring/enhance';
-import type { ApplicationData, LeadScoreDetails } from '@/lib/types';
+import { scoreDynamicApplication } from '@/lib/dynamic-lead-scoring';
+import type { ApplicationData, IntakeFormConfig, LeadScoreDetails } from '@/lib/types';
 
 export type LeadScoringResult = {
   scoringStatus: 'scored' | 'failed' | 'pending';
@@ -143,4 +144,58 @@ function failedResult(): LeadScoringResult {
     scoreSummary: 'Scoring unavailable right now. Lead saved successfully.',
     scoreDetails: null,
   };
+}
+
+/**
+ * Dynamic scoring entry point — routes to the appropriate scoring pipeline.
+ *
+ * If `formConfig` is provided, uses the new dynamic scoring pipeline
+ * that handles arbitrary form questions and scoring rules.
+ *
+ * If `formConfig` is null/undefined, falls back to the existing
+ * `scoreLeadApplication()` for legacy hardcoded forms.
+ */
+export async function scoreLeadApplicationDynamic(input: {
+  contactId: string;
+  formConfig: IntakeFormConfig | null;
+  answers?: Record<string, string | string[] | number | boolean>;
+  leadType?: 'rental' | 'buyer' | 'general';
+  // Legacy fields — used when formConfig is null
+  name?: string;
+  email?: string | null;
+  phone?: string;
+  budget?: number | null;
+  applicationData?: ApplicationData | null;
+}): Promise<LeadScoringResult> {
+  // Route to dynamic scoring when a form config is present
+  if (input.formConfig && input.answers) {
+    return scoreDynamicApplication({
+      contactId: input.contactId,
+      formConfig: input.formConfig,
+      answers: input.answers,
+      leadType: input.leadType ?? input.formConfig.leadType ?? 'rental',
+    });
+  }
+
+  // Fall back to legacy scoring for hardcoded forms
+  if (input.name && input.phone) {
+    return scoreLeadApplication({
+      contactId: input.contactId,
+      name: input.name,
+      email: input.email ?? null,
+      phone: input.phone,
+      budget: input.budget ?? null,
+      applicationData: input.applicationData ?? null,
+      leadType: (input.leadType === 'general' ? 'rental' : input.leadType) as 'rental' | 'buyer' | undefined,
+    });
+  }
+
+  // Cannot score without minimum required data
+  console.warn('[lead-scoring] scoreLeadApplicationDynamic called with insufficient data', {
+    contactId: input.contactId,
+    hasFormConfig: !!input.formConfig,
+    hasAnswers: !!input.answers,
+    hasName: !!input.name,
+  });
+  return failedResult();
 }

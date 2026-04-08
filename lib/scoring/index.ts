@@ -13,3 +13,8 @@
 export { computeLeadScore, DEFAULT_WEIGHTS, BUYER_WEIGHTS } from './engine';
 export type { ScoringEngineResult, ScoringInput, CategoryResult, ScoringWeights } from './engine';
 export { enhanceWithAI } from './enhance';
+
+// Dynamic form scoring
+export { computeDeterministicScore } from './deterministic-scorer';
+export type { DeterministicScoringResult, DeterministicBreakdownItem } from './deterministic-scorer';
+export { buildDynamicScoringPrompt, buildDynamicSystemPrompt } from './dynamic-prompt-builder';
