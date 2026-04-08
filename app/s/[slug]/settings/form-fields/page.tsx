@@ -36,8 +36,8 @@ export default function FormFieldsSettingsPage() {
         return r.json();
       })
       .then((data) => {
-        if (data && data.sections) {
-          setConfig(data as IntakeFormConfig);
+        if (data?.formConfig?.sections) {
+          setConfig(data.formConfig as IntakeFormConfig);
         }
       })
       .catch(() => {
@@ -64,7 +64,7 @@ export default function FormFieldsSettingsPage() {
       const res = await fetch('/api/form-config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, config }),
+        body: JSON.stringify({ slug, formConfig: config }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -82,8 +82,10 @@ export default function FormFieldsSettingsPage() {
   const handleReset = useCallback(async () => {
     if (!confirm('Are you sure you want to reset to default? This cannot be undone.')) return;
     try {
-      const res = await fetch(`/api/form-config?slug=${encodeURIComponent(slug)}`, {
+      const res = await fetch('/api/form-config', {
         method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
       });
       if (!res.ok) {
         throw new Error('Failed to reset form configuration.');

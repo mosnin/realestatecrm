@@ -44,8 +44,8 @@ export default function BrokerFormBuilderPage() {
         return r.json();
       })
       .then((data) => {
-        if (data && data.sections) {
-          setConfig(data as IntakeFormConfig);
+        if (data?.formConfig?.sections) {
+          setConfig(data.formConfig as IntakeFormConfig);
         }
       })
       .catch(() => {
@@ -72,7 +72,7 @@ export default function BrokerFormBuilderPage() {
       const res = await fetch('/api/broker/form-config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config }),
+        body: JSON.stringify({ formConfig: config }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -111,7 +111,7 @@ export default function BrokerFormBuilderPage() {
       const res = await fetch('/api/broker/form-config/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config }),
+        body: JSON.stringify({ formConfig: config }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
