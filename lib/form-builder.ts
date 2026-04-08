@@ -5,10 +5,12 @@ import type {
   FormQuestion,
 } from '@/lib/types';
 
-// ── Stable UUIDs for system fields (shared across all default configs) ──
-const SYSTEM_NAME_ID = '00000000-0000-4000-a000-000000000001';
-const SYSTEM_EMAIL_ID = '00000000-0000-4000-a000-000000000002';
-const SYSTEM_PHONE_ID = '00000000-0000-4000-a000-000000000003';
+// ── Stable IDs for system fields ──
+// These IDs MUST match the Zod schema superRefine check in form-config-schema.ts
+// which validates that system fields with ids 'name', 'email', 'phone' are present.
+const SYSTEM_NAME_ID = 'name';
+const SYSTEM_EMAIL_ID = 'email';
+const SYSTEM_PHONE_ID = 'phone';
 
 // ── System field generator ──
 
@@ -49,23 +51,49 @@ export function generateSystemFields(): FormQuestion[] {
 }
 
 // ── Default Rental Form Config ──
-// Maps the current hardcoded RENTAL_STEPS from application-form.tsx into IntakeFormConfig format
+// Maps the 10 hardcoded RENTAL_STEPS from application-form.tsx into IntakeFormConfig format
+// Step 1: Getting Started  |  Step 2: Basics  |  Step 3: Move Timing  |  Step 4: Location
+// Step 5: Budget  |  Step 6: Income  |  Step 7: Employment  |  Step 8: Household
+// Step 9: Additional Info  |  Step 10: Ready?
 
 export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
   version: 1,
   leadType: 'rental',
   sections: [
+    // ── Section 0 (Step 1): Getting Started ──
+    {
+      id: '10000000-0000-4000-a000-000000000000',
+      title: 'Getting Started',
+      description: 'What are you looking for?',
+      position: 0,
+      questions: [
+        {
+          id: '10000000-0000-4000-b000-000000000000',
+          type: 'radio',
+          label: 'Lead type',
+          required: true,
+          position: 0,
+          options: [
+            { value: 'rental', label: "I'm looking to rent" },
+            { value: 'buyer', label: "I'm looking to buy" },
+          ],
+          scoring: { weight: 0 },
+        },
+      ],
+    },
+    // ── Section 1 (Step 2): Basics ──
     {
       id: '10000000-0000-4000-a000-000000000001',
       title: "Let's start with the basics",
       description: 'We just need a few details to get going.',
-      position: 0,
+      position: 1,
       questions: generateSystemFields(),
     },
+    // ── Section 2 (Step 3): Move Timing ──
     {
       id: '10000000-0000-4000-a000-000000000002',
       title: 'When are you planning to move?',
-      position: 1,
+      position: 2,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000001',
@@ -91,10 +119,11 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
+    // ── Section 3 (Step 4): Location ──
     {
       id: '10000000-0000-4000-a000-000000000003',
       title: 'Where are you looking to live?',
-      position: 2,
+      position: 3,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000002',
@@ -107,10 +136,11 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
+    // ── Section 4 (Step 5): Budget ──
     {
       id: '10000000-0000-4000-a000-000000000004',
       title: "What's your monthly rent budget?",
-      position: 3,
+      position: 4,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000003',
@@ -138,10 +168,11 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
+    // ── Section 5 (Step 6): Income ──
     {
       id: '10000000-0000-4000-a000-000000000005',
       title: "What's your estimated monthly income?",
-      position: 4,
+      position: 5,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000004',
@@ -169,10 +200,11 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
+    // ── Section 6 (Step 7): Employment ──
     {
       id: '10000000-0000-4000-a000-000000000006',
       title: "What's your current work situation?",
-      position: 5,
+      position: 6,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000005',
@@ -200,10 +232,11 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
+    // ── Section 7 (Step 8): Household ──
     {
       id: '10000000-0000-4000-a000-000000000007',
       title: 'Tell us about your household',
-      position: 6,
+      position: 7,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000006',
@@ -229,11 +262,12 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
+    // ── Section 8 (Step 9): Additional Info ──
     {
       id: '10000000-0000-4000-a000-000000000008',
       title: 'Anything we should know?',
       description: 'This step is optional. Share anything that might help.',
-      position: 7,
+      position: 8,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000008',
@@ -247,10 +281,11 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
+    // ── Section 9 (Step 10): Ready? ──
     {
       id: '10000000-0000-4000-a000-000000000009',
       title: 'If you find the right place, are you ready to move forward?',
-      position: 8,
+      position: 9,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000009',
@@ -278,23 +313,49 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
 };
 
 // ── Default Buyer Form Config ──
-// Maps the current hardcoded BUYER_STEPS from application-form.tsx into IntakeFormConfig format
+// Maps the 9 hardcoded BUYER_STEPS from application-form.tsx into IntakeFormConfig format
+// Step 1: Getting Started  |  Step 2: Basics  |  Step 3: Budget
+// Step 4: Pre-Approval  |  Step 5: Property Type  |  Step 6: Must-Haves
+// Step 7: Timeline  |  Step 8: About You  |  Step 9: Ready?
 
 export const DEFAULT_BUYER_FORM_CONFIG: IntakeFormConfig = {
   version: 1,
   leadType: 'buyer',
   sections: [
+    // ── Section 0 (Step 1): Getting Started ──
+    {
+      id: '20000000-0000-4000-a000-000000000000',
+      title: 'Getting Started',
+      description: 'What are you looking for?',
+      position: 0,
+      questions: [
+        {
+          id: '20000000-0000-4000-b000-000000000000',
+          type: 'radio',
+          label: 'Lead type',
+          required: true,
+          position: 0,
+          options: [
+            { value: 'rental', label: "I'm looking to rent" },
+            { value: 'buyer', label: "I'm looking to buy" },
+          ],
+          scoring: { weight: 0 },
+        },
+      ],
+    },
+    // ── Section 1 (Step 2): Basics ──
     {
       id: '20000000-0000-4000-a000-000000000001',
       title: "Let's start with the basics",
       description: 'We just need a few details to get going.',
-      position: 0,
+      position: 1,
       questions: generateSystemFields(),
     },
+    // ── Section 2 (Step 3): Budget ──
     {
       id: '20000000-0000-4000-a000-000000000002',
       title: "What's your budget?",
-      position: 1,
+      position: 2,
       questions: [
         {
           id: '20000000-0000-4000-b000-000000000001',
@@ -324,10 +385,11 @@ export const DEFAULT_BUYER_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
+    // ── Section 3 (Step 4): Pre-Approval ──
     {
       id: '20000000-0000-4000-a000-000000000003',
       title: 'Are you pre-approved for a mortgage?',
-      position: 2,
+      position: 3,
       questions: [
         {
           id: '20000000-0000-4000-b000-000000000002',
@@ -379,10 +441,11 @@ export const DEFAULT_BUYER_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
+    // ── Section 4 (Step 5): Property Type ──
     {
       id: '20000000-0000-4000-a000-000000000004',
       title: 'What type of property are you looking for?',
-      position: 3,
+      position: 4,
       questions: [
         {
           id: '20000000-0000-4000-b000-000000000005',
@@ -428,11 +491,12 @@ export const DEFAULT_BUYER_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
+    // ── Section 5 (Step 6): Must-Haves ──
     {
       id: '20000000-0000-4000-a000-000000000005',
       title: 'Any must-haves?',
       description: 'Select all that apply.',
-      position: 4,
+      position: 5,
       questions: [
         {
           id: '20000000-0000-4000-b000-000000000008',
@@ -454,10 +518,11 @@ export const DEFAULT_BUYER_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
+    // ── Section 6 (Step 7): Timeline ──
     {
       id: '20000000-0000-4000-a000-000000000006',
       title: 'When do you want to close?',
-      position: 5,
+      position: 6,
       questions: [
         {
           id: '20000000-0000-4000-b000-000000000009',
@@ -483,10 +548,11 @@ export const DEFAULT_BUYER_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
+    // ── Section 7 (Step 8): About You ──
     {
       id: '20000000-0000-4000-a000-000000000007',
       title: 'Tell us about you',
-      position: 6,
+      position: 7,
       questions: [
         {
           id: '20000000-0000-4000-b000-000000000010',
@@ -516,10 +582,11 @@ export const DEFAULT_BUYER_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
+    // ── Section 8 (Step 9): Ready? ──
     {
       id: '20000000-0000-4000-a000-000000000008',
       title: 'If you find the right place, are you ready to move forward?',
-      position: 7,
+      position: 8,
       questions: [
         {
           id: '20000000-0000-4000-b000-000000000012',

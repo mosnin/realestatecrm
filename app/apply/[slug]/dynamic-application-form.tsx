@@ -11,6 +11,8 @@ import {
   ChevronRight,
   ChevronLeft,
   AlertTriangle,
+  Home,
+  Key,
 } from 'lucide-react';
 import type { IntakeFormConfig, FormSection, FormQuestion } from '@/lib/types';
 import type { IntakeCustomization } from './application-form';
@@ -203,6 +205,77 @@ function StepHeader({
       {description && (
         <p className="text-sm text-muted-foreground">{description}</p>
       )}
+    </div>
+  );
+}
+
+// ── Lead type selector (matches legacy form's two-card Getting Started step) ─
+
+/**
+ * Detect whether a question is a "lead type" selector.
+ * Convention: question.id === 'leadType', or it's a radio/select with
+ * options whose values include 'rental' and 'buyer'.
+ */
+function isLeadTypeQuestion(question: FormQuestion): boolean {
+  if (question.id === 'leadType') return true;
+  if (question.type !== 'radio' && question.type !== 'select') return false;
+  const values = (question.options ?? []).map((o) => o.value);
+  return values.includes('rental') && values.includes('buyer');
+}
+
+function LeadTypeSelector({
+  question,
+  value,
+  onChange,
+  error,
+  accentColor,
+}: {
+  question: FormQuestion;
+  value: string;
+  onChange: (val: string) => void;
+  error?: string;
+  accentColor: string;
+}) {
+  const options = question.options ?? [];
+  // Map known values to icons, fall back to generic
+  const iconMap: Record<string, typeof Home> = {
+    rental: Home,
+    buyer: Key,
+    buy: Key,
+  };
+
+  return (
+    <div className="space-y-3">
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      {options.map((option) => {
+        const Icon = iconMap[option.value] || Home;
+        const selected = value === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className={cn(
+              'w-full flex items-center gap-4 px-5 py-5 rounded-xl border-2 transition-all text-left',
+              selected
+                ? 'shadow-sm font-medium'
+                : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+            )}
+            style={
+              selected
+                ? { borderColor: accentColor, backgroundColor: `${accentColor}08` }
+                : undefined
+            }
+          >
+            <Icon
+              size={24}
+              className="flex-shrink-0"
+              style={selected ? { color: accentColor } : undefined}
+            />
+            <span className="text-sm">{option.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -655,16 +728,31 @@ export function DynamicApplicationForm({
                 />
                 {currentSection.questions
                   .filter((q) => isQuestionVisible(q, answers))
-                  .map((question) => (
-                    <QuestionRenderer
-                      key={question.id}
-                      question={question}
-                      value={getAnswer(question.id)}
-                      onChange={(val) => setAnswer(question.id, val)}
-                      error={errors[question.id]}
-                      accentColor={accentColor}
-                    />
-                  ))}
+                  .map((question) =>
+                    isLeadTypeQuestion(question) ? (
+                      <LeadTypeSelector
+                        key={question.id}
+                        question={question}
+                        value={
+                          typeof getAnswer(question.id) === 'string'
+                            ? (getAnswer(question.id) as string)
+                            : ''
+                        }
+                        onChange={(val) => setAnswer(question.id, val)}
+                        error={errors[question.id]}
+                        accentColor={accentColor}
+                      />
+                    ) : (
+                      <QuestionRenderer
+                        key={question.id}
+                        question={question}
+                        value={getAnswer(question.id)}
+                        onChange={(val) => setAnswer(question.id, val)}
+                        error={errors[question.id]}
+                        accentColor={accentColor}
+                      />
+                    ),
+                  )}
 
                 {/* Consent checkboxes on the last step */}
                 {isLastStep && (
