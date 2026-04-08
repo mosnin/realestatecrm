@@ -405,7 +405,7 @@ export default function IntakeCustomizePage() {
             onScoringModelChange={handleScoringModelChange}
             onSave={async (model) => {
               const res = await fetch('/api/form-config/save-scoring', {
-                method: 'POST',
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ slug, leadType: activeLeadType, scoringModel: model }),
               });
