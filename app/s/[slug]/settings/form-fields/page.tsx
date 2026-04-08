@@ -16,10 +16,15 @@ import {
   CheckCircle2,
   AlertCircle,
   Info,
+  Lightbulb,
+  Gauge,
+  Shuffle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormBuilder } from '@/components/form-builder';
 import { FormPreview } from '@/components/form-builder/form-preview';
+import { OptimizationPanel } from '@/components/form-builder/optimization-panel';
+import { ScoringPreview } from '@/components/form-builder/scoring-preview';
 import { TEMPLATES } from '@/components/form-builder/templates';
 import type { IntakeFormConfig } from '@/components/form-builder/types';
 import type { TemplateName } from '@/components/form-builder/templates';
@@ -34,11 +39,12 @@ type FormConfigSource = 'custom' | 'brokerage' | 'legacy';
 const FORM_TYPE_LABELS: Record<string, string> = {
   rental: 'Rental Application',
   buyer: 'Buyer Inquiry',
-  general: 'General Intake',
+  general: 'Universal (Rent & Buy)',
 };
 
 /** Detect which standard template the config matches, if any */
 function detectActiveTemplate(config: IntakeFormConfig): TemplateName | null {
+  if (config.leadType === 'general') return 'unified';
   return config.leadType === 'rental'
     ? 'rental'
     : config.leadType === 'buyer'
@@ -234,12 +240,20 @@ export default function FormFieldsSettingsPage() {
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="text-xs text-muted-foreground mr-1">Switch to:</span>
               <Button
+                variant={activeTemplate === 'unified' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleSwitchTemplate('unified')}
+                disabled={activeTemplate === 'unified'}
+              >
+                <Shuffle size={14} className="mr-1.5" /> Universal
+              </Button>
+              <Button
                 variant={activeTemplate === 'rental' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => handleSwitchTemplate('rental')}
                 disabled={activeTemplate === 'rental'}
               >
-                <Home size={14} className="mr-1.5" /> Rental Application
+                <Home size={14} className="mr-1.5" /> Rental
               </Button>
               <Button
                 variant={activeTemplate === 'buyer' ? 'default' : 'outline'}
@@ -247,7 +261,7 @@ export default function FormFieldsSettingsPage() {
                 onClick={() => handleSwitchTemplate('buyer')}
                 disabled={activeTemplate === 'buyer'}
               >
-                <Users size={14} className="mr-1.5" /> Buyer Inquiry
+                <Users size={14} className="mr-1.5" /> Buyer
               </Button>
             </div>
           </div>
@@ -272,7 +286,7 @@ export default function FormFieldsSettingsPage() {
         </div>
       </div>
 
-      {/* ── Builder / Preview tabs ── */}
+      {/* ── Builder / Preview / Optimize / Test Scoring tabs ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="builder">
@@ -280,6 +294,12 @@ export default function FormFieldsSettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="preview">
             <Eye size={14} className="mr-1.5" /> Preview
+          </TabsTrigger>
+          <TabsTrigger value="optimize">
+            <Lightbulb size={14} className="mr-1.5" /> Optimize
+          </TabsTrigger>
+          <TabsTrigger value="test-scoring">
+            <Gauge size={14} className="mr-1.5" /> Test Scoring
           </TabsTrigger>
         </TabsList>
 
@@ -289,6 +309,14 @@ export default function FormFieldsSettingsPage() {
 
         <TabsContent value="preview">
           <FormPreview config={config} />
+        </TabsContent>
+
+        <TabsContent value="optimize">
+          <OptimizationPanel slug={slug} />
+        </TabsContent>
+
+        <TabsContent value="test-scoring">
+          <ScoringPreview config={config} slug={slug} />
         </TabsContent>
       </Tabs>
     </div>

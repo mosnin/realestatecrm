@@ -6,16 +6,59 @@ import type {
 } from '@/lib/types';
 
 /**
+ * Evaluate a visibleWhen condition against a set of answers.
+ */
+function evaluateVisibleWhen(
+  condition: { questionId: string; operator: 'equals' | 'not_equals' | 'contains'; value: string } | undefined,
+  answers: Record<string, unknown>,
+): boolean {
+  if (!condition) return true;
+  const raw = answers[condition.questionId];
+  const strAnswer = raw == null ? '' : Array.isArray(raw) ? raw.join(',') : String(raw);
+
+  switch (condition.operator) {
+    case 'equals':
+      return strAnswer === condition.value;
+    case 'not_equals':
+      return strAnswer !== condition.value;
+    case 'contains':
+      return strAnswer.includes(condition.value);
+    default:
+      return true;
+  }
+}
+
+/**
  * Dynamically builds a Zod validation schema from an IntakeFormConfig.
  * Each question in the form becomes a field in the schema, keyed by question ID.
  * Respects the question's type, required flag, and validation settings.
+ *
+ * When `answers` is provided, sections and questions with `visibleWhen` conditions
+ * that evaluate to false are made optional (two-pass visibility-aware validation).
  */
-export function buildDynamicApplicationSchema(config: IntakeFormConfig) {
-  const allQuestions = config.sections.flatMap((s) => s.questions);
+export function buildDynamicApplicationSchema(
+  config: IntakeFormConfig,
+  answers?: Record<string, unknown>,
+) {
   const shape: Record<string, z.ZodTypeAny> = {};
 
-  for (const question of allQuestions) {
-    shape[question.id] = buildFieldSchema(question);
+  for (const section of config.sections) {
+    const sectionVisible = answers
+      ? evaluateVisibleWhen(section.visibleWhen, answers)
+      : !section.visibleWhen; // If no answers provided, treat conditioned sections as hidden
+
+    for (const question of section.questions) {
+      const questionVisible = answers
+        ? evaluateVisibleWhen(question.visibleWhen, answers)
+        : !question.visibleWhen;
+
+      if (sectionVisible && questionVisible) {
+        shape[question.id] = buildFieldSchema(question);
+      } else {
+        // Hidden question: make optional regardless of `required` flag
+        shape[question.id] = buildFieldSchema({ ...question, required: false });
+      }
+    }
   }
 
   return z.object(shape);
@@ -156,15 +199,25 @@ function buildFieldSchema(question: FormQuestion): z.ZodTypeAny {
 /**
  * Structures submission data from raw answers into the FormSubmission format.
  * Includes the frozen form config snapshot and version for future reference.
+ * Only includes answers from visible sections and questions.
  */
 export function buildDynamicApplicationData(
   config: IntakeFormConfig,
   answers: Record<string, unknown>
 ): FormSubmission {
-  const allQuestions = config.sections.flatMap((s) => s.questions);
+  // Only include questions from visible sections/questions
+  const visibleQuestions: FormQuestion[] = [];
+  for (const section of config.sections) {
+    if (!evaluateVisibleWhen(section.visibleWhen, answers)) continue;
+    for (const question of section.questions) {
+      if (!evaluateVisibleWhen(question.visibleWhen, answers)) continue;
+      visibleQuestions.push(question);
+    }
+  }
+
   const cleanedAnswers: Record<string, string | string[] | number | boolean> = {};
 
-  for (const question of allQuestions) {
+  for (const question of visibleQuestions) {
     const rawValue = answers[question.id];
     if (rawValue == null || rawValue === '' || rawValue === undefined) continue;
 

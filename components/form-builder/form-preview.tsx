@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Eye } from 'lucide-react';
 import type { IntakeFormConfig, FormSection, FormQuestion } from './types';
 import { getQuestionTypeConfig } from './question-types';
 
@@ -102,11 +103,33 @@ function PreviewQuestion({ question }: { question: FormQuestion }) {
   );
 }
 
+// ── Helper: format condition for display ──
+
+function formatCondition(condition: FormSection['visibleWhen'], allSections: FormSection[]): string {
+  if (!condition) return '';
+  const allQuestions = allSections.flatMap((s) => s.questions);
+  const refQuestion = allQuestions.find((q) => q.id === condition.questionId);
+  const questionLabel = refQuestion?.label || condition.questionId;
+  const operatorLabel =
+    condition.operator === 'equals' ? '=' :
+    condition.operator === 'not_equals' ? '!=' :
+    'contains';
+  return `"${questionLabel}" ${operatorLabel} "${condition.value}"`;
+}
+
 // ── Preview section ──
 
-function PreviewSection({ section }: { section: FormSection }) {
+function PreviewSection({ section, allSections }: { section: FormSection; allSections: FormSection[] }) {
+  const isConditional = !!section.visibleWhen;
+
   return (
-    <div className="space-y-4">
+    <div className={cn('space-y-4', isConditional && 'opacity-50 relative')}>
+      {isConditional && (
+        <div className="flex items-center gap-1.5 text-xs text-blue-500 bg-blue-50 dark:bg-blue-950/30 rounded-md px-2.5 py-1.5 border border-blue-200 dark:border-blue-800">
+          <Eye size={12} className="flex-shrink-0" />
+          <span>Hidden when {formatCondition(section.visibleWhen, allSections)}</span>
+        </div>
+      )}
       <div className="space-y-1">
         <h3 className="text-base font-semibold">{section.title}</h3>
         {section.description && (
@@ -157,7 +180,7 @@ export function FormPreview({ config }: FormPreviewProps) {
         {/* Sections */}
         <div className="px-6 py-5 space-y-8">
           {config.sections.map((section) => (
-            <PreviewSection key={section.id} section={section} />
+            <PreviewSection key={section.id} section={section} allSections={config.sections} />
           ))}
         </div>
 

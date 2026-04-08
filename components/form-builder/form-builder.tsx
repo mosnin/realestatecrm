@@ -45,6 +45,7 @@ import {
   ChevronDown,
   ChevronRight,
   X,
+  Eye,
 } from 'lucide-react';
 import { QUESTION_TYPES, getQuestionTypeConfig } from './question-types';
 import type { IntakeFormConfig, FormSection, FormQuestion } from './types';
@@ -240,9 +241,21 @@ function SortableSection({
           {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold truncate">{section.title}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-semibold truncate">{section.title}</p>
+            {section.visibleWhen && (
+              <span title={`Visible when "${section.visibleWhen.questionId}" ${section.visibleWhen.operator} "${section.visibleWhen.value}"`}>
+                <Eye size={14} className="text-blue-500 flex-shrink-0" />
+              </span>
+            )}
+          </div>
           {section.description && (
             <p className="text-xs text-muted-foreground truncate">{section.description}</p>
+          )}
+          {section.visibleWhen && (
+            <p className="text-[10px] text-blue-500 truncate">
+              Conditional: shown when condition is met
+            </p>
           )}
         </div>
         <Badge variant="outline" className="text-[10px] flex-shrink-0">
@@ -528,13 +541,30 @@ function QuestionEditor({
 
 function SectionEditor({
   section,
+  allQuestions,
+  allSections,
   onChange,
   onDelete,
 }: {
   section: FormSection;
+  allQuestions: FormQuestion[];
+  allSections: FormSection[];
   onChange: (updated: FormSection) => void;
   onDelete: () => void;
 }) {
+  const SYSTEM_FIELD_IDS = ['name', 'email', 'phone'];
+  const hasSystemField = section.questions.some(
+    (q) => q.system || SYSTEM_FIELD_IDS.includes(q.id),
+  );
+  const isFirstSection = allSections.length > 0 && allSections[0].id === section.id;
+  const disableVisibility = hasSystemField || isFirstSection;
+
+  // Gather questions from earlier sections
+  const sectionIndex = allSections.findIndex((s) => s.id === section.id);
+  const earlierQuestions = allSections
+    .slice(0, Math.max(0, sectionIndex))
+    .flatMap((s) => s.questions);
+
   return (
     <div className="space-y-5">
       <h3 className="text-sm font-semibold">Edit Section</h3>
@@ -556,6 +586,91 @@ function SectionEditor({
           placeholder="Brief description of this section"
           className="min-h-[60px]"
         />
+      </div>
+
+      {/* Section Visibility */}
+      <div className="space-y-2">
+        <Label className="text-xs">Section Visibility</Label>
+        {disableVisibility ? (
+          <p className="text-[11px] text-muted-foreground">
+            {hasSystemField
+              ? 'This section contains system fields and must always be visible.'
+              : 'The first section must always be visible.'}
+          </p>
+        ) : (
+          <>
+            <p className="text-[11px] text-muted-foreground">Show this section only when a question from an earlier section meets a condition.</p>
+
+            <div className="space-y-2">
+              <Select
+                value={section.visibleWhen?.questionId || '__none__'}
+                onValueChange={(val) => {
+                  if (val === '__none__') {
+                    onChange({ ...section, visibleWhen: undefined });
+                    return;
+                  }
+                  onChange({
+                    ...section,
+                    visibleWhen: {
+                      questionId: val,
+                      operator: section.visibleWhen?.operator || 'equals',
+                      value: section.visibleWhen?.value || '',
+                    },
+                  });
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a question..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Always visible</SelectItem>
+                  {earlierQuestions.map((q) => (
+                    <SelectItem key={q.id} value={q.id}>{q.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {section.visibleWhen?.questionId && (
+                <>
+                  <Select
+                    value={section.visibleWhen.operator}
+                    onValueChange={(val) => {
+                      onChange({
+                        ...section,
+                        visibleWhen: {
+                          ...section.visibleWhen!,
+                          operator: val as 'equals' | 'not_equals' | 'contains',
+                        },
+                      });
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="equals">Equals</SelectItem>
+                      <SelectItem value="not_equals">Does not equal</SelectItem>
+                      <SelectItem value="contains">Contains</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    value={section.visibleWhen.value}
+                    onChange={(e) => {
+                      onChange({
+                        ...section,
+                        visibleWhen: {
+                          ...section.visibleWhen!,
+                          value: e.target.value,
+                        },
+                      });
+                    }}
+                    placeholder="Value"
+                  />
+                </>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       <Button
@@ -942,6 +1057,8 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
                 ) : selectedSection ? (
                   <SectionEditor
                     section={selectedSection}
+                    allQuestions={allQuestions}
+                    allSections={config.sections}
                     onChange={handleUpdateSection}
                     onDelete={handleDeleteSection}
                   />

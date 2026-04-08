@@ -4,8 +4,424 @@ function id() {
   return crypto.randomUUID();
 }
 
+// ── Stable question ID for the leadType selector (referenced by section visibleWhen) ──
+const LEAD_TYPE_QUESTION_ID = 'leadType';
+
+// ── Rental-specific visibleWhen condition ──
+const RENT_CONDITION = { questionId: LEAD_TYPE_QUESTION_ID, operator: 'equals' as const, value: 'rental' };
+const BUY_CONDITION = { questionId: LEAD_TYPE_QUESTION_ID, operator: 'equals' as const, value: 'buyer' };
+
 // ─────────────────────────────────────────────────────────────────────────────
-// RENTAL TEMPLATE — matches the legacy rental intake form in application-form.tsx
+// UNIFIED TEMPLATE — one template that branches based on rent/buy selection
+// Uses section-level visibleWhen for conditional paths
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const UNIFIED_TEMPLATE: IntakeFormConfig = {
+  version: 1,
+  leadType: 'general',
+  sections: [
+    // ── 1. Getting Started (always visible) ──
+    {
+      id: id(),
+      title: 'Getting Started',
+      description: 'What are you looking for?',
+      position: 0,
+      questions: [
+        {
+          id: LEAD_TYPE_QUESTION_ID,
+          type: 'radio',
+          label: 'What are you looking for?',
+          required: true,
+          position: 0,
+          options: [
+            { value: 'rental', label: "I'm looking to rent" },
+            { value: 'buyer', label: "I'm looking to buy" },
+          ],
+        },
+      ],
+    },
+
+    // ── 2. Basics (always visible — contains system fields) ──
+    {
+      id: id(),
+      title: 'Basics',
+      description: 'We just need a few details to get going.',
+      position: 1,
+      questions: [
+        {
+          id: 'name',
+          type: 'text',
+          label: 'Full Name',
+          placeholder: 'Alex Johnson',
+          required: true,
+          position: 0,
+          system: true,
+        },
+        {
+          id: 'email',
+          type: 'email',
+          label: 'Email',
+          placeholder: 'alex@email.com',
+          required: true,
+          position: 1,
+          system: true,
+        },
+        {
+          id: 'phone',
+          type: 'phone',
+          label: 'Phone',
+          placeholder: '(555) 123-4567',
+          required: true,
+          position: 2,
+          system: true,
+        },
+      ],
+    },
+
+    // ── 3. Move Timing (rental only) ──
+    {
+      id: id(),
+      title: 'Move Timing',
+      position: 2,
+      visibleWhen: RENT_CONDITION,
+      questions: [
+        {
+          id: id(),
+          type: 'radio',
+          label: 'When are you planning to move?',
+          required: true,
+          position: 0,
+          scoring: { weight: 8 },
+          options: [
+            { value: 'asap', label: 'ASAP (within 2 weeks)' },
+            { value: '30days', label: 'Within 30 days' },
+            { value: '1-2months', label: '1-2 months' },
+            { value: 'browsing', label: 'Just browsing' },
+          ],
+        },
+      ],
+    },
+
+    // ── 4. Location (rental only) ──
+    {
+      id: id(),
+      title: 'Location',
+      position: 3,
+      visibleWhen: RENT_CONDITION,
+      questions: [
+        {
+          id: id(),
+          type: 'text',
+          label: 'Where are you looking to live?',
+          placeholder: 'e.g., Downtown Miami, Brickell',
+          required: true,
+          position: 0,
+        },
+      ],
+    },
+
+    // ── 5. Rent Budget (rental only) ──
+    {
+      id: id(),
+      title: 'Budget',
+      position: 4,
+      visibleWhen: RENT_CONDITION,
+      questions: [
+        {
+          id: id(),
+          type: 'radio',
+          label: "What's your monthly rent budget?",
+          required: true,
+          position: 0,
+          scoring: {
+            weight: 6,
+            mappings: [
+              { value: 'under_1500', points: 2 },
+              { value: '1500_2000', points: 4 },
+              { value: '2000_2500', points: 6 },
+              { value: '2500_3500', points: 8 },
+              { value: '3500_plus', points: 10 },
+            ],
+          },
+          options: [
+            { value: 'under_1500', label: 'Under $1,500' },
+            { value: '1500_2000', label: '$1,500 - $2,000' },
+            { value: '2000_2500', label: '$2,000 - $2,500' },
+            { value: '2500_3500', label: '$2,500 - $3,500' },
+            { value: '3500_plus', label: '$3,500+' },
+          ],
+        },
+      ],
+    },
+
+    // ── 6. Income (rental only) ──
+    {
+      id: id(),
+      title: 'Income',
+      position: 5,
+      visibleWhen: RENT_CONDITION,
+      questions: [
+        {
+          id: id(),
+          type: 'radio',
+          label: "What's your estimated monthly income?",
+          required: true,
+          position: 0,
+          scoring: { weight: 7 },
+          options: [
+            { value: 'under_2000', label: 'Under $2,000' },
+            { value: '2000_3000', label: '$2,000 - $3,000' },
+            { value: '3000_4000', label: '$3,000 - $4,000' },
+            { value: '4000_6000', label: '$4,000 - $6,000' },
+            { value: '6000_plus', label: '$6,000+' },
+          ],
+        },
+      ],
+    },
+
+    // ── 7. Employment (rental only) ──
+    {
+      id: id(),
+      title: 'Employment',
+      position: 6,
+      visibleWhen: RENT_CONDITION,
+      questions: [
+        {
+          id: id(),
+          type: 'radio',
+          label: "What's your current work situation?",
+          required: true,
+          position: 0,
+          scoring: { weight: 5 },
+          options: [
+            { value: 'full-time', label: 'Full-time employed' },
+            { value: 'self-employed', label: 'Self-employed' },
+            { value: 'part-time', label: 'Part-time employed' },
+            { value: 'student', label: 'Student' },
+            { value: 'not-employed', label: 'Not currently employed' },
+          ],
+        },
+      ],
+    },
+
+    // ── 8. Household (rental only) ──
+    {
+      id: id(),
+      title: 'Household',
+      position: 7,
+      visibleWhen: RENT_CONDITION,
+      questions: [
+        {
+          id: id(),
+          type: 'number',
+          label: 'How many people will be living in the home?',
+          placeholder: 'e.g., 2',
+          required: true,
+          position: 0,
+          validation: { min: 1 },
+        },
+        {
+          id: id(),
+          type: 'radio',
+          label: 'Do you have pets?',
+          required: false,
+          position: 1,
+          options: [
+            { value: 'yes', label: 'Yes' },
+            { value: 'no', label: 'No' },
+          ],
+        },
+      ],
+    },
+
+    // ── 9. Budget (buyer only) ──
+    {
+      id: id(),
+      title: 'Budget',
+      position: 8,
+      visibleWhen: BUY_CONDITION,
+      questions: [
+        {
+          id: id(),
+          type: 'radio',
+          label: "What's your budget?",
+          required: true,
+          position: 0,
+          scoring: { weight: 6 },
+          options: [
+            { value: 'under_200k', label: 'Under $200K' },
+            { value: '200k_350k', label: '$200K - $350K' },
+            { value: '350k_500k', label: '$350K - $500K' },
+            { value: '500k_750k', label: '$500K - $750K' },
+            { value: '750k_1m', label: '$750K - $1M' },
+            { value: '1m_plus', label: '$1M+' },
+          ],
+        },
+      ],
+    },
+
+    // ── 10. Pre-Approval (buyer only) ──
+    {
+      id: id(),
+      title: 'Pre-Approval',
+      position: 9,
+      visibleWhen: BUY_CONDITION,
+      questions: [
+        {
+          id: 'preApproval',
+          type: 'radio',
+          label: 'Are you pre-approved for a mortgage?',
+          required: false,
+          position: 0,
+          scoring: { weight: 8 },
+          options: [
+            { value: 'yes', label: 'Yes' },
+            { value: 'no', label: 'No' },
+            { value: 'not-yet', label: 'Not yet' },
+          ],
+        },
+        {
+          id: id(),
+          type: 'text',
+          label: 'Lender name',
+          placeholder: 'e.g., Chase, Wells Fargo',
+          required: false,
+          position: 1,
+          visibleWhen: { questionId: 'preApproval', operator: 'equals', value: 'yes' },
+        },
+        {
+          id: id(),
+          type: 'text',
+          label: 'Pre-approval amount',
+          placeholder: 'e.g., $400,000',
+          required: false,
+          position: 2,
+          visibleWhen: { questionId: 'preApproval', operator: 'equals', value: 'yes' },
+        },
+      ],
+    },
+
+    // ── 11. Property (buyer only) ──
+    {
+      id: id(),
+      title: 'Property',
+      position: 10,
+      visibleWhen: BUY_CONDITION,
+      questions: [
+        {
+          id: id(),
+          type: 'radio',
+          label: 'What type of property are you looking for?',
+          required: true,
+          position: 0,
+          options: [
+            { value: 'single-family', label: 'Single Family' },
+            { value: 'condo', label: 'Condo / Apartment' },
+            { value: 'townhouse', label: 'Townhouse' },
+            { value: 'multi-family', label: 'Multi-Family' },
+          ],
+        },
+        {
+          id: id(),
+          type: 'radio',
+          label: 'Bedrooms needed',
+          required: false,
+          position: 1,
+          options: [
+            { value: '1', label: '1' },
+            { value: '2', label: '2' },
+            { value: '3', label: '3' },
+            { value: '4', label: '4' },
+            { value: '5+', label: '5+' },
+          ],
+        },
+        {
+          id: id(),
+          type: 'radio',
+          label: 'Bathrooms needed',
+          required: false,
+          position: 2,
+          options: [
+            { value: '1', label: '1' },
+            { value: '2', label: '2' },
+            { value: '3+', label: '3+' },
+          ],
+        },
+      ],
+    },
+
+    // ── 12. Must-Haves (buyer only) ──
+    {
+      id: id(),
+      title: 'Must-Haves',
+      description: 'Select all that apply.',
+      position: 11,
+      visibleWhen: BUY_CONDITION,
+      questions: [
+        {
+          id: id(),
+          type: 'multi_select',
+          label: 'Any must-haves?',
+          required: false,
+          position: 0,
+          options: [
+            { value: 'garage', label: 'Garage' },
+            { value: 'yard', label: 'Yard' },
+            { value: 'pool', label: 'Pool' },
+            { value: 'updated_kitchen', label: 'Updated Kitchen' },
+            { value: 'home_office', label: 'Home Office' },
+            { value: 'storage', label: 'Storage' },
+            { value: 'washer_dryer', label: 'Washer/Dryer' },
+            { value: 'accessibility', label: 'Accessibility Features' },
+          ],
+        },
+      ],
+    },
+
+    // ── 13. Additional Info (always visible) ──
+    {
+      id: id(),
+      title: 'Additional Info',
+      description: 'This step is optional. Share anything that might help.',
+      position: 12,
+      questions: [
+        {
+          id: id(),
+          type: 'textarea',
+          label: 'Anything we should know?',
+          placeholder: 'Special requirements, preferences, questions...',
+          required: false,
+          position: 0,
+        },
+      ],
+    },
+
+    // ── 14. Ready? (always visible) ──
+    {
+      id: id(),
+      title: 'Ready?',
+      position: 13,
+      questions: [
+        {
+          id: id(),
+          type: 'radio',
+          label: 'If you find the right place, are you ready to move forward?',
+          required: true,
+          position: 0,
+          scoring: { weight: 9 },
+          options: [
+            { value: 'ready', label: 'Yes, ready now', scoreValue: 10 },
+            { value: 'maybe', label: 'Maybe', scoreValue: 5 },
+            { value: 'exploring', label: 'Just exploring', scoreValue: 2 },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Legacy templates kept for backwards compatibility
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const RENTAL_TEMPLATE: IntakeFormConfig = {
@@ -20,7 +436,7 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
       position: 0,
       questions: [
         {
-          id: id(),
+          id: LEAD_TYPE_QUESTION_ID,
           type: 'radio',
           label: 'What are you looking for?',
           required: true,
@@ -262,10 +678,6 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
   ],
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BUYER TEMPLATE — matches the legacy buyer intake form in application-form.tsx
-// ─────────────────────────────────────────────────────────────────────────────
-
 export const BUYER_TEMPLATE: IntakeFormConfig = {
   version: 1,
   leadType: 'buyer',
@@ -278,7 +690,7 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
       position: 0,
       questions: [
         {
-          id: id(),
+          id: LEAD_TYPE_QUESTION_ID,
           type: 'radio',
           label: 'What are you looking for?',
           required: true,
@@ -549,6 +961,7 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
 };
 
 export const TEMPLATES = {
+  unified: { label: 'Universal (Rent & Buy)', config: UNIFIED_TEMPLATE },
   rental: { label: 'Rental Application', config: RENTAL_TEMPLATE },
   buyer: { label: 'Buyer Inquiry', config: BUYER_TEMPLATE },
 } as const;
