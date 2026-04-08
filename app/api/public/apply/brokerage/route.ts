@@ -425,7 +425,8 @@ export async function POST(req: NextRequest) {
       .limit(5);
     if (dupError) throw dupError;
 
-    const applicationRef = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+    const applicationRef = (crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '')).slice(0, 24);
+    const statusPortalToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
 
     if (existingRecentLeads?.length) {
       const normalizedPhone = normalizePhone(contactPhone ?? '');
@@ -500,6 +501,7 @@ export async function POST(req: NextRequest) {
       sourceLabel: 'brokerage-intake',
       applicationData,
       applicationRef,
+      statusPortalToken,
       applicationStatus: 'received',
       consentGiven: privacyConsent === true ? true : privacyConsent === false ? false : null,
       consentTimestamp: privacyConsent === true ? new Date().toISOString() : null,

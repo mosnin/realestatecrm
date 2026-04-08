@@ -177,6 +177,15 @@ export async function scoreLeadApplicationDynamic(input: {
     });
   }
 
+  // Warn if formConfig exists but answers are missing (likely a bug)
+  if (input.formConfig && !input.answers) {
+    console.warn('[lead-scoring] formConfig provided without answers — cannot use dynamic scoring, falling back to legacy', {
+      contactId: input.contactId,
+      hasFormConfig: true,
+      hasAnswers: false,
+    });
+  }
+
   // Fall back to legacy scoring for hardcoded forms
   if (input.name && input.phone) {
     return scoreLeadApplication({
