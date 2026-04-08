@@ -21,6 +21,8 @@ export function ApplicationFormLoader({
   customization,
   brokerageId,
   formConfig,
+  rentalFormConfig,
+  buyerFormConfig,
   resumeToken,
 }: {
   slug: string;
@@ -28,10 +30,29 @@ export function ApplicationFormLoader({
   businessName: string;
   customization?: IntakeCustomization;
   brokerageId?: string;
+  /** @deprecated Use rentalFormConfig/buyerFormConfig instead */
   formConfig?: IntakeFormConfig | null;
+  rentalFormConfig?: IntakeFormConfig | null;
+  buyerFormConfig?: IntakeFormConfig | null;
   resumeToken?: string;
 }) {
-  // Dynamic form config provided — use the new renderer
+  // Dual form configs provided — use the new renderer with Getting Started step
+  if (rentalFormConfig || buyerFormConfig) {
+    return (
+      <DynamicApplicationForm
+        slug={slug}
+        spaceId={spaceId}
+        businessName={businessName}
+        rentalFormConfig={rentalFormConfig}
+        buyerFormConfig={buyerFormConfig}
+        customization={customization}
+        brokerageId={brokerageId}
+        resumeToken={resumeToken}
+      />
+    );
+  }
+
+  // Legacy single form config — use the dynamic renderer (backwards compat)
   if (formConfig) {
     return (
       <DynamicApplicationForm

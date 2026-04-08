@@ -11,7 +11,7 @@ import {
   Eye,
   Pencil,
   Home,
-  Users,
+  Key,
   Send,
   CheckCircle2,
   AlertCircle,
@@ -22,65 +22,76 @@ import { FormBuilder } from '@/components/form-builder';
 import { FormPreview } from '@/components/form-builder/form-preview';
 import { TEMPLATES } from '@/components/form-builder/templates';
 import type { IntakeFormConfig } from '@/components/form-builder/types';
-import type { TemplateName } from '@/components/form-builder/templates';
 
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
-/** Human-friendly labels for each form type */
-const FORM_TYPE_LABELS: Record<string, string> = {
-  rental: 'Rental Application',
-  buyer: 'Buyer Inquiry',
-  general: 'General Intake',
-};
-
-/** Detect which standard template the config matches, if any */
-function detectActiveTemplate(config: IntakeFormConfig): TemplateName | null {
-  return config.leadType === 'rental'
-    ? 'rental'
-    : config.leadType === 'buyer'
-      ? 'buyer'
-      : null;
-}
+type LeadType = 'rental' | 'buyer';
 
 export default function BrokerFormBuilderPage() {
-  const [config, setConfig] = useState<IntakeFormConfig>(deepClone(TEMPLATES.rental.config));
+  // ── Primary tab: which form are we editing ──
+  const [activeLeadType, setActiveLeadType] = useState<LeadType>('rental');
+
+  // ── Per-form state ──
+  const [rentalConfig, setRentalConfig] = useState<IntakeFormConfig>(deepClone(TEMPLATES.rental.config));
+  const [buyerConfig, setBuyerConfig] = useState<IntakeFormConfig>(deepClone(TEMPLATES.buyer.config));
+  const [rentalHasChanges, setRentalHasChanges] = useState(false);
+  const [buyerHasChanges, setBuyerHasChanges] = useState(false);
+  const [rentalHasSavedConfig, setRentalHasSavedConfig] = useState(false);
+  const [buyerHasSavedConfig, setBuyerHasSavedConfig] = useState(false);
+  const rentalSavedRef = useRef<string>('');
+  const buyerSavedRef = useRef<string>('');
+
   const [saving, setSaving] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>('builder');
-  const [hasChanges, setHasChanges] = useState(false);
-  const [hasSavedConfig, setHasSavedConfig] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<string>('builder');
   const [memberCount, setMemberCount] = useState<number | null>(null);
 
-  // Track the last-saved config to detect unsaved changes accurately
-  const savedConfigRef = useRef<string>('');
-
-  // Load existing config
+  // Load existing configs
   useEffect(() => {
     fetch('/api/broker/form-config')
       .then((r) => {
         if (!r.ok) throw new Error('Not found');
         return r.json();
       })
-      .then((data: { brokerageId: string; formConfig: IntakeFormConfig | null }) => {
-        if (data.formConfig?.sections) {
-          setConfig(data.formConfig);
-          setHasSavedConfig(true);
-          savedConfigRef.current = JSON.stringify(data.formConfig);
+      .then((data: {
+        brokerageId: string;
+        rentalFormConfig: IntakeFormConfig | null;
+        buyerFormConfig: IntakeFormConfig | null;
+      }) => {
+        // Rental config
+        if (data.rentalFormConfig?.sections) {
+          setRentalConfig(data.rentalFormConfig);
+          setRentalHasSavedConfig(true);
+          rentalSavedRef.current = JSON.stringify(data.rentalFormConfig);
         } else {
           const defaultConfig = deepClone(TEMPLATES.rental.config);
-          setConfig(defaultConfig);
-          setHasSavedConfig(false);
-          savedConfigRef.current = JSON.stringify(defaultConfig);
+          setRentalConfig(defaultConfig);
+          setRentalHasSavedConfig(false);
+          rentalSavedRef.current = JSON.stringify(defaultConfig);
+        }
+
+        // Buyer config
+        if (data.buyerFormConfig?.sections) {
+          setBuyerConfig(data.buyerFormConfig);
+          setBuyerHasSavedConfig(true);
+          buyerSavedRef.current = JSON.stringify(data.buyerFormConfig);
+        } else {
+          const defaultConfig = deepClone(TEMPLATES.buyer.config);
+          setBuyerConfig(defaultConfig);
+          setBuyerHasSavedConfig(false);
+          buyerSavedRef.current = JSON.stringify(defaultConfig);
         }
       })
       .catch(() => {
-        // Network error or no existing config -- start with rental default
-        const defaultConfig = deepClone(TEMPLATES.rental.config);
-        setConfig(defaultConfig);
-        savedConfigRef.current = JSON.stringify(defaultConfig);
+        const defaultRental = deepClone(TEMPLATES.rental.config);
+        const defaultBuyer = deepClone(TEMPLATES.buyer.config);
+        setRentalConfig(defaultRental);
+        setBuyerConfig(defaultBuyer);
+        rentalSavedRef.current = JSON.stringify(defaultRental);
+        buyerSavedRef.current = JSON.stringify(defaultBuyer);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -95,76 +106,100 @@ export default function BrokerFormBuilderPage() {
         }
       })
       .catch(() => {
-        // Silently fail -- member count is informational
+        // Silently fail
       });
   }, []);
 
-  const handleConfigChange = useCallback((newConfig: IntakeFormConfig) => {
-    setConfig(newConfig);
-    setHasChanges(JSON.stringify(newConfig) !== savedConfigRef.current);
-  }, []);
+  // ── Active config accessor ──
+  const config = activeLeadType === 'rental' ? rentalConfig : buyerConfig;
+  const hasChanges = activeLeadType === 'rental' ? rentalHasChanges : buyerHasChanges;
+  const hasSavedConfig = activeLeadType === 'rental' ? rentalHasSavedConfig : buyerHasSavedConfig;
+  const anyHasChanges = rentalHasChanges || buyerHasChanges;
+  const eitherHasSavedConfig = rentalHasSavedConfig || buyerHasSavedConfig;
 
-  const handleSwitchTemplate = useCallback((name: TemplateName) => {
-    const template = TEMPLATES[name];
-    const newConfig = deepClone(template.config);
-    setConfig(newConfig);
-    setHasChanges(JSON.stringify(newConfig) !== savedConfigRef.current);
-    toast.success(`Switched to ${FORM_TYPE_LABELS[template.config.leadType] ?? template.label} form`);
-  }, []);
+  const handleConfigChange = useCallback((newConfig: IntakeFormConfig) => {
+    if (activeLeadType === 'rental') {
+      setRentalConfig(newConfig);
+      setRentalHasChanges(JSON.stringify(newConfig) !== rentalSavedRef.current);
+    } else {
+      setBuyerConfig(newConfig);
+      setBuyerHasChanges(JSON.stringify(newConfig) !== buyerSavedRef.current);
+    }
+  }, [activeLeadType]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
+    const currentConfig = activeLeadType === 'rental' ? rentalConfig : buyerConfig;
     try {
       const res = await fetch('/api/broker/form-config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formConfig: config }),
+        body: JSON.stringify({ leadType: activeLeadType, formConfig: currentConfig }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || 'Failed to save form configuration.');
       }
-      setHasSavedConfig(true);
-      setHasChanges(false);
-      savedConfigRef.current = JSON.stringify(config);
-      toast.success('Brokerage form saved successfully.');
+
+      if (activeLeadType === 'rental') {
+        setRentalHasSavedConfig(true);
+        setRentalHasChanges(false);
+        rentalSavedRef.current = JSON.stringify(currentConfig);
+      } else {
+        setBuyerHasSavedConfig(true);
+        setBuyerHasChanges(false);
+        buyerSavedRef.current = JSON.stringify(currentConfig);
+      }
+
+      toast.success(`Brokerage ${activeLeadType === 'rental' ? 'rental' : 'buyer'} form saved successfully.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
       setSaving(false);
     }
-  }, [config]);
+  }, [activeLeadType, rentalConfig, buyerConfig]);
 
   const handleReset = useCallback(async () => {
+    const label = activeLeadType === 'rental' ? 'rental' : 'buyer';
     if (
       !confirm(
-        'Reset to the standard Chippi rental form? Your custom brokerage form will be removed.',
+        `Reset the ${label} form to the standard Chippi default? Your custom brokerage form will be removed.`,
       )
     )
       return;
     try {
       const res = await fetch('/api/broker/form-config', {
         method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadType: activeLeadType }),
       });
       if (!res.ok) {
         throw new Error('Failed to reset form configuration.');
       }
-      const defaultConfig = deepClone(TEMPLATES.rental.config);
-      setConfig(defaultConfig);
-      setHasSavedConfig(false);
-      setHasChanges(false);
-      savedConfigRef.current = JSON.stringify(defaultConfig);
-      toast.success('Form reset to the standard Chippi default.');
+      const templateKey = activeLeadType === 'rental' ? 'rental' : 'buyer';
+      const defaultConfig = deepClone(TEMPLATES[templateKey].config);
+      if (activeLeadType === 'rental') {
+        setRentalConfig(defaultConfig);
+        setRentalHasSavedConfig(false);
+        setRentalHasChanges(false);
+        rentalSavedRef.current = JSON.stringify(defaultConfig);
+      } else {
+        setBuyerConfig(defaultConfig);
+        setBuyerHasSavedConfig(false);
+        setBuyerHasChanges(false);
+        buyerSavedRef.current = JSON.stringify(defaultConfig);
+      }
+      toast.success(`Brokerage ${label} form reset to the standard Chippi default.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     }
-  }, []);
+  }, [activeLeadType]);
 
   const handlePushToMembers = useCallback(async () => {
     const memberLabel = memberCount != null ? `${memberCount} member${memberCount === 1 ? '' : 's'}` : 'all member realtors';
     if (
       !confirm(
-        `This will override the individual form settings for ${memberLabel} with this brokerage form. Their formConfigSource will be set to "brokerage". Continue?`,
+        `This will override BOTH rental and buyer form settings for ${memberLabel} with the brokerage forms. Their formConfigSource will be set to "brokerage". Continue?`,
       )
     )
       return;
@@ -173,23 +208,22 @@ export default function BrokerFormBuilderPage() {
       const res = await fetch('/api/broker/form-config/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formConfig: config }),
+        body: JSON.stringify({
+          rentalFormConfig: rentalConfig,
+          buyerFormConfig: buyerConfig,
+        }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || 'Failed to push form to members.');
       }
-      toast.success(`Form configuration pushed to ${memberLabel}.`);
+      toast.success(`Both rental and buyer forms pushed to ${memberLabel}.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
       setPushing(false);
     }
-  }, [config, memberCount]);
-
-  // Derived display values
-  const activeTemplate = detectActiveTemplate(config);
-  const formLabel = FORM_TYPE_LABELS[config.leadType] ?? 'Custom Form';
+  }, [rentalConfig, buyerConfig, memberCount]);
 
   if (loading) {
     return (
@@ -202,13 +236,13 @@ export default function BrokerFormBuilderPage() {
 
   return (
     <div className="space-y-6">
-      {/* ── Header with active form status ── */}
+      {/* ── Header ── */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="space-y-1">
             <h1 className="text-xl font-semibold tracking-tight">Brokerage Intake Form</h1>
             <p className="text-muted-foreground text-sm">
-              Design a standard intake form for your brokerage and push it to all members.
+              Design standard rental and buyer intake forms for your brokerage and push them to all members.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -236,14 +270,49 @@ export default function BrokerFormBuilderPage() {
           </div>
         </div>
 
+        {/* ── Primary tabs: Rental Form / Buyer Form ── */}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveLeadType('rental')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
+              activeLeadType === 'rental'
+                ? 'border-orange-400 bg-orange-50 text-orange-700 shadow-sm'
+                : 'border-border text-muted-foreground hover:border-muted-foreground/30'
+            }`}
+          >
+            <Home size={16} />
+            Rental Form
+            {rentalHasChanges && (
+              <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveLeadType('buyer')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
+              activeLeadType === 'buyer'
+                ? 'border-blue-400 bg-blue-50 text-blue-700 shadow-sm'
+                : 'border-border text-muted-foreground hover:border-muted-foreground/30'
+            }`}
+          >
+            <Key size={16} />
+            Buyer Form
+            {buyerHasChanges && (
+              <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+            )}
+          </button>
+        </div>
+
         {/* ── Active form status bar ── */}
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-            {/* Current form identity */}
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <Pencil size={16} className="text-muted-foreground flex-shrink-0" />
-                <span className="text-sm font-semibold">Editing: {formLabel}</span>
+                <span className="text-sm font-semibold">
+                  Editing: {activeLeadType === 'rental' ? 'Rental Application' : 'Buyer Inquiry'}
+                </span>
               </div>
               {hasSavedConfig ? (
                 <Badge variant="secondary" className="text-[10px]">Custom</Badge>
@@ -251,35 +320,13 @@ export default function BrokerFormBuilderPage() {
                 <Badge variant="outline" className="text-[10px]">Not configured</Badge>
               )}
             </div>
-
-            {/* Form switcher */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-xs text-muted-foreground mr-1">Switch to:</span>
-              <Button
-                variant={activeTemplate === 'rental' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleSwitchTemplate('rental')}
-                disabled={activeTemplate === 'rental'}
-              >
-                <Home size={14} className="mr-1.5" /> Rental Application
-              </Button>
-              <Button
-                variant={activeTemplate === 'buyer' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleSwitchTemplate('buyer')}
-                disabled={activeTemplate === 'buyer'}
-              >
-                <Users size={14} className="mr-1.5" /> Buyer Inquiry
-              </Button>
-            </div>
           </div>
 
-          {/* Contextual hint */}
           {!hasSavedConfig && (
             <div className="px-5 py-2.5 border-t border-border bg-blue-50/50 flex items-start gap-2">
               <Info size={14} className="text-blue-500 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-blue-700">
-                No custom brokerage form is configured yet. Customize the fields below and save to create your brokerage standard form.
+                No custom brokerage {activeLeadType === 'rental' ? 'rental' : 'buyer'} form is configured yet. Customize the fields below and save to create your brokerage standard form.
               </p>
             </div>
           )}
@@ -292,7 +339,7 @@ export default function BrokerFormBuilderPage() {
           <div className="space-y-0.5">
             <p className="text-sm font-semibold">Push to All Members</p>
             <p className="text-xs text-muted-foreground">
-              Apply this form to {memberCount != null ? (
+              Apply both rental and buyer forms to {memberCount != null ? (
                 <span className="font-medium">{memberCount} member{memberCount === 1 ? '' : 's'}</span>
               ) : (
                 'all member realtors'
@@ -303,7 +350,7 @@ export default function BrokerFormBuilderPage() {
             variant="outline"
             size="sm"
             onClick={handlePushToMembers}
-            disabled={pushing || hasChanges || !hasSavedConfig}
+            disabled={pushing || anyHasChanges || !eitherHasSavedConfig}
             className="flex-shrink-0"
           >
             {pushing ? (
@@ -313,13 +360,13 @@ export default function BrokerFormBuilderPage() {
             )}
           </Button>
         </div>
-        {hasChanges && (
+        {anyHasChanges && (
           <div className="px-5 py-2 border-t border-border bg-amber-50 dark:bg-amber-950/20 flex items-start gap-2">
             <AlertCircle size={12} className="text-amber-600 flex-shrink-0 mt-0.5" />
             <p className="text-[11px] text-amber-700 dark:text-amber-400">Save your changes before pushing to members.</p>
           </div>
         )}
-        {!hasSavedConfig && !hasChanges && (
+        {!eitherHasSavedConfig && !anyHasChanges && (
           <div className="px-5 py-2 border-t border-border bg-blue-50/50 flex items-start gap-2">
             <Info size={12} className="text-blue-500 flex-shrink-0 mt-0.5" />
             <p className="text-[11px] text-blue-700">Save a custom brokerage form first before pushing to members.</p>
@@ -327,8 +374,8 @@ export default function BrokerFormBuilderPage() {
         )}
       </div>
 
-      {/* ── Builder / Preview tabs ── */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      {/* ── Builder / Preview sub-tabs ── */}
+      <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
         <TabsList>
           <TabsTrigger value="builder">
             <Pencil size={14} className="mr-1.5" /> Builder

@@ -11,7 +11,7 @@ const MAX_TOTAL_QUESTIONS = 200;
 
 /**
  * GET /api/broker/form-config
- * Returns the brokerage's brokerageFormConfig from the Brokerage table.
+ * Returns BOTH rental and buyer brokerage form configs.
  */
 export async function GET() {
   let ctx;
@@ -21,10 +21,9 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  // Fetch the brokerageFormConfig field from the Brokerage row
   const { data: brokerage, error } = await supabase
     .from('Brokerage')
-    .select('id, brokerageFormConfig')
+    .select('id, brokerageFormConfig, brokerageRentalFormConfig, brokerageBuyerFormConfig')
     .eq('id', ctx.brokerage.id)
     .maybeSingle();
 
@@ -33,16 +32,25 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to fetch form config' }, { status: 500 });
   }
 
+  // Backwards compatibility: if rentalFormConfig is null but old brokerageFormConfig exists
+  let rentalFormConfig = brokerage?.brokerageRentalFormConfig ?? null;
+  const buyerFormConfig = brokerage?.brokerageBuyerFormConfig ?? null;
+
+  if (!rentalFormConfig && brokerage?.brokerageFormConfig) {
+    rentalFormConfig = brokerage.brokerageFormConfig;
+  }
+
   return NextResponse.json({
     brokerageId: ctx.brokerage.id,
-    formConfig: brokerage?.brokerageFormConfig ?? null,
+    rentalFormConfig,
+    buyerFormConfig,
   });
 }
 
 /**
  * PUT /api/broker/form-config
  * Validate and save a brokerage-level form config.
- * Requires broker access + settings edit permission.
+ * Accepts { leadType: 'rental' | 'buyer', formConfig }
  */
 export async function PUT(req: NextRequest) {
   const { userId: clerkId } = await auth();
@@ -66,6 +74,11 @@ export async function PUT(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const leadType = body.leadType as string | undefined;
+  if (!leadType || (leadType !== 'rental' && leadType !== 'buyer')) {
+    return NextResponse.json({ error: 'leadType must be "rental" or "buyer"' }, { status: 400 });
   }
 
   // Validate the form config
@@ -98,9 +111,11 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: `Form exceeds max ${MAX_TOTAL_QUESTIONS} questions` }, { status: 400 });
   }
 
+  const column = leadType === 'rental' ? 'brokerageRentalFormConfig' : 'brokerageBuyerFormConfig';
+
   const { error: updateErr } = await supabase
     .from('Brokerage')
-    .update({ brokerageFormConfig: formConfig })
+    .update({ [column]: formConfig })
     .eq('id', ctx.brokerage.id);
 
   if (updateErr) {
@@ -114,13 +129,15 @@ export async function PUT(req: NextRequest) {
     resource: 'Brokerage',
     resourceId: ctx.brokerage.id,
     metadata: {
-      field: 'brokerageFormConfig',
+      field: column,
+      leadType,
       sectionCount: formConfig.sections.length,
     },
   });
 
   return NextResponse.json({
     brokerageId: ctx.brokerage.id,
-    formConfig,
+    [column]: formConfig,
+    leadType,
   });
 }

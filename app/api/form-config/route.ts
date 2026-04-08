@@ -10,7 +10,7 @@ const MAX_TOTAL_QUESTIONS = 200;
 
 /**
  * GET /api/form-config?slug={slug}
- * Returns the space's formConfig from SpaceSetting, or null if using legacy.
+ * Returns BOTH rental and buyer form configs from SpaceSetting.
  */
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
@@ -22,21 +22,28 @@ export async function GET(req: NextRequest) {
 
   const { data: settings, error } = await supabase
     .from('SpaceSetting')
-    .select('formConfig, formConfigSource')
+    .select('rentalFormConfig, buyerFormConfig, formConfig, formConfigSource')
     .eq('spaceId', space.id)
     .maybeSingle();
   if (error) throw error;
 
-  const formConfig = settings?.formConfig ?? null;
+  // Backwards compatibility: if rentalFormConfig is null but old formConfig exists, use it
+  let rentalFormConfig = settings?.rentalFormConfig ?? null;
+  const buyerFormConfig = settings?.buyerFormConfig ?? null;
   const formConfigSource: 'custom' | 'brokerage' | 'legacy' =
     settings?.formConfigSource ?? 'legacy';
 
-  return NextResponse.json({ formConfig, formConfigSource });
+  if (!rentalFormConfig && settings?.formConfig) {
+    rentalFormConfig = settings.formConfig;
+  }
+
+  return NextResponse.json({ rentalFormConfig, buyerFormConfig, formConfigSource });
 }
 
 /**
  * PUT /api/form-config
  * Validate and save a custom form config for the space.
+ * Accepts { slug, leadType: 'rental' | 'buyer', formConfig }
  */
 export async function PUT(req: NextRequest) {
   let body: Record<string, unknown>;
@@ -48,6 +55,11 @@ export async function PUT(req: NextRequest) {
 
   const slug = body.slug as string | undefined;
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
+
+  const leadType = body.leadType as string | undefined;
+  if (!leadType || (leadType !== 'rental' && leadType !== 'buyer')) {
+    return NextResponse.json({ error: 'leadType must be "rental" or "buyer"' }, { status: 400 });
+  }
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
@@ -83,6 +95,9 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: `Form exceeds max ${MAX_TOTAL_QUESTIONS} questions` }, { status: 400 });
   }
 
+  // Determine which column to write to
+  const column = leadType === 'rental' ? 'rentalFormConfig' : 'buyerFormConfig';
+
   // Upsert into SpaceSetting
   const { data: existing } = await supabase
     .from('SpaceSetting')
@@ -93,7 +108,7 @@ export async function PUT(req: NextRequest) {
   if (existing) {
     const { error: updateErr } = await supabase
       .from('SpaceSetting')
-      .update({ formConfig, formConfigSource: 'custom' })
+      .update({ [column]: formConfig, formConfigSource: 'custom' })
       .eq('spaceId', space.id);
     if (updateErr) {
       console.error('[form-config] update failed', updateErr);
@@ -105,7 +120,7 @@ export async function PUT(req: NextRequest) {
       .insert({
         id: crypto.randomUUID(),
         spaceId: space.id,
-        formConfig,
+        [column]: formConfig,
         formConfigSource: 'custom',
       });
     if (insertErr) {
@@ -120,15 +135,17 @@ export async function PUT(req: NextRequest) {
     resource: 'SpaceSetting',
     resourceId: space.id,
     spaceId: space.id,
-    metadata: { field: 'formConfig', formConfigSource: 'custom', sectionCount: formConfig.sections.length },
+    metadata: { field: column, formConfigSource: 'custom', leadType, sectionCount: formConfig.sections.length },
   });
 
-  return NextResponse.json({ formConfig, formConfigSource: 'custom' as const });
+  return NextResponse.json({ [column]: formConfig, formConfigSource: 'custom' as const, leadType });
 }
 
 /**
  * DELETE /api/form-config
- * Revert to legacy form by clearing formConfig.
+ * Reset form config(s) by clearing the appropriate column(s).
+ * Accepts { slug, leadType?: 'rental' | 'buyer' }
+ * If leadType is omitted, resets BOTH.
  */
 export async function DELETE(req: NextRequest) {
   let body: Record<string, unknown>;
@@ -141,13 +158,30 @@ export async function DELETE(req: NextRequest) {
   const slug = body.slug as string | undefined;
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
+  const leadType = body.leadType as string | undefined;
+
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { userId, space } = auth;
 
+  // Determine what to clear
+  const updates: Record<string, unknown> = {};
+  if (!leadType || leadType === 'rental') {
+    updates.rentalFormConfig = null;
+  }
+  if (!leadType || leadType === 'buyer') {
+    updates.buyerFormConfig = null;
+  }
+
+  // If both are being cleared, also reset source to legacy
+  if (!leadType) {
+    updates.formConfigSource = 'legacy';
+    updates.formConfig = null; // Also clear legacy column
+  }
+
   const { error: updateErr } = await supabase
     .from('SpaceSetting')
-    .update({ formConfig: null, formConfigSource: 'legacy' })
+    .update(updates)
     .eq('spaceId', space.id);
 
   if (updateErr) {
@@ -161,8 +195,8 @@ export async function DELETE(req: NextRequest) {
     resource: 'SpaceSetting',
     resourceId: space.id,
     spaceId: space.id,
-    metadata: { field: 'formConfig', formConfigSource: 'legacy', action: 'reset_to_legacy' },
+    metadata: { field: 'formConfig', formConfigSource: leadType ? 'custom' : 'legacy', action: 'reset', leadType: leadType || 'both' },
   });
 
-  return NextResponse.json({ success: true, formConfigSource: 'legacy' as const });
+  return NextResponse.json({ success: true, formConfigSource: leadType ? 'custom' : ('legacy' as const) });
 }

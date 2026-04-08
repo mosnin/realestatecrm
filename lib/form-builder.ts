@@ -141,27 +141,13 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000004',
-          type: 'radio',
+          type: 'number',
           label: 'Monthly income',
+          placeholder: 'e.g., 5000',
           required: true,
           position: 0,
-          options: [
-            { value: 'under_2000', label: 'Under $2,000' },
-            { value: '2000_3000', label: '$2,000 - $3,000' },
-            { value: '3000_4000', label: '$3,000 - $4,000' },
-            { value: '4000_6000', label: '$4,000 - $6,000' },
-            { value: '6000_plus', label: '$6,000+' },
-          ],
-          scoring: {
-            weight: 7,
-            mappings: [
-              { value: 'under_2000', points: 3 },
-              { value: '2000_3000', points: 5 },
-              { value: '3000_4000', points: 7 },
-              { value: '4000_6000', points: 8 },
-              { value: '6000_plus', points: 10 },
-            ],
-          },
+          scoring: { weight: 7 },
+          validation: { min: 0 },
         },
       ],
     },
@@ -287,74 +273,37 @@ export const DEFAULT_BUYER_FORM_CONFIG: IntakeFormConfig = {
   version: 1,
   leadType: 'buyer',
   sections: [
-    // ── Section 0 (Step 1): Getting Started ──
-    {
-      id: '20000000-0000-4000-a000-000000000000',
-      title: 'Getting Started',
-      description: 'What are you looking for?',
-      position: 0,
-      questions: [
-        {
-          id: '20000000-0000-4000-b000-000000000000',
-          type: 'radio',
-          label: 'Lead type',
-          required: true,
-          position: 0,
-          options: [
-            { value: 'rental', label: "I'm looking to rent" },
-            { value: 'buyer', label: "I'm looking to buy" },
-          ],
-          scoring: { weight: 0 },
-        },
-      ],
-    },
-    // ── Section 1 (Step 2): Basics ──
+    // ── Section 0 (Step 1): Basics ──
     {
       id: '20000000-0000-4000-a000-000000000001',
       title: "Let's start with the basics",
       description: 'We just need a few details to get going.',
-      position: 1,
+      position: 0,
       questions: generateSystemFields(),
     },
-    // ── Section 2 (Step 3): Budget ──
+    // ── Section 1 (Step 2): Budget ──
     {
       id: '20000000-0000-4000-a000-000000000002',
       title: "What's your budget?",
-      position: 2,
+      position: 1,
       questions: [
         {
           id: '20000000-0000-4000-b000-000000000001',
-          type: 'radio',
-          label: 'Budget range',
+          type: 'number',
+          label: 'Purchase budget',
+          placeholder: 'e.g., 450000',
           required: true,
           position: 0,
-          options: [
-            { value: 'under_200k', label: 'Under $200K' },
-            { value: '200k_350k', label: '$200K - $350K' },
-            { value: '350k_500k', label: '$350K - $500K' },
-            { value: '500k_750k', label: '$500K - $750K' },
-            { value: '750k_1m', label: '$750K - $1M' },
-            { value: '1m_plus', label: '$1M+' },
-          ],
-          scoring: {
-            weight: 6,
-            mappings: [
-              { value: 'under_200k', points: 4 },
-              { value: '200k_350k', points: 6 },
-              { value: '350k_500k', points: 7 },
-              { value: '500k_750k', points: 8 },
-              { value: '750k_1m', points: 9 },
-              { value: '1m_plus', points: 10 },
-            ],
-          },
+          scoring: { weight: 6 },
+          validation: { min: 0 },
         },
       ],
     },
-    // ── Section 3 (Step 4): Pre-Approval ──
+    // ── Section 2 (Step 3): Pre-Approval ──
     {
       id: '20000000-0000-4000-a000-000000000003',
       title: 'Are you pre-approved for a mortgage?',
-      position: 3,
+      position: 2,
       questions: [
         {
           id: '20000000-0000-4000-b000-000000000002',
@@ -406,11 +355,11 @@ export const DEFAULT_BUYER_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
-    // ── Section 4 (Step 5): Property Type ──
+    // ── Section 3 (Step 4): Property Type ──
     {
       id: '20000000-0000-4000-a000-000000000004',
       title: 'What type of property are you looking for?',
-      position: 4,
+      position: 3,
       questions: [
         {
           id: '20000000-0000-4000-b000-000000000005',
@@ -456,12 +405,12 @@ export const DEFAULT_BUYER_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
-    // ── Section 5 (Step 6): Must-Haves ──
+    // ── Section 4 (Step 5): Must-Haves ──
     {
       id: '20000000-0000-4000-a000-000000000005',
       title: 'Any must-haves?',
       description: 'Select all that apply.',
-      position: 5,
+      position: 4,
       questions: [
         {
           id: '20000000-0000-4000-b000-000000000008',
@@ -483,11 +432,11 @@ export const DEFAULT_BUYER_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
-    // ── Section 6 (Step 7): Timeline ──
+    // ── Section 5 (Step 6): Timeline ──
     {
       id: '20000000-0000-4000-a000-000000000006',
       title: 'When do you want to close?',
-      position: 6,
+      position: 5,
       questions: [
         {
           id: '20000000-0000-4000-b000-000000000009',
@@ -513,11 +462,11 @@ export const DEFAULT_BUYER_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
-    // ── Section 7 (Step 8): About You ──
+    // ── Section 6 (Step 7): About You ──
     {
       id: '20000000-0000-4000-a000-000000000007',
       title: 'Tell us about you',
-      position: 7,
+      position: 6,
       questions: [
         {
           id: '20000000-0000-4000-b000-000000000010',
@@ -547,11 +496,11 @@ export const DEFAULT_BUYER_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
-    // ── Section 8 (Step 9): Ready? ──
+    // ── Section 7 (Step 8): Ready? ──
     {
       id: '20000000-0000-4000-a000-000000000008',
       title: 'If you find the right place, are you ready to move forward?',
-      position: 8,
+      position: 7,
       questions: [
         {
           id: '20000000-0000-4000-b000-000000000012',

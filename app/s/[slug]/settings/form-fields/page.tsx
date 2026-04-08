@@ -12,13 +12,12 @@ import {
   Eye,
   Pencil,
   Home,
-  Users,
+  Key,
   CheckCircle2,
   AlertCircle,
   Info,
   Lightbulb,
   Gauge,
-  Shuffle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormBuilder } from '@/components/form-builder';
@@ -27,47 +26,37 @@ import { OptimizationPanel } from '@/components/form-builder/optimization-panel'
 import { ScoringPreview } from '@/components/form-builder/scoring-preview';
 import { TEMPLATES } from '@/components/form-builder/templates';
 import type { IntakeFormConfig } from '@/components/form-builder/types';
-import type { TemplateName } from '@/components/form-builder/templates';
 
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
 type FormConfigSource = 'custom' | 'brokerage' | 'legacy';
-
-/** Human-friendly labels for each form type */
-const FORM_TYPE_LABELS: Record<string, string> = {
-  rental: 'Rental Application',
-  buyer: 'Buyer Inquiry',
-  general: 'Universal (Rent & Buy)',
-};
-
-/** Detect which standard template the config matches, if any */
-function detectActiveTemplate(config: IntakeFormConfig): TemplateName | null {
-  if (config.leadType === 'general') return 'unified';
-  return config.leadType === 'rental'
-    ? 'rental'
-    : config.leadType === 'buyer'
-      ? 'buyer'
-      : null;
-}
+type LeadType = 'rental' | 'buyer';
 
 export default function FormFieldsSettingsPage() {
   const params = useParams<{ slug: string }>();
   const slug = params?.slug ?? '';
 
-  const [config, setConfig] = useState<IntakeFormConfig>(deepClone(TEMPLATES.rental.config));
+  // ── Primary tab: which form are we editing ──
+  const [activeLeadType, setActiveLeadType] = useState<LeadType>('rental');
+
+  // ── Per-form state ──
+  const [rentalConfig, setRentalConfig] = useState<IntakeFormConfig>(deepClone(TEMPLATES.rental.config));
+  const [buyerConfig, setBuyerConfig] = useState<IntakeFormConfig>(deepClone(TEMPLATES.buyer.config));
+  const [rentalHasChanges, setRentalHasChanges] = useState(false);
+  const [buyerHasChanges, setBuyerHasChanges] = useState(false);
+  const [rentalHasSavedConfig, setRentalHasSavedConfig] = useState(false);
+  const [buyerHasSavedConfig, setBuyerHasSavedConfig] = useState(false);
+  const rentalSavedRef = useRef<string>('');
+  const buyerSavedRef = useRef<string>('');
+
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>('builder');
-  const [hasChanges, setHasChanges] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<string>('builder');
   const [configSource, setConfigSource] = useState<FormConfigSource>('legacy');
-  const [hasSavedConfig, setHasSavedConfig] = useState(false);
 
-  // Track the last-saved config to detect unsaved changes accurately
-  const savedConfigRef = useRef<string>('');
-
-  // Load existing config from the API
+  // Load existing configs from the API
   useEffect(() => {
     if (!slug) return;
     fetch(`/api/form-config?slug=${encodeURIComponent(slug)}`)
@@ -75,52 +64,72 @@ export default function FormFieldsSettingsPage() {
         if (!r.ok) throw new Error('Not found');
         return r.json();
       })
-      .then((data: { formConfig: IntakeFormConfig | null; formConfigSource: FormConfigSource }) => {
+      .then((data: {
+        rentalFormConfig: IntakeFormConfig | null;
+        buyerFormConfig: IntakeFormConfig | null;
+        formConfigSource: FormConfigSource;
+      }) => {
         const source = data.formConfigSource ?? 'legacy';
         setConfigSource(source);
 
-        if (data.formConfig?.sections) {
-          // Saved custom or brokerage config exists -- load it
-          setConfig(data.formConfig);
-          setHasSavedConfig(true);
-          savedConfigRef.current = JSON.stringify(data.formConfig);
+        // Rental config
+        if (data.rentalFormConfig?.sections) {
+          setRentalConfig(data.rentalFormConfig);
+          setRentalHasSavedConfig(true);
+          rentalSavedRef.current = JSON.stringify(data.rentalFormConfig);
         } else {
-          // Legacy / no saved config -- show the rental template as the default
           const defaultConfig = deepClone(TEMPLATES.rental.config);
-          setConfig(defaultConfig);
-          setHasSavedConfig(false);
-          savedConfigRef.current = JSON.stringify(defaultConfig);
+          setRentalConfig(defaultConfig);
+          setRentalHasSavedConfig(false);
+          rentalSavedRef.current = JSON.stringify(defaultConfig);
+        }
+
+        // Buyer config
+        if (data.buyerFormConfig?.sections) {
+          setBuyerConfig(data.buyerFormConfig);
+          setBuyerHasSavedConfig(true);
+          buyerSavedRef.current = JSON.stringify(data.buyerFormConfig);
+        } else {
+          const defaultConfig = deepClone(TEMPLATES.buyer.config);
+          setBuyerConfig(defaultConfig);
+          setBuyerHasSavedConfig(false);
+          buyerSavedRef.current = JSON.stringify(defaultConfig);
         }
       })
       .catch(() => {
-        // Network error or no existing config -- start with rental default
-        const defaultConfig = deepClone(TEMPLATES.rental.config);
-        setConfig(defaultConfig);
-        savedConfigRef.current = JSON.stringify(defaultConfig);
+        const defaultRental = deepClone(TEMPLATES.rental.config);
+        const defaultBuyer = deepClone(TEMPLATES.buyer.config);
+        setRentalConfig(defaultRental);
+        setBuyerConfig(defaultBuyer);
+        rentalSavedRef.current = JSON.stringify(defaultRental);
+        buyerSavedRef.current = JSON.stringify(defaultBuyer);
       })
       .finally(() => setLoading(false));
   }, [slug]);
 
-  const handleConfigChange = useCallback((newConfig: IntakeFormConfig) => {
-    setConfig(newConfig);
-    setHasChanges(JSON.stringify(newConfig) !== savedConfigRef.current);
-  }, []);
+  // ── Active config accessor ──
+  const config = activeLeadType === 'rental' ? rentalConfig : buyerConfig;
+  const hasChanges = activeLeadType === 'rental' ? rentalHasChanges : buyerHasChanges;
+  const hasSavedConfig = activeLeadType === 'rental' ? rentalHasSavedConfig : buyerHasSavedConfig;
 
-  const handleSwitchTemplate = useCallback((name: TemplateName) => {
-    const template = TEMPLATES[name];
-    const newConfig = deepClone(template.config);
-    setConfig(newConfig);
-    setHasChanges(JSON.stringify(newConfig) !== savedConfigRef.current);
-    toast.success(`Switched to ${FORM_TYPE_LABELS[template.config.leadType] ?? template.label} form`);
-  }, []);
+  const handleConfigChange = useCallback((newConfig: IntakeFormConfig) => {
+    if (activeLeadType === 'rental') {
+      setRentalConfig(newConfig);
+      setRentalHasChanges(JSON.stringify(newConfig) !== rentalSavedRef.current);
+    } else {
+      setBuyerConfig(newConfig);
+      setBuyerHasChanges(JSON.stringify(newConfig) !== buyerSavedRef.current);
+    }
+  }, [activeLeadType]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
+    const currentConfig = activeLeadType === 'rental' ? rentalConfig : buyerConfig;
     try {
       const res = await fetch('/api/form-config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, formConfig: config }),
+        body: JSON.stringify({ slug, leadType: activeLeadType, formConfig: currentConfig }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -128,21 +137,30 @@ export default function FormFieldsSettingsPage() {
       }
       const result = await res.json().catch(() => ({}));
       setConfigSource(result.formConfigSource ?? 'custom');
-      setHasSavedConfig(true);
-      setHasChanges(false);
-      savedConfigRef.current = JSON.stringify(config);
-      toast.success('Form saved successfully.');
+
+      if (activeLeadType === 'rental') {
+        setRentalHasSavedConfig(true);
+        setRentalHasChanges(false);
+        rentalSavedRef.current = JSON.stringify(currentConfig);
+      } else {
+        setBuyerHasSavedConfig(true);
+        setBuyerHasChanges(false);
+        buyerSavedRef.current = JSON.stringify(currentConfig);
+      }
+
+      toast.success(`${activeLeadType === 'rental' ? 'Rental' : 'Buyer'} form saved successfully.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
       setSaving(false);
     }
-  }, [slug, config]);
+  }, [slug, activeLeadType, rentalConfig, buyerConfig]);
 
   const handleReset = useCallback(async () => {
+    const label = activeLeadType === 'rental' ? 'rental' : 'buyer';
     if (
       !confirm(
-        'Reset to the standard Chippi rental form? Your custom changes will be removed and applicants will see the default form.',
+        `Reset the ${label} form to the standard Chippi default? Your custom changes will be removed.`,
       )
     )
       return;
@@ -150,26 +168,29 @@ export default function FormFieldsSettingsPage() {
       const res = await fetch('/api/form-config', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug }),
+        body: JSON.stringify({ slug, leadType: activeLeadType }),
       });
       if (!res.ok) {
         throw new Error('Failed to reset form configuration.');
       }
-      const defaultConfig = deepClone(TEMPLATES.rental.config);
-      setConfig(defaultConfig);
-      setConfigSource('legacy');
-      setHasSavedConfig(false);
-      setHasChanges(false);
-      savedConfigRef.current = JSON.stringify(defaultConfig);
-      toast.success('Form reset to the standard Chippi default.');
+      const templateKey = activeLeadType === 'rental' ? 'rental' : 'buyer';
+      const defaultConfig = deepClone(TEMPLATES[templateKey].config);
+      if (activeLeadType === 'rental') {
+        setRentalConfig(defaultConfig);
+        setRentalHasSavedConfig(false);
+        setRentalHasChanges(false);
+        rentalSavedRef.current = JSON.stringify(defaultConfig);
+      } else {
+        setBuyerConfig(defaultConfig);
+        setBuyerHasSavedConfig(false);
+        setBuyerHasChanges(false);
+        buyerSavedRef.current = JSON.stringify(defaultConfig);
+      }
+      toast.success(`${activeLeadType === 'rental' ? 'Rental' : 'Buyer'} form reset to the standard Chippi default.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     }
-  }, [slug]);
-
-  // Derived display values
-  const activeTemplate = detectActiveTemplate(config);
-  const formLabel = FORM_TYPE_LABELS[config.leadType] ?? 'Custom Form';
+  }, [slug, activeLeadType]);
 
   if (loading) {
     return (
@@ -182,13 +203,13 @@ export default function FormFieldsSettingsPage() {
 
   return (
     <div className="space-y-6">
-      {/* ── Header with active form status ── */}
+      {/* ── Header ── */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="space-y-1">
             <h1 className="text-xl font-semibold tracking-tight">Intake Form</h1>
             <p className="text-muted-foreground text-sm">
-              Customize the form applicants fill out when they inquire about your listings.
+              Customize the forms applicants see. Your intake link shows a &quot;Getting Started&quot; step that routes to the correct form.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -216,14 +237,49 @@ export default function FormFieldsSettingsPage() {
           </div>
         </div>
 
+        {/* ── Primary tabs: Rental Form / Buyer Form ── */}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveLeadType('rental')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
+              activeLeadType === 'rental'
+                ? 'border-orange-400 bg-orange-50 text-orange-700 shadow-sm'
+                : 'border-border text-muted-foreground hover:border-muted-foreground/30'
+            }`}
+          >
+            <Home size={16} />
+            Rental Form
+            {rentalHasChanges && (
+              <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveLeadType('buyer')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
+              activeLeadType === 'buyer'
+                ? 'border-blue-400 bg-blue-50 text-blue-700 shadow-sm'
+                : 'border-border text-muted-foreground hover:border-muted-foreground/30'
+            }`}
+          >
+            <Key size={16} />
+            Buyer Form
+            {buyerHasChanges && (
+              <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+            )}
+          </button>
+        </div>
+
         {/* ── Active form status bar ── */}
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-            {/* Current form identity */}
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <Pencil size={16} className="text-muted-foreground flex-shrink-0" />
-                <span className="text-sm font-semibold">Editing: {formLabel}</span>
+                <span className="text-sm font-semibold">
+                  Editing: {activeLeadType === 'rental' ? 'Rental Application' : 'Buyer Inquiry'}
+                </span>
               </div>
               {configSource === 'custom' && hasSavedConfig && (
                 <Badge variant="secondary" className="text-[10px]">Custom</Badge>
@@ -235,43 +291,13 @@ export default function FormFieldsSettingsPage() {
                 <Badge variant="outline" className="text-[10px]">Default</Badge>
               )}
             </div>
-
-            {/* Form switcher */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-xs text-muted-foreground mr-1">Switch to:</span>
-              <Button
-                variant={activeTemplate === 'unified' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleSwitchTemplate('unified')}
-                disabled={activeTemplate === 'unified'}
-              >
-                <Shuffle size={14} className="mr-1.5" /> Universal
-              </Button>
-              <Button
-                variant={activeTemplate === 'rental' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleSwitchTemplate('rental')}
-                disabled={activeTemplate === 'rental'}
-              >
-                <Home size={14} className="mr-1.5" /> Rental
-              </Button>
-              <Button
-                variant={activeTemplate === 'buyer' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleSwitchTemplate('buyer')}
-                disabled={activeTemplate === 'buyer'}
-              >
-                <Users size={14} className="mr-1.5" /> Buyer
-              </Button>
-            </div>
           </div>
 
-          {/* Contextual hint */}
           {configSource === 'legacy' && !hasSavedConfig && (
             <div className="px-5 py-2.5 border-t border-border bg-blue-50/50 flex items-start gap-2">
               <Info size={14} className="text-blue-500 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-blue-700">
-                You are using the standard Chippi form. Customize the fields below and save to create your own version.
+                You are using the standard Chippi {activeLeadType === 'rental' ? 'rental' : 'buyer'} form. Customize the fields below and save to create your own version.
               </p>
             </div>
           )}
@@ -286,8 +312,8 @@ export default function FormFieldsSettingsPage() {
         </div>
       </div>
 
-      {/* ── Builder / Preview / Optimize / Test Scoring tabs ── */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      {/* ── Builder / Preview / Optimize / Test Scoring sub-tabs ── */}
+      <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
         <TabsList>
           <TabsTrigger value="builder">
             <Pencil size={14} className="mr-1.5" /> Builder
