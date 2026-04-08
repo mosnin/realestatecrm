@@ -203,7 +203,7 @@ function SortableSection({
 
   return (
     <div
-      ref={(node) => {
+      ref={(node: HTMLDivElement | null) => {
         setSortableRef(node);
         setDroppableRef(node);
       }}
