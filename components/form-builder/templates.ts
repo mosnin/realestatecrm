@@ -41,7 +41,7 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
       position: 1,
       questions: [
         {
-          id: id(),
+          id: 'name',
           type: 'text',
           label: 'Full Name',
           placeholder: 'Alex Johnson',
@@ -50,7 +50,7 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
           system: true,
         },
         {
-          id: id(),
+          id: 'email',
           type: 'email',
           label: 'Email',
           placeholder: 'alex@email.com',
@@ -59,7 +59,7 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
           system: true,
         },
         {
-          id: id(),
+          id: 'phone',
           type: 'phone',
           label: 'Phone',
           placeholder: '(555) 123-4567',
@@ -299,7 +299,7 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
       position: 1,
       questions: [
         {
-          id: id(),
+          id: 'name',
           type: 'text',
           label: 'Full Name',
           placeholder: 'Alex Johnson',
@@ -308,7 +308,7 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
           system: true,
         },
         {
-          id: id(),
+          id: 'email',
           type: 'email',
           label: 'Email',
           placeholder: 'alex@email.com',
@@ -317,7 +317,7 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
           system: true,
         },
         {
-          id: id(),
+          id: 'phone',
           type: 'phone',
           label: 'Phone',
           placeholder: '(555) 123-4567',
@@ -360,7 +360,7 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
       position: 3,
       questions: [
         {
-          id: id(),
+          id: 'preApproval',
           type: 'radio',
           label: 'Are you pre-approved for a mortgage?',
           required: false,
