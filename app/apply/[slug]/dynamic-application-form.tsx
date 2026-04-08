@@ -521,9 +521,16 @@ export function DynamicApplicationForm({
       if (selectedLeadType && rentalFormConfig) return rentalFormConfig;
       if (selectedLeadType && buyerFormConfig) return buyerFormConfig;
       // Return a placeholder config until user selects
-      return rentalFormConfig || buyerFormConfig || formConfig!;
+      if (rentalFormConfig) return rentalFormConfig;
+      if (buyerFormConfig) return buyerFormConfig;
     }
-    return formConfig!;
+    // Fallback: use legacy formConfig or a safe empty config to prevent crashes
+    // when neither formConfig nor dual configs are provided.
+    return formConfig ?? {
+      version: 1,
+      leadType: 'rental' as const,
+      sections: [],
+    };
   })();
 
   // Sort sections and questions by position
@@ -982,11 +989,14 @@ export function DynamicApplicationForm({
         s.questions.filter((q) => isQuestionVisible(q, answers)).map((q) => q.id),
       ),
     );
-    const flatAnswers: Record<string, string> = {};
+    const flatAnswers: Record<string, string | string[]> = {};
     for (const [key, val] of Object.entries(answers)) {
       if (key === 'privacyConsent' || key === 'chippiTosConsent') continue;
       if (!visibleQuestionIds.has(key)) continue;
-      flatAnswers[key] = Array.isArray(val) ? val.join(',') : val;
+      // Preserve arrays for multi_select fields so the API Zod schema
+      // (z.array(z.string())) validates correctly instead of receiving a
+      // comma-joined string.
+      flatAnswers[key] = val;
     }
 
     // Determine lead type for submission
