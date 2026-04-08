@@ -270,28 +270,40 @@ export function ApplicationStatusManager({
       <div className="space-y-2">
         <button
           onClick={() => setShowMessages(!showMessages)}
-          className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+          aria-expanded={showMessages}
+          aria-controls="realtor-messages-panel"
+          className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors min-h-[44px]"
         >
-          <MessageSquare size={12} />
+          <MessageSquare size={12} aria-hidden="true" />
           Applicant Messages
           {unreadCount > 0 && (
-            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+            <span
+              className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold"
+              aria-label={`${unreadCount} unread messages`}
+            >
               {unreadCount}
             </span>
           )}
           <ChevronDown
             size={12}
             className={cn('transition-transform', showMessages && 'rotate-180')}
+            aria-hidden="true"
           />
         </button>
 
         {showMessages && (
-          <div className="rounded-lg border border-border overflow-hidden">
+          <div id="realtor-messages-panel" className="rounded-lg border border-border overflow-hidden">
             {/* Message list */}
-            <div className="max-h-60 overflow-y-auto p-3 space-y-2 bg-muted/20">
+            <div
+              role="log"
+              aria-live="polite"
+              aria-label="Applicant message history"
+              className="max-h-60 overflow-y-auto p-3 space-y-2 bg-muted/20"
+            >
               {loadingMessages ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 size={16} className="animate-spin text-muted-foreground" />
+                <div className="flex items-center justify-center py-4" role="status">
+                  <Loader2 size={16} className="animate-spin text-muted-foreground" aria-hidden="true" />
+                  <span className="sr-only">Loading messages</span>
                 </div>
               ) : messages.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-4">
@@ -320,14 +332,17 @@ export function ApplicationStatusManager({
                           {isRealtor ? 'You' : 'Applicant'}
                         </p>
                         <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                        <p className="opacity-50 mt-0.5 text-[10px]">
+                        <time
+                          dateTime={msg.createdAt}
+                          className="opacity-50 mt-0.5 text-[10px] block"
+                        >
                           {new Date(msg.createdAt).toLocaleString('en-US', {
                             month: 'short',
                             day: 'numeric',
                             hour: 'numeric',
                             minute: '2-digit',
                           })}
-                        </p>
+                        </time>
                       </div>
                     </div>
                   );
@@ -349,25 +364,27 @@ export function ApplicationStatusManager({
                       sendMessage();
                     }
                   }}
+                  aria-label="Message to applicant"
                   placeholder="Send a message to applicant..."
                   maxLength={2000}
-                  className="flex-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="flex-1 rounded-md border border-border bg-background px-2.5 min-h-[44px] text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   disabled={sendingMessage}
                 />
                 <button
                   onClick={sendMessage}
                   disabled={!messageText.trim() || sendingMessage}
+                  aria-label={sendingMessage ? 'Sending message' : 'Send message'}
                   className={cn(
-                    'rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                    'rounded-md min-w-[44px] min-h-[44px] flex items-center justify-center text-xs font-medium transition-colors',
                     messageText.trim() && !sendingMessage
                       ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                       : 'bg-muted text-muted-foreground cursor-not-allowed',
                   )}
                 >
                   {sendingMessage ? (
-                    <Loader2 size={12} className="animate-spin" />
+                    <Loader2 size={12} className="animate-spin" aria-hidden="true" />
                   ) : (
-                    <Send size={12} />
+                    <Send size={12} aria-hidden="true" />
                   )}
                 </button>
               </div>
@@ -378,9 +395,10 @@ export function ApplicationStatusManager({
               <button
                 onClick={fetchMessages}
                 disabled={loadingMessages}
-                className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Refresh messages"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors min-h-[44px] px-1"
               >
-                <RefreshCw size={10} className={cn(loadingMessages && 'animate-spin')} />
+                <RefreshCw size={10} className={cn(loadingMessages && 'animate-spin')} aria-hidden="true" />
                 Refresh
               </button>
             </div>
@@ -388,7 +406,7 @@ export function ApplicationStatusManager({
         )}
       </div>
 
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
