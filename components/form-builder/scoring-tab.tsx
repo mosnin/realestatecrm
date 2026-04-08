@@ -3,28 +3,34 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import {
   Loader2,
-  RefreshCw,
   Sparkles,
-  Info,
+  Save,
+  ChevronDown,
+  ChevronRight,
+  Minus,
   Plus,
-  Trash2,
-  AlertTriangle,
+  Info,
   CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import type { IntakeFormConfig, FormQuestion } from './types';
-import type { ScoringModel, NumberRange } from '@/lib/scoring/scoring-model-types';
+import type { ScoringModel, QuestionScoringModel, NumberRange } from '@/lib/scoring/scoring-model-types';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface ScoringTabProps {
   config: IntakeFormConfig;
   slug: string;
+  leadType: 'rental' | 'buyer';
   scoringModel: ScoringModel | null;
   onScoringModelChange: (model: ScoringModel) => void;
+  onSave: (model: ScoringModel) => Promise<void>;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -41,306 +47,275 @@ function formatTimeAgo(isoStr: string): string {
   const diff = Date.now() - new Date(isoStr).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
+  if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
+  return `${days}d ago`;
 }
 
-function getWeightColor(weight: number): string {
-  if (weight >= 25) return 'bg-emerald-500';
-  if (weight >= 15) return 'bg-emerald-400';
-  if (weight >= 10) return 'bg-amber-400';
-  if (weight >= 5) return 'bg-amber-300';
+function weightBarColor(weight: number): string {
+  if (weight >= 20) return 'bg-emerald-500';
+  if (weight >= 10) return 'bg-amber-500';
+  if (weight >= 5) return 'bg-orange-400';
   return 'bg-gray-300';
 }
 
-function getScoreColor(score: number): string {
-  if (score >= 80) return 'text-emerald-600';
-  if (score >= 50) return 'text-amber-600';
-  if (score >= 20) return 'text-orange-500';
-  return 'text-red-500';
+function scoreBarColor(score: number): string {
+  if (score >= 75) return 'bg-emerald-500';
+  if (score >= 50) return 'bg-amber-500';
+  if (score >= 25) return 'bg-orange-400';
+  return 'bg-red-400';
 }
 
-// ── Weight Slider (HTML range input) ─────────────────────────────────────────
+// ── Question Scoring Card ────────────────────────────────────────────────────
 
-function WeightSlider({
-  questionId,
-  label,
-  weight,
-  onWeightChange,
-}: {
-  questionId: string;
-  label: string;
-  weight: number;
-  onWeightChange: (id: string, newWeight: number) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium truncate max-w-[70%]">{label}</span>
-        <span className={`text-xs font-bold tabular-nums ${getWeightColor(weight).replace('bg-', 'text-').replace('-500', '-700').replace('-400', '-600').replace('-300', '-500')}`}>
-          {weight}%
-        </span>
-      </div>
-      <div className="flex items-center gap-3">
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={weight}
-          onChange={(e) => onWeightChange(questionId, parseInt(e.target.value, 10))}
-          className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer"
-          style={{
-            background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${weight}%, hsl(var(--muted)) ${weight}%, hsl(var(--muted)) 100%)`,
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
-// ── Option Scores Table ──────────────────────────────────────────────────────
-
-function OptionScoresEditor({
-  questionId,
+function QuestionCard({
   question,
-  optionScores,
+  model,
+  enabled,
+  onToggle,
+  onWeightChange,
   onOptionScoreChange,
-}: {
-  questionId: string;
-  question: FormQuestion;
-  optionScores: Record<string, number>;
-  onOptionScoreChange: (questionId: string, optValue: string, score: number) => void;
-}) {
-  const options = question.options ?? [];
-  if (options.length === 0) return null;
-
-  return (
-    <div className="ml-4 pl-4 border-l-2 border-muted space-y-1.5">
-      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-        Option Scores
-      </p>
-      {options.map((opt) => {
-        const score = optionScores[opt.value] ?? 0;
-        return (
-          <div key={opt.value} className="flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground truncate min-w-[100px] max-w-[160px]">
-              {opt.label}
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={score}
-              onChange={(e) =>
-                onOptionScoreChange(questionId, opt.value, parseInt(e.target.value, 10))
-              }
-              className="flex-1 h-1 rounded-full appearance-none cursor-pointer accent-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer"
-              style={{
-                background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${score}%, hsl(var(--muted)) ${score}%, hsl(var(--muted)) 100%)`,
-              }}
-            />
-            <span className={`text-[11px] font-mono w-8 text-right ${getScoreColor(score)}`}>
-              {score}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Range Buckets Editor ─────────────────────────────────────────────────────
-
-function RangeBucketsEditor({
-  questionId,
-  ranges,
   onRangeChange,
   onAddRange,
   onRemoveRange,
 }: {
-  questionId: string;
-  ranges: NumberRange[];
-  onRangeChange: (
-    questionId: string,
-    index: number,
-    field: 'min' | 'max' | 'points' | 'label',
-    value: number | string | null,
-  ) => void;
-  onAddRange: (questionId: string) => void;
-  onRemoveRange: (questionId: string, index: number) => void;
+  question: FormQuestion;
+  model: QuestionScoringModel | undefined;
+  enabled: boolean;
+  onToggle: () => void;
+  onWeightChange: (delta: number) => void;
+  onOptionScoreChange: (optValue: string, score: number) => void;
+  onRangeChange: (idx: number, field: keyof NumberRange, value: number | string | null) => void;
+  onAddRange: () => void;
+  onRemoveRange: (idx: number) => void;
 }) {
-  if (ranges.length === 0) return null;
+  const [expanded, setExpanded] = useState(false);
+  const weight = model?.weight ?? 0;
+  const hasOptions = question.options && question.options.length > 0;
+  const hasRanges = model?.ranges && model.ranges.length > 0;
+  const showDetails = hasOptions || hasRanges;
+  const sectionTitle = question.label;
 
   return (
-    <div className="ml-4 pl-4 border-l-2 border-muted space-y-2">
-      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-        Range Buckets
-      </p>
-      {ranges.map((range, i) => (
-        <div key={i} className="flex items-center gap-2 text-[11px]">
-          <span className="text-muted-foreground shrink-0">$</span>
-          <Input
-            type="number"
-            value={range.min}
-            onChange={(e) =>
-              onRangeChange(questionId, i, 'min', parseInt(e.target.value, 10) || 0)
-            }
-            className="w-20 h-6 text-[11px] px-1.5"
-          />
-          <span className="text-muted-foreground shrink-0">to</span>
-          <Input
-            type="number"
-            value={range.max ?? ''}
-            placeholder="no limit"
-            onChange={(e) => {
-              const val = e.target.value;
-              onRangeChange(
-                questionId,
-                i,
-                'max',
-                val === '' ? null : parseInt(val, 10) || 0,
-              );
-            }}
-            className="w-20 h-6 text-[11px] px-1.5"
-          />
-          <span className="text-muted-foreground shrink-0 mx-1">=</span>
-          <Input
-            type="number"
-            min={0}
-            max={100}
-            value={range.points}
-            onChange={(e) =>
-              onRangeChange(
-                questionId,
-                i,
-                'points',
-                Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)),
-              )
-            }
-            className="w-14 h-6 text-[11px] px-1.5"
-          />
-          <span className="text-muted-foreground shrink-0">pts</span>
-          {ranges.length > 1 && (
+    <div
+      className={cn(
+        'rounded-xl border transition-all',
+        enabled
+          ? 'border-border bg-card'
+          : 'border-border/40 bg-muted/30 opacity-60',
+      )}
+    >
+      {/* Header row */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <Switch
+          checked={enabled}
+          onCheckedChange={onToggle}
+          className="flex-shrink-0"
+        />
+
+        <div className="flex-1 min-w-0">
+          <p className={cn('text-sm font-medium truncate', !enabled && 'text-muted-foreground')}>
+            {sectionTitle}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
+              {question.type}
+            </Badge>
+            {question.required && (
+              <Badge variant="secondary" className="text-[9px] px-1.5 py-0 text-amber-600 border-amber-200 bg-amber-50">
+                Required
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {/* Weight display + controls */}
+        {enabled && (
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <button
               type="button"
-              onClick={() => onRemoveRange(questionId, i)}
-              className="text-muted-foreground hover:text-red-500 transition-colors shrink-0"
-              title="Remove range"
+              onClick={() => onWeightChange(-5)}
+              disabled={weight <= 0}
+              className="w-7 h-7 rounded-md border border-border flex items-center justify-center hover:bg-muted transition-colors disabled:opacity-30"
             >
-              <Trash2 size={11} />
+              <Minus size={12} />
             </button>
+            <span className="text-lg font-bold tabular-nums text-primary min-w-[40px] text-center">
+              {weight}%
+            </span>
+            <button
+              type="button"
+              onClick={() => onWeightChange(5)}
+              disabled={weight >= 100}
+              className="w-7 h-7 rounded-md border border-border flex items-center justify-center hover:bg-muted transition-colors disabled:opacity-30"
+            >
+              <Plus size={12} />
+            </button>
+          </div>
+        )}
+
+        {/* Expand toggle for details */}
+        {enabled && showDetails && (
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+        )}
+      </div>
+
+      {/* Weight bar */}
+      {enabled && (
+        <div className="px-4 pb-3">
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className={cn('h-full rounded-full transition-all duration-300', weightBarColor(weight))}
+              style={{ width: `${weight}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Expanded details */}
+      {enabled && expanded && (
+        <div className="border-t border-border px-4 py-3 space-y-3">
+          {/* Option scores for radio/select */}
+          {hasOptions && model?.optionScores && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Option Scores
+              </p>
+              {question.options!.map((opt) => {
+                const score = model.optionScores?.[opt.value] ?? 0;
+                return (
+                  <div key={opt.value} className="flex items-center gap-3">
+                    <span className="text-xs text-foreground min-w-0 flex-1 truncate">
+                      {opt.label}
+                    </span>
+                    <div className="w-24 h-1.5 rounded-full bg-muted overflow-hidden flex-shrink-0">
+                      <div
+                        className={cn('h-full rounded-full transition-all', scoreBarColor(score))}
+                        style={{ width: `${score}%` }}
+                      />
+                    </div>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={score}
+                      onChange={(e) => onOptionScoreChange(opt.value, Number(e.target.value) || 0)}
+                      className="w-16 h-7 text-xs text-center"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Range buckets for number fields */}
+          {hasRanges && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Score Ranges
+              </p>
+              {model!.ranges!.map((range, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    value={range.min}
+                    onChange={(e) => onRangeChange(idx, 'min', Number(e.target.value))}
+                    placeholder="Min"
+                    className="w-20 h-7 text-xs"
+                  />
+                  <span className="text-xs text-muted-foreground">to</span>
+                  <Input
+                    type="number"
+                    value={range.max ?? ''}
+                    onChange={(e) => onRangeChange(idx, 'max', e.target.value ? Number(e.target.value) : null)}
+                    placeholder="Max (∞)"
+                    className="w-20 h-7 text-xs"
+                  />
+                  <span className="text-xs text-muted-foreground">=</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={range.points}
+                    onChange={(e) => onRangeChange(idx, 'points', Number(e.target.value) || 0)}
+                    className="w-16 h-7 text-xs"
+                  />
+                  <span className="text-[10px] text-muted-foreground">pts</span>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveRange(idx)}
+                    className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-destructive"
+                  >
+                    <Minus size={12} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={onAddRange}
+                className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1"
+              >
+                <Plus size={12} /> Add range
+              </button>
+            </div>
           )}
         </div>
-      ))}
-      {ranges.length < 8 && (
-        <button
-          type="button"
-          onClick={() => onAddRange(questionId)}
-          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
-        >
-          <Plus size={11} /> Add range
-        </button>
       )}
     </div>
   );
 }
 
-// ── Total Weight Bar ─────────────────────────────────────────────────────────
-
-function TotalWeightBar({
-  total,
-  onRebalance,
-}: {
-  total: number;
-  onRebalance: () => void;
-}) {
-  const isValid = total === 100;
-  const barWidth = Math.min(100, total);
-  const barColor = isValid
-    ? 'bg-emerald-500'
-    : total > 100
-      ? 'bg-red-500'
-      : 'bg-amber-500';
-
-  return (
-    <div className="rounded-lg border border-border bg-card px-4 py-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold">Total Weight</span>
-          {isValid ? (
-            <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-300 bg-emerald-50 gap-1">
-              <CheckCircle2 size={10} /> 100%
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 bg-amber-50 gap-1">
-              <AlertTriangle size={10} /> {total}%
-            </Badge>
-          )}
-        </div>
-        {!isValid && (
-          <Button variant="outline" size="sm" onClick={onRebalance} className="h-6 text-[11px] px-2">
-            <RefreshCw size={11} className="mr-1" /> Rebalance
-          </Button>
-        )}
-      </div>
-      <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-300 ${barColor}`}
-          style={{ width: `${barWidth}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Main Component
-// ═══════════════════════════════════════════════════════════════════════════════
+// ── Main Scoring Tab ─────────────────────────────────────────────────────────
 
 export function ScoringTab({
   config,
   slug,
+  leadType,
   scoringModel,
   onScoringModelChange,
+  onSave,
 }: ScoringTabProps) {
   const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // All scorable questions from the form config
+  // Get all scorable questions
   const scorableQuestions = useMemo(() => {
-    const qs: { question: FormQuestion; sectionTitle: string }[] = [];
+    const qs: FormQuestion[] = [];
     for (const section of config.sections) {
       for (const q of section.questions) {
-        if (isScorableQuestion(q)) {
-          qs.push({ question: q, sectionTitle: section.title });
-        }
+        if (isScorableQuestion(q)) qs.push(q);
       }
     }
     return qs;
   }, [config]);
 
-  // Non-scorable questions (system fields, etc.)
+  // Non-scorable fields
   const nonScorableQuestions = useMemo(() => {
     const qs: FormQuestion[] = [];
     for (const section of config.sections) {
       for (const q of section.questions) {
-        if (!isScorableQuestion(q)) {
-          qs.push(q);
-        }
+        if (!isScorableQuestion(q)) qs.push(q);
       }
     }
     return qs;
   }, [config]);
 
-  // Compute current total weight
+  // Total weight
   const totalWeight = useMemo(() => {
     if (!scoringModel) return 0;
-    return Object.values(scoringModel.weights).reduce((s, w) => s + w.weight, 0);
+    return Object.values(scoringModel.weights).reduce((sum, q) => sum + q.weight, 0);
   }, [scoringModel]);
 
-  // ── Generate / Regenerate ──────────────────────────────────────────────────
+  // ── Generate scoring model ─────────────────────────────────────────────────
 
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
@@ -348,129 +323,166 @@ export function ScoringTab({
       const res = await fetch('/api/form-config/generate-scoring', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slug,
-          leadType: config.leadType === 'general' ? 'rental' : config.leadType,
-          formConfig: config,
-        }),
+        body: JSON.stringify({ slug, leadType, formConfig: config }),
       });
-
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to generate scoring model');
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Failed to generate scoring model');
       }
-
-      const { scoringModel: newModel } = await res.json();
-      onScoringModelChange(newModel);
-      toast.success('Scoring model generated successfully.');
+      const data = await res.json();
+      onScoringModelChange(data.scoringModel);
+      setHasUnsavedChanges(false);
+      toast.success('Scoring model generated and saved');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to generate scoring model');
     } finally {
       setGenerating(false);
     }
-  }, [slug, config, onScoringModelChange]);
+  }, [slug, leadType, config, onScoringModelChange]);
 
-  // ── Weight Change (redistributes proportionally) ───────────────────────────
+  // ── Save scoring model ─────────────────────────────────────────────────────
+
+  const handleSave = useCallback(async () => {
+    if (!scoringModel) return;
+    setSaving(true);
+    try {
+      await onSave(scoringModel);
+      setHasUnsavedChanges(false);
+      toast.success('Scoring model saved');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }, [scoringModel, onSave]);
+
+  // ── Weight adjustment (redistributes) ──────────────────────────────────────
 
   const handleWeightChange = useCallback(
-    (questionId: string, newWeight: number) => {
+    (questionId: string, delta: number) => {
       if (!scoringModel) return;
-
-      const currentWeights = { ...scoringModel.weights };
-      const oldWeight = currentWeights[questionId]?.weight ?? 0;
-      const diff = newWeight - oldWeight;
-
+      const current = scoringModel.weights[questionId]?.weight ?? 0;
+      const newWeight = Math.max(0, Math.min(100, current + delta));
+      const diff = newWeight - current;
       if (diff === 0) return;
 
-      // Set the new weight for the changed question
-      currentWeights[questionId] = {
-        ...currentWeights[questionId],
-        weight: newWeight,
-      };
+      // Redistribute from/to other enabled questions
+      const others = Object.entries(scoringModel.weights).filter(
+        ([id, q]) => id !== questionId && q.weight > 0,
+      );
+      const othersTotal = others.reduce((s, [, q]) => s + q.weight, 0);
 
-      // Redistribute the difference across other questions proportionally
-      const otherIds = Object.keys(currentWeights).filter((id) => id !== questionId);
-      const otherTotal = otherIds.reduce((s, id) => s + (currentWeights[id]?.weight ?? 0), 0);
+      const newWeights = { ...scoringModel.weights };
+      newWeights[questionId] = { ...newWeights[questionId], weight: newWeight };
 
-      if (otherTotal > 0 && diff !== 0) {
-        let distributed = 0;
-        for (let i = 0; i < otherIds.length; i++) {
-          const id = otherIds[i];
-          const proportion = (currentWeights[id]?.weight ?? 0) / otherTotal;
-          const adjustment =
-            i === otherIds.length - 1
-              ? diff - distributed // last one gets remainder to avoid rounding issues
-              : Math.round(diff * proportion);
-
-          const newOtherWeight = Math.max(
-            0,
-            Math.min(100, (currentWeights[id]?.weight ?? 0) - adjustment),
-          );
-          currentWeights[id] = { ...currentWeights[id], weight: newOtherWeight };
-          distributed += (currentWeights[id]?.weight ?? 0) + adjustment - newOtherWeight === 0
-            ? adjustment
-            : (scoringModel.weights[id]?.weight ?? 0) - newOtherWeight;
+      if (othersTotal > 0 && diff !== 0) {
+        let remaining = -diff;
+        for (const [id, q] of others) {
+          const proportion = q.weight / othersTotal;
+          const adjustment = Math.round(remaining * proportion);
+          newWeights[id] = { ...newWeights[id], weight: Math.max(0, q.weight + adjustment) };
         }
       }
 
-      onScoringModelChange({
-        ...scoringModel,
-        weights: currentWeights,
-      });
+      onScoringModelChange({ ...scoringModel, weights: newWeights });
+      setHasUnsavedChanges(true);
     },
     [scoringModel, onScoringModelChange],
   );
 
-  // ── Option Score Change ────────────────────────────────────────────────────
+  // ── Toggle question on/off ─────────────────────────────────────────────────
+
+  const handleToggle = useCallback(
+    (questionId: string) => {
+      if (!scoringModel) return;
+      const current = scoringModel.weights[questionId];
+      const isEnabled = current && current.weight > 0;
+
+      const newWeights = { ...scoringModel.weights };
+
+      if (isEnabled) {
+        // Disable: set to 0, redistribute weight to others
+        const freed = current.weight;
+        newWeights[questionId] = { ...current, weight: 0 };
+
+        const others = Object.entries(newWeights).filter(([id, q]) => id !== questionId && q.weight > 0);
+        const othersTotal = others.reduce((s, [, q]) => s + q.weight, 0);
+
+        if (othersTotal > 0) {
+          let remaining = freed;
+          for (const [id, q] of others) {
+            const share = Math.round((q.weight / othersTotal) * freed);
+            newWeights[id] = { ...q, weight: q.weight + share };
+            remaining -= share;
+          }
+          // Give any rounding remainder to first
+          if (remaining !== 0 && others.length > 0) {
+            const [firstId, firstQ] = others[0];
+            newWeights[firstId] = { ...firstQ, weight: (newWeights[firstId]?.weight ?? 0) + remaining };
+          }
+        }
+      } else {
+        // Enable: give a fair share from others
+        const enabledCount = Object.values(newWeights).filter((q) => q.weight > 0).length;
+        const fairShare = enabledCount > 0 ? Math.round(100 / (enabledCount + 1)) : 100;
+
+        newWeights[questionId] = {
+          weight: fairShare,
+          optionScores: current?.optionScores,
+          ranges: current?.ranges,
+        };
+
+        // Reduce others proportionally
+        const others = Object.entries(newWeights).filter(([id, q]) => id !== questionId && q.weight > 0);
+        const othersTotal = others.reduce((s, [, q]) => s + q.weight, 0);
+        const targetOthersTotal = 100 - fairShare;
+
+        if (othersTotal > 0) {
+          for (const [id, q] of others) {
+            newWeights[id] = { ...q, weight: Math.round((q.weight / othersTotal) * targetOthersTotal) };
+          }
+        }
+      }
+
+      onScoringModelChange({ ...scoringModel, weights: newWeights });
+      setHasUnsavedChanges(true);
+    },
+    [scoringModel, onScoringModelChange],
+  );
+
+  // ── Option score change ────────────────────────────────────────────────────
 
   const handleOptionScoreChange = useCallback(
     (questionId: string, optValue: string, score: number) => {
       if (!scoringModel) return;
-
-      const qModel = scoringModel.weights[questionId];
-      if (!qModel) return;
-
-      onScoringModelChange({
-        ...scoringModel,
-        weights: {
-          ...scoringModel.weights,
-          [questionId]: {
-            ...qModel,
-            optionScores: {
-              ...(qModel.optionScores || {}),
-              [optValue]: score,
-            },
-          },
-        },
-      });
+      const current = scoringModel.weights[questionId];
+      if (!current) return;
+      const newOptScores = { ...(current.optionScores ?? {}), [optValue]: Math.max(0, Math.min(100, score)) };
+      const newWeights = {
+        ...scoringModel.weights,
+        [questionId]: { ...current, optionScores: newOptScores },
+      };
+      onScoringModelChange({ ...scoringModel, weights: newWeights });
+      setHasUnsavedChanges(true);
     },
     [scoringModel, onScoringModelChange],
   );
 
-  // ── Range Change ───────────────────────────────────────────────────────────
+  // ── Range changes ──────────────────────────────────────────────────────────
 
   const handleRangeChange = useCallback(
-    (
-      questionId: string,
-      index: number,
-      field: 'min' | 'max' | 'points' | 'label',
-      value: number | string | null,
-    ) => {
+    (questionId: string, idx: number, field: keyof NumberRange, value: number | string | null) => {
       if (!scoringModel) return;
-
-      const qModel = scoringModel.weights[questionId];
-      if (!qModel?.ranges) return;
-
-      const newRanges = [...qModel.ranges];
-      newRanges[index] = { ...newRanges[index], [field]: value };
-
-      onScoringModelChange({
-        ...scoringModel,
-        weights: {
-          ...scoringModel.weights,
-          [questionId]: { ...qModel, ranges: newRanges },
-        },
-      });
+      const current = scoringModel.weights[questionId];
+      if (!current?.ranges) return;
+      const newRanges = [...current.ranges];
+      newRanges[idx] = { ...newRanges[idx], [field]: value };
+      const newWeights = {
+        ...scoringModel.weights,
+        [questionId]: { ...current, ranges: newRanges },
+      };
+      onScoringModelChange({ ...scoringModel, weights: newWeights });
+      setHasUnsavedChanges(true);
     },
     [scoringModel, onScoringModelChange],
   );
@@ -478,274 +490,180 @@ export function ScoringTab({
   const handleAddRange = useCallback(
     (questionId: string) => {
       if (!scoringModel) return;
-
-      const qModel = scoringModel.weights[questionId];
-      if (!qModel) return;
-
-      const currentRanges = qModel.ranges || [];
-      const lastRange = currentRanges[currentRanges.length - 1];
-      const newMin = lastRange?.max ?? 0;
-
-      onScoringModelChange({
-        ...scoringModel,
-        weights: {
-          ...scoringModel.weights,
-          [questionId]: {
-            ...qModel,
-            ranges: [
-              ...currentRanges,
-              { min: newMin, max: null, points: 100, label: `$${newMin.toLocaleString()}+` },
-            ],
-          },
-        },
-      });
+      const current = scoringModel.weights[questionId];
+      if (!current) return;
+      const ranges = [...(current.ranges ?? [])];
+      const lastMax = ranges.length > 0 ? (ranges[ranges.length - 1].max ?? 10000) : 0;
+      ranges.push({ min: lastMax, max: null, points: 50, label: '' });
+      const newWeights = {
+        ...scoringModel.weights,
+        [questionId]: { ...current, ranges },
+      };
+      onScoringModelChange({ ...scoringModel, weights: newWeights });
+      setHasUnsavedChanges(true);
     },
     [scoringModel, onScoringModelChange],
   );
 
   const handleRemoveRange = useCallback(
-    (questionId: string, index: number) => {
+    (questionId: string, idx: number) => {
       if (!scoringModel) return;
-
-      const qModel = scoringModel.weights[questionId];
-      if (!qModel?.ranges || qModel.ranges.length <= 1) return;
-
-      const newRanges = qModel.ranges.filter((_, i) => i !== index);
-
-      onScoringModelChange({
-        ...scoringModel,
-        weights: {
-          ...scoringModel.weights,
-          [questionId]: { ...qModel, ranges: newRanges },
-        },
-      });
+      const current = scoringModel.weights[questionId];
+      if (!current?.ranges) return;
+      const newRanges = current.ranges.filter((_, i) => i !== idx);
+      const newWeights = {
+        ...scoringModel.weights,
+        [questionId]: { ...current, ranges: newRanges },
+      };
+      onScoringModelChange({ ...scoringModel, weights: newWeights });
+      setHasUnsavedChanges(true);
     },
     [scoringModel, onScoringModelChange],
   );
 
-  // ── Rebalance to 100 ──────────────────────────────────────────────────────
-
-  const handleRebalance = useCallback(() => {
-    if (!scoringModel) return;
-
-    const entries = Object.entries(scoringModel.weights);
-    const currentTotal = entries.reduce((s, [, w]) => s + w.weight, 0);
-    if (currentTotal === 0 || currentTotal === 100) return;
-
-    const factor = 100 / currentTotal;
-    const scaled = entries.map(([id, w]) => ({
-      id,
-      weight: w.weight * factor,
-      rest: w,
-    }));
-
-    const floored = scaled.map((s) => ({
-      ...s,
-      intWeight: Math.floor(s.weight),
-      fraction: s.weight - Math.floor(s.weight),
-    }));
-
-    let rem = 100 - floored.reduce((s, f) => s + f.intWeight, 0);
-    const sorted = [...floored].sort((a, b) => b.fraction - a.fraction);
-    for (const item of sorted) {
-      if (rem <= 0) break;
-      item.intWeight += 1;
-      rem -= 1;
-    }
-
-    const newWeights: ScoringModel['weights'] = {};
-    for (const item of floored) {
-      newWeights[item.id] = { ...item.rest, weight: item.intWeight };
-    }
-
-    onScoringModelChange({ ...scoringModel, weights: newWeights });
-  }, [scoringModel, onScoringModelChange]);
-
-  // ── Render: No model yet ───────────────────────────────────────────────────
+  // ── No model yet ───────────────────────────────────────────────────────────
 
   if (!scoringModel) {
     return (
       <div className="space-y-6">
         <div className="rounded-xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center">
-          <Sparkles size={32} className="mx-auto text-muted-foreground mb-3" />
-          <h3 className="text-sm font-semibold mb-1.5">No Scoring Model Yet</h3>
+          <Sparkles size={32} className="mx-auto text-primary/60 mb-3" />
+          <h3 className="text-sm font-semibold mb-1.5">Generate Scoring Model</h3>
           <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed mb-4">
-            Generate an AI-powered scoring model that automatically assigns optimal weights to each
-            question based on your form structure and lead type. You can fine-tune the weights
-            afterward.
+            AI will analyze your form questions and create an optimal scoring model
+            that automatically weights each question based on its importance for
+            {leadType === 'rental' ? ' rental' : ' buyer'} lead qualification.
           </p>
           <Button onClick={handleGenerate} disabled={generating}>
             {generating ? (
-              <>
-                <Loader2 size={14} className="mr-1.5 animate-spin" /> Generating scoring model...
-              </>
+              <><Loader2 size={14} className="mr-1.5 animate-spin" /> Generating...</>
             ) : (
-              <>
-                <Sparkles size={14} className="mr-1.5" /> Generate Scoring Model
-              </>
+              <><Sparkles size={14} className="mr-1.5" /> Generate Scoring Model</>
             )}
           </Button>
         </div>
-
-        {scorableQuestions.length > 0 && (
-          <div className="rounded-lg border border-border bg-card px-4 py-3">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              {scorableQuestions.length} scorable question{scorableQuestions.length !== 1 ? 's' : ''} detected
-            </p>
-            <div className="space-y-1">
-              {scorableQuestions.map(({ question }) => (
-                <div key={question.id} className="text-xs text-muted-foreground flex items-center gap-2">
-                  <Badge variant="secondary" className="text-[9px] px-1 py-0 shrink-0">
-                    {question.type}
-                  </Badge>
-                  {question.label}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     );
   }
 
-  // ── Render: Model exists ───────────────────────────────────────────────────
+  // ── Has model ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center justify-between">
+    <div className="space-y-4">
+      {/* Header: Total weight + actions */}
+      <div className="rounded-xl border border-border bg-card px-4 py-3">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <Sparkles size={14} className="text-primary" />
-            <span className="text-xs font-semibold">AI-Generated Scoring Model</span>
-            <Badge variant="outline" className="text-[9px]">
-              {scoringModel.leadType}
+            <span className="text-sm font-semibold">Total Weight</span>
+            <Badge
+              variant={totalWeight === 100 ? 'secondary' : 'destructive'}
+              className="text-[10px]"
+            >
+              {totalWeight === 100 ? (
+                <><CheckCircle2 size={10} className="mr-1" /> {totalWeight}%</>
+              ) : (
+                <><AlertCircle size={10} className="mr-1" /> {totalWeight}%</>
+              )}
             </Badge>
           </div>
           <div className="flex items-center gap-2">
-            {scoringModel.generatedAt && (
-              <span className="text-[10px] text-muted-foreground">
-                Generated {formatTimeAgo(scoringModel.generatedAt)}
-              </span>
+            {hasUnsavedChanges && (
+              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
+                Unsaved
+              </Badge>
             )}
             <Button
               variant="outline"
               size="sm"
               onClick={handleGenerate}
               disabled={generating}
-              className="h-6 text-[11px] px-2"
             >
               {generating ? (
-                <Loader2 size={11} className="mr-1 animate-spin" />
+                <Loader2 size={13} className="mr-1.5 animate-spin" />
               ) : (
-                <RefreshCw size={11} className="mr-1" />
+                <Sparkles size={13} className="mr-1.5" />
               )}
               Regenerate
             </Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={saving || !hasUnsavedChanges}
+            >
+              {saving ? (
+                <Loader2 size={13} className="mr-1.5 animate-spin" />
+              ) : (
+                <Save size={13} className="mr-1.5" />
+              )}
+              Save
+            </Button>
           </div>
         </div>
-
-        {/* Reasoning */}
-        {scoringModel.reasoning && (
-          <div className="px-4 py-2.5 border-b border-border bg-blue-50/50 flex items-start gap-2">
-            <Info size={12} className="text-blue-500 flex-shrink-0 mt-0.5" />
-            <p className="text-[11px] text-blue-700 leading-relaxed">{scoringModel.reasoning}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Total Weight Bar */}
-      <TotalWeightBar total={totalWeight} onRebalance={handleRebalance} />
-
-      {/* Weight Sliders + Option/Range Editors */}
-      <div className="space-y-5">
-        {scorableQuestions.map(({ question, sectionTitle }) => {
-          const qModel = scoringModel.weights[question.id];
-          if (!qModel) {
+        {/* Segmented weight bar */}
+        <div className="h-3 rounded-full bg-muted overflow-hidden flex">
+          {scorableQuestions.map((q) => {
+            const w = scoringModel.weights[q.id]?.weight ?? 0;
+            if (w <= 0) return null;
             return (
               <div
-                key={question.id}
-                className="rounded-lg border border-dashed border-border px-4 py-2.5"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{question.label}</span>
-                    <Badge variant="secondary" className="text-[9px] px-1 py-0">
-                      {question.type}
-                    </Badge>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground italic">Not in model</span>
-                </div>
-              </div>
-            );
-          }
-
-          return (
-            <div
-              key={question.id}
-              className="rounded-lg border border-border bg-card px-4 py-3 space-y-3"
-            >
-              {/* Section label */}
-              <div className="flex items-center gap-2">
-                <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
-                  {sectionTitle}
-                </span>
-                <Badge variant="secondary" className="text-[9px] px-1 py-0">
-                  {question.type}
-                </Badge>
-                {question.required && (
-                  <span className="text-[9px] text-red-400">Required</span>
-                )}
-              </div>
-
-              {/* Weight slider */}
-              <WeightSlider
-                questionId={question.id}
-                label={question.label}
-                weight={qModel.weight}
-                onWeightChange={handleWeightChange}
+                key={q.id}
+                className={cn('h-full transition-all duration-300', weightBarColor(w))}
+                style={{ width: `${w}%` }}
+                title={`${q.label}: ${w}%`}
               />
+            );
+          })}
+        </div>
+      </div>
 
-              {/* Option scores for radio/select */}
-              {(question.type === 'radio' || question.type === 'select') &&
-                qModel.optionScores && (
-                  <OptionScoresEditor
-                    questionId={question.id}
-                    question={question}
-                    optionScores={qModel.optionScores}
-                    onOptionScoreChange={handleOptionScoreChange}
-                  />
-                )}
+      {/* AI reasoning */}
+      {scoringModel.reasoning && (
+        <div className="flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/10 px-3 py-2.5">
+          <Info size={14} className="text-primary flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs text-foreground/80 leading-relaxed">{scoringModel.reasoning}</p>
+            {scoringModel.generatedAt && (
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Generated {formatTimeAgo(scoringModel.generatedAt)}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
-              {/* Range buckets for number fields */}
-              {question.type === 'number' && qModel.ranges && qModel.ranges.length > 0 && (
-                <RangeBucketsEditor
-                  questionId={question.id}
-                  ranges={qModel.ranges}
-                  onRangeChange={handleRangeChange}
-                  onAddRange={handleAddRange}
-                  onRemoveRange={handleRemoveRange}
-                />
-              )}
-            </div>
+      {/* Question cards */}
+      <div className="space-y-2">
+        {scorableQuestions.map((q) => {
+          const model = scoringModel.weights[q.id];
+          const enabled = model != null && model.weight > 0;
+          return (
+            <QuestionCard
+              key={q.id}
+              question={q}
+              model={model}
+              enabled={enabled}
+              onToggle={() => handleToggle(q.id)}
+              onWeightChange={(delta) => handleWeightChange(q.id, delta)}
+              onOptionScoreChange={(optVal, score) => handleOptionScoreChange(q.id, optVal, score)}
+              onRangeChange={(idx, field, val) => handleRangeChange(q.id, idx, field, val)}
+              onAddRange={() => handleAddRange(q.id)}
+              onRemoveRange={(idx) => handleRemoveRange(q.id, idx)}
+            />
           );
         })}
       </div>
 
-      {/* Non-scorable questions */}
+      {/* Not scored section */}
       {nonScorableQuestions.length > 0 && (
-        <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
-          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-            Not Scored
+        <div className="rounded-xl border border-border/40 bg-muted/20 px-4 py-3">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            Not Scored ({nonScorableQuestions.length})
           </p>
-          <div className="space-y-1">
+          <div className="flex flex-wrap gap-1.5">
             {nonScorableQuestions.map((q) => (
-              <div key={q.id} className="text-[11px] text-muted-foreground flex items-center gap-2">
-                <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0">
-                  {q.system ? 'system' : q.type}
-                </Badge>
+              <Badge key={q.id} variant="outline" className="text-[10px] text-muted-foreground">
                 {q.label}
-              </div>
+              </Badge>
             ))}
           </div>
         </div>

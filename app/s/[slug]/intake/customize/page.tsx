@@ -400,8 +400,20 @@ export default function IntakeCustomizePage() {
           <ScoringTab
             config={config}
             slug={slug}
+            leadType={activeLeadType}
             scoringModel={activeScoringModel}
             onScoringModelChange={handleScoringModelChange}
+            onSave={async (model) => {
+              const res = await fetch('/api/form-config/save-scoring', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slug, leadType: activeLeadType, scoringModel: model }),
+              });
+              if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                throw new Error(d.error || 'Failed to save scoring model');
+              }
+            }}
           />
         </TabsContent>
 
