@@ -433,9 +433,9 @@ function QuestionEditor({
 
         <div className="space-y-2">
           <Select
-            value={question.visibleWhen?.questionId || ''}
+            value={question.visibleWhen?.questionId || '__none__'}
             onValueChange={(val) => {
-              if (!val) {
+              if (val === '__none__') {
                 updateField('visibleWhen', undefined);
                 return;
               }
@@ -450,7 +450,7 @@ function QuestionEditor({
               <SelectValue placeholder="Select a question..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">None</SelectItem>
+              <SelectItem value="__none__">None</SelectItem>
               {allQuestions
                 .filter((q) => q.id !== question.id)
                 .map((q) => (

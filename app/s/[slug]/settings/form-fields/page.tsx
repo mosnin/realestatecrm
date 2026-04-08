@@ -9,7 +9,7 @@ import { Loader2, Save, RotateCcw, Eye, Pencil, FileText, Home, Users } from 'lu
 import { toast } from 'sonner';
 import { FormBuilder } from '@/components/form-builder';
 import { FormPreview } from '@/components/form-builder/form-preview';
-import { TEMPLATES, BLANK_TEMPLATE } from '@/components/form-builder/templates';
+import { TEMPLATES } from '@/components/form-builder/templates';
 import type { IntakeFormConfig } from '@/components/form-builder/types';
 import type { TemplateName } from '@/components/form-builder/templates';
 
@@ -21,7 +21,7 @@ export default function FormFieldsSettingsPage() {
   const params = useParams<{ slug: string }>();
   const slug = params?.slug ?? '';
 
-  const [config, setConfig] = useState<IntakeFormConfig>(deepClone(BLANK_TEMPLATE));
+  const [config, setConfig] = useState<IntakeFormConfig>(deepClone(TEMPLATES.rental.config));
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('builder');
@@ -88,7 +88,7 @@ export default function FormFieldsSettingsPage() {
       if (!res.ok) {
         throw new Error('Failed to reset form configuration.');
       }
-      setConfig(deepClone(BLANK_TEMPLATE));
+      setConfig(deepClone(TEMPLATES.rental.config));
       setHasChanges(false);
       toast.success('Form configuration reset to default.');
     } catch (err) {
@@ -153,13 +153,6 @@ export default function FormFieldsSettingsPage() {
             onClick={() => handleTemplateSelect('buyer')}
           >
             <Users size={14} className="mr-1.5" /> Buyer
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleTemplateSelect('blank')}
-          >
-            <FileText size={14} className="mr-1.5" /> Blank
           </Button>
         </div>
       </div>
