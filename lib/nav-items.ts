@@ -41,7 +41,7 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   exact?: boolean;
-  /** Sub-items that expand inline (Shopify-style) */
+  /** Sub-items that expand inline */
   children?: NavChild[];
   /** Show as AI assistant item with chip avatar */
   isAI?: boolean;
@@ -49,7 +49,7 @@ export interface NavItem {
   badgeKey?: string;
 }
 
-// ── Realtor sidebar nav (Shopify-style) ──────────────────────────────────────
+// ── Realtor sidebar nav ──────────────────────────────────────────────────────
 
 export const realtorNavItems: NavItem[] = [
   {

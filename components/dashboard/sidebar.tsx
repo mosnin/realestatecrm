@@ -255,7 +255,7 @@ function CollapsibleChildren({
 // Shopify-style nav item — parent with optional inline collapsible children
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function ShopifyNavItem({
+function CollapsibleNavItem({
   item,
   base,
   pathname,
@@ -599,14 +599,16 @@ function UserFooter({
 // Shopify-style realtor nav — accordion (one section expanded at a time)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function RealtorShopifyNav({
+function RealtorNav({
   base,
   pathname,
+  searchParamsString,
   unreadLeadCount,
   overdueFollowUpCount,
 }: {
   base: string;
   pathname: string;
+  searchParamsString: string;
   unreadLeadCount: number;
   overdueFollowUpCount: number;
 }) {
@@ -659,7 +661,7 @@ function RealtorShopifyNav({
         }
 
         return (
-          <ShopifyNavItem
+          <CollapsibleNavItem
             key={item.href}
             item={item}
             base={base}
@@ -845,9 +847,10 @@ export function Sidebar({
       />
 
       {/* Shopify-style nav — all items with inline collapsible children */}
-      <RealtorShopifyNav
+      <RealtorNav
         base={base}
         pathname={pathname}
+        searchParamsString={searchParamsString}
         unreadLeadCount={unreadLeadCount}
         overdueFollowUpCount={overdueFollowUpCount}
       />
