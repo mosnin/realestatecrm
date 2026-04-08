@@ -517,30 +517,18 @@ function LeadsSubMenu({
         <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
           {leadsSubItems.map((sub) => {
             const href = `${base}${sub.href}`;
-            // "All Leads" is active when on /leads with no type/tier param
-            // Sub-items with query params are active only when the URL matches
-            const subIsActive = sub.exact
-              ? pathname === `${base}/leads` && typeof window !== 'undefined' && !window.location.search
-              : typeof window !== 'undefined' && window.location.pathname === `${base}/leads` && window.location.search === sub.href.replace('/leads', '');
             return (
               <Link
                 key={sub.href}
                 href={href}
                 className={cn(
                   'group relative flex items-center gap-2 h-8 px-2 rounded-md text-[13px] font-medium transition-colors',
-                  subIsActive
-                    ? 'bg-primary/8 text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  'text-muted-foreground hover:bg-muted hover:text-foreground',
                 )}
               >
                 <sub.icon
                   size={14}
-                  className={cn(
-                    'flex-shrink-0 transition-colors',
-                    subIsActive
-                      ? 'text-primary'
-                      : 'text-muted-foreground/50 group-hover:text-foreground',
-                  )}
+                  className="flex-shrink-0 transition-colors text-muted-foreground/50 group-hover:text-foreground"
                 />
                 <span className="truncate">{sub.label}</span>
               </Link>
