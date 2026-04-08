@@ -607,16 +607,18 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
             <Search size={20} className="text-muted-foreground" />
           </div>
           <p className="font-semibold text-foreground mb-1">
-            {search ? 'No matching leads' : tierFilter !== 'all' ? `No ${tierFilter} leads` : 'No leads'}
+            {search ? 'No matching leads' : tierFilter === 'needs-followup' ? 'No overdue follow-ups' : tierFilter !== 'all' ? `No ${tierFilter} leads` : 'No leads'}
           </p>
           <p className="text-sm text-muted-foreground">
             {search
               ? `No leads match "${search}". Try a different search term.`
+              : tierFilter === 'needs-followup'
+              ? 'All follow-ups are up to date.'
               : tierFilter !== 'all'
               ? 'Try a different filter.'
               : 'Share your intake link to receive applications.'}
           </p>
-          {(search || tierFilter !== 'all') && (
+          {(search || tierFilter !== 'all' || leadTypeFilter !== 'all') && (
             <button
               type="button"
               onClick={() => { setSearch(''); setTierFilter('all'); setLeadTypeFilter('all'); }}
@@ -682,6 +684,18 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                         >
                           {lead.name}
                         </Link>
+                        {/* Lead type badge */}
+                        {lead.leadType === 'buyer' ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5 bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400 flex-shrink-0">
+                            <Home size={9} />
+                            Buyer
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5 bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400 flex-shrink-0">
+                            <Home size={9} />
+                            Rental
+                          </span>
+                        )}
                         {isNew && (
                           <span className="inline-flex text-[10px] font-bold text-primary bg-primary/10 rounded-md px-2 py-0.5 flex-shrink-0">
                             NEW
@@ -712,6 +726,22 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                             <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                               <CheckCircle2 size={10} />
                               Contacted {timeAgo(new Date(lead.lastContactedAt))}
+                            </span>
+                          </>
+                        )}
+                        {lead.followUpAt && (
+                          <>
+                            <span className="opacity-40">·</span>
+                            <span className={cn(
+                              'inline-flex items-center gap-1',
+                              new Date(lead.followUpAt) < new Date()
+                                ? 'text-destructive font-medium'
+                                : 'text-amber-600 dark:text-amber-400',
+                            )}>
+                              <AlertCircle size={10} />
+                              {new Date(lead.followUpAt) < new Date()
+                                ? `Follow-up overdue`
+                                : `Follow-up ${formatFollowUpDate(lead.followUpAt)}`}
                             </span>
                           </>
                         )}
@@ -924,6 +954,11 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="font-medium hover:text-primary transition-colors">{lead.name}</span>
+                              {lead.leadType === 'buyer' ? (
+                                <span className="text-[10px] font-semibold rounded-md px-1.5 py-0.5 bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400">Buyer</span>
+                              ) : (
+                                <span className="text-[10px] font-semibold rounded-md px-1.5 py-0.5 bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400">Rental</span>
+                              )}
                               {isNew && (
                                 <span className="text-[10px] font-bold text-primary bg-primary/10 rounded-md px-1.5 py-0.5">NEW</span>
                               )}

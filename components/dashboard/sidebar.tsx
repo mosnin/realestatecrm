@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
-import { primaryNavItems, secondaryNavItems, analyticsSubItems } from '@/lib/nav-items';
+import { primaryNavItems, secondaryNavItems, analyticsSubItems, intakeSubItems } from '@/lib/nav-items';
 import {
   Building2,
   ChevronRight,
@@ -42,6 +42,9 @@ import {
   Shuffle,
   Plus,
   Check,
+  ClipboardList,
+  Flame,
+  Home,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -447,6 +450,197 @@ function AnalyticsSubMenu({
   );
 }
 
+// ── Leads sub-menu ──────────────────────────────────────────────────────
+
+const leadsSubItems = [
+  { href: '/leads', label: 'All Leads', icon: PhoneIncoming, exact: true },
+  { href: '/leads?type=rental', label: 'Rental Leads', icon: Home, exact: false, match: '/leads' },
+  { href: '/leads?type=buyer', label: 'Buyer Leads', icon: Key, exact: false, match: '/leads' },
+  { href: '/leads?tier=hot', label: 'Hot Leads', icon: Flame, exact: false, match: '/leads' },
+] as const;
+
+function LeadsSubMenu({
+  base,
+  pathname,
+  isActive,
+  icon: Icon,
+  badge,
+}: {
+  base: string;
+  pathname: string;
+  isActive: boolean;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  badge?: React.ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(isActive);
+
+  useEffect(() => {
+    if (isActive && !expanded) setExpanded(true);
+  }, [isActive]);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className={cn(
+          'group relative flex items-center gap-2.5 w-full h-9 px-2.5 rounded-md text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-primary/10 text-primary'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        )}
+      >
+        {isActive && (
+          <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-primary" />
+        )}
+        <Icon
+          size={16}
+          className={cn(
+            'flex-shrink-0 transition-colors',
+            isActive
+              ? 'text-primary'
+              : 'text-muted-foreground/60 group-hover:text-foreground',
+          )}
+        />
+        <span className="flex-1 truncate text-left">Leads</span>
+        {badge}
+        <ChevronDown
+          size={14}
+          className={cn(
+            'flex-shrink-0 text-muted-foreground/40 transition-transform duration-200',
+            !expanded && '-rotate-90',
+          )}
+        />
+      </button>
+
+      {expanded && (
+        <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
+          {leadsSubItems.map((sub) => {
+            const href = `${base}${sub.href}`;
+            // "All Leads" is active when on /leads with no type/tier param
+            // Sub-items with query params are active only when the URL matches
+            const subIsActive = sub.exact
+              ? pathname === `${base}/leads` && typeof window !== 'undefined' && !window.location.search
+              : typeof window !== 'undefined' && window.location.pathname === `${base}/leads` && window.location.search === sub.href.replace('/leads', '');
+            return (
+              <Link
+                key={sub.href}
+                href={href}
+                className={cn(
+                  'group relative flex items-center gap-2 h-8 px-2 rounded-md text-[13px] font-medium transition-colors',
+                  subIsActive
+                    ? 'bg-primary/8 text-primary'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                )}
+              >
+                <sub.icon
+                  size={14}
+                  className={cn(
+                    'flex-shrink-0 transition-colors',
+                    subIsActive
+                      ? 'text-primary'
+                      : 'text-muted-foreground/50 group-hover:text-foreground',
+                  )}
+                />
+                <span className="truncate">{sub.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Intake Form sub-menu ─────────────────────────────────────────────────
+
+function IntakeSubMenu({
+  base,
+  pathname,
+  isActive,
+}: {
+  base: string;
+  pathname: string;
+  isActive: boolean;
+}) {
+  const [expanded, setExpanded] = useState(isActive);
+
+  // Auto-expand when navigating to an intake page
+  useEffect(() => {
+    if (isActive && !expanded) setExpanded(true);
+  }, [isActive]);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className={cn(
+          'group relative flex items-center gap-2.5 w-full h-9 px-2.5 rounded-md text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-primary/10 text-primary'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        )}
+      >
+        {isActive && (
+          <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-primary" />
+        )}
+        <ClipboardList
+          size={16}
+          className={cn(
+            'flex-shrink-0 transition-colors',
+            isActive
+              ? 'text-primary'
+              : 'text-muted-foreground/60 group-hover:text-foreground',
+          )}
+        />
+        <span className="flex-1 truncate text-left">Intake Form</span>
+        <ChevronDown
+          size={14}
+          className={cn(
+            'flex-shrink-0 text-muted-foreground/40 transition-transform duration-200',
+            !expanded && '-rotate-90',
+          )}
+        />
+      </button>
+
+      {expanded && (
+        <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
+          {intakeSubItems.map((sub) => {
+            const href = `${base}${sub.href}`;
+            const subIsActive = sub.exact
+              ? pathname === href
+              : pathname.startsWith(href);
+            return (
+              <Link
+                key={sub.href}
+                href={href}
+                className={cn(
+                  'group relative flex items-center gap-2 h-8 px-2 rounded-md text-[13px] font-medium transition-colors',
+                  subIsActive
+                    ? 'bg-primary/8 text-primary'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                )}
+              >
+                <sub.icon
+                  size={14}
+                  className={cn(
+                    'flex-shrink-0 transition-colors',
+                    subIsActive
+                      ? 'text-primary'
+                      : 'text-muted-foreground/50 group-hover:text-foreground',
+                  )}
+                />
+                <span className="truncate">{sub.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Sidebar
 // ═══════════════════════════════════════════════════════════════════════════
@@ -600,12 +794,11 @@ export function Sidebar({
       ],
     },
     {
-      label: 'Intake Form',
+      label: 'Intake Form Appearance',
       items: [
         { href: `${base}/settings/appearance`, label: 'Appearance', icon: Palette, exact: false },
         { href: `${base}/settings/content`, label: 'Content', icon: Type, exact: false },
-        { href: `${base}/settings/form-fields`, label: 'Form Fields', icon: ListChecks, exact: false },
-        { href: `${base}/settings/tracking`, label: 'Tracking & Analytics', icon: BarChart3, exact: false },
+        { href: `${base}/intake`, label: 'Form Builder & More', icon: ClipboardList, exact: false },
       ],
     },
     {
@@ -733,6 +926,20 @@ export function Sidebar({
             );
           }
 
+          // Leads gets a collapsible sub-menu
+          if (item.href === '/leads') {
+            return (
+              <LeadsSubMenu
+                key={item.href}
+                base={base}
+                pathname={pathname}
+                isActive={isActive}
+                icon={item.icon}
+                badge={badge}
+              />
+            );
+          }
+
           // Analytics gets a collapsible sub-menu
           if (item.href === '/analytics') {
             return (
@@ -758,6 +965,14 @@ export function Sidebar({
             />
           );
         })}
+
+        {/* Intake Form — top-level collapsible section */}
+        <SectionLabel>Intake Form</SectionLabel>
+        <IntakeSubMenu
+          base={base}
+          pathname={pathname}
+          isActive={pathname.startsWith(`${base}/intake`)}
+        />
 
       </nav>
 

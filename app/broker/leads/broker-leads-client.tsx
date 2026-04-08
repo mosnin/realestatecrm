@@ -684,13 +684,40 @@ function AssignedLeadItem({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+type BrokerSortKey = 'newest' | 'oldest' | 'score' | 'score-low' | 'name-az' | 'name-za';
+type ScoreFilter = 'all' | 'hot' | 'warm' | 'cold';
+
+const BROKER_SORT_OPTIONS: { value: BrokerSortKey; label: string }[] = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'score', label: 'Highest score' },
+  { value: 'score-low', label: 'Lowest score' },
+  { value: 'name-az', label: 'Name A-Z' },
+  { value: 'name-za', label: 'Name Z-A' },
+];
+
 export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, assignedLeadProgress = {} }: Props) {
   const [unassigned, setUnassigned] = useState(unassignedLeads);
   const [assigned, setAssigned] = useState(assignedLeads);
   const [tab, setTab] = useState('unassigned');
   const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'rental' | 'buyer'>('all');
+  const [scoreFilter, setScoreFilter] = useState<ScoreFilter>('all');
   const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'score' | 'name-az'>('newest');
+  const [sortBy, setSortBy] = useState<BrokerSortKey>('newest');
+
+  // Count badges
+  const allLeads = [...unassigned, ...assigned];
+  const leadTypeCounts = useMemo(() => ({
+    all: allLeads.length,
+    rental: allLeads.filter((l) => (l.leadType ?? 'rental') === 'rental').length,
+    buyer: allLeads.filter((l) => (l.leadType ?? 'rental') === 'buyer').length,
+  }), [allLeads]);
+  const scoreCounts = useMemo(() => ({
+    all: allLeads.length,
+    hot: allLeads.filter((l) => l.scoreLabel?.toLowerCase() === 'hot').length,
+    warm: allLeads.filter((l) => l.scoreLabel?.toLowerCase() === 'warm').length,
+    cold: allLeads.filter((l) => l.scoreLabel?.toLowerCase() === 'cold').length,
+  }), [allLeads]);
 
   const applySearchAndSort = useCallback((list: LeadRow[]) => {
     let result = list;
@@ -703,15 +730,23 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
           l.phone?.toLowerCase().includes(q),
       );
     }
+    // Score filter
+    if (scoreFilter !== 'all') {
+      result = result.filter((l) => l.scoreLabel?.toLowerCase() === scoreFilter);
+    }
     if (sortBy === 'oldest') {
       result = [...result].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     } else if (sortBy === 'score') {
       result = [...result].sort((a, b) => (b.leadScore ?? -1) - (a.leadScore ?? -1));
+    } else if (sortBy === 'score-low') {
+      result = [...result].sort((a, b) => (a.leadScore ?? Infinity) - (b.leadScore ?? Infinity));
     } else if (sortBy === 'name-az') {
       result = [...result].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+    } else if (sortBy === 'name-za') {
+      result = [...result].sort((a, b) => (b.name ?? '').localeCompare(a.name ?? ''));
     }
     return result;
-  }, [search, sortBy]);
+  }, [search, sortBy, scoreFilter]);
 
   const filteredUnassigned = useMemo(() => {
     let list = leadTypeFilter === 'all' ? unassigned : unassigned.filter((l) => (l.leadType ?? 'rental') === leadTypeFilter);
