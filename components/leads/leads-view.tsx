@@ -256,7 +256,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
       id: crypto.randomUUID(),
       name: saveViewName.trim(),
       page: 'leads',
-      filters: { tierFilter, sort },
+      filters: { tierFilter, leadTypeFilter, sort },
     };
     persistSavedViews([...savedViews, newView]);
     setSaveViewName('');
@@ -264,8 +264,9 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
   }
 
   function applyView(v: SavedView) {
-    const f = v.filters as { tierFilter?: TierFilter; sort?: typeof sort };
+    const f = v.filters as { tierFilter?: TierFilter; leadTypeFilter?: LeadTypeFilter; sort?: SortKey };
     if (f.tierFilter) setTierFilter(f.tierFilter);
+    if (f.leadTypeFilter) setLeadTypeFilter(f.leadTypeFilter);
     if (f.sort) setSort(f.sort);
   }
 
