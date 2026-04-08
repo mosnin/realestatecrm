@@ -97,6 +97,8 @@ export const realtorNavItems: NavItem[] = [
     children: [
       { href: '/intake', label: 'Overview', exact: true },
       { href: '/intake/customize', label: 'Customize' },
+      { href: '/settings/appearance', label: 'Appearance' },
+      { href: '/settings/content', label: 'Content' },
       { href: '/intake/tracking', label: 'Tracking' },
       { href: '/intake/share', label: 'Share' },
     ],
@@ -133,7 +135,6 @@ export const realtorNavItems: NavItem[] = [
       { href: '/settings', label: 'Account', exact: true },
       { href: '/settings/notifications', label: 'Notifications' },
       { href: '/settings/integrations', label: 'Integrations' },
-      { href: '/settings/appearance', label: 'Appearance' },
       { href: '/settings/legal', label: 'Legal' },
     ],
   },
@@ -157,6 +158,8 @@ export const primaryNavItems = [
 export const intakeSubItems = [
   { href: '/intake', label: 'Overview', icon: ClipboardList, exact: true },
   { href: '/intake/customize', label: 'Customize', icon: Pencil },
+  { href: '/settings/appearance', label: 'Appearance', icon: Palette },
+  { href: '/settings/content', label: 'Content', icon: FileText },
   { href: '/intake/tracking', label: 'Tracking', icon: BarChart3 },
   { href: '/intake/analytics', label: 'Form Analytics', icon: FormInput },
   { href: '/intake/share', label: 'Share', icon: Share2 },
