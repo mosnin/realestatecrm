@@ -53,6 +53,19 @@ export async function POST(req: NextRequest) {
 
   const normalizedEmail = email.toLowerCase().trim();
 
+  // Rate limit by IP to prevent abuse from rotating email addresses
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown';
+  const { allowed: ipAllowed } = await checkRateLimit(`draft:save:ip:${ip}`, 60, 3600);
+  if (!ipAllowed) {
+    return NextResponse.json(
+      { error: 'Too many saves. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': '3600' } },
+    );
+  }
+
   // Rate limit: 30 saves per email per hour
   const { allowed } = await checkRateLimit(`draft:save:${normalizedEmail}`, 30, 3600);
   if (!allowed) {
