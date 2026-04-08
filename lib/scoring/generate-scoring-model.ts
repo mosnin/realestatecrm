@@ -87,6 +87,17 @@ function buildAIInput(formConfig: IntakeFormConfig) {
 
 // ── JSON Schema for structured output ───────────────────────────────────────
 
+/**
+ * OpenAI strict json_schema mode requires:
+ * - additionalProperties: false on ALL objects
+ * - No array types like ['object', 'null'] — use anyOf instead
+ * - All properties listed in required
+ * - No dynamic/unknown keys in objects — use arrays of {key, value} instead
+ *
+ * We use arrays instead of Record<string, ...> for weights and optionScores
+ * because strict mode forbids additionalProperties with a schema value.
+ * The response is converted back to Record form in parseAIWeightsResponse().
+ */
 const SCORING_MODEL_JSON_SCHEMA = {
   name: 'scoring_model',
   strict: true,
@@ -95,41 +106,80 @@ const SCORING_MODEL_JSON_SCHEMA = {
     additionalProperties: false,
     properties: {
       weights: {
-        type: 'object' as const,
+        type: 'array' as const,
         description:
-          'Map of question ID to scoring model. Only include questions that should be scored.',
-        additionalProperties: {
+          'Array of per-question scoring entries. Only include questions that should be scored.',
+        items: {
           type: 'object' as const,
           additionalProperties: false,
           properties: {
+            questionId: {
+              type: 'string' as const,
+              description: 'The question ID from the form config.',
+            },
             weight: {
               type: 'number' as const,
               description: 'Importance weight 0-100. All weights must sum to exactly 100.',
             },
             optionScores: {
-              type: ['object', 'null'] as const,
+              anyOf: [
+                {
+                  type: 'array' as const,
+                  description:
+                    'For radio/select: array of option value to 0-100 score mappings.',
+                  items: {
+                    type: 'object' as const,
+                    additionalProperties: false,
+                    properties: {
+                      option: {
+                        type: 'string' as const,
+                        description:
+                          'Option value (lowercase, hyphens for spaces).',
+                      },
+                      score: {
+                        type: 'number' as const,
+                        description: 'Score 0-100 for this option.',
+                      },
+                    },
+                    required: ['option', 'score'],
+                  },
+                },
+                { type: 'null' as const },
+              ],
               description:
-                'For radio/select: map of option value (lowercase, hyphens for spaces) to 0-100 score. Null for non-option fields.',
-              additionalProperties: { type: 'number' as const },
+                'For radio/select fields: option-to-score mappings. Null for non-option fields.',
             },
             ranges: {
-              type: ['array', 'null'] as const,
-              description:
-                'For number fields (budget, income, price): 3-5 range buckets. Null for non-number fields.',
-              items: {
-                type: 'object' as const,
-                additionalProperties: false,
-                properties: {
-                  min: { type: 'number' as const },
-                  max: { type: ['number', 'null'] as const },
-                  points: { type: 'number' as const },
-                  label: { type: 'string' as const },
+              anyOf: [
+                {
+                  type: 'array' as const,
+                  description:
+                    'For number fields (budget, income, price): 3-5 range buckets.',
+                  items: {
+                    type: 'object' as const,
+                    additionalProperties: false,
+                    properties: {
+                      min: { type: 'number' as const },
+                      max: {
+                        anyOf: [
+                          { type: 'number' as const },
+                          { type: 'null' as const },
+                        ],
+                        description: 'Upper bound, or null for unlimited.',
+                      },
+                      points: { type: 'number' as const },
+                      label: { type: 'string' as const },
+                    },
+                    required: ['min', 'max', 'points', 'label'],
+                  },
                 },
-                required: ['min', 'max', 'points', 'label'],
-              },
+                { type: 'null' as const },
+              ],
+              description:
+                'For number fields: range buckets. Null for non-number fields.',
             },
           },
-          required: ['weight', 'optionScores', 'ranges'],
+          required: ['questionId', 'weight', 'optionScores', 'ranges'],
         },
       },
       totalWeight: {
@@ -146,13 +196,73 @@ const SCORING_MODEL_JSON_SCHEMA = {
   },
 };
 
-const SYSTEM_PROMPT = `You are a real estate lead scoring expert. Given an intake form's questions, generate an optimal scoring model. Distribute importance weights across ALL questions that should be scored, summing to exactly 100. For radio/select questions, assign point values (0-100) to each option reflecting lead quality. For number fields related to money (budget, income, rent, price), generate 3-5 range buckets with point values. Skip system fields (name, email, phone) and informational-only fields (notes, additional info). Consider the lead type (rental vs buyer) when assigning weights — different signals matter for each.
+// ── Types for the array-based AI response format ───────────────────────────
+
+interface AIWeightEntry {
+  questionId: string;
+  weight: number;
+  optionScores: { option: string; score: number }[] | null;
+  ranges: { min: number; max: number | null; points: number; label: string }[] | null;
+}
+
+interface AIResponseRaw {
+  weights: AIWeightEntry[];
+  totalWeight: number;
+  reasoning: string;
+}
+
+/**
+ * Convert the array-based AI response into the Record-based
+ * ScoringModelAIResponse that the rest of the pipeline expects.
+ */
+function parseAIWeightsResponse(raw: AIResponseRaw): ScoringModelAIResponse {
+  const weights: ScoringModelAIResponse['weights'] = {};
+
+  for (const entry of raw.weights) {
+    const converted: ScoringModelAIResponse['weights'][string] = {
+      weight: entry.weight,
+    };
+
+    if (entry.optionScores) {
+      const optionMap: Record<string, number> = {};
+      for (const os of entry.optionScores) {
+        optionMap[os.option] = os.score;
+      }
+      converted.optionScores = optionMap;
+    }
+
+    if (entry.ranges) {
+      converted.ranges = entry.ranges;
+    }
+
+    weights[entry.questionId] = converted;
+  }
+
+  return {
+    weights,
+    totalWeight: raw.totalWeight,
+    reasoning: raw.reasoning,
+  };
+}
+
+const SYSTEM_PROMPT = `You are a real estate lead scoring expert. Given an intake form's questions, generate an optimal scoring model.
+
+RESPONSE FORMAT:
+- "weights" is an ARRAY of objects, each with: questionId (string), weight (number 0-100), optionScores (array or null), ranges (array or null).
+- For radio/select questions, "optionScores" is an array of { "option": string, "score": number } entries. Use the actual option values (lowercase with hyphens for multi-word values).
+- For number fields, "ranges" is an array of { "min": number, "max": number|null, "points": number, "label": string } bucket entries (3-5 buckets). Use null for unlimited upper bound.
+- For fields that are not radio/select, set optionScores to null. For fields that are not number fields, set ranges to null.
+
+SCORING GUIDELINES:
+- Distribute importance weights across ALL questions that should be scored, summing to exactly 100.
+- Skip system fields (name, email, phone) and informational-only fields (notes, additional info).
+- Consider the lead type (rental vs buyer) when assigning weights.
 
 For RENTAL leads, prioritize: move-in timeline urgency, income stability, employment status, budget-to-income ratio, and readiness to commit.
 
 For BUYER leads, prioritize: pre-approval status, purchase budget, timeline to close, property type clarity, and readiness to commit.
 
-When creating option scores, use the actual option values provided (lowercase with hyphens for multi-word values). When creating number ranges, consider realistic real estate values in USD.
+When creating number ranges, consider realistic real estate values in USD.
 
 The weights MUST sum to exactly 100. Double-check your arithmetic.`;
 
@@ -202,7 +312,8 @@ export async function generateScoringModel(
       return generateFallbackModel(formConfig);
     }
 
-    const parsed = JSON.parse(raw) as ScoringModelAIResponse;
+    const rawParsed = JSON.parse(raw) as AIResponseRaw;
+    const parsed = parseAIWeightsResponse(rawParsed);
 
     // Validate and normalize weights to ensure they sum to 100
     const normalizedWeights = normalizeWeights(parsed.weights);
@@ -219,7 +330,7 @@ export async function generateScoringModel(
       leadType,
     };
   } catch (error) {
-    console.warn('[generate-scoring-model] AI call failed, using fallback', { error });
+    console.error('[generate-scoring-model] AI call failed:', error instanceof Error ? error.message : error);
     return generateFallbackModel(formConfig);
   }
 }
