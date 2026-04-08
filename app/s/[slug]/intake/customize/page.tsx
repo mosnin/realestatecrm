@@ -18,14 +18,17 @@ import {
   Info,
   Lightbulb,
   Gauge,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormBuilder } from '@/components/form-builder';
 import { FormPreview } from '@/components/form-builder/form-preview';
 import { OptimizationPanel } from '@/components/form-builder/optimization-panel';
 import { ScoringPreview } from '@/components/form-builder/scoring-preview';
+import { ScoringTab } from '@/components/form-builder/scoring-tab';
 import { TEMPLATES } from '@/components/form-builder/templates';
 import type { IntakeFormConfig } from '@/components/form-builder/types';
+import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
@@ -52,9 +55,14 @@ export default function IntakeCustomizePage() {
   const buyerSavedRef = useRef<string>('');
 
   const [saving, setSaving] = useState(false);
+  const [savingPhase, setSavingPhase] = useState<'form' | 'scoring' | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<string>('builder');
   const [configSource, setConfigSource] = useState<FormConfigSource>('legacy');
+
+  // Scoring model state (separate from form config)
+  const [rentalScoringModel, setRentalScoringModel] = useState<ScoringModel | null>(null);
+  const [buyerScoringModel, setBuyerScoringModel] = useState<ScoringModel | null>(null);
 
   // Load existing configs from the API
   useEffect(() => {
@@ -68,9 +76,15 @@ export default function IntakeCustomizePage() {
         rentalFormConfig: IntakeFormConfig | null;
         buyerFormConfig: IntakeFormConfig | null;
         formConfigSource: FormConfigSource;
+        rentalScoringModel: ScoringModel | null;
+        buyerScoringModel: ScoringModel | null;
       }) => {
         const source = data.formConfigSource ?? 'legacy';
         setConfigSource(source);
+
+        // Scoring models
+        if (data.rentalScoringModel) setRentalScoringModel(data.rentalScoringModel);
+        if (data.buyerScoringModel) setBuyerScoringModel(data.buyerScoringModel);
 
         // Rental config
         if (data.rentalFormConfig?.sections) {
@@ -111,6 +125,15 @@ export default function IntakeCustomizePage() {
   const config = activeLeadType === 'rental' ? rentalConfig : buyerConfig;
   const hasChanges = activeLeadType === 'rental' ? rentalHasChanges : buyerHasChanges;
   const hasSavedConfig = activeLeadType === 'rental' ? rentalHasSavedConfig : buyerHasSavedConfig;
+  const activeScoringModel = activeLeadType === 'rental' ? rentalScoringModel : buyerScoringModel;
+
+  const handleScoringModelChange = useCallback((model: ScoringModel) => {
+    if (activeLeadType === 'rental') {
+      setRentalScoringModel(model);
+    } else {
+      setBuyerScoringModel(model);
+    }
+  }, [activeLeadType]);
 
   const handleConfigChange = useCallback((newConfig: IntakeFormConfig) => {
     if (activeLeadType === 'rental') {
@@ -129,8 +152,10 @@ export default function IntakeCustomizePage() {
 
   const handleSave = useCallback(async () => {
     setSaving(true);
+    setSavingPhase('form');
     const currentConfig = activeLeadType === 'rental' ? rentalConfigRef.current : buyerConfigRef.current;
     try {
+      // Phase 1: Save the form config
       const res = await fetch('/api/form-config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -153,11 +178,37 @@ export default function IntakeCustomizePage() {
         buyerSavedRef.current = JSON.stringify(currentConfig);
       }
 
+      // Phase 2: Generate scoring model in background
+      setSavingPhase('scoring');
+      try {
+        const scoringRes = await fetch('/api/form-config/generate-scoring', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slug,
+            leadType: activeLeadType,
+            formConfig: currentConfig,
+          }),
+        });
+        if (scoringRes.ok) {
+          const { scoringModel: newModel } = await scoringRes.json();
+          if (activeLeadType === 'rental') {
+            setRentalScoringModel(newModel);
+          } else {
+            setBuyerScoringModel(newModel);
+          }
+        }
+      } catch {
+        // Scoring generation is non-blocking -- form save already succeeded
+        console.warn('[intake-customize] Scoring model generation failed (non-blocking)');
+      }
+
       toast.success(`${activeLeadType === 'rental' ? 'Rental' : 'Buyer'} form saved successfully.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
       setSaving(false);
+      setSavingPhase(null);
     }
   }, [slug, activeLeadType]);
 
@@ -234,7 +285,7 @@ export default function IntakeCustomizePage() {
             </Button>
             <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}>
               {saving ? (
-                <><Loader2 size={14} className="mr-1.5 animate-spin" /> Saving...</>
+                <><Loader2 size={14} className="mr-1.5 animate-spin" /> {savingPhase === 'scoring' ? 'Generating scoring model...' : 'Saving form...'}</>
               ) : (
                 <><Save size={14} className="mr-1.5" /> Save Form</>
               )}
@@ -329,6 +380,9 @@ export default function IntakeCustomizePage() {
           <TabsTrigger value="optimize" title="Get AI-powered suggestions to improve your form based on real applicant data">
             <Lightbulb size={14} className="mr-1.5" /> Suggestions
           </TabsTrigger>
+          <TabsTrigger value="scoring" title="View and fine-tune the AI-generated scoring weights for each question">
+            <Sparkles size={14} className="mr-1.5" /> Scoring
+          </TabsTrigger>
           <TabsTrigger value="test-scoring" title="Try filling out your form as a test applicant to see what lead score they would get">
             <Gauge size={14} className="mr-1.5" /> Score Simulator
           </TabsTrigger>
@@ -340,6 +394,15 @@ export default function IntakeCustomizePage() {
 
         <TabsContent value="preview">
           <FormPreview config={config} />
+        </TabsContent>
+
+        <TabsContent value="scoring">
+          <ScoringTab
+            config={config}
+            slug={slug}
+            scoringModel={activeScoringModel}
+            onScoringModelChange={handleScoringModelChange}
+          />
         </TabsContent>
 
         <TabsContent value="optimize">

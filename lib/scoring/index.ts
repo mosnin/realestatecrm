@@ -15,6 +15,10 @@ export type { ScoringEngineResult, ScoringInput, CategoryResult, ScoringWeights 
 export { enhanceWithAI } from './enhance';
 
 // Dynamic form scoring
-export { computeDeterministicScore } from './deterministic-scorer';
-export type { DeterministicScoringResult, DeterministicBreakdownItem } from './deterministic-scorer';
+export { computeDeterministicScore, computeModelBasedScore } from './deterministic-scorer';
+export type { DeterministicScoringResult, DeterministicBreakdownItem, ModelScoringResult } from './deterministic-scorer';
 export { buildDynamicScoringPrompt, buildDynamicSystemPrompt } from './dynamic-prompt-builder';
+
+// AI-generated scoring models
+export { generateScoringModel, generateFallbackModel } from './generate-scoring-model';
+export type { ScoringModel, QuestionScoringModel, NumberRange, ScoringModelAIResponse } from './scoring-model-types';

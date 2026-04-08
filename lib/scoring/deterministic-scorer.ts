@@ -11,6 +11,7 @@
  */
 
 import type { IntakeFormConfig, FormQuestion } from '@/lib/types';
+import type { ScoringModel } from './scoring-model-types';
 
 export type DeterministicBreakdownItem = {
   questionId: string;
@@ -271,4 +272,105 @@ function matchAnswer(
     default:
       return 0;
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Model-based scoring — uses ScoringModel from AI generation
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type ModelScoringResult = {
+  score: number; // 0-100
+  breakdown: {
+    questionId: string;
+    label: string;
+    weight: number;
+    points: number; // 0-100 raw points for this question
+    weightedContribution: number; // (points/100) * (weight/totalWeight) * 100
+    matched: boolean;
+  }[];
+  hasModel: boolean;
+};
+
+/**
+ * Score answers using an AI-generated ScoringModel.
+ *
+ * For questions with `ranges`, matches the numeric answer to a range bucket.
+ * For questions with `optionScores`, maps the selected option value to its score.
+ * The final score = sum of (points/100) * (weight/totalWeight) * 100 across all
+ * scored questions, yielding a 0-100 result.
+ */
+export function computeModelBasedScore(
+  formConfig: IntakeFormConfig,
+  answers: Answers,
+  model: ScoringModel,
+): ModelScoringResult {
+  const breakdown: ModelScoringResult['breakdown'] = [];
+
+  // Build a lookup of all questions by ID
+  const questionMap = new Map<string, FormQuestion>();
+  for (const section of formConfig.sections) {
+    for (const q of section.questions) {
+      questionMap.set(q.id, q);
+    }
+  }
+
+  let totalScore = 0;
+  const totalWeight = Object.values(model.weights).reduce((s, w) => s + w.weight, 0) || 100;
+
+  for (const [questionId, qModel] of Object.entries(model.weights)) {
+    if (qModel.weight <= 0) continue;
+
+    const question = questionMap.get(questionId);
+    const label = question?.label || questionId;
+    const answer = answers[questionId];
+
+    let points = 0;
+    let matched = false;
+
+    if (answer !== undefined && answer !== null && answer !== '') {
+      // Try range matching for number fields
+      if (qModel.ranges && qModel.ranges.length > 0) {
+        const numVal = Number(answer);
+        if (!isNaN(numVal)) {
+          for (const range of qModel.ranges) {
+            if (numVal >= range.min && (range.max === null || numVal < range.max)) {
+              points = range.points;
+              matched = true;
+              break;
+            }
+          }
+        }
+      }
+
+      // Try option score matching for radio/select
+      if (!matched && qModel.optionScores) {
+        const answerStr = String(answer).trim().toLowerCase();
+        for (const [optValue, optPoints] of Object.entries(qModel.optionScores)) {
+          if (optValue.toLowerCase() === answerStr) {
+            points = optPoints;
+            matched = true;
+            break;
+          }
+        }
+      }
+    }
+
+    const weightedContribution = (points / 100) * (qModel.weight / totalWeight) * 100;
+    totalScore += weightedContribution;
+
+    breakdown.push({
+      questionId,
+      label,
+      weight: qModel.weight,
+      points,
+      weightedContribution: Math.round(weightedContribution * 100) / 100,
+      matched,
+    });
+  }
+
+  return {
+    score: Math.max(0, Math.min(100, Math.round(totalScore))),
+    breakdown,
+    hasModel: Object.keys(model.weights).length > 0,
+  };
 }

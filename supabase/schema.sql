@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS "Brokerage" (
   "brokerageFormConfig" jsonb DEFAULT NULL,
   "brokerageRentalFormConfig" jsonb DEFAULT NULL,
   "brokerageBuyerFormConfig" jsonb DEFAULT NULL,
+  "brokerageRentalScoringModel" jsonb DEFAULT NULL,
+  "brokerageBuyerScoringModel" jsonb DEFAULT NULL,
   "createdAt"   timestamptz NOT NULL DEFAULT now()
 );
 
@@ -101,6 +103,8 @@ CREATE TABLE IF NOT EXISTS "SpaceSetting" (
   "buyerFormConfig"      jsonb DEFAULT NULL,
   "formConfigSource"     text NOT NULL DEFAULT 'legacy'
     CHECK ("formConfigSource" IN ('custom', 'brokerage', 'legacy')),
+  "rentalScoringModel"   jsonb DEFAULT NULL,
+  "buyerScoringModel"    jsonb DEFAULT NULL,
   "trackingPixels"       jsonb
 );
 
