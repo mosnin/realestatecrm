@@ -757,21 +757,51 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
 
   return (
     <div className="space-y-4">
-    {/* Lead type filter */}
-    <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5 w-fit">
-      {(['all', 'rental', 'buyer'] as const).map((lt) => (
-        <button
-          key={lt}
-          onClick={() => setLeadTypeFilter(lt)}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-            leadTypeFilter === lt
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          {lt === 'all' ? 'All' : lt === 'rental' ? 'Rental' : 'Buyer'}
-        </button>
-      ))}
+    {/* Search and controls */}
+    <div className="flex flex-col sm:flex-row gap-2.5">
+      <div className="relative flex-1">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search by name, email, or phone..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-lg border border-border bg-card pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+      </div>
+      <div className="flex gap-2 items-center">
+        {/* Sort dropdown */}
+        <div className="relative">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="appearance-none rounded-md border border-border bg-card pl-7 pr-8 py-2 text-xs font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring h-9"
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="score">Highest score</option>
+            <option value="name-az">Name A-Z</option>
+          </select>
+          <ArrowUpDown size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        </div>
+
+        {/* Lead type filter */}
+        <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+          {(['all', 'rental', 'buyer'] as const).map((lt) => (
+            <button
+              key={lt}
+              onClick={() => setLeadTypeFilter(lt)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                leadTypeFilter === lt
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {lt === 'all' ? 'All' : lt === 'rental' ? 'Rental' : 'Buyer'}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
 
     <Tabs value={tab} onValueChange={setTab}>

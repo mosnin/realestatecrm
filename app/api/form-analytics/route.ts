@@ -81,7 +81,24 @@ export async function POST(req: NextRequest) {
     events = [parsed.data];
   }
 
-  // Rate limit: 60 events per session per hour
+  // Rate limit by IP to prevent abuse from rotating session IDs
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown';
+  const { allowed: ipAllowed } = await checkRateLimit(
+    `form-analytics:rl:ip:${ip}`,
+    200,
+    3600,
+  );
+  if (!ipAllowed) {
+    return NextResponse.json(
+      { error: 'Too many events. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': '3600' } },
+    );
+  }
+
+  // Also rate limit per session to prevent single-session flooding
   // Truncate sessionId for rate limit key to prevent key-length manipulation
   const sessionId = events[0].sessionId.slice(0, 64);
   const { allowed } = await checkRateLimit(
