@@ -158,36 +158,50 @@ export function ApplicationStatusManager({
     <div className="space-y-4">
       {/* Status Control */}
       <div className="space-y-2">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        <label id="status-label" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
           Application Status
-        </p>
+        </label>
 
         {/* Current status badge */}
         <div className="relative">
           <button
             onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+            onKeyDown={(e: React.KeyboardEvent) => {
+              if (e.key === 'Escape' && statusDropdownOpen) {
+                setStatusDropdownOpen(false);
+              }
+            }}
+            aria-expanded={statusDropdownOpen}
+            aria-haspopup="listbox"
+            aria-labelledby="status-label"
             className={cn(
-              'w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-sm font-medium border transition-colors',
+              'w-full flex items-center justify-between gap-2 px-3 min-h-[44px] rounded-lg text-sm font-medium border transition-colors',
               currentStatusConfig.color,
               'border-current/20',
             )}
           >
             <span className="flex items-center gap-2">
-              <CurrentIcon size={14} />
+              <CurrentIcon size={14} aria-hidden="true" />
               {currentStatusConfig.label}
             </span>
-            <ChevronDown size={14} className={cn('transition-transform', statusDropdownOpen && 'rotate-180')} />
+            <ChevronDown size={14} className={cn('transition-transform', statusDropdownOpen && 'rotate-180')} aria-hidden="true" />
           </button>
 
           {/* Dropdown */}
           {statusDropdownOpen && (
-            <div className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-popover shadow-md overflow-hidden">
+            <div
+              role="listbox"
+              aria-labelledby="status-label"
+              className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-popover shadow-md overflow-hidden"
+            >
               {STATUSES.map((s) => {
                 const Icon = s.icon;
                 const isActive = s.key === status;
                 return (
                   <button
                     key={s.key}
+                    role="option"
+                    aria-selected={isActive}
                     onClick={() => {
                       if (!isActive) {
                         setStatusDropdownOpen(false);
@@ -198,15 +212,15 @@ export function ApplicationStatusManager({
                     }}
                     disabled={updating}
                     className={cn(
-                      'w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-muted transition-colors',
+                      'w-full flex items-center gap-2 px-3 min-h-[44px] text-sm text-left hover:bg-muted transition-colors',
                       isActive && 'bg-muted font-medium',
                       updating && 'opacity-50',
                     )}
                   >
                     {updating && isActive ? (
-                      <Loader2 size={12} className="animate-spin" />
+                      <Loader2 size={12} className="animate-spin" aria-hidden="true" />
                     ) : (
-                      <Icon size={12} />
+                      <Icon size={12} aria-hidden="true" />
                     )}
                     {s.label}
                     {isActive && <span className="ml-auto text-xs text-muted-foreground">Current</span>}
@@ -217,14 +231,23 @@ export function ApplicationStatusManager({
           )}
         </div>
 
-        {/* Optional note field */}
-        {showNoteField && (
+        {/* Note toggle + field */}
+        {!showNoteField ? (
+          <button
+            onClick={() => setShowNoteField(true)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors min-h-[44px] px-1"
+          >
+            + Add note with status update
+          </button>
+        ) : (
           <div className="space-y-2">
+            <label htmlFor="status-note" className="sr-only">Status note</label>
             <textarea
+              id="status-note"
               value={note}
               onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNote(e.target.value)}
               placeholder="Add an optional note visible to the applicant..."
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
               rows={2}
               maxLength={500}
             />
@@ -234,7 +257,7 @@ export function ApplicationStatusManager({
                   setShowNoteField(false);
                   setNote('');
                 }}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors min-h-[44px] px-1"
               >
                 Cancel
               </button>
