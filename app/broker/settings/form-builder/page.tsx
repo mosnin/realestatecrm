@@ -1,11 +1,22 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Save, RotateCcw, Eye, Pencil, FileText, Home, Users } from 'lucide-react';
+import {
+  Loader2,
+  Save,
+  RotateCcw,
+  Eye,
+  Pencil,
+  FileText,
+  Home,
+  Users,
+  Send,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { FormBuilder } from '@/components/form-builder';
 import { FormPreview } from '@/components/form-builder/form-preview';
@@ -17,20 +28,17 @@ function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
-export default function FormFieldsSettingsPage() {
-  const params = useParams<{ slug: string }>();
-  const slug = params?.slug ?? '';
-
+export default function BrokerFormBuilderPage() {
   const [config, setConfig] = useState<IntakeFormConfig>(deepClone(BLANK_TEMPLATE));
   const [saving, setSaving] = useState(false);
+  const [pushing, setPushing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('builder');
   const [hasChanges, setHasChanges] = useState(false);
 
   // Load existing config
   useEffect(() => {
-    if (!slug) return;
-    fetch(`/api/form-config?slug=${encodeURIComponent(slug)}`)
+    fetch('/api/broker/form-config')
       .then((r) => {
         if (!r.ok) throw new Error('Not found');
         return r.json();
@@ -44,7 +52,7 @@ export default function FormFieldsSettingsPage() {
         // No existing config, use blank template
       })
       .finally(() => setLoading(false));
-  }, [slug]);
+  }, []);
 
   const handleConfigChange = useCallback((newConfig: IntakeFormConfig) => {
     setConfig(newConfig);
@@ -61,28 +69,28 @@ export default function FormFieldsSettingsPage() {
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      const res = await fetch('/api/form-config', {
+      const res = await fetch('/api/broker/form-config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, config }),
+        body: JSON.stringify({ config }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || 'Failed to save form configuration.');
       }
       setHasChanges(false);
-      toast.success('Form configuration saved.');
+      toast.success('Brokerage form configuration saved.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
       setSaving(false);
     }
-  }, [slug, config]);
+  }, [config]);
 
   const handleReset = useCallback(async () => {
     if (!confirm('Are you sure you want to reset to default? This cannot be undone.')) return;
     try {
-      const res = await fetch(`/api/form-config?slug=${encodeURIComponent(slug)}`, {
+      const res = await fetch('/api/broker/form-config', {
         method: 'DELETE',
       });
       if (!res.ok) {
@@ -94,7 +102,28 @@ export default function FormFieldsSettingsPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     }
-  }, [slug]);
+  }, []);
+
+  const handlePushToMembers = useCallback(async () => {
+    if (!confirm('This will override all member realtors\' individual form configurations with the brokerage form. Continue?')) return;
+    setPushing(true);
+    try {
+      const res = await fetch('/api/broker/form-config/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Failed to push form to members.');
+      }
+      toast.success('Form configuration pushed to all member realtors.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setPushing(false);
+    }
+  }, [config]);
 
   if (loading) {
     return (
@@ -110,12 +139,12 @@ export default function FormFieldsSettingsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Form Builder</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Brokerage Form Builder</h1>
           <p className="text-muted-foreground text-sm">
-            Design your custom intake form with drag-and-drop
+            Design a standard intake form for your brokerage
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {hasChanges && (
             <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
               Unsaved changes
@@ -132,6 +161,38 @@ export default function FormFieldsSettingsPage() {
             )}
           </Button>
         </div>
+      </div>
+
+      {/* Push to members */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">Push to All Members</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Apply this form configuration to all member realtors. Their individual form settings
+              will be overridden and their <code className="text-[11px] bg-muted px-1 py-0.5 rounded">formConfigSource</code> will
+              be set to &quot;brokerage&quot;.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePushToMembers}
+            disabled={pushing || hasChanges}
+            className="flex-shrink-0"
+          >
+            {pushing ? (
+              <><Loader2 size={14} className="mr-1.5 animate-spin" /> Pushing...</>
+            ) : (
+              <><Send size={14} className="mr-1.5" /> Push to Members</>
+            )}
+          </Button>
+        </div>
+        {hasChanges && (
+          <div className="px-5 py-2 border-t border-border bg-amber-50 dark:bg-amber-950/20">
+            <p className="text-[11px] text-amber-700 dark:text-amber-400">Save your changes before pushing to members.</p>
+          </div>
+        )}
       </div>
 
       {/* Template selector */}
