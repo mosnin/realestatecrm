@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
+import { DEFAULT_RENTAL_FORM_CONFIG, DEFAULT_BUYER_FORM_CONFIG } from '@/lib/form-builder';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -515,14 +516,12 @@ export function DynamicApplicationForm({
   // Determine the active form config
   const activeFormConfig = (() => {
     if (hasDualConfigs) {
-      if (selectedLeadType === 'buyer' && buyerFormConfig) return buyerFormConfig;
-      if (selectedLeadType === 'rental' && rentalFormConfig) return rentalFormConfig;
-      // Not yet selected or missing config -- use rental as fallback
-      if (selectedLeadType && rentalFormConfig) return rentalFormConfig;
-      if (selectedLeadType && buyerFormConfig) return buyerFormConfig;
-      // Return a placeholder config until user selects
+      if (selectedLeadType === 'buyer') return buyerFormConfig ?? DEFAULT_BUYER_FORM_CONFIG;
+      if (selectedLeadType === 'rental') return rentalFormConfig ?? DEFAULT_RENTAL_FORM_CONFIG;
+      // Not yet selected — show rental config as placeholder (user will pick on Getting Started)
       if (rentalFormConfig) return rentalFormConfig;
       if (buyerFormConfig) return buyerFormConfig;
+      return DEFAULT_RENTAL_FORM_CONFIG;
     }
     // Fallback: use legacy formConfig or a safe empty config to prevent crashes
     // when neither formConfig nor dual configs are provided.
