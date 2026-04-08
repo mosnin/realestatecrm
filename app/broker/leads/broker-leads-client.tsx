@@ -809,13 +809,12 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
         <div className="relative">
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            onChange={(e) => setSortBy(e.target.value as BrokerSortKey)}
             className="appearance-none rounded-md border border-border bg-card pl-7 pr-8 py-2 text-xs font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring h-9"
           >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="score">Highest score</option>
-            <option value="name-az">Name A-Z</option>
+            {BROKER_SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
           <ArrowUpDown size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
         </div>
@@ -826,17 +825,42 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
             <button
               key={lt}
               onClick={() => setLeadTypeFilter(lt)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 leadTypeFilter === lt
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {lt === 'all' ? 'All' : lt === 'rental' ? 'Rental' : 'Buyer'}
+              <span className="tabular-nums opacity-60">{leadTypeCounts[lt]}</span>
             </button>
           ))}
         </div>
       </div>
+    </div>
+
+    {/* Score filter pills */}
+    <div className="flex flex-wrap items-center gap-1.5">
+      {(['all', 'hot', 'warm', 'cold'] as const).map((key) => {
+        const count = scoreCounts[key];
+        if (key !== 'all' && count === 0) return null;
+        return (
+          <button
+            key={key}
+            onClick={() => setScoreFilter(key)}
+            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              scoreFilter === key
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
+            }`}
+          >
+            {key === 'all' ? 'All Scores' : key.charAt(0).toUpperCase() + key.slice(1)}
+            <span className={`tabular-nums ${scoreFilter === key ? 'opacity-80' : 'opacity-60'}`}>
+              {count}
+            </span>
+          </button>
+        );
+      })}
     </div>
 
     <Tabs value={tab} onValueChange={setTab}>

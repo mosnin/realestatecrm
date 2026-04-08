@@ -108,9 +108,10 @@ export const realtorNavItems: NavItem[] = [
     children: [
       { href: '/analytics', label: 'Overview', exact: true },
       { href: '/analytics/leads', label: 'Leads' },
+      { href: '/analytics/clients', label: 'Clients' },
       { href: '/analytics/tours', label: 'Tours' },
       { href: '/analytics/pipeline', label: 'Pipeline' },
-      { href: '/form-analytics', label: 'Form Traffic' },
+      { href: '/analytics/form-traffic', label: 'Form Traffic' },
     ],
   },
   {
