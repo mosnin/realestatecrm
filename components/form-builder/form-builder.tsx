@@ -9,6 +9,8 @@ import {
   useSensor,
   useSensors,
   closestCenter,
+  useDraggable,
+  useDroppable,
   type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core';
@@ -78,8 +80,8 @@ function createSection(position: number): FormSection {
 
 // ── Draggable palette item ──
 
-function PaletteItem({ type, label, icon: Icon }: { type: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({
+function PaletteItem({ type, label, icon: Icon, onClick }: { type: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; onClick?: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `palette-${type}`,
     data: { origin: 'palette', questionType: type },
   });
@@ -92,10 +94,15 @@ function PaletteItem({ type, label, icon: Icon }: { type: string; label: string;
       style={style}
       {...attributes}
       {...listeners}
-      className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-border bg-card p-3 cursor-grab text-center hover:border-primary/40 hover:bg-accent/50 transition-colors active:cursor-grabbing"
+      onClick={onClick}
+      className={cn(
+        'flex flex-col items-center justify-center gap-1.5 rounded-lg border border-border bg-card p-3 cursor-grab text-center hover:border-primary/40 hover:bg-accent/50 transition-colors active:cursor-grabbing',
+        isDragging && 'ring-2 ring-primary/30',
+      )}
     >
       <Icon size={18} className="text-muted-foreground" />
       <span className="text-[11px] font-medium text-muted-foreground leading-tight">{label}</span>
+      <GripVertical size={10} className="text-muted-foreground/30" />
     </div>
   );
 }
@@ -178,9 +185,14 @@ function SortableSection({
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setNodeRef: setSortableRef, transform, transition, isDragging } = useSortable({
     id: section.id,
     data: { origin: 'section', section },
+  });
+
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: `droppable-${section.id}`,
+    data: { origin: 'section', sectionId: section.id },
   });
 
   const style = {
@@ -191,13 +203,18 @@ function SortableSection({
 
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => {
+        setSortableRef(node);
+        setDroppableRef(node);
+      }}
       style={style}
       className={cn(
-        'rounded-xl border overflow-hidden transition-colors',
-        isSectionSelected
-          ? 'border-primary ring-1 ring-primary/20'
-          : 'border-border',
+        'rounded-xl border-2 overflow-hidden transition-colors',
+        isOver
+          ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+          : isSectionSelected
+            ? 'border-primary ring-1 ring-primary/20'
+            : 'border-border',
       )}
     >
       {/* Section header */}
@@ -662,6 +679,29 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
     setSelectedId(null);
   }, [selectedId, updateSections]);
 
+  // ── Click-to-add from palette ──
+
+  const handlePaletteClick = useCallback(
+    (type: FormQuestion['type']) => {
+      if (config.sections.length === 0) return;
+      // Add to the currently selected section, or default to the first section
+      const targetSectionId =
+        selectedType === 'section' && selectedId
+          ? selectedId
+          : config.sections[0].id;
+      const newQ = createQuestion(type);
+      updateSections((sections) =>
+        sections.map((s) => {
+          if (s.id !== targetSectionId) return s;
+          return { ...s, questions: [...s.questions, { ...newQ, position: s.questions.length }] };
+        }),
+      );
+      setSelectedId(newQ.id);
+      setSelectedType('question');
+    },
+    [config.sections, selectedId, selectedType, updateSections],
+  );
+
   // ── Drag handlers ──
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -685,14 +725,25 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
         // Find which section the over target belongs to
         let targetSectionId: string | null = null;
 
-        for (const section of config.sections) {
-          if (section.id === overId) {
-            targetSectionId = section.id;
-            break;
+        // Check droppable zone IDs (droppable-<sectionId>)
+        const droppablePrefix = 'droppable-';
+        if (overId.startsWith(droppablePrefix)) {
+          const sectionId = overId.slice(droppablePrefix.length);
+          if (config.sections.some((s) => s.id === sectionId)) {
+            targetSectionId = sectionId;
           }
-          if (section.questions.some((q) => q.id === overId)) {
-            targetSectionId = section.id;
-            break;
+        }
+
+        if (!targetSectionId) {
+          for (const section of config.sections) {
+            if (section.id === overId) {
+              targetSectionId = section.id;
+              break;
+            }
+            if (section.questions.some((q) => q.id === overId)) {
+              targetSectionId = section.id;
+              break;
+            }
           }
         }
 
@@ -825,13 +876,18 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Field Types</p>
             </div>
             <div className="p-3">
-              <SortableContext items={QUESTION_TYPES.map((qt) => `palette-${qt.type}`)} strategy={verticalListSortingStrategy}>
-                <div className="grid grid-cols-2 lg:grid-cols-2 gap-2">
-                  {QUESTION_TYPES.map((qt) => (
-                    <PaletteItem key={qt.type} type={qt.type} label={qt.label} icon={qt.icon} />
-                  ))}
-                </div>
-              </SortableContext>
+              <div className="grid grid-cols-2 lg:grid-cols-2 gap-2">
+                {QUESTION_TYPES.map((qt) => (
+                  <PaletteItem
+                    key={qt.type}
+                    type={qt.type}
+                    label={qt.label}
+                    icon={qt.icon}
+                    onClick={() => handlePaletteClick(qt.type as FormQuestion['type'])}
+                  />
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground text-center mt-3">Drag onto a section or click to add</p>
             </div>
           </div>
         </div>
@@ -902,11 +958,49 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
 
       {/* Drag overlay */}
       <DragOverlay>
-        {activeDragId && (
-          <div className="rounded-lg border border-primary/30 bg-card px-3 py-2 shadow-lg text-sm font-medium opacity-90">
-            Dragging...
-          </div>
-        )}
+        {activeDragId && (() => {
+          // If dragging from the palette, show the field type info
+          if (activeDragId.startsWith('palette-')) {
+            const fieldType = activeDragId.replace('palette-', '');
+            const qtConfig = QUESTION_TYPES.find((qt) => qt.type === fieldType);
+            if (qtConfig) {
+              const OverlayIcon = qtConfig.icon;
+              return (
+                <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-card px-3 py-2 shadow-lg text-sm font-medium opacity-90">
+                  <OverlayIcon size={16} className="text-primary" />
+                  {qtConfig.label}
+                </div>
+              );
+            }
+          }
+          // For questions, show the question label
+          const draggedQuestion = allQuestions.find((q) => q.id === activeDragId);
+          if (draggedQuestion) {
+            const qtConfig = getQuestionTypeConfig(draggedQuestion.type);
+            const OverlayIcon = qtConfig?.icon;
+            return (
+              <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-card px-3 py-2 shadow-lg text-sm font-medium opacity-90">
+                {OverlayIcon && <OverlayIcon size={14} className="text-muted-foreground" />}
+                {draggedQuestion.label}
+              </div>
+            );
+          }
+          // For sections, show section title
+          const draggedSection = config.sections.find((s) => s.id === activeDragId);
+          if (draggedSection) {
+            return (
+              <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-card px-3 py-2 shadow-lg text-sm font-medium opacity-90">
+                <GripVertical size={14} className="text-muted-foreground" />
+                {draggedSection.title}
+              </div>
+            );
+          }
+          return (
+            <div className="rounded-lg border border-primary/30 bg-card px-3 py-2 shadow-lg text-sm font-medium opacity-90">
+              Dragging...
+            </div>
+          );
+        })()}
       </DragOverlay>
     </DndContext>
   );
