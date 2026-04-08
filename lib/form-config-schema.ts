@@ -92,7 +92,7 @@ export const formConfigSchema = z
     leadType: z.enum(['rental', 'buyer', 'general']),
     sections: z.array(formSectionSchema).min(1, 'At least one section is required'),
   })
-  .superRefine((config, ctx) => {
+  .superRefine((config: { version: number; leadType: string; sections: z.infer<typeof formSectionSchema>[] }, ctx: z.RefinementCtx) => {
     // Collect all question IDs and check for duplicates
     const allQuestionIds = new Set<string>();
     const allQuestions: z.infer<typeof formQuestionSchema>[] = [];
