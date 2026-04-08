@@ -158,6 +158,34 @@ export function buildDynamicSystemPrompt(input: {
     '- Consistency across answers (do income, budget, timeline align?)',
     '- Red flags (unrealistic claims, contradictions, very low engagement)',
     '- Weighted importance of each question',
+  );
+
+  // Lead-type-specific scoring guidance
+  if (leadType === 'rental' || leadType === 'general') {
+    parts.push(
+      '',
+      'For RENTAL leads, prioritize:',
+      '- Stable employment or verifiable income source',
+      '- Budget-to-income ratio (rent should be under 30% of gross monthly income)',
+      '- Move-in timeline urgency (ASAP or within 30 days = stronger lead)',
+      '- Number of occupants and pet situation (affects property matching)',
+      '- Completeness of application (all required fields answered = more serious)',
+    );
+  } else if (leadType === 'buyer') {
+    parts.push(
+      '',
+      'For BUYER leads, prioritize:',
+      '- Pre-approval status (already approved = strongest signal)',
+      '- Budget adequacy relative to market (higher budget = more options)',
+      '- Timeline to close (ASAP or 1-3 months = serious buyer)',
+      '- Property type clarity (knows what they want = further along)',
+      '- First-time buyer status (may need more guidance but often highly motivated)',
+    );
+  }
+
+  parts.push(
+    '',
+    'Number fields (budget, income) are in USD unless otherwise labeled.',
     '',
     'Return a JSON object with:',
     '- leadScore: 0-100 integer (overall lead quality)',
@@ -203,8 +231,17 @@ function formatAnswer(
     case 'checkbox':
       return Boolean(answer) ? 'Yes' : 'No';
 
-    case 'number':
-      return String(answer);
+    case 'number': {
+      const num = Number(answer);
+      if (!Number.isFinite(num)) return String(answer);
+      // Infer currency context from question label
+      const label = question.label.toLowerCase();
+      const isCurrency = /budget|income|rent|salary|payment|price|amount|cost/i.test(label);
+      if (isCurrency) {
+        return `$${num.toLocaleString('en-US')}`;
+      }
+      return String(num);
+    }
 
     case 'date':
       return String(answer);
