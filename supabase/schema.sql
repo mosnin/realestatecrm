@@ -388,6 +388,12 @@ CREATE INDEX IF NOT EXISTS idx_space_owner_id      ON "Space"("ownerId");
 CREATE INDEX IF NOT EXISTS idx_space_slug          ON "Space"(slug);
 CREATE INDEX IF NOT EXISTS idx_space_brokerage     ON "Space"("brokerageId");
 CREATE INDEX IF NOT EXISTS idx_space_setting_sid   ON "SpaceSetting"("spaceId");
+CREATE INDEX IF NOT EXISTS idx_space_setting_form_config_source
+  ON "SpaceSetting"("formConfigSource");
+CREATE INDEX IF NOT EXISTS idx_space_setting_form_config
+  ON "SpaceSetting" USING gin("formConfig") WHERE "formConfig" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_brokerage_form_config
+  ON "Brokerage" USING gin("brokerageFormConfig") WHERE "brokerageFormConfig" IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_contact_space_id    ON "Contact"("spaceId");
 CREATE INDEX IF NOT EXISTS idx_contact_tags        ON "Contact" USING gin(tags);
