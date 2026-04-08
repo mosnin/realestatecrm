@@ -1219,7 +1219,7 @@ export function ApplicationForm({
   return (
     <div
       className={cn(
-        'bg-card border border-border/40 shadow-lg shadow-black/[0.03] overflow-hidden',
+        'bg-card overflow-hidden',
         radiusClass,
         fontClass,
         customization?.darkMode && 'dark',
