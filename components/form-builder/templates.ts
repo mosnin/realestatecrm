@@ -428,33 +428,12 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
   version: 1,
   leadType: 'rental',
   sections: [
-    // ── 1. Getting Started ──
-    {
-      id: id(),
-      title: 'Getting Started',
-      description: 'What are you looking for?',
-      position: 0,
-      questions: [
-        {
-          id: LEAD_TYPE_QUESTION_ID,
-          type: 'radio',
-          label: 'What are you looking for?',
-          required: true,
-          position: 0,
-          options: [
-            { value: 'rental', label: "I'm looking to rent" },
-            { value: 'buyer', label: "I'm looking to buy" },
-          ],
-        },
-      ],
-    },
-
-    // ── 2. Basics ──
+    // ── 1. Basics ──
     {
       id: id(),
       title: 'Basics',
       description: 'We just need a few details to get going.',
-      position: 1,
+      position: 0,
       questions: [
         {
           id: 'name',
@@ -486,11 +465,11 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 3. Move Timing ──
+    // ── 2. Move Timing ──
     {
       id: id(),
       title: 'Move Timing',
-      position: 2,
+      position: 1,
       questions: [
         {
           id: id(),
@@ -509,11 +488,11 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 4. Location ──
+    // ── 3. Location ──
     {
       id: id(),
       title: 'Location',
-      position: 3,
+      position: 2,
       questions: [
         {
           id: id(),
@@ -526,11 +505,11 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 5. Budget ──
+    // ── 4. Budget ──
     {
       id: id(),
       title: 'Budget',
-      position: 4,
+      position: 3,
       questions: [
         {
           id: id(),
@@ -559,11 +538,11 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 6. Income ──
+    // ── 5. Income ──
     {
       id: id(),
       title: 'Income',
-      position: 5,
+      position: 4,
       questions: [
         {
           id: id(),
@@ -583,11 +562,11 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 7. Employment ──
+    // ── 6. Employment ──
     {
       id: id(),
       title: 'Employment',
-      position: 6,
+      position: 5,
       questions: [
         {
           id: id(),
@@ -607,11 +586,11 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 8. Household ──
+    // ── 7. Household ──
     {
       id: id(),
       title: 'Household',
-      position: 7,
+      position: 6,
       questions: [
         {
           id: id(),
@@ -636,12 +615,12 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 9. Additional Info ──
+    // ── 8. Additional Info ──
     {
       id: id(),
       title: 'Additional Info',
       description: 'This step is optional. Share anything that might help.',
-      position: 8,
+      position: 7,
       questions: [
         {
           id: id(),
@@ -654,11 +633,11 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 10. Ready? ──
+    // ── 9. Ready? ──
     {
       id: id(),
       title: 'Ready?',
-      position: 9,
+      position: 8,
       questions: [
         {
           id: id(),
@@ -682,33 +661,12 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
   version: 1,
   leadType: 'buyer',
   sections: [
-    // ── 1. Getting Started ──
-    {
-      id: id(),
-      title: 'Getting Started',
-      description: 'What are you looking for?',
-      position: 0,
-      questions: [
-        {
-          id: LEAD_TYPE_QUESTION_ID,
-          type: 'radio',
-          label: 'What are you looking for?',
-          required: true,
-          position: 0,
-          options: [
-            { value: 'rental', label: "I'm looking to rent" },
-            { value: 'buyer', label: "I'm looking to buy" },
-          ],
-        },
-      ],
-    },
-
-    // ── 2. Basics ──
+    // ── 1. Basics ──
     {
       id: id(),
       title: 'Basics',
       description: 'We just need a few details to get going.',
-      position: 1,
+      position: 0,
       questions: [
         {
           id: 'name',
@@ -740,11 +698,11 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 3. Budget ──
+    // ── 2. Budget ──
     {
       id: id(),
       title: 'Budget',
-      position: 2,
+      position: 1,
       questions: [
         {
           id: id(),
@@ -765,11 +723,11 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 4. Pre-Approval ──
+    // ── 3. Pre-Approval ──
     {
       id: id(),
       title: 'Pre-Approval',
-      position: 3,
+      position: 2,
       questions: [
         {
           id: 'preApproval',
@@ -805,11 +763,11 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 5. Property ──
+    // ── 4. Property ──
     {
       id: id(),
       title: 'Property',
-      position: 4,
+      position: 3,
       questions: [
         {
           id: id(),
@@ -853,12 +811,12 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 6. Must-Haves ──
+    // ── 5. Must-Haves ──
     {
       id: id(),
       title: 'Must-Haves',
       description: 'Select all that apply.',
-      position: 5,
+      position: 4,
       questions: [
         {
           id: id(),
@@ -880,11 +838,11 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 7. Timeline ──
+    // ── 6. Timeline ──
     {
       id: id(),
       title: 'Timeline',
-      position: 6,
+      position: 5,
       questions: [
         {
           id: id(),
@@ -903,11 +861,11 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 8. About You ──
+    // ── 7. About You ──
     {
       id: id(),
       title: 'About You',
-      position: 7,
+      position: 6,
       questions: [
         {
           id: id(),
@@ -936,11 +894,11 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
       ],
     },
 
-    // ── 9. Ready? ──
+    // ── 8. Ready? ──
     {
       id: id(),
       title: 'Ready?',
-      position: 8,
+      position: 7,
       questions: [
         {
           id: id(),
