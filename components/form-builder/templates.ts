@@ -69,7 +69,15 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
           label: 'When are you planning to move?',
           required: true,
           position: 0,
-          scoring: { weight: 8 },
+          scoring: {
+            weight: 8,
+            mappings: [
+              { value: 'asap', points: 10 },
+              { value: '30days', points: 7 },
+              { value: '1-2months', points: 4 },
+              { value: 'browsing', points: 1 },
+            ],
+          },
           options: [
             { value: 'asap', label: 'ASAP (within 2 weeks)' },
             { value: '30days', label: 'Within 30 days' },

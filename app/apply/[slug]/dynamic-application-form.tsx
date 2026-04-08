@@ -1016,6 +1016,10 @@ export function DynamicApplicationForm({
       slug,
       leadType: submissionLeadType,
       formLeadType: submissionLeadType,
+      // System fields: the dynamic Zod schema (buildDynamicSchema) expects
+      // top-level 'name', 'email', 'phone' matching the system question IDs.
+      // The legacy schema expects 'legalName'. Send both for compat.
+      name: systemName,
       legalName: systemName,
       email: systemEmail,
       phone: systemPhone,

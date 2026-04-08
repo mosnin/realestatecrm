@@ -217,8 +217,8 @@ export default function BrokerFormBuilderPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          rentalFormConfig: rentalConfig,
-          buyerFormConfig: buyerConfig,
+          rentalFormConfig: rentalConfigRef.current,
+          buyerFormConfig: buyerConfigRef.current,
         }),
       });
       if (!res.ok) {
@@ -231,7 +231,7 @@ export default function BrokerFormBuilderPage() {
     } finally {
       setPushing(false);
     }
-  }, [rentalConfig, buyerConfig, memberCount]);
+  }, [memberCount]);
 
   if (loading) {
     return (

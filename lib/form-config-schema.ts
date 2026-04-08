@@ -23,11 +23,12 @@ const formOptionSchema = z.object({
 // ── Validation rules ──────────────────────────────────────────────────────────
 
 const validationSchema = z.object({
-  pattern: z.string().optional(),
+  // Cap pattern length to prevent ReDoS attacks with complex regex
+  pattern: z.string().max(200).optional(),
   min: z.number().optional(),
   max: z.number().optional(),
-  minLength: z.number().int().nonnegative().optional(),
-  maxLength: z.number().int().positive().optional(),
+  minLength: z.number().int().nonnegative().max(10000).optional(),
+  maxLength: z.number().int().positive().max(10000).optional(),
 }).optional();
 
 // ── Scoring rules ─────────────────────────────────────────────────────────────
@@ -68,7 +69,7 @@ const formQuestionSchema = z.object({
   required: z.boolean(),
   position: z.number().int().nonnegative(),
   system: z.boolean().optional(),
-  options: z.array(formOptionSchema).optional(),
+  options: z.array(formOptionSchema).max(200).optional(),
   validation: validationSchema,
   scoring: scoringSchema,
   visibleWhen: visibleWhenSchema,
@@ -81,7 +82,7 @@ const formSectionSchema = z.object({
   title: z.string().min(1, 'Section title is required').max(200),
   description: z.string().max(1000).optional(),
   position: z.number().int().nonnegative(),
-  questions: z.array(formQuestionSchema).min(1, 'Each section must have at least one question'),
+  questions: z.array(formQuestionSchema).min(1, 'Each section must have at least one question').max(50),
   visibleWhen: visibleWhenSchema,
 });
 
@@ -91,7 +92,7 @@ export const formConfigSchema = z
   .object({
     version: z.number().int().positive(),
     leadType: z.enum(['rental', 'buyer', 'general']),
-    sections: z.array(formSectionSchema).min(1, 'At least one section is required'),
+    sections: z.array(formSectionSchema).min(1, 'At least one section is required').max(50),
   })
   .superRefine((config: { version: number; leadType: string; sections: z.infer<typeof formSectionSchema>[] }, ctx: z.RefinementCtx) => {
     // Collect all question IDs and check for duplicates

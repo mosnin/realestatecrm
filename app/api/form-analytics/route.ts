@@ -30,6 +30,24 @@ const batchSchema = z.object({
   events: z.array(eventSchema).min(1).max(50),
 });
 
+/**
+ * Sanitize metadata object: limit depth, strip HTML from string values, cap size.
+ */
+function sanitizeMetadata(meta: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  const keys = Object.keys(meta).slice(0, 20); // Max 20 keys
+  for (const key of keys) {
+    const val = meta[key];
+    if (typeof val === 'string') {
+      result[key] = val.replace(/<[^>]*>/g, '').slice(0, 500);
+    } else if (typeof val === 'number' || typeof val === 'boolean') {
+      result[key] = val;
+    }
+    // Drop non-primitive values (arrays, objects, functions) to prevent abuse
+  }
+  return result;
+}
+
 // ── POST — Public endpoint to receive analytics events ──────────────────────
 
 export async function POST(req: NextRequest) {
@@ -77,16 +95,36 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Strip any potentially sensitive metadata keys
+  // Validate that the spaceId actually exists (prevent analytics pollution for arbitrary IDs)
+  const spaceId = events[0].spaceId;
+  try {
+    const { data: space } = await supabase
+      .from('Space')
+      .select('id')
+      .eq('id', spaceId)
+      .maybeSingle();
+    if (!space) {
+      return NextResponse.json({ error: 'Invalid space' }, { status: 400 });
+    }
+  } catch {
+    return NextResponse.json({ error: 'Validation failed' }, { status: 400 });
+  }
+
+  // Ensure all events in batch target the same space (prevent cross-space pollution)
+  if (events.some(e => e.spaceId !== spaceId)) {
+    return NextResponse.json({ error: 'All events in a batch must target the same space' }, { status: 400 });
+  }
+
+  // Strip any potentially sensitive metadata keys and sanitize stepTitle
   const sanitizedEvents = events.map((e) => ({
     spaceId: e.spaceId,
     sessionId: e.sessionId,
     formConfigVersion: e.formConfigVersion ?? null,
     eventType: e.eventType,
     stepIndex: e.stepIndex ?? null,
-    stepTitle: e.stepTitle ?? null,
+    stepTitle: e.stepTitle ? e.stepTitle.replace(/<[^>]*>/g, '').slice(0, 200) : null,
     durationMs: e.durationMs ?? null,
-    metadata: e.metadata ?? null,
+    metadata: e.metadata ? sanitizeMetadata(e.metadata) : null,
   }));
 
   try {
@@ -136,7 +174,7 @@ export async function GET(req: NextRequest) {
       .eq('spaceId', space.id)
       .gte('createdAt', cutoff)
       .order('createdAt', { ascending: true })
-      .limit(50000);
+      .limit(10000);
 
     if (formVersion !== undefined) {
       query = query.eq('formConfigVersion', formVersion);

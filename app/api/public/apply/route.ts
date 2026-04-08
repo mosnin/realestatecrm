@@ -295,7 +295,12 @@ export async function POST(req: NextRequest) {
       const parsed = dynamicSchema.safeParse(requestBody);
       if (!parsed.success) {
         console.warn('[apply] dynamic validation failed', { issues: parsed.error.issues });
-        return NextResponse.json({ error: 'Invalid submission data', issues: parsed.error.issues }, { status: 400 });
+        // Only return field-level path/message to the client, not full Zod internals
+        const safeIssues = parsed.error.issues.map(i => ({
+          path: i.path,
+          message: i.message,
+        }));
+        return NextResponse.json({ error: 'Invalid submission data', issues: safeIssues }, { status: 400 });
       }
 
       const data = parsed.data as Record<string, unknown>;
@@ -390,10 +395,10 @@ export async function POST(req: NextRequest) {
       .limit(5);
     if (dupError) throw dupError;
 
-    // Generate a unique application reference for the status page
-    const applicationRef = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+    // Generate a unique application reference for the status page (24 hex chars = 96 bits entropy)
+    const applicationRef = (crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '')).slice(0, 24);
 
-    // Generate a secure portal token for applicant access
+    // Generate a secure portal token for applicant access (64 hex chars = 256 bits entropy)
     const statusPortalToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
 
     if (existingRecentLeads?.length) {

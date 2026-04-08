@@ -143,8 +143,9 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
   const [leads, setLeads] = useState<Contact[]>(initialLeads);
   const [tierFilter, setTierFilter] = useState<TierFilter>('all');
   const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'rental' | 'buyer'>('all');
-  const [sort, setSort] = useState<'newest' | 'score' | 'followup'>('newest');
+  const [sort, setSort] = useState<'newest' | 'oldest' | 'score' | 'name-az' | 'name-za' | 'followup'>('newest');
   const [view, setView] = useState<'card' | 'list'>('card');
+  const [search, setSearch] = useState('');
   const [convertTarget, setConvertTarget] = useState<Contact | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
@@ -189,7 +190,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
   }
 
   function applyView(v: SavedView) {
-    const f = v.filters as { tierFilter?: TierFilter; sort?: 'newest' | 'score' | 'followup' };
+    const f = v.filters as { tierFilter?: TierFilter; sort?: typeof sort };
     if (f.tierFilter) setTierFilter(f.tierFilter);
     if (f.sort) setSort(f.sort);
   }
@@ -203,8 +204,23 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
     if (leadTypeFilter !== 'all') {
       list = list.filter((l) => l.leadType === leadTypeFilter);
     }
-    if (sort === 'score') {
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (l) =>
+          l.name?.toLowerCase().includes(q) ||
+          l.email?.toLowerCase().includes(q) ||
+          l.phone?.toLowerCase().includes(q),
+      );
+    }
+    if (sort === 'oldest') {
+      list = [...list].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    } else if (sort === 'score') {
       list = [...list].sort((a, b) => (b.leadScore ?? -1) - (a.leadScore ?? -1));
+    } else if (sort === 'name-az') {
+      list = [...list].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+    } else if (sort === 'name-za') {
+      list = [...list].sort((a, b) => (b.name ?? '').localeCompare(a.name ?? ''));
     } else if (sort === 'followup') {
       list = [...list].sort((a, b) => {
         const aTime = a.followUpAt ? new Date(a.followUpAt).getTime() : Infinity;
@@ -212,8 +228,9 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
         return aTime - bTime;
       });
     }
+    // Default 'newest' is the original server order (createdAt desc)
     return list;
-  }, [leads, tierFilter, leadTypeFilter, sort]);
+  }, [leads, tierFilter, leadTypeFilter, sort, search]);
 
   function handleConverted(leadId: string) {
     setLeads((prev) => prev.filter((l) => l.id !== leadId));

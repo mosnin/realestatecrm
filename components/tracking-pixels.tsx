@@ -15,14 +15,88 @@ function safePixelId(id: string | undefined): string | null {
 }
 
 /**
- * Sanitize custom head script at render time.
- * Strips closing </script> tags that could break out of the container element.
+ * Allowlisted domains for custom script src attributes.
+ * Must match the API-side allowlist in /api/settings/tracking/route.ts.
+ */
+const ALLOWED_SCRIPT_DOMAINS = [
+  'connect.facebook.net',
+  'www.facebook.com',
+  'analytics.tiktok.com',
+  'www.googletagmanager.com',
+  'www.google-analytics.com',
+  'googleads.g.doubleclick.net',
+  'static.ads-twitter.com',
+  'snap.licdn.com',
+  'sc-static.net',
+  'www.google.com',
+  'cdn.amplitude.com',
+  'js.hs-scripts.com',
+  'js.hs-analytics.net',
+  'www.clarity.ms',
+  'cdn.segment.com',
+];
+
+/**
+ * Sanitize custom head script at render time (defense-in-depth).
+ *
+ * SECURITY: Only allow external script tags with HTTPS src from allowlisted domains.
+ * Block inline scripts entirely. This prevents stored XSS even if the API validation
+ * is bypassed or if existing DB records predate the API-side fix.
  */
 function safeCustomScript(script: string | undefined): string | null {
   if (!script) return null;
   const trimmed = script.trim();
   if (!trimmed) return null;
-  // Remove any </script> tags (case-insensitive) that would break out of the container
+
+  // Block dangerous patterns outright
+  const dangerousPatterns = [
+    /javascript\s*:/gi,
+    /data\s*:/gi,
+    /vbscript\s*:/gi,
+    /on\w+\s*=/gi,
+    /expression\s*\(/gi,
+    /<iframe/gi,
+    /<object/gi,
+    /<embed/gi,
+    /<form/gi,
+    /<svg/gi,
+    /document\s*\./gi,
+    /window\s*\./gi,
+    /eval\s*\(/gi,
+  ];
+
+  for (const pattern of dangerousPatterns) {
+    if (pattern.test(trimmed)) {
+      console.warn('[TrackingPixels] Blocked dangerous custom script pattern');
+      return null;
+    }
+  }
+
+  // Reject inline scripts: all <script> tags must have a src attribute
+  const allScriptTags = trimmed.match(/<script[^>]*>/gi) ?? [];
+  const scriptTagsWithSrc = trimmed.match(/<script[^>]*\bsrc\s*=/gi) ?? [];
+  if (allScriptTags.length > scriptTagsWithSrc.length) {
+    console.warn('[TrackingPixels] Blocked inline custom script (no src)');
+    return null;
+  }
+
+  // Validate all src URLs against domain allowlist
+  const scriptSrcRegex = /<script[^>]*\bsrc\s*=\s*["']([^"']+)["'][^>]*>/gi;
+  let match;
+  while ((match = scriptSrcRegex.exec(trimmed)) !== null) {
+    try {
+      const parsed = new URL(match[1]);
+      if (parsed.protocol !== 'https:') return null;
+      if (!ALLOWED_SCRIPT_DOMAINS.some(d => parsed.hostname === d || parsed.hostname.endsWith('.' + d))) {
+        console.warn('[TrackingPixels] Blocked script from non-allowlisted domain:', parsed.hostname);
+        return null;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  // Remove </script> tags to prevent breaking out of the container
   return trimmed.replace(/<\/script\s*>/gi, '');
 }
 

@@ -25,6 +25,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Validate token format to reject obviously invalid inputs before DB lookup
+  if (
+    typeof applicationRef !== 'string' || applicationRef.length < 10 || applicationRef.length > 64 ||
+    typeof token !== 'string' || token.length < 32 || token.length > 128 ||
+    typeof content !== 'string'
+  ) {
+    return NextResponse.json({ error: 'Application not found' }, { status: 404 });
+  }
+
   // Validate content length
   const trimmed = content.trim();
   if (trimmed.length === 0) {
@@ -34,8 +43,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Message too long (max 2000 characters)' }, { status: 400 });
   }
 
-  // Rate limit: 10 messages per token per hour
-  const { allowed } = await checkRateLimit(`portal:msg:${token}`, 10, 3600);
+  // Rate limit by IP to prevent abuse (token is user-controlled, so also limit by IP)
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown';
+  const { allowed: ipAllowed } = await checkRateLimit(`portal:msg:ip:${ip}`, 30, 3600);
+  if (!ipAllowed) {
+    return NextResponse.json(
+      { error: 'Too many messages. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': '3600' } },
+    );
+  }
+
+  // Also rate limit per token to prevent per-application spam
+  // Truncate token to prevent rate-limit key manipulation with excessively long strings
+  const tokenKey = typeof token === 'string' ? token.slice(0, 64) : 'invalid';
+  const { allowed } = await checkRateLimit(`portal:msg:${tokenKey}`, 10, 3600);
   if (!allowed) {
     return NextResponse.json(
       { error: 'Too many messages. Please try again later.' },

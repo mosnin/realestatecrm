@@ -35,6 +35,17 @@ export async function POST(req: NextRequest) {
   }
 
   const { spaceId, email, answers, currentStep, formConfigVersion, completed } = parsed.data;
+
+  // Guard against oversized payloads: limit answers to 500KB serialized
+  const answersSize = JSON.stringify(answers).length;
+  if (answersSize > 512_000) {
+    return NextResponse.json({ error: 'Draft data too large' }, { status: 413 });
+  }
+  // Limit number of answer keys to prevent abuse
+  if (Object.keys(answers).length > 500) {
+    return NextResponse.json({ error: 'Too many answer fields' }, { status: 400 });
+  }
+
   const normalizedEmail = email.toLowerCase().trim();
 
   // Rate limit: 30 saves per email per hour
