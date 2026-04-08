@@ -1,10 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Loader2,
@@ -12,10 +10,12 @@ import {
   RotateCcw,
   Eye,
   Pencil,
-  FileText,
   Home,
   Users,
   Send,
+  CheckCircle2,
+  AlertCircle,
+  Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormBuilder } from '@/components/form-builder';
@@ -28,6 +28,22 @@ function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
+/** Human-friendly labels for each form type */
+const FORM_TYPE_LABELS: Record<string, string> = {
+  rental: 'Rental Application',
+  buyer: 'Buyer Inquiry',
+  general: 'General Intake',
+};
+
+/** Detect which standard template the config matches, if any */
+function detectActiveTemplate(config: IntakeFormConfig): TemplateName | null {
+  return config.leadType === 'rental'
+    ? 'rental'
+    : config.leadType === 'buyer'
+      ? 'buyer'
+      : null;
+}
+
 export default function BrokerFormBuilderPage() {
   const [config, setConfig] = useState<IntakeFormConfig>(deepClone(TEMPLATES.rental.config));
   const [saving, setSaving] = useState(false);
@@ -35,6 +51,11 @@ export default function BrokerFormBuilderPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('builder');
   const [hasChanges, setHasChanges] = useState(false);
+  const [hasSavedConfig, setHasSavedConfig] = useState(false);
+  const [memberCount, setMemberCount] = useState<number | null>(null);
+
+  // Track the last-saved config to detect unsaved changes accurately
+  const savedConfigRef = useRef<string>('');
 
   // Load existing config
   useEffect(() => {
@@ -43,27 +64,52 @@ export default function BrokerFormBuilderPage() {
         if (!r.ok) throw new Error('Not found');
         return r.json();
       })
-      .then((data) => {
-        if (data?.formConfig?.sections) {
-          setConfig(data.formConfig as IntakeFormConfig);
+      .then((data: { brokerageId: string; formConfig: IntakeFormConfig | null }) => {
+        if (data.formConfig?.sections) {
+          setConfig(data.formConfig);
+          setHasSavedConfig(true);
+          savedConfigRef.current = JSON.stringify(data.formConfig);
+        } else {
+          const defaultConfig = deepClone(TEMPLATES.rental.config);
+          setConfig(defaultConfig);
+          setHasSavedConfig(false);
+          savedConfigRef.current = JSON.stringify(defaultConfig);
         }
       })
       .catch(() => {
-        // No existing config, use blank template
+        // Network error or no existing config -- start with rental default
+        const defaultConfig = deepClone(TEMPLATES.rental.config);
+        setConfig(defaultConfig);
+        savedConfigRef.current = JSON.stringify(defaultConfig);
       })
       .finally(() => setLoading(false));
   }, []);
 
-  const handleConfigChange = useCallback((newConfig: IntakeFormConfig) => {
-    setConfig(newConfig);
-    setHasChanges(true);
+  // Fetch member count for the "Push to Members" section
+  useEffect(() => {
+    fetch('/api/broker/stats')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.memberCount != null) {
+          setMemberCount(data.memberCount);
+        }
+      })
+      .catch(() => {
+        // Silently fail -- member count is informational
+      });
   }, []);
 
-  const handleTemplateSelect = useCallback((name: TemplateName) => {
+  const handleConfigChange = useCallback((newConfig: IntakeFormConfig) => {
+    setConfig(newConfig);
+    setHasChanges(JSON.stringify(newConfig) !== savedConfigRef.current);
+  }, []);
+
+  const handleSwitchTemplate = useCallback((name: TemplateName) => {
     const template = TEMPLATES[name];
-    setConfig(deepClone(template.config));
-    setHasChanges(true);
-    toast.success(`Loaded "${template.label}" template`);
+    const newConfig = deepClone(template.config);
+    setConfig(newConfig);
+    setHasChanges(JSON.stringify(newConfig) !== savedConfigRef.current);
+    toast.success(`Switched to ${FORM_TYPE_LABELS[template.config.leadType] ?? template.label} form`);
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -78,8 +124,10 @@ export default function BrokerFormBuilderPage() {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || 'Failed to save form configuration.');
       }
+      setHasSavedConfig(true);
       setHasChanges(false);
-      toast.success('Brokerage form configuration saved.');
+      savedConfigRef.current = JSON.stringify(config);
+      toast.success('Brokerage form saved successfully.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
@@ -88,7 +136,12 @@ export default function BrokerFormBuilderPage() {
   }, [config]);
 
   const handleReset = useCallback(async () => {
-    if (!confirm('Are you sure you want to reset to default? This cannot be undone.')) return;
+    if (
+      !confirm(
+        'Reset to the standard Chippi rental form? Your custom brokerage form will be removed.',
+      )
+    )
+      return;
     try {
       const res = await fetch('/api/broker/form-config', {
         method: 'DELETE',
@@ -96,16 +149,25 @@ export default function BrokerFormBuilderPage() {
       if (!res.ok) {
         throw new Error('Failed to reset form configuration.');
       }
-      setConfig(deepClone(TEMPLATES.rental.config));
+      const defaultConfig = deepClone(TEMPLATES.rental.config);
+      setConfig(defaultConfig);
+      setHasSavedConfig(false);
       setHasChanges(false);
-      toast.success('Form configuration reset to default.');
+      savedConfigRef.current = JSON.stringify(defaultConfig);
+      toast.success('Form reset to the standard Chippi default.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     }
   }, []);
 
   const handlePushToMembers = useCallback(async () => {
-    if (!confirm('This will override all member realtors\' individual form configurations with the brokerage form. Continue?')) return;
+    const memberLabel = memberCount != null ? `${memberCount} member${memberCount === 1 ? '' : 's'}` : 'all member realtors';
+    if (
+      !confirm(
+        `This will override the individual form settings for ${memberLabel} with this brokerage form. Their formConfigSource will be set to "brokerage". Continue?`,
+      )
+    )
+      return;
     setPushing(true);
     try {
       const res = await fetch('/api/broker/form-config/push', {
@@ -117,13 +179,17 @@ export default function BrokerFormBuilderPage() {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || 'Failed to push form to members.');
       }
-      toast.success('Form configuration pushed to all member realtors.');
+      toast.success(`Form configuration pushed to ${memberLabel}.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
       setPushing(false);
     }
-  }, [config]);
+  }, [config, memberCount]);
+
+  // Derived display values
+  const activeTemplate = detectActiveTemplate(config);
+  const formLabel = FORM_TYPE_LABELS[config.leadType] ?? 'Custom Form';
 
   if (loading) {
     return (
@@ -136,49 +202,108 @@ export default function BrokerFormBuilderPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Brokerage Form Builder</h1>
-          <p className="text-muted-foreground text-sm">
-            Design a standard intake form for your brokerage
-          </p>
+      {/* ── Header with active form status ── */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="space-y-1">
+            <h1 className="text-xl font-semibold tracking-tight">Brokerage Intake Form</h1>
+            <p className="text-muted-foreground text-sm">
+              Design a standard intake form for your brokerage and push it to all members.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {hasChanges ? (
+              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50 gap-1.5">
+                <AlertCircle size={12} />
+                Unsaved changes
+              </Badge>
+            ) : hasSavedConfig ? (
+              <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-300 bg-emerald-50 gap-1.5">
+                <CheckCircle2 size={12} />
+                Saved
+              </Badge>
+            ) : null}
+            <Button variant="outline" size="sm" onClick={handleReset}>
+              <RotateCcw size={14} className="mr-1.5" /> Reset to Default
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}>
+              {saving ? (
+                <><Loader2 size={14} className="mr-1.5 animate-spin" /> Saving...</>
+              ) : (
+                <><Save size={14} className="mr-1.5" /> Save Form</>
+              )}
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {hasChanges && (
-            <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
-              Unsaved changes
-            </Badge>
+
+        {/* ── Active form status bar ── */}
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            {/* Current form identity */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <Pencil size={16} className="text-muted-foreground flex-shrink-0" />
+                <span className="text-sm font-semibold">Editing: {formLabel}</span>
+              </div>
+              {hasSavedConfig ? (
+                <Badge variant="secondary" className="text-[10px]">Custom</Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px]">Not configured</Badge>
+              )}
+            </div>
+
+            {/* Form switcher */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-xs text-muted-foreground mr-1">Switch to:</span>
+              <Button
+                variant={activeTemplate === 'rental' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleSwitchTemplate('rental')}
+                disabled={activeTemplate === 'rental'}
+              >
+                <Home size={14} className="mr-1.5" /> Rental Application
+              </Button>
+              <Button
+                variant={activeTemplate === 'buyer' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleSwitchTemplate('buyer')}
+                disabled={activeTemplate === 'buyer'}
+              >
+                <Users size={14} className="mr-1.5" /> Buyer Inquiry
+              </Button>
+            </div>
+          </div>
+
+          {/* Contextual hint */}
+          {!hasSavedConfig && (
+            <div className="px-5 py-2.5 border-t border-border bg-blue-50/50 flex items-start gap-2">
+              <Info size={14} className="text-blue-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-700">
+                No custom brokerage form is configured yet. Customize the fields below and save to create your brokerage standard form.
+              </p>
+            </div>
           )}
-          <Button variant="outline" size="sm" onClick={handleReset}>
-            <RotateCcw size={14} className="mr-1.5" /> Reset
-          </Button>
-          <Button size="sm" onClick={handleSave} disabled={saving}>
-            {saving ? (
-              <><Loader2 size={14} className="mr-1.5 animate-spin" /> Saving...</>
-            ) : (
-              <><Save size={14} className="mr-1.5" /> Save</>
-            )}
-          </Button>
         </div>
       </div>
 
-      {/* Push to members */}
+      {/* ── Push to members ── */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
+          <div className="space-y-0.5">
             <p className="text-sm font-semibold">Push to All Members</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Apply this form configuration to all member realtors. Their individual form settings
-              will be overridden and their <code className="text-[11px] bg-muted px-1 py-0.5 rounded">formConfigSource</code> will
-              be set to &quot;brokerage&quot;.
+            <p className="text-xs text-muted-foreground">
+              Apply this form to {memberCount != null ? (
+                <span className="font-medium">{memberCount} member{memberCount === 1 ? '' : 's'}</span>
+              ) : (
+                'all member realtors'
+              )}. Their individual form settings will be overridden.
             </p>
           </div>
           <Button
             variant="outline"
             size="sm"
             onClick={handlePushToMembers}
-            disabled={pushing || hasChanges}
+            disabled={pushing || hasChanges || !hasSavedConfig}
             className="flex-shrink-0"
           >
             {pushing ? (
@@ -189,36 +314,20 @@ export default function BrokerFormBuilderPage() {
           </Button>
         </div>
         {hasChanges && (
-          <div className="px-5 py-2 border-t border-border bg-amber-50 dark:bg-amber-950/20">
+          <div className="px-5 py-2 border-t border-border bg-amber-50 dark:bg-amber-950/20 flex items-start gap-2">
+            <AlertCircle size={12} className="text-amber-600 flex-shrink-0 mt-0.5" />
             <p className="text-[11px] text-amber-700 dark:text-amber-400">Save your changes before pushing to members.</p>
+          </div>
+        )}
+        {!hasSavedConfig && !hasChanges && (
+          <div className="px-5 py-2 border-t border-border bg-blue-50/50 flex items-start gap-2">
+            <Info size={12} className="text-blue-500 flex-shrink-0 mt-0.5" />
+            <p className="text-[11px] text-blue-700">Save a custom brokerage form first before pushing to members.</p>
           </div>
         )}
       </div>
 
-      {/* Template selector */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="px-5 py-3 border-b border-border bg-muted/20">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Start from a template</p>
-        </div>
-        <div className="px-5 py-3 flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleTemplateSelect('rental')}
-          >
-            <Home size={14} className="mr-1.5" /> Rental
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleTemplateSelect('buyer')}
-          >
-            <Users size={14} className="mr-1.5" /> Buyer
-          </Button>
-        </div>
-      </div>
-
-      {/* Builder / Preview tabs */}
+      {/* ── Builder / Preview tabs ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="builder">
