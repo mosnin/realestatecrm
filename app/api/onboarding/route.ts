@@ -228,6 +228,9 @@ export async function POST(req: NextRequest) {
         slug, intakePageTitle, intakePageIntro, businessName, logoUrl, realtorPhotoUrl,
         intakeAccentColor, intakeBorderRadius, intakeFont, intakeFooterLinks, bio, socialLinks,
         intakeDisabledSteps, intakeCustomQuestions, privacyPolicyHtml,
+        intakeDarkMode, intakeHeaderBgColor, intakeHeaderGradient, intakeFaviconUrl,
+        intakeVideoUrl, intakeThankYouTitle, intakeThankYouMessage,
+        intakeConfirmationEmail, intakeDisclaimerText,
         // Enhanced onboarding fields (User record)
         phone, websiteUrl, mlsId, brokerageAffiliation,
         preferredNotification, timezone, referralSource, biggestPainPoint,
@@ -241,6 +244,15 @@ export async function POST(req: NextRequest) {
         intakeAccentColor?: string;
         intakeBorderRadius?: 'rounded' | 'sharp';
         intakeFont?: 'system' | 'serif' | 'mono';
+        intakeDarkMode?: boolean;
+        intakeHeaderBgColor?: string | null;
+        intakeHeaderGradient?: string | null;
+        intakeFaviconUrl?: string | null;
+        intakeVideoUrl?: string | null;
+        intakeThankYouTitle?: string | null;
+        intakeThankYouMessage?: string | null;
+        intakeConfirmationEmail?: string | null;
+        intakeDisclaimerText?: string | null;
         intakeFooterLinks?: { label: string; url: string }[];
         bio?: string | null;
         socialLinks?: { instagram?: string; linkedin?: string; facebook?: string; tiktok?: string };
@@ -308,6 +320,15 @@ export async function POST(req: NextRequest) {
               ...(intakeDisabledSteps !== undefined && { intakeDisabledSteps }),
               ...(intakeCustomQuestions !== undefined && { intakeCustomQuestions }),
               ...(privacyPolicyHtml !== undefined && { privacyPolicyHtml }),
+              ...(intakeDarkMode !== undefined && { intakeDarkMode }),
+              ...(intakeHeaderBgColor !== undefined && { intakeHeaderBgColor }),
+              ...(intakeHeaderGradient !== undefined && { intakeHeaderGradient }),
+              ...(intakeFaviconUrl !== undefined && { intakeFaviconUrl }),
+              ...(intakeVideoUrl !== undefined && { intakeVideoUrl }),
+              ...(intakeThankYouTitle !== undefined && { intakeThankYouTitle }),
+              ...(intakeThankYouMessage !== undefined && { intakeThankYouMessage }),
+              ...(intakeConfirmationEmail !== undefined && { intakeConfirmationEmail }),
+              ...(intakeDisclaimerText !== undefined && { intakeDisclaimerText }),
               ...((preferredNotification === 'sms' || preferredNotification === 'both') && { smsNotifications: true }),
               ...(timezone && { timezone }),
             },
