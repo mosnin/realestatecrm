@@ -82,6 +82,7 @@ const formSectionSchema = z.object({
   description: z.string().max(1000).optional(),
   position: z.number().int().nonnegative(),
   questions: z.array(formQuestionSchema).min(1, 'Each section must have at least one question'),
+  visibleWhen: visibleWhenSchema,
 });
 
 // ── Full form config ──────────────────────────────────────────────────────────
@@ -169,6 +170,51 @@ export const formConfigSchema = z
             path: ['sections'],
           });
         }
+      }
+    }
+
+    // Validate section-level visibleWhen
+    const SYSTEM_FIELD_IDS = ['name', 'email', 'phone'];
+    for (let si = 0; si < config.sections.length; si++) {
+      const section = config.sections[si];
+      if (!section.visibleWhen) continue;
+
+      // Sections containing system fields must not have visibleWhen
+      const hasSystemField = section.questions.some(
+        (q) => q.system || SYSTEM_FIELD_IDS.includes(q.id),
+      );
+      if (hasSystemField) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Section "${section.title}" contains system fields and must not have visibleWhen`,
+          path: ['sections', si, 'visibleWhen'],
+        });
+        continue;
+      }
+
+      // visibleWhen must reference a valid questionId
+      if (!allQuestionIds.has(section.visibleWhen.questionId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Section "${section.title}" visibleWhen references unknown questionId "${section.visibleWhen.questionId}"`,
+          path: ['sections', si, 'visibleWhen'],
+        });
+        continue;
+      }
+
+      // visibleWhen can only reference questions in EARLIER sections (prevent forward references and cycles)
+      const earlierQuestionIds = new Set<string>();
+      for (let ej = 0; ej < si; ej++) {
+        for (const q of config.sections[ej].questions) {
+          earlierQuestionIds.add(q.id);
+        }
+      }
+      if (!earlierQuestionIds.has(section.visibleWhen.questionId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Section "${section.title}" visibleWhen can only reference questions from earlier sections`,
+          path: ['sections', si, 'visibleWhen'],
+        });
       }
     }
   });

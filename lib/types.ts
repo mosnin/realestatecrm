@@ -417,6 +417,7 @@ export type FormSection = {
   description?: string;
   position: number;
   questions: FormQuestion[];
+  visibleWhen?: FormQuestionVisibility;
 };
 
 export type IntakeFormConfig = {

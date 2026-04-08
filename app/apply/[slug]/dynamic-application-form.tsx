@@ -282,13 +282,13 @@ function LeadTypeSelector({
 
 // ── Conditional visibility evaluator ─────────────────────────────────────────
 
-function isQuestionVisible(
-  question: FormQuestion,
+function evaluateVisibility(
+  condition: { questionId: string; operator: 'equals' | 'not_equals' | 'contains'; value: string } | undefined,
   answers: AnswerMap,
 ): boolean {
-  if (!question.visibleWhen) return true;
+  if (!condition) return true;
 
-  const { questionId, operator, value: targetValue } = question.visibleWhen;
+  const { questionId, operator, value: targetValue } = condition;
   const currentAnswer = answers[questionId];
   const strAnswer = Array.isArray(currentAnswer)
     ? currentAnswer.join(',')
@@ -304,6 +304,20 @@ function isQuestionVisible(
     default:
       return true;
   }
+}
+
+function isQuestionVisible(
+  question: FormQuestion,
+  answers: AnswerMap,
+): boolean {
+  return evaluateVisibility(question.visibleWhen, answers);
+}
+
+function isSectionVisible(
+  section: FormSection,
+  answers: AnswerMap,
+): boolean {
+  return evaluateVisibility(section.visibleWhen, answers);
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
@@ -323,12 +337,10 @@ export function DynamicApplicationForm({
 }) {
   // Sort sections and questions by position
   const sections = [...formConfig.sections].sort((a, b) => a.position - b.position);
-  const sortedSections = sections.map((s) => ({
+  const allSortedSections = sections.map((s) => ({
     ...s,
     questions: [...s.questions].sort((a, b) => a.position - b.position),
   }));
-
-  const totalSteps = sortedSections.length;
 
   const [currentStep, setCurrentStep] = useState(1);
   const [direction, setDirection] = useState(1);
@@ -350,6 +362,62 @@ export function DynamicApplicationForm({
     applicationRef?: string;
   } | null>(null);
   const submissionLockRef = useRef(false);
+
+  // ── Compute visible sections based on current answers ─────────────────────
+
+  const sortedSections = allSortedSections.filter((s) => isSectionVisible(s, answers));
+  const totalSteps = sortedSections.length;
+
+  // Track previously visible section IDs to detect when sections become hidden
+  const prevVisibleSectionIdsRef = useRef<Set<string>>(
+    new Set(sortedSections.map((s) => s.id)),
+  );
+
+  // Clear answers from sections that became hidden
+  useEffect(() => {
+    const currentVisibleIds = new Set(sortedSections.map((s) => s.id));
+    const prevVisibleIds = prevVisibleSectionIdsRef.current;
+
+    // Find sections that were visible but are now hidden
+    const nowHiddenIds = new Set<string>();
+    prevVisibleIds.forEach((id) => {
+      if (!currentVisibleIds.has(id)) nowHiddenIds.add(id);
+    });
+
+    if (nowHiddenIds.size > 0) {
+      // Get question IDs from the now-hidden sections
+      const hiddenQuestionIds = allSortedSections
+        .filter((s) => nowHiddenIds.has(s.id))
+        .flatMap((s) => s.questions.map((q) => q.id));
+
+      if (hiddenQuestionIds.length > 0) {
+        setAnswers((prev) => {
+          const next = { ...prev };
+          let changed = false;
+          for (const qId of hiddenQuestionIds) {
+            if (qId in next) {
+              delete next[qId];
+              changed = true;
+            }
+          }
+          if (changed) {
+            debouncedSave(next);
+          }
+          return changed ? next : prev;
+        });
+      }
+    }
+
+    prevVisibleSectionIdsRef.current = currentVisibleIds;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortedSections.map((s) => s.id).join(',')]);
+
+  // Clamp currentStep if sections were hidden
+  useEffect(() => {
+    if (currentStep > totalSteps && totalSteps > 0) {
+      setCurrentStep(totalSteps);
+    }
+  }, [currentStep, totalSteps]);
 
   // ── Answer accessors ───────────────────────────────────────────────────────
 
@@ -466,10 +534,16 @@ export function DynamicApplicationForm({
     const systemPhone =
       typeof answers['phone'] === 'string' ? answers['phone'] : '';
 
-    // Build a flat answers record (convert arrays to comma-separated strings for API compat)
+    // Build a flat answers record (only from visible sections, convert arrays to comma-separated strings for API compat)
+    const visibleQuestionIds = new Set(
+      sortedSections.flatMap((s) =>
+        s.questions.filter((q) => isQuestionVisible(q, answers)).map((q) => q.id),
+      ),
+    );
     const flatAnswers: Record<string, string> = {};
     for (const [key, val] of Object.entries(answers)) {
       if (key === 'privacyConsent' || key === 'chippiTosConsent') continue;
+      if (!visibleQuestionIds.has(key)) continue;
       flatAnswers[key] = Array.isArray(val) ? val.join(',') : val;
     }
 
@@ -499,7 +573,7 @@ export function DynamicApplicationForm({
       // Dynamic form metadata
       formConfigVersion: formConfig.version,
       answers: flatAnswers,
-      completedSteps: sortedSections.map((_, i) => i + 1),
+      completedSteps: sortedSections.map((_, i) => i + 1), // only visible steps
     };
 
     if (brokerageId) {

@@ -319,6 +319,34 @@ CREATE TABLE IF NOT EXISTS "DocumentEmbedding" (
   embedding     vector(1536)     -- OpenAI text-embedding-3-small output
 );
 
+CREATE TABLE IF NOT EXISTS "FormAnalyticsEvent" (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "spaceId"           text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  "sessionId"         text NOT NULL,
+  "formConfigVersion" integer,
+  "eventType"         text NOT NULL
+    CHECK ("eventType" IN ('form_start', 'step_view', 'step_complete', 'form_submit', 'form_abandon')),
+  "stepIndex"         integer,
+  "stepTitle"         text,
+  "durationMs"        integer,
+  metadata            jsonb,
+  "createdAt"         timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS "FormDraft" (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "spaceId"           text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  email               text NOT NULL,
+  "resumeToken"       text NOT NULL UNIQUE,
+  answers             jsonb NOT NULL DEFAULT '{}',
+  "currentStep"       integer NOT NULL DEFAULT 0,
+  "formConfigVersion" integer,
+  "expiresAt"         timestamptz NOT NULL,
+  "completedAt"       timestamptz,
+  "createdAt"         timestamptz NOT NULL DEFAULT now(),
+  "updatedAt"         timestamptz NOT NULL DEFAULT now()
+);
+
 -- ============================================================
 -- Migrations: ADD COLUMN IF NOT EXISTS for existing databases
 -- Runs before indexes so columns exist when indexes are created.
@@ -446,6 +474,24 @@ CREATE INDEX IF NOT EXISTS idx_doc_embedding_entity ON "DocumentEmbedding"("enti
 CREATE INDEX IF NOT EXISTS idx_doc_embedding_hnsw
   ON "DocumentEmbedding" USING hnsw (embedding vector_cosine_ops);
 
+CREATE INDEX IF NOT EXISTS idx_form_analytics_space
+  ON "FormAnalyticsEvent"("spaceId");
+CREATE INDEX IF NOT EXISTS idx_form_analytics_session
+  ON "FormAnalyticsEvent"("sessionId");
+CREATE INDEX IF NOT EXISTS idx_form_analytics_event_type
+  ON "FormAnalyticsEvent"("eventType");
+CREATE INDEX IF NOT EXISTS idx_form_analytics_created
+  ON "FormAnalyticsEvent"("createdAt");
+CREATE INDEX IF NOT EXISTS idx_form_analytics_space_created_type
+  ON "FormAnalyticsEvent"("spaceId", "createdAt" DESC, "eventType");
+
+CREATE INDEX IF NOT EXISTS idx_form_draft_resume_token
+  ON "FormDraft"("resumeToken");
+CREATE INDEX IF NOT EXISTS idx_form_draft_space_email
+  ON "FormDraft"("spaceId", email);
+CREATE INDEX IF NOT EXISTS idx_form_draft_expires_at
+  ON "FormDraft"("expiresAt");
+
 -- ============================================================
 -- Row-Level Security
 -- All tables have RLS enabled. The application uses the Supabase
@@ -473,6 +519,7 @@ ALTER TABLE "BrokerNotification"      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "AuditLog"                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "TourAvailabilityOverride" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "TourWaitlist"            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "FormAnalyticsEvent"      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "DocumentEmbedding"       ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================

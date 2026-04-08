@@ -10,6 +10,11 @@ export interface FormSection {
   description?: string;
   position: number;
   questions: FormQuestion[];
+  visibleWhen?: {
+    questionId: string;
+    operator: 'equals' | 'not_equals' | 'contains';
+    value: string;
+  };
 }
 
 export interface FormQuestion {
