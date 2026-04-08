@@ -62,6 +62,11 @@ export function buildDynamicScoringPrompt(input: {
     const sortedQuestions = [...section.questions].sort((a, b) => a.position - b.position);
 
     for (const question of sortedQuestions) {
+      // Exclude PII system fields (name, email, phone) from AI prompt
+      if (question.system) {
+        continue;
+      }
+
       const weight = question.scoring?.weight;
       const weightLabel = weight != null && weight > 0 ? ` [weight: ${weight}]` : '';
 

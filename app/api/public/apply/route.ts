@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { getSpaceFromSlug } from '@/lib/space';
-import { scoreLeadApplication } from '@/lib/lead-scoring';
+import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
 import type { LeadScoringResult } from '@/lib/lead-scoring';
 import type { Contact } from '@/lib/types';
 import {
@@ -448,13 +448,19 @@ export async function POST(req: NextRequest) {
 
     console.log('[APPLY-DEBUG] 6. Starting scoring');
     try {
-      scoring = await scoreLeadApplication({
+      scoring = await scoreLeadApplicationDynamic({
         contactId: contact.id,
+        formConfig: formConfigSnapshot,
+        answers: formConfigSnapshot
+          ? (applicationData as Record<string, string | string[] | number | boolean>)
+          : undefined,
         name: contactName,
         email: contactEmail,
         phone: contactPhone,
         budget: contactBudget,
-        applicationData: applicationData as Record<string, unknown> & { legalName: string },
+        applicationData: !formConfigSnapshot
+          ? (applicationData as Record<string, unknown> & { legalName: string })
+          : undefined,
         leadType: contactLeadType,
       });
 
