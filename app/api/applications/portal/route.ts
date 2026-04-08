@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 /**
  * GET /api/applications/portal?ref={applicationRef}&token={statusPortalToken}
@@ -14,6 +15,24 @@ export async function GET(req: NextRequest) {
 
   if (!ref || !token) {
     return NextResponse.json({ error: 'Missing ref or token' }, { status: 400 });
+  }
+
+  // Validate token format: reject obviously invalid tokens early to avoid DB lookups
+  if (ref.length < 10 || ref.length > 64 || token.length < 32 || token.length > 128) {
+    return NextResponse.json({ error: 'Application not found' }, { status: 404 });
+  }
+
+  // Rate limit by IP to prevent token brute-force attacks
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown';
+  const { allowed } = await checkRateLimit(`portal:get:${ip}`, 20, 3600);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': '3600' } },
+    );
   }
 
   // Validate both applicationRef AND statusPortalToken match (defense in depth)

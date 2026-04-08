@@ -1,21 +1,49 @@
 import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
 
 /**
+ * Validate a pixel ID at render time to prevent XSS via dangerouslySetInnerHTML.
+ * Returns the ID if safe, or null if it contains unexpected characters.
+ * Defense-in-depth: the API already validates on save, but we also validate at render.
+ */
+const PIXEL_ID_SAFE = /^[a-zA-Z0-9\-_]+$/;
+function safePixelId(id: string | undefined): string | null {
+  if (!id) return null;
+  const trimmed = id.trim();
+  if (!trimmed || trimmed.length > 100) return null;
+  if (!PIXEL_ID_SAFE.test(trimmed)) return null;
+  return trimmed;
+}
+
+/**
+ * Sanitize custom head script at render time.
+ * Strips closing </script> tags that could break out of the container element.
+ */
+function safeCustomScript(script: string | undefined): string | null {
+  if (!script) return null;
+  const trimmed = script.trim();
+  if (!trimmed) return null;
+  // Remove any </script> tags (case-insensitive) that would break out of the container
+  return trimmed.replace(/<\/script\s*>/gi, '');
+}
+
+/**
  * Server component that renders tracking pixel scripts for public-facing pages.
  * Each pixel loads asynchronously / non-blocking via `async` or deferred init patterns.
  */
 export function TrackingPixels({ pixels }: { pixels: TrackingPixelsType | null }) {
   if (!pixels) return null;
 
-  const hasAny =
-    pixels.facebookPixelId ||
-    pixels.tiktokPixelId ||
-    pixels.googleAnalyticsId ||
-    pixels.googleAdsId ||
-    pixels.twitterPixelId ||
-    pixels.linkedinPartnerId ||
-    pixels.snapchatPixelId ||
-    pixels.customHeadScript;
+  // Validate all pixel IDs at render time to prevent XSS
+  const fb = safePixelId(pixels.facebookPixelId);
+  const tt = safePixelId(pixels.tiktokPixelId);
+  const ga = safePixelId(pixels.googleAnalyticsId);
+  const gads = safePixelId(pixels.googleAdsId);
+  const tw = safePixelId(pixels.twitterPixelId);
+  const li = safePixelId(pixels.linkedinPartnerId);
+  const snap = safePixelId(pixels.snapchatPixelId);
+  const customScript = safeCustomScript(pixels.customHeadScript);
+
+  const hasAny = fb || tt || ga || gads || tw || li || snap || customScript;
 
   if (!hasAny) return null;
 

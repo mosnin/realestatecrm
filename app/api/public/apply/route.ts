@@ -411,11 +411,15 @@ export async function POST(req: NextRequest) {
       });
 
     if (duplicate) {
+        // Return the EXISTING contact's applicationRef (if any), not the newly
+        // generated one that was never persisted. Using a phantom ref would
+        // give the user a status-tracking link that points to nothing.
+        const existingRef = (duplicate as Record<string, unknown>).applicationRef;
         return NextResponse.json(
           {
             success: true,
             id: duplicate.id,
-            applicationRef,
+            applicationRef: typeof existingRef === 'string' ? existingRef : undefined,
           },
           { status: 200 }
         );

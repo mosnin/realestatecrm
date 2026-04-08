@@ -5,7 +5,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Search, UserPlus, Check, PhoneIncoming, Users, CalendarClock, Handshake, ArrowRight, Clock, MessageSquare, ChevronDown, ChevronUp, Loader2, Home, Key } from 'lucide-react';
+import { Search, UserPlus, UserMinus, Check, PhoneIncoming, Users, CalendarClock, Handshake, ArrowRight, Clock, MessageSquare, ChevronDown, ChevronUp, Loader2, Home, Key } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { formatCompact } from '@/lib/formatting';
 

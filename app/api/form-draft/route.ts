@@ -155,6 +155,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid or missing token' }, { status: 400 });
   }
 
+  // Validate token format: must be hex only
+  if (!/^[a-f0-9]{64}$/i.test(token)) {
+    return NextResponse.json({ error: 'Invalid or missing token' }, { status: 400 });
+  }
+
+  // Rate limit by IP to prevent resume token brute-force
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown';
+  const { allowed } = await checkRateLimit(`draft:get:${ip}`, 20, 3600);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': '3600' } },
+    );
+  }
+
   try {
     const { data: draft, error } = await supabase
       .from('FormDraft')

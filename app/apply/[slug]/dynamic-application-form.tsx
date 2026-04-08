@@ -818,15 +818,24 @@ export function DynamicApplicationForm({
     if (prevStepRef.current === currentStep) return;
 
     // Track completion of previous step
-    const prevSection = sortedSections[prevStepRef.current - 1];
+    // Account for the Getting Started offset: step 1 in dual-config mode is
+    // "Getting Started" (not in sortedSections), so the section index is
+    // (stepNumber - 1 - gettingStartedOffset).
+    const prevSectionIdx = prevStepRef.current - 1 - gettingStartedOffset;
+    const prevSection = prevSectionIdx >= 0 ? sortedSections[prevSectionIdx] : null;
     if (prevSection) {
-      trackStepComplete(spaceId, prevStepRef.current - 1, prevSection.title, configVersion);
+      trackStepComplete(spaceId, prevSectionIdx, prevSection.title, configVersion);
+    } else if (hasDualConfigs && prevStepRef.current === 1) {
+      trackStepComplete(spaceId, 0, 'Getting Started', configVersion);
     }
 
     // Track view of new step
-    const newSection = sortedSections[currentStep - 1];
+    const newSectionIdx = currentStep - 1 - gettingStartedOffset;
+    const newSection = newSectionIdx >= 0 ? sortedSections[newSectionIdx] : null;
     if (newSection) {
-      trackStepView(spaceId, currentStep - 1, newSection.title, configVersion);
+      trackStepView(spaceId, newSectionIdx, newSection.title, configVersion);
+    } else if (hasDualConfigs && currentStep === 1) {
+      trackStepView(spaceId, 0, 'Getting Started', configVersion);
     }
 
     prevStepRef.current = currentStep;
