@@ -381,7 +381,7 @@ export async function POST(req: NextRequest) {
     const duplicateCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const { data: existingRecentLeads, error: dupError } = await supabase
       .from('Contact')
-      .select('id, phone, email, scoringStatus, leadScore, scoreLabel, scoreSummary, scoreDetails')
+      .select('id, phone, email, scoringStatus, leadScore, scoreLabel, scoreSummary, scoreDetails, applicationRef')
       .eq('spaceId', space.id)
       .eq('name', contactName)
       .contains('tags', ['application-link'])

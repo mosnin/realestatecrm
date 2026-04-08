@@ -443,12 +443,40 @@ function relativeTime(iso: string | null) {
 function AssignedLeadItem({
   lead,
   progress,
+  onUnassigned,
 }: {
   lead: LeadRow;
   progress?: AssignedLeadProgress;
+  onUnassigned?: (leadId: string, realtorName: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [unassigning, setUnassigning] = useState(false);
+
+  const realtorName = progress?.realtorName ?? lead.assignedTo ?? 'this realtor';
+
+  async function handleUnassign() {
+    setUnassigning(true);
+    try {
+      const res = await fetch('/api/broker/unassign-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId: lead.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to unassign lead');
+      }
+      toast.success(`Lead unassigned from ${realtorName}`);
+      setConfirmOpen(false);
+      onUnassigned?.(lead.id, realtorName);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to unassign lead');
+    } finally {
+      setUnassigning(false);
+    }
+  }
 
   return (
     <div className="border-b border-border last:border-b-0">
@@ -513,13 +541,28 @@ function AssignedLeadItem({
           </button>
         )}
 
-        {/* Score */}
+        {/* Score + Unassign */}
         <div className="flex items-center gap-2 flex-shrink-0">
           {(progress?.currentScore ?? lead.leadScore) != null && (
             <span className="text-xs text-muted-foreground tabular-nums">
               Score: {progress?.currentScore ?? lead.leadScore}
             </span>
           )}
+
+          {/* Unassign button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setConfirmOpen(true);
+            }}
+            disabled={unassigning}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-red-200 text-red-600 text-xs font-medium hover:bg-red-50 hover:border-red-300 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            title="Unassign lead"
+          >
+            <UserMinus size={12} />
+            <span className="hidden sm:inline">Unassign</span>
+          </button>
+
           {progress && (
             <ArrowRight
               size={14}
@@ -528,6 +571,41 @@ function AssignedLeadItem({
           )}
         </div>
       </div>
+
+      {/* Unassign confirmation dialog */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unassign Lead</DialogTitle>
+            <DialogDescription>
+              Unassign <span className="font-medium text-foreground">{lead.name || 'this lead'}</span> from{' '}
+              <span className="font-medium text-foreground">{realtorName}</span>?
+              This will remove the lead from their CRM.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              onClick={() => setConfirmOpen(false)}
+              disabled={unassigning}
+              className="px-4 py-2 rounded-md border border-border text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUnassign}
+              disabled={unassigning}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {unassigning ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <UserMinus size={14} />
+              )}
+              Unassign
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Expanded detail panel */}
       {expanded && progress && (
@@ -638,6 +716,22 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
     setTab('assigned');
   }
 
+  function handleUnassigned(leadId: string, _realtorName: string) {
+    const lead = assigned.find((l) => l.id === leadId);
+    if (!lead) return;
+
+    setAssigned((prev) => prev.filter((l) => l.id !== leadId));
+    setUnassigned((prev) => [
+      {
+        ...lead,
+        assignedTo: null,
+        assignedAt: null,
+      },
+      ...prev,
+    ]);
+    setTab('unassigned');
+  }
+
   return (
     <div className="space-y-4">
     {/* Lead type filter */}
@@ -733,6 +827,7 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
                   key={lead.id}
                   lead={lead}
                   progress={assignedLeadProgress[lead.id]}
+                  onUnassigned={handleUnassigned}
                 />
               ))}
             </CardContent>

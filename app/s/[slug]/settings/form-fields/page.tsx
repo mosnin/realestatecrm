@@ -122,9 +122,17 @@ export default function FormFieldsSettingsPage() {
     }
   }, [activeLeadType]);
 
+  // Use refs so handleSave always reads the latest config without needing
+  // rentalConfig/buyerConfig in the dependency array (avoids stale closures
+  // when React batches a FormBuilder onChange with the save click).
+  const rentalConfigRef = useRef(rentalConfig);
+  rentalConfigRef.current = rentalConfig;
+  const buyerConfigRef = useRef(buyerConfig);
+  buyerConfigRef.current = buyerConfig;
+
   const handleSave = useCallback(async () => {
     setSaving(true);
-    const currentConfig = activeLeadType === 'rental' ? rentalConfig : buyerConfig;
+    const currentConfig = activeLeadType === 'rental' ? rentalConfigRef.current : buyerConfigRef.current;
     try {
       const res = await fetch('/api/form-config', {
         method: 'PUT',
@@ -154,7 +162,7 @@ export default function FormFieldsSettingsPage() {
     } finally {
       setSaving(false);
     }
-  }, [slug, activeLeadType, rentalConfig, buyerConfig]);
+  }, [slug, activeLeadType]);
 
   const handleReset = useCallback(async () => {
     const label = activeLeadType === 'rental' ? 'rental' : 'buyer';

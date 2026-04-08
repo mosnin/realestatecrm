@@ -60,8 +60,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Application not found' }, { status: 404 });
   }
 
-  // Strip any HTML tags for XSS prevention (plain text only)
-  const sanitized = trimmed.replace(/<[^>]*>/g, '');
+  // Strip any HTML/script content for XSS prevention (plain text only)
+  // Multi-pass approach to handle nested and malformed tags
+  let sanitized = trimmed;
+  // First pass: remove complete tags
+  sanitized = sanitized.replace(/<[^>]*>/g, '');
+  // Second pass: remove any remaining angle brackets (catches unclosed tags)
+  sanitized = sanitized.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Remove null bytes and other control characters
+  sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
   // Create the message
   const { data: message, error: insertError } = await supabase

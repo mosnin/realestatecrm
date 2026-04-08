@@ -1,7 +1,14 @@
 import type { IntakeFormConfig } from './types';
 
+// Use deterministic IDs for template sections/questions so that JSON.stringify
+// comparisons (used for change detection in the form builder pages) produce
+// stable results across server restarts, SSR hydration, and hot-reloads.
+// crypto.randomUUID() would generate new IDs every time the module is
+// evaluated, causing false "unsaved changes" indicators.
+let _idCounter = 0;
 function id() {
-  return crypto.randomUUID();
+  _idCounter += 1;
+  return `tmpl-${_idCounter.toString(36).padStart(6, '0')}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

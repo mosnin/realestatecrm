@@ -179,6 +179,26 @@ export async function DELETE(req: NextRequest) {
     updates.formConfig = null; // Also clear legacy column
   }
 
+  // When clearing a single lead type, check if the OTHER config still exists.
+  // If not, both configs are now null and we should reset source to legacy.
+  let resolvedSource: 'custom' | 'legacy' = leadType ? 'custom' : 'legacy';
+  if (leadType) {
+    const { data: currentSettings } = await supabase
+      .from('SpaceSetting')
+      .select('rentalFormConfig, buyerFormConfig')
+      .eq('spaceId', space.id)
+      .maybeSingle();
+
+    const otherColumn = leadType === 'rental' ? 'buyerFormConfig' : 'rentalFormConfig';
+    const otherConfigExists = currentSettings?.[otherColumn] != null;
+
+    if (!otherConfigExists) {
+      // Both configs will be null after this update — reset to legacy
+      updates.formConfigSource = 'legacy';
+      resolvedSource = 'legacy';
+    }
+  }
+
   const { error: updateErr } = await supabase
     .from('SpaceSetting')
     .update(updates)
@@ -195,8 +215,8 @@ export async function DELETE(req: NextRequest) {
     resource: 'SpaceSetting',
     resourceId: space.id,
     spaceId: space.id,
-    metadata: { field: 'formConfig', formConfigSource: leadType ? 'custom' : 'legacy', action: 'reset', leadType: leadType || 'both' },
+    metadata: { field: 'formConfig', formConfigSource: resolvedSource, action: 'reset', leadType: leadType || 'both' },
   });
 
-  return NextResponse.json({ success: true, formConfigSource: leadType ? 'custom' : ('legacy' as const) });
+  return NextResponse.json({ success: true, formConfigSource: resolvedSource });
 }
