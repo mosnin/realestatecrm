@@ -149,7 +149,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 });
     }
 
-    const allEvents = events ?? [];
+    type EventRow = {
+      id: string;
+      sessionId: string;
+      formConfigVersion: number | null;
+      eventType: string;
+      stepIndex: number | null;
+      stepTitle: string | null;
+      durationMs: number | null;
+      metadata: Record<string, unknown> | null;
+      createdAt: string;
+    };
+
+    const allEvents = (events ?? []) as EventRow[];
 
     // ── Compute analytics from raw events ────────────────────────────────
 

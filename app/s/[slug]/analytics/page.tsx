@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard';
+import { FormAnalytics } from '@/components/analytics/form-analytics';
 import type { AnalyticsData } from '@/components/analytics/analytics-dashboard';
 import type { ApplicationData, LeadScoreDetails } from '@/lib/types';
 
@@ -375,6 +376,11 @@ export default async function AnalyticsPage({
         </p>
       </div>
       <AnalyticsDashboard data={data} />
+
+      {/* Form Performance — tracks applicant interaction with dynamic intake forms */}
+      <div className="border-t border-border pt-5">
+        <FormAnalytics slug={slug} />
+      </div>
     </div>
   );
 }

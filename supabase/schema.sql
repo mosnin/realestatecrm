@@ -520,6 +520,7 @@ ALTER TABLE "AuditLog"                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "TourAvailabilityOverride" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "TourWaitlist"            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "FormAnalyticsEvent"      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "FormDraft"               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "DocumentEmbedding"       ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================

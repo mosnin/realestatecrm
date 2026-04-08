@@ -12,10 +12,13 @@ export const revalidate = 60;
 
 export default async function PublicApplyPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ resume?: string }>;
 }) {
   const { slug } = await params;
+  const { resume: resumeToken } = await searchParams;
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
@@ -161,7 +164,7 @@ export default async function PublicApplyPage({
       trustLine={`Your information is shared only with ${agentName} and used solely for rental inquiries.`}
       customization={customization}
     >
-      <ApplicationFormLoader slug={slug} businessName={businessName} customization={customization} formConfig={resolvedFormConfig} />
+      <ApplicationFormLoader slug={slug} spaceId={space.id} businessName={businessName} customization={customization} formConfig={resolvedFormConfig} resumeToken={resumeToken} />
     </PublicPageShell>
   );
 }

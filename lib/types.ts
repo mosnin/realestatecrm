@@ -431,3 +431,25 @@ export type FormSubmission = {
   formConfigSnapshot: IntakeFormConfig; // frozen copy of form at submission time
   answers: Record<string, string | string[] | number | boolean>;
 };
+
+// ── Form Analytics Types ──
+
+export type FormAnalyticsEventType =
+  | 'form_start'
+  | 'step_view'
+  | 'step_complete'
+  | 'form_submit'
+  | 'form_abandon';
+
+export type FormAnalyticsEvent = {
+  id: string;
+  spaceId: string;
+  sessionId: string;
+  formConfigVersion: number | null;
+  eventType: FormAnalyticsEventType;
+  stepIndex: number | null;
+  stepTitle: string | null;
+  durationMs: number | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: Date;
+};

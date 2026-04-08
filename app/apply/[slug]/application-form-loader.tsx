@@ -16,26 +16,32 @@ const DynamicApplicationForm = dynamic(
 
 export function ApplicationFormLoader({
   slug,
+  spaceId,
   businessName,
   customization,
   brokerageId,
   formConfig,
+  resumeToken,
 }: {
   slug: string;
+  spaceId?: string;
   businessName: string;
   customization?: IntakeCustomization;
   brokerageId?: string;
   formConfig?: IntakeFormConfig | null;
+  resumeToken?: string;
 }) {
   // Dynamic form config provided — use the new renderer
   if (formConfig) {
     return (
       <DynamicApplicationForm
         slug={slug}
+        spaceId={spaceId}
         businessName={businessName}
         formConfig={formConfig}
         customization={customization}
         brokerageId={brokerageId}
+        resumeToken={resumeToken}
       />
     );
   }

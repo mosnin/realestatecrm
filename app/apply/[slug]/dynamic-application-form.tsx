@@ -20,6 +20,14 @@ import {
   QuestionRenderer,
   validateQuestion,
 } from '@/components/form-renderer/question-renderer';
+import {
+  trackFormStart,
+  trackStepView,
+  trackStepComplete,
+  trackFormSubmit,
+  trackFormAbandon,
+  setupAbandonTracking,
+} from '@/lib/form-analytics-client';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -322,18 +330,80 @@ function isSectionVisible(
 
 // ── Main component ───────────────────────────────────────────────────────────
 
+// ── Inline save notification ────────────────────────────────────────────────
+
+function SaveNotification({
+  message,
+  visible,
+}: {
+  message: string;
+  visible: boolean;
+}) {
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          transition={{ duration: 0.3 }}
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-lg bg-foreground text-background text-sm font-medium shadow-lg max-w-[90vw]"
+        >
+          {message}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ── Resume banner ───────────────────────────────────────────────────────────
+
+function ResumeBanner({
+  visible,
+  onDismiss,
+}: {
+  visible: boolean;
+  onDismiss: () => void;
+}) {
+  if (!visible) return null;
+  return (
+    <div className="mx-5 mt-4 md:mx-8 flex items-start gap-3 p-3 rounded-lg border border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/30">
+      <CheckCircle2
+        size={16}
+        className="text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5"
+      />
+      <div className="flex-1">
+        <p className="text-sm text-green-800 dark:text-green-200">
+          Welcome back! Your progress has been restored.
+        </p>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="text-xs text-green-600 dark:text-green-400 underline mt-1"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function DynamicApplicationForm({
   slug,
+  spaceId,
   businessName,
   formConfig,
   customization,
   brokerageId,
+  resumeToken,
 }: {
   slug: string;
+  spaceId?: string;
   businessName: string;
   formConfig: IntakeFormConfig;
   customization?: IntakeCustomization;
   brokerageId?: string;
+  resumeToken?: string;
 }) {
   // Sort sections and questions by position
   const sections = [...formConfig.sections].sort((a, b) => a.position - b.position);
@@ -362,6 +432,119 @@ export function DynamicApplicationForm({
     applicationRef?: string;
   } | null>(null);
   const submissionLockRef = useRef(false);
+
+  // ── Server-side draft auto-save state ─────────────────────────────────────
+
+  const [saveNotification, setSaveNotification] = useState('');
+  const [showSaveNotification, setShowSaveNotification] = useState(false);
+  const [showResumeBanner, setShowResumeBanner] = useState(false);
+  const hasShownEmailNoticeRef = useRef(false);
+  const serverSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastServerSaveRef = useRef<number>(0);
+  const answersRef = useRef<AnswerMap>(answers);
+  answersRef.current = answers;
+  const currentStepForSaveRef = useRef(currentStep);
+  currentStepForSaveRef.current = currentStep;
+
+  // Show a temporary notification
+  const showNotification = useCallback((msg: string, durationMs = 3000) => {
+    setSaveNotification(msg);
+    setShowSaveNotification(true);
+    setTimeout(() => setShowSaveNotification(false), durationMs);
+  }, []);
+
+  // Save draft to server (non-blocking, fire-and-forget)
+  const saveToServer = useCallback(async () => {
+    if (!spaceId) return;
+    const email = typeof answersRef.current['email'] === 'string' ? answersRef.current['email'] : '';
+    if (!email || !email.includes('@')) return; // Need valid email for server save
+
+    try {
+      const res = await fetch('/api/form-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          spaceId,
+          email,
+          answers: answersRef.current,
+          currentStep: currentStepForSaveRef.current,
+          formConfigVersion: formConfig.version,
+        }),
+      });
+
+      if (res.ok) {
+        lastServerSaveRef.current = Date.now();
+        const data = await res.json();
+
+        if (!data.updated && !hasShownEmailNoticeRef.current) {
+          // First-time save — draft was created, email will be sent
+          hasShownEmailNoticeRef.current = true;
+          showNotification('Progress saved. Check your email for a link to resume later.', 5000);
+        } else {
+          showNotification('Progress saved.', 2000);
+        }
+      }
+    } catch {
+      // Non-blocking — silently fail
+    }
+  }, [spaceId, formConfig.version, showNotification]);
+
+  // Load draft from server when resumeToken is present
+  useEffect(() => {
+    if (!resumeToken) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/form-draft?token=${encodeURIComponent(resumeToken)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (cancelled) return;
+
+        if (data.answers && typeof data.answers === 'object') {
+          const serverAnswers = data.answers as AnswerMap;
+          setAnswers(serverAnswers);
+          saveDraft(slug, formConfig.version, serverAnswers);
+
+          if (typeof data.currentStep === 'number' && data.currentStep > 0) {
+            setCurrentStep(data.currentStep);
+          }
+
+          // Check if form config version changed
+          if (data.formConfigVersion != null && data.formConfigVersion !== formConfig.version) {
+            setStaleDraft(true);
+          }
+
+          setShowResumeBanner(true);
+          hasShownEmailNoticeRef.current = true; // Don't show "check email" since they came from email
+        }
+      } catch {
+        // Failed to load — form still works with localStorage
+      }
+    })();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeToken]);
+
+  // Auto-save to server every 30 seconds while form is active
+  useEffect(() => {
+    if (!spaceId) return;
+
+    const interval = setInterval(() => {
+      const email = typeof answersRef.current['email'] === 'string' ? answersRef.current['email'] : '';
+      if (!email || !email.includes('@')) return;
+
+      // Only save if something has changed since last save
+      const now = Date.now();
+      if (now - lastServerSaveRef.current < 25000) return; // Minimum 25s gap
+
+      saveToServer();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [spaceId, saveToServer]);
 
   // ── Compute visible sections based on current answers ─────────────────────
 
@@ -418,6 +601,59 @@ export function DynamicApplicationForm({
       setCurrentStep(totalSteps);
     }
   }, [currentStep, totalSteps]);
+
+  // ── Form analytics tracking ───────────────────────────────────────────────
+  // Only track when spaceId is provided (dynamic forms only, not legacy)
+
+  const submittedRef = useRef(false);
+  const currentStepRef = useRef(currentStep);
+  currentStepRef.current = currentStep;
+
+  // Track form_start on mount
+  useEffect(() => {
+    if (!spaceId) return;
+    trackFormStart(spaceId, formConfig.version);
+    // Track initial step view
+    const section = sortedSections[0];
+    if (section) {
+      trackStepView(spaceId, 0, section.title, formConfig.version);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spaceId]);
+
+  // Track step_view when currentStep changes
+  const prevStepRef = useRef(currentStep);
+  useEffect(() => {
+    if (!spaceId) return;
+    if (prevStepRef.current === currentStep) return;
+
+    // Track completion of previous step
+    const prevSection = sortedSections[prevStepRef.current - 1];
+    if (prevSection) {
+      trackStepComplete(spaceId, prevStepRef.current - 1, prevSection.title, formConfig.version);
+    }
+
+    // Track view of new step
+    const newSection = sortedSections[currentStep - 1];
+    if (newSection) {
+      trackStepView(spaceId, currentStep - 1, newSection.title, formConfig.version);
+    }
+
+    prevStepRef.current = currentStep;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, spaceId]);
+
+  // Setup abandon tracking via beforeunload
+  useEffect(() => {
+    if (!spaceId) return;
+    return setupAbandonTracking(
+      spaceId,
+      () => currentStepRef.current - 1,
+      () => submittedRef.current,
+      formConfig.version,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spaceId]);
 
   // ── Answer accessors ───────────────────────────────────────────────────────
 
@@ -506,6 +742,8 @@ export function DynamicApplicationForm({
     if (currentStep < totalSteps) {
       setDirection(1);
       setCurrentStep((s) => s + 1);
+      // Trigger server save after step navigation (non-blocking)
+      saveToServer();
     }
   }
 
@@ -594,6 +832,11 @@ export function DynamicApplicationForm({
         const result = await response.json().catch(() => ({}));
         setScoreState(result);
         setSubmitted(true);
+        submittedRef.current = true;
+        // Track form submission for analytics
+        if (spaceId) {
+          trackFormSubmit(spaceId, formConfig.version);
+        }
         setTimeout(() => {
           confettiRef.current?.fire({
             particleCount: 100,
@@ -614,6 +857,24 @@ export function DynamicApplicationForm({
           });
         }, 300);
         clearDraft(slug, formConfig.version);
+        // Mark server-side draft as completed (non-blocking)
+        if (spaceId) {
+          const draftEmail = typeof answers['email'] === 'string' ? answers['email'] : '';
+          if (draftEmail && draftEmail.includes('@')) {
+            fetch('/api/form-draft', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                spaceId,
+                email: draftEmail,
+                answers,
+                currentStep: totalSteps,
+                formConfigVersion: formConfig.version,
+                completed: true,
+              }),
+            }).catch(() => {});
+          }
+        }
       } else {
         const body = await response.json().catch(() => ({}));
         setSubmitError(
@@ -758,6 +1019,12 @@ export function DynamicApplicationForm({
           accentColor={accentColor}
         />
       </div>
+
+      {/* Resume banner (shown when user returns via magic link) */}
+      <ResumeBanner
+        visible={showResumeBanner}
+        onDismiss={() => setShowResumeBanner(false)}
+      />
 
       {/* Stale draft notice */}
       {staleDraft && (
@@ -949,6 +1216,9 @@ export function DynamicApplicationForm({
           )}
         </div>
       </div>
+
+      {/* Save notification toast */}
+      <SaveNotification message={saveNotification} visible={showSaveNotification} />
     </div>
   );
 }
