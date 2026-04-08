@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Search, UserPlus, UserMinus, Check, PhoneIncoming, Users, CalendarClock, Handshake, ArrowRight, Clock, MessageSquare, ChevronDown, ChevronUp, Loader2, Home, Key } from 'lucide-react';
+import { Search, UserPlus, UserMinus, Check, PhoneIncoming, Users, CalendarClock, Handshake, ArrowRight, Clock, MessageSquare, ChevronDown, ChevronUp, Loader2, Home, Key, ArrowUpDown } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -689,16 +689,39 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
   const [assigned, setAssigned] = useState(assignedLeads);
   const [tab, setTab] = useState('unassigned');
   const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'rental' | 'buyer'>('all');
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'score' | 'name-az'>('newest');
+
+  const applySearchAndSort = useCallback((list: LeadRow[]) => {
+    let result = list;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (l) =>
+          l.name?.toLowerCase().includes(q) ||
+          l.email?.toLowerCase().includes(q) ||
+          l.phone?.toLowerCase().includes(q),
+      );
+    }
+    if (sortBy === 'oldest') {
+      result = [...result].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    } else if (sortBy === 'score') {
+      result = [...result].sort((a, b) => (b.leadScore ?? -1) - (a.leadScore ?? -1));
+    } else if (sortBy === 'name-az') {
+      result = [...result].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+    }
+    return result;
+  }, [search, sortBy]);
 
   const filteredUnassigned = useMemo(() => {
-    if (leadTypeFilter === 'all') return unassigned;
-    return unassigned.filter((l) => (l.leadType ?? 'rental') === leadTypeFilter);
-  }, [unassigned, leadTypeFilter]);
+    let list = leadTypeFilter === 'all' ? unassigned : unassigned.filter((l) => (l.leadType ?? 'rental') === leadTypeFilter);
+    return applySearchAndSort(list);
+  }, [unassigned, leadTypeFilter, applySearchAndSort]);
 
   const filteredAssigned = useMemo(() => {
-    if (leadTypeFilter === 'all') return assigned;
-    return assigned.filter((l) => (l.leadType ?? 'rental') === leadTypeFilter);
-  }, [assigned, leadTypeFilter]);
+    let list = leadTypeFilter === 'all' ? assigned : assigned.filter((l) => (l.leadType ?? 'rental') === leadTypeFilter);
+    return applySearchAndSort(list);
+  }, [assigned, leadTypeFilter, applySearchAndSort]);
 
   function handleAssigned(leadId: string, realtor: RealtorOption) {
     const lead = unassigned.find((l) => l.id === leadId);

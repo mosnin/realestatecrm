@@ -251,13 +251,33 @@ export async function scoreDynamicApplication(
     });
 
     // ── Step 3: Blend final score ───────────────────────────────────────
+    // The blend ratio adapts based on how much of the total scoring weight
+    // the deterministic engine actually covers. If rules only cover 50% of
+    // the weighted questions (e.g. number fields have no mappings), the
+    // deterministic influence is halved and AI picks up the slack.
     let finalScore: number;
     let scoreSource: string;
 
     if (deterministicResult.hasRules && aiResult) {
-      // Both available: weighted blend
-      finalScore = Math.round(deterministicResult.score * 0.4 + aiResult.leadScore * 0.6);
-      scoreSource = 'hybrid';
+      // Both available: adaptive weighted blend
+      // Base deterministic weight is 0.4, scaled by coverage fraction
+      const baseDeterministicWeight = 0.4;
+      const coverage = deterministicResult.weightCoverage; // 0-1
+      const deterministicWeight = baseDeterministicWeight * coverage;
+      const aiWeight = 1 - deterministicWeight;
+
+      finalScore = Math.round(
+        deterministicResult.score * deterministicWeight +
+          aiResult.leadScore * aiWeight,
+      );
+      scoreSource = coverage >= 0.8 ? 'hybrid' : 'hybrid_ai_heavy';
+
+      console.info('[dynamic-lead-scoring] blend weights', {
+        contactId,
+        coverage: Math.round(coverage * 100),
+        deterministicWeight: Math.round(deterministicWeight * 100),
+        aiWeight: Math.round(aiWeight * 100),
+      });
     } else if (deterministicResult.hasRules) {
       // Only deterministic (AI failed)
       finalScore = deterministicResult.score;

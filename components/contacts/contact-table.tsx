@@ -413,6 +413,21 @@ export function ContactTable({ slug }: ContactTableProps) {
           />
         </div>
         <div className="flex gap-2 flex-wrap">
+          {/* Sort dropdown */}
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="appearance-none rounded-md border border-border bg-card pl-7 pr-8 py-2 text-xs font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring h-9"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="name-az">Name A-Z</option>
+              <option value="name-za">Name Z-A</option>
+            </select>
+            <ArrowUpDown size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          </div>
+
           {/* Stage filter — list view only or when searching */}
           {(view === 'list' || search) && (
             <Select value={typeFilter} onValueChange={setTypeFilter}>
