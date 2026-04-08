@@ -88,18 +88,14 @@ export const publicApplicationSchema = z.object({
   email: z
     .string()
     .trim()
+    .min(1, 'Email is required')
     .email('Invalid email')
-    .max(255)
-    .optional()
-    .or(z.literal(''))
-    .transform((v) => (v ? v : undefined)),
+    .max(255),
   phone: z
     .string()
     .trim()
-    .max(40)
-    .optional()
-    .or(z.literal(''))
-    .transform((v) => (v ? v : undefined)),
+    .min(1, 'Phone number is required')
+    .max(40),
   dateOfBirth: optStr,
 
   // Step 3: Current Living Situation

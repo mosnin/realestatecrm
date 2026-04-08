@@ -62,7 +62,7 @@ export default async function BrokerLeadsPage() {
   const unassignedRaw = brokerageUnassigned ?? [];
 
   const assignedRaw = brokerageAssigned ?? [];
-  const members = allMembers.filter((m) => m.role === 'realtor_member');
+  const members = allMembers;
 
   // Get lead counts per realtor space
   const realtorSpaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];

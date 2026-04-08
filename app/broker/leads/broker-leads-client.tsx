@@ -146,7 +146,7 @@ function RealtorPicker({
             <Search size={13} className="text-muted-foreground flex-shrink-0" />
             <input
               type="text"
-              placeholder="Search realtors..."
+              placeholder="Search team members..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
@@ -156,7 +156,7 @@ function RealtorPicker({
         </div>
         <div className="max-h-52 overflow-y-auto py-1">
           {filtered.length === 0 ? (
-            <p className="px-4 py-3 text-xs text-muted-foreground text-center">No realtors found</p>
+            <p className="px-4 py-3 text-xs text-muted-foreground text-center">No team members found</p>
           ) : (
             filtered.map((r) => (
               <button

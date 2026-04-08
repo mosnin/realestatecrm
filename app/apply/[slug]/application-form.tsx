@@ -317,6 +317,7 @@ export function ApplicationForm({
         const email = get('email').trim();
         if (!email) errs.email = 'Email is required';
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = 'Invalid email';
+        if (!get('phone').trim()) errs.phone = 'Phone number is required';
       }
       if (s === 3) {
         if (!get('buyerBudget')) errs.buyerBudget = 'Please select your budget';
@@ -346,6 +347,7 @@ export function ApplicationForm({
         const email = get('email').trim();
         if (!email) errs.email = 'Email is required';
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = 'Invalid email';
+        if (!get('phone').trim()) errs.phone = 'Phone number is required';
       }
       if (s === 3) {
         if (!get('moveTiming')) errs.moveTiming = 'Please select when you plan to move';
@@ -585,15 +587,18 @@ export function ApplicationForm({
           {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="phone">Phone</Label>
+          <Label htmlFor="phone">
+            Phone <span className="text-destructive">*</span>
+          </Label>
           <Input
             id="phone"
             type="tel"
             placeholder="(555) 123-4567"
             value={get('phone')}
             onChange={(e) => set('phone', e.target.value)}
-            className="h-12 rounded-xl"
+            className={cn('h-12 rounded-xl', errors.phone && 'border-destructive')}
           />
+          {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
         </div>
       </div>
     );

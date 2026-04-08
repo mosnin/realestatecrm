@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     if (memberError) throw memberError;
     if (!realtorMembership) {
       return NextResponse.json(
-        { error: 'Realtor is not a member of this brokerage' },
+        { error: 'User is not a member of this brokerage' },
         { status: 403 },
       );
     }
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
     const realtorSpace = await getSpaceByOwnerId(realtorUserId);
     if (!realtorSpace) {
       return NextResponse.json(
-        { error: 'Realtor does not have a workspace yet' },
+        { error: 'Member does not have a workspace yet' },
         { status: 404 },
       );
     }
