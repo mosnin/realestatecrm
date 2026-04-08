@@ -16,6 +16,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
 import { getFormConfigs, getDefaultFormConfig } from '@/lib/form-builder';
 import { formConfigSchema, type FormQuestion } from '@/lib/form-config-schema';
+import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 
 /** Parse budget/rent range strings to a midpoint number for the DB. */
 function parseBudgetToNumber(val: unknown): number | null {
@@ -302,6 +303,31 @@ export async function POST(req: NextRequest) {
       formConfig = null;
     }
 
+    // ── Fetch the saved ScoringModel (AI-generated weights/ranges) ─────
+    let scoringModel: ScoringModel | null = null;
+    if (formConfig) {
+      try {
+        const scoringColumn = resolvedLeadType === 'buyer'
+          ? 'buyerScoringModel'
+          : 'rentalScoringModel';
+        const { data: scoringSettings } = await supabase
+          .from('SpaceSetting')
+          .select(scoringColumn)
+          .eq('spaceId', space.id)
+          .maybeSingle();
+        if (scoringSettings) {
+          scoringModel = (scoringSettings as Record<string, unknown>)[scoringColumn] as ScoringModel | null;
+        }
+      } catch (err) {
+        console.warn('[apply/brokerage] scoring model fetch failed (non-fatal, will use legacy scoring)', {
+          spaceId: space.id,
+          brokerageId: brokerage.id,
+          leadType: resolvedLeadType,
+          err,
+        });
+      }
+    }
+
     // ── Validate & extract submission data ────────────────────────────────
     let contactName: string;
     let contactEmail: string | null;
@@ -553,6 +579,7 @@ export async function POST(req: NextRequest) {
           ? (applicationData as Record<string, unknown> & { legalName: string })
           : undefined,
         leadType: contactLeadType,
+        scoringModel,
       });
 
       const { error: scoreUpdateError } = await supabase

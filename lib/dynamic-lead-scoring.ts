@@ -9,19 +9,21 @@
  * Falls back gracefully at every step — never blocks form submission.
  */
 
-import { computeDeterministicScore } from '@/lib/scoring/deterministic-scorer';
+import { computeDeterministicScore, computeModelBasedScore } from '@/lib/scoring/deterministic-scorer';
 import {
   buildDynamicScoringPrompt,
   buildDynamicSystemPrompt,
 } from '@/lib/scoring/dynamic-prompt-builder';
 import type { IntakeFormConfig, LeadScoreDetails } from '@/lib/types';
 import type { LeadScoringResult } from '@/lib/lead-scoring';
+import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 
 type DynamicScoringInput = {
   contactId: string;
   formConfig: IntakeFormConfig;
   answers: Record<string, string | string[] | number | boolean>;
   leadType: string;
+  scoringModel?: ScoringModel;
 };
 
 type AIScoreResponse = {
@@ -221,19 +223,66 @@ function deriveLeadState(
 export async function scoreDynamicApplication(
   input: DynamicScoringInput,
 ): Promise<LeadScoringResult> {
-  const { contactId, formConfig, answers, leadType } = input;
+  const { contactId, formConfig, answers, leadType, scoringModel } = input;
 
-  console.info('[dynamic-lead-scoring] start', { contactId, leadType });
+  console.info('[dynamic-lead-scoring] start', { contactId, leadType, hasScoringModel: !!scoringModel });
 
   try {
     // ── Step 1: Deterministic rule-based score ──────────────────────────
-    const deterministicResult = computeDeterministicScore(formConfig, answers);
+    // If a ScoringModel is available (AI-generated with ranges + optionScores),
+    // use model-based scoring. Otherwise fall back to the legacy formConfig
+    // mapping-based scorer.
+    let deterministicResult: {
+      score: number;
+      hasRules: boolean;
+      breakdown: { questionId: string; label: string; weight: number; points: number; matched: boolean }[];
+      weightCoverage: number;
+    };
+
+    if (scoringModel && Object.keys(scoringModel.weights).length > 0) {
+      const modelResult = computeModelBasedScore(formConfig, answers, scoringModel);
+      deterministicResult = {
+        score: modelResult.score,
+        hasRules: modelResult.hasModel,
+        breakdown: modelResult.breakdown.map((b) => ({
+          questionId: b.questionId,
+          label: b.label,
+          weight: b.weight,
+          points: b.points,
+          matched: b.matched,
+        })),
+        // Model-based scoring covers all weighted questions by design
+        weightCoverage: 1.0,
+      };
+      console.info('[dynamic-lead-scoring] model-based score used', {
+        contactId,
+        score: modelResult.score,
+        hasModel: modelResult.hasModel,
+        questionCount: modelResult.breakdown.length,
+        matchedCount: modelResult.breakdown.filter((b) => b.matched).length,
+      });
+    } else {
+      const legacyResult = computeDeterministicScore(formConfig, answers);
+      deterministicResult = {
+        score: legacyResult.score,
+        hasRules: legacyResult.hasRules,
+        breakdown: legacyResult.breakdown.map((b) => ({
+          questionId: b.questionId,
+          label: b.label,
+          weight: b.weight,
+          points: b.points,
+          matched: b.matched,
+        })),
+        weightCoverage: legacyResult.weightCoverage,
+      };
+    }
 
     console.info('[dynamic-lead-scoring] deterministic score', {
       contactId,
       score: deterministicResult.score,
       hasRules: deterministicResult.hasRules,
       ruleCount: deterministicResult.breakdown.length,
+      usedScoringModel: !!scoringModel,
     });
 
     // ── Step 2: AI enhancement ──────────────────────────────────────────

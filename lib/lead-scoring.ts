@@ -13,6 +13,7 @@ import { computeLeadScore } from '@/lib/scoring/engine';
 import { enhanceWithAI, deriveLeadState, deriveSummary, deriveExplanationTags } from '@/lib/scoring/enhance';
 import { scoreDynamicApplication } from '@/lib/dynamic-lead-scoring';
 import type { ApplicationData, IntakeFormConfig, LeadScoreDetails } from '@/lib/types';
+import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 
 export type LeadScoringResult = {
   scoringStatus: 'scored' | 'failed' | 'pending';
@@ -160,6 +161,7 @@ export async function scoreLeadApplicationDynamic(input: {
   formConfig: IntakeFormConfig | null;
   answers?: Record<string, string | string[] | number | boolean>;
   leadType?: 'rental' | 'buyer' | 'general';
+  scoringModel?: ScoringModel | null;
   // Legacy fields — used when formConfig is null
   name?: string;
   email?: string | null;
@@ -174,6 +176,7 @@ export async function scoreLeadApplicationDynamic(input: {
       formConfig: input.formConfig,
       answers: input.answers,
       leadType: input.leadType ?? input.formConfig.leadType ?? 'rental',
+      scoringModel: input.scoringModel ?? undefined,
     });
   }
 
