@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { formConfigSchema } from '@/lib/form-config-schema';
 import type {
   IntakeFormConfig,
   FormQuestion,
@@ -545,10 +546,9 @@ export const DEFAULT_BUYER_FORM_CONFIG: IntakeFormConfig = {
   ],
 };
 
-// ── Validation (delegates to the canonical Zod schema) ──
+// ── Validation (delegates to the canonical Zod schema in form-config-schema.ts) ──
 
-/** Re-export the canonical validation schema from form-config-schema.ts */
-export { formConfigSchema } from '@/lib/form-config-schema';
+export { formConfigSchema };
 
 /** Validate an unknown value as a valid IntakeFormConfig */
 export function validateFormConfig(config: unknown) {

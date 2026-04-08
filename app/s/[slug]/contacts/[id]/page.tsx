@@ -21,7 +21,7 @@ import {
   CalendarPlus,
   ShieldCheck,
 } from 'lucide-react';
-import type { Contact, ApplicationData, LeadScoreDetails } from '@/lib/types';
+import type { Contact, ApplicationData, LeadScoreDetails, IntakeFormConfig } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
 import { ComposeEmailDialog } from '@/components/contacts/compose-email-dialog';
 import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-field';
@@ -31,6 +31,7 @@ import { RescoreButton } from '@/components/contacts/rescore-button';
 import { ApplicationStatusControl } from '@/components/contacts/application-status-control';
 import { PdfExportButton } from '@/components/contacts/pdf-export-button';
 import { CollapsibleSection } from '@/components/contacts/collapsible-section';
+import { DynamicApplicationDisplay } from '@/components/contacts/dynamic-application-display';
 import { getInitials, formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug } from '@/lib/space';
 
@@ -99,6 +100,7 @@ export default async function ClientDetailPage({
 
   const app = contact.applicationData as ApplicationData | null;
   const details = contact.scoreDetails as LeadScoreDetails | null;
+  const formSnapshot = contact.formConfigSnapshot as IntakeFormConfig | null;
 
   return (
     <div className="max-w-4xl space-y-5">

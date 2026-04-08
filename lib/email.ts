@@ -1,4 +1,5 @@
-import type { ApplicationData } from '@/lib/types';
+import type { ApplicationData, IntakeFormConfig } from '@/lib/types';
+import { getSubmissionDisplay, formatAnswerValue } from '@/lib/form-versioning';
 
 /**
  * Normalize RESEND_FROM_EMAIL — if someone sets it to just a domain like
@@ -45,6 +46,8 @@ export interface NewLeadEmailParams {
   scoreLabel?: string | null;
   scoreSummary?: string | null;
   applicationData: ApplicationData;
+  /** If present, render dynamic form Q&A instead of hardcoded fields */
+  formConfigSnapshot?: IntakeFormConfig | null;
 }
 
 export async function sendNewLeadNotification(params: NewLeadEmailParams): Promise<void> {
@@ -58,7 +61,7 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
   const FROM = getFromAddress();
   console.log('[EMAIL-DEBUG] 2. Resend initialized, API key prefix:', process.env.RESEND_API_KEY?.slice(0, 8));
 
-  const { toEmail, spaceName, spaceSlug, contactId, name, phone, email, leadScore, scoreLabel, scoreSummary, applicationData: app } = params;
+  const { toEmail, spaceName, spaceSlug, contactId, name, phone, email, leadScore, scoreLabel, scoreSummary, applicationData: app, formConfigSnapshot } = params;
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
   const contactUrl = `${appUrl}/s/${spaceSlug}/contacts/${contactId}`;
@@ -68,18 +71,34 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
     ? `<span style="display:inline-block;background:${tierColor}1a;color:${tierColor};font-size:12px;font-weight:600;padding:2px 10px;border-radius:9999px;text-transform:uppercase">${Math.round(leadScore)} ${scoreLabel ?? ''}</span>`
     : '';
 
-  const detailRows = [
-    row('Phone', phone),
-    row('Email', email),
-    row('Property', app.propertyAddress),
-    row('Move-in date', app.targetMoveInDate),
-    row('Monthly rent', app.monthlyRent != null ? fmt(app.monthlyRent) : null),
-    row('Employment', app.employmentStatus),
-    row('Gross income', app.monthlyGrossIncome != null ? `${fmt(app.monthlyGrossIncome)}/mo` : null),
-    row('Occupants', app.numberOfOccupants),
-    row('Pets', app.hasPets === true ? (app.petDetails ?? 'Yes') : app.hasPets === false ? 'No' : null),
-    row('Prior evictions', app.priorEvictions),
-  ].filter(Boolean).join('');
+  let detailRows: string;
+
+  if (formConfigSnapshot?.sections && app) {
+    // ── Dynamic form: render Q&A pairs from snapshot ──────────────────
+    const displayFields = getSubmissionDisplay({
+      applicationData: app as Record<string, any>,
+      formConfigSnapshot,
+    });
+    detailRows = [
+      row('Phone', phone),
+      row('Email', email),
+      ...displayFields.map((f) => row(f.label, f.value)),
+    ].filter(Boolean).join('');
+  } else {
+    // ── Legacy: hardcoded fields ─────────────────────────────────────
+    detailRows = [
+      row('Phone', phone),
+      row('Email', email),
+      row('Property', app.propertyAddress),
+      row('Move-in date', app.targetMoveInDate),
+      row('Monthly rent', app.monthlyRent != null ? fmt(app.monthlyRent) : null),
+      row('Employment', app.employmentStatus),
+      row('Gross income', app.monthlyGrossIncome != null ? `${fmt(app.monthlyGrossIncome)}/mo` : null),
+      row('Occupants', app.numberOfOccupants),
+      row('Pets', app.hasPets === true ? (app.petDetails ?? 'Yes') : app.hasPets === false ? 'No' : null),
+      row('Prior evictions', app.priorEvictions),
+    ].filter(Boolean).join('');
+  }
 
   const html = `
 <!DOCTYPE html>

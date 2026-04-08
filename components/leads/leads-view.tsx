@@ -38,7 +38,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { ConvertLeadDialog } from './convert-lead-dialog';
 import type { Contact, ApplicationData, LeadScoreDetails, SavedView } from '@/lib/types';
-import { downloadCSV } from '@/lib/csv';
+import { downloadCSV, downloadLeadsCSV } from '@/lib/csv';
 import { timeAgo, formatMoney, getInitials, formatFollowUpDate, toDateInputValue } from '@/lib/formatting';
 import { LEAD_TIERS, type TierKey } from '@/lib/constants';
 import { toast } from 'sonner';
@@ -294,22 +294,8 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
 
   function exportLeadsCSV(items: Contact[]) {
     toast.success('Leads exported');
-    downloadCSV('leads.csv', items.map((l) => {
-      const app = l.applicationData as ApplicationData | null;
-      return {
-        Name: l.name,
-        Phone: l.phone ?? '',
-        Email: l.email ?? '',
-        Score: l.leadScore != null ? Math.round(l.leadScore) : '',
-        Tier: l.scoreLabel ?? '',
-        'Score summary': l.scoreSummary ?? '',
-        Employment: app?.employmentStatus ?? '',
-        'Monthly income': app?.monthlyGrossIncome ?? '',
-        'Monthly rent': app?.monthlyRent ?? (l.budget ?? ''),
-        'Follow-up': l.followUpAt ? new Date(l.followUpAt).toLocaleDateString('en-US') : '',
-        Submitted: new Date(l.createdAt).toLocaleDateString('en-US'),
-      };
-    }));
+    // Use dynamic-aware CSV export that handles formConfigSnapshot
+    downloadLeadsCSV('leads.csv', items);
   }
 
   const leadViews = savedViews.filter((v) => v.page === 'leads');
