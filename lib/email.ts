@@ -786,24 +786,32 @@ export async function sendStatusUpdateEmail(params: StatusUpdateEmailParams): Pr
     newStatus === 'tour_scheduled' ? '#7c3aed' :
     '#2563eb';
 
+  // Explicit background colors for email client compatibility (no hex+alpha trick)
+  const statusBgColor =
+    newStatus === 'approved' ? '#ecfdf5' :
+    newStatus === 'declined' ? '#fef2f2' :
+    newStatus === 'waitlisted' ? '#fffbeb' :
+    newStatus === 'tour_scheduled' ? '#f5f3ff' :
+    '#eff6ff';
+
   const html = `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f9fafb;padding:32px 16px">
     <tr><td align="center">
-      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
         <!-- Header -->
         <tr><td style="background:#0f172a;padding:20px 28px">
-          <p style="margin:0;color:#ffffff;font-size:20px;font-weight:700">${safeBusinessName}</p>
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700">${safeBusinessName}</h1>
         </td></tr>
         <!-- Body -->
         <tr><td style="padding:24px 28px">
-          <p style="margin:0 0 16px;font-size:18px;font-weight:700;color:#111827">Application Update</p>
+          <h2 style="margin:0 0 16px;font-size:18px;font-weight:700;color:#111827">Application Update</h2>
           <p style="margin:0 0 16px;font-size:14px;color:#374151;line-height:1.6">Hi ${safeName}, your application status has been updated:</p>
           <!-- Status badge -->
           <div style="text-align:center;margin:20px 0">
-            <span style="display:inline-block;background:${statusColor}1a;color:${statusColor};font-size:16px;font-weight:700;padding:8px 20px;border-radius:9999px">${esc(statusLabel)}</span>
+            <span style="display:inline-block;background:${statusBgColor};color:${statusColor};font-size:16px;font-weight:700;padding:10px 24px;border-radius:9999px">${esc(statusLabel)}</span>
           </div>
           ${safeNote ? `
           <div style="background:#f3f4f6;border-radius:8px;padding:16px;margin:16px 0">
@@ -812,11 +820,22 @@ export async function sendStatusUpdateEmail(params: StatusUpdateEmailParams): Pr
           </div>
           ` : ''}
           <!-- CTA -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:24px">
             <tr><td align="center">
-              <a href="${portalUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 22px;border-radius:8px">View your application &rarr;</a>
+              <!--[if mso]>
+              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${portalUrl}" style="height:44px;v-text-anchor:middle;width:240px;" arcsize="18%" strokecolor="#0f172a" fillcolor="#0f172a">
+                <w:anchorlock/>
+                <center style="color:#ffffff;font-family:sans-serif;font-size:14px;font-weight:600;">View your application &rarr;</center>
+              </v:roundrect>
+              <![endif]-->
+              <!--[if !mso]><!-->
+              <a href="${portalUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:8px;min-width:200px;text-align:center">View your application &rarr;</a>
+              <!--<![endif]-->
             </td></tr>
           </table>
+          <p style="margin:20px 0 0;font-size:11px;color:#9ca3af;text-align:center">
+            Or copy this link: <a href="${portalUrl}" style="color:#6b7280;word-break:break-all">${portalUrl}</a>
+          </p>
         </td></tr>
         <!-- Footer -->
         <tr><td style="padding:16px 28px;border-top:1px solid #f1f5f9">
