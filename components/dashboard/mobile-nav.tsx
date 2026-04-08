@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { mobileNavItems } from '@/lib/nav-items';
-import { LayoutDashboard, UserCircle, Users, Briefcase, Building2, PhoneIncoming } from 'lucide-react';
+import { LayoutDashboard, UserCircle, Users, Briefcase, Building2, PhoneIncoming, ClipboardList } from 'lucide-react';
 
 const brokerMobileItems = [
   { href: '/broker', label: 'Team', icon: LayoutDashboard, exact: true },
@@ -97,6 +97,24 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
           </Link>
         );
       })}
+      {/* Intake form link */}
+      <Link
+        href={`${base}/intake`}
+        className={cn(
+          'flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors',
+          pathname.startsWith(`${base}/intake`) ? 'text-primary' : 'text-muted-foreground'
+        )}
+      >
+        <div
+          className={cn(
+            'w-9 h-6 rounded-md flex items-center justify-center transition-colors',
+            pathname.startsWith(`${base}/intake`) ? 'bg-primary/10' : ''
+          )}
+        >
+          <ClipboardList size={18} />
+        </div>
+        <span>Intake</span>
+      </Link>
       {/* Broker users get a quick link to brokerage */}
       {isBroker && (
         <Link
