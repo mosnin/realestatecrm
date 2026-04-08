@@ -134,7 +134,7 @@ export const realtorNavItems: NavItem[] = [
     children: [
       { href: '/settings', label: 'Account', exact: true },
       { href: '/settings/notifications', label: 'Notifications' },
-      { href: '/settings/integrations', label: 'Integrations' },
+      { href: '/settings/integrations', label: 'API & MCP' },
       { href: '/settings/legal', label: 'Legal' },
     ],
   },

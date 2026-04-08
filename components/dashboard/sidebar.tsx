@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
@@ -691,8 +691,11 @@ export function Sidebar({
   brokerageMemberships = [],
 }: SidebarProps) {
   const pathname = usePathname();
-  const currentSearchParams = useSearchParams();
-  const searchParamsString = currentSearchParams?.toString() ?? '';
+  // Read search params from window.location to avoid Next.js Suspense requirement
+  const [searchParamsString, setSearchParamsString] = useState('');
+  useEffect(() => {
+    setSearchParamsString(window.location.search.replace('?', ''));
+  }, [pathname]);
   const base = `/s/${slug}`;
   const { user } = useUser();
 
