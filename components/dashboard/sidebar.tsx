@@ -2,15 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
-import { primaryNavItems, secondaryNavItems, analyticsSubItems, intakeSubItems } from '@/lib/nav-items';
+import { realtorNavItems } from '@/lib/nav-items';
+import type { NavItem, NavChild } from '@/lib/nav-items';
 import {
   Building2,
   ChevronRight,
-  ChevronDown,
   Users,
   UserCircle,
   Mail,
@@ -18,34 +18,25 @@ import {
   SlidersHorizontal,
   Briefcase,
   ChevronsUpDown,
-  ArrowLeftRight,
   PhoneIncoming,
   BarChart3,
-  Clock,
   Trophy,
   FileText,
   Megaphone,
   MessageCircle,
-  DollarSign,
   Upload,
   ArrowLeft,
   Settings,
-  User,
-  Bell,
-  Puzzle,
-  Shield,
-  Palette,
-  Type,
-  ListChecks,
-  CreditCard,
   Key,
   Shuffle,
+  CreditCard,
   Plus,
   Check,
-  ClipboardList,
-  Flame,
-  Home,
 } from 'lucide-react';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Types
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface SidebarProps {
   slug: string;
@@ -58,6 +49,10 @@ interface SidebarProps {
   brokerageRole?: string | null;
   brokerageMemberships?: { id: string; name: string; role: string }[];
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Broker nav definitions (unchanged structure)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const brokerAdminNavSections = [
   {
@@ -114,10 +109,6 @@ const brokerMemberNavSections = [
   },
 ];
 
-const brokerNavSections = brokerAdminNavSections;
-// Flat list for backward compat
-const brokerTeamNavItems = brokerNavSections.flatMap(s => s.items);
-
 const brokerSettingsNavSections = [
   {
     label: 'Brokerage',
@@ -141,7 +132,218 @@ const brokerSettingsNavSections = [
   },
 ];
 
-// ── Section label ──────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Helpers: determine active state for nav items and children
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function isChildActive(child: NavChild, pathname: string, base: string): boolean {
+  const childPath = child.href.split('?')[0]; // strip query params
+  const fullHref = `${base}${childPath}`;
+  if (child.exact) {
+    return pathname === fullHref;
+  }
+  return pathname.startsWith(fullHref);
+}
+
+/** Returns true if the current pathname belongs to this item or any of its children. */
+function doesItemOwnPath(item: NavItem, pathname: string, base: string): boolean {
+  if (item.href === '') {
+    return pathname === base;
+  }
+  if (item.children) {
+    // Check children first — some children like /form-analytics don't share the parent prefix
+    const childMatch = item.children.some((child) => {
+      const childPath = child.href.split('?')[0];
+      const fullChildPath = `${base}${childPath}`;
+      return child.exact
+        ? pathname === fullChildPath
+        : pathname.startsWith(fullChildPath);
+    });
+    if (childMatch) return true;
+  }
+  return pathname.startsWith(`${base}${item.href}`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Collapsible children wrapper with smooth CSS height animation
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function CollapsibleChildren({
+  children,
+  isOpen,
+}: {
+  children: React.ReactNode;
+  isOpen: boolean;
+}) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number | undefined>(isOpen ? undefined : 0);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+
+    if (isOpen) {
+      const measured = el.scrollHeight;
+      setHeight(0);
+      setIsAnimating(true);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setHeight(measured);
+        });
+      });
+    } else {
+      const measured = el.scrollHeight;
+      setHeight(measured);
+      setIsAnimating(true);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setHeight(0);
+        });
+      });
+    }
+  }, [isOpen]);
+
+  const handleTransitionEnd = useCallback(() => {
+    setIsAnimating(false);
+    if (isOpen) {
+      setHeight(undefined); // Allow natural height after opening
+    }
+  }, [isOpen]);
+
+  return (
+    <div
+      ref={contentRef}
+      style={{ height: height !== undefined ? `${height}px` : 'auto' }}
+      className={cn(
+        'transition-[height] duration-200 ease-in-out',
+        !isOpen && !isAnimating && 'hidden',
+        isAnimating && 'overflow-hidden',
+      )}
+      onTransitionEnd={handleTransitionEnd}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Shopify-style nav item — parent with optional inline collapsible children
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function ShopifyNavItem({
+  item,
+  base,
+  pathname,
+  isExpanded,
+  onToggle,
+  badge,
+}: {
+  item: NavItem;
+  base: string;
+  pathname: string;
+  isExpanded: boolean;
+  onToggle: () => void;
+  badge?: React.ReactNode;
+}) {
+  const Icon = item.icon;
+  const hasChildren = item.children && item.children.length > 0;
+  const isParentActive = doesItemOwnPath(item, pathname, base);
+  const href = `${base}${item.href}`;
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (hasChildren) {
+        e.preventDefault();
+        onToggle();
+      }
+    },
+    [hasChildren, onToggle],
+  );
+
+  return (
+    <div>
+      {/* Parent item — 44px min touch target (Apple HIG) */}
+      <Link
+        href={href}
+        onClick={handleClick}
+        className={cn(
+          'group relative flex items-center gap-2.5 min-h-[44px] h-11 px-2.5 rounded-lg text-sm transition-colors',
+          isParentActive
+            ? 'bg-primary/10 text-foreground font-semibold'
+            : 'text-muted-foreground font-medium hover:bg-muted hover:text-foreground',
+        )}
+      >
+        {/* Active indicator bar */}
+        {isParentActive && (
+          <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-primary" />
+        )}
+
+        {item.isAI ? (
+          <img
+            src="/chip-avatar.png"
+            alt="Chip"
+            className="w-[18px] h-[18px] rounded-full flex-shrink-0"
+          />
+        ) : (
+          <Icon
+            size={18}
+            className={cn(
+              'flex-shrink-0 transition-colors',
+              isParentActive
+                ? 'text-primary'
+                : 'text-muted-foreground/60 group-hover:text-foreground',
+            )}
+          />
+        )}
+
+        <span className="flex-1 truncate">{item.label}</span>
+
+        {badge}
+
+        {hasChildren && (
+          <ChevronRight
+            size={14}
+            className={cn(
+              'flex-shrink-0 text-muted-foreground/40 transition-transform duration-200',
+              isExpanded && 'rotate-90',
+            )}
+          />
+        )}
+      </Link>
+
+      {/* Inline children — no icons, indented, smaller text */}
+      {hasChildren && (
+        <CollapsibleChildren isOpen={isExpanded}>
+          <div className="ml-[18px] pl-3.5 py-1 space-y-0.5 border-l border-border/40">
+            {item.children!.map((child) => {
+              const childHref = `${base}${child.href}`;
+              const childActive = isChildActive(child, pathname, base);
+              return (
+                <Link
+                  key={child.href}
+                  href={childHref}
+                  className={cn(
+                    'flex items-center min-h-[36px] h-9 px-2.5 rounded-md text-[13px] transition-colors',
+                    childActive
+                      ? 'text-primary font-medium bg-primary/5'
+                      : 'text-muted-foreground font-normal hover:text-foreground hover:bg-muted/50',
+                  )}
+                >
+                  <span className="truncate">{child.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </CollapsibleChildren>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Section label (used in broker nav)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -151,22 +353,22 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ── Nav item with left accent bar ──────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Flat nav item (for broker nav, settings sub-pages)
+// ═══════════════════════════════════════════════════════════════════════════════
 
-function NavItem({
+function FlatNavItem({
   href,
   label,
   icon: Icon,
   isActive,
   badge,
-  isAI,
 }: {
   href: string;
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   isActive: boolean;
   badge?: React.ReactNode;
-  isAI?: boolean;
 }) {
   return (
     <Link
@@ -178,32 +380,27 @@ function NavItem({
           : 'text-muted-foreground hover:bg-muted hover:text-foreground',
       )}
     >
-      {/* Active indicator — 2px left bar */}
       {isActive && (
         <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-primary" />
       )}
-      {isAI ? (
-        <img src="/chip-avatar.png" alt="Chip" className="w-4 h-4 rounded-full flex-shrink-0" />
-      ) : (
-        <Icon
-          size={16}
-          className={cn(
-            'flex-shrink-0 transition-colors',
-            isActive
-              ? 'text-primary'
-              : 'text-muted-foreground/60 group-hover:text-foreground',
-          )}
-        />
-      )}
-      <span className={cn('flex-1 truncate', isAI && !isActive && 'text-foreground/80')}>
-        {label}
-      </span>
+      <Icon
+        size={16}
+        className={cn(
+          'flex-shrink-0 transition-colors',
+          isActive
+            ? 'text-primary'
+            : 'text-muted-foreground/60 group-hover:text-foreground',
+        )}
+      />
+      <span className="flex-1 truncate">{label}</span>
       {badge}
     </Link>
   );
 }
 
-// ── Workspace switcher ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Workspace switcher
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function WorkspaceSwitcher({
   currentName,
@@ -224,8 +421,8 @@ function WorkspaceSwitcher({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const base = `/s/${slug}`;
 
-  // Close on click outside
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -237,7 +434,6 @@ function WorkspaceSwitcher({
 
   return (
     <div ref={ref} className="relative mx-3">
-      {/* Trigger button */}
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md border border-border/60 bg-muted/30 hover:bg-muted hover:border-border transition-all text-left"
@@ -246,23 +442,25 @@ function WorkspaceSwitcher({
           <Icon size={14} className="text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold truncate text-foreground leading-tight">{currentName}</p>
-          <p className="text-[11px] text-muted-foreground leading-tight">{currentSubtitle}</p>
+          <p className="text-sm font-semibold truncate text-foreground leading-tight">
+            {currentName}
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-tight">
+            {currentSubtitle}
+          </p>
         </div>
         <ChevronsUpDown size={13} className="text-muted-foreground/40 flex-shrink-0" />
       </button>
 
-      {/* Dropdown */}
       {open && (
         <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border bg-popover shadow-lg overflow-hidden">
-          {/* Personal workspace — only show if user has a space */}
           {slug && (
             <Link
-              href={`/s/${slug}`}
+              href={base}
               onClick={() => setOpen(false)}
               className={cn(
                 'flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted transition-colors',
-                !isOnBrokerPage && 'bg-primary/5'
+                !isOnBrokerPage && 'bg-primary/5',
               )}
             >
               <Briefcase size={14} className="text-primary flex-shrink-0" />
@@ -270,15 +468,18 @@ function WorkspaceSwitcher({
                 <p className="font-medium truncate">{spaceName}</p>
                 <p className="text-[10px] text-muted-foreground">Realtor Dashboard</p>
               </div>
-              {!isOnBrokerPage && <Check size={14} className="text-primary flex-shrink-0" />}
+              {!isOnBrokerPage && (
+                <Check size={14} className="text-primary flex-shrink-0" />
+              )}
             </Link>
           )}
 
-          {/* Brokerages */}
           {brokerageMemberships.length > 0 && (
             <>
               <div className="border-t border-border" />
-              <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">Brokerages</p>
+              <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
+                Brokerages
+              </p>
               {brokerageMemberships.map((b) => (
                 <Link
                   key={b.id}
@@ -286,21 +487,28 @@ function WorkspaceSwitcher({
                   onClick={() => setOpen(false)}
                   className={cn(
                     'flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted transition-colors',
-                    isOnBrokerPage && 'bg-primary/5'
+                    isOnBrokerPage && 'bg-primary/5',
                   )}
                 >
                   <Building2 size={14} className="text-primary flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{b.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{b.role === 'broker_owner' ? 'Owner' : b.role === 'broker_admin' ? 'Admin' : 'Member'}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {b.role === 'broker_owner'
+                        ? 'Owner'
+                        : b.role === 'broker_admin'
+                          ? 'Admin'
+                          : 'Member'}
+                    </p>
                   </div>
-                  {isOnBrokerPage && <Check size={14} className="text-primary flex-shrink-0" />}
+                  {isOnBrokerPage && (
+                    <Check size={14} className="text-primary flex-shrink-0" />
+                  )}
                 </Link>
               ))}
             </>
           )}
 
-          {/* Create brokerage option — only when not in any brokerage */}
           {brokerageMemberships.length === 0 && !isOnBrokerPage && (
             <>
               <div className="border-t border-border" />
@@ -320,7 +528,9 @@ function WorkspaceSwitcher({
   );
 }
 
-// ── User footer ────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// User footer
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function UserFooter({
   href,
@@ -359,279 +569,88 @@ function UserFooter({
   );
 }
 
-// ── Analytics sub-menu ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Shopify-style realtor nav — accordion (one section expanded at a time)
+// ═══════════════════════════════════════════════════════════════════════════════
 
-function AnalyticsSubMenu({
+function RealtorShopifyNav({
   base,
   pathname,
-  isActive,
-  icon: Icon,
+  unreadLeadCount,
+  overdueFollowUpCount,
 }: {
   base: string;
   pathname: string;
-  isActive: boolean;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  unreadLeadCount: number;
+  overdueFollowUpCount: number;
 }) {
-  const [expanded, setExpanded] = useState(isActive);
+  // Determine which section should be initially expanded based on current route
+  const initialExpanded = useMemo(() => {
+    for (const item of realtorNavItems) {
+      if (item.children && doesItemOwnPath(item, pathname, base)) {
+        return item.href;
+      }
+    }
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only compute on mount
 
-  // Auto-expand when navigating to an analytics page
+  const [expandedKey, setExpandedKey] = useState<string | null>(initialExpanded);
+
+  // Auto-expand when navigating to a child route
   useEffect(() => {
-    if (isActive && !expanded) setExpanded(true);
-  }, [isActive]);
+    for (const item of realtorNavItems) {
+      if (item.children && doesItemOwnPath(item, pathname, base)) {
+        setExpandedKey(item.href);
+        return;
+      }
+    }
+  }, [pathname, base]);
+
+  const handleToggle = useCallback((key: string) => {
+    setExpandedKey((prev) => (prev === key ? null : key));
+  }, []);
 
   return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className={cn(
-          'group relative flex items-center gap-2.5 w-full h-9 px-2.5 rounded-md text-sm font-medium transition-colors',
-          isActive
-            ? 'bg-primary/10 text-primary'
-            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-        )}
-      >
-        {isActive && (
-          <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-primary" />
-        )}
-        <Icon
-          size={16}
-          className={cn(
-            'flex-shrink-0 transition-colors',
-            isActive
-              ? 'text-primary'
-              : 'text-muted-foreground/60 group-hover:text-foreground',
-          )}
-        />
-        <span className="flex-1 truncate text-left">Analytics</span>
-        <ChevronDown
-          size={14}
-          className={cn(
-            'flex-shrink-0 text-muted-foreground/40 transition-transform duration-200',
-            !expanded && '-rotate-90',
-          )}
-        />
-      </button>
+    <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
+      {realtorNavItems.map((item) => {
+        let badge: React.ReactNode = undefined;
+        const isParentActive = doesItemOwnPath(item, pathname, base);
 
-      {expanded && (
-        <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
-          {analyticsSubItems.map((sub) => {
-            const href = `${base}${sub.href}`;
-            const subIsActive = sub.exact
-              ? pathname === href
-              : pathname.startsWith(href);
-            return (
-              <Link
-                key={sub.href}
-                href={href}
-                className={cn(
-                  'group relative flex items-center gap-2 h-8 px-2 rounded-md text-[13px] font-medium transition-colors',
-                  subIsActive
-                    ? 'bg-primary/8 text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                )}
-              >
-                <sub.icon
-                  size={14}
-                  className={cn(
-                    'flex-shrink-0 transition-colors',
-                    subIsActive
-                      ? 'text-primary'
-                      : 'text-muted-foreground/50 group-hover:text-foreground',
-                  )}
-                />
-                <span className="truncate">{sub.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      )}
-    </div>
+        if (item.badgeKey === 'leads' && unreadLeadCount > 0) {
+          badge = (
+            <span
+              className={cn(
+                'inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums flex-shrink-0',
+                isParentActive
+                  ? 'bg-primary/20 text-primary'
+                  : 'bg-primary text-primary-foreground',
+              )}
+            >
+              {unreadLeadCount > 99 ? '99+' : unreadLeadCount}
+            </span>
+          );
+        }
+
+        return (
+          <ShopifyNavItem
+            key={item.href}
+            item={item}
+            base={base}
+            pathname={pathname}
+            isExpanded={expandedKey === item.href}
+            onToggle={() => handleToggle(item.href)}
+            badge={badge}
+          />
+        );
+      })}
+    </nav>
   );
 }
 
-// ── Leads sub-menu ──────────────────────────────────────────────────────
-
-const leadsSubItems = [
-  { href: '/leads', label: 'All Leads', icon: PhoneIncoming, exact: true },
-  { href: '/leads?type=rental', label: 'Rental Leads', icon: Home, exact: false, match: '/leads' },
-  { href: '/leads?type=buyer', label: 'Buyer Leads', icon: Key, exact: false, match: '/leads' },
-  { href: '/leads?tier=hot', label: 'Hot Leads', icon: Flame, exact: false, match: '/leads' },
-] as const;
-
-function LeadsSubMenu({
-  base,
-  pathname,
-  isActive,
-  icon: Icon,
-  badge,
-}: {
-  base: string;
-  pathname: string;
-  isActive: boolean;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  badge?: React.ReactNode;
-}) {
-  const [expanded, setExpanded] = useState(isActive);
-
-  useEffect(() => {
-    if (isActive && !expanded) setExpanded(true);
-  }, [isActive]);
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className={cn(
-          'group relative flex items-center gap-2.5 w-full h-9 px-2.5 rounded-md text-sm font-medium transition-colors',
-          isActive
-            ? 'bg-primary/10 text-primary'
-            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-        )}
-      >
-        {isActive && (
-          <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-primary" />
-        )}
-        <Icon
-          size={16}
-          className={cn(
-            'flex-shrink-0 transition-colors',
-            isActive
-              ? 'text-primary'
-              : 'text-muted-foreground/60 group-hover:text-foreground',
-          )}
-        />
-        <span className="flex-1 truncate text-left">Leads</span>
-        {badge}
-        <ChevronDown
-          size={14}
-          className={cn(
-            'flex-shrink-0 text-muted-foreground/40 transition-transform duration-200',
-            !expanded && '-rotate-90',
-          )}
-        />
-      </button>
-
-      {expanded && (
-        <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
-          {leadsSubItems.map((sub) => {
-            const href = `${base}${sub.href}`;
-            return (
-              <Link
-                key={sub.href}
-                href={href}
-                className={cn(
-                  'group relative flex items-center gap-2 h-8 px-2 rounded-md text-[13px] font-medium transition-colors',
-                  'text-muted-foreground hover:bg-muted hover:text-foreground',
-                )}
-              >
-                <sub.icon
-                  size={14}
-                  className="flex-shrink-0 transition-colors text-muted-foreground/50 group-hover:text-foreground"
-                />
-                <span className="truncate">{sub.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Intake Form sub-menu ─────────────────────────────────────────────────
-
-function IntakeSubMenu({
-  base,
-  pathname,
-  isActive,
-}: {
-  base: string;
-  pathname: string;
-  isActive: boolean;
-}) {
-  const [expanded, setExpanded] = useState(isActive);
-
-  // Auto-expand when navigating to an intake page
-  useEffect(() => {
-    if (isActive && !expanded) setExpanded(true);
-  }, [isActive]);
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className={cn(
-          'group relative flex items-center gap-2.5 w-full h-9 px-2.5 rounded-md text-sm font-medium transition-colors',
-          isActive
-            ? 'bg-primary/10 text-primary'
-            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-        )}
-      >
-        {isActive && (
-          <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-primary" />
-        )}
-        <ClipboardList
-          size={16}
-          className={cn(
-            'flex-shrink-0 transition-colors',
-            isActive
-              ? 'text-primary'
-              : 'text-muted-foreground/60 group-hover:text-foreground',
-          )}
-        />
-        <span className="flex-1 truncate text-left">Intake Form</span>
-        <ChevronDown
-          size={14}
-          className={cn(
-            'flex-shrink-0 text-muted-foreground/40 transition-transform duration-200',
-            !expanded && '-rotate-90',
-          )}
-        />
-      </button>
-
-      {expanded && (
-        <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
-          {intakeSubItems.map((sub) => {
-            const href = `${base}${sub.href}`;
-            const subIsActive = sub.exact
-              ? pathname === href
-              : pathname.startsWith(href);
-            return (
-              <Link
-                key={sub.href}
-                href={href}
-                className={cn(
-                  'group relative flex items-center gap-2 h-8 px-2 rounded-md text-[13px] font-medium transition-colors',
-                  subIsActive
-                    ? 'bg-primary/8 text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                )}
-              >
-                <sub.icon
-                  size={14}
-                  className={cn(
-                    'flex-shrink-0 transition-colors',
-                    subIsActive
-                      ? 'text-primary'
-                      : 'text-muted-foreground/50 group-hover:text-foreground',
-                  )}
-                />
-                <span className="truncate">{sub.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Sidebar
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// Main Sidebar export
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export function Sidebar({
   slug,
@@ -653,19 +672,16 @@ export function Sidebar({
     : 'My Account';
 
   const isOnBrokerPage = pathname.startsWith('/broker');
-
   const isOnBrokerSettings = pathname.startsWith('/broker/settings');
 
-  // ── Broker settings sub-nav ──
+  // ── Broker settings sub-nav ──────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly) && isOnBrokerSettings) {
     return (
       <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0">
-        {/* Logo */}
         <div className="px-5 pt-5 pb-4">
           <BrandLogo className="h-7" alt="Chippi" />
         </div>
 
-        {/* Back to dashboard */}
         <div className="px-3 pb-1">
           <Link
             href="/broker"
@@ -676,7 +692,6 @@ export function Sidebar({
           </Link>
         </div>
 
-        {/* Settings sub-nav */}
         <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
           {brokerSettingsNavSections.map((section) => (
             <div key={section.label}>
@@ -686,7 +701,7 @@ export function Sidebar({
                   ? pathname === item.href
                   : pathname.startsWith(item.href);
                 return (
-                  <NavItem
+                  <FlatNavItem
                     key={item.href}
                     href={item.href}
                     label={item.label}
@@ -699,7 +714,6 @@ export function Sidebar({
           ))}
         </nav>
 
-        {/* User */}
         <div className="mx-4 border-t border-border" />
         <UserFooter
           href={slug ? `${base}/profile` : '/broker/settings'}
@@ -710,16 +724,14 @@ export function Sidebar({
     );
   }
 
-  // ── Broker sidebar ──
+  // ── Broker sidebar ───────────────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
       <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0">
-        {/* Logo */}
         <div className="px-5 pt-5 pb-4">
           <BrandLogo className="h-7" alt="Chippi" />
         </div>
 
-        {/* Brokerage switcher */}
         <WorkspaceSwitcher
           currentName={brokerageName ?? 'Brokerage'}
           currentSubtitle="Brokerage Dashboard"
@@ -730,29 +742,47 @@ export function Sidebar({
           isOnBrokerPage={isOnBrokerPage}
         />
 
-        {/* Team nav — organized into sections */}
         <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
-          {(brokerageRole === 'realtor_member' ? brokerMemberNavSections : brokerAdminNavSections).map((section) => {
+          {(brokerageRole === 'realtor_member'
+            ? brokerMemberNavSections
+            : brokerAdminNavSections
+          ).map((section) => {
             const visibleItems = section.items.filter(
-              (item) => !item.adminOnly || brokerageRole === 'broker_owner' || brokerageRole === 'broker_admin'
+              (item) =>
+                !item.adminOnly ||
+                brokerageRole === 'broker_owner' ||
+                brokerageRole === 'broker_admin',
             );
             if (visibleItems.length === 0) return null;
             return (
               <div key={section.label}>
                 <SectionLabel>{section.label}</SectionLabel>
                 {visibleItems.map((item) => {
-                  const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-                  const highlightBadge = 'highlight' in item && (item as any).highlight && !isActive ? (
-                    <span className="inline-flex h-2 w-2 rounded-full bg-primary shrink-0" />
-                  ) : undefined;
-                  return <NavItem key={item.href} href={item.href} label={item.label} icon={item.icon} isActive={isActive} badge={highlightBadge} />;
+                  const isActive = item.exact
+                    ? pathname === item.href
+                    : pathname.startsWith(item.href);
+                  const highlightBadge =
+                    'highlight' in item &&
+                    (item as any).highlight &&
+                    !isActive ? (
+                      <span className="inline-flex h-2 w-2 rounded-full bg-primary shrink-0" />
+                    ) : undefined;
+                  return (
+                    <FlatNavItem
+                      key={item.href}
+                      href={item.href}
+                      label={item.label}
+                      icon={item.icon}
+                      isActive={isActive}
+                      badge={highlightBadge}
+                    />
+                  );
                 })}
               </div>
             );
           })}
         </nav>
 
-        {/* User */}
         <div className="mx-4 border-t border-border" />
         <UserFooter
           href={slug ? `${base}/profile` : '/broker/settings'}
@@ -763,101 +793,7 @@ export function Sidebar({
     );
   }
 
-  // ── Detect settings pages ──
-  const isOnSettingsPage =
-    pathname.startsWith(`${base}/settings`) ||
-    pathname.startsWith(`${base}/profile`) ||
-    pathname.startsWith(`${base}/configure`) ||
-    pathname.startsWith(`${base}/billing`);
-
-  const settingsNavSections = [
-    {
-      label: 'Settings',
-      items: [
-        { href: `${base}/settings`, label: 'General', icon: Settings, exact: true },
-        { href: `${base}/settings/profile`, label: 'Profile', icon: User, exact: false },
-        { href: `${base}/settings/notifications`, label: 'Notifications', icon: Bell, exact: false },
-        { href: `${base}/settings/integrations`, label: 'Integrations', icon: Puzzle, exact: false },
-        { href: `${base}/settings/legal`, label: 'Legal', icon: Shield, exact: false },
-      ],
-    },
-    {
-      label: 'Intake Form Appearance',
-      items: [
-        { href: `${base}/settings/appearance`, label: 'Appearance', icon: Palette, exact: false },
-        { href: `${base}/settings/content`, label: 'Content', icon: Type, exact: false },
-        { href: `${base}/intake`, label: 'Form Builder & More', icon: ClipboardList, exact: false },
-      ],
-    },
-    {
-      label: 'Brokerage',
-      items: [
-        { href: `${base}/settings/brokerage`, label: 'Brokerage Invites', icon: Building2, exact: false },
-      ],
-    },
-    {
-      label: 'Account',
-      items: [
-        { href: `${base}/billing`, label: 'Billing', icon: CreditCard, exact: false },
-      ],
-    },
-  ];
-
-  // ── Settings sidebar ──
-  if (isOnSettingsPage) {
-    return (
-      <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0">
-        {/* Logo */}
-        <div className="px-5 pt-5 pb-4">
-          <BrandLogo className="h-7" alt="Chippi" />
-        </div>
-
-        {/* Back to dashboard */}
-        <div className="px-3 pb-1">
-          <Link
-            href={base}
-            className="group flex items-center gap-2 h-9 px-2.5 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <ArrowLeft size={14} className="flex-shrink-0" />
-            <span>Back to dashboard</span>
-          </Link>
-        </div>
-
-        {/* Settings nav */}
-        <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
-          {settingsNavSections.map((section) => (
-            <div key={section.label}>
-              <SectionLabel>{section.label}</SectionLabel>
-              {section.items.map((item) => {
-                const isActive = item.exact
-                  ? pathname === item.href
-                  : pathname.startsWith(item.href);
-                return (
-                  <NavItem
-                    key={item.href}
-                    href={item.href}
-                    label={item.label}
-                    icon={item.icon}
-                    isActive={isActive}
-                  />
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-
-        {/* User */}
-        <div className="mx-4 mt-2 border-t border-border" />
-        <UserFooter
-          href={`${base}/settings/profile`}
-          displayName={displayName}
-          imageUrl={user?.imageUrl}
-        />
-      </aside>
-    );
-  }
-
-  // ── Standard workspace sidebar ──
+  // ── Realtor workspace sidebar (Shopify-style) ────────────────────────────
   return (
     <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0">
       {/* Logo */}
@@ -876,114 +812,16 @@ export function Sidebar({
         isOnBrokerPage={isOnBrokerPage}
       />
 
-      {/* Primary nav */}
-      <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
-        <SectionLabel>Workspace</SectionLabel>
-        {primaryNavItems.map((item) => {
-          const href = `${base}${item.href}`;
-          const isActive =
-            item.href === '' ? pathname === base : pathname.startsWith(`${base}${item.href}`);
+      {/* Shopify-style nav — all items with inline collapsible children */}
+      <RealtorShopifyNav
+        base={base}
+        pathname={pathname}
+        unreadLeadCount={unreadLeadCount}
+        overdueFollowUpCount={overdueFollowUpCount}
+      />
 
-          let badge: React.ReactNode = undefined;
-          if (item.href === '/leads' && unreadLeadCount > 0) {
-            badge = (
-              <span
-                className={cn(
-                  'inline-flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums flex-shrink-0',
-                  isActive
-                    ? 'bg-primary/20 text-primary'
-                    : 'bg-primary text-primary-foreground',
-                )}
-              >
-                {unreadLeadCount > 99 ? '99+' : unreadLeadCount}
-              </span>
-            );
-          }
-          if (item.href === '/follow-ups' && overdueFollowUpCount > 0) {
-            badge = (
-              <span
-                className={cn(
-                  'inline-flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums flex-shrink-0',
-                  isActive
-                    ? 'bg-red-200/60 text-red-700 dark:bg-red-500/20 dark:text-red-400'
-                    : 'bg-red-500 text-white dark:bg-red-600',
-                )}
-              >
-                {overdueFollowUpCount > 99 ? '99+' : overdueFollowUpCount}
-              </span>
-            );
-          }
-
-          // Leads gets a collapsible sub-menu
-          if (item.href === '/leads') {
-            return (
-              <LeadsSubMenu
-                key={item.href}
-                base={base}
-                pathname={pathname}
-                isActive={isActive}
-                icon={item.icon}
-                badge={badge}
-              />
-            );
-          }
-
-          // Analytics gets a collapsible sub-menu
-          if (item.href === '/analytics') {
-            return (
-              <AnalyticsSubMenu
-                key={item.href}
-                base={base}
-                pathname={pathname}
-                isActive={isActive}
-                icon={item.icon}
-              />
-            );
-          }
-
-          return (
-            <NavItem
-              key={item.href}
-              href={href}
-              label={item.label}
-              icon={item.icon}
-              isActive={isActive}
-              badge={badge}
-              isAI={item.label === 'Chip'}
-            />
-          );
-        })}
-
-        {/* Intake Form — top-level collapsible section */}
-        <SectionLabel>Intake Form</SectionLabel>
-        <IntakeSubMenu
-          base={base}
-          pathname={pathname}
-          isActive={pathname.startsWith(`${base}/intake`)}
-        />
-
-      </nav>
-
-      {/* Settings */}
+      {/* User footer */}
       <div className="mx-4 border-t border-border" />
-      <div className="px-3 space-y-0.5">
-        {secondaryNavItems.map((item) => {
-          const href = `${base}${item.href}`;
-          const isActive = pathname.startsWith(href);
-          return (
-            <NavItem
-              key={item.href}
-              href={href}
-              label={item.label}
-              icon={item.icon}
-              isActive={isActive}
-            />
-          );
-        })}
-      </div>
-
-      {/* User */}
-      <div className="mx-4 mt-2 border-t border-border" />
       <UserFooter
         href={`${base}/settings/profile`}
         displayName={displayName}
