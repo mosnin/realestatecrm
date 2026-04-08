@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { fireConversionEvents } from '@/lib/tracking-events';
 
 interface BookingFormProps {
   slug: string;
@@ -130,6 +131,8 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
         throw new Error(data.error || 'Booking failed');
       }
       setStep('confirmed');
+      // Fire tracking pixel conversion events on successful booking
+      fireConversionEvents();
       setTimeout(() => {
         confettiRef.current?.fire({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
         confettiRef.current?.fire({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 } });

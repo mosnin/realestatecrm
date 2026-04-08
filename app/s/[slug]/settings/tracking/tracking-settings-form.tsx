@@ -185,14 +185,14 @@ export function TrackingSettingsForm({ slug, trackingPixels }: TrackingSettingsF
           <Label htmlFor="customHeadScript">Script content</Label>
           <Textarea
             id="customHeadScript"
-            placeholder={'// Paste your tracking script here\n// e.g., Google Tag Manager, Hotjar, etc.'}
+            placeholder={'<script async src="https://www.googletagmanager.com/gtag/js?id=GTM-XXXX"></script>'}
             value={values.customHeadScript ?? ''}
             onChange={(e) => handleChange('customHeadScript', e.target.value)}
             rows={6}
             className="font-mono text-xs"
           />
           <p className="text-xs text-muted-foreground">
-            Maximum 10,000 characters. Do not wrap in &lt;script&gt; tags.
+            Maximum 5,000 characters. Paste the full script tag(s), e.g. &lt;script async src=&quot;https://...&quot;&gt;&lt;/script&gt;.
           </p>
         </div>
       </div>

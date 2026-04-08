@@ -96,8 +96,9 @@ function safeCustomScript(script: string | undefined): string | null {
     }
   }
 
-  // Remove </script> tags to prevent breaking out of the container
-  return trimmed.replace(/<\/script\s*>/gi, '');
+  // Custom scripts are rendered inside a <div>, not a <script> tag,
+  // so </script> closing tags are valid and needed for proper HTML structure.
+  return trimmed;
 }
 
 /**
@@ -217,12 +218,13 @@ export function TrackingPixels({ pixels }: { pixels: TrackingPixelsType | null }
         />
       )}
 
-      {/* Custom Head Script */}
+      {/* Custom Head Script — rendered as raw HTML since content contains <script> tags */}
       {customScript && (
-        <script
+        <div
           dangerouslySetInnerHTML={{
             __html: customScript,
           }}
+          style={{ display: 'none' }}
         />
       )}
     </>
