@@ -11,6 +11,11 @@ import {
   Calendar,
   Clock,
   FileText,
+  TrendingUp,
+  UserCheck,
+  MapPin,
+  GitBranch,
+  FormInput,
 } from 'lucide-react';
 
 export const primaryNavItems = [
@@ -23,8 +28,16 @@ export const primaryNavItems = [
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/notes', label: 'Notes', icon: FileText },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
-  { href: '/form-analytics', label: 'Form Analytics', icon: BarChart3 },
   { href: '/ai', label: 'Chip', icon: Sparkles },
+] as const;
+
+export const analyticsSubItems = [
+  { href: '/analytics', label: 'Overview', icon: BarChart2, exact: true },
+  { href: '/analytics/leads', label: 'Leads', icon: TrendingUp },
+  { href: '/analytics/clients', label: 'Clients', icon: UserCheck },
+  { href: '/analytics/tours', label: 'Tours', icon: MapPin },
+  { href: '/analytics/pipeline', label: 'Pipeline', icon: GitBranch },
+  { href: '/analytics/form-traffic', label: 'Form Traffic', icon: FormInput },
 ] as const;
 
 export const secondaryNavItems = [
