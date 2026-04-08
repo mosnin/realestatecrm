@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -18,6 +18,9 @@ import {
   ChevronRight,
   TrendingUp,
   TrendingDown,
+  Sparkles,
+  Database,
+  HelpCircle,
 } from 'lucide-react';
 
 // ── Types (mirror server types) ──────────────────────────────────────────────
@@ -29,6 +32,7 @@ interface FormSuggestion {
   description: string;
   impact: 'high' | 'medium' | 'low';
   reasoning: string;
+  source?: 'data' | 'ai';
 }
 
 interface ScoreDistribution {
@@ -53,10 +57,19 @@ interface OptimizationResult {
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
-const IMPACT_COLORS: Record<string, string> = {
-  high: 'bg-red-100 text-red-700 border-red-200',
-  medium: 'bg-amber-100 text-amber-700 border-amber-200',
-  low: 'bg-blue-100 text-blue-700 border-blue-200',
+const IMPACT_STYLES: Record<string, { className: string; label: string }> = {
+  high: { className: 'bg-red-100 text-red-700 border-red-200', label: 'High Impact' },
+  medium: { className: 'bg-amber-100 text-amber-700 border-amber-200', label: 'Medium Impact' },
+  low: { className: 'bg-blue-100 text-blue-700 border-blue-200', label: 'Low Impact' },
+};
+
+/** Human-readable labels for suggestion types (no raw enum values in the UI) */
+const TYPE_LABELS: Record<string, string> = {
+  reorder: 'Reorder Fields',
+  remove: 'Remove Field',
+  modify: 'Edit Field',
+  add: 'Add Field',
+  scoring: 'Adjust Scoring',
 };
 
 const TYPE_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
@@ -67,6 +80,14 @@ const TYPE_ICONS: Record<string, React.ComponentType<{ size?: number; className?
   scoring: BarChart3,
 };
 
+/** Loading messages that rotate during AI analysis to reassure the user */
+const LOADING_STEPS = [
+  'Gathering your submission data...',
+  'Analyzing answer patterns across questions...',
+  'Identifying drop-off points...',
+  'Generating personalized suggestions...',
+];
+
 function SuggestionCard({
   suggestion,
   onDismiss,
@@ -76,6 +97,8 @@ function SuggestionCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const Icon = TYPE_ICONS[suggestion.type] ?? Lightbulb;
+  const impact = IMPACT_STYLES[suggestion.impact] ?? IMPACT_STYLES.low;
+  const isAI = suggestion.source === 'ai';
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -84,28 +107,37 @@ function SuggestionCard({
           <Icon size={14} className="text-muted-foreground" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <Badge
               variant="outline"
-              className={`text-[10px] px-1.5 py-0 font-semibold ${IMPACT_COLORS[suggestion.impact] ?? ''}`}
+              className={`text-[10px] px-1.5 py-0 font-semibold ${impact.className}`}
             >
-              {suggestion.impact.toUpperCase()}
+              {impact.label}
             </Badge>
             <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-              {suggestion.type}
+              {TYPE_LABELS[suggestion.type] ?? suggestion.type}
             </Badge>
+            {isAI ? (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-0.5 text-violet-600 border-violet-200 bg-violet-50">
+                <Sparkles size={9} /> AI Suggestion
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-0.5 text-slate-600 border-slate-200 bg-slate-50">
+                <Database size={9} /> Based on Your Data
+              </Badge>
+            )}
           </div>
           <p className="text-sm font-medium leading-snug">{suggestion.title}</p>
           <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{suggestion.description}</p>
 
-          {/* Expandable reasoning */}
+          {/* Reasoning shown by default so users always see WHY */}
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
             className="flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 mt-2 transition-colors"
           >
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            {expanded ? 'Hide reasoning' : 'Show reasoning'}
+            {expanded ? 'Hide details' : 'Why this suggestion?'}
           </button>
           {expanded && (
             <p className="text-[11px] text-muted-foreground mt-1 pl-4 border-l-2 border-border leading-relaxed">
@@ -117,6 +149,7 @@ function SuggestionCard({
           type="button"
           onClick={onDismiss}
           className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted transition-colors"
+          aria-label="Dismiss this suggestion"
           title="Dismiss suggestion"
         >
           <X size={14} />
@@ -136,34 +169,67 @@ function PerformanceSummary({ performance }: { performance: FormPerformance }) {
           <p className="text-[10px] text-muted-foreground">last 30 days</p>
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Avg Score</p>
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Avg Lead Score</p>
           <p className="text-lg font-bold mt-0.5">{performance.avgLeadScore}/100</p>
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Distribution</p>
-          <div className="flex items-center gap-2 mt-1">
-            <div className="flex items-center gap-1">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Lead Quality</p>
+          <div className="flex flex-col gap-1 mt-1">
+            <div className="flex items-center gap-1.5">
               <TrendingUp size={12} className="text-emerald-500" />
-              <span className="text-xs font-medium">{performance.scoreDistribution.hot}%</span>
+              <span className="text-xs font-medium">{performance.scoreDistribution.hot}% Hot</span>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-              <span className="text-xs font-medium">{performance.scoreDistribution.warm}%</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
+              <span className="text-xs font-medium">{performance.scoreDistribution.warm}% Warm</span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <TrendingDown size={12} className="text-blue-400" />
-              <span className="text-xs font-medium">{performance.scoreDistribution.cold}%</span>
+              <span className="text-xs font-medium">{performance.scoreDistribution.cold}% Cold</span>
             </div>
           </div>
         </div>
         {performance.mostCommonDropOff && (
           <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Drop-off Point</p>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Common Drop-off</p>
             <p className="text-xs font-medium mt-1 truncate" title={performance.mostCommonDropOff}>
               {performance.mostCommonDropOff}
             </p>
+            <p className="text-[10px] text-muted-foreground">where applicants stop</p>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function AnalyzingProgress() {
+  const [step, setStep] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      setStep((prev) => (prev < LOADING_STEPS.length - 1 ? prev + 1 : prev));
+    }, 2200);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-8 text-center">
+      <Loader2 size={24} className="mx-auto animate-spin text-primary mb-3" />
+      <p className="text-sm font-medium">Analyzing your form...</p>
+      <p className="text-xs text-muted-foreground mt-2 h-4 transition-opacity duration-300">
+        {LOADING_STEPS[step]}
+      </p>
+      <div className="flex justify-center gap-1.5 mt-4">
+        {LOADING_STEPS.map((_, i) => (
+          <div
+            key={i}
+            className={`h-1 rounded-full transition-all duration-500 ${
+              i <= step ? 'w-6 bg-primary' : 'w-3 bg-muted'
+            }`}
+          />
+        ))}
       </div>
     </div>
   );
@@ -173,6 +239,33 @@ function PerformanceSummary({ performance }: { performance: FormPerformance }) {
 
 export interface OptimizationPanelProps {
   slug: string;
+}
+
+/** Maps raw API error text to friendly, actionable messages for realtors */
+function friendlyErrorMessage(raw: string): { title: string; detail: string } {
+  const lower = raw.toLowerCase();
+  if (lower.includes('rate limit')) {
+    return {
+      title: 'You have reached the analysis limit',
+      detail: 'You can refresh suggestions up to 5 times per hour. Please wait a bit and try again.',
+    };
+  }
+  if (lower.includes('openai') || lower.includes('ai') || lower.includes('timeout')) {
+    return {
+      title: 'Our AI assistant is temporarily unavailable',
+      detail: 'The analysis service is experiencing high demand. Your data-driven suggestions will still appear. Try again in a minute.',
+    };
+  }
+  if (lower.includes('no custom form')) {
+    return {
+      title: 'No form set up yet',
+      detail: 'Switch to the Builder tab to create your intake form before running an analysis.',
+    };
+  }
+  return {
+    title: 'Something went wrong',
+    detail: raw,
+  };
 }
 
 export function OptimizationPanel({ slug }: OptimizationPanelProps) {
@@ -214,24 +307,24 @@ export function OptimizationPanel({ slug }: OptimizationPanelProps) {
     (s) => !dismissedIds.has(`${s.type}:${s.target}`)
   ) ?? [];
 
-  // Initial state: show analyze button
-  if (!hasLoaded && !loading) {
+  // Initial state: show analyze button with clear explanation
+  if (!hasLoaded && !loading && !error) {
     return (
       <div className="space-y-4">
         <div className="rounded-xl border-2 border-dashed border-border p-8 text-center">
           <Lightbulb size={32} className="mx-auto text-muted-foreground/50 mb-3" />
-          <h3 className="text-sm font-semibold mb-1">Form Optimization</h3>
-          <p className="text-xs text-muted-foreground mb-4 max-w-md mx-auto">
-            Analyze your submission data to get AI-powered suggestions for improving your intake form.
-            Requires at least 10 submissions.
+          <h3 className="text-sm font-semibold mb-1">Get Suggestions to Improve Your Form</h3>
+          <p className="text-xs text-muted-foreground mb-4 max-w-md mx-auto leading-relaxed">
+            We will review how applicants interact with your form -- which questions they skip,
+            where they drop off, and how their answers affect lead scores -- then recommend
+            specific changes to get better results.
           </p>
           <Button onClick={() => fetchSuggestions()} disabled={loading}>
-            {loading ? (
-              <><Loader2 size={14} className="mr-1.5 animate-spin" /> Analyzing...</>
-            ) : (
-              <><Lightbulb size={14} className="mr-1.5" /> Analyze Form</>
-            )}
+            <Lightbulb size={14} className="mr-1.5" /> Analyze My Form
           </Button>
+          <p className="text-[10px] text-muted-foreground mt-3">
+            Works best with at least 10 submissions in the last 30 days.
+          </p>
         </div>
       </div>
     );
@@ -242,10 +335,10 @@ export function OptimizationPanel({ slug }: OptimizationPanelProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold">Optimization Suggestions</h3>
+          <h3 className="text-sm font-semibold">Suggestions for Your Form</h3>
           {result?.generatedAt && (
             <p className="text-[10px] text-muted-foreground mt-0.5">
-              Generated {new Date(result.generatedAt).toLocaleString()}
+              Last analyzed {new Date(result.generatedAt).toLocaleString()}
             </p>
           )}
         </div>
@@ -260,36 +353,34 @@ export function OptimizationPanel({ slug }: OptimizationPanelProps) {
           ) : (
             <RefreshCw size={14} />
           )}
-          <span className="ml-1.5">Refresh</span>
+          <span className="ml-1.5">Re-analyze</span>
         </Button>
       </div>
 
-      {/* Loading */}
-      {loading && (
-        <div className="rounded-lg border border-border bg-card p-8 text-center">
-          <Loader2 size={24} className="mx-auto animate-spin text-primary mb-3" />
-          <p className="text-sm font-medium">Analyzing form performance...</p>
-          <p className="text-xs text-muted-foreground mt-1">This may take a few seconds.</p>
-        </div>
-      )}
+      {/* Loading -- stepped progress instead of a bare spinner */}
+      {loading && <AnalyzingProgress />}
 
-      {/* Error */}
-      {error && !loading && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-2">
-          <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-red-700">{error}</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-red-600 hover:text-red-700 mt-1 h-auto p-0"
-              onClick={() => fetchSuggestions()}
-            >
-              Try again
-            </Button>
+      {/* Error -- friendly, structured, with recovery action */}
+      {error && !loading && (() => {
+        const { title, detail } = friendlyErrorMessage(error);
+        return (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-3">
+            <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-red-700">{title}</p>
+              <p className="text-xs text-red-600/80 mt-0.5">{detail}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-600 hover:text-red-700 mt-2 h-auto p-0 text-xs"
+                onClick={() => fetchSuggestions()}
+              >
+                Try again
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Results */}
       {result && !loading && (
@@ -297,11 +388,16 @@ export function OptimizationPanel({ slug }: OptimizationPanelProps) {
           {/* Performance summary */}
           <PerformanceSummary performance={result.performance} />
 
-          {/* Message (e.g., not enough data) */}
+          {/* Message (e.g., not enough data) -- with guidance */}
           {result.message && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-2">
-              <AlertTriangle size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-700">{result.message}</p>
+              <HelpCircle size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs text-amber-700 font-medium">{result.message}</p>
+                <p className="text-[11px] text-amber-600/80 mt-1">
+                  Share your form link with more applicants to collect enough data. Once you reach the threshold, come back here for personalized recommendations.
+                </p>
+              </div>
             </div>
           )}
 
@@ -319,13 +415,16 @@ export function OptimizationPanel({ slug }: OptimizationPanelProps) {
           ) : result.suggestions.length > 0 ? (
             <div className="rounded-lg border border-border bg-card p-6 text-center">
               <p className="text-sm text-muted-foreground">
-                All suggestions dismissed. Click Refresh to re-analyze.
+                All suggestions dismissed. Click <strong>Re-analyze</strong> to get fresh recommendations.
               </p>
             </div>
           ) : !result.message ? (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-center">
               <p className="text-sm font-medium text-emerald-700">
-                Your form is performing well! No optimization suggestions at this time.
+                Your form looks great! No changes needed right now.
+              </p>
+              <p className="text-xs text-emerald-600/70 mt-1">
+                Check back after you get more submissions for new insights.
               </p>
             </div>
           ) : null}

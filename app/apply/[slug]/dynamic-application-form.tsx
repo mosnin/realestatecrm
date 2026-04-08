@@ -13,6 +13,9 @@ import {
   AlertTriangle,
   Home,
   Key,
+  Cloud,
+  CloudOff,
+  XCircle,
 } from 'lucide-react';
 import type { IntakeFormConfig, FormSection, FormQuestion } from '@/lib/types';
 import type { IntakeCustomization } from './application-form';
@@ -137,12 +140,19 @@ function ProgressBar({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-[11px] text-muted-foreground font-medium">
-        <span>
+        <span aria-live="polite">
           Step {current} of {total}
         </span>
-        <span>{pct}%</span>
+        <span aria-hidden="true">{pct}%</span>
       </div>
-      <div className="h-1 bg-muted rounded-full overflow-hidden">
+      <div
+        className="h-1 bg-muted rounded-full overflow-hidden"
+        role="progressbar"
+        aria-valuenow={current}
+        aria-valuemin={1}
+        aria-valuemax={total}
+        aria-label={`Application progress: step ${current} of ${total}`}
+      >
         <motion.div
           className="h-full rounded-full"
           style={{ backgroundColor: color }}
@@ -168,33 +178,42 @@ function StepIndicator({
 }) {
   const color = accentColor || 'hsl(var(--primary))';
   return (
-    <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
-      {sections.map((section, idx) => {
-        const stepNum = idx + 1;
-        const isActive = stepNum === current;
-        const isDone = stepNum < current;
-        return (
-          <div
-            key={section.id}
-            className={cn(
-              'flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all flex-shrink-0',
-              !isActive && !isDone && 'text-muted-foreground/60',
-              isDone && 'text-muted-foreground',
-            )}
-            style={
-              isActive
-                ? { backgroundColor: color, color: '#fff' }
-                : isDone
-                  ? { backgroundColor: `${color}15`, color }
-                  : undefined
-            }
-          >
-            <span className="w-3 text-center">{stepNum}</span>
-            <span className="hidden sm:inline">{section.title}</span>
-          </div>
-        );
-      })}
-    </div>
+    <nav aria-label="Form steps" className="flex gap-1 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
+      <AnimatePresence initial={false}>
+        {sections.map((section, idx) => {
+          const stepNum = idx + 1;
+          const isActive = stepNum === current;
+          const isDone = stepNum < current;
+          return (
+            <motion.div
+              key={section.id}
+              layout
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className={cn(
+                'flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors flex-shrink-0',
+                !isActive && !isDone && 'text-muted-foreground/60',
+                isDone && 'text-muted-foreground',
+              )}
+              style={
+                isActive
+                  ? { backgroundColor: color, color: '#fff' }
+                  : isDone
+                    ? { backgroundColor: `${color}15`, color }
+                    : undefined
+              }
+              aria-current={isActive ? 'step' : undefined}
+              role="listitem"
+            >
+              <span className="w-3 text-center">{stepNum}</span>
+              <span className="hidden sm:inline">{section.title}</span>
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
+    </nav>
   );
 }
 
@@ -330,7 +349,7 @@ function isSectionVisible(
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-// ── Inline save notification ────────────────────────────────────────────────
+// ── Inline save notification (ephemeral toast) ─────────────────────────────
 
 function SaveNotification({
   message,
@@ -356,14 +375,53 @@ function SaveNotification({
   );
 }
 
+// ── Persistent save status indicator (Apple-style, always visible) ──────────
+
+function SaveStatusIndicator({
+  status,
+}: {
+  status: 'idle' | 'saving' | 'saved' | 'error';
+}) {
+  if (status === 'idle') return null;
+
+  return (
+    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+      {status === 'saving' && (
+        <>
+          <Loader2 size={12} className="animate-spin" />
+          <span>Saving...</span>
+        </>
+      )}
+      {status === 'saved' && (
+        <>
+          <Cloud size={12} className="text-green-500" />
+          <span>Saved</span>
+        </>
+      )}
+      {status === 'error' && (
+        <>
+          <CloudOff size={12} className="text-destructive" />
+          <span>Save failed</span>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Resume banner ───────────────────────────────────────────────────────────
 
 function ResumeBanner({
   visible,
   onDismiss,
+  currentStep,
+  totalSteps,
+  answeredCount,
 }: {
   visible: boolean;
   onDismiss: () => void;
+  currentStep: number;
+  totalSteps: number;
+  answeredCount: number;
 }) {
   if (!visible) return null;
   return (
@@ -373,13 +431,49 @@ function ResumeBanner({
         className="text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5"
       />
       <div className="flex-1">
-        <p className="text-sm text-green-800 dark:text-green-200">
+        <p className="text-sm font-medium text-green-800 dark:text-green-200">
           Welcome back! Your progress has been restored.
+        </p>
+        <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">
+          {answeredCount} {answeredCount === 1 ? 'answer' : 'answers'} restored
+          {totalSteps > 1 && <> &mdash; you&apos;re on step {currentStep} of {totalSteps}</>}
         </p>
         <button
           type="button"
           onClick={onDismiss}
           className="text-xs text-green-600 dark:text-green-400 underline mt-1"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Resume error banner (expired link, already submitted, etc.) ─────────────
+
+function ResumeErrorBanner({
+  message,
+  onDismiss,
+}: {
+  message: string;
+  onDismiss: () => void;
+}) {
+  if (!message) return null;
+  return (
+    <div className="mx-5 mt-4 md:mx-8 flex items-start gap-3 p-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30">
+      <XCircle
+        size={16}
+        className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
+      />
+      <div className="flex-1">
+        <p className="text-sm text-amber-800 dark:text-amber-200">
+          {message}
+        </p>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="text-xs text-amber-600 dark:text-amber-400 underline mt-1"
         >
           Dismiss
         </button>
@@ -414,14 +508,9 @@ export function DynamicApplicationForm({
 
   const [currentStep, setCurrentStep] = useState(1);
   const [direction, setDirection] = useState(1);
-  const [answers, setAnswers] = useState<AnswerMap>(() => {
-    const { data } = loadDraft(slug, formConfig.version);
-    return data;
-  });
-  const [staleDraft, setStaleDraft] = useState(() => {
-    const { stale } = loadDraft(slug, formConfig.version);
-    return stale;
-  });
+  const [initialDraft] = useState(() => loadDraft(slug, formConfig.version));
+  const [answers, setAnswers] = useState<AnswerMap>(() => initialDraft.data);
+  const [staleDraft, setStaleDraft] = useState(() => initialDraft.stale);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -438,9 +527,12 @@ export function DynamicApplicationForm({
   const [saveNotification, setSaveNotification] = useState('');
   const [showSaveNotification, setShowSaveNotification] = useState(false);
   const [showResumeBanner, setShowResumeBanner] = useState(false);
+  const [resumeError, setResumeError] = useState('');
+  // Persistent save status: 'idle' | 'saving' | 'saved' | 'error'
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const hasShownEmailNoticeRef = useRef(false);
-  const serverSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastServerSaveRef = useRef<number>(0);
+  const lastSavedAnswersRef = useRef<string>('');
   const answersRef = useRef<AnswerMap>(answers);
   answersRef.current = answers;
   const currentStepForSaveRef = useRef(currentStep);
@@ -453,11 +545,17 @@ export function DynamicApplicationForm({
     setTimeout(() => setShowSaveNotification(false), durationMs);
   }, []);
 
-  // Save draft to server (non-blocking, fire-and-forget)
-  const saveToServer = useCallback(async () => {
+  // Save draft to server with error feedback and dirty-checking
+  const saveToServer = useCallback(async (force = false) => {
     if (!spaceId) return;
     const email = typeof answersRef.current['email'] === 'string' ? answersRef.current['email'] : '';
     if (!email || !email.includes('@')) return; // Need valid email for server save
+
+    // Skip save if answers haven't changed since last successful save (unless forced)
+    const answersSnapshot = JSON.stringify(answersRef.current);
+    if (!force && answersSnapshot === lastSavedAnswersRef.current) return;
+
+    setSaveStatus('saving');
 
     try {
       const res = await fetch('/api/form-draft', {
@@ -474,18 +572,26 @@ export function DynamicApplicationForm({
 
       if (res.ok) {
         lastServerSaveRef.current = Date.now();
+        lastSavedAnswersRef.current = answersSnapshot;
+        setSaveStatus('saved');
         const data = await res.json();
 
         if (!data.updated && !hasShownEmailNoticeRef.current) {
           // First-time save — draft was created, email will be sent
           hasShownEmailNoticeRef.current = true;
-          showNotification('Progress saved. Check your email for a link to resume later.', 5000);
+          showNotification('Progress auto-saved. A resume link has been sent to your email.', 5000);
         } else {
-          showNotification('Progress saved.', 2000);
+          showNotification('Progress saved', 2000);
         }
+      } else if (res.status === 429) {
+        setSaveStatus('error');
+        showNotification('Auto-save paused \u2014 too many saves. Your local progress is still safe.', 4000);
+      } else {
+        setSaveStatus('error');
       }
     } catch {
-      // Non-blocking — silently fail
+      setSaveStatus('error');
+      showNotification('Unable to save \u2014 check your connection. Your local progress is safe.', 4000);
     }
   }, [spaceId, formConfig.version, showNotification]);
 
@@ -497,15 +603,49 @@ export function DynamicApplicationForm({
     (async () => {
       try {
         const res = await fetch(`/api/form-draft?token=${encodeURIComponent(resumeToken)}`);
-        if (!res.ok) return;
+
+        if (cancelled) return;
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          if (res.status === 410) {
+            // Expired or already submitted
+            setResumeError(
+              body.error === 'This application has already been submitted'
+                ? 'This application was already submitted. You can start a new one below.'
+                : 'This resume link has expired. You can start a new application below.'
+            );
+          } else if (res.status === 404) {
+            setResumeError('This resume link is no longer valid. You can start a new application below.');
+          }
+          // Clean the resume token from URL so it can't leak via bookmark/share
+          if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('resume');
+            window.history.replaceState({}, '', url.toString());
+          }
+          return;
+        }
+
         const data = await res.json();
 
         if (cancelled) return;
 
         if (data.answers && typeof data.answers === 'object') {
           const serverAnswers = data.answers as AnswerMap;
-          setAnswers(serverAnswers);
-          saveDraft(slug, formConfig.version, serverAnswers);
+
+          // Merge strategy: if localStorage has more answers than the server
+          // draft, prefer the version with more filled fields (user may have
+          // continued typing after the last server save).
+          const localDraft = loadDraft(slug, formConfig.version);
+          const localCount = Object.keys(localDraft.data).filter((k) => localDraft.data[k] !== '' && localDraft.data[k]?.length !== 0).length;
+          const serverCount = Object.keys(serverAnswers).filter((k) => serverAnswers[k] !== '' && (serverAnswers[k] as string | string[])?.length !== 0).length;
+
+          const useServer = serverCount >= localCount;
+          const mergedAnswers = useServer ? serverAnswers : { ...serverAnswers, ...localDraft.data };
+
+          setAnswers(mergedAnswers);
+          saveDraft(slug, formConfig.version, mergedAnswers);
 
           if (typeof data.currentStep === 'number' && data.currentStep > 0) {
             setCurrentStep(data.currentStep);
@@ -519,8 +659,15 @@ export function DynamicApplicationForm({
           setShowResumeBanner(true);
           hasShownEmailNoticeRef.current = true; // Don't show "check email" since they came from email
         }
+
+        // Clean the resume token from URL to prevent leakage via bookmark/share
+        if (typeof window !== 'undefined') {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('resume');
+          window.history.replaceState({}, '', url.toString());
+        }
       } catch {
-        // Failed to load — form still works with localStorage
+        setResumeError('Unable to restore your progress. You can continue filling out the form below.');
       }
     })();
 
@@ -528,7 +675,7 @@ export function DynamicApplicationForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeToken]);
 
-  // Auto-save to server every 30 seconds while form is active
+  // Auto-save to server every 30 seconds, but only when data has actually changed
   useEffect(() => {
     if (!spaceId) return;
 
@@ -536,9 +683,10 @@ export function DynamicApplicationForm({
       const email = typeof answersRef.current['email'] === 'string' ? answersRef.current['email'] : '';
       if (!email || !email.includes('@')) return;
 
-      // Only save if something has changed since last save
-      const now = Date.now();
-      if (now - lastServerSaveRef.current < 25000) return; // Minimum 25s gap
+      // Dirty-check: skip if nothing changed (saveToServer also checks, but
+      // this avoids even calling the function and setting 'saving' status)
+      const snapshot = JSON.stringify(answersRef.current);
+      if (snapshot === lastSavedAnswersRef.current) return;
 
       saveToServer();
     }, 30000);
@@ -556,7 +704,7 @@ export function DynamicApplicationForm({
     new Set(sortedSections.map((s) => s.id)),
   );
 
-  // Clear answers from sections that became hidden
+  // Clear answers from sections that became hidden and notify the user
   useEffect(() => {
     const currentVisibleIds = new Set(sortedSections.map((s) => s.id));
     const prevVisibleIds = prevVisibleSectionIdsRef.current;
@@ -569,9 +717,8 @@ export function DynamicApplicationForm({
 
     if (nowHiddenIds.size > 0) {
       // Get question IDs from the now-hidden sections
-      const hiddenQuestionIds = allSortedSections
-        .filter((s) => nowHiddenIds.has(s.id))
-        .flatMap((s) => s.questions.map((q) => q.id));
+      const hiddenSections = allSortedSections.filter((s) => nowHiddenIds.has(s.id));
+      const hiddenQuestionIds = hiddenSections.flatMap((s) => s.questions.map((q) => q.id));
 
       if (hiddenQuestionIds.length > 0) {
         setAnswers((prev) => {
@@ -585,6 +732,12 @@ export function DynamicApplicationForm({
           }
           if (changed) {
             debouncedSave(next);
+            // Notify the user that some answers were cleared
+            const sectionNames = hiddenSections.map((s) => s.title).join(', ');
+            showNotification(
+              `Your answers for ${sectionNames} ${hiddenSections.length === 1 ? 'have' : 'have'} been cleared because ${hiddenSections.length === 1 ? 'that step no longer applies' : 'those steps no longer apply'}.`,
+              4000,
+            );
           }
           return changed ? next : prev;
         });
@@ -993,6 +1146,11 @@ export function DynamicApplicationForm({
       )}
       style={{ '--intake-accent': accentColor } as React.CSSProperties}
     >
+      {/* Screen reader announcements for dynamic section changes */}
+      <div className="sr-only" aria-live="assertive" aria-atomic="true">
+        {currentSection && `Now on step ${currentStep} of ${totalSteps}: ${currentSection.title}`}
+      </div>
+
       {/* Video embed */}
       {embedUrl && (
         <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
@@ -1008,11 +1166,16 @@ export function DynamicApplicationForm({
 
       {/* Progress */}
       <div className="px-5 pt-5 pb-3 md:px-7 space-y-3 border-b border-border/30">
-        <ProgressBar
-          current={currentStep}
-          total={totalSteps}
-          accentColor={accentColor}
-        />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <ProgressBar
+              current={currentStep}
+              total={totalSteps}
+              accentColor={accentColor}
+            />
+          </div>
+          <SaveStatusIndicator status={saveStatus} />
+        </div>
         <StepIndicator
           current={currentStep}
           sections={sortedSections}
@@ -1024,6 +1187,18 @@ export function DynamicApplicationForm({
       <ResumeBanner
         visible={showResumeBanner}
         onDismiss={() => setShowResumeBanner(false)}
+        currentStep={currentStep}
+        totalSteps={totalSteps}
+        answeredCount={Object.keys(answers).filter((k) => {
+          const v = answers[k];
+          return v !== '' && v !== undefined && (typeof v !== 'object' || (v as string[]).length > 0);
+        }).length}
+      />
+
+      {/* Resume error banner (expired/submitted link) */}
+      <ResumeErrorBanner
+        message={resumeError}
+        onDismiss={() => setResumeError('')}
       />
 
       {/* Stale draft notice */}

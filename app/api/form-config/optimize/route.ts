@@ -103,8 +103,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error('[form-config/optimize] failed', error);
+
+    // Provide structured, user-facing error messages based on failure type
+    const message = error instanceof Error ? error.message : '';
+    const lower = message.toLowerCase();
+
+    if (lower.includes('openai') || lower.includes('api key') || lower.includes('rate_limit')) {
+      return NextResponse.json(
+        { error: 'AI analysis is temporarily unavailable. Your data-driven suggestions may still appear. Please try again in a minute.' },
+        { status: 502 },
+      );
+    }
+    if (lower.includes('timeout') || lower.includes('econnrefused')) {
+      return NextResponse.json(
+        { error: 'The analysis timed out. This can happen with large datasets. Please try again.' },
+        { status: 504 },
+      );
+    }
+    if (lower.includes('fetch') || lower.includes('submission')) {
+      return NextResponse.json(
+        { error: 'Could not load your submission data. Please check your connection and try again.' },
+        { status: 500 },
+      );
+    }
     return NextResponse.json(
-      { error: 'Failed to generate optimization suggestions.' },
+      { error: 'Something unexpected went wrong while analyzing your form. Please try again or contact support if this persists.' },
       { status: 500 },
     );
   }

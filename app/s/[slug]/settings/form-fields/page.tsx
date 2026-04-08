@@ -295,11 +295,11 @@ export default function FormFieldsSettingsPage() {
           <TabsTrigger value="preview">
             <Eye size={14} className="mr-1.5" /> Preview
           </TabsTrigger>
-          <TabsTrigger value="optimize">
-            <Lightbulb size={14} className="mr-1.5" /> Optimize
+          <TabsTrigger value="optimize" title="Get AI-powered suggestions to improve your form based on real applicant data">
+            <Lightbulb size={14} className="mr-1.5" /> Suggestions
           </TabsTrigger>
-          <TabsTrigger value="test-scoring">
-            <Gauge size={14} className="mr-1.5" /> Test Scoring
+          <TabsTrigger value="test-scoring" title="Try filling out your form as a test applicant to see what lead score they would get">
+            <Gauge size={14} className="mr-1.5" /> Score Simulator
           </TabsTrigger>
         </TabsList>
 

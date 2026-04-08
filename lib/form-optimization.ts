@@ -21,6 +21,8 @@ export interface FormSuggestion {
   description: string;
   impact: 'high' | 'medium' | 'low';
   reasoning: string;
+  /** Whether this suggestion came from deterministic data analysis or AI interpretation */
+  source: 'data' | 'ai';
 }
 
 export interface QuestionStats {
@@ -271,6 +273,7 @@ export function generateDeterministicSuggestions(
         description: `Only ${Math.round(qs.answerRate * 100)}% of applicants answer this question. It may be causing friction without providing useful data.`,
         impact: 'high',
         reasoning: `Answer rate: ${Math.round(qs.answerRate * 100)}% across ${performance.totalSubmissions} submissions.`,
+        source: 'data',
       });
     }
 
@@ -283,6 +286,7 @@ export function generateDeterministicSuggestions(
         description: `This required question is left blank by ${Math.round((1 - qs.answerRate) * 100)}% of applicants. Making it optional may improve form completion rates.`,
         impact: 'high',
         reasoning: `Required field with ${Math.round(qs.answerRate * 100)}% answer rate suggests applicants are abandoning the form at this point.`,
+        source: 'data',
       });
     }
 
@@ -296,6 +300,7 @@ export function generateDeterministicSuggestions(
         description: `Over ${Math.round(qs.uniformity * 100)}% of applicants give the same answer ("${topAnswer}"). This question adds length without helping differentiate leads.`,
         impact: 'medium',
         reasoning: `Uniformity: ${Math.round(qs.uniformity * 100)}%. Top answer: "${topAnswer}" (${qs.commonAnswers[0]?.count}/${performance.totalSubmissions} submissions).`,
+        source: 'data',
       });
     }
 
@@ -312,6 +317,7 @@ export function generateDeterministicSuggestions(
         description: `This question has a high answer rate but no scoring weight. Adding scoring rules could improve lead qualification accuracy.`,
         impact: 'medium',
         reasoning: `Answer rate: ${Math.round(qs.answerRate * 100)}%, scoring weight: 0, question type: ${qs.type} (supports score mappings).`,
+        source: 'data',
       });
     }
   }
@@ -326,6 +332,7 @@ export function generateDeterministicSuggestions(
         description: `${Math.round(ss.dropOffRate * 100)}% of applicants skip this entire section. Consider reducing the number of questions or making them optional.`,
         impact: 'high',
         reasoning: `Section drop-off rate: ${Math.round(ss.dropOffRate * 100)}%, questions: ${ss.questionCount}, avg answer rate: ${Math.round(ss.avgAnswerRate * 100)}%.`,
+        source: 'data',
       });
     }
   }
@@ -400,7 +407,8 @@ export async function generateAISuggestions(
     if (!raw) return [];
 
     const parsed = JSON.parse(raw) as { suggestions: FormSuggestion[] };
-    return (parsed.suggestions ?? []).slice(0, 8);
+    // Tag each AI suggestion with its source so the UI can distinguish them
+    return (parsed.suggestions ?? []).slice(0, 8).map((s) => ({ ...s, source: 'ai' as const }));
   } catch (error) {
     console.warn('[form-optimization] AI suggestions failed', { error });
     return [];

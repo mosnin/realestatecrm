@@ -296,9 +296,10 @@ export function ScoringPreview({ config, slug }: ScoringPreviewProps) {
     <div className="space-y-6">
       {/* Instructions */}
       <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
-        <p className="text-xs text-muted-foreground">
-          Fill in sample answers below and click "Run Scoring" to see how your scoring rules translate to actual lead scores.
-          This is a simulation — no data is saved.
+        <p className="text-xs font-medium mb-1">Test how your form scores different applicants</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Fill in the fields below as if you were an applicant, then press <strong>Score This Applicant</strong> to see
+          the lead score they would receive. This is a safe simulation -- nothing is saved and no real leads are affected.
         </p>
       </div>
 
@@ -316,8 +317,8 @@ export function ScoringPreview({ config, slug }: ScoringPreviewProps) {
                     {question.label}
                     {question.required && <span className="text-red-500">*</span>}
                     {question.scoring?.weight ? (
-                      <Badge variant="secondary" className="text-[9px] px-1 py-0 ml-1">
-                        wt: {question.scoring.weight}
+                      <Badge variant="secondary" className="text-[9px] px-1 py-0 ml-1" title={`This question contributes ${question.scoring.weight} out of 10 toward the lead score`}>
+                        Score weight: {question.scoring.weight}/10
                       </Badge>
                     ) : null}
                   </Label>
@@ -334,27 +335,43 @@ export function ScoringPreview({ config, slug }: ScoringPreviewProps) {
       </div>
 
       {/* Action buttons */}
-      <div className="flex items-center gap-2">
-        <Button onClick={handleRunScoring} disabled={loading || filledCount === 0}>
-          {loading ? (
-            <><Loader2 size={14} className="mr-1.5 animate-spin" /> Scoring...</>
-          ) : (
-            <><Play size={14} className="mr-1.5" /> Run Scoring</>
-          )}
-        </Button>
-        <Button variant="outline" onClick={handleReset} disabled={loading}>
-          <RotateCcw size={14} className="mr-1.5" /> Reset
-        </Button>
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Button onClick={handleRunScoring} disabled={loading || filledCount === 0}>
+            {loading ? (
+              <><Loader2 size={14} className="mr-1.5 animate-spin" /> Calculating score...</>
+            ) : (
+              <><Play size={14} className="mr-1.5" /> Score This Applicant</>
+            )}
+          </Button>
+          <Button variant="outline" onClick={handleReset} disabled={loading}>
+            <RotateCcw size={14} className="mr-1.5" /> Clear All
+          </Button>
+        </div>
         <span className="text-xs text-muted-foreground ml-auto">
-          {filledCount} / {allQuestions.length} fields filled
+          {filledCount === 0 ? (
+            <span className="text-amber-600">Fill in at least one field to run scoring</span>
+          ) : (
+            <>{filledCount} of {allQuestions.length} fields filled</>
+          )}
         </span>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-2">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-3">
           <AlertCircle size={14} className="text-red-500 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-red-700">{error}</p>
+          <div>
+            <p className="text-xs font-medium text-red-700">Could not calculate the score</p>
+            <p className="text-[11px] text-red-600/80 mt-0.5">{error}</p>
+            <button
+              type="button"
+              onClick={handleRunScoring}
+              className="text-[11px] text-red-600 hover:text-red-700 mt-1.5 underline underline-offset-2"
+            >
+              Try again
+            </button>
+          </div>
         </div>
       )}
 
@@ -375,7 +392,14 @@ export function ScoringPreview({ config, slug }: ScoringPreviewProps) {
               </div>
               <div className="flex-1 space-y-2">
                 <ScoreBar score={scoreResult.leadScore ?? 0} />
-                <ScoreBadge label={scoreResult.scoreLabel} />
+                <div className="flex items-center gap-2">
+                  <ScoreBadge label={scoreResult.scoreLabel} />
+                  {scoreResult.scoreDetails?.confidence != null && (
+                    <span className="text-[10px] text-muted-foreground" title="How confident the scoring model is in this result">
+                      {Math.round(scoreResult.scoreDetails.confidence * 100)}% confidence
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -430,7 +454,7 @@ export function ScoringPreview({ config, slug }: ScoringPreviewProps) {
                 )}
                 {scoreResult.scoreDetails.missingInformation.length > 0 && (
                   <div>
-                    <p className="font-semibold text-blue-600 mb-1">Missing Info</p>
+                    <p className="font-semibold text-blue-600 mb-1">Missing Information</p>
                     <ul className="space-y-0.5 text-muted-foreground">
                       {scoreResult.scoreDetails.missingInformation.map((m, i) => (
                         <li key={i} className="flex items-start gap-1.5">
@@ -468,10 +492,22 @@ export function ScoringPreview({ config, slug }: ScoringPreviewProps) {
 
       {/* Failed result */}
       {scoreResult && scoreResult.scoringStatus === 'failed' && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-          <p className="text-xs text-amber-700">
-            Scoring could not be completed. Make sure you have scoring rules configured for at least some questions.
-          </p>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3">
+          <AlertCircle size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs font-medium text-amber-700">Scoring could not be calculated</p>
+            <p className="text-[11px] text-amber-600/80 mt-0.5 leading-relaxed">
+              This usually means no scoring rules are set up yet. Go to the <strong>Builder</strong> tab,
+              select a question, and add scoring weights and answer-score mappings. Then come back to test.
+            </p>
+            <button
+              type="button"
+              onClick={handleRunScoring}
+              className="text-[11px] text-amber-600 hover:text-amber-700 mt-1.5 underline underline-offset-2"
+            >
+              Retry scoring
+            </button>
+          </div>
         </div>
       )}
     </div>

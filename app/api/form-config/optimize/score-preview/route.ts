@@ -49,8 +49,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error('[score-preview] scoring failed', error);
+
+    const message = error instanceof Error ? error.message : '';
+    const lower = message.toLowerCase();
+
+    if (lower.includes('openai') || lower.includes('api key') || lower.includes('rate_limit')) {
+      return NextResponse.json(
+        { error: 'The scoring service is temporarily unavailable. Please try again in a moment.' },
+        { status: 502 },
+      );
+    }
+    if (lower.includes('scoring') || lower.includes('config')) {
+      return NextResponse.json(
+        { error: 'Scoring could not run. Make sure your form has scoring rules configured in the Builder tab.' },
+        { status: 400 },
+      );
+    }
     return NextResponse.json(
-      { error: 'Scoring simulation failed.' },
+      { error: 'Something went wrong while scoring. Please try again or contact support if this continues.' },
       { status: 500 },
     );
   }
