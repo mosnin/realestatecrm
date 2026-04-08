@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -150,7 +151,9 @@ export default async function LeadsPage({
           </Link>
         </div>
       ) : (
-        <LeadsView leads={leads} slug={slug} newLeadIds={newLeadIds} />
+        <Suspense fallback={<div className="text-sm text-muted-foreground py-8 text-center">Loading leads...</div>}>
+          <LeadsView leads={leads} slug={slug} newLeadIds={newLeadIds} />
+        </Suspense>
       )}
     </div>
   );
