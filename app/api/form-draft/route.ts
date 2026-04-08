@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const parsed = createDraftSchema.safeParse(body);
   if (!parsed.success) {
     // Only return minimal error info to prevent schema leakage
-    const safeIssues = parsed.error.issues.map(i => ({
+    const safeIssues = parsed.error.issues.map((i: { path: (string | number)[]; message: string }) => ({
       path: i.path,
       message: i.message,
     }));

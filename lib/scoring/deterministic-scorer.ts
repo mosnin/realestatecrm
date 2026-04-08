@@ -55,20 +55,35 @@ export function computeDeterministicScore(
   let weightedMaxPossible = 0;
   let hasRules = false;
 
+  // Track total scoring weight across ALL scored questions (with or without
+  // mappings) so callers can determine how much of the form the deterministic
+  // engine actually covers. Questions with weight but no mappings (e.g. number
+  // fields) cannot be scored deterministically.
+  let totalScoringWeight = 0;
+  let coveredScoringWeight = 0;
+
   for (const section of formConfig.sections) {
     for (const question of section.questions) {
       const scoring = question.scoring;
       if (!scoring) continue;
-      if (!scoring.mappings || scoring.mappings.length === 0) continue;
 
       const weight = scoring.weight;
       if (weight <= 0) continue;
 
-      hasRules = true;
+      totalScoringWeight += weight;
 
-      const maxPoints = getMaxPoints(scoring.mappings);
+      // Resolve mappings: use explicit mappings if present, otherwise
+      // auto-derive from options[].scoreValue (a common pattern in form
+      // templates where each option carries its own point value).
+      const mappings = resolveMappings(question);
+      if (!mappings || mappings.length === 0) continue;
+
+      hasRules = true;
+      coveredScoringWeight += weight;
+
+      const maxPoints = getMaxPoints(mappings);
       const answer = answers[question.id];
-      const points = matchAnswer(question, answer, scoring.mappings);
+      const points = matchAnswer(question, answer, mappings);
 
       breakdown.push({
         questionId: question.id,
@@ -90,6 +105,7 @@ export function computeDeterministicScore(
       maxPossible: 0,
       breakdown: [],
       hasRules: false,
+      weightCoverage: 0,
     };
   }
 
@@ -100,7 +116,44 @@ export function computeDeterministicScore(
     maxPossible: weightedMaxPossible,
     breakdown,
     hasRules: true,
+    weightCoverage:
+      totalScoringWeight > 0 ? coveredScoringWeight / totalScoringWeight : 0,
   };
+}
+
+/**
+ * Resolve scoring mappings for a question.
+ *
+ * Priority:
+ *   1. Explicit `scoring.mappings` — always wins
+ *   2. Derived from `options[].scoreValue` — if at least one option has a
+ *      scoreValue, build mappings from those (options without scoreValue get 0)
+ *   3. null — no deterministic scoring possible (e.g. number/text fields
+ *      without mappings)
+ */
+function resolveMappings(
+  question: FormQuestion,
+): { value: string; points: number }[] | null {
+  // 1. Explicit mappings
+  if (question.scoring?.mappings && question.scoring.mappings.length > 0) {
+    return question.scoring.mappings;
+  }
+
+  // 2. Derive from options[].scoreValue
+  if (question.options && question.options.length > 0) {
+    const hasAnyScoreValue = question.options.some(
+      (o) => o.scoreValue != null && o.scoreValue > 0,
+    );
+    if (hasAnyScoreValue) {
+      return question.options.map((o) => ({
+        value: o.value,
+        points: o.scoreValue ?? 0,
+      }));
+    }
+  }
+
+  // 3. No deterministic scoring possible
+  return null;
 }
 
 /**

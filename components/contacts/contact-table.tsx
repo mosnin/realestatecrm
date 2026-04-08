@@ -31,6 +31,7 @@ import {
   CheckSquare,
   GitCompare,
   CalendarDays,
+  ArrowUpDown,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ApplicationCompare } from './application-compare';
@@ -77,6 +78,7 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'rental' | 'buyer'>('all');
   const [tagFilter, setTagFilter] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name-az' | 'name-za'>('newest');
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editContact, setEditContact] = useState<Client | null>(null);
@@ -277,10 +279,22 @@ export function ContactTable({ slug }: ContactTableProps) {
     new Set(contacts.flatMap((c) => c.tags.filter((t) => !SYSTEM_TAGS.has(t))))
   ).sort();
 
-  // Apply tag + leadType filters client-side
-  const visibleContacts = contacts
-    .filter((c) => leadTypeFilter === 'all' || c.leadType === leadTypeFilter)
-    .filter((c) => !tagFilter || c.tags.includes(tagFilter));
+  // Apply tag + leadType filters and sorting client-side
+  const visibleContacts = (() => {
+    let list = contacts
+      .filter((c) => leadTypeFilter === 'all' || c.leadType === leadTypeFilter)
+      .filter((c) => !tagFilter || c.tags.includes(tagFilter));
+    if (sortBy === 'oldest') {
+      list = [...list].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    } else if (sortBy === 'newest') {
+      list = [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (sortBy === 'name-az') {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'name-za') {
+      list = [...list].sort((a, b) => b.name.localeCompare(a.name));
+    }
+    return list;
+  })();
 
   const contactViews = savedViews.filter((v) => v.page === 'contacts');
 
