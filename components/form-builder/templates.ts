@@ -24,7 +24,7 @@ export const UNIFIED_TEMPLATE: IntakeFormConfig = {
     {
       id: id(),
       title: 'Getting Started',
-      description: 'What are you looking for?',
+      description: "Let's personalize your experience.",
       position: 0,
       questions: [
         {

@@ -176,6 +176,7 @@ function SortableSection({
   onSelectSection,
   onAddQuestion,
   isSectionSelected,
+  allSections,
 }: {
   section: FormSection;
   selectedId: string | null;
@@ -183,6 +184,7 @@ function SortableSection({
   onSelectSection: (id: string) => void;
   onAddQuestion: (sectionId: string) => void;
   isSectionSelected: boolean;
+  allSections: FormSection[];
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -244,9 +246,10 @@ function SortableSection({
           <div className="flex items-center gap-1.5">
             <p className="text-sm font-semibold truncate">{section.title}</p>
             {section.visibleWhen && (
-              <span title={`Visible when "${section.visibleWhen.questionId}" ${section.visibleWhen.operator} "${section.visibleWhen.value}"`}>
-                <Eye size={14} className="text-blue-500 flex-shrink-0" />
-              </span>
+              <Badge variant="outline" className="text-[10px] flex-shrink-0 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 gap-1">
+                <Eye size={10} />
+                Conditional
+              </Badge>
             )}
           </div>
           {section.description && (
@@ -254,7 +257,16 @@ function SortableSection({
           )}
           {section.visibleWhen && (
             <p className="text-[10px] text-blue-500 truncate">
-              Conditional: shown when condition is met
+              Shown when &quot;{(() => {
+                const allQs = allSections.flatMap((s) => s.questions);
+                const refQ = allQs.find((q) => q.id === section.visibleWhen?.questionId);
+                return refQ?.label || section.visibleWhen?.questionId;
+              })()}&quot; {section.visibleWhen.operator === 'equals' ? 'is' : section.visibleWhen.operator === 'not_equals' ? 'is not' : 'contains'} &quot;{(() => {
+                const allQs = allSections.flatMap((s) => s.questions);
+                const refQ = allQs.find((q) => q.id === section.visibleWhen?.questionId);
+                const refOpt = refQ?.options?.find((o) => o.value === section.visibleWhen?.value);
+                return refOpt?.label || section.visibleWhen?.value;
+              })()}&quot;
             </p>
           )}
         </div>
@@ -458,8 +470,8 @@ function QuestionEditor({
 
       {/* Conditional visibility */}
       <div className="space-y-2">
-        <Label className="text-xs">Conditional Visibility</Label>
-        <p className="text-[11px] text-muted-foreground">Show this question only when another question meets a condition.</p>
+        <Label className="text-xs">Show or hide this question</Label>
+        <p className="text-[11px] text-muted-foreground">Only show this question when another question has a specific answer.</p>
 
         <div className="space-y-2">
           <Select
@@ -477,10 +489,10 @@ function QuestionEditor({
             }}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a question..." />
+              <SelectValue placeholder="Pick a question..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__none__">None</SelectItem>
+              <SelectItem value="__none__">Always show</SelectItem>
               {allQuestions
                 .filter((q) => q.id !== question.id)
                 .map((q) => (
@@ -504,21 +516,52 @@ function QuestionEditor({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="equals">Equals</SelectItem>
-                  <SelectItem value="not_equals">Does not equal</SelectItem>
-                  <SelectItem value="contains">Contains</SelectItem>
+                  <SelectItem value="equals">is exactly</SelectItem>
+                  <SelectItem value="not_equals">is not</SelectItem>
+                  <SelectItem value="contains">contains</SelectItem>
                 </SelectContent>
               </Select>
-              <Input
-                value={question.visibleWhen.value}
-                onChange={(e) => {
-                  updateField('visibleWhen', {
-                    ...question.visibleWhen!,
-                    value: e.target.value,
-                  });
-                }}
-                placeholder="Value"
-              />
+              {/* Show dropdown of available options when the referenced question has predefined choices */}
+              {(() => {
+                const refQuestion = allQuestions.find((q) => q.id === question.visibleWhen?.questionId);
+                const hasRefOptions = refQuestion?.options && refQuestion.options.length > 0;
+                if (hasRefOptions) {
+                  return (
+                    <Select
+                      value={question.visibleWhen!.value || '__pick__'}
+                      onValueChange={(val) => {
+                        if (val === '__pick__') return;
+                        updateField('visibleWhen', {
+                          ...question.visibleWhen!,
+                          value: val,
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Pick an answer..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__pick__" disabled>Pick an answer...</SelectItem>
+                        {refQuestion!.options!.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  );
+                }
+                return (
+                  <Input
+                    value={question.visibleWhen!.value}
+                    onChange={(e) => {
+                      updateField('visibleWhen', {
+                        ...question.visibleWhen!,
+                        value: e.target.value,
+                      });
+                    }}
+                    placeholder="Type the answer value..."
+                  />
+                );
+              })()}
             </>
           )}
         </div>
@@ -590,16 +633,16 @@ function SectionEditor({
 
       {/* Section Visibility */}
       <div className="space-y-2">
-        <Label className="text-xs">Section Visibility</Label>
+        <Label className="text-xs">Show or hide this step</Label>
         {disableVisibility ? (
           <p className="text-[11px] text-muted-foreground">
             {hasSystemField
-              ? 'This section contains system fields and must always be visible.'
-              : 'The first section must always be visible.'}
+              ? 'This section contains required contact fields and is always shown to applicants.'
+              : 'The first step is always shown to applicants.'}
           </p>
         ) : (
           <>
-            <p className="text-[11px] text-muted-foreground">Show this section only when a question from an earlier section meets a condition.</p>
+            <p className="text-[11px] text-muted-foreground">Only show this step to applicants when they give a specific answer to an earlier question. For example, show rental-only questions when someone picks &quot;I&apos;m looking to rent.&quot;</p>
 
             <div className="space-y-2">
               <Select
@@ -620,10 +663,10 @@ function SectionEditor({
                 }}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a question..." />
+                  <SelectValue placeholder="Pick a question..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">Always visible</SelectItem>
+                  <SelectItem value="__none__">Always show this step</SelectItem>
                   {earlierQuestions.map((q) => (
                     <SelectItem key={q.id} value={q.id}>{q.label}</SelectItem>
                   ))}
@@ -648,25 +691,71 @@ function SectionEditor({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="equals">Equals</SelectItem>
-                      <SelectItem value="not_equals">Does not equal</SelectItem>
-                      <SelectItem value="contains">Contains</SelectItem>
+                      <SelectItem value="equals">is exactly</SelectItem>
+                      <SelectItem value="not_equals">is not</SelectItem>
+                      <SelectItem value="contains">contains</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Input
-                    value={section.visibleWhen.value}
-                    onChange={(e) => {
-                      onChange({
-                        ...section,
-                        visibleWhen: {
-                          ...section.visibleWhen!,
-                          value: e.target.value,
-                        },
-                      });
-                    }}
-                    placeholder="Value"
-                  />
+                  {/* Show a dropdown of available options when the referenced question has predefined choices */}
+                  {(() => {
+                    const refQuestion = earlierQuestions.find((q) => q.id === section.visibleWhen?.questionId);
+                    const hasRefOptions = refQuestion?.options && refQuestion.options.length > 0;
+                    if (hasRefOptions) {
+                      return (
+                        <Select
+                          value={section.visibleWhen!.value || '__pick__'}
+                          onValueChange={(val) => {
+                            if (val === '__pick__') return;
+                            onChange({
+                              ...section,
+                              visibleWhen: {
+                                ...section.visibleWhen!,
+                                value: val,
+                              },
+                            });
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Pick an answer..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__pick__" disabled>Pick an answer...</SelectItem>
+                            {refQuestion!.options!.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    }
+                    return (
+                      <Input
+                        value={section.visibleWhen!.value}
+                        onChange={(e) => {
+                          onChange({
+                            ...section,
+                            visibleWhen: {
+                              ...section.visibleWhen!,
+                              value: e.target.value,
+                            },
+                          });
+                        }}
+                        placeholder="Type the answer value..."
+                      />
+                    );
+                  })()}
                 </>
+              )}
+
+              {section.visibleWhen?.questionId && section.visibleWhen?.value && (
+                <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 px-3 py-2">
+                  <p className="text-[11px] text-blue-700 dark:text-blue-300">
+                    Applicants will see this step only when they answer &quot;{(() => {
+                      const refQ = earlierQuestions.find((q) => q.id === section.visibleWhen?.questionId);
+                      const refOpt = refQ?.options?.find((o) => o.value === section.visibleWhen?.value);
+                      return refOpt?.label || section.visibleWhen?.value;
+                    })()}&quot; to &quot;{earlierQuestions.find((q) => q.id === section.visibleWhen?.questionId)?.label || section.visibleWhen.questionId}&quot;.
+                  </p>
+                </div>
               )}
             </div>
           </>
@@ -1023,6 +1112,7 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
                   onSelectSection={handleSelectSection}
                   onAddQuestion={handleAddQuestion}
                   isSectionSelected={selectedType === 'section' && selectedId === section.id}
+                  allSections={config.sections}
                 />
               ))}
             </SortableContext>

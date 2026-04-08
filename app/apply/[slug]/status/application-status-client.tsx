@@ -14,6 +14,7 @@ import {
   Send,
   RefreshCw,
   MessageSquare,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { IntakeFormConfig, ApplicationData } from '@/lib/types';
@@ -251,7 +252,7 @@ export function ApplicationStatusClient({
   // ── Full Portal Mode ────────────────────────────────────────────────────
 
   return (
-    <div className="w-full max-w-lg space-y-4">
+    <div className="w-full max-w-lg space-y-4" role="main" aria-label="Application status portal">
       {/* Header Card */}
       <div className="rounded-xl bg-card border border-border/60 shadow-sm p-5">
         <div className="flex items-start justify-between gap-3">
@@ -267,13 +268,15 @@ export function ApplicationStatusClient({
             </p>
           </div>
           <div
+            role="status"
+            aria-label={`Application status: ${currentConfig.label}`}
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold flex-shrink-0',
               currentConfig.bgColor,
               currentConfig.color,
             )}
           >
-            <CurrentIcon size={13} />
+            <CurrentIcon size={13} aria-hidden="true" />
             {currentConfig.label}
           </div>
         </div>
@@ -287,18 +290,22 @@ export function ApplicationStatusClient({
 
       {/* Status Timeline */}
       {statusHistory.length > 0 && (
-        <div className="rounded-xl bg-card border border-border/60 shadow-sm p-5">
+        <nav aria-label="Application status timeline" className="rounded-xl bg-card border border-border/60 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-foreground mb-4">Status Timeline</h2>
-          <div className="space-y-0">
+          <ol className="space-y-0 list-none m-0 p-0" aria-label="Status updates">
             {statusHistory.map((update: StatusUpdate, i: number) => {
               const config = getStatusConfig(update.toStatus);
               const Icon = config.icon;
               const isLast = i === statusHistory.length - 1;
 
               return (
-                <div key={update.id} className="flex gap-3">
+                <li
+                  key={update.id}
+                  className="flex gap-3"
+                  aria-current={isLast ? 'step' : undefined}
+                >
                   {/* Timeline line + dot */}
-                  <div className="flex flex-col items-center">
+                  <div className="flex flex-col items-center" aria-hidden="true">
                     <div
                       className={cn(
                         'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 border-2',
@@ -326,6 +333,7 @@ export function ApplicationStatusClient({
                       )}
                     >
                       {config.label}
+                      {isLast && <span className="sr-only"> (current status)</span>}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {formatDateTime(update.createdAt)}
@@ -336,11 +344,11 @@ export function ApplicationStatusClient({
                       </p>
                     )}
                   </div>
-                </div>
+                </li>
               );
             })}
-          </div>
-        </div>
+          </ol>
+        </nav>
       )}
 
       {/* Application Summary (Collapsible) */}
@@ -348,32 +356,34 @@ export function ApplicationStatusClient({
         <div className="rounded-xl bg-card border border-border/60 shadow-sm overflow-hidden">
           <button
             onClick={() => setShowAppData(!showAppData)}
-            className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors"
+            aria-expanded={showAppData}
+            aria-controls="application-details-panel"
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors min-h-[44px]"
           >
             <h2 className="text-sm font-semibold text-foreground">
               Application Details
             </h2>
             {showAppData ? (
-              <ChevronUp size={16} className="text-muted-foreground" />
+              <ChevronUp size={16} className="text-muted-foreground" aria-hidden="true" />
             ) : (
-              <ChevronDown size={16} className="text-muted-foreground" />
+              <ChevronDown size={16} className="text-muted-foreground" aria-hidden="true" />
             )}
           </button>
           {showAppData && (
-            <div className="px-5 pb-5 border-t border-border/40">
+            <div id="application-details-panel" className="px-5 pb-5 border-t border-border/40">
               {appSections.map(([title, fields]: [string, DisplayField[]]) => (
                 <div key={title} className="mt-4">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                     {title}
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                     {fields.map((field: DisplayField, i: number) => (
                       <div key={i}>
-                        <p className="text-xs text-muted-foreground">{field.label}</p>
-                        <p className="text-sm font-medium text-foreground">{field.value}</p>
+                        <dt className="text-xs text-muted-foreground">{field.label}</dt>
+                        <dd className="text-sm font-medium text-foreground m-0">{field.value}</dd>
                       </div>
                     ))}
-                  </div>
+                  </dl>
                 </div>
               ))}
             </div>
@@ -382,27 +392,32 @@ export function ApplicationStatusClient({
       )}
 
       {/* Messages */}
-      <div className="rounded-xl bg-card border border-border/60 shadow-sm overflow-hidden">
+      <section aria-label="Messages" className="rounded-xl bg-card border border-border/60 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-border/40">
           <div className="flex items-center gap-2">
-            <MessageSquare size={14} className="text-muted-foreground" />
+            <MessageSquare size={14} className="text-muted-foreground" aria-hidden="true" />
             <h2 className="text-sm font-semibold text-foreground">Messages</h2>
             {messages.length > 0 && (
-              <span className="text-xs text-muted-foreground">({messages.length})</span>
+              <span className="text-xs text-muted-foreground" aria-label={`${messages.length} messages`}>({messages.length})</span>
             )}
           </div>
           <button
             onClick={refreshData}
             disabled={refreshing}
-            className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground"
-            title="Refresh messages"
+            aria-label="Refresh messages"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md hover:bg-muted transition-colors text-muted-foreground"
           >
-            <RefreshCw size={13} className={cn(refreshing && 'animate-spin')} />
+            <RefreshCw size={14} className={cn(refreshing && 'animate-spin')} aria-hidden="true" />
           </button>
         </div>
 
         {/* Message list */}
-        <div className="max-h-80 overflow-y-auto px-5 py-3 space-y-3">
+        <div
+          role="log"
+          aria-live="polite"
+          aria-label="Message history"
+          className="max-h-80 overflow-y-auto px-5 py-3 space-y-3"
+        >
           {messages.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">
               No messages yet. Send a message to {businessName} below.
@@ -427,14 +442,15 @@ export function ApplicationStatusClient({
                       {isApplicant ? 'You' : businessName}
                     </p>
                     <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-                    <p
+                    <time
+                      dateTime={msg.createdAt}
                       className={cn(
-                        'text-[10px] mt-1',
+                        'text-[10px] mt-1 block',
                         isApplicant ? 'text-primary-foreground/60' : 'text-muted-foreground',
                       )}
                     >
                       {formatTime(msg.createdAt)}
-                    </p>
+                    </time>
                   </div>
                 </div>
               );
@@ -446,7 +462,7 @@ export function ApplicationStatusClient({
         {/* Message input */}
         <div className="border-t border-border/40 px-4 py-3">
           {sendError && (
-            <p className="text-xs text-destructive mb-2">{sendError}</p>
+            <p role="alert" className="text-xs text-destructive mb-2">{sendError}</p>
           )}
           <div className="flex gap-2">
             <input
@@ -459,29 +475,36 @@ export function ApplicationStatusClient({
                   sendMessage();
                 }
               }}
+              aria-label={`Message ${businessName}`}
+              aria-describedby="message-char-count"
               placeholder={`Message ${businessName}...`}
               maxLength={2000}
-              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="flex-1 rounded-lg border border-border bg-background px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring min-h-[44px]"
               disabled={sending}
             />
             <button
               onClick={sendMessage}
               disabled={!messageText.trim() || sending}
+              aria-label={sending ? 'Sending message' : 'Send message'}
               className={cn(
-                'rounded-lg px-3 py-2 flex items-center gap-1.5 text-sm font-medium transition-colors',
+                'rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center text-sm font-medium transition-colors',
                 messageText.trim() && !sending
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : 'bg-muted text-muted-foreground cursor-not-allowed',
               )}
             >
-              <Send size={14} />
+              {sending ? (
+                <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+              ) : (
+                <Send size={14} aria-hidden="true" />
+              )}
             </button>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1.5">
+          <p id="message-char-count" className="text-[10px] text-muted-foreground mt-1.5" aria-live="polite">
             {messageText.length}/2000 characters
           </p>
         </div>
-      </div>
+      </section>
 
       {/* What happens next */}
       <div className="rounded-xl bg-card border border-border/60 shadow-sm p-5">
@@ -556,7 +579,7 @@ function SimpleStatusView({
   });
 
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full max-w-md" role="main" aria-label="Application status">
       <div className="rounded-xl bg-card border border-border/60 shadow-sm p-6 space-y-6">
         <div className="text-center space-y-1">
           <h1 className="text-xl font-semibold">Application Status</h1>
@@ -576,8 +599,8 @@ function SimpleStatusView({
           const current = STATUSES.find((s) => s.key === contact.status) || STATUSES[0];
           const Icon = current.icon;
           return (
-            <div className={cn('rounded-xl p-5 text-center', current.bgColor)}>
-              <Icon size={32} className={cn('mx-auto mb-2', current.color)} />
+            <div role="status" aria-label={`Current status: ${current.label}`} className={cn('rounded-xl p-5 text-center', current.bgColor)}>
+              <Icon size={32} className={cn('mx-auto mb-2', current.color)} aria-hidden="true" />
               <p className={cn('text-lg font-semibold', current.color)}>{current.label}</p>
               {contact.statusNote && (
                 <p className="text-sm text-foreground mt-2">{contact.statusNote}</p>
@@ -587,61 +610,65 @@ function SimpleStatusView({
         })()}
 
         {/* Progress tracker */}
-        <div className="space-y-0">
-          {progressSteps.map((step, i) => {
-            const Icon = step.icon;
-            const stepIdx = STATUSES.findIndex((s) => s.key === step.key);
-            const isCurrent = step.key === contact.status;
-            const isPast = stepIdx < currentIndex;
-            const isLast = i === progressSteps.length - 1;
+        <nav aria-label="Application progress">
+          <ol className="space-y-0 list-none m-0 p-0">
+            {progressSteps.map((step, i) => {
+              const Icon = step.icon;
+              const stepIdx = STATUSES.findIndex((s) => s.key === step.key);
+              const isCurrent = step.key === contact.status;
+              const isPast = stepIdx < currentIndex;
+              const isLast = i === progressSteps.length - 1;
 
-            return (
-              <div key={step.key} className="flex items-start gap-3">
-                <div className="flex flex-col items-center">
-                  <div
-                    className={cn(
-                      'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
-                      isPast || isCurrent ? step.bgColor : 'bg-muted',
-                    )}
-                  >
-                    <Icon
-                      size={14}
-                      className={cn(
-                        isPast || isCurrent
-                          ? step.color
-                          : 'text-muted-foreground/30',
-                      )}
-                    />
-                  </div>
-                  {!isLast && (
+              return (
+                <li key={step.key} className="flex items-start gap-3" aria-current={isCurrent ? 'step' : undefined}>
+                  <div className="flex flex-col items-center" aria-hidden="true">
                     <div
                       className={cn(
-                        'w-px h-6',
-                        isPast
-                          ? 'bg-emerald-300 dark:bg-emerald-700'
-                          : 'bg-border',
+                        'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
+                        isPast || isCurrent ? step.bgColor : 'bg-muted',
                       )}
-                    />
-                  )}
-                </div>
-                <div className="pt-1.5">
-                  <p
-                    className={cn(
-                      'text-sm font-medium',
-                      isCurrent
-                        ? 'text-foreground'
-                        : isPast
-                        ? 'text-muted-foreground'
-                        : 'text-muted-foreground/40',
+                    >
+                      <Icon
+                        size={14}
+                        className={cn(
+                          isPast || isCurrent
+                            ? step.color
+                            : 'text-muted-foreground/30',
+                        )}
+                      />
+                    </div>
+                    {!isLast && (
+                      <div
+                        className={cn(
+                          'w-px h-6',
+                          isPast
+                            ? 'bg-emerald-300 dark:bg-emerald-700'
+                            : 'bg-border',
+                        )}
+                      />
                     )}
-                  >
-                    {step.label}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                  </div>
+                  <div className="pt-1.5">
+                    <p
+                      className={cn(
+                        'text-sm font-medium',
+                        isCurrent
+                          ? 'text-foreground'
+                          : isPast
+                          ? 'text-muted-foreground'
+                          : 'text-muted-foreground/40',
+                      )}
+                    >
+                      {step.label}
+                      {isCurrent && <span className="sr-only"> (current status)</span>}
+                      {isPast && <span className="sr-only"> (completed)</span>}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
 
         {/* What happens next */}
         <div className="rounded-xl bg-muted/30 p-4 space-y-2">

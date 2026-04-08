@@ -7,6 +7,59 @@ import { PublicPageMinimalShell } from '@/components/public-page-shell';
 // Disable caching so status updates show immediately
 export const dynamic = 'force-dynamic';
 
+/**
+ * Friendly error page shown when a portal link is invalid or expired,
+ * instead of the generic Next.js 404.
+ */
+function PortalErrorPage({
+  businessName,
+  logoUrl,
+  hasToken,
+}: {
+  businessName: string;
+  logoUrl?: string | null;
+  hasToken: boolean;
+}) {
+  return (
+    <PublicPageMinimalShell logoUrl={logoUrl} businessName={businessName}>
+      <div className="w-full max-w-md text-center space-y-4" role="alert">
+        <div className="mx-auto w-14 h-14 rounded-full bg-muted flex items-center justify-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-muted-foreground"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="m15 9-6 6" />
+            <path d="m9 9 6 6" />
+          </svg>
+        </div>
+        <h1 className="text-xl font-semibold text-foreground">
+          {hasToken ? 'Invalid or Expired Link' : 'Application Not Found'}
+        </h1>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {hasToken
+            ? 'This portal link is no longer valid. It may have expired or been replaced by a newer one. Please check your latest email from ' +
+              businessName +
+              ' for an updated link.'
+            : 'We could not find an application with that reference number. Please double-check the link from your confirmation email.'}
+        </p>
+        <p className="text-xs text-muted-foreground pt-2">
+          If you continue to have trouble, contact {businessName} directly for assistance.
+        </p>
+      </div>
+    </PublicPageMinimalShell>
+  );
+}
+
 export default async function ApplicationStatusPage({
   params,
   searchParams,
@@ -22,6 +75,15 @@ export default async function ApplicationStatusPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
+  // Fetch settings early so we can use them in error pages too
+  const { data: settings } = await supabase
+    .from('SpaceSetting')
+    .select('businessName, logoUrl')
+    .eq('spaceId', space.id)
+    .maybeSingle();
+
+  const businessName = settings?.businessName || space.name;
+
   // Build query — if token is provided, validate both ref AND token (portal mode)
   let query = supabase
     .from('Contact')
@@ -36,18 +98,18 @@ export default async function ApplicationStatusPage({
     query = query.eq('statusPortalToken', token);
   }
 
-  const [{ data: contact }, { data: settings }] = await Promise.all([
-    query.maybeSingle(),
-    supabase
-      .from('SpaceSetting')
-      .select('businessName, logoUrl')
-      .eq('spaceId', space.id)
-      .maybeSingle(),
-  ]);
+  const { data: contact } = await query.maybeSingle();
 
-  if (!contact) notFound();
-
-  const businessName = settings?.businessName || space.name;
+  // Show a helpful, branded error page instead of generic 404
+  if (!contact) {
+    return (
+      <PortalErrorPage
+        businessName={businessName}
+        logoUrl={settings?.logoUrl}
+        hasToken={!!token}
+      />
+    );
+  }
 
   // Determine if portal mode is enabled (token matches)
   const portalMode = !!(token && contact.statusPortalToken === token);

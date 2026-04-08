@@ -110,11 +110,14 @@ function formatCondition(condition: FormSection['visibleWhen'], allSections: For
   const allQuestions = allSections.flatMap((s) => s.questions);
   const refQuestion = allQuestions.find((q) => q.id === condition.questionId);
   const questionLabel = refQuestion?.label || condition.questionId;
+  // Resolve the value to its human-readable label if the referenced question has options
+  const refOption = refQuestion?.options?.find((o) => o.value === condition.value);
+  const valueLabel = refOption?.label || condition.value;
   const operatorLabel =
-    condition.operator === 'equals' ? '=' :
-    condition.operator === 'not_equals' ? '!=' :
+    condition.operator === 'equals' ? 'is' :
+    condition.operator === 'not_equals' ? 'is not' :
     'contains';
-  return `"${questionLabel}" ${operatorLabel} "${condition.value}"`;
+  return `"${questionLabel}" ${operatorLabel} "${valueLabel}"`;
 }
 
 // ── Preview section ──
@@ -125,9 +128,9 @@ function PreviewSection({ section, allSections }: { section: FormSection; allSec
   return (
     <div className={cn('space-y-4', isConditional && 'opacity-50 relative')}>
       {isConditional && (
-        <div className="flex items-center gap-1.5 text-xs text-blue-500 bg-blue-50 dark:bg-blue-950/30 rounded-md px-2.5 py-1.5 border border-blue-200 dark:border-blue-800">
+        <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 rounded-md px-2.5 py-1.5 border border-blue-200 dark:border-blue-800">
           <Eye size={12} className="flex-shrink-0" />
-          <span>Hidden when {formatCondition(section.visibleWhen, allSections)}</span>
+          <span>Applicants see this step only when {formatCondition(section.visibleWhen, allSections)}</span>
         </div>
       )}
       <div className="space-y-1">
