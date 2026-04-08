@@ -1,11 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Save, RotateCcw, Eye, Pencil, FileText, Home, Users } from 'lucide-react';
+import {
+  Loader2,
+  Save,
+  RotateCcw,
+  Eye,
+  Pencil,
+  Home,
+  Users,
+  CheckCircle2,
+  AlertCircle,
+  Info,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { FormBuilder } from '@/components/form-builder';
 import { FormPreview } from '@/components/form-builder/form-preview';
@@ -17,6 +28,24 @@ function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
+type FormConfigSource = 'custom' | 'brokerage' | 'legacy';
+
+/** Human-friendly labels for each form type */
+const FORM_TYPE_LABELS: Record<string, string> = {
+  rental: 'Rental Application',
+  buyer: 'Buyer Inquiry',
+  general: 'General Intake',
+};
+
+/** Detect which standard template the config matches, if any */
+function detectActiveTemplate(config: IntakeFormConfig): TemplateName | null {
+  return config.leadType === 'rental'
+    ? 'rental'
+    : config.leadType === 'buyer'
+      ? 'buyer'
+      : null;
+}
+
 export default function FormFieldsSettingsPage() {
   const params = useParams<{ slug: string }>();
   const slug = params?.slug ?? '';
@@ -26,8 +55,13 @@ export default function FormFieldsSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('builder');
   const [hasChanges, setHasChanges] = useState(false);
+  const [configSource, setConfigSource] = useState<FormConfigSource>('legacy');
+  const [hasSavedConfig, setHasSavedConfig] = useState(false);
 
-  // Load existing config
+  // Track the last-saved config to detect unsaved changes accurately
+  const savedConfigRef = useRef<string>('');
+
+  // Load existing config from the API
   useEffect(() => {
     if (!slug) return;
     fetch(`/api/form-config?slug=${encodeURIComponent(slug)}`)
@@ -35,27 +69,43 @@ export default function FormFieldsSettingsPage() {
         if (!r.ok) throw new Error('Not found');
         return r.json();
       })
-      .then((data) => {
-        if (data?.formConfig?.sections) {
-          setConfig(data.formConfig as IntakeFormConfig);
+      .then((data: { formConfig: IntakeFormConfig | null; formConfigSource: FormConfigSource }) => {
+        const source = data.formConfigSource ?? 'legacy';
+        setConfigSource(source);
+
+        if (data.formConfig?.sections) {
+          // Saved custom or brokerage config exists -- load it
+          setConfig(data.formConfig);
+          setHasSavedConfig(true);
+          savedConfigRef.current = JSON.stringify(data.formConfig);
+        } else {
+          // Legacy / no saved config -- show the rental template as the default
+          const defaultConfig = deepClone(TEMPLATES.rental.config);
+          setConfig(defaultConfig);
+          setHasSavedConfig(false);
+          savedConfigRef.current = JSON.stringify(defaultConfig);
         }
       })
       .catch(() => {
-        // No existing config, use blank template
+        // Network error or no existing config -- start with rental default
+        const defaultConfig = deepClone(TEMPLATES.rental.config);
+        setConfig(defaultConfig);
+        savedConfigRef.current = JSON.stringify(defaultConfig);
       })
       .finally(() => setLoading(false));
   }, [slug]);
 
   const handleConfigChange = useCallback((newConfig: IntakeFormConfig) => {
     setConfig(newConfig);
-    setHasChanges(true);
+    setHasChanges(JSON.stringify(newConfig) !== savedConfigRef.current);
   }, []);
 
-  const handleTemplateSelect = useCallback((name: TemplateName) => {
+  const handleSwitchTemplate = useCallback((name: TemplateName) => {
     const template = TEMPLATES[name];
-    setConfig(deepClone(template.config));
-    setHasChanges(true);
-    toast.success(`Loaded "${template.label}" template`);
+    const newConfig = deepClone(template.config);
+    setConfig(newConfig);
+    setHasChanges(JSON.stringify(newConfig) !== savedConfigRef.current);
+    toast.success(`Switched to ${FORM_TYPE_LABELS[template.config.leadType] ?? template.label} form`);
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -70,8 +120,12 @@ export default function FormFieldsSettingsPage() {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || 'Failed to save form configuration.');
       }
+      const result = await res.json().catch(() => ({}));
+      setConfigSource(result.formConfigSource ?? 'custom');
+      setHasSavedConfig(true);
       setHasChanges(false);
-      toast.success('Form configuration saved.');
+      savedConfigRef.current = JSON.stringify(config);
+      toast.success('Form saved successfully.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
@@ -80,7 +134,12 @@ export default function FormFieldsSettingsPage() {
   }, [slug, config]);
 
   const handleReset = useCallback(async () => {
-    if (!confirm('Are you sure you want to reset to default? This cannot be undone.')) return;
+    if (
+      !confirm(
+        'Reset to the standard Chippi rental form? Your custom changes will be removed and applicants will see the default form.',
+      )
+    )
+      return;
     try {
       const res = await fetch('/api/form-config', {
         method: 'DELETE',
@@ -90,13 +149,21 @@ export default function FormFieldsSettingsPage() {
       if (!res.ok) {
         throw new Error('Failed to reset form configuration.');
       }
-      setConfig(deepClone(TEMPLATES.rental.config));
+      const defaultConfig = deepClone(TEMPLATES.rental.config);
+      setConfig(defaultConfig);
+      setConfigSource('legacy');
+      setHasSavedConfig(false);
       setHasChanges(false);
-      toast.success('Form configuration reset to default.');
+      savedConfigRef.current = JSON.stringify(defaultConfig);
+      toast.success('Form reset to the standard Chippi default.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     }
   }, [slug]);
+
+  // Derived display values
+  const activeTemplate = detectActiveTemplate(config);
+  const formLabel = FORM_TYPE_LABELS[config.leadType] ?? 'Custom Form';
 
   if (loading) {
     return (
@@ -109,57 +176,103 @@ export default function FormFieldsSettingsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Form Builder</h1>
-          <p className="text-muted-foreground text-sm">
-            Design your custom intake form with drag-and-drop
-          </p>
+      {/* ── Header with active form status ── */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="space-y-1">
+            <h1 className="text-xl font-semibold tracking-tight">Intake Form</h1>
+            <p className="text-muted-foreground text-sm">
+              Customize the form applicants fill out when they inquire about your listings.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {hasChanges ? (
+              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50 gap-1.5">
+                <AlertCircle size={12} />
+                Unsaved changes
+              </Badge>
+            ) : hasSavedConfig ? (
+              <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-300 bg-emerald-50 gap-1.5">
+                <CheckCircle2 size={12} />
+                Saved
+              </Badge>
+            ) : null}
+            <Button variant="outline" size="sm" onClick={handleReset}>
+              <RotateCcw size={14} className="mr-1.5" /> Reset to Default
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}>
+              {saving ? (
+                <><Loader2 size={14} className="mr-1.5 animate-spin" /> Saving...</>
+              ) : (
+                <><Save size={14} className="mr-1.5" /> Save Form</>
+              )}
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {hasChanges && (
-            <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
-              Unsaved changes
-            </Badge>
+
+        {/* ── Active form status bar ── */}
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            {/* Current form identity */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <Pencil size={16} className="text-muted-foreground flex-shrink-0" />
+                <span className="text-sm font-semibold">Editing: {formLabel}</span>
+              </div>
+              {configSource === 'custom' && hasSavedConfig && (
+                <Badge variant="secondary" className="text-[10px]">Custom</Badge>
+              )}
+              {configSource === 'brokerage' && (
+                <Badge variant="secondary" className="text-[10px]">Brokerage Template</Badge>
+              )}
+              {configSource === 'legacy' && !hasSavedConfig && (
+                <Badge variant="outline" className="text-[10px]">Default</Badge>
+              )}
+            </div>
+
+            {/* Form switcher */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-xs text-muted-foreground mr-1">Switch to:</span>
+              <Button
+                variant={activeTemplate === 'rental' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleSwitchTemplate('rental')}
+                disabled={activeTemplate === 'rental'}
+              >
+                <Home size={14} className="mr-1.5" /> Rental Application
+              </Button>
+              <Button
+                variant={activeTemplate === 'buyer' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleSwitchTemplate('buyer')}
+                disabled={activeTemplate === 'buyer'}
+              >
+                <Users size={14} className="mr-1.5" /> Buyer Inquiry
+              </Button>
+            </div>
+          </div>
+
+          {/* Contextual hint */}
+          {configSource === 'legacy' && !hasSavedConfig && (
+            <div className="px-5 py-2.5 border-t border-border bg-blue-50/50 flex items-start gap-2">
+              <Info size={14} className="text-blue-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-700">
+                You are using the standard Chippi form. Customize the fields below and save to create your own version.
+              </p>
+            </div>
           )}
-          <Button variant="outline" size="sm" onClick={handleReset}>
-            <RotateCcw size={14} className="mr-1.5" /> Reset
-          </Button>
-          <Button size="sm" onClick={handleSave} disabled={saving}>
-            {saving ? (
-              <><Loader2 size={14} className="mr-1.5 animate-spin" /> Saving...</>
-            ) : (
-              <><Save size={14} className="mr-1.5" /> Save</>
-            )}
-          </Button>
+          {configSource === 'brokerage' && (
+            <div className="px-5 py-2.5 border-t border-border bg-blue-50/50 flex items-start gap-2">
+              <Info size={14} className="text-blue-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-700">
+                This form was set by your brokerage. You can customize it and save your own version, or reset to go back to the brokerage default.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Template selector */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="px-5 py-3 border-b border-border bg-muted/20">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Start from a template</p>
-        </div>
-        <div className="px-5 py-3 flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleTemplateSelect('rental')}
-          >
-            <Home size={14} className="mr-1.5" /> Rental
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleTemplateSelect('buyer')}
-          >
-            <Users size={14} className="mr-1.5" /> Buyer
-          </Button>
-        </div>
-      </div>
-
-      {/* Builder / Preview tabs */}
+      {/* ── Builder / Preview tabs ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="builder">
