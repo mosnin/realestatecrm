@@ -54,10 +54,16 @@ export function generatePrivacyPolicy(
   <li><strong>AI Services:</strong> Artificial intelligence providers used for lead scoring and analysis. Data sent to AI services is used solely for generating scores and insights, and is not used to train AI models</li>
   <li><strong>Email and SMS Providers:</strong> Third-party services used to deliver communications you have consented to receive</li>
   <li><strong>Calendar Services:</strong> For scheduling and managing tour appointments</li>
+  <li><strong>Advertising and Analytics Platforms:</strong> Third-party tracking technologies from platforms such as Meta/Facebook, Google, TikTok, Twitter/X, LinkedIn, and Snapchat may be used on our intake forms to measure advertising effectiveness</li>
 </ul>
 <p>We require all third-party processors to handle your data in accordance with applicable privacy laws and only for the purposes we specify.</p>
 
-<h3>5. Data Sharing</h3>
+<h3>5. Tracking Technologies and Analytics</h3>
+<p>We may use tracking technologies including cookies and pixels from third-party platforms (Meta/Facebook, Google, TikTok, Twitter/X, LinkedIn, Snapchat) to measure the effectiveness of advertising campaigns and understand how visitors interact with our forms.</p>
+<p>These technologies may collect information such as your IP address, browser type, device information, pages visited, and actions taken (such as form submissions). This data helps us improve our marketing efforts and provide a better experience.</p>
+<p>You can opt out of tracking by adjusting your browser settings, using browser extensions that block tracking scripts, or using tools like the <a href="https://optout.aboutads.info/" target="_blank" rel="noopener noreferrer">Digital Advertising Alliance's opt-out page</a>. Please note that opting out may not prevent all data collection, and some features may not function as intended without these technologies.</p>
+
+<h3>6. Data Sharing</h3>
 <p>We do not sell your personal information. We may share your data only in the following circumstances:</p>
 <ul>
   <li>With service providers who assist us in operating our business (as described above)</li>
@@ -67,7 +73,7 @@ export function generatePrivacyPolicy(
   <li>With your explicit consent</li>
 </ul>
 
-<h3>6. Data Retention</h3>
+<h3>7. Data Retention</h3>
 <p>We retain your personal information for as long as necessary to fulfill the purposes described in this policy, or as required by applicable law. Specifically:</p>
 <ul>
   <li><strong>Active client data:</strong> Retained for the duration of our business relationship and for a reasonable period thereafter</li>
@@ -76,7 +82,7 @@ export function generatePrivacyPolicy(
   <li><strong>Consent records:</strong> Retained for as long as needed to demonstrate compliance with applicable laws</li>
 </ul>
 
-<h3>7. Your Rights</h3>
+<h3>8. Your Rights</h3>
 <p>Depending on your jurisdiction, you may have the following rights regarding your personal data:</p>
 <ul>
   <li><strong>Access:</strong> You may request a copy of the personal information we hold about you</li>
@@ -88,19 +94,19 @@ export function generatePrivacyPolicy(
 </ul>
 <p>To exercise any of these rights, please contact us using the information provided below.</p>
 
-<h3>8. Data Security</h3>
+<h3>9. Data Security</h3>
 <p>We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. However, no method of electronic storage or transmission is 100% secure, and we cannot guarantee absolute security.</p>
 
-<h3>9. Children's Privacy</h3>
+<h3>10. Children's Privacy</h3>
 <p>Our services are not directed to individuals under the age of 18. We do not knowingly collect personal information from children. If you believe we have collected data from a minor, please contact us immediately.</p>
 
-<h3>10. Changes to This Policy</h3>
+<h3>11. Changes to This Policy</h3>
 <p>We may update this Privacy Policy from time to time. We will notify you of material changes by posting the updated policy with a revised "Last updated" date. Your continued interaction with us after such changes constitutes acceptance of the updated policy.</p>
 
-<h3>11. Platform Disclaimer</h3>
+<h3>12. Platform Disclaimer</h3>
 <p>Chippi (my.usechippi.com) is a software platform that provides tools for real estate professionals to manage their client relationships. <strong>Chippi is not responsible for the privacy practices of individual ${entityLabel}s or brokerages that use its platform.</strong> This privacy policy is maintained by ${entity}, and all inquiries about data handling should be directed to ${entity}, not to Chippi. Chippi processes data solely as instructed by ${entity} and bears no independent liability for the data collection or use practices described herein.</p>
 
-<h3>12. Contact Information</h3>
+<h3>13. Contact Information</h3>
 <p>If you have questions about this Privacy Policy or wish to exercise your rights, please contact us:</p>
 <p><strong>${entity}</strong><br/>
 Email: [YOUR EMAIL ADDRESS]<br/>

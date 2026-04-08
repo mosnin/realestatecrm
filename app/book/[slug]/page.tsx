@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { BookingForm } from './booking-form';
 import { PublicPageShell } from '@/components/public-page-shell';
 import { FormUnavailable } from '@/components/form-unavailable';
+import { TrackingPixels } from '@/components/tracking-pixels';
+import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
 
 export const revalidate = 60;
 
@@ -27,7 +29,7 @@ export default async function PublicBookingPage({
       .select(
         'intakeAccentColor, intakeFont, intakeDarkMode, ' +
         'intakeHeaderBgColor, intakeHeaderGradient, ' +
-        'intakeFooterLinks, bio, socialLinks'
+        'intakeFooterLinks, bio, socialLinks, trackingPixels'
       )
       .eq('spaceId', space.id)
       .maybeSingle(),
@@ -55,6 +57,7 @@ export default async function PublicBookingPage({
     intakeFooterLinks: { label: string; url: string }[] | null;
     bio: string | null;
     socialLinks: Record<string, string> | null;
+    trackingPixels: TrackingPixelsType | null;
   } | null;
 
   const pageTitle = settings?.tourBookingPageTitle || 'Book a Tour';
@@ -84,19 +87,24 @@ export default async function PublicBookingPage({
     socialLinks: settings?.socialLinks || null,
   };
 
+  const trackingPixels = settings?.trackingPixels ?? null;
+
   return (
-    <PublicPageShell
-      logoUrl={logoUrl}
-      businessName={businessName}
-      agentName={agentName}
-      agentPhone={null}
-      agentPhoto={agentPhoto}
-      pageTitle={pageTitle}
-      pageIntro={pageIntro}
-      trustLine={`Your information is shared only with ${agentName} and used solely for scheduling.`}
-      customization={customization}
-    >
-      <BookingForm slug={slug} duration={duration} businessName={businessName} timezone={timezone} accentColor={customization.accentColor} />
-    </PublicPageShell>
+    <>
+      <TrackingPixels pixels={trackingPixels} />
+      <PublicPageShell
+        logoUrl={logoUrl}
+        businessName={businessName}
+        agentName={agentName}
+        agentPhone={null}
+        agentPhoto={agentPhoto}
+        pageTitle={pageTitle}
+        pageIntro={pageIntro}
+        trustLine={`Your information is shared only with ${agentName} and used solely for scheduling.`}
+        customization={customization}
+      >
+        <BookingForm slug={slug} duration={duration} businessName={businessName} timezone={timezone} accentColor={customization.accentColor} />
+      </PublicPageShell>
+    </>
   );
 }

@@ -31,6 +31,7 @@ import {
   trackFormAbandon,
   setupAbandonTracking,
 } from '@/lib/form-analytics-client';
+import { fireConversionEvents } from '@/lib/tracking-events';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -487,6 +488,8 @@ export function DynamicApplicationForm({
   spaceId,
   businessName,
   formConfig,
+  rentalFormConfig,
+  buyerFormConfig,
   customization,
   brokerageId,
   resumeToken,
@@ -494,13 +497,37 @@ export function DynamicApplicationForm({
   slug: string;
   spaceId?: string;
   businessName: string;
-  formConfig: IntakeFormConfig;
+  /** @deprecated Use rentalFormConfig/buyerFormConfig instead. Kept for backwards compat. */
+  formConfig?: IntakeFormConfig;
+  rentalFormConfig?: IntakeFormConfig | null;
+  buyerFormConfig?: IntakeFormConfig | null;
   customization?: IntakeCustomization;
   brokerageId?: string;
   resumeToken?: string;
 }) {
+  // ── Resolve which config to use based on lead type selection ──
+  // If dual configs are provided, we show a Getting Started step first.
+  // If only legacy formConfig is provided, use it directly (backwards compat).
+  const hasDualConfigs = rentalFormConfig != null || buyerFormConfig != null;
+
+  const [selectedLeadType, setSelectedLeadType] = useState<'rental' | 'buyer' | null>(null);
+
+  // Determine the active form config
+  const activeFormConfig = (() => {
+    if (hasDualConfigs) {
+      if (selectedLeadType === 'buyer' && buyerFormConfig) return buyerFormConfig;
+      if (selectedLeadType === 'rental' && rentalFormConfig) return rentalFormConfig;
+      // Not yet selected or missing config -- use rental as fallback
+      if (selectedLeadType && rentalFormConfig) return rentalFormConfig;
+      if (selectedLeadType && buyerFormConfig) return buyerFormConfig;
+      // Return a placeholder config until user selects
+      return rentalFormConfig || buyerFormConfig || formConfig!;
+    }
+    return formConfig!;
+  })();
+
   // Sort sections and questions by position
-  const sections = [...formConfig.sections].sort((a, b) => a.position - b.position);
+  const sections = [...activeFormConfig.sections].sort((a, b) => a.position - b.position);
   const allSortedSections = sections.map((s) => ({
     ...s,
     questions: [...s.questions].sort((a, b) => a.position - b.position),
@@ -508,7 +535,8 @@ export function DynamicApplicationForm({
 
   const [currentStep, setCurrentStep] = useState(1);
   const [direction, setDirection] = useState(1);
-  const [initialDraft] = useState(() => loadDraft(slug, formConfig.version));
+  const configVersion = activeFormConfig.version;
+  const [initialDraft] = useState(() => loadDraft(slug, configVersion));
   const [answers, setAnswers] = useState<AnswerMap>(() => initialDraft.data);
   const [staleDraft, setStaleDraft] = useState(() => initialDraft.stale);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -566,7 +594,7 @@ export function DynamicApplicationForm({
           email,
           answers: answersRef.current,
           currentStep: currentStepForSaveRef.current,
-          formConfigVersion: formConfig.version,
+          formConfigVersion: configVersion,
         }),
       });
 
@@ -593,7 +621,7 @@ export function DynamicApplicationForm({
       setSaveStatus('error');
       showNotification('Unable to save \u2014 check your connection. Your local progress is safe.', 4000);
     }
-  }, [spaceId, formConfig.version, showNotification]);
+  }, [spaceId, configVersion, showNotification]);
 
   // Load draft from server when resumeToken is present
   useEffect(() => {
@@ -637,7 +665,7 @@ export function DynamicApplicationForm({
           // Merge strategy: if localStorage has more answers than the server
           // draft, prefer the version with more filled fields (user may have
           // continued typing after the last server save).
-          const localDraft = loadDraft(slug, formConfig.version);
+          const localDraft = loadDraft(slug, configVersion);
           const localCount = Object.keys(localDraft.data).filter((k) => localDraft.data[k] !== '' && localDraft.data[k]?.length !== 0).length;
           const serverCount = Object.keys(serverAnswers).filter((k) => serverAnswers[k] !== '' && (serverAnswers[k] as string | string[])?.length !== 0).length;
 
@@ -645,14 +673,14 @@ export function DynamicApplicationForm({
           const mergedAnswers = useServer ? serverAnswers : { ...serverAnswers, ...localDraft.data };
 
           setAnswers(mergedAnswers);
-          saveDraft(slug, formConfig.version, mergedAnswers);
+          saveDraft(slug, configVersion, mergedAnswers);
 
           if (typeof data.currentStep === 'number' && data.currentStep > 0) {
             setCurrentStep(data.currentStep);
           }
 
           // Check if form config version changed
-          if (data.formConfigVersion != null && data.formConfigVersion !== formConfig.version) {
+          if (data.formConfigVersion != null && data.formConfigVersion !== configVersion) {
             setStaleDraft(true);
           }
 
@@ -697,7 +725,9 @@ export function DynamicApplicationForm({
   // ── Compute visible sections based on current answers ─────────────────────
 
   const sortedSections = allSortedSections.filter((s) => isSectionVisible(s, answers));
-  const totalSteps = sortedSections.length;
+  // When using dual configs, step 1 is the Getting Started step (hardcoded)
+  const gettingStartedOffset = hasDualConfigs ? 1 : 0;
+  const totalSteps = sortedSections.length + gettingStartedOffset;
 
   // Track previously visible section IDs to detect when sections become hidden
   const prevVisibleSectionIdsRef = useRef<Set<string>>(
@@ -765,11 +795,11 @@ export function DynamicApplicationForm({
   // Track form_start on mount
   useEffect(() => {
     if (!spaceId) return;
-    trackFormStart(spaceId, formConfig.version);
+    trackFormStart(spaceId, configVersion);
     // Track initial step view
     const section = sortedSections[0];
     if (section) {
-      trackStepView(spaceId, 0, section.title, formConfig.version);
+      trackStepView(spaceId, 0, section.title, configVersion);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spaceId]);
@@ -783,13 +813,13 @@ export function DynamicApplicationForm({
     // Track completion of previous step
     const prevSection = sortedSections[prevStepRef.current - 1];
     if (prevSection) {
-      trackStepComplete(spaceId, prevStepRef.current - 1, prevSection.title, formConfig.version);
+      trackStepComplete(spaceId, prevStepRef.current - 1, prevSection.title, configVersion);
     }
 
     // Track view of new step
     const newSection = sortedSections[currentStep - 1];
     if (newSection) {
-      trackStepView(spaceId, currentStep - 1, newSection.title, formConfig.version);
+      trackStepView(spaceId, currentStep - 1, newSection.title, configVersion);
     }
 
     prevStepRef.current = currentStep;
@@ -803,7 +833,7 @@ export function DynamicApplicationForm({
       spaceId,
       () => currentStepRef.current - 1,
       () => submittedRef.current,
-      formConfig.version,
+      configVersion,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spaceId]);
@@ -821,11 +851,11 @@ export function DynamicApplicationForm({
     (data: AnswerMap) => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(
-        () => saveDraft(slug, formConfig.version, data),
+        () => saveDraft(slug, configVersion, data),
         500,
       );
     },
-    [slug, formConfig.version],
+    [slug, configVersion],
   );
 
   const setAnswer = useCallback(
@@ -852,8 +882,23 @@ export function DynamicApplicationForm({
 
   // ── Validation ─────────────────────────────────────────────────────────────
 
+  // Whether we're on the Getting Started step (only in dual config mode)
+  const isOnGettingStarted = hasDualConfigs && currentStep === 1;
+  // Map current step to section index (accounting for Getting Started offset)
+  const sectionIndex = currentStep - 1 - gettingStartedOffset;
+
   function validateCurrentStep(): boolean {
-    const section = sortedSections[currentStep - 1];
+    // Getting Started step: validate lead type selection
+    if (isOnGettingStarted) {
+      if (!selectedLeadType) {
+        setErrors({ __leadType: 'Please select whether you are renting or buying.' });
+        return false;
+      }
+      setErrors({});
+      return true;
+    }
+
+    const section = sortedSections[sectionIndex];
     if (!section) return true;
 
     const errs: Record<string, string> = {};
@@ -903,6 +948,12 @@ export function DynamicApplicationForm({
   function goBack() {
     if (currentStep > 1) {
       setDirection(-1);
+      // If going back to Getting Started, clear answers from the config-specific sections
+      // so the user can switch lead type cleanly
+      if (hasDualConfigs && currentStep === 2) {
+        // Going back to Getting Started — allow changing lead type
+        // Don't clear answers yet; only clear if they actually change lead type
+      }
       setCurrentStep((s) => s - 1);
     }
   }
@@ -938,9 +989,14 @@ export function DynamicApplicationForm({
       flatAnswers[key] = Array.isArray(val) ? val.join(',') : val;
     }
 
+    // Determine lead type for submission
+    const resolvedLeadType = selectedLeadType || activeFormConfig.leadType;
+    const submissionLeadType = resolvedLeadType === 'general' ? 'rental' : resolvedLeadType;
+
     const payload: Record<string, unknown> = {
       slug,
-      leadType: formConfig.leadType === 'general' ? 'rental' : formConfig.leadType,
+      leadType: submissionLeadType,
+      formLeadType: submissionLeadType,
       legalName: systemName,
       email: systemEmail,
       phone: systemPhone,
@@ -962,7 +1018,7 @@ export function DynamicApplicationForm({
         ? { privacyConsent: answers['privacyConsent'] === 'true' }
         : {}),
       // Dynamic form metadata
-      formConfigVersion: formConfig.version,
+      formConfigVersion: activeFormConfig.version,
       answers: flatAnswers,
       completedSteps: sortedSections.map((_, i) => i + 1), // only visible steps
     };
@@ -988,8 +1044,10 @@ export function DynamicApplicationForm({
         submittedRef.current = true;
         // Track form submission for analytics
         if (spaceId) {
-          trackFormSubmit(spaceId, formConfig.version);
+          trackFormSubmit(spaceId, configVersion);
         }
+        // Fire tracking pixel conversion events
+        fireConversionEvents();
         setTimeout(() => {
           confettiRef.current?.fire({
             particleCount: 100,
@@ -1009,7 +1067,7 @@ export function DynamicApplicationForm({
             origin: { x: 1 },
           });
         }, 300);
-        clearDraft(slug, formConfig.version);
+        clearDraft(slug, configVersion);
         // Mark server-side draft as completed (non-blocking)
         if (spaceId) {
           const draftEmail = typeof answers['email'] === 'string' ? answers['email'] : '';
@@ -1022,7 +1080,7 @@ export function DynamicApplicationForm({
                 email: draftEmail,
                 answers,
                 currentStep: totalSteps,
-                formConfigVersion: formConfig.version,
+                formConfigVersion: configVersion,
                 completed: true,
               }),
             }).catch(() => {});
@@ -1133,7 +1191,7 @@ export function DynamicApplicationForm({
     ? toEmbedUrl(customization.videoUrl)
     : null;
 
-  const currentSection = sortedSections[currentStep - 1];
+  const currentSection = isOnGettingStarted ? null : sortedSections[sectionIndex];
   const isLastStep = currentStep === totalSteps;
 
   return (
@@ -1148,7 +1206,9 @@ export function DynamicApplicationForm({
     >
       {/* Screen reader announcements for dynamic section changes */}
       <div className="sr-only" aria-live="assertive" aria-atomic="true">
-        {currentSection && `Now on step ${currentStep} of ${totalSteps}: ${currentSection.title}`}
+        {isOnGettingStarted
+          ? `Now on step 1 of ${totalSteps}: Getting Started`
+          : currentSection && `Now on step ${currentStep} of ${totalSteps}: ${currentSection.title}`}
       </div>
 
       {/* Video embed */}
@@ -1178,7 +1238,11 @@ export function DynamicApplicationForm({
         </div>
         <StepIndicator
           current={currentStep}
-          sections={sortedSections}
+          sections={
+            hasDualConfigs
+              ? [{ id: '__getting-started', title: 'Getting Started', position: -1, questions: [] }, ...sortedSections]
+              : sortedSections
+          }
           accentColor={accentColor}
         />
       </div>
@@ -1236,6 +1300,46 @@ export function DynamicApplicationForm({
             exit={{ x: direction * -60, opacity: 0 }}
             transition={{ duration: 0.25, ease: 'easeInOut' }}
           >
+            {/* ── Getting Started step (dual-config mode only) ── */}
+            {isOnGettingStarted && (
+              <div className="space-y-5">
+                <StepHeader
+                  title="Getting Started"
+                  description="Let's personalize your experience."
+                />
+                {errors['__leadType'] && (
+                  <p className="text-xs text-destructive">{errors['__leadType']}</p>
+                )}
+                <LeadTypeSelector
+                  question={{
+                    id: '__leadType',
+                    type: 'radio',
+                    label: 'What are you looking for?',
+                    required: true,
+                    position: 0,
+                    options: [
+                      { value: 'rental', label: "I'm looking to rent" },
+                      { value: 'buyer', label: "I'm looking to buy" },
+                    ],
+                  }}
+                  value={selectedLeadType || ''}
+                  onChange={(val) => {
+                    const newType = val as 'rental' | 'buyer';
+                    if (selectedLeadType && newType !== selectedLeadType) {
+                      // User changed lead type — clear previous answers
+                      setAnswers({});
+                      saveDraft(slug, configVersion, {});
+                    }
+                    setSelectedLeadType(newType);
+                    setErrors({});
+                  }}
+                  error={errors['__leadType']}
+                  accentColor={accentColor}
+                />
+              </div>
+            )}
+
+            {/* ── Config-based section content ── */}
             {currentSection && (
               <div className="space-y-5">
                 <StepHeader

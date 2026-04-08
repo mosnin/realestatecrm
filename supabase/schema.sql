@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS "Brokerage" (
   "logoUrl"     text,
   "joinCode"    text UNIQUE,
   "brokerageFormConfig" jsonb DEFAULT NULL,
+  "brokerageRentalFormConfig" jsonb DEFAULT NULL,
+  "brokerageBuyerFormConfig" jsonb DEFAULT NULL,
   "createdAt"   timestamptz NOT NULL DEFAULT now()
 );
 
@@ -95,8 +97,11 @@ CREATE TABLE IF NOT EXISTS "SpaceSetting" (
   "privacyPolicyUrl"     text,
   "consentCheckboxLabel" text,
   "formConfig"           jsonb DEFAULT NULL,
+  "rentalFormConfig"     jsonb DEFAULT NULL,
+  "buyerFormConfig"      jsonb DEFAULT NULL,
   "formConfigSource"     text NOT NULL DEFAULT 'legacy'
-    CHECK ("formConfigSource" IN ('custom', 'brokerage', 'legacy'))
+    CHECK ("formConfigSource" IN ('custom', 'brokerage', 'legacy')),
+  "trackingPixels"       jsonb
 );
 
 CREATE TABLE IF NOT EXISTS "Contact" (
@@ -133,6 +138,7 @@ CREATE TABLE IF NOT EXISTS "Contact" (
   "consentIp"             text,
   "consentPrivacyPolicyUrl" text,
   "formConfigSnapshot"      jsonb DEFAULT NULL,
+  "formLeadType"            text,
   "createdAt"     timestamptz NOT NULL DEFAULT now(),
   "updatedAt"     timestamptz NOT NULL DEFAULT now()
 );
@@ -422,12 +428,18 @@ ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "privacyPolicyHtml"  text;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "privacyPolicyUrl"  text;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "consentCheckboxLabel" text;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "formConfig"           jsonb DEFAULT NULL;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "rentalFormConfig"     jsonb DEFAULT NULL;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "buyerFormConfig"      jsonb DEFAULT NULL;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "formConfigSource"     text NOT NULL DEFAULT 'legacy';
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "trackingPixels"       jsonb;
 
 ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "privacyPolicyHtml"    text;
 ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "brokerageFormConfig"  jsonb DEFAULT NULL;
+ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "brokerageRentalFormConfig" jsonb DEFAULT NULL;
+ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "brokerageBuyerFormConfig"  jsonb DEFAULT NULL;
 
 ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "formConfigSnapshot"    jsonb DEFAULT NULL;
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "formLeadType"         text;
 
 -- ============================================================
 -- Indexes
@@ -444,6 +456,14 @@ CREATE INDEX IF NOT EXISTS idx_space_setting_form_config
   ON "SpaceSetting" USING gin("formConfig") WHERE "formConfig" IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_brokerage_form_config
   ON "Brokerage" USING gin("brokerageFormConfig") WHERE "brokerageFormConfig" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_space_setting_rental_form_config
+  ON "SpaceSetting" USING gin("rentalFormConfig") WHERE "rentalFormConfig" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_space_setting_buyer_form_config
+  ON "SpaceSetting" USING gin("buyerFormConfig") WHERE "buyerFormConfig" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_brokerage_rental_form_config
+  ON "Brokerage" USING gin("brokerageRentalFormConfig") WHERE "brokerageRentalFormConfig" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_brokerage_buyer_form_config
+  ON "Brokerage" USING gin("brokerageBuyerFormConfig") WHERE "brokerageBuyerFormConfig" IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_contact_space_id    ON "Contact"("spaceId");
 CREATE INDEX IF NOT EXISTS idx_contact_tags        ON "Contact" USING gin(tags);

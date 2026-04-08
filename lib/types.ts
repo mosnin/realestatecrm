@@ -31,6 +31,8 @@ export type Brokerage = {
   joinCode: string | null;
   privacyPolicyHtml: string | null;
   brokerageFormConfig: IntakeFormConfig | null;
+  brokerageRentalFormConfig: IntakeFormConfig | null;
+  brokerageBuyerFormConfig: IntakeFormConfig | null;
   createdAt: Date;
 };
 
@@ -118,6 +120,21 @@ export type SpaceSetting = {
   // Dynamic form builder
   formConfig: IntakeFormConfig | null;
   formConfigSource: FormConfigSource;
+  rentalFormConfig: IntakeFormConfig | null;
+  buyerFormConfig: IntakeFormConfig | null;
+  // Tracking pixels
+  trackingPixels: TrackingPixels | null;
+};
+
+export type TrackingPixels = {
+  facebookPixelId?: string;
+  tiktokPixelId?: string;
+  googleAnalyticsId?: string;
+  googleAdsId?: string;
+  twitterPixelId?: string;
+  linkedinPartnerId?: string;
+  snapchatPixelId?: string;
+  customHeadScript?: string;
 };
 
 export type Contact = {
@@ -154,6 +171,7 @@ export type Contact = {
   consentIp: string | null;
   consentPrivacyPolicyUrl: string | null;
   formConfigSnapshot: IntakeFormConfig | null;
+  formLeadType: 'rental' | 'buyer' | null;
   createdAt: Date;
   updatedAt: Date;
 };

@@ -3,8 +3,10 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { PublicPageShell } from '@/components/public-page-shell';
 import { FormUnavailable } from '@/components/form-unavailable';
+import { TrackingPixels } from '@/components/tracking-pixels';
 import { ApplicationFormLoader } from './application-form-loader';
 import { clerkClient } from '@clerk/nextjs/server';
+import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
 
 // Cache this page for 60 seconds — it's public and rarely changes.
 // Eliminates cold-start latency for repeat visitors and crawlers.
@@ -38,7 +40,7 @@ export default async function PublicApplyPage({
         'intakeDisclaimerText, intakeThankYouTitle, intakeThankYouMessage, ' +
         'intakeFooterLinks, intakeDisabledSteps, intakeCustomQuestions, ' +
         'intakeFaviconUrl, bio, socialLinks, privacyPolicyUrl, consentCheckboxLabel, ' +
-        'formConfig, formConfigSource'
+        'formConfig, formConfigSource, rentalFormConfig, buyerFormConfig, trackingPixels'
       )
       .eq('spaceId', space.id)
       .maybeSingle()
@@ -77,6 +79,9 @@ export default async function PublicApplyPage({
     consentCheckboxLabel: string | null;
     formConfig: import('@/lib/types').IntakeFormConfig | null;
     formConfigSource: string | null;
+    rentalFormConfig: import('@/lib/types').IntakeFormConfig | null;
+    buyerFormConfig: import('@/lib/types').IntakeFormConfig | null;
+    trackingPixels: TrackingPixelsType | null;
   } | null;
 
   const pageTitle = settings?.intakePageTitle || 'Rental Application';
@@ -152,19 +157,24 @@ export default async function PublicApplyPage({
     consentCheckboxLabel: settings?.consentCheckboxLabel || null,
   };
 
+  const trackingPixels = settings?.trackingPixels ?? null;
+
   return (
-    <PublicPageShell
-      logoUrl={logoUrl}
-      businessName={businessName}
-      agentName={agentName}
-      agentPhone={null}
-      agentPhoto={agentPhoto}
-      pageTitle={pageTitle}
-      pageIntro={pageIntro}
-      trustLine={`Your information is shared only with ${agentName} and used solely for rental inquiries.`}
-      customization={customization}
-    >
-      <ApplicationFormLoader slug={slug} spaceId={space.id} businessName={businessName} customization={customization} formConfig={resolvedFormConfig} resumeToken={resumeToken} />
-    </PublicPageShell>
+    <>
+      <TrackingPixels pixels={trackingPixels} />
+      <PublicPageShell
+        logoUrl={logoUrl}
+        businessName={businessName}
+        agentName={agentName}
+        agentPhone={null}
+        agentPhoto={agentPhoto}
+        pageTitle={pageTitle}
+        pageIntro={pageIntro}
+        trustLine={`Your information is shared only with ${agentName} and used solely for rental inquiries.`}
+        customization={customization}
+      >
+        <ApplicationFormLoader slug={slug} spaceId={space.id} businessName={businessName} customization={customization} formConfig={resolvedFormConfig} resumeToken={resumeToken} />
+      </PublicPageShell>
+    </>
   );
 }

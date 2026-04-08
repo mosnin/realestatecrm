@@ -24,6 +24,7 @@ import {
   Key,
   ListChecks,
 } from 'lucide-react';
+import { fireConversionEvents } from '@/lib/tracking-events';
 
 // ── Step config ──
 const RENTAL_STEPS = [
@@ -466,6 +467,8 @@ export function ApplicationForm({
         const result = await response.json().catch(() => ({}));
         setScoreState(result);
         setSubmitted(true);
+        // Fire tracking pixel conversion events
+        fireConversionEvents();
         setTimeout(() => {
           confettiRef.current?.fire({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
           confettiRef.current?.fire({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 } });

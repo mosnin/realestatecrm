@@ -194,6 +194,17 @@ export default function PrivacyPolicyPage() {
         </div>
       </section>
 
+      {/* 14A. Subscriber Tracking Technologies */}
+      <section>
+        <h2 className="text-xl font-semibold">14A. Subscriber Tracking Technologies</h2>
+        <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
+          <p>14A.1. Subscribers (realtors and brokerages) may configure third-party tracking pixels on their public-facing intake forms and tour booking pages. These tracking technologies may include pixels and scripts from platforms such as Meta/Facebook, Google Analytics, Google Ads, TikTok, Twitter/X, LinkedIn, and Snapchat.</p>
+          <p>14A.2. These technologies may collect information such as IP addresses, browser type, device information, pages visited, and actions taken (such as form submissions). This data is sent directly from the Applicant&apos;s browser to the respective third-party platform.</p>
+          <p>14A.3. <strong className="text-foreground">Chippi acts as a Data Processor</strong> with respect to Subscriber-configured tracking pixels. The Subscriber (Data Controller) is responsible for disclosing the use of these technologies in their own privacy policy and obtaining any required consents.</p>
+          <p>14A.4. Applicants may opt out of third-party tracking by adjusting their browser settings, using browser extensions that block tracking scripts, or visiting the <a href="https://optout.aboutads.info/" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">Digital Advertising Alliance&apos;s opt-out page</a>.</p>
+        </div>
+      </section>
+
       {/* 15. Changes to This Policy */}
       <section>
         <h2 className="text-xl font-semibold">15. Changes to This Policy</h2>

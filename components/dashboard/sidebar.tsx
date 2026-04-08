@@ -513,6 +513,7 @@ export function Sidebar({
         { href: `${base}/settings/appearance`, label: 'Appearance', icon: Palette, exact: false },
         { href: `${base}/settings/content`, label: 'Content', icon: Type, exact: false },
         { href: `${base}/settings/form-fields`, label: 'Form Fields', icon: ListChecks, exact: false },
+        { href: `${base}/settings/tracking`, label: 'Tracking & Analytics', icon: BarChart3, exact: false },
       ],
     },
     {
