@@ -404,39 +404,44 @@ function QuestionEditor({
         <div className="space-y-2">
           <Label className="text-xs">Options</Label>
           {(question.options || []).map((opt, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <Input
-                value={opt.label}
-                onChange={(e) => {
-                  const newOpts = [...(question.options || [])];
-                  newOpts[idx] = { ...newOpts[idx], label: e.target.value, value: e.target.value.toLowerCase().replace(/\s+/g, '_') };
-                  updateField('options', newOpts);
-                }}
-                placeholder="Option label"
-                className="flex-1"
-              />
-              <Input
-                type="number"
-                value={opt.scoreValue ?? ''}
-                onChange={(e) => {
-                  const newOpts = [...(question.options || [])];
-                  newOpts[idx] = { ...newOpts[idx], scoreValue: e.target.value ? Number(e.target.value) : undefined };
-                  updateField('options', newOpts);
-                }}
-                placeholder="Score"
-                className="w-20"
-                title="Score value for this option"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const newOpts = (question.options || []).filter((_, i) => i !== idx);
-                  updateField('options', newOpts);
-                }}
-                className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors"
+            <div key={idx} className="rounded-md border border-border/60 p-2 space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Input
+                  value={opt.label}
+                  onChange={(e) => {
+                    const newOpts = [...(question.options || [])];
+                    newOpts[idx] = { ...newOpts[idx], label: e.target.value, value: e.target.value.toLowerCase().replace(/\s+/g, '_') };
+                    updateField('options', newOpts);
+                  }}
+                  placeholder="Option label"
+                  className="flex-1 h-8 text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newOpts = (question.options || []).filter((_, i) => i !== idx);
+                    updateField('options', newOpts);
+                  }}
+                  className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors"
               >
                 <X size={14} />
               </button>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Label className="text-[10px] text-muted-foreground w-10 flex-shrink-0">Score</Label>
+                <Input
+                  type="number"
+                  value={opt.scoreValue ?? ''}
+                  onChange={(e) => {
+                    const newOpts = [...(question.options || [])];
+                    newOpts[idx] = { ...newOpts[idx], scoreValue: e.target.value ? Number(e.target.value) : undefined };
+                    updateField('options', newOpts);
+                  }}
+                  placeholder="0"
+                  className="flex-1 h-7 text-xs"
+                  title="Score value for this option"
+                />
+              </div>
             </div>
           ))}
           <button
@@ -1130,7 +1135,7 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
         </div>
 
         {/* Right Panel - Property Editor */}
-        <div className="w-full lg:w-72 flex-shrink-0">
+        <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
           <div className="rounded-xl border border-border bg-card overflow-hidden sticky top-4">
             <div className="px-4 py-3 border-b border-border bg-muted/20">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Properties</p>
