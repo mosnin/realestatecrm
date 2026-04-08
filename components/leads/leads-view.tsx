@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Phone,
   Mail,
@@ -35,6 +36,7 @@ import {
   ShieldCheck,
   Search,
   ArrowUpDown,
+  AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -123,7 +125,7 @@ function QChip({ icon: Icon, label, highlight, href }: { icon: React.ComponentTy
 
 // ── Tier filter pill ─────────────────────────────────────────────────────────
 
-type TierFilter = 'all' | TierKey;
+type TierFilter = 'all' | TierKey | 'needs-followup';
 
 const TIER_FILTERS: { key: TierFilter; label: string; icon?: React.ComponentType<{ size: number }> }[] = [
   { key: 'all', label: 'All' },
@@ -131,6 +133,7 @@ const TIER_FILTERS: { key: TierFilter; label: string; icon?: React.ComponentType
   { key: 'warm', label: 'Warm', icon: Thermometer },
   { key: 'cold', label: 'Cold', icon: Snowflake },
   { key: 'unscored', label: 'Unscored' },
+  { key: 'needs-followup', label: 'Needs Follow-up', icon: AlertCircle },
 ];
 
 // ── Main component ───────────────────────────────────────────────────────────
@@ -141,13 +144,51 @@ interface LeadsViewProps {
   newLeadIds: Set<string>;
 }
 
+type SortKey = 'newest' | 'oldest' | 'score' | 'score-low' | 'name-az' | 'name-za' | 'followup';
+type LeadTypeFilter = 'all' | 'rental' | 'buyer';
+type ViewMode = 'card' | 'list';
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'score', label: 'Highest score' },
+  { value: 'score-low', label: 'Lowest score' },
+  { value: 'name-az', label: 'Name A-Z' },
+  { value: 'name-za', label: 'Name Z-A' },
+  { value: 'followup', label: 'Follow-up date' },
+];
+
+function isValidTierFilter(v: string | null): v is TierFilter {
+  return v != null && ['all', 'hot', 'warm', 'cold', 'unscored', 'needs-followup'].includes(v);
+}
+function isValidSort(v: string | null): v is SortKey {
+  return v != null && SORT_OPTIONS.some((o) => o.value === v);
+}
+function isValidLeadType(v: string | null): v is LeadTypeFilter {
+  return v != null && ['all', 'rental', 'buyer'].includes(v);
+}
+function isValidView(v: string | null): v is ViewMode {
+  return v != null && ['card', 'list'].includes(v);
+}
+
 export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [leads, setLeads] = useState<Contact[]>(initialLeads);
-  const [tierFilter, setTierFilter] = useState<TierFilter>('all');
-  const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'rental' | 'buyer'>('all');
-  const [sort, setSort] = useState<'newest' | 'oldest' | 'score' | 'name-az' | 'name-za' | 'followup'>('newest');
-  const [view, setView] = useState<'card' | 'list'>('card');
-  const [search, setSearch] = useState('');
+
+  // Read initial state from URL params, fallback to defaults
+  const paramTier = searchParams.get('tier');
+  const paramType = searchParams.get('type');
+  const paramSort = searchParams.get('sort');
+  const paramView = searchParams.get('view');
+  const paramSearch = searchParams.get('q');
+
+  const [tierFilter, setTierFilterState] = useState<TierFilter>(isValidTierFilter(paramTier) ? paramTier : 'all');
+  const [leadTypeFilter, setLeadTypeFilterState] = useState<LeadTypeFilter>(isValidLeadType(paramType) ? paramType : 'all');
+  const [sort, setSortState] = useState<SortKey>(isValidSort(paramSort) ? paramSort : 'newest');
+  const [view, setViewState] = useState<ViewMode>(isValidView(paramView) ? paramView : 'card');
+  const [search, setSearch] = useState(paramSearch ?? '');
   const [convertTarget, setConvertTarget] = useState<Contact | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
@@ -155,6 +196,37 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
   const [showSaveInput, setShowSaveInput] = useState(false);
   const saveInputRef = useRef<HTMLInputElement>(null);
   const { confirm, ConfirmDialog } = useConfirm();
+
+  // Sync filters to URL params
+  const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, val] of Object.entries(updates)) {
+      if (val == null || val === '' || val === 'all' || (key === 'sort' && val === 'newest') || (key === 'view' && val === 'card')) {
+        params.delete(key);
+      } else {
+        params.set(key, val);
+      }
+    }
+    const qs = params.toString();
+    router.replace(`/s/${slug}/leads${qs ? `?${qs}` : ''}`, { scroll: false });
+  }, [searchParams, router, slug]);
+
+  function setTierFilter(v: TierFilter) {
+    setTierFilterState(v);
+    updateUrlParams({ tier: v });
+  }
+  function setLeadTypeFilter(v: LeadTypeFilter) {
+    setLeadTypeFilterState(v);
+    updateUrlParams({ type: v });
+  }
+  function setSort(v: SortKey) {
+    setSortState(v);
+    updateUrlParams({ sort: v });
+  }
+  function setView(v: ViewMode) {
+    setViewState(v);
+    updateUrlParams({ view: v });
+  }
 
   // Load saved views from localStorage on mount
   useEffect(() => {
@@ -201,8 +273,32 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
     persistSavedViews(savedViews.filter((v) => v.id !== id));
   }
 
+  // Counts for filter badges (based on all leads, not filtered)
+  const filterCounts = useMemo(() => {
+    const now = new Date();
+    return {
+      all: leads.length,
+      hot: leads.filter((l) => getTierKey(l) === 'hot').length,
+      warm: leads.filter((l) => getTierKey(l) === 'warm').length,
+      cold: leads.filter((l) => getTierKey(l) === 'cold').length,
+      unscored: leads.filter((l) => getTierKey(l) === 'unscored').length,
+      'needs-followup': leads.filter((l) => l.followUpAt && new Date(l.followUpAt) < now).length,
+      rental: leads.filter((l) => l.leadType === 'rental').length,
+      buyer: leads.filter((l) => l.leadType === 'buyer').length,
+    };
+  }, [leads]);
+
   const filtered = useMemo(() => {
-    let list = tierFilter === 'all' ? leads : leads.filter((l) => getTierKey(l) === tierFilter);
+    const now = new Date();
+    let list = leads;
+
+    // Tier / special filters
+    if (tierFilter === 'needs-followup') {
+      list = list.filter((l) => l.followUpAt && new Date(l.followUpAt) < now);
+    } else if (tierFilter !== 'all') {
+      list = list.filter((l) => getTierKey(l) === tierFilter);
+    }
+
     if (leadTypeFilter !== 'all') {
       list = list.filter((l) => l.leadType === leadTypeFilter);
     }
@@ -219,6 +315,8 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
       list = [...list].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     } else if (sort === 'score') {
       list = [...list].sort((a, b) => (b.leadScore ?? -1) - (a.leadScore ?? -1));
+    } else if (sort === 'score-low') {
+      list = [...list].sort((a, b) => (a.leadScore ?? Infinity) - (b.leadScore ?? Infinity));
     } else if (sort === 'name-az') {
       list = [...list].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
     } else if (sort === 'name-za') {
@@ -358,30 +456,33 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
       <div className="flex flex-wrap items-center gap-2">
         {/* Tier filter pills */}
         <div className="flex gap-1 flex-wrap">
-          {TIER_FILTERS.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTierFilter(key)}
-              className={cn(
-                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-                tierFilter === key
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
-              )}
-            >
-              {Icon && <Icon size={11} />}
-              {label}
-              {key !== 'all' && (
+          {TIER_FILTERS.map(({ key, label, icon: Icon }) => {
+            const count = filterCounts[key] ?? 0;
+            // Hide "Needs Follow-up" if none exist
+            if (key === 'needs-followup' && count === 0) return null;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setTierFilter(key)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                  tierFilter === key
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
+                )}
+              >
+                {Icon && <Icon size={11} />}
+                {label}
                 <span className={cn(
                   'ml-0.5 tabular-nums',
                   tierFilter === key ? 'opacity-80' : 'opacity-60',
                 )}>
-                  {leads.filter((l) => getTierKey(l) === key).length}
+                  {count}
                 </span>
-              )}
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
 
         {/* Lead type filter */}
@@ -399,11 +500,9 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
               )}
             >
               {key === 'all' ? 'All' : key === 'rental' ? 'Rental' : 'Buyer'}
-              {key !== 'all' && (
-                <span className={cn('ml-1 tabular-nums', leadTypeFilter === key ? 'opacity-80' : 'opacity-60')}>
-                  {leads.filter((l) => l.leadType === key).length}
-                </span>
-              )}
+              <span className={cn('ml-1 tabular-nums', leadTypeFilter === key ? 'opacity-80' : 'opacity-60')}>
+                {key === 'all' ? filterCounts.all : filterCounts[key]}
+              </span>
             </button>
           ))}
         </div>
@@ -413,15 +512,12 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
           <div className="relative">
             <select
               value={sort}
-              onChange={(e) => setSort(e.target.value as typeof sort)}
+              onChange={(e) => setSort(e.target.value as SortKey)}
               className="appearance-none rounded-md border border-border bg-card pl-7 pr-8 py-1.5 text-xs font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-              <option value="score">Highest score</option>
-              <option value="name-az">Name A-Z</option>
-              <option value="name-za">Name Z-A</option>
-              <option value="followup">Follow-up date</option>
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
             <ArrowUpDown size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           </div>
