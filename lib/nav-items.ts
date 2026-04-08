@@ -65,6 +65,7 @@ export const realtorNavItems: NavItem[] = [
     badgeKey: 'leads',
     children: [
       { href: '/leads', label: 'All Leads', exact: true },
+      { href: '/leads?sort=newest', label: 'Most Recent' },
       { href: '/leads?type=rental', label: 'Rental Leads' },
       { href: '/leads?type=buyer', label: 'Buyer Leads' },
       { href: '/leads?tier=hot', label: 'Hot Leads' },

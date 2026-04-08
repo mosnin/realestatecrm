@@ -197,6 +197,21 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
   const saveInputRef = useRef<HTMLInputElement>(null);
   const { confirm, ConfirmDialog } = useConfirm();
 
+  // Sync state FROM URL params when they change (e.g., sidebar navigation)
+  useEffect(() => {
+    const newTier = searchParams.get('tier');
+    const newType = searchParams.get('type');
+    const newSort = searchParams.get('sort');
+    const newView = searchParams.get('view');
+    const newSearch = searchParams.get('q');
+
+    setTierFilterState(isValidTierFilter(newTier) ? newTier : 'all');
+    setLeadTypeFilterState(isValidLeadType(newType) ? newType : 'all');
+    setSortState(isValidSort(newSort) ? newSort : 'newest');
+    setViewState(isValidView(newView) ? newView : 'card');
+    setSearch(newSearch ?? '');
+  }, [searchParams]);
+
   // Sync filters to URL params
   const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
