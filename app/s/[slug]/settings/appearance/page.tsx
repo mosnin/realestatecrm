@@ -204,27 +204,6 @@ export default function AppearanceSettingsPage() {
               </div>
             </div>
 
-            {/* Header Background */}
-            <div className="space-y-2">
-              <Label>Header background</Label>
-              <div className="flex items-center gap-3">
-                <input type="color" value={intakeHeaderBgColor || '#ffffff'} onChange={(e) => { setIntakeHeaderBgColor(e.target.value); setIntakeHeaderGradient(''); }} className="w-10 h-10 rounded-md border border-border cursor-pointer" />
-                <span className="text-xs text-muted-foreground">Solid color</span>
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                {[
-                  { label: 'None', value: '' },
-                  { label: 'Warm sunset', value: 'linear-gradient(135deg, #f97316, #ec4899)' },
-                  { label: 'Cool ocean', value: 'linear-gradient(135deg, #06b6d4, #3b82f6)' },
-                  { label: 'Forest', value: 'linear-gradient(135deg, #22c55e, #14b8a6)' },
-                ].map((preset) => (
-                  <button key={preset.label} type="button" onClick={() => { setIntakeHeaderGradient(preset.value); if (preset.value) setIntakeHeaderBgColor(''); }} className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${intakeHeaderGradient === preset.value ? 'border-primary bg-primary/10 text-foreground' : 'border-border bg-background text-muted-foreground hover:bg-muted'}`}>
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Dark Mode */}
             <div className="flex items-center justify-between py-3 border-t border-border">
               <div>
