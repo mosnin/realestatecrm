@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS "Brokerage" (
   "websiteUrl"  text,
   "logoUrl"     text,
   "joinCode"    text UNIQUE,
+  "brokerageFormConfig" jsonb DEFAULT NULL,
   "createdAt"   timestamptz NOT NULL DEFAULT now()
 );
 
@@ -92,7 +93,10 @@ CREATE TABLE IF NOT EXISTS "SpaceSetting" (
   "tourBufferMinutes"    integer NOT NULL DEFAULT 0,
   "tourBlockedDates"     text[] NOT NULL DEFAULT '{}',
   "privacyPolicyUrl"     text,
-  "consentCheckboxLabel" text
+  "consentCheckboxLabel" text,
+  "formConfig"           jsonb DEFAULT NULL,
+  "formConfigSource"     text NOT NULL DEFAULT 'legacy'
+    CHECK ("formConfigSource" IN ('custom', 'brokerage', 'legacy'))
 );
 
 CREATE TABLE IF NOT EXISTS "Contact" (
@@ -127,6 +131,7 @@ CREATE TABLE IF NOT EXISTS "Contact" (
   "consentTimestamp"      timestamptz,
   "consentIp"             text,
   "consentPrivacyPolicyUrl" text,
+  "formConfigSnapshot"      jsonb DEFAULT NULL,
   "createdAt"     timestamptz NOT NULL DEFAULT now(),
   "updatedAt"     timestamptz NOT NULL DEFAULT now()
 );
@@ -366,8 +371,13 @@ ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "notifyFollowUps"    boolean
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "privacyPolicyHtml"  text;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "privacyPolicyUrl"  text;
 ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "consentCheckboxLabel" text;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "formConfig"           jsonb DEFAULT NULL;
+ALTER TABLE "SpaceSetting" ADD COLUMN IF NOT EXISTS "formConfigSource"     text NOT NULL DEFAULT 'legacy';
 
 ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "privacyPolicyHtml"    text;
+ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "brokerageFormConfig"  jsonb DEFAULT NULL;
+
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "formConfigSnapshot"    jsonb DEFAULT NULL;
 
 -- ============================================================
 -- Indexes

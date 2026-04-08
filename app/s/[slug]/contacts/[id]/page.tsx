@@ -396,6 +396,16 @@ export default async function ClientDetailPage({
               statusNote={contact.applicationStatusNote ?? null}
             />
           </div>
+          {/* Dynamic form display (uses formConfigSnapshot when present) */}
+          {formSnapshot ? (
+            <div className="px-4 sm:px-6 py-2">
+              <DynamicApplicationDisplay
+                applicationData={app as Record<string, any>}
+                formConfigSnapshot={formSnapshot}
+                defaultOpen
+              />
+            </div>
+          ) : (
           <div className="px-4 sm:px-6 py-2 divide-y divide-border/50">
             {/* Property — always open (most important) */}
             {(app.propertyAddress || app.unitType || app.targetMoveInDate || app.monthlyRent != null || app.leaseTermPreference || app.numberOfOccupants != null) && (
@@ -497,6 +507,7 @@ export default async function ClientDetailPage({
               </CollapsibleSection>
             )}
           </div>
+          )}
         </div>
       ) : (
         /* Legacy application details (no structured data) */
