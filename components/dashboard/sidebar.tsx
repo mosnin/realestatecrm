@@ -82,6 +82,13 @@ const brokerAdminNavSections = [
     ],
   },
   {
+    label: 'Intake Form',
+    items: [
+      { href: '/broker/settings/form-builder', label: 'Customize', icon: FileText, exact: false, adminOnly: true },
+      { href: '/broker/settings/tracking', label: 'Tracking', icon: BarChart3, exact: false, adminOnly: true },
+    ],
+  },
+  {
     label: 'Admin',
     items: [
       { href: '/broker/import-export', label: 'Import / Export', icon: Upload, exact: false, adminOnly: true },
