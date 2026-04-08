@@ -30,6 +30,7 @@ export type Brokerage = {
   logoUrl: string | null;
   joinCode: string | null;
   privacyPolicyHtml: string | null;
+  brokerageFormConfig: IntakeFormConfig | null;
   createdAt: Date;
 };
 
@@ -114,6 +115,9 @@ export type SpaceSetting = {
   privacyPolicyUrl: string | null;
   privacyPolicyHtml: string | null;
   consentCheckboxLabel: string | null;
+  // Dynamic form builder
+  formConfig: IntakeFormConfig | null;
+  formConfigSource: FormConfigSource;
 };
 
 export type Contact = {
@@ -148,6 +152,7 @@ export type Contact = {
   consentTimestamp: Date | null;
   consentIp: string | null;
   consentPrivacyPolicyUrl: string | null;
+  formConfigSnapshot: IntakeFormConfig | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -346,4 +351,82 @@ export type Note = {
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
+};
+
+// ── Form Builder Types ──
+
+export type FormQuestionType =
+  | 'text'
+  | 'textarea'
+  | 'email'
+  | 'phone'
+  | 'number'
+  | 'select'
+  | 'multi_select'
+  | 'radio'
+  | 'checkbox'
+  | 'date';
+
+export type FormLeadType = 'rental' | 'buyer' | 'general';
+
+export type FormConfigSource = 'custom' | 'brokerage' | 'legacy';
+
+export type FormQuestionOption = {
+  value: string;
+  label: string;
+  scoreValue?: number;
+};
+
+export type FormQuestionValidation = {
+  pattern?: string;
+  min?: number;
+  max?: number;
+  minLength?: number;
+  maxLength?: number;
+};
+
+export type FormQuestionScoring = {
+  weight: number; // 0-10, 0 = informational only
+  mappings?: { value: string; points: number }[];
+};
+
+export type FormQuestionVisibility = {
+  questionId: string;
+  operator: 'equals' | 'not_equals' | 'contains';
+  value: string;
+};
+
+export type FormQuestion = {
+  id: string; // stable UUID
+  type: FormQuestionType;
+  label: string;
+  description?: string;
+  placeholder?: string;
+  required: boolean;
+  position: number;
+  system?: boolean; // true for name, email, phone -- can't be deleted
+  options?: FormQuestionOption[];
+  validation?: FormQuestionValidation;
+  scoring?: FormQuestionScoring;
+  visibleWhen?: FormQuestionVisibility;
+};
+
+export type FormSection = {
+  id: string; // stable UUID
+  title: string;
+  description?: string;
+  position: number;
+  questions: FormQuestion[];
+};
+
+export type IntakeFormConfig = {
+  version: number;
+  leadType: FormLeadType;
+  sections: FormSection[];
+};
+
+export type FormSubmission = {
+  formConfigVersion: number;
+  formConfigSnapshot: IntakeFormConfig; // frozen copy of form at submission time
+  answers: Record<string, string | string[] | number | boolean>;
 };
