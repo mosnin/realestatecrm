@@ -15,7 +15,7 @@ import {
 import { notifyNewLead } from '@/lib/notify';
 import { sendApplicationConfirmation } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
-import type { IntakeFormConfig, FormQuestion } from '@/lib/form-config-schema';
+import { formConfigSchema, type IntakeFormConfig, type FormQuestion } from '@/lib/form-config-schema';
 
 /** Parse budget/rent range strings like 'under_1500', '1500_2000', '1m_plus' to a midpoint number. */
 function parseBudgetToNumber(val: unknown): number | null {
@@ -211,9 +211,13 @@ export async function POST(req: NextRequest) {
     // ── Determine if this space uses a dynamic form config ────────────────
     let formConfig: IntakeFormConfig | null = null;
     try {
-      formConfig = await fetchFormConfig(space.id, space.brokerageId);
+      const rawConfig = await fetchFormConfig(space.id, space.brokerageId);
+      if (rawConfig) {
+        formConfig = formConfigSchema.parse(rawConfig);
+      }
     } catch (err) {
-      console.warn('[apply] failed to fetch form config, falling back to legacy', { spaceId: space.id, err });
+      console.warn('[apply] form config invalid or fetch failed, falling back to legacy', { spaceId: space.id, err });
+      formConfig = null;
     }
 
     // ── Validate & extract submission data ────────────────────────────────
@@ -255,7 +259,7 @@ export async function POST(req: NextRequest) {
       contactAddress = typeof data.currentAddress === 'string' ? data.currentAddress : null;
       privacyConsent = typeof data.privacyConsent === 'boolean' ? data.privacyConsent : undefined;
       slugForFingerprint = rawSlug;
-      formConfigSnapshot = formConfig;
+      formConfigSnapshot = JSON.parse(JSON.stringify(formConfig));
 
       // Build applicationData from all submitted answers
       applicationData = {
