@@ -342,6 +342,18 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
         </div>
       )}
 
+      {/* ── Search bar ── */}
+      <div className="relative">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search by name, email, or phone..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-lg border border-border bg-card pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+      </div>
+
       {/* ── Controls bar ── */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Tier filter pills */}
@@ -397,40 +409,21 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
         </div>
 
         <div className="flex gap-2 ml-auto flex-wrap">
-          {/* Sort */}
-          <div className="flex rounded-md border border-border overflow-hidden bg-card text-xs">
-            <button
-              type="button"
-              onClick={() => setSort('newest')}
-              className={cn(
-                'px-2.5 py-1.5 transition-colors',
-                sort === 'newest' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-              )}
+          {/* Sort dropdown */}
+          <div className="relative">
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as typeof sort)}
+              className="appearance-none rounded-md border border-border bg-card pl-7 pr-8 py-1.5 text-xs font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              Newest
-            </button>
-            <button
-              type="button"
-              onClick={() => setSort('score')}
-              className={cn(
-                'px-2.5 py-1.5 flex items-center gap-1 transition-colors',
-                sort === 'score' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-              )}
-            >
-              <Sparkles size={11} />
-              Top score
-            </button>
-            <button
-              type="button"
-              onClick={() => setSort('followup')}
-              className={cn(
-                'px-2.5 py-1.5 flex items-center gap-1 transition-colors',
-                sort === 'followup' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-              )}
-            >
-              <CalendarDays size={11} />
-              Follow-up
-            </button>
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="score">Highest score</option>
+              <option value="name-az">Name A-Z</option>
+              <option value="name-za">Name Z-A</option>
+              <option value="followup">Follow-up date</option>
+            </select>
+            <ArrowUpDown size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           </div>
 
           {/* Save view */}
@@ -514,10 +507,29 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
       {/* ── Empty state ── */}
       {filtered.length === 0 && (
         <div className="rounded-lg border border-dashed border-border bg-card py-12 text-center px-6">
-          <p className="font-semibold text-foreground mb-1">No {tierFilter !== 'all' ? tierFilter : ''} leads</p>
-          <p className="text-sm text-muted-foreground">
-            {tierFilter !== 'all' ? 'Try a different filter.' : 'Share your intake link to receive applications.'}
+          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center mx-auto mb-4">
+            <Search size={20} className="text-muted-foreground" />
+          </div>
+          <p className="font-semibold text-foreground mb-1">
+            {search ? 'No matching leads' : tierFilter !== 'all' ? `No ${tierFilter} leads` : 'No leads'}
           </p>
+          <p className="text-sm text-muted-foreground">
+            {search
+              ? `No leads match "${search}". Try a different search term.`
+              : tierFilter !== 'all'
+              ? 'Try a different filter.'
+              : 'Share your intake link to receive applications.'}
+          </p>
+          {(search || tierFilter !== 'all') && (
+            <button
+              type="button"
+              onClick={() => { setSearch(''); setTierFilter('all'); setLeadTypeFilter('all'); }}
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline underline-offset-2"
+            >
+              <X size={11} />
+              Clear all filters
+            </button>
+          )}
         </div>
       )}
 

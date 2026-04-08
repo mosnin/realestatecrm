@@ -453,7 +453,15 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
           label: 'When do you want to close?',
           required: true,
           position: 0,
-          scoring: { weight: 8 },
+          scoring: {
+            weight: 8,
+            mappings: [
+              { value: 'asap', points: 10 },
+              { value: '1-3months', points: 7 },
+              { value: '3-6months', points: 4 },
+              { value: 'exploring', points: 1 },
+            ],
+          },
           options: [
             { value: 'asap', label: 'ASAP (within 30 days)' },
             { value: '1-3months', label: '1-3 months' },
@@ -509,7 +517,14 @@ export const BUYER_TEMPLATE: IntakeFormConfig = {
           label: 'If you find the right place, are you ready to move forward?',
           required: true,
           position: 0,
-          scoring: { weight: 9 },
+          scoring: {
+            weight: 9,
+            mappings: [
+              { value: 'ready', points: 10 },
+              { value: 'maybe', points: 5 },
+              { value: 'exploring', points: 2 },
+            ],
+          },
           options: [
             { value: 'ready', label: 'Yes, ready now', scoreValue: 10 },
             { value: 'maybe', label: 'Maybe', scoreValue: 5 },

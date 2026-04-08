@@ -28,8 +28,13 @@ export async function POST(req: NextRequest) {
 
   const parsed = createDraftSchema.safeParse(body);
   if (!parsed.success) {
+    // Only return minimal error info to prevent schema leakage
+    const safeIssues = parsed.error.issues.map(i => ({
+      path: i.path,
+      message: i.message,
+    }));
     return NextResponse.json(
-      { error: 'Invalid draft data', issues: parsed.error.issues },
+      { error: 'Invalid draft data', issues: safeIssues },
       { status: 400 },
     );
   }

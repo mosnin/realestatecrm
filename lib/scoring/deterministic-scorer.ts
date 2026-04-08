@@ -26,6 +26,8 @@ export type DeterministicScoringResult = {
   maxPossible: number;
   breakdown: DeterministicBreakdownItem[];
   hasRules: boolean; // true if any question had scoring mappings
+  /** Fraction (0-1) of total scoring weight covered by deterministic rules. */
+  weightCoverage: number;
 };
 
 type Answers = Record<string, string | string[] | number | boolean>;
