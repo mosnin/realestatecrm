@@ -141,3 +141,70 @@ export async function PUT(req: NextRequest) {
     leadType,
   });
 }
+
+/**
+ * DELETE /api/broker/form-config
+ * Reset one or both brokerage form configs.
+ * Accepts { leadType?: 'rental' | 'buyer' }
+ */
+export async function DELETE(req: NextRequest) {
+  const { userId: clerkId } = await auth();
+
+  let ctx;
+  try {
+    ctx = await requireBroker();
+  } catch {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  if (!canEditSettings(ctx.membership.role)) {
+    return NextResponse.json(
+      { error: 'Only the owner or admins can reset form config' },
+      { status: 403 },
+    );
+  }
+
+  let body: Record<string, unknown> = {};
+  try {
+    body = await req.json();
+  } catch {
+    // No body is OK — resets both
+  }
+
+  const leadType = body.leadType as string | undefined;
+
+  const updates: Record<string, unknown> = {};
+  if (!leadType || leadType === 'rental') {
+    updates.brokerageRentalFormConfig = null;
+  }
+  if (!leadType || leadType === 'buyer') {
+    updates.brokerageBuyerFormConfig = null;
+  }
+  if (!leadType) {
+    updates.brokerageFormConfig = null; // Also clear legacy column
+  }
+
+  const { error: updateErr } = await supabase
+    .from('Brokerage')
+    .update(updates)
+    .eq('id', ctx.brokerage.id);
+
+  if (updateErr) {
+    console.error('[broker/form-config] delete failed', updateErr);
+    return NextResponse.json({ error: 'Failed to reset form config' }, { status: 500 });
+  }
+
+  void audit({
+    actorClerkId: clerkId ?? null,
+    action: 'UPDATE',
+    resource: 'Brokerage',
+    resourceId: ctx.brokerage.id,
+    metadata: {
+      field: 'brokerageFormConfig',
+      action: 'reset',
+      leadType: leadType || 'both',
+    },
+  });
+
+  return NextResponse.json({ success: true });
+}
