@@ -34,7 +34,8 @@ export default async function PublicApplyPage({
         'intakeHeaderBgColor, intakeHeaderGradient, intakeVideoUrl, ' +
         'intakeDisclaimerText, intakeThankYouTitle, intakeThankYouMessage, ' +
         'intakeFooterLinks, intakeDisabledSteps, intakeCustomQuestions, ' +
-        'intakeFaviconUrl, bio, socialLinks, privacyPolicyUrl, consentCheckboxLabel'
+        'intakeFaviconUrl, bio, socialLinks, privacyPolicyUrl, consentCheckboxLabel, ' +
+        'formConfig, formConfigSource'
       )
       .eq('spaceId', space.id)
       .maybeSingle()
@@ -71,6 +72,8 @@ export default async function PublicApplyPage({
     socialLinks: Record<string, string> | null;
     privacyPolicyUrl: string | null;
     consentCheckboxLabel: string | null;
+    formConfig: import('@/lib/types').IntakeFormConfig | null;
+    formConfigSource: string | null;
   } | null;
 
   const pageTitle = settings?.intakePageTitle || 'Rental Application';
@@ -101,6 +104,29 @@ export default async function PublicApplyPage({
   if (formPaused) {
     return <FormUnavailable agentName={agentName} />;
   }
+
+  // ── Resolve dynamic form config ───────────────────────────────────────────
+  let resolvedFormConfig: import('@/lib/types').IntakeFormConfig | null = null;
+  const formConfigSource = settings?.formConfigSource ?? 'legacy';
+
+  if (formConfigSource === 'brokerage' && space.brokerageId) {
+    // Fetch form config from brokerage template
+    try {
+      const { data: brokerageData } = await supabase
+        .from('Brokerage')
+        .select('brokerageFormConfig')
+        .eq('id', space.brokerageId)
+        .maybeSingle();
+      if (brokerageData?.brokerageFormConfig) {
+        resolvedFormConfig = brokerageData.brokerageFormConfig as import('@/lib/types').IntakeFormConfig;
+      }
+    } catch {
+      // Brokerage fetch failed — fall back to legacy form
+    }
+  } else if (formConfigSource === 'custom' && settings?.formConfig) {
+    resolvedFormConfig = settings.formConfig;
+  }
+  // formConfigSource === 'legacy' or null formConfig → resolvedFormConfig stays null → legacy form
 
   const customization = {
     accentColor: settings?.intakeAccentColor || '#ff964f',
@@ -135,7 +161,7 @@ export default async function PublicApplyPage({
       trustLine={`Your information is shared only with ${agentName} and used solely for rental inquiries.`}
       customization={customization}
     >
-      <ApplicationFormLoader slug={slug} businessName={businessName} customization={customization} />
+      <ApplicationFormLoader slug={slug} businessName={businessName} customization={customization} formConfig={resolvedFormConfig} />
     </PublicPageShell>
   );
 }
