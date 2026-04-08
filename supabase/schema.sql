@@ -127,6 +127,7 @@ CREATE TABLE IF NOT EXISTS "Contact" (
   "applicationRef"        text,
   "applicationStatus"     text,
   "applicationStatusNote" text,
+  "statusPortalToken"     text UNIQUE,
   "consentGiven"          boolean,
   "consentTimestamp"      timestamptz,
   "consentIp"             text,
@@ -347,6 +348,26 @@ CREATE TABLE IF NOT EXISTS "FormDraft" (
   "updatedAt"         timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS "ApplicationMessage" (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "contactId" text NOT NULL REFERENCES "Contact"(id) ON DELETE CASCADE,
+  "spaceId"   text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  "senderType" text NOT NULL CHECK ("senderType" IN ('applicant', 'realtor')),
+  content     text NOT NULL CHECK (char_length(content) <= 2000),
+  "readAt"    timestamptz,
+  "createdAt" timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS "ApplicationStatusUpdate" (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "contactId" text NOT NULL REFERENCES "Contact"(id) ON DELETE CASCADE,
+  "spaceId"   text NOT NULL REFERENCES "Space"(id) ON DELETE CASCADE,
+  "fromStatus" text,
+  "toStatus"  text NOT NULL,
+  note        text,
+  "createdAt" timestamptz NOT NULL DEFAULT now()
+);
+
 -- ============================================================
 -- Migrations: ADD COLUMN IF NOT EXISTS for existing databases
 -- Runs before indexes so columns exist when indexes are created.
@@ -363,6 +384,7 @@ ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "stageChangedAt"        timestamp
 ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "applicationRef"        text;
 ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "applicationStatus"     text;
 ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "applicationStatusNote" text;
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "statusPortalToken"     text UNIQUE;
 ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "consentGiven"          boolean;
 ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "consentTimestamp"      timestamptz;
 ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "consentIp"             text;
@@ -427,6 +449,22 @@ CREATE INDEX IF NOT EXISTS idx_contact_space_id    ON "Contact"("spaceId");
 CREATE INDEX IF NOT EXISTS idx_contact_tags        ON "Contact" USING gin(tags);
 CREATE INDEX IF NOT EXISTS idx_contact_email       ON "Contact"(email);
 CREATE INDEX IF NOT EXISTS idx_contact_phone       ON "Contact"(phone);
+CREATE INDEX IF NOT EXISTS idx_contact_status_portal_token
+  ON "Contact"("statusPortalToken") WHERE "statusPortalToken" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_contact_application_ref
+  ON "Contact"("applicationRef") WHERE "applicationRef" IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_app_message_contact
+  ON "ApplicationMessage"("contactId", "createdAt" ASC);
+CREATE INDEX IF NOT EXISTS idx_app_message_space
+  ON "ApplicationMessage"("spaceId");
+CREATE INDEX IF NOT EXISTS idx_app_message_unread
+  ON "ApplicationMessage"("contactId", "readAt") WHERE "readAt" IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_app_status_update_contact
+  ON "ApplicationStatusUpdate"("contactId", "createdAt" ASC);
+CREATE INDEX IF NOT EXISTS idx_app_status_update_space
+  ON "ApplicationStatusUpdate"("spaceId");
 
 CREATE INDEX IF NOT EXISTS idx_dealstage_space_id  ON "DealStage"("spaceId");
 CREATE INDEX IF NOT EXISTS idx_deal_space_id       ON "Deal"("spaceId");
@@ -522,6 +560,8 @@ ALTER TABLE "TourWaitlist"            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "FormAnalyticsEvent"      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "FormDraft"               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "DocumentEmbedding"       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ApplicationMessage"      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ApplicationStatusUpdate" ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================
 -- reorder_deal: atomically shift positions and move a deal

@@ -339,6 +339,9 @@ export async function POST(req: NextRequest) {
     // Generate a unique application reference for the status page
     const applicationRef = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
 
+    // Generate a secure portal token for applicant access
+    const statusPortalToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+
     if (existingRecentLeads?.length) {
       const normalizedPhone = normalizePhone(contactPhone);
       const normalizedEmail = (contactEmail ?? '').trim().toLowerCase();
@@ -409,6 +412,7 @@ export async function POST(req: NextRequest) {
       sourceLabel: 'intake-form',
       applicationData,
       applicationRef,
+      statusPortalToken,
       applicationStatus: 'received',
       consentGiven: privacyConsent === true ? true : privacyConsent === false ? false : null,
       consentTimestamp: privacyConsent === true ? new Date().toISOString() : null,
@@ -428,6 +432,17 @@ export async function POST(req: NextRequest) {
     if (insertError) throw insertError;
     const contact = contacts![0] as Contact;
     console.log('[APPLY-DEBUG] 5. Contact created:', contact?.id);
+
+    // Create initial status update record for audit trail
+    await supabase.from('ApplicationStatusUpdate').insert({
+      contactId: contact.id,
+      spaceId: space.id,
+      fromStatus: null,
+      toStatus: 'received',
+      note: null,
+    }).then(({ error: auditErr }) => {
+      if (auditErr) console.warn('[apply] Initial status audit insert failed (non-fatal):', auditErr);
+    });
 
     console.info('[apply] submission persisted', {
       contactId: contact.id,
@@ -531,6 +546,7 @@ export async function POST(req: NextRequest) {
           applicationRef,
           leadType: contactLeadType,
           customMessage: intakeConfirmationEmail,
+          statusPortalToken,
         }).catch((confirmErr) => {
           console.error('[apply] Applicant confirmation email failed:', confirmErr);
         })

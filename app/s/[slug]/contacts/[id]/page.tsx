@@ -29,6 +29,7 @@ import { FollowUpSuggestions } from '@/components/contacts/follow-up-suggestions
 import { StageProgression } from '@/components/contacts/stage-progression';
 import { RescoreButton } from '@/components/contacts/rescore-button';
 import { ApplicationStatusControl } from '@/components/contacts/application-status-control';
+import { ApplicationStatusManager } from '@/components/contacts/application-status-manager';
 import { PdfExportButton } from '@/components/contacts/pdf-export-button';
 import { CollapsibleSection } from '@/components/contacts/collapsible-section';
 import { DynamicApplicationDisplay } from '@/components/contacts/dynamic-application-display';
@@ -388,9 +389,9 @@ export default async function ClientDetailPage({
               <PdfExportButton contactId={contact.id} />
             </div>
           </div>
-          {/* Application status control */}
+          {/* Application status manager with messaging */}
           <div className="px-4 sm:px-6 py-3 border-b border-border/50">
-            <ApplicationStatusControl
+            <ApplicationStatusManager
               contactId={contact.id}
               currentStatus={contact.applicationStatus ?? 'received'}
               statusNote={contact.applicationStatusNote ?? null}

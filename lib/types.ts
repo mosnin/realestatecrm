@@ -147,6 +147,7 @@ export type Contact = {
   applicationStatus: string | null;
   applicationStatusNote: string | null;
   applicationRef: string | null;
+  statusPortalToken: string | null;
   // Consent tracking (read-only after capture)
   consentGiven: boolean | null;
   consentTimestamp: Date | null;
@@ -453,3 +454,35 @@ export type FormAnalyticsEvent = {
   metadata: Record<string, unknown> | null;
   createdAt: Date;
 };
+
+// ── Application Portal Types ──
+
+export type ApplicationMessageSenderType = 'applicant' | 'realtor';
+
+export type ApplicationMessage = {
+  id: string;
+  contactId: string;
+  spaceId: string;
+  senderType: ApplicationMessageSenderType;
+  content: string;
+  readAt: Date | null;
+  createdAt: Date;
+};
+
+export type ApplicationStatusUpdate = {
+  id: string;
+  contactId: string;
+  spaceId: string;
+  fromStatus: string | null;
+  toStatus: string;
+  note: string | null;
+  createdAt: Date;
+};
+
+export type ApplicationStatus =
+  | 'received'
+  | 'under_review'
+  | 'tour_scheduled'
+  | 'approved'
+  | 'declined'
+  | 'waitlisted';
