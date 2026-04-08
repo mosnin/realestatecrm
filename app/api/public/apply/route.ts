@@ -16,6 +16,7 @@ import { notifyNewLead } from '@/lib/notify';
 import { sendApplicationConfirmation } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { formConfigSchema, type IntakeFormConfig, type FormQuestion } from '@/lib/form-config-schema';
+import { getFormConfigs, getDefaultFormConfig } from '@/lib/form-builder';
 
 /** Parse budget/rent range strings like 'under_1500', '1500_2000', '1m_plus' to a midpoint number. */
 function parseBudgetToNumber(val: unknown): number | null {
@@ -50,34 +51,71 @@ function parseBudgetToNumber(val: unknown): number | null {
 // ── Dynamic form config helpers ───────────────────────────────────────────
 
 /**
- * Fetch the active form config for a space. Priority:
- *   1. SpaceSetting.formConfig (custom)
- *   2. Brokerage.brokerageFormConfig (brokerage-level)
- *   3. null (use legacy schema)
+ * Resolve the correct form config for a space + lead type using the dual config system.
+ *
+ * Fallback chain:
+ *   1. Dual config: SpaceSetting.[rental|buyer]FormConfig (custom per-agent)
+ *   2. Legacy single: SpaceSetting.formConfig (if leadType matches)
+ *   3. Brokerage dual: Brokerage.[brokerage[Rental|Buyer]FormConfig]
+ *   4. Brokerage legacy: Brokerage.brokerageFormConfig (if leadType matches)
+ *   5. null (use legacy schema / default template)
  */
-async function fetchFormConfig(spaceId: string, brokerageId: string | null): Promise<IntakeFormConfig | null> {
-  // Check space-level config first
-  const { data: spaceSetting } = await supabase
-    .from('SpaceSetting')
-    .select('formConfig, formConfigSource')
-    .eq('spaceId', spaceId)
-    .maybeSingle();
+async function fetchFormConfigForLeadType(
+  spaceId: string,
+  brokerageId: string | null,
+  leadType: 'rental' | 'buyer',
+): Promise<IntakeFormConfig | null> {
+  try {
+    const dual = await getFormConfigs(spaceId, brokerageId);
 
-  if (spaceSetting?.formConfig && spaceSetting.formConfigSource !== 'legacy') {
-    return spaceSetting.formConfig as IntakeFormConfig;
+    const config = leadType === 'buyer'
+      ? dual.buyer
+      : dual.rental;
+
+    if (config) return config;
+  } catch (err) {
+    console.warn('[apply] getFormConfigs failed, trying legacy fetch', { spaceId, err });
   }
 
-  // Fall back to brokerage-level config
-  if (brokerageId) {
-    const { data: brokerage } = await supabase
-      .from('Brokerage')
-      .select('brokerageFormConfig')
-      .eq('id', brokerageId)
+  // Legacy fallback: try the single formConfig column directly
+  try {
+    const { data: spaceSetting } = await supabase
+      .from('SpaceSetting')
+      .select('formConfig, formConfigSource')
+      .eq('spaceId', spaceId)
       .maybeSingle();
 
-    if (brokerage?.brokerageFormConfig) {
-      return brokerage.brokerageFormConfig as IntakeFormConfig;
+    if (spaceSetting?.formConfig && spaceSetting.formConfigSource !== 'legacy') {
+      const parsed = formConfigSchema.safeParse(spaceSetting.formConfig);
+      if (parsed.success) {
+        // Only use if the leadType matches or is 'general'
+        const configLeadType = parsed.data.leadType;
+        if (configLeadType === leadType || configLeadType === 'general') {
+          return parsed.data;
+        }
+      }
     }
+
+    // Fall back to brokerage-level config
+    if (brokerageId) {
+      const { data: brokerage } = await supabase
+        .from('Brokerage')
+        .select('brokerageFormConfig')
+        .eq('id', brokerageId)
+        .maybeSingle();
+
+      if (brokerage?.brokerageFormConfig) {
+        const parsed = formConfigSchema.safeParse(brokerage.brokerageFormConfig);
+        if (parsed.success) {
+          const configLeadType = parsed.data.leadType;
+          if (configLeadType === leadType || configLeadType === 'general') {
+            return parsed.data;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[apply] legacy fetchFormConfig also failed', { spaceId, err });
   }
 
   return null;
@@ -208,16 +246,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Space not found' }, { status: 404 });
     }
 
+    // ── Extract leadType from the raw payload ─────────────────────────────
+    // The "Getting Started" step sends leadType: 'rental' | 'buyer'.
+    // We need this BEFORE fetching the form config so we fetch the correct one.
+    const rawBody = requestBody as Record<string, unknown>;
+    const rawLeadType = rawBody.leadType;
+    const resolvedLeadType: 'rental' | 'buyer' =
+      rawLeadType === 'buyer' ? 'buyer' : 'rental';
+
     // ── Determine if this space uses a dynamic form config ────────────────
+    // Fetch the CORRECT config based on leadType (rental vs buyer)
     let formConfig: IntakeFormConfig | null = null;
     try {
-      const rawConfig = await fetchFormConfig(space.id, space.brokerageId);
+      const rawConfig = await fetchFormConfigForLeadType(space.id, space.brokerageId, resolvedLeadType);
       if (rawConfig) {
         // Re-validate the stored config to guard against corrupt data
         formConfig = formConfigSchema.parse(rawConfig);
       }
     } catch (err) {
-      console.warn('[apply] form config invalid or fetch failed, falling back to legacy', { spaceId: space.id, err });
+      console.warn('[apply] form config invalid or fetch failed, falling back to legacy', {
+        spaceId: space.id,
+        leadType: resolvedLeadType,
+        err,
+      });
       formConfig = null;
     }
 
@@ -254,7 +305,9 @@ export async function POST(req: NextRequest) {
       contactEmail = extracted.email;
       contactPhone = extracted.phone;
       contactNotes = extracted.notes;
-      contactLeadType = formConfig.leadType === 'general' ? 'rental' : formConfig.leadType;
+      // Use the resolved leadType from the "Getting Started" step, not the config's leadType
+      // (the config's leadType reflects which form template it is, but the user's choice is authoritative)
+      contactLeadType = resolvedLeadType;
       contactBudget = parseBudgetToNumber(data.monthlyRent ?? data.buyerBudget ?? data.monthlyGrossIncome ?? null);
       contactPreferences = typeof data.propertyAddress === 'string' ? data.propertyAddress : null;
       contactAddress = typeof data.currentAddress === 'string' ? data.currentAddress : null;
@@ -283,7 +336,8 @@ export async function POST(req: NextRequest) {
       contactName = payload.legalName;
       contactEmail = payload.email ?? null;
       contactPhone = payload.phone;
-      contactLeadType = payload.leadType ?? 'rental';
+      // Use resolvedLeadType which was extracted from raw body before validation
+      contactLeadType = resolvedLeadType;
       contactBudget = parseBudgetToNumber(
         payload.leadType === 'buyer'
           ? (payload.buyerBudget ?? payload.monthlyGrossIncome ?? null)
@@ -406,6 +460,7 @@ export async function POST(req: NextRequest) {
       type: 'QUALIFICATION',
       properties: [],
       leadType: contactLeadType,
+      formLeadType: contactLeadType,
       tags: ['application-link', 'new-lead'],
       scoringStatus: 'pending',
       scoreLabel: 'unscored',

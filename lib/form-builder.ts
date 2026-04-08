@@ -60,40 +60,19 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
   version: 1,
   leadType: 'rental',
   sections: [
-    // ── Section 0 (Step 1): Getting Started ──
-    {
-      id: '10000000-0000-4000-a000-000000000000',
-      title: 'Getting Started',
-      description: 'What are you looking for?',
-      position: 0,
-      questions: [
-        {
-          id: '10000000-0000-4000-b000-000000000000',
-          type: 'radio',
-          label: 'Lead type',
-          required: true,
-          position: 0,
-          options: [
-            { value: 'rental', label: "I'm looking to rent" },
-            { value: 'buyer', label: "I'm looking to buy" },
-          ],
-          scoring: { weight: 0 },
-        },
-      ],
-    },
-    // ── Section 1 (Step 2): Basics ──
+    // ── Section 0 (Step 1): Basics ──
     {
       id: '10000000-0000-4000-a000-000000000001',
       title: "Let's start with the basics",
       description: 'We just need a few details to get going.',
-      position: 1,
+      position: 0,
       questions: generateSystemFields(),
     },
-    // ── Section 2 (Step 3): Move Timing ──
+    // ── Section 1 (Step 2): Move Timing ──
     {
       id: '10000000-0000-4000-a000-000000000002',
       title: 'When are you planning to move?',
-      position: 2,
+      position: 1,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000001',
@@ -119,11 +98,11 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
-    // ── Section 3 (Step 4): Location ──
+    // ── Section 2 (Step 3): Location ──
     {
       id: '10000000-0000-4000-a000-000000000003',
       title: 'Where are you looking to live?',
-      position: 3,
+      position: 2,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000002',
@@ -136,43 +115,29 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
-    // ── Section 4 (Step 5): Budget ──
+    // ── Section 3 (Step 4): Budget ──
     {
       id: '10000000-0000-4000-a000-000000000004',
       title: "What's your monthly rent budget?",
-      position: 4,
+      position: 3,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000003',
-          type: 'radio',
+          type: 'number',
           label: 'Monthly budget',
+          placeholder: 'e.g., 2500',
           required: true,
           position: 0,
-          options: [
-            { value: 'under_1500', label: 'Under $1,500' },
-            { value: '1500_2000', label: '$1,500 - $2,000' },
-            { value: '2000_2500', label: '$2,000 - $2,500' },
-            { value: '2500_3500', label: '$2,500 - $3,500' },
-            { value: '3500_plus', label: '$3,500+' },
-          ],
-          scoring: {
-            weight: 6,
-            mappings: [
-              { value: 'under_1500', points: 4 },
-              { value: '1500_2000', points: 6 },
-              { value: '2000_2500', points: 7 },
-              { value: '2500_3500', points: 8 },
-              { value: '3500_plus', points: 10 },
-            ],
-          },
+          scoring: { weight: 6 },
+          validation: { min: 0 },
         },
       ],
     },
-    // ── Section 5 (Step 6): Income ──
+    // ── Section 4 (Step 5): Income ──
     {
       id: '10000000-0000-4000-a000-000000000005',
       title: "What's your estimated monthly income?",
-      position: 5,
+      position: 4,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000004',
@@ -200,11 +165,11 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
-    // ── Section 6 (Step 7): Employment ──
+    // ── Section 5 (Step 6): Employment ──
     {
       id: '10000000-0000-4000-a000-000000000006',
       title: "What's your current work situation?",
-      position: 6,
+      position: 5,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000005',
@@ -232,11 +197,11 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
-    // ── Section 7 (Step 8): Household ──
+    // ── Section 6 (Step 7): Household ──
     {
       id: '10000000-0000-4000-a000-000000000007',
       title: 'Tell us about your household',
-      position: 7,
+      position: 6,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000006',
@@ -262,12 +227,12 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
-    // ── Section 8 (Step 9): Additional Info ──
+    // ── Section 7 (Step 8): Additional Info ──
     {
       id: '10000000-0000-4000-a000-000000000008',
       title: 'Anything we should know?',
       description: 'This step is optional. Share anything that might help.',
-      position: 8,
+      position: 7,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000008',
@@ -281,11 +246,11 @@ export const DEFAULT_RENTAL_FORM_CONFIG: IntakeFormConfig = {
         },
       ],
     },
-    // ── Section 9 (Step 10): Ready? ──
+    // ── Section 8 (Step 9): Ready? ──
     {
       id: '10000000-0000-4000-a000-000000000009',
       title: 'If you find the right place, are you ready to move forward?',
-      position: 9,
+      position: 8,
       questions: [
         {
           id: '10000000-0000-4000-b000-000000000009',
@@ -681,6 +646,142 @@ export async function getFormConfig(
 
   // Legacy mode (explicit or implicit)
   return null;
+}
+
+// ── Dual form config fetching (rental + buyer) ──
+
+export type DualFormConfigs = {
+  rental: IntakeFormConfig | null;
+  buyer: IntakeFormConfig | null;
+  source: 'custom' | 'brokerage' | 'legacy';
+};
+
+/** Safely parse a raw JSON value as IntakeFormConfig, returning null on failure. */
+function safeParseConfig(raw: unknown): IntakeFormConfig | null {
+  if (!raw) return null;
+  const result = formConfigSchema.safeParse(raw);
+  return result.success ? result.data : null;
+}
+
+/**
+ * Fetches BOTH rental and buyer form configs for a space.
+ *
+ * Fallback chain per lead type:
+ *   1. SpaceSetting.[rental|buyer]FormConfig (dual config columns)
+ *   2. SpaceSetting.formConfig (legacy single column, treated as rental or buyer based on its leadType)
+ *   3. Brokerage.[brokerage[Rental|Buyer]FormConfig] (if formConfigSource === 'brokerage')
+ *   4. Brokerage.brokerageFormConfig (legacy single brokerage column)
+ *   5. null (caller should use DEFAULT_*_FORM_CONFIG or legacy scoring)
+ */
+export async function getFormConfigs(
+  spaceId: string,
+  brokerageId?: string | null,
+): Promise<DualFormConfigs> {
+  const { data: setting, error: settingError } = await supabase
+    .from('SpaceSetting')
+    .select('"formConfig", "formConfigSource", "rentalFormConfig", "buyerFormConfig"')
+    .eq('spaceId', spaceId)
+    .maybeSingle();
+
+  if (settingError || !setting) {
+    return { rental: null, buyer: null, source: 'legacy' };
+  }
+
+  const source = (setting.formConfigSource as string) || 'legacy';
+
+  if (source === 'custom') {
+    let rentalConfig = safeParseConfig(setting.rentalFormConfig);
+    let buyerConfig = safeParseConfig(setting.buyerFormConfig);
+
+    // Legacy compatibility: if no dual configs exist but single formConfig does,
+    // route it to the correct lead type based on its leadType field
+    if (!rentalConfig && !buyerConfig && setting.formConfig) {
+      const legacySingle = safeParseConfig(setting.formConfig);
+      if (legacySingle) {
+        if (legacySingle.leadType === 'buyer') {
+          buyerConfig = legacySingle;
+        } else {
+          // 'rental' or 'general' → treat as rental
+          rentalConfig = legacySingle;
+        }
+      }
+    }
+
+    return { rental: rentalConfig, buyer: buyerConfig, source: 'custom' };
+  }
+
+  if (source === 'brokerage') {
+    // Resolve brokerageId if not provided
+    let resolvedBrokerageId = brokerageId;
+    if (!resolvedBrokerageId) {
+      const { data: space } = await supabase
+        .from('Space')
+        .select('"brokerageId"')
+        .eq('id', spaceId)
+        .maybeSingle();
+      resolvedBrokerageId = space?.brokerageId ?? null;
+    }
+
+    if (resolvedBrokerageId) {
+      const { data: brokerage } = await supabase
+        .from('Brokerage')
+        .select('"brokerageFormConfig", "brokerageRentalFormConfig", "brokerageBuyerFormConfig"')
+        .eq('id', resolvedBrokerageId)
+        .maybeSingle();
+
+      if (brokerage) {
+        let rentalConfig = safeParseConfig(brokerage.brokerageRentalFormConfig);
+        let buyerConfig = safeParseConfig(brokerage.brokerageBuyerFormConfig);
+
+        // Legacy compatibility: single brokerageFormConfig
+        if (!rentalConfig && !buyerConfig && brokerage.brokerageFormConfig) {
+          const legacySingle = safeParseConfig(brokerage.brokerageFormConfig);
+          if (legacySingle) {
+            if (legacySingle.leadType === 'buyer') {
+              buyerConfig = legacySingle;
+            } else {
+              rentalConfig = legacySingle;
+            }
+          }
+        }
+
+        return { rental: rentalConfig, buyer: buyerConfig, source: 'brokerage' };
+      }
+    }
+
+    return { rental: null, buyer: null, source: 'brokerage' };
+  }
+
+  // Legacy mode
+  return { rental: null, buyer: null, source: 'legacy' };
+}
+
+/**
+ * Resolves the correct form config for a specific lead type using the full fallback chain:
+ *   1. Custom or brokerage config for the specific lead type
+ *   2. Default template for the lead type
+ *
+ * Returns { config, isCustom } so callers know whether to use dynamic scoring
+ * (custom config with user-defined weights) vs default/legacy scoring.
+ */
+export async function getFormConfigForLeadType(
+  spaceId: string,
+  leadType: 'rental' | 'buyer',
+  brokerageId?: string | null,
+): Promise<{ config: IntakeFormConfig; isCustom: boolean }> {
+  const dual = await getFormConfigs(spaceId, brokerageId);
+
+  const customConfig = leadType === 'buyer'
+    ? dual.buyer
+    : dual.rental;
+
+  if (customConfig) {
+    return { config: customConfig, isCustom: true };
+  }
+
+  // Fall back to default template (still usable for dynamic scoring, but
+  // the caller may choose to use legacy scoring if they prefer)
+  return { config: getDefaultFormConfig(leadType), isCustom: false };
 }
 
 /**

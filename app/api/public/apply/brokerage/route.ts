@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
-import { scoreLeadApplication } from '@/lib/lead-scoring';
+import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
 import type { LeadScoringResult } from '@/lib/lead-scoring';
-import type { Contact } from '@/lib/types';
+import type { Contact, IntakeFormConfig } from '@/lib/types';
 import {
   applicationFingerprintKey,
   buildApplicationData,
@@ -14,6 +14,8 @@ import { notifyBroker } from '@/lib/broker-notify';
 import { sendApplicationConfirmation } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
+import { getFormConfigs, getDefaultFormConfig } from '@/lib/form-builder';
+import { formConfigSchema, type FormQuestion } from '@/lib/form-config-schema';
 
 /** Parse budget/rent range strings to a midpoint number for the DB. */
 function parseBudgetToNumber(val: unknown): number | null {
@@ -52,6 +54,147 @@ const brokerageApplicationSchema = publicApplicationSchema
     brokerageId: z.string().uuid('Invalid brokerage ID'),
   });
 
+// ── Dynamic form config helpers (mirrors main apply route) ──────────────
+
+/**
+ * Resolve the correct form config for a brokerage submission.
+ *
+ * Fallback chain:
+ *   1. Brokerage dual config: [brokerageRentalFormConfig | brokerageBuyerFormConfig]
+ *   2. Brokerage legacy: brokerageFormConfig (if leadType matches)
+ *   3. Space dual config: [rentalFormConfig | buyerFormConfig]
+ *   4. Space legacy: formConfig (if leadType matches)
+ *   5. null (use legacy scoring)
+ */
+async function fetchBrokerageFormConfig(
+  brokerageId: string,
+  spaceId: string,
+  leadType: 'rental' | 'buyer',
+): Promise<IntakeFormConfig | null> {
+  try {
+    // First try brokerage-level configs directly
+    const { data: brokerage } = await supabase
+      .from('Brokerage')
+      .select('"brokerageFormConfig", "brokerageRentalFormConfig", "brokerageBuyerFormConfig"')
+      .eq('id', brokerageId)
+      .maybeSingle();
+
+    if (brokerage) {
+      // Try dual config first
+      const dualRaw = leadType === 'buyer'
+        ? brokerage.brokerageBuyerFormConfig
+        : brokerage.brokerageRentalFormConfig;
+      if (dualRaw) {
+        const parsed = formConfigSchema.safeParse(dualRaw);
+        if (parsed.success) return parsed.data;
+      }
+
+      // Try legacy single config
+      if (brokerage.brokerageFormConfig) {
+        const parsed = formConfigSchema.safeParse(brokerage.brokerageFormConfig);
+        if (parsed.success) {
+          const configLeadType = parsed.data.leadType;
+          if (configLeadType === leadType || configLeadType === 'general') {
+            return parsed.data;
+          }
+        }
+      }
+    }
+
+    // Fall back to space-level configs
+    const dual = await getFormConfigs(spaceId, brokerageId);
+    const spaceConfig = leadType === 'buyer' ? dual.buyer : dual.rental;
+    if (spaceConfig) return spaceConfig;
+  } catch (err) {
+    console.warn('[apply/brokerage] form config fetch failed', { brokerageId, spaceId, leadType, err });
+  }
+
+  return null;
+}
+
+/**
+ * Build a Zod schema dynamically from the IntakeFormConfig.
+ */
+function buildDynamicSchema(config: IntakeFormConfig) {
+  const shape: Record<string, z.ZodTypeAny> = {
+    brokerageId: z.string().uuid(),
+  };
+
+  const allQuestions: FormQuestion[] = [];
+  for (const section of config.sections) {
+    for (const question of section.questions) {
+      allQuestions.push(question);
+
+      let fieldSchema: z.ZodTypeAny;
+
+      switch (question.type) {
+        case 'email':
+          fieldSchema = question.required
+            ? z.string().trim().min(1).email().max(255)
+            : z.string().trim().email().max(255).optional().or(z.literal(''));
+          break;
+        case 'phone':
+          fieldSchema = question.required
+            ? z.string().trim().min(1).max(40)
+            : z.string().trim().max(40).optional().or(z.literal(''));
+          break;
+        case 'number':
+          fieldSchema = question.required
+            ? z.union([z.number(), z.string()]).pipe(z.coerce.number())
+            : z.union([z.number(), z.string(), z.null(), z.undefined()]).optional();
+          break;
+        case 'checkbox':
+          fieldSchema = question.required
+            ? z.boolean()
+            : z.boolean().optional();
+          break;
+        case 'multi_select':
+          fieldSchema = question.required
+            ? z.array(z.string()).min(1)
+            : z.array(z.string()).optional();
+          break;
+        case 'date':
+        case 'text':
+        case 'textarea':
+        case 'select':
+        case 'radio':
+        default:
+          fieldSchema = question.required
+            ? z.string().trim().min(1).max(4000)
+            : z.string().trim().max(4000).optional().or(z.literal(''));
+          break;
+      }
+
+      shape[question.id] = fieldSchema;
+    }
+  }
+
+  return { schema: z.object(shape).passthrough(), allQuestions };
+}
+
+/**
+ * Extract standard contact fields from dynamic form submission.
+ */
+function extractContactFields(data: Record<string, unknown>, config: IntakeFormConfig) {
+  const name = (data.name as string) ?? '';
+  const email = (data.email as string) || null;
+  const phone = (data.phone as string) ?? '';
+
+  const noteParts: string[] = [];
+  for (const section of config.sections) {
+    for (const question of section.questions) {
+      if (question.system) continue;
+      const val = data[question.id];
+      if (val != null && val !== '' && typeof val !== 'boolean') {
+        const valStr = Array.isArray(val) ? val.join(', ') : String(val);
+        if (valStr) noteParts.push(`${question.label}: ${valStr}`);
+      }
+    }
+  }
+
+  return { name, email, phone, notes: noteParts.length > 0 ? noteParts.join('\n') : null };
+}
+
 export async function POST(req: NextRequest) {
   // ── IP-based rate limiting (10 submissions / IP / hour) ──────────────────
   const ip =
@@ -74,29 +217,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const parsed = brokerageApplicationSchema.safeParse(requestBody);
-  if (!parsed.success) {
-    console.warn('[apply/brokerage] validation failed', {
-      issues: parsed.error.issues,
-    });
+  // Extract brokerageId and leadType from raw body before validation
+  const rawBody = typeof requestBody === 'object' && requestBody !== null
+    ? (requestBody as Record<string, unknown>)
+    : {};
+  const rawBrokerageId = rawBody.brokerageId;
+  if (!rawBrokerageId || typeof rawBrokerageId !== 'string') {
     return NextResponse.json({ error: 'Invalid submission data' }, { status: 400 });
   }
 
-  const payload = parsed.data;
-
-  // Build a fingerprint key using brokerageId instead of slug
-  const fingerprint = applicationFingerprintKey({
-    ...payload,
-    slug: `brokerage:${payload.brokerageId}`,
-  });
-  const idempotencyKey = `apply-brokerage:idempotency:${fingerprint}`;
+  const rawLeadType = rawBody.leadType;
+  const resolvedLeadType: 'rental' | 'buyer' =
+    rawLeadType === 'buyer' ? 'buyer' : 'rental';
 
   try {
     // ── Look up the Brokerage ──────────────────────────────────────────────
     const { data: brokerage, error: brokerageError } = await supabase
       .from('Brokerage')
       .select('id, name, ownerId, status, privacyPolicyHtml')
-      .eq('id', payload.brokerageId)
+      .eq('id', rawBrokerageId)
       .maybeSingle();
     if (brokerageError) throw brokerageError;
     if (!brokerage) {
@@ -107,9 +246,6 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Find the brokerage-linked Space owned by the broker owner ──────────
-    // Prefer explicit brokerage linkage. For legacy data where brokerageId
-    // has not been backfilled yet, allow a safe fallback ONLY when the owner
-    // has exactly one space.
     let space: { id: string; slug: string; name: string; ownerId: string; brokerageId: string | null } | null = null;
 
     const { data: linkedSpace, error: spaceError } = await supabase
@@ -149,6 +285,121 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Brokerage configuration error' }, { status: 500 });
     }
 
+    // ── Fetch the correct form config based on leadType ────────────────────
+    let formConfig: IntakeFormConfig | null = null;
+    try {
+      formConfig = await fetchBrokerageFormConfig(brokerage.id, space.id, resolvedLeadType);
+      if (formConfig) {
+        formConfig = formConfigSchema.parse(formConfig);
+      }
+    } catch (err) {
+      console.warn('[apply/brokerage] form config invalid or fetch failed, falling back to legacy', {
+        brokerageId: brokerage.id,
+        spaceId: space.id,
+        leadType: resolvedLeadType,
+        err,
+      });
+      formConfig = null;
+    }
+
+    // ── Validate & extract submission data ────────────────────────────────
+    let contactName: string;
+    let contactEmail: string | null;
+    let contactPhone: string;
+    let contactNotes: string | null;
+    let contactBudget: number | null;
+    let contactPreferences: string | null;
+    let contactAddress: string | null;
+    let contactLeadType: 'rental' | 'buyer' = resolvedLeadType;
+    let applicationData: Record<string, unknown>;
+    let formConfigSnapshot: IntakeFormConfig | null = null;
+    let privacyConsent: boolean | undefined;
+
+    if (formConfig) {
+      // ── Dynamic form config path ──────────────────────────────────────
+      console.log('[apply/brokerage] using dynamic form config', {
+        brokerageId: brokerage.id,
+        spaceId: space.id,
+        leadType: resolvedLeadType,
+        version: formConfig.version,
+      });
+      const { schema: dynamicSchema } = buildDynamicSchema(formConfig);
+
+      const parsed = dynamicSchema.safeParse(requestBody);
+      if (!parsed.success) {
+        console.warn('[apply/brokerage] dynamic validation failed', { issues: parsed.error.issues });
+        return NextResponse.json({ error: 'Invalid submission data', issues: parsed.error.issues }, { status: 400 });
+      }
+
+      const data = parsed.data as Record<string, unknown>;
+      const extracted = extractContactFields(data, formConfig);
+
+      contactName = extracted.name;
+      contactEmail = extracted.email;
+      contactPhone = extracted.phone;
+      contactNotes = extracted.notes;
+      contactBudget = parseBudgetToNumber(data.monthlyRent ?? data.buyerBudget ?? data.monthlyGrossIncome ?? null);
+      contactPreferences = typeof data.propertyAddress === 'string' ? data.propertyAddress : null;
+      contactAddress = typeof data.currentAddress === 'string' ? data.currentAddress : null;
+      privacyConsent = typeof data.privacyConsent === 'boolean' ? data.privacyConsent : undefined;
+      formConfigSnapshot = JSON.parse(JSON.stringify(formConfig));
+
+      applicationData = {
+        ...data,
+        submittedAt: new Date().toISOString(),
+        formConfigVersion: formConfig.version,
+        leadType: contactLeadType,
+        brokerageId: brokerage.id,
+        brokerageName: brokerage.name,
+      };
+    } else {
+      // ── Legacy path (backwards compatible) ────────────────────────────
+      const parsed = brokerageApplicationSchema.safeParse(requestBody);
+      if (!parsed.success) {
+        console.warn('[apply/brokerage] validation failed', { issues: parsed.error.issues });
+        return NextResponse.json({ error: 'Invalid submission data' }, { status: 400 });
+      }
+
+      const payload = parsed.data;
+      contactName = payload.legalName;
+      contactEmail = payload.email ?? null;
+      contactPhone = payload.phone ?? '';
+      contactBudget = parseBudgetToNumber(
+        resolvedLeadType === 'buyer'
+          ? (payload.buyerBudget ?? payload.monthlyGrossIncome ?? null)
+          : (payload.monthlyRent ?? payload.monthlyGrossIncome ?? null),
+      );
+      contactPreferences = payload.propertyAddress ?? null;
+      contactAddress = payload.currentAddress ?? null;
+      privacyConsent = payload.privacyConsent;
+
+      const noteParts: string[] = [];
+      if (payload.targetMoveInDate) noteParts.push(`Timeline: ${payload.targetMoveInDate}`);
+      if (payload.propertyAddress) noteParts.push(`Property: ${payload.propertyAddress}`);
+      if (payload.employmentStatus) noteParts.push(`Employment: ${payload.employmentStatus}`);
+      if (payload.monthlyGrossIncome != null) noteParts.push(`Income: $${payload.monthlyGrossIncome}/mo`);
+      if (payload.additionalNotes) noteParts.push(payload.additionalNotes);
+      contactNotes = noteParts.length > 0 ? noteParts.join('\n') : null;
+
+      const legacyAppData = buildApplicationData({
+        ...payload,
+        slug: `brokerage:${payload.brokerageId}`,
+      });
+      applicationData = {
+        ...legacyAppData,
+        brokerageId: brokerage.id,
+        brokerageName: brokerage.name,
+      };
+    }
+
+    const fingerprint = applicationFingerprintKey({
+      legalName: contactName,
+      phone: contactPhone,
+      email: contactEmail,
+      slug: `brokerage:${brokerage.id}`,
+    });
+    const idempotencyKey = `apply-brokerage:idempotency:${fingerprint}`;
+
     // ── Idempotency lock ───────────────────────────────────────────────────
     let idempotencyLockAcquired = false;
     try {
@@ -167,19 +418,18 @@ export async function POST(req: NextRequest) {
       .from('Contact')
       .select('id, phone, email, scoringStatus, leadScore, scoreLabel, scoreSummary, scoreDetails')
       .eq('spaceId', space.id)
-      .eq('name', payload.legalName)
+      .eq('name', contactName)
       .contains('tags', ['brokerage-lead'])
       .gte('createdAt', duplicateCutoff)
       .order('createdAt', { ascending: false })
       .limit(5);
     if (dupError) throw dupError;
 
-    // Generate a unique application reference for the status page
     const applicationRef = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
 
     if (existingRecentLeads?.length) {
-      const normalizedPhone = normalizePhone(payload.phone ?? '');
-      const normalizedEmail = (payload.email ?? '').trim().toLowerCase();
+      const normalizedPhone = normalizePhone(contactPhone ?? '');
+      const normalizedEmail = (contactEmail ?? '').trim().toLowerCase();
 
       const duplicate = (existingRecentLeads as Contact[]).find((lead) => {
         const phoneMatch =
@@ -206,7 +456,7 @@ export async function POST(req: NextRequest) {
     if (!idempotencyLockAcquired) {
       console.info('[apply/brokerage] proceeding without distributed lock', {
         spaceId: space.id,
-        brokerageId: payload.brokerageId,
+        brokerageId: brokerage.id,
         fingerprint,
       });
     }
@@ -228,55 +478,42 @@ export async function POST(req: NextRequest) {
       console.warn('[apply/brokerage] failed to fetch space settings', { spaceId: space.id, err });
     }
 
-    // ── Build application data ─────────────────────────────────────────────
-    const applicationData = buildApplicationData({
-      ...payload,
-      slug: `brokerage:${payload.brokerageId}`,
-    });
-
-    const noteParts: string[] = [];
-    if (payload.targetMoveInDate) noteParts.push(`Timeline: ${payload.targetMoveInDate}`);
-    if (payload.propertyAddress) noteParts.push(`Property: ${payload.propertyAddress}`);
-    if (payload.employmentStatus) noteParts.push(`Employment: ${payload.employmentStatus}`);
-    if (payload.monthlyGrossIncome != null) noteParts.push(`Income: $${payload.monthlyGrossIncome}/mo`);
-    if (payload.additionalNotes) noteParts.push(payload.additionalNotes);
-
     // ── Create Contact in the broker's space ───────────────────────────────
+    const contactInsert: Record<string, unknown> = {
+      id: crypto.randomUUID(),
+      spaceId: space.id,
+      brokerageId: brokerage.id,
+      name: contactName,
+      email: contactEmail,
+      phone: contactPhone,
+      budget: contactBudget,
+      preferences: contactPreferences,
+      address: contactAddress,
+      notes: contactNotes,
+      type: 'QUALIFICATION',
+      properties: [],
+      leadType: contactLeadType,
+      formLeadType: contactLeadType,
+      tags: ['brokerage-lead', 'new-lead'],
+      scoringStatus: 'pending',
+      scoreLabel: 'unscored',
+      sourceLabel: 'brokerage-intake',
+      applicationData,
+      applicationRef,
+      applicationStatus: 'received',
+      consentGiven: privacyConsent === true ? true : privacyConsent === false ? false : null,
+      consentTimestamp: privacyConsent === true ? new Date().toISOString() : null,
+      consentIp: privacyConsent === true ? ip : null,
+      consentPrivacyPolicyUrl: privacyConsent === true ? spacePrivacyPolicyUrl : null,
+    };
+
+    if (formConfigSnapshot) {
+      contactInsert.formConfigSnapshot = formConfigSnapshot;
+    }
+
     const { data: contacts, error: insertError } = await supabase
       .from('Contact')
-      .insert({
-        id: crypto.randomUUID(),
-        spaceId: space.id,
-        brokerageId: brokerage.id,
-        name: payload.legalName,
-        email: payload.email ?? null,
-        phone: payload.phone ?? null,
-        budget: parseBudgetToNumber(
-          payload.leadType === 'buyer'
-            ? (payload.buyerBudget ?? payload.monthlyGrossIncome ?? null)
-            : (payload.monthlyRent ?? payload.monthlyGrossIncome ?? null)
-        ),
-        preferences: payload.propertyAddress ?? null,
-        address: payload.currentAddress ?? null,
-        notes: noteParts.length > 0 ? noteParts.join('\n') : null,
-        type: 'QUALIFICATION',
-        properties: [],
-        tags: ['brokerage-lead', 'new-lead'],
-        scoringStatus: 'pending',
-        scoreLabel: 'unscored',
-        sourceLabel: 'brokerage-intake',
-        applicationData: {
-          ...applicationData,
-          brokerageId: brokerage.id,
-          brokerageName: brokerage.name,
-        },
-        applicationRef,
-        applicationStatus: 'received',
-        consentGiven: payload.privacyConsent === true ? true : payload.privacyConsent === false ? false : null,
-        consentTimestamp: payload.privacyConsent === true ? new Date().toISOString() : null,
-        consentIp: payload.privacyConsent === true ? ip : null,
-        consentPrivacyPolicyUrl: payload.privacyConsent === true ? spacePrivacyPolicyUrl : null,
-      })
+      .insert(contactInsert)
       .select();
     if (insertError) throw insertError;
     const contact = contacts![0] as Contact;
@@ -285,9 +522,11 @@ export async function POST(req: NextRequest) {
       contactId: contact.id,
       spaceId: space.id,
       brokerageId: brokerage.id,
+      dynamicForm: !!formConfigSnapshot,
+      leadType: contactLeadType,
     });
 
-    // ── AI scoring + notification (awaited before response) ─────────────────
+    // ── Scoring + notification (awaited before response) ──────────────────
     let scoring: LeadScoringResult = {
       scoringStatus: 'failed',
       leadScore: null,
@@ -297,14 +536,21 @@ export async function POST(req: NextRequest) {
     };
 
     try {
-      scoring = await scoreLeadApplication({
+      // Use dynamic scoring when we have a form config, legacy otherwise
+      scoring = await scoreLeadApplicationDynamic({
         contactId: contact.id,
-        name: payload.legalName,
-        email: payload.email ?? null,
-        phone: payload.phone ?? null,
-        budget: parseBudgetToNumber(payload.leadType === 'buyer' ? (payload.buyerBudget ?? null) : (payload.monthlyRent ?? null)),
-        applicationData,
-        leadType: payload.leadType ?? 'rental',
+        formConfig: formConfigSnapshot,
+        answers: formConfigSnapshot
+          ? (applicationData as Record<string, string | string[] | number | boolean>)
+          : undefined,
+        name: contactName,
+        email: contactEmail,
+        phone: contactPhone,
+        budget: contactBudget,
+        applicationData: !formConfigSnapshot
+          ? (applicationData as Record<string, unknown> & { legalName: string })
+          : undefined,
+        leadType: contactLeadType,
       });
 
       const { error: scoreUpdateError } = await supabase
@@ -357,8 +603,8 @@ export async function POST(req: NextRequest) {
     const brokerNotification = notifyBroker({
       brokerageId: brokerage.id,
       type: 'lead_hot',
-      title: `New brokerage lead: ${payload.legalName}`,
-      body: payload.phone ?? payload.email ?? 'New application submitted',
+      title: `New brokerage lead: ${contactName}`,
+      body: contactPhone ?? contactEmail ?? 'New application submitted',
       metadata: {
         contactId: contact.id,
         leadScore: scoring.leadScore,
@@ -369,14 +615,14 @@ export async function POST(req: NextRequest) {
       console.error('[apply/brokerage] brokerage notification failed', { contactId: contact.id, err });
     });
 
-    const applicantConfirmation = payload.email
+    const applicantConfirmation = contactEmail
       ? sendApplicationConfirmation({
-          toEmail: payload.email,
-          applicantName: payload.legalName,
+          toEmail: contactEmail,
+          applicantName: contactName,
           businessName,
-          slug: `brokerage:${payload.brokerageId}`,
+          slug: `brokerage:${brokerage.id}`,
           applicationRef,
-          leadType: payload.leadType ?? 'rental',
+          leadType: contactLeadType,
           customMessage: intakeConfirmationEmail,
         }).catch((confirmErr) => {
           console.error('[apply/brokerage] applicant confirmation email failed', { contactId: contact.id, confirmErr });
@@ -396,7 +642,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error('[apply/brokerage] unhandled submission failure', {
-      brokerageId: parsed.data.brokerageId,
+      brokerageId: rawBrokerageId,
       error,
     });
     return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 });
