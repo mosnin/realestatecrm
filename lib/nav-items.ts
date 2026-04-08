@@ -67,7 +67,7 @@ export const realtorNavItems: NavItem[] = [
       { href: '/leads', label: 'All Leads', exact: true },
       { href: '/leads?type=rental', label: 'Rental Leads' },
       { href: '/leads?type=buyer', label: 'Buyer Leads' },
-      { href: '/leads?type=hot', label: 'Hot Leads' },
+      { href: '/leads?tier=hot', label: 'Hot Leads' },
     ],
   },
   {

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
@@ -143,11 +143,28 @@ const brokerSettingsNavSections = [
 // Helpers: determine active state for nav items and children
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function isChildActive(child: NavChild, pathname: string, base: string): boolean {
-  const childPath = child.href.split('?')[0]; // strip query params
+function isChildActive(child: NavChild, pathname: string, base: string, searchParams?: string): boolean {
+  const [childPath, childQuery] = child.href.split('?');
   const fullHref = `${base}${childPath}`;
+
+  // If the child has query params, match both pathname AND query params
+  if (childQuery) {
+    if (pathname !== fullHref && !pathname.startsWith(fullHref + '/')) return false;
+    // Compare query params
+    const childParams = new URLSearchParams(childQuery);
+    const currentParams = new URLSearchParams(searchParams || '');
+    for (const [key, value] of childParams.entries()) {
+      if (currentParams.get(key) !== value) return false;
+    }
+    return true;
+  }
+
+  // No query params — use path matching
   if (child.exact) {
-    return pathname === fullHref;
+    // Exact match: pathname matches AND no filter query params present
+    const currentParams = new URLSearchParams(searchParams || '');
+    const hasFilterParams = currentParams.has('type') || currentParams.has('tier');
+    return pathname === fullHref && !hasFilterParams;
   }
   return pathname.startsWith(fullHref);
 }
@@ -242,6 +259,7 @@ function ShopifyNavItem({
   item,
   base,
   pathname,
+  searchParams,
   isExpanded,
   onToggle,
   badge,
@@ -249,6 +267,7 @@ function ShopifyNavItem({
   item: NavItem;
   base: string;
   pathname: string;
+  searchParams?: string;
   isExpanded: boolean;
   onToggle: () => void;
   badge?: React.ReactNode;
@@ -325,7 +344,7 @@ function ShopifyNavItem({
           <div className="ml-[18px] pl-3.5 py-1 space-y-0.5 border-l border-border/40">
             {item.children!.map((child) => {
               const childHref = `${base}${child.href}`;
-              const childActive = isChildActive(child, pathname, base);
+              const childActive = isChildActive(child, pathname, base, searchParams);
               return (
                 <Link
                   key={child.href}
@@ -645,6 +664,7 @@ function RealtorShopifyNav({
             item={item}
             base={base}
             pathname={pathname}
+            searchParams={searchParamsString}
             isExpanded={expandedKey === item.href}
             onToggle={() => handleToggle(item.href)}
             badge={badge}
@@ -671,6 +691,8 @@ export function Sidebar({
   brokerageMemberships = [],
 }: SidebarProps) {
   const pathname = usePathname();
+  const currentSearchParams = useSearchParams();
+  const searchParamsString = currentSearchParams?.toString() ?? '';
   const base = `/s/${slug}`;
   const { user } = useUser();
 
