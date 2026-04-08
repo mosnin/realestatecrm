@@ -204,7 +204,21 @@ export function ScoringPreview({ config, slug }: ScoringPreviewProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Build list of all questions (excluding system fields that have fixed test values)
+  // Evaluate section visibility based on current answers
+  const isSectionVisible = useCallback((section: { visibleWhen?: { questionId: string; operator: 'equals' | 'not_equals' | 'contains'; value: string } }) => {
+    if (!section.visibleWhen) return true;
+    const { questionId, operator, value: targetValue } = section.visibleWhen;
+    const currentAnswer = answers[questionId];
+    const strAnswer = Array.isArray(currentAnswer) ? currentAnswer.join(',') : (currentAnswer ?? '');
+    switch (operator) {
+      case 'equals': return strAnswer === targetValue;
+      case 'not_equals': return strAnswer !== targetValue;
+      case 'contains': return strAnswer.includes(targetValue);
+      default: return true;
+    }
+  }, [answers]);
+
+  // Build list of all questions from visible sections
   const allQuestions = useMemo(() => {
     const qs: { question: FormQuestion; sectionTitle: string }[] = [];
     for (const section of config.sections) {
@@ -214,6 +228,11 @@ export function ScoringPreview({ config, slug }: ScoringPreviewProps) {
     }
     return qs;
   }, [config]);
+
+  // Visible sections for rendering
+  const visibleSections = useMemo(() => {
+    return config.sections.filter((s) => isSectionVisible(s));
+  }, [config.sections, isSectionVisible]);
 
   const handleChange = useCallback((questionId: string, value: string | string[]) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
@@ -283,9 +302,9 @@ export function ScoringPreview({ config, slug }: ScoringPreviewProps) {
         </p>
       </div>
 
-      {/* Form questions */}
+      {/* Form questions (only from visible sections) */}
       <div className="space-y-6">
-        {config.sections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.id}>
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
               {section.title}
