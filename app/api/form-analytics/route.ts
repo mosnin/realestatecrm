@@ -249,6 +249,38 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    // ── Recent leads (last 10 form submissions that created contacts) ────
+    let recentLeads: {
+      id: string;
+      name: string | null;
+      email: string | null;
+      createdAt: string;
+      scoreLabel: string | null;
+      leadScore: number | null;
+    }[] = [];
+
+    try {
+      const { data: leads } = await supabase
+        .from('Contact')
+        .select('id, name, email, createdAt, scoreLabel, leadScore, tags')
+        .eq('spaceId', space.id)
+        .contains('tags', ['application-link'])
+        .gte('createdAt', cutoff)
+        .order('createdAt', { ascending: false })
+        .limit(10);
+
+      recentLeads = (leads ?? []).map((l: any) => ({
+        id: l.id,
+        name: l.name,
+        email: l.email,
+        createdAt: l.createdAt,
+        scoreLabel: l.scoreLabel,
+        leadScore: l.leadScore,
+      }));
+    } catch {
+      // Non-critical — return empty array
+    }
+
     return NextResponse.json({
       days,
       totalSessions: sessions.size,
@@ -258,6 +290,7 @@ export async function GET(req: NextRequest) {
       completionRate,
       funnel: funnelData,
       dropOff: dropOffData,
+      recentLeads,
     });
   } catch (err) {
     console.error('[form-analytics] unexpected error', err);

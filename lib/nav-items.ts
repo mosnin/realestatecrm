@@ -6,6 +6,7 @@ import {
   Sparkles,
   Settings,
   BarChart2,
+  BarChart3,
   CalendarDays,
   Calendar,
   Clock,
@@ -22,6 +23,7 @@ export const primaryNavItems = [
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/notes', label: 'Notes', icon: FileText },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
+  { href: '/form-analytics', label: 'Form Analytics', icon: BarChart3 },
   { href: '/ai', label: 'Chip', icon: Sparkles },
 ] as const;
 

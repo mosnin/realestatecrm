@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard';
-import { FormAnalytics } from '@/components/analytics/form-analytics';
+import Link from 'next/link';
 import type { AnalyticsData } from '@/components/analytics/analytics-dashboard';
 import type { ApplicationData, LeadScoreDetails } from '@/lib/types';
 
@@ -377,9 +377,22 @@ export default async function AnalyticsPage({
       </div>
       <AnalyticsDashboard data={data} />
 
-      {/* Form Performance — tracks applicant interaction with dynamic intake forms */}
+      {/* Link to dedicated form analytics page */}
       <div className="border-t border-border pt-5">
-        <FormAnalytics slug={slug} />
+        <Link
+          href={`/s/${slug}/form-analytics`}
+          className="group flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4 hover:border-primary/30 hover:bg-primary/5 transition-all"
+        >
+          <div>
+            <p className="font-semibold text-sm">Form Analytics</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              See how applicants interact with your intake form — visitors, conversions, drop-offs, and more
+            </p>
+          </div>
+          <span className="text-xs font-medium text-primary group-hover:underline flex-shrink-0 ml-4">
+            View dashboard &rarr;
+          </span>
+        </Link>
       </div>
     </div>
   );
