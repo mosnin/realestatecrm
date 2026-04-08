@@ -10,6 +10,17 @@ import type { IntakeFormConfig, FormQuestion } from '@/lib/types';
 
 type Answers = Record<string, string | string[] | number | boolean>;
 
+/** Sanitize user-provided text before embedding in scoring prompt. */
+function sanitizePromptText(text: string): string {
+  return text
+    .replace(/\n/g, ' ')
+    .replace(/\r/g, ' ')
+    .replace(/\t/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, 500);
+}
+
 /**
  * Build a scoring prompt from a dynamic form config and answers.
  *
@@ -45,7 +56,7 @@ export function buildDynamicScoringPrompt(input: {
   const sortedSections = [...formConfig.sections].sort((a, b) => a.position - b.position);
 
   for (const section of sortedSections) {
-    lines.push(`=== ${section.title} ===`);
+    lines.push(`=== ${sanitizePromptText(section.title)} ===`);
 
     // Sort questions by position
     const sortedQuestions = [...section.questions].sort((a, b) => a.position - b.position);
@@ -54,13 +65,13 @@ export function buildDynamicScoringPrompt(input: {
       const weight = question.scoring?.weight;
       const weightLabel = weight != null && weight > 0 ? ` [weight: ${weight}]` : '';
 
-      lines.push(`Q: ${question.label}${weightLabel}`);
+      lines.push(`Q: ${sanitizePromptText(question.label)}${weightLabel}`);
 
       const answer = answers[question.id];
       const formatted = formatAnswer(question, answer);
 
       if (formatted !== null) {
-        lines.push(`A: ${formatted}`);
+        lines.push(`A: ${sanitizePromptText(formatted)}`);
       } else if (question.required) {
         lines.push('A: (not answered) -- required but missing');
       } else {

@@ -35,8 +35,8 @@ const validationSchema = z.object({
 const scoringSchema = z.object({
   weight: z.number().min(0).max(100),
   mappings: z.array(z.object({
-    value: z.string(),
-    points: z.number(),
+    value: z.string().max(500),
+    points: z.number().min(-100).max(100),
   })).optional(),
 }).optional();
 
@@ -45,7 +45,7 @@ const scoringSchema = z.object({
 const visibleWhenSchema = z.object({
   questionId: z.string().min(1),
   operator: z.enum(['equals', 'not_equals', 'contains']),
-  value: z.string(),
+  value: z.string().max(500),
 }).optional();
 
 // ── Question types ────────────────────────────────────────────────────────────

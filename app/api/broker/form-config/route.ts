@@ -4,6 +4,10 @@ import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import { formConfigSchema } from '@/lib/form-config-schema';
 import { auth } from '@clerk/nextjs/server';
+import { checkRateLimit } from '@/lib/rate-limit';
+
+const MAX_FORM_CONFIG_SIZE = 512_000;
+const MAX_TOTAL_QUESTIONS = 200;
 
 /**
  * GET /api/broker/form-config
@@ -74,6 +78,25 @@ export async function PUT(req: NextRequest) {
   }
 
   const formConfig = parsed.data;
+
+  // Rate limit: 10 updates per hour
+  const { allowed } = await checkRateLimit(`broker-form-config:put:${ctx.brokerage.id}`, 10, 3600);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Too many form updates. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': '3600' } },
+    );
+  }
+
+  // Size & question count limits
+  const configSize = JSON.stringify(formConfig).length;
+  if (configSize > MAX_FORM_CONFIG_SIZE) {
+    return NextResponse.json({ error: `Form config exceeds ${MAX_FORM_CONFIG_SIZE} byte size limit` }, { status: 413 });
+  }
+  const totalQuestions = formConfig.sections.reduce((sum, s) => sum + s.questions.length, 0);
+  if (totalQuestions > MAX_TOTAL_QUESTIONS) {
+    return NextResponse.json({ error: `Form exceeds max ${MAX_TOTAL_QUESTIONS} questions` }, { status: 400 });
+  }
 
   const { error: updateErr } = await supabase
     .from('Brokerage')

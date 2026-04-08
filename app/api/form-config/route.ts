@@ -3,6 +3,10 @@ import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
 import { formConfigSchema } from '@/lib/form-config-schema';
+import { checkRateLimit } from '@/lib/rate-limit';
+
+const MAX_FORM_CONFIG_SIZE = 512_000; // 500KB
+const MAX_TOTAL_QUESTIONS = 200;
 
 /**
  * GET /api/form-config?slug={slug}
@@ -49,6 +53,15 @@ export async function PUT(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { userId, space } = auth;
 
+  // Rate limit: 10 updates per hour per user
+  const { allowed } = await checkRateLimit(`form-config:put:${userId}`, 10, 3600);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Too many form updates. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': '3600' } },
+    );
+  }
+
   // Validate the form config
   const parsed = formConfigSchema.safeParse(body.formConfig);
   if (!parsed.success) {
@@ -59,6 +72,16 @@ export async function PUT(req: NextRequest) {
   }
 
   const formConfig = parsed.data;
+
+  // Size & question count limits
+  const configSize = JSON.stringify(formConfig).length;
+  if (configSize > MAX_FORM_CONFIG_SIZE) {
+    return NextResponse.json({ error: `Form config exceeds ${MAX_FORM_CONFIG_SIZE} byte size limit` }, { status: 413 });
+  }
+  const totalQuestions = formConfig.sections.reduce((sum, s) => sum + s.questions.length, 0);
+  if (totalQuestions > MAX_TOTAL_QUESTIONS) {
+    return NextResponse.json({ error: `Form exceeds max ${MAX_TOTAL_QUESTIONS} questions` }, { status: 400 });
+  }
 
   // Upsert into SpaceSetting
   const { data: existing } = await supabase
