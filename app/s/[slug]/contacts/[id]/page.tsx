@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { safeHref } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -599,7 +600,7 @@ export default async function ClientDetailPage({
               <div className="sm:col-span-2">
                 <p className="text-xs text-muted-foreground mb-1">Privacy Policy URL (at time of consent)</p>
                 <a
-                  href={contact.consentPrivacyPolicyUrl}
+                  href={safeHref(contact.consentPrivacyPolicyUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-primary hover:underline break-all"

@@ -1,5 +1,6 @@
 import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
+import { safeHref } from '@/lib/utils';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { redirect } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
@@ -162,7 +163,7 @@ export default async function BrokerOverviewPage() {
         <div className="flex items-center gap-2 flex-shrink-0">
           {brokerage.websiteUrl && (
             <a
-              href={brokerage.websiteUrl}
+              href={safeHref(brokerage.websiteUrl)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-xs font-medium border border-border text-foreground px-3 py-2 rounded-lg hover:bg-muted transition-colors"

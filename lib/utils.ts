@@ -36,3 +36,25 @@ export const rootDomain =
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+/**
+ * Sanitize a user-provided URL for safe use in href attributes.
+ * Only allows http: and https: protocols. Returns '#' for invalid/dangerous URLs.
+ * Prevents javascript:, data:, vbscript: protocol XSS.
+ */
+export function safeHref(url: string | null | undefined): string {
+  if (!url) return '#';
+  const trimmed = url.trim();
+  if (!trimmed) return '#';
+  try {
+    const parsed = new URL(trimmed, 'https://placeholder.invalid');
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return trimmed;
+    }
+    return '#';
+  } catch {
+    // Relative URLs starting with / are safe
+    if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return trimmed;
+    return '#';
+  }
+}
