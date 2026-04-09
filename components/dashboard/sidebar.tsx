@@ -693,10 +693,21 @@ export function Sidebar({
   brokerageMemberships = [],
 }: SidebarProps) {
   const pathname = usePathname();
-  // Read search params from window.location to avoid Next.js Suspense requirement
+  // Read search params and keep in sync with URL changes
   const [searchParamsString, setSearchParamsString] = useState('');
   useEffect(() => {
-    setSearchParamsString(window.location.search.replace('?', ''));
+    const updateParams = () => {
+      setSearchParamsString(window.location.search.replace('?', ''));
+    };
+    updateParams();
+    // Listen for popstate (back/forward) and custom pushState/replaceState
+    window.addEventListener('popstate', updateParams);
+    // Poll briefly to catch Next.js soft navigations that change query params
+    const interval = setInterval(updateParams, 300);
+    return () => {
+      window.removeEventListener('popstate', updateParams);
+      clearInterval(interval);
+    };
   }, [pathname]);
   const base = `/s/${slug}`;
   const { user } = useUser();
