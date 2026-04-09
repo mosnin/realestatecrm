@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
 
-  const { allowed } = await checkRateLimit(`realtime:session:${userId}`, 5, 60);
+  const { allowed } = await checkRateLimit(`realtime:session:${userId}`, 2, 60);
   if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
 
   const { slug } = await req.json();

@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
 
-  const { allowed } = await checkRateLimit(`voice:transcribe:${userId}`, 30, 60);
+  const { allowed } = await checkRateLimit(`voice:transcribe:${userId}`, 5, 60);
   if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
 
   try {

@@ -7,6 +7,18 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import type { SpaceSetting } from '@/lib/types';
 
 
+/**
+ * Strip HTML tags and control characters from a string.
+ * Used to sanitize auto-generated conversation titles derived from user input.
+ */
+function sanitizeTitle(text: string): string {
+  return text
+    .replace(/<[^>]*>/g, '')           // strip HTML tags
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // strip control chars (preserve \n, \r, \t)
+    .replace(/\s+/g, ' ')             // collapse whitespace
+    .trim();
+}
+
 function sanitizeIncomingMessages(raw: any[]): Array<{ role: 'user' | 'assistant'; content: string }> {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -81,7 +93,7 @@ export async function POST(req: NextRequest) {
           .eq('id', conversationId)
           .maybeSingle();
         if (conv?.title === 'New conversation') {
-          const autoTitle = lastUserMsg.content.trim().slice(0, 60);
+          const autoTitle = sanitizeTitle(lastUserMsg.content).slice(0, 60) || 'Chat';
           await supabase
             .from('Conversation')
             .update({ title: autoTitle, updatedAt: new Date().toISOString() })
