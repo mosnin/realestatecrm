@@ -37,6 +37,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Add a random delay to prevent timing attacks on draft lookup
+  const randomDelay = 50 + Math.floor(Math.random() * 100); // 50-150ms
+  await new Promise((resolve) => setTimeout(resolve, randomDelay));
+
   try {
     // Find active draft for this email + space
     const { data: draft, error: draftError } = await supabase

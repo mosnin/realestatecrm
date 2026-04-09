@@ -36,7 +36,12 @@ export async function GET(
     .eq('contactId', id);
   if (dcError) throw dcError;
 
-  contact.dealContacts = (dealContactRows || []).map((row: any) => ({
+  // Filter dealContacts to only include deals belonging to the user's space
+  const filteredDealContactRows = (dealContactRows || []).filter(
+    (row: any) => row.Deal && row.Deal.spaceId === space.id
+  );
+
+  contact.dealContacts = filteredDealContactRows.map((row: any) => ({
     dealId: row.dealId,
     contactId: row.contactId,
     deal: row.Deal

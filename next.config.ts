@@ -18,12 +18,12 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), geolocation=()' },
   // Force HTTPS for 2 years (only active when served over TLS)
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
-  // Content Security Policy (report-only to avoid breaking Clerk while domains are validated)
+  // Content Security Policy (enforcing)
   {
-    key: 'Content-Security-Policy-Report-Only',
+    key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
+      "script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https://img.clerk.com https://*.stripe.com",

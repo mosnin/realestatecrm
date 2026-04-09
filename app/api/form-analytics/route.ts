@@ -114,6 +114,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Validate that the spaceId actually exists (prevent analytics pollution for arbitrary IDs)
+  // Always return 202 Accepted to prevent space ID enumeration
   const spaceId = events[0].spaceId;
   try {
     const { data: space } = await supabase
@@ -122,10 +123,12 @@ export async function POST(req: NextRequest) {
       .eq('id', spaceId)
       .maybeSingle();
     if (!space) {
-      return NextResponse.json({ error: 'Invalid space' }, { status: 400 });
+      console.warn('[form-analytics] event received for invalid spaceId', { spaceId });
+      return NextResponse.json({ accepted: true }, { status: 202 });
     }
   } catch {
-    return NextResponse.json({ error: 'Validation failed' }, { status: 400 });
+    console.warn('[form-analytics] space validation failed', { spaceId });
+    return NextResponse.json({ accepted: true }, { status: 202 });
   }
 
   // Ensure all events in batch target the same space (prevent cross-space pollution)
