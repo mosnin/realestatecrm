@@ -144,11 +144,36 @@ export async function PATCH(
       }
     }
 
+    // Validate stageId belongs to this space before updating
+    if (body.stageId !== undefined) {
+      const { data: stageCheck } = await supabase
+        .from('DealStage')
+        .select('id')
+        .eq('id', body.stageId)
+        .eq('spaceId', space.id)
+        .maybeSingle();
+      if (!stageCheck) {
+        return NextResponse.json({ error: 'Invalid stage' }, { status: 400 });
+      }
+    }
+
+    // Validate title/description lengths and priority enum
+    if (body.title !== undefined && (typeof body.title !== 'string' || body.title.length > 255)) {
+      return NextResponse.json({ error: 'Title must be under 255 chars' }, { status: 400 });
+    }
+    if (body.description !== undefined && typeof body.description === 'string' && body.description.length > 5000) {
+      return NextResponse.json({ error: 'Description must be under 5000 chars' }, { status: 400 });
+    }
+    const VALID_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH'];
+    if (body.priority !== undefined && !VALID_PRIORITIES.includes(body.priority)) {
+      return NextResponse.json({ error: 'Invalid priority' }, { status: 400 });
+    }
+
     const { data: dealRow, error: updateError } = await supabase
       .from('Deal')
       .update({
-        ...(body.title !== undefined && { title: body.title }),
-        ...(body.description !== undefined && { description: body.description ?? null }),
+        ...(body.title !== undefined && { title: String(body.title).slice(0, 255) }),
+        ...(body.description !== undefined && { description: body.description ? String(body.description).slice(0, 5000) : null }),
         ...(body.value !== undefined && { value: valueVal }),
         ...(body.address !== undefined && { address: body.address ?? null }),
         ...(body.priority !== undefined && { priority: body.priority }),
