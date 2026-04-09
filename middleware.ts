@@ -27,6 +27,28 @@ const isAdminRoute = createRouteMatcher([
   '/api/admin(.*)'
 ]);
 
+// Routes where a secondary DB-level banned check is performed.
+// Only write operations (POST/PUT/PATCH/DELETE) on API routes and all admin routes,
+// to avoid a DB round-trip on every GET request.
+const isWriteApiRoute = createRouteMatcher([
+  '/api/(.*)',
+]);
+
+/**
+ * Lazy-initialized Supabase client for middleware-only use.
+ * We avoid importing from lib/supabase because Edge middleware
+ * may run in a different runtime context.
+ */
+let _mwSupabase: ReturnType<typeof createClient> | null = null;
+function getMwSupabase() {
+  if (_mwSupabase) return _mwSupabase;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  _mwSupabase = createClient(url, key);
+  return _mwSupabase;
+}
+
 // Public-facing pages that never need auth — skip the Clerk session
 // lookup entirely so these routes aren't blocked by the auth round-trip.
 const isFullyPublicRoute = createRouteMatcher([
@@ -88,6 +110,34 @@ export default clerkMiddleware(async (auth, request) => {
       const bannedUrl = new URL('/login/realtor', request.url);
       bannedUrl.searchParams.set('reason', 'suspended');
       return NextResponse.redirect(bannedUrl);
+    }
+
+    // Secondary DB-level banned check for write operations and admin routes.
+    // This catches cases where the Clerk metadata hasn't propagated yet but
+    // the user was already marked as banned in the database.
+    const isWriteMethod = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method);
+    const needsDbBanCheck =
+      isAdminRoute(request) || (isWriteMethod && isWriteApiRoute(request));
+
+    if (needsDbBanCheck) {
+      const sb = getMwSupabase();
+      if (sb) {
+        try {
+          const { data: dbUser } = await sb
+            .from('User')
+            .select('platformRole')
+            .eq('clerkId', session.userId)
+            .maybeSingle();
+          if (dbUser?.platformRole === 'banned') {
+            const bannedUrl = new URL('/login/realtor', request.url);
+            bannedUrl.searchParams.set('reason', 'suspended');
+            return NextResponse.redirect(bannedUrl);
+          }
+        } catch {
+          // If the DB check fails, don't block the request — the Clerk
+          // metadata check above is the primary guard.
+        }
+      }
     }
   }
 
