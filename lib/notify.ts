@@ -128,6 +128,7 @@ export async function notifyNewLead(params: NotifyNewLeadParams): Promise<void> 
         scoreLabel: params.scoreLabel,
         scoreSummary: params.scoreSummary,
         applicationData: params.applicationData,
+      }).catch((err) => console.error('[notify] lead email failed', err))
     );
   }
 
