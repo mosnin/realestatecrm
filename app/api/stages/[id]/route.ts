@@ -13,19 +13,20 @@ export async function PATCH(
 
   const { id } = await params;
 
+  const space = await getSpaceForUser(userId);
+  if (!space) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const { data: existingRows, error: existingError } = await supabase
     .from('DealStage')
     .select('*')
-    .eq('id', id);
+    .eq('id', id)
+    .eq('spaceId', space.id);
   if (existingError) throw existingError;
   if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const existing = existingRows[0];
-
-  const space = await getSpaceForUser(userId);
-  if (!space || existing.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   const body = await req.json();
 
@@ -48,6 +49,7 @@ export async function PATCH(
     .from('DealStage')
     .update({ name: body.name !== undefined ? body.name.trim() : existing.name, color: safeColor })
     .eq('id', id)
+    .eq('spaceId', space.id)
     .select()
     .single();
   if (updateError) throw updateError;
@@ -65,21 +67,20 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const { data: existingRows, error: existingError } = await supabase
-    .from('DealStage')
-    .select('*')
-    .eq('id', id);
-  if (existingError) throw existingError;
-  if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  const existing = existingRows[0];
-
   const space = await getSpaceForUser(userId);
-  if (!space || existing.spaceId !== space.id) {
+  if (!space) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { error: deleteError } = await supabase.from('DealStage').delete().eq('id', id);
+  const { data: existingRows, error: existingError } = await supabase
+    .from('DealStage')
+    .select('*')
+    .eq('id', id)
+    .eq('spaceId', space.id);
+  if (existingError) throw existingError;
+  if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const { error: deleteError } = await supabase.from('DealStage').delete().eq('id', id).eq('spaceId', space.id);
   if (deleteError) throw deleteError;
   return NextResponse.json({ success: true });
 }

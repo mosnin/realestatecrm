@@ -4,7 +4,9 @@ import { redis } from '@/lib/redis';
  * In-memory fallback rate limiter (bounded LRU).
  * Used when Redis is unavailable. Tracks last N IPs.
  */
-const MEM_MAX_ENTRIES = 500;
+// In-memory fallback only — Redis should be the primary rate limiter in production.
+// 10 000 entries is enough to resist trivial eviction attacks while keeping memory bounded.
+const MEM_MAX_ENTRIES = 10_000;
 const memStore = new Map<string, { count: number; expiresAt: number }>();
 let redisFailCount = 0;
 

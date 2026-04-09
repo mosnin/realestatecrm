@@ -30,8 +30,11 @@ export async function POST(req: NextRequest) {
   // Validate redirect_uri — must be a Claude callback
   try {
     const url = new URL(redirect_uri);
-    const allowedHosts = ['claude.ai', 'www.claude.ai', 'localhost'];
-    if (!allowedHosts.some(h => url.hostname === h || url.hostname.endsWith(`.${h}`))) {
+    const allowedHosts = ['claude.ai', 'www.claude.ai'];
+    if (process.env.NODE_ENV === 'development') {
+      allowedHosts.push('localhost');
+    }
+    if (!allowedHosts.some(h => url.hostname === h)) {
       return NextResponse.json({ error: 'Invalid redirect_uri' }, { status: 400 });
     }
   } catch {

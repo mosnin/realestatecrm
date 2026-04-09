@@ -1,3 +1,12 @@
+/** Escape user-provided values for safe embedding in HTML. */
+function escHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 /**
  * Generates a comprehensive privacy policy HTML template for realtors and brokerages.
  * Designed to protect both the entity and Chippi (the platform) from liability.
@@ -6,7 +15,7 @@ export function generatePrivacyPolicy(
   entityName: string,
   entityType: 'realtor' | 'brokerage'
 ): string {
-  const entity = entityName || (entityType === 'brokerage' ? 'Our Brokerage' : 'Our Office');
+  const entity = escHtml(entityName || (entityType === 'brokerage' ? 'Our Brokerage' : 'Our Office'));
   const entityLabel = entityType === 'brokerage' ? 'brokerage' : 'real estate professional';
   const today = new Date().toLocaleDateString('en-US', {
     year: 'numeric',

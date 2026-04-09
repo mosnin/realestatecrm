@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   const { data: contact, error: contactError } = await supabase
     .from('Contact')
     .select(
-      'id, name, email, applicationStatus, applicationStatusNote, applicationData, formConfigSnapshot, applicationRef, spaceId, createdAt',
+      'id, name, applicationStatus, applicationStatusNote, applicationRef, spaceId, createdAt',
     )
     .eq('applicationRef', ref)
     .eq('statusPortalToken', token)
@@ -90,12 +90,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     contact: {
       name: contact.name,
-      email: contact.email,
       status: contact.applicationStatus ?? 'received',
       statusNote: contact.applicationStatusNote,
       applicationRef: contact.applicationRef,
-      applicationData: contact.applicationData,
-      formConfigSnapshot: contact.formConfigSnapshot,
       createdAt: contact.createdAt,
     },
     statusHistory: statusHistory ?? [],

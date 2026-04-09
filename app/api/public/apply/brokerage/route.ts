@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
 import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
@@ -208,6 +209,12 @@ export async function POST(req: NextRequest) {
       { error: 'Too many submissions. Please try again later.' },
       { status: 429, headers: { 'Retry-After': '3600' } },
     );
+  }
+
+  // Reject oversized payloads before parsing (1MB limit)
+  const contentLength = parseInt(req.headers.get('content-length') ?? '0', 10);
+  if (contentLength > 1_000_000) {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
   }
 
   let requestBody: unknown;
@@ -451,7 +458,7 @@ export async function POST(req: NextRequest) {
       .limit(5);
     if (dupError) throw dupError;
 
-    const applicationRef = (crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '')).slice(0, 24);
+    const applicationRef = crypto.randomBytes(32).toString('hex');
     const statusPortalToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
 
     if (existingRecentLeads?.length) {

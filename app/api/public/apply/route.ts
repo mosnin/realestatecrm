@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
@@ -224,6 +225,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Reject oversized payloads before parsing (1MB limit)
+  const contentLength = parseInt(req.headers.get('content-length') ?? '0', 10);
+  if (contentLength > 1_000_000) {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+  }
+
   let requestBody: unknown;
   try {
     requestBody = await req.json();
@@ -420,8 +427,8 @@ export async function POST(req: NextRequest) {
       .limit(5);
     if (dupError) throw dupError;
 
-    // Generate a unique application reference for the status page (24 hex chars = 96 bits entropy)
-    const applicationRef = (crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '')).slice(0, 24);
+    // Generate a unique application reference for the status page (64 hex chars = 256 bits entropy)
+    const applicationRef = crypto.randomBytes(32).toString('hex');
 
     // Generate a secure portal token for applicant access (64 hex chars = 256 bits entropy)
     const statusPortalToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');

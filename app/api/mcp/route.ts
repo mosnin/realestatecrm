@@ -7,9 +7,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import crypto from 'crypto';
 import { jwtVerify } from 'jose';
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.MCP_JWT_SECRET || process.env.CLERK_SECRET_KEY || 'chippi-mcp-secret-change-me'
-);
+// JWT_SECRET is resolved per-request; see authenticateKey() below.
 
 // ---------------------------------------------------------------------------
 // Auth – validate Bearer token (supports both raw API keys and OAuth JWTs)
@@ -24,6 +22,9 @@ async function authenticateKey(req: NextRequest): Promise<{ spaceId: string; ip:
 
   // Try JWT first (OAuth flow)
   if (token.includes('.')) {
+    const secret = process.env.MCP_JWT_SECRET || process.env.CLERK_SECRET_KEY;
+    if (!secret) return null; // No secret configured — cannot verify JWTs
+    const JWT_SECRET = new TextEncoder().encode(secret);
     try {
       const { payload } = await jwtVerify(token, JWT_SECRET);
       if (payload.spaceId && typeof payload.spaceId === 'string') {

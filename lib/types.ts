@@ -89,7 +89,6 @@ export type SpaceSetting = {
   myConnections: string | null;
   aiPersonalization: string | null;
   billingSettings: string | null;
-  anthropicApiKey: string | null;
   businessName: string | null;
   intakePageTitle: string | null;
   intakePageIntro: string | null;

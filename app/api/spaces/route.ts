@@ -72,9 +72,6 @@ export async function PATCH(req: NextRequest) {
   const bio             = typeof body.bio             === 'string' ? body.bio.slice(0, 500)             : undefined;
   const socialLinks     = body.socialLinks && typeof body.socialLinks === 'object' ? body.socialLinks    : undefined;
   const logoUrl         = typeof body.logoUrl         === 'string' ? body.logoUrl.slice(0, 500)         : undefined;
-  // Anthropic key: validate prefix format; reject anything that looks wrong
-  const rawKey = typeof body.anthropicApiKey === 'string' ? body.anthropicApiKey.trim() : undefined;
-  const anthropicApiKey = rawKey === undefined ? undefined : (rawKey === '' || rawKey.startsWith('sk-ant-') ? (rawKey || null) : null);
 
   // Legal & compliance fields
   const rawPrivacyPolicyUrl = typeof body.privacyPolicyUrl === 'string' ? body.privacyPolicyUrl.trim().slice(0, 500) : undefined;
@@ -172,7 +169,6 @@ export async function PATCH(req: NextRequest) {
   if (myConnections !== undefined) settingsPayload.myConnections = myConnections;
   if (aiPersonalization !== undefined) settingsPayload.aiPersonalization = aiPersonalization;
   if (billingSettings !== undefined) settingsPayload.billingSettings = billingSettings;
-  if (anthropicApiKey !== undefined) settingsPayload.anthropicApiKey = anthropicApiKey || null;
   if (bio !== undefined) settingsPayload.bio = bio;
   if (socialLinks !== undefined) settingsPayload.socialLinks = socialLinks;
   if (logoUrl !== undefined) settingsPayload.logoUrl = logoUrl;

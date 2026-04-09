@@ -4,9 +4,11 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import crypto from 'crypto';
 import { SignJWT } from 'jose';
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.MCP_JWT_SECRET || process.env.CLERK_SECRET_KEY || 'chippi-mcp-secret-change-me'
-);
+function getJwtSecret(): Uint8Array {
+  const secret = process.env.MCP_JWT_SECRET || process.env.CLERK_SECRET_KEY;
+  if (!secret) throw new Error('MCP_JWT_SECRET not configured');
+  return new TextEncoder().encode(secret);
+}
 
 /**
  * POST /api/mcp/oauth/token
@@ -134,11 +136,18 @@ export async function POST(req: NextRequest) {
 
     // Issue JWT
     const expiresIn = 30 * 24 * 3600; // 30 days
+    let jwtSecret: Uint8Array;
+    try {
+      jwtSecret = getJwtSecret();
+    } catch {
+      return NextResponse.json({ error: 'MCP not configured' }, { status: 500 });
+    }
+
     const token = await new SignJWT({ spaceId: authCode.spaceId, sub: authCode.clientId })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime(`${expiresIn}s`)
-      .sign(JWT_SECRET);
+      .sign(jwtSecret);
 
     console.log('[mcp/token] SUCCESS — issued JWT for space:', authCode.spaceId);
 
@@ -170,12 +179,19 @@ export async function POST(req: NextRequest) {
 
     supabase.from('McpApiKey').update({ lastUsedAt: new Date().toISOString() }).eq('clientId', client_id).then(() => {});
 
+    let jwtSecret: Uint8Array;
+    try {
+      jwtSecret = getJwtSecret();
+    } catch {
+      return NextResponse.json({ error: 'MCP not configured' }, { status: 500 });
+    }
+
     const expiresIn = 30 * 24 * 3600; // 30 days
     const token = await new SignJWT({ spaceId: key.spaceId, sub: client_id })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime(`${expiresIn}s`)
-      .sign(JWT_SECRET);
+      .sign(jwtSecret);
 
     return NextResponse.json({ access_token: token, token_type: 'bearer', expires_in: expiresIn });
   }
