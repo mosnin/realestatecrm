@@ -15,7 +15,8 @@ export async function POST(req: NextRequest) {
     console.error('[tours/reminders] CRON_SECRET env var is not set — rejecting request');
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
   }
-  const secret = req.headers.get('x-cron-secret') || req.nextUrl.searchParams.get('secret');
+  // Only accept secret via headers (never query params — those appear in logs)
+  const secret = req.headers.get('x-cron-secret') || req.headers.get('authorization')?.replace('Bearer ', '');
   if (secret !== expectedSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 /**
  * POST — Guest self-service tour management via manage token.
  * Actions: cancel
  */
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  const { allowed } = await checkRateLimit(`tour-manage:${ip}`, 10, 3600);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
+
   const { token, action } = await req.json();
 
   if (!token || !action) {

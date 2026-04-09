@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 /** GET — list waitlist entries (authenticated, space owner) */
 export async function GET(req: NextRequest) {
@@ -25,6 +26,12 @@ export async function GET(req: NextRequest) {
 
 /** POST — public endpoint: guest joins the waitlist */
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  const { allowed } = await checkRateLimit(`waitlist:${ip}`, 5, 3600);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
+
   const body = await req.json();
   const { slug, guestName, guestEmail, guestPhone, preferredDate, notes, propertyProfileId } = body;
 
