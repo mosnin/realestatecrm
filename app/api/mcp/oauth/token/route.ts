@@ -126,6 +126,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'invalid_grant', error_description: 'redirect_uri mismatch' }, { status: 400 });
     }
 
+    // Verify state nonce — ensures the authorization response was not forged
+    // or replayed with a tampered state value.
+    if (authCode.stateHash) {
+      const state = params.state;
+      if (!state) {
+        console.error('[mcp/token] state required but missing');
+        await supabase.from('McpAuthCode').delete().eq('code', code);
+        return NextResponse.json({ error: 'invalid_grant', error_description: 'state parameter required' }, { status: 400 });
+      }
+      const expectedStateHash = crypto
+        .createHash('sha256')
+        .update(`${authCode.stateNonce}:${state}`)
+        .digest('hex');
+      if (expectedStateHash !== authCode.stateHash) {
+        console.error('[mcp/token] state nonce verification failed');
+        await supabase.from('McpAuthCode').delete().eq('code', code);
+        return NextResponse.json({ error: 'invalid_grant', error_description: 'state verification failed' }, { status: 400 });
+      }
+    }
+
     // Delete code (single-use)
     await supabase.from('McpAuthCode').delete().eq('code', code);
 

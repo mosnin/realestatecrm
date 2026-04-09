@@ -56,6 +56,14 @@ export async function POST(req: NextRequest) {
   const code = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 min
 
+  // Generate a server-side nonce bound to the client-provided state parameter.
+  // During token exchange we verify this nonce to ensure the authorization
+  // response was not forged or replayed with a different state value.
+  const stateNonce = crypto.randomBytes(32).toString('hex');
+  const stateHash = state
+    ? crypto.createHash('sha256').update(`${stateNonce}:${state}`).digest('hex')
+    : null;
+
   // Store code with PKCE challenge for verification during token exchange
   const { error } = await supabase.from('McpAuthCode').insert({
     code,
@@ -64,6 +72,8 @@ export async function POST(req: NextRequest) {
     codeChallenge: code_challenge,
     codeChallengeMethod: code_challenge_method || 'S256',
     redirectUri: redirect_uri,
+    stateNonce,
+    stateHash,
     expiresAt,
   });
 
