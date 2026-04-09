@@ -296,11 +296,20 @@ export async function POST(req: NextRequest) {
 
       const { data: space } = await supabase
         .from('Space')
-        .select('id')
+        .select('id, stripeSubscriptionStatus')
         .eq('ownerId', targetUserId)
         .maybeSingle();
 
       if (!space) return NextResponse.json({ error: 'No workspace found' }, { status: 404 });
+
+      // Only allow comp on non-active subscriptions
+      const allowedStatuses = ['canceled', 'past_due', 'inactive'];
+      if (!allowedStatuses.includes(space.stripeSubscriptionStatus ?? '')) {
+        return NextResponse.json(
+          { error: `Cannot comp a free month on a subscription with status '${space.stripeSubscriptionStatus}'. Only allowed for: ${allowedStatuses.join(', ')}.` },
+          { status: 400 },
+        );
+      }
 
       const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       await supabase.from('Space').update({
@@ -314,7 +323,21 @@ export async function POST(req: NextRequest) {
 
     // ── Issue refund ──────────────────────────────────────────────────────
     if (action === 'issue_refund') {
-      const { userId: targetUserId, invoiceId } = body as { userId: string; invoiceId?: string };
+      const { userId: targetUserId, invoiceId } = body as { userId: string; invoiceId: string };
+
+      if (!targetUserId || typeof targetUserId !== 'string') {
+        return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+      }
+      if (!invoiceId || typeof invoiceId !== 'string') {
+        return NextResponse.json({ error: 'invoiceId is required — explicit invoice selection is mandatory' }, { status: 400 });
+      }
+
+      // Per-admin refund limit: 3 per day
+      const { allowed: refundAllowed } = await checkRateLimit(`refund:${admin.userId}`, 3, 86400);
+      if (!refundAllowed) {
+        return NextResponse.json({ error: 'Refund limit reached (max 3 per day). Try again tomorrow.' }, { status: 429 });
+      }
+
       const { data: space } = await supabase
         .from('Space')
         .select('id, stripeCustomerId')
@@ -325,17 +348,8 @@ export async function POST(req: NextRequest) {
 
       const stripe = (await import('@/lib/stripe')).getStripe();
 
-      let targetInvoice = invoiceId;
-      if (!targetInvoice) {
-        // Find the last paid invoice
-        const invoices = await stripe.invoices.list({ customer: space.stripeCustomerId, status: 'paid', limit: 1 });
-        targetInvoice = invoices.data[0]?.id;
-      }
-
-      if (!targetInvoice) return NextResponse.json({ error: 'No paid invoices to refund' }, { status: 404 });
-
-      const refund = await stripe.refunds.create({ invoice: targetInvoice });
-      logAdminAction({ actor: admin.userId, action: 'issue_refund', target: targetUserId, details: { invoiceId: targetInvoice, refundId: refund.id, amount: refund.amount } });
+      const refund = await stripe.refunds.create({ invoice: invoiceId });
+      logAdminAction({ actor: admin.userId, action: 'issue_refund', target: targetUserId, details: { invoiceId, refundId: refund.id, amount: refund.amount } });
       return NextResponse.json({ success: true, refundId: refund.id, amount: refund.amount });
     }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { audit } from '@/lib/audit';
 
 export async function PATCH(
   req: NextRequest,
@@ -54,6 +55,14 @@ export async function PATCH(
     .single();
   if (updateError) throw updateError;
 
+  void audit({
+    actorClerkId: userId,
+    action: 'UPDATE',
+    resource: 'DealStage',
+    resourceId: id,
+    spaceId: space.id,
+  });
+
   return NextResponse.json(stage);
 }
 
@@ -82,5 +91,14 @@ export async function DELETE(
 
   const { error: deleteError } = await supabase.from('DealStage').delete().eq('id', id).eq('spaceId', space.id);
   if (deleteError) throw deleteError;
+
+  void audit({
+    actorClerkId: userId,
+    action: 'DELETE',
+    resource: 'DealStage',
+    resourceId: id,
+    spaceId: space.id,
+  });
+
   return NextResponse.json({ success: true });
 }

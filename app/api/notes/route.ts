@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // GET /api/notes?slug=xxx — list all notes for a workspace
 export async function GET(req: NextRequest) {
@@ -29,6 +30,12 @@ export async function POST(req: NextRequest) {
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
+
+  // Rate limit: 60 notes per hour per user
+  const { allowed } = await checkRateLimit(`notes:${space.id}`, 60, 3600);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Too many notes created. Try again later.' }, { status: 429 });
+  }
 
   // Get max sortOrder
   const { data: maxRow } = await supabase
