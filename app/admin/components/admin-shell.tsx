@@ -195,7 +195,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
         {/* Page content */}
         <main className="flex-1 px-4 py-5 md:px-8 md:py-7 pb-20 md:pb-7">
+          <div className="w-full max-w-[1500px] mx-auto">
           {children}
+          </div>
         </main>
       </div>
 

@@ -158,9 +158,11 @@ export default async function BrokerLayout({ children }: { children: React.React
       />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header slug={slug} spaceName={spaceName} title={spaceName} isBroker={true} isBrokerOnly={isBrokerOnly} brokerageName={ctx.brokerage.name} />
-        <main className="flex-1 overflow-y-auto flex flex-col px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
+        <main className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
+          <div className="w-full max-w-[1500px] mx-auto">
           {children}
           <DashboardFooter />
+          </div>
         </main>
       </div>
       <MobileNav slug={slug} isBroker={true} isBrokerOnly={isBrokerOnly} />
