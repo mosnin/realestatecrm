@@ -51,6 +51,12 @@ export async function POST() {
     return NextResponse.json({ error: 'Only the owner or admins can manage the invite code' }, { status: 403 });
   }
 
+  // Rate limit: 5 regenerations per hour per brokerage
+  const { allowed } = await checkRateLimit(`broker-join-code:${ctx.brokerage.id}`, 5, 3600);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Rate limit exceeded. Maximum 5 code regenerations per hour.' }, { status: 429 });
+  }
+
   // Generate a unique code (retry on collision, though extremely unlikely)
   let joinCode = '';
   for (let attempt = 0; attempt < 5; attempt++) {
