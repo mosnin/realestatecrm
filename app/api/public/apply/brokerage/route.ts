@@ -13,7 +13,7 @@ import {
 } from '@/lib/public-application';
 import { notifyBroker } from '@/lib/broker-notify';
 import { sendApplicationConfirmation } from '@/lib/email';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { z } from 'zod';
 import { getFormConfigs, getDefaultFormConfig } from '@/lib/form-builder';
 import { formConfigSchema, type FormQuestion } from '@/lib/form-config-schema';
@@ -199,10 +199,7 @@ function extractContactFields(data: Record<string, unknown>, config: IntakeFormC
 
 export async function POST(req: NextRequest) {
   // ── IP-based rate limiting (10 submissions / IP / hour) ──────────────────
-  const ip =
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    req.headers.get('x-real-ip') ??
-    'unknown';
+  const ip = getClientIp(req);
   const { allowed } = await checkRateLimit(`apply-brokerage:rl:${ip}`, 10, 3600);
   if (!allowed) {
     return NextResponse.json(

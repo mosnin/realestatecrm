@@ -3,7 +3,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import { notifyBroker } from '@/lib/broker-notify';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 /**
  * GET /api/invitations/[token]
@@ -23,7 +23,7 @@ export async function GET(req: Request, { params }: Params) {
   }
 
   // Rate limit token lookups to prevent enumeration
-  const ip = (req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()) ?? 'unknown';
+  const ip = getClientIp(req);
   const { allowed } = await checkRateLimit(`invite:token:${ip}`, 10, 60);
   if (!allowed) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });

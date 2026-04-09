@@ -18,7 +18,7 @@ async function authenticateKey(req: NextRequest): Promise<{ spaceId: string; ip:
   const token = auth.slice(7);
   if (token.length < 10 || token.length > 500) return null;
 
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const ip = getClientIp(req);
 
   // Try JWT first (OAuth flow)
   if (token.includes('.')) {
@@ -357,7 +357,7 @@ function buildServer(spaceId: string): McpServer {
 // ---------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
   // Rate limit by IP before auth to prevent brute-force
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const ip = getClientIp(req);
   const { allowed: ipAllowed } = await checkRateLimit(`mcp:ip:${ip}`, 60, 60);
   if (!ipAllowed) {
     return new Response(JSON.stringify({ error: 'Too many requests' }), {

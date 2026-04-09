@@ -15,7 +15,7 @@ import {
 } from '@/lib/public-application';
 import { notifyNewLead } from '@/lib/notify';
 import { sendApplicationConfirmation } from '@/lib/email';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { formConfigSchema, type IntakeFormConfig, type FormQuestion } from '@/lib/form-config-schema';
 import { getFormConfigs, getDefaultFormConfig } from '@/lib/form-builder';
 import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
@@ -211,10 +211,7 @@ function extractContactFields(data: Record<string, unknown>, config: IntakeFormC
 
 export async function POST(req: NextRequest) {
   // ── IP-based rate limiting (10 submissions / IP / hour) ──────────────────
-  const ip =
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    req.headers.get('x-real-ip') ??
-    'unknown';
+  const ip = getClientIp(req);
   const { allowed } = await checkRateLimit(`apply:rl:${ip}`, 10, 3600);
   if (!allowed) {
     return NextResponse.json(

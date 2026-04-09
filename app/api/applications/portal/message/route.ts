@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 /**
  * POST /api/applications/portal/message
@@ -44,10 +44,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Rate limit by IP to prevent abuse (token is user-controlled, so also limit by IP)
-  const ip =
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    req.headers.get('x-real-ip') ??
-    'unknown';
+  const ip = getClientIp(req);
   const { allowed: ipAllowed } = await checkRateLimit(`portal:msg:ip:${ip}`, 30, 3600);
   if (!ipAllowed) {
     return NextResponse.json(

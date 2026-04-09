@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import crypto from 'crypto';
 import { SignJWT } from 'jose';
 
@@ -17,7 +17,7 @@ function getJwtSecret(): Uint8Array {
  * 2. client_credentials — direct API usage
  */
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const ip = getClientIp(req);
   const { allowed } = await checkRateLimit(`mcp:oauth:${ip}`, 30, 60);
   if (!allowed) {
     return NextResponse.json({ error: 'rate_limit_exceeded' }, { status: 429 });
