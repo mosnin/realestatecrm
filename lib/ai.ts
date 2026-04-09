@@ -194,7 +194,10 @@ export async function chatWithRAG(
     contextBlocks.push(
       'Notes:\n' +
         notes
-          .map((n) => `- "${n.title}" (updated ${new Date(n.updatedAt).toLocaleDateString()}): ${(n.content ?? '').slice(0, 200)}${(n.content ?? '').length > 200 ? '...' : ''}`)
+          .map((n) => {
+            const sanitizedContent = sanitizeCrmText(n.content);
+            return `- "${sanitizeCrmText(n.title)}" (updated ${new Date(n.updatedAt).toLocaleDateString()}): ${sanitizedContent.slice(0, 200)}${sanitizedContent.length > 200 ? '...' : ''}`;
+          })
           .join('\n')
     );
   }
@@ -205,7 +208,7 @@ export async function chatWithRAG(
     contextBlocks.push(
       'Upcoming Tours:\n' +
         tours
-          .map((t) => `- ${t.guestName} | ${t.propertyAddress ?? 'No address'} | ${new Date(t.startsAt).toLocaleDateString()} ${new Date(t.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} | Status: ${t.status}`)
+          .map((t) => `- ${sanitizeCrmText(t.guestName)} | ${t.propertyAddress ?? 'No address'} | ${new Date(t.startsAt).toLocaleDateString()} ${new Date(t.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} | Status: ${t.status}`)
           .join('\n')
     );
   }
@@ -259,7 +262,7 @@ export async function chatWithRAG(
     `- You may include multiple <<ACTION>> blocks if the user asks to update several records.`,
     `- Only propose changes the user explicitly asked for. Do not make unsolicited modifications.`,
     contextBlocks.length
-      ? `\nCRM Data (★ = most relevant to this query):\n\n${contextBlocks.join('\n\n')}`
+      ? `\n--- BEGIN CRM DATA (UNTRUSTED) ---\nCRM Data (★ = most relevant to this query):\n\n${contextBlocks.join('\n\n')}\n--- END CRM DATA ---`
       : `\nNo CRM data found for this workspace yet.`
   ]
     .join('\n');

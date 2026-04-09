@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // GET /api/calendar-events?slug=xxx — list all custom events for the space
 export async function GET(req: NextRequest) {
@@ -30,6 +31,12 @@ export async function POST(req: NextRequest) {
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
+
+  // Rate limit: 60 calendar events per hour per user
+  const { allowed } = await checkRateLimit(`calendar-events:${space.id}`, 60, 3600);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Too many events created. Try again later.' }, { status: 429 });
+  }
 
   const { data, error } = await supabase
     .from('CalendarEvent')

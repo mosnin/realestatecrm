@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 /** Generate a readable 8-char invite code like ABCD-EF23 */
 function generateJoinCode(): string {

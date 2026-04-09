@@ -1,28 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_ROWS = 1000;
-const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const RATE_LIMIT_MAX = 5;
-
-// Simple in-memory rate limit tracker (keyed by brokerage ID)
-const importTracker = new Map<string, number[]>();
-
-function checkRateLimit(brokerageId: string): boolean {
-  const now = Date.now();
-  const timestamps = importTracker.get(brokerageId) ?? [];
-  const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
-  importTracker.set(brokerageId, recent);
-  return recent.length < RATE_LIMIT_MAX;
-}
-
-function recordImport(brokerageId: string) {
-  const timestamps = importTracker.get(brokerageId) ?? [];
-  timestamps.push(Date.now());
-  importTracker.set(brokerageId, timestamps);
-}
 
 /**
  * POST /api/broker/leads/import
@@ -40,7 +22,8 @@ export async function POST(req: NextRequest) {
   const { brokerage } = ctx;
 
   // ── Rate limit ──────────────────────────────────────────────────────────
-  if (!checkRateLimit(brokerage.id)) {
+  const { allowed } = await checkRateLimit(`broker-import:${brokerage.id}`, 5, 3600);
+  if (!allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded. Maximum 5 imports per hour.' },
       { status: 429 },
@@ -260,8 +243,6 @@ export async function POST(req: NextRequest) {
       imported += batch.length;
     }
   }
-
-  recordImport(brokerage.id);
 
   return NextResponse.json({
     imported,
