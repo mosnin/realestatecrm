@@ -492,22 +492,6 @@ function QuestionEditor({
         </div>
       )}
 
-      {/* Scoring weight */}
-      <div className="space-y-1.5">
-        <Label className="text-xs">Scoring Weight (0-10)</Label>
-        <Input
-          type="number"
-          min={0}
-          max={10}
-          value={question.scoring?.weight ?? 0}
-          onChange={(e) => {
-            const weight = Math.min(10, Math.max(0, Number(e.target.value) || 0));
-            updateField('scoring', { ...question.scoring, weight });
-          }}
-          className="w-24"
-        />
-      </div>
-
       {/* Conditional visibility */}
       <div className="space-y-2">
         <Label className="text-xs">Show or hide this question</Label>
