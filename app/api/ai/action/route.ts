@@ -4,7 +4,12 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 import { syncContact } from '@/lib/vectorize';
 import { syncDeal } from '@/lib/vectorize';
 import { audit } from '@/lib/audit';
+import { checkRateLimit } from '@/lib/rate-limit';
 import type { Contact, Deal, DealStage } from '@/lib/types';
+
+// Whitelist of fields that can be modified via AI actions
+const CONTACT_ALLOWED_FIELDS = new Set(['name', 'email', 'phone', 'budget', 'preferences', 'address', 'notes', 'type', 'tags', 'followUpAt']);
+const DEAL_ALLOWED_FIELDS = new Set(['title', 'description', 'value', 'address', 'priority', 'closeDate', 'status', 'stageId']);
 
 /**
  * POST /api/ai/action
@@ -23,6 +28,22 @@ export async function POST(req: NextRequest) {
 
     const auth = await requireSpaceOwner(slug);
     if (auth instanceof NextResponse) return auth;
+
+    // Rate limit: 20 AI actions per hour per user
+    const { allowed } = await checkRateLimit(`ai-action:${auth.userId}`, 20, 3600);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many AI actions. Please try again later.' }, { status: 429 });
+    }
+
+    // Whitelist changes to prevent AI from modifying sensitive fields
+    const allowedFields = action.type === 'update_contact' ? CONTACT_ALLOWED_FIELDS : DEAL_ALLOWED_FIELDS;
+    const sanitizedChanges: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(action.changes)) {
+      if (allowedFields.has(key)) {
+        sanitizedChanges[key] = value;
+      }
+    }
+    action.changes = sanitizedChanges;
     const { userId, space } = auth;
 
     let result: NextResponse;
