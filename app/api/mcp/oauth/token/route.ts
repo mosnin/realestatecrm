@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
       .setExpirationTime(`${expiresIn}s`)
       .sign(jwtSecret);
 
-    console.log('[mcp/token] SUCCESS — issued JWT for space:', authCode.spaceId);
+    console.log('[mcp/token] SUCCESS — issued JWT via authorization_code grant');
 
     return NextResponse.json({
       access_token: token,
