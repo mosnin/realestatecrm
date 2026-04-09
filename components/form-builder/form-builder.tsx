@@ -114,11 +114,14 @@ function SortableQuestion({
   question,
   isSelected,
   onSelect,
+  onDelete,
 }: {
   question: FormQuestion;
   isSelected: boolean;
   onSelect: () => void;
+  onDelete: () => void;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const typeConfig = getQuestionTypeConfig(question.type);
   const Icon = typeConfig?.icon;
 
@@ -162,6 +165,35 @@ function SortableQuestion({
         {question.system && (
           <Lock size={12} className="text-muted-foreground" />
         )}
+        {!question.system && (
+          confirmDelete ? (
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => { onDelete(); setConfirmDelete(false); }}
+                className="px-2 py-0.5 text-[10px] font-medium rounded bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="px-2 py-0.5 text-[10px] font-medium rounded border border-border hover:bg-muted"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
+              className="opacity-0 group-hover:opacity-100 flex-shrink-0 w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+              title="Delete question"
+            >
+              <Trash2 size={12} />
+            </button>
+          )
+        )}
       </div>
     </div>
   );
@@ -175,6 +207,7 @@ function SortableSection({
   onSelectQuestion,
   onSelectSection,
   onAddQuestion,
+  onDeleteQuestion,
   isSectionSelected,
   allSections,
 }: {
@@ -183,6 +216,7 @@ function SortableSection({
   onSelectQuestion: (id: string) => void;
   onSelectSection: (id: string) => void;
   onAddQuestion: (sectionId: string) => void;
+  onDeleteQuestion: (questionId: string) => void;
   isSectionSelected: boolean;
   allSections: FormSection[];
 }) {
@@ -288,6 +322,7 @@ function SortableSection({
                 question={question}
                 isSelected={selectedId === question.id}
                 onSelect={() => onSelectQuestion(question.id)}
+                onDelete={() => onDeleteQuestion(question.id)}
               />
             ))}
           </SortableContext>
@@ -873,6 +908,16 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
     setSelectedId(null);
   }, [selectedId, updateSections]);
 
+  const handleDeleteQuestionById = useCallback((questionId: string) => {
+    updateSections((sections) =>
+      sections.map((s) => ({
+        ...s,
+        questions: s.questions.filter((q) => q.id !== questionId),
+      })),
+    );
+    if (selectedId === questionId) setSelectedId(null);
+  }, [selectedId, updateSections]);
+
   const handleUpdateSection = useCallback(
     (updated: FormSection) => {
       updateSections((sections) =>
@@ -1116,6 +1161,7 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
                   onSelectQuestion={handleSelectQuestion}
                   onSelectSection={handleSelectSection}
                   onAddQuestion={handleAddQuestion}
+                  onDeleteQuestion={handleDeleteQuestionById}
                   isSectionSelected={selectedType === 'section' && selectedId === section.id}
                   allSections={config.sections}
                 />
@@ -1140,7 +1186,7 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
             <div className="px-4 py-3 border-b border-border bg-muted/20">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Properties</p>
             </div>
-            <ScrollArea className="max-h-[calc(100vh-200px)]">
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 160px)' }}>
               <div className="p-4">
                 {selectedQuestion ? (
                   <QuestionEditor
@@ -1163,7 +1209,7 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
                   </p>
                 )}
               </div>
-            </ScrollArea>
+            </div>
           </div>
         </div>
       </div>
