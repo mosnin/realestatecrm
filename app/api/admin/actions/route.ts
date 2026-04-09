@@ -226,6 +226,13 @@ export async function POST(req: NextRequest) {
       // Ban the user in Clerk — prevents them from signing in
       await clerkClient.users.banUser(target.clerkId);
 
+      // Also mark as banned in the DB so the middleware secondary check works
+      // even if Clerk metadata hasn't propagated yet.
+      await supabase
+        .from('User')
+        .update({ platformRole: 'banned' })
+        .eq('id', userId);
+
       logAdminAction({
         actor: admin.userId,
         action: 'suspend_user',
@@ -262,6 +269,12 @@ export async function POST(req: NextRequest) {
 
       // Unban the user in Clerk — restores their ability to sign in
       await clerkClient.users.unbanUser(target.clerkId);
+
+      // Restore platformRole in DB (back to 'user' — admins wouldn't be banned)
+      await supabase
+        .from('User')
+        .update({ platformRole: 'user' })
+        .eq('id', userId);
 
       logAdminAction({
         actor: admin.userId,
