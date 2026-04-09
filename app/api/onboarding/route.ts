@@ -288,7 +288,16 @@ export async function POST(req: NextRequest) {
       const userUpdates: Record<string, unknown> = {};
       if (phone) userUpdates.phone = String(phone).slice(0, 40);
       if (bio) userUpdates.bio = String(bio).slice(0, 500);
-      if (socialLinks && typeof socialLinks === 'object') userUpdates.socialLinks = socialLinks;
+      if (socialLinks && typeof socialLinks === 'object') {
+        const allowed = ['instagram', 'linkedin', 'facebook', 'tiktok', 'twitter', 'youtube'];
+        const sanitized: Record<string, string> = {};
+        for (const key of allowed) {
+          if (typeof (socialLinks as any)[key] === 'string') {
+            sanitized[key] = String((socialLinks as any)[key]).slice(0, 500);
+          }
+        }
+        userUpdates.socialLinks = sanitized;
+      }
       if (websiteUrl) userUpdates.websiteUrl = String(websiteUrl).slice(0, 500);
       if (mlsId) userUpdates.mlsId = String(mlsId).slice(0, 50);
       if (brokerageAffiliation) userUpdates.brokerageAffiliation = String(brokerageAffiliation).slice(0, 200);

@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'invalid_grant', error_description: 'Invalid or expired authorization code' }, { status: 400 });
     }
 
-    console.log('[mcp/token] code found, spaceId:', authCode.spaceId, 'expires:', authCode.expiresAt);
+    console.log('[mcp/token] authorization code found, validating');
 
     // Check expiry
     if (new Date(authCode.expiresAt) < new Date()) {

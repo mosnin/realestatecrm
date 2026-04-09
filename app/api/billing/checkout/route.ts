@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
         .eq('id', space.ownerId)
         .single();
 
-      console.log('[checkout] Creating Stripe customer for:', user?.email);
+      console.log('[checkout] Creating Stripe customer for space:', space.id);
       const customer = await stripe.customers.create({
         email: user?.email,
         name: user?.name || undefined,
