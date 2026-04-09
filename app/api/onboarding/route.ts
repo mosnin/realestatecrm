@@ -269,6 +269,14 @@ export async function POST(req: NextRequest) {
         biggestPainPoint?: string;
       };
 
+      // Block dangerous fields from being injected via request body
+      const BLOCKED_FIELDS = ['platformRole', 'clerkId', 'id', 'createdAt', 'updatedAt'];
+      for (const field of BLOCKED_FIELDS) {
+        if (field in body) {
+          return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+        }
+      }
+
       if (!slug) return NextResponse.json({ error: 'Slug is required' }, { status: 400 });
 
       const sanitized = normalizeSlug(slug);
