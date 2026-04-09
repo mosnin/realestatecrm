@@ -66,7 +66,7 @@ async function getSpaceOwnerInfo(spaceId: string): Promise<SpaceOwnerInfo | null
     } else if (smsEnabled && !ownerPhone) {
       console.warn(`[notify] SMS is enabled for spaceId ${spaceId} but no phone number is configured — SMS will be skipped`);
     } else if (!smsEnabled) {
-      console.log(`[notify] SMS notifications are disabled for spaceId ${spaceId} (smsNotifications = false)`);
+      console.info('[notify] SMS disabled for space');
     }
 
     return {
@@ -106,18 +106,15 @@ export interface NotifyNewLeadParams {
  * Respects both the channel toggles AND the notifyNewLeads event toggle.
  */
 export async function notifyNewLead(params: NotifyNewLeadParams): Promise<void> {
-  console.log('[NOTIFY-DEBUG] 1. notifyNewLead called, spaceId:', params.spaceId);
   const info = await getSpaceOwnerInfo(params.spaceId);
-  console.log('[NOTIFY-DEBUG] 2. Owner info:', JSON.stringify(info));
   if (!info) { console.warn('[notify] No space owner info found for spaceId:', params.spaceId); return; }
   if (!info.notifyNewLeads) { console.warn('[notify] notifyNewLeads is disabled for space:', params.spaceId); return; }
-  console.log('[notify] Sending new lead notification to:', info.ownerEmail, 'emailEnabled:', info.emailEnabled, 'smsEnabled:', info.smsEnabled);
+  console.info('[notify] Sending lead notification', { spaceId: params.spaceId, emailEnabled: info.emailEnabled, smsEnabled: info.smsEnabled });
 
   const promises: Promise<unknown>[] = [];
 
   // Email notification
   if (info.emailEnabled) {
-    console.log('[NOTIFY-DEBUG] 3. About to send email');
     promises.push(
       sendNewLeadNotification({
         toEmail: info.ownerEmail,
@@ -131,12 +128,10 @@ export async function notifyNewLead(params: NotifyNewLeadParams): Promise<void> 
         scoreLabel: params.scoreLabel,
         scoreSummary: params.scoreSummary,
         applicationData: params.applicationData,
-      }).then((res) => { console.log('[NOTIFY-DEBUG] 4. Email send complete'); return res; }).catch((err) => console.error('[notify] lead email failed', err))
     );
   }
 
   // SMS notification
-  console.log('[NOTIFY-DEBUG] 5. About to send SMS, smsEnabled:', info.smsEnabled, 'phone:', info.ownerPhone);
   if (info.smsEnabled && info.ownerPhone) {
     promises.push(
       sendSMS(
