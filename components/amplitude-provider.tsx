@@ -15,7 +15,7 @@ export function AmplitudeProvider({ children }: { children: React.ReactNode }) {
     import('@amplitude/unified').then((amplitude) => {
       amplitude.initAll('246fdb1876379c5d56ce99456e6ce954', {
         analytics: { autocapture: true },
-        sessionReplay: { sampleRate: 1 },
+        sessionReplay: { sampleRate: 0.1 },
       });
     }).catch(() => {
       // Non-fatal — analytics is best-effort

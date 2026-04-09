@@ -60,7 +60,7 @@ export async function DELETE(
   const conv = await getConversationAndVerifyOwner(id, userId);
   if (!conv) return NextResponse.json({ error: 'Not found or Forbidden' }, { status: 404 });
 
-  const { error } = await supabase.from('Conversation').delete().eq('id', id);
+  const { error } = await supabase.from('Conversation').delete().eq('id', id).eq('spaceId', conv.spaceId);
   if (error) throw error;
 
   return NextResponse.json({ success: true });

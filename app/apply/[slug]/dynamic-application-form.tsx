@@ -42,7 +42,7 @@ const STORAGE_KEY_PREFIX = 'chippi_dynamic_';
 
 type AnswerMap = Record<string, string | string[]>;
 
-// ── Helper: localStorage draft management ────────────────────────────────────
+// ── Helper: sessionStorage draft management ──────────────────────────────────
 
 function getStorageKey(slug: string, version: number) {
   return `${STORAGE_KEY_PREFIX}${slug}_v${version}`;
@@ -52,17 +52,17 @@ function loadDraft(slug: string, version: number): { data: AnswerMap; stale: boo
   if (typeof window === 'undefined') return { data: {}, stale: false };
   try {
     // Try loading draft for this exact version
-    const raw = localStorage.getItem(getStorageKey(slug, version));
+    const raw = sessionStorage.getItem(getStorageKey(slug, version));
     if (raw) return { data: JSON.parse(raw), stale: false };
 
     // Check if there's a draft from an older version
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
       if (key && key.startsWith(`${STORAGE_KEY_PREFIX}${slug}_v`) && key !== getStorageKey(slug, version)) {
-        const oldRaw = localStorage.getItem(key);
+        const oldRaw = sessionStorage.getItem(key);
         if (oldRaw) {
           // Return old data but flag it as stale
-          localStorage.removeItem(key);
+          sessionStorage.removeItem(key);
           return { data: JSON.parse(oldRaw), stale: true };
         }
       }
@@ -77,16 +77,16 @@ function loadDraft(slug: string, version: number): { data: AnswerMap; stale: boo
 function saveDraft(slug: string, version: number, data: AnswerMap) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(getStorageKey(slug, version), JSON.stringify(data));
+    sessionStorage.setItem(getStorageKey(slug, version), JSON.stringify(data));
   } catch {
-    // localStorage may be full or unavailable
+    // sessionStorage may be full or unavailable
   }
 }
 
 function clearDraft(slug: string, version: number) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.removeItem(getStorageKey(slug, version));
+    sessionStorage.removeItem(getStorageKey(slug, version));
   } catch {}
 }
 
@@ -668,7 +668,7 @@ export function DynamicApplicationForm({
         if (data.answers && typeof data.answers === 'object') {
           const serverAnswers = data.answers as AnswerMap;
 
-          // Merge strategy: if localStorage has more answers than the server
+          // Merge strategy: if sessionStorage has more answers than the server
           // draft, prefer the version with more filled fields (user may have
           // continued typing after the last server save).
           const localDraft = loadDraft(slug, configVersion);
@@ -860,7 +860,7 @@ export function DynamicApplicationForm({
     [answers],
   );
 
-  // Debounce localStorage saves
+  // Debounce sessionStorage saves
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedSave = useCallback(
     (data: AnswerMap) => {

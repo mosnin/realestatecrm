@@ -84,7 +84,7 @@ function getStorageKey(slug: string) {
 function loadDraft(slug: string): FormData {
   if (typeof window === 'undefined') return {};
   try {
-    const raw = localStorage.getItem(getStorageKey(slug));
+    const raw = sessionStorage.getItem(getStorageKey(slug));
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
@@ -94,16 +94,16 @@ function loadDraft(slug: string): FormData {
 function saveDraft(slug: string, data: FormData) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(getStorageKey(slug), JSON.stringify(data));
+    sessionStorage.setItem(getStorageKey(slug), JSON.stringify(data));
   } catch {
-    // localStorage may be full or unavailable
+    // sessionStorage may be full or unavailable
   }
 }
 
 function clearDraft(slug: string) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.removeItem(getStorageKey(slug));
+    sessionStorage.removeItem(getStorageKey(slug));
   } catch {}
 }
 
@@ -274,7 +274,7 @@ export function ApplicationForm({
   const currentStepIndex = STEPS.findIndex((s) => s.id === step);
   const totalSteps = STEPS.length;
 
-  // Debounce localStorage saves
+  // Debounce sessionStorage saves
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedSave = useCallback(
     (d: FormData) => {

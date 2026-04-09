@@ -3,7 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import crypto from 'crypto';
 import { jwtVerify } from 'jose';
 
@@ -16,7 +16,7 @@ async function authenticateKey(req: NextRequest): Promise<{ spaceId: string; ip:
   const auth = req.headers.get('authorization');
   if (!auth?.startsWith('Bearer ')) return null;
   const token = auth.slice(7);
-  if (token.length < 10 || token.length > 2000) return null;
+  if (token.length < 10 || token.length > 500) return null;
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
 

@@ -1,5 +1,38 @@
 import { redis } from '@/lib/redis';
 
+// ── IP extraction helper ────────────────────────────────────────────────────
+// On Vercel, X-Forwarded-For is set by the edge network and cannot be spoofed
+// by the end-user — Vercel always overwrites the header with the true client IP
+// as the first entry. The same applies to Cloudflare (CF-Connecting-IP) and
+// AWS ALB. If you self-host behind a different reverse proxy, ensure it strips
+// or overwrites the X-Forwarded-For header before reaching the app.
+//
+// Even so, we validate the extracted value to reject obviously malformed IPs
+// (e.g. extremely long strings, embedded payloads) which could bloat rate-limit
+// keys or Redis storage.
+
+const IPV4_REGEX = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+const IPV6_REGEX = /^[a-fA-F0-9:]+$/;
+
+/**
+ * Extract and validate the client IP from a request.
+ * Returns a sanitised IP string suitable for use in rate-limit keys.
+ *
+ * Only the first entry in X-Forwarded-For is used (the one the reverse proxy
+ * sets). If the value doesn't look like a valid IP, falls back to 'unknown'.
+ */
+export function getClientIp(req: { headers: { get(name: string): string | null } }): string {
+  const raw = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '';
+  if (!raw || raw.length > 45) return 'unknown';
+
+  // Quick structural check — must look like an IPv4 or IPv6 address
+  if (IPV4_REGEX.test(raw) || IPV6_REGEX.test(raw)) {
+    return raw;
+  }
+
+  return 'unknown';
+}
+
 /**
  * In-memory fallback rate limiter (bounded LRU).
  * Used when Redis is unavailable. Tracks last N IPs.

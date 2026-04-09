@@ -246,11 +246,11 @@ export async function POST(req: NextRequest) {
       .eq('id', rawBrokerageId)
       .maybeSingle();
     if (brokerageError) throw brokerageError;
-    if (!brokerage) {
-      return NextResponse.json({ error: 'Brokerage not found' }, { status: 404 });
-    }
-    if (brokerage.status !== 'active') {
-      return NextResponse.json({ error: 'Brokerage is not accepting applications' }, { status: 403 });
+    if (!brokerage || brokerage.status !== 'active') {
+      // Return a generic error for both invalid and not-found brokerages
+      // to prevent ID enumeration attacks
+      console.warn('[apply/brokerage] invalid or inactive brokerage', { brokerageId: rawBrokerageId });
+      return NextResponse.json({ error: 'Unable to process application. Please check the link and try again.' }, { status: 422 });
     }
 
     // ── Find the brokerage-linked Space owned by the broker owner ──────────

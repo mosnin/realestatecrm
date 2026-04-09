@@ -210,14 +210,12 @@ function extractContactFields(data: Record<string, unknown>, config: IntakeFormC
 }
 
 export async function POST(req: NextRequest) {
-  console.log('[APPLY-DEBUG] 1. Route handler entered');
   // ── IP-based rate limiting (10 submissions / IP / hour) ──────────────────
   const ip =
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     req.headers.get('x-real-ip') ??
     'unknown';
   const { allowed } = await checkRateLimit(`apply:rl:${ip}`, 10, 3600);
-  console.log('[APPLY-DEBUG] 2. Rate limit passed');
   if (!allowed) {
     return NextResponse.json(
       { error: 'Too many submissions. Please try again later.' },
@@ -249,7 +247,6 @@ export async function POST(req: NextRequest) {
 
   try {
     const space = await getSpaceFromSlug(rawSlug);
-    console.log('[APPLY-DEBUG] 4. Space found:', space?.id);
     if (!space) {
       return NextResponse.json({ error: 'Space not found' }, { status: 404 });
     }
@@ -368,8 +365,6 @@ export async function POST(req: NextRequest) {
       }
 
       const payload = parsed.data;
-      console.log('[APPLY-DEBUG] 3. Body parsed, slug:', payload.slug);
-
       contactName = payload.legalName;
       contactEmail = payload.email ?? null;
       contactPhone = payload.phone;
@@ -527,8 +522,6 @@ export async function POST(req: NextRequest) {
       .select();
     if (insertError) throw insertError;
     const contact = contacts![0] as Contact;
-    console.log('[APPLY-DEBUG] 5. Contact created:', contact?.id);
-
     // Create initial status update record for audit trail
     await supabase.from('ApplicationStatusUpdate').insert({
       contactId: contact.id,
@@ -558,7 +551,6 @@ export async function POST(req: NextRequest) {
       scoreDetails: null,
     };
 
-    console.log('[APPLY-DEBUG] 6. Starting scoring');
     try {
       scoring = await scoreLeadApplicationDynamic({
         contactId: contact.id,
@@ -615,8 +607,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    console.log('[APPLY-DEBUG] 7. Scoring complete:', scoring?.scoringStatus);
-
     // Send realtor notification + applicant confirmation email in parallel
     const businessName = spaceBusinessName || space.name;
 
@@ -652,7 +642,6 @@ export async function POST(req: NextRequest) {
     await Promise.all([realtorNotification, applicantConfirmation]);
     console.log('[apply] Notifications dispatched');
 
-    console.log('[APPLY-DEBUG] 10. Returning response');
     return NextResponse.json(
       {
         success: true,
