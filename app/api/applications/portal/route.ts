@@ -23,10 +23,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Rate limit by IP to prevent token brute-force attacks
-  const ip =
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    req.headers.get('x-real-ip') ??
-    'unknown';
+  const ip = getClientIp(req);
   const { allowed } = await checkRateLimit(`portal:get:${ip}`, 20, 3600);
   if (!allowed) {
     return NextResponse.json(

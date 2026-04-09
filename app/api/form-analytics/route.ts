@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { getSpaceFromSlug } from '@/lib/space';
 
@@ -82,10 +82,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Rate limit by IP to prevent abuse from rotating session IDs
-  const ip =
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    req.headers.get('x-real-ip') ??
-    'unknown';
+  const ip = getClientIp(req);
   const { allowed: ipAllowed } = await checkRateLimit(
     `form-analytics:rl:ip:${ip}`,
     200,
