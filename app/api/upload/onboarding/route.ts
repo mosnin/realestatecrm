@@ -36,7 +36,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'File must be under 2MB' }, { status: 400 });
     }
 
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+    // Validate magic bytes to prevent disguised file uploads
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const PNG_MAGIC = [0x89, 0x50, 0x4E, 0x47];
+    const JPEG_MAGIC = [0xFF, 0xD8, 0xFF];
+    const WEBP_MAGIC = [0x57, 0x45, 0x42, 0x50]; // bytes 8-11
+
+    let detectedExt: string | null = null;
+    if (buffer.length >= 4 && PNG_MAGIC.every((b, i) => buffer[i] === b)) {
+      detectedExt = 'png';
+    } else if (buffer.length >= 3 && JPEG_MAGIC.every((b, i) => buffer[i] === b)) {
+      detectedExt = 'jpg';
+    } else if (buffer.length >= 12 && WEBP_MAGIC.every((b, i) => buffer[i + 8] === b)) {
+      detectedExt = 'webp';
+    }
+
+    if (!detectedExt) {
+      return NextResponse.json({ error: 'File content does not match a valid image format (PNG, JPEG, WebP)' }, { status: 400 });
+    }
+
+    const ext = detectedExt;
     const fileName = `onboarding/${userId}/${type}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
     const bucket = 'branding';
 
@@ -46,7 +65,6 @@ export async function POST(req: NextRequest) {
       await supabase.storage.createBucket(bucket, { public: true });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
     const { error: uploadError } = await supabase.storage
       .from(bucket)
       .upload(fileName, buffer, { contentType: file.type, upsert: true });

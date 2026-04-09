@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { z } from 'zod';
 
 const notifySchema = z.object({
@@ -22,6 +23,12 @@ export async function POST(req: NextRequest) {
     ctx = await requireBroker();
   } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  // Rate limit: 20 notifications per hour per user
+  const { allowed } = await checkRateLimit(`chat-notify:${ctx.dbUserId}`, 20, 3600);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Too many notifications. Try again later.' }, { status: 429 });
   }
 
   let requestBody: unknown;

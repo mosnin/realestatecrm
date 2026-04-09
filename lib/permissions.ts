@@ -18,18 +18,13 @@ import type { Brokerage, BrokerageMembership } from '@/lib/types';
 
 /**
  * Returns true if the current Clerk user is a platform admin.
- * Primary check: User.platformRole = 'admin' in DB.
- * Fallback: Clerk publicMetadata.role = 'admin' (backwards-compat with existing admins).
+ * Only check: User.platformRole = 'admin' in DB (single source of truth).
  */
 export async function isPlatformAdmin(): Promise<boolean> {
   const session = await auth();
   if (!session.userId) return false;
 
-  // Fast fallback from session claims (no extra DB query)
-  const metadata = (session.sessionClaims?.publicMetadata ?? {}) as Record<string, unknown>;
-  if (metadata.role === 'admin') return true;
-
-  // Authoritative check in DB
+  // Authoritative check in DB — the single source of truth for admin role
   const { data } = await supabase
     .from('User')
     .select('platformRole')

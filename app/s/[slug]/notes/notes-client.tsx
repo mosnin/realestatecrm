@@ -445,14 +445,25 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
     URL.revokeObjectURL(url);
   }, [title, content]);
 
+  // HTML-escape to prevent XSS when injecting into document.write
+  const escHtml = useCallback((s: string): string => {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }, []);
+
   // Export note as PDF (uses browser print)
   const exportPDF = useCallback(() => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
+    const safeTitle = escHtml(title);
+    const safeContent = escHtml(content).replace(/@([\w][\w\s\-']*[\w])/g, (match) => {
+      const name = match.slice(1);
+      const found = mentionLookup.get(name.toLowerCase());
+      return found ? `<span class="mention">${match}</span>` : match;
+    });
     printWindow.document.write(`
       <html>
         <head>
-          <title>${title || 'Note'}</title>
+          <title>${safeTitle || 'Note'}</title>
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; }
             h1 { font-size: 28px; margin-bottom: 24px; }
@@ -461,18 +472,14 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
           </style>
         </head>
         <body>
-          <h1>${title || 'Untitled'}</h1>
-          <div class="content">${content.replace(/@([\w][\w\s\-']*[\w])/g, (match) => {
-            const name = match.slice(1);
-            const found = mentionLookup.get(name.toLowerCase());
-            return found ? `<span class="mention">${match}</span>` : match;
-          })}</div>
+          <h1>${safeTitle || 'Untitled'}</h1>
+          <div class="content">${safeContent}</div>
         </body>
       </html>
     `);
     printWindow.document.close();
     printWindow.print();
-  }, [title, content, mentionLookup]);
+  }, [title, content, mentionLookup, escHtml]);
 
   return (
     <div className="flex h-full">

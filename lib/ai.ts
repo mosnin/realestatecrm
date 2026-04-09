@@ -18,6 +18,24 @@ function textStream(message: string): ReadableStream {
   });
 }
 
+/**
+ * Sanitize untrusted CRM data before embedding in the AI prompt context.
+ * Strips prompt-injection patterns, ChatML tokens, delimiters, and zero-width Unicode.
+ */
+function sanitizeCrmText(input: unknown): string {
+  if (typeof input !== 'string') return '';
+  let s = input;
+  // Strip zero-width Unicode characters (U+200B, U+200C, U+200D, U+FEFF, U+2060, U+00AD)
+  s = s.replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00AD]/g, '');
+  // Strip ChatML tokens
+  s = s.replace(/<\|im_start\|>/gi, '').replace(/<\|im_end\|>/gi, '');
+  // Strip prompt delimiters (===, ###, triple backticks)
+  s = s.replace(/={3,}/g, '').replace(/#{3,}/g, '').replace(/`{3,}/g, '');
+  // Strip newlines followed by instruction-like patterns
+  s = s.replace(/\n\s*(IGNORE|SYSTEM|ACTION|ASSISTANT|USER|HUMAN|INSTRUCTION|OVERRIDE|FORGET|DISREGARD)[:\s]/gi, '\n');
+  return s;
+}
+
 export async function chatWithRAG(
   messages: ChatMessage[],
   spaceId: string,
@@ -119,7 +137,7 @@ export async function chatWithRAG(
             (c) => {
               const lt = (c.leadType === 'buyer' ? 'BUYER' : 'RENTAL');
               const stageLabel = c.leadType === 'buyer' ? (c.type ?? '') : (c.type ?? '');
-              let base = `- [ID:${c.id}] ${c.name} (${lt} · ${stageLabel})${priorityContactIds.has(c.id) ? ' ★' : ''} | Score: ${c.leadScore ?? 'N/A'} (${c.scoreLabel ?? 'unscored'}) | ${c.email ?? ''} | ${c.phone ?? ''} | Budget: ${c.budget != null ? `$${c.budget}` : 'N/A'} | ${c.address ?? ''} | Tags: ${(c.tags ?? []).join(', ')} | Notes: ${c.notes ?? ''}`;
+              let base = `- [ID:${c.id}] ${sanitizeCrmText(c.name)} (${lt} · ${stageLabel})${priorityContactIds.has(c.id) ? ' ★' : ''} | Score: ${c.leadScore ?? 'N/A'} (${c.scoreLabel ?? 'unscored'}) | ${c.email ?? ''} | ${c.phone ?? ''} | Budget: ${c.budget != null ? `$${c.budget}` : 'N/A'} | ${c.address ?? ''} | Tags: ${(c.tags ?? []).join(', ')} | Notes: ${sanitizeCrmText(c.notes)}`;
 
               // Append dynamic form answers if available
               if (c.formConfigSnapshot?.sections && c.applicationData) {
@@ -164,7 +182,7 @@ export async function chatWithRAG(
         sortedDeals
           .map(
             (d) =>
-              `- [ID:${d.id}] ${d.title}${priorityDealIds.has(d.id) ? ' ★' : ''} | Stage: ${d.DealStage?.name ?? 'N/A'} | Value: ${d.value != null ? `$${d.value}` : 'N/A'} | Priority: ${d.priority} | Address: ${d.address ?? ''} | Contacts: ${(contactsByDeal[d.id] ?? []).join(', ')}`
+              `- [ID:${d.id}] ${sanitizeCrmText(d.title)}${priorityDealIds.has(d.id) ? ' ★' : ''} | Stage: ${d.DealStage?.name ?? 'N/A'} | Value: ${d.value != null ? `$${d.value}` : 'N/A'} | Priority: ${d.priority} | Address: ${d.address ?? ''} | Description: ${sanitizeCrmText(d.description)} | Contacts: ${(contactsByDeal[d.id] ?? []).join(', ')}`
           )
           .join('\n')
     );

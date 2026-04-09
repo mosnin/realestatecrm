@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       date: String(date),
       time: time ? String(time).slice(0, 10) : null,
       description: description ? String(description).slice(0, 2000) : null,
-      color: color ? String(color).slice(0, 30) : null,
+      color: color && /^#[0-9a-fA-F]{6}$/.test(String(color)) ? String(color) : null,
     })
     .select()
     .single();
