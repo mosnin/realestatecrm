@@ -18,6 +18,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { getClientIp } from '@/lib/rate-limit';
 import type { NextRequest } from 'next/server';
 
 export type AuditAction =
@@ -55,10 +56,7 @@ export async function audit(params: AuditParams): Promise<void> {
     metadata,
   } = params;
 
-  const ipAddress =
-    req?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    req?.headers.get('x-real-ip') ??
-    null;
+  const ipAddress = req ? getClientIp(req) : null;
 
   try {
     const { error } = await supabase.from('AuditLog').insert({
