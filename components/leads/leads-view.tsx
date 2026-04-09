@@ -198,6 +198,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
   const { confirm, ConfirmDialog } = useConfirm();
 
   // Sync state FROM URL params when they change (e.g., sidebar navigation)
+  const searchParamsKey = searchParams.toString();
   useEffect(() => {
     const newTier = searchParams.get('tier');
     const newType = searchParams.get('type');
@@ -210,7 +211,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
     setSortState(isValidSort(newSort) ? newSort : 'newest');
     setViewState(isValidView(newView) ? newView : 'card');
     setSearch(newSearch ?? '');
-  }, [searchParams]);
+  }, [searchParamsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync filters to URL params
   const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
