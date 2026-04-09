@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { encrypt, decrypt } from '@/lib/crypto';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? '';
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
         id: crypto.randomUUID(),
         spaceId: space.id,
         accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
+        refreshToken: encrypt(tokens.refresh_token),
         expiresAt: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
         updatedAt: new Date().toISOString(),
       }, { onConflict: 'spaceId' });
@@ -181,7 +182,7 @@ async function getValidAccessToken(tokenRow: any, spaceId: string): Promise<stri
     body: new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
       client_secret: GOOGLE_CLIENT_SECRET,
-      refresh_token: tokenRow.refreshToken,
+      refresh_token: decrypt(tokenRow.refreshToken),
       grant_type: 'refresh_token',
     }),
   });

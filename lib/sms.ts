@@ -73,6 +73,13 @@ export async function sendSMS(params: SendSMSParams): Promise<boolean> {
     return false;
   }
 
+  // Block premium-rate numbers to prevent toll fraud
+  const premiumPrefixes = ['+1900', '+1976', '+44870', '+44871', '+44872', '+44090', '+44091'];
+  if (premiumPrefixes.some((prefix) => toNumber.startsWith(prefix))) {
+    console.warn(`[sms] Blocked premium-rate number: "${toNumber}"`);
+    return false;
+  }
+
   try {
     console.log(`[sms] Sending to ${toNumber} from ${fromNumber} (body length: ${params.body.length})`);
     const response = await client.messages.send({

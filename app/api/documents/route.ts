@@ -52,13 +52,13 @@ export async function POST(req: NextRequest) {
   // intake contacts to prevent arbitrary file uploads to any contact.
   let resolvedSpaceId: string;
   if (uploadedBy === 'guest') {
-    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const { data: guestContact } = await supabase
       .from('Contact')
       .select('spaceId')
       .eq('id', contactId)
       .contains('tags', ['application-link'])
-      .gte('createdAt', thirtyMinAgo)
+      .gte('createdAt', fiveMinAgo)
       .maybeSingle();
     if (!guestContact) {
       return NextResponse.json({ error: 'Contact not found or upload window expired' }, { status: 404 });

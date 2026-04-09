@@ -4,6 +4,28 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { generatePrivacyPolicy } from '@/lib/privacy-policy-template';
 import Link from 'next/link';
 
+/** Strip dangerous HTML elements and attributes to prevent XSS */
+function sanitizeHtml(html: string): string {
+  let sanitized = html;
+  // Remove <script> tags and their contents
+  sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  // Remove <iframe>, <object>, <embed>, <form> tags and their contents
+  sanitized = sanitized.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
+  sanitized = sanitized.replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '');
+  sanitized = sanitized.replace(/<embed\b[^>]*\/?>/gi, '');
+  sanitized = sanitized.replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '');
+  // Remove self-closing / unclosed versions of dangerous tags
+  sanitized = sanitized.replace(/<script\b[^>]*\/?>/gi, '');
+  sanitized = sanitized.replace(/<iframe\b[^>]*\/?>/gi, '');
+  sanitized = sanitized.replace(/<object\b[^>]*\/?>/gi, '');
+  sanitized = sanitized.replace(/<form\b[^>]*\/?>/gi, '');
+  // Remove event handler attributes (on*)
+  sanitized = sanitized.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+  // Remove javascript: URLs in any attribute
+  sanitized = sanitized.replace(/javascript\s*:/gi, '');
+  return sanitized;
+}
+
 export const revalidate = 300; // Cache 5 minutes
 
 export default async function RealtorPrivacyPolicyPage({
@@ -30,7 +52,8 @@ export default async function RealtorPrivacyPolicyPage({
 
   const businessName = settings?.businessName || space.name;
   // Use the realtor's custom policy, or auto-generate a comprehensive default
-  const policyHtml = settings?.privacyPolicyHtml || generatePrivacyPolicy(businessName, 'realtor');
+  const rawPolicyHtml = settings?.privacyPolicyHtml || generatePrivacyPolicy(businessName, 'realtor');
+  const policyHtml = sanitizeHtml(rawPolicyHtml);
 
   return (
     <div className="min-h-screen bg-background">

@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Issue JWT
-    const expiresIn = 30 * 24 * 3600; // 30 days
+    const expiresIn = 3600; // 1 hour
     let jwtSecret: Uint8Array;
     try {
       jwtSecret = getJwtSecret();
@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'MCP not configured' }, { status: 500 });
     }
 
-    const expiresIn = 30 * 24 * 3600; // 30 days
+    const expiresIn = 3600; // 1 hour
     const token = await new SignJWT({ spaceId: key.spaceId, sub: client_id })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
@@ -204,7 +204,7 @@ export async function OPTIONS() {
   return new Response(null, {
     status: 204,
     headers: {
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": "https://claude.ai",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     },
