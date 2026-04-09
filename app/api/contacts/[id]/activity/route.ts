@@ -13,10 +13,12 @@ export async function GET(
   const limit = Math.min(Math.max(1, parseInt(_req.nextUrl.searchParams.get('limit') ?? '50') || 50), 200);
   const offset = Math.max(0, parseInt(_req.nextUrl.searchParams.get('offset') ?? '0') || 0);
 
+  const { space } = auth;
   const { data, error } = await supabase
     .from('ContactActivity')
     .select('*')
     .eq('contactId', id)
+    .eq('spaceId', space.id)
     .order('createdAt', { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) throw error;
@@ -42,6 +44,11 @@ export async function POST(
   }
 
   const safeContent = typeof content === 'string' ? content.slice(0, 5000) : null;
+
+  // Validate metadata size to prevent DoS
+  if (metadata && JSON.stringify(metadata).length > 10000) {
+    return NextResponse.json({ error: 'Metadata too large' }, { status: 413 });
+  }
 
   const { data, error } = await supabase
     .from('ContactActivity')
