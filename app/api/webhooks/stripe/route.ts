@@ -141,6 +141,22 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Validate spaceId ownership before updating
+        const { data: targetSpace } = await supabase
+          .from('Space')
+          .select('stripeCustomerId')
+          .eq('id', spaceId)
+          .maybeSingle();
+
+        if (targetSpace && targetSpace.stripeCustomerId && targetSpace.stripeCustomerId !== (session.customer as string)) {
+          console.error('[stripe webhook] checkout spaceId mismatch — rejecting metadata poisoning attempt', {
+            spaceId,
+            existingCustomer: targetSpace.stripeCustomerId,
+            sessionCustomer: session.customer,
+          });
+          break;
+        }
+
         await supabase
           .from('Space')
           .update(updateData)
@@ -159,6 +175,23 @@ export async function POST(req: NextRequest) {
         };
 
         if (spaceId) {
+          // Validate spaceId ownership: only update if the space's existing customer matches
+          // or if the space has no customer yet (first-time setup)
+          const { data: existingSpace } = await supabase
+            .from('Space')
+            .select('stripeCustomerId')
+            .eq('id', spaceId)
+            .maybeSingle();
+
+          if (existingSpace && existingSpace.stripeCustomerId && existingSpace.stripeCustomerId !== subscription.customer) {
+            console.error('[stripe webhook] spaceId metadata mismatch — space belongs to different customer', {
+              spaceId,
+              spaceCustomer: existingSpace.stripeCustomerId,
+              webhookCustomer: subscription.customer,
+            });
+            break; // Reject update — potential metadata poisoning attack
+          }
+
           await supabase.from('Space').update(updateData).eq('id', spaceId);
         } else {
           await supabase

@@ -108,6 +108,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
     console.error('[checkout] FAILED:', err.message, err.stack?.slice(0, 200));
-    return NextResponse.json({ error: err.message || 'Checkout failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Checkout failed. Please try again.' }, { status: 500 });
   }
 }
