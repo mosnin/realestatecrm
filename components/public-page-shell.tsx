@@ -1,5 +1,6 @@
 import { BrandLogo } from '@/components/brand-logo';
 import { CheckIcon } from 'lucide-react';
+import { safeHref } from '@/lib/utils';
 
 interface ShellCustomization {
   accentColor?: string;
@@ -118,7 +119,7 @@ export function PublicPageShell({
                   url ? (
                     <a
                       key={platform}
-                      href={url as string}
+                      href={safeHref(url as string)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground/50 hover:text-foreground transition-colors"
@@ -181,7 +182,7 @@ export function PublicPageShell({
                 customization.footerLinks.slice(0, 2).map((link) => (
                   <a
                     key={link.url}
-                    href={link.url}
+                    href={safeHref(link.url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-foreground transition-colors truncate max-w-[80px]"
