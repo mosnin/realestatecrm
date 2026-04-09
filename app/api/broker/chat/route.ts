@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
         spaceId: space.id,
         conversationId,
         role,
-        content: parsed.data.content,
+        content: parsed.data.content.replace(/</g, '&lt;').replace(/>/g, '&gt;'),
         createdAt: now,
       });
 

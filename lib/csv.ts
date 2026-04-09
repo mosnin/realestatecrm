@@ -29,6 +29,10 @@ export function downloadCSV(filename: string, rows: Record<string, unknown>[]): 
 function escapeCsvCell(val: unknown): string {
   if (val == null) return '';
   const str = String(val).replace(/"/g, '""');
+  // Prevent CSV formula injection: always quote cells starting with =, +, -, @, tab
+  if (/^[=+\-@\t\r]/.test(str)) {
+    return `"'${str}"`;  // Prefix with single quote inside quotes to neutralize formulas
+  }
   return str.includes(',') || str.includes('\n') || str.includes('"') ? `"${str}"` : str;
 }
 

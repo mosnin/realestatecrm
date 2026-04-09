@@ -136,12 +136,13 @@ export async function GET() {
 }
 
 function csvEscape(val: string): string {
-  let safe = val;
-  if (/^[=+\-@\t\r]/.test(safe)) {
-    safe = `\t${safe}`;
+  const escaped = val.replace(/"/g, '""');
+  // Prevent CSV formula injection: prefix with single quote inside quotes
+  if (/^[=+\-@\t\r]/.test(escaped)) {
+    return `"'${escaped}"`;
   }
-  if (safe.includes(',') || safe.includes('"') || safe.includes('\n') || safe !== val) {
-    return `"${safe.replace(/"/g, '""')}"`;
+  if (escaped.includes(',') || escaped.includes('"') || escaped.includes('\n')) {
+    return `"${escaped}"`;
   }
-  return safe;
+  return escaped;
 }
