@@ -118,10 +118,14 @@ export default async function BrokerLayout({ children }: { children: React.React
             redirect(`/subscribe?slug=${ownerSlug}`);
           }
         }
+        // broker_only without personal space — skip subscription gate entirely.
+        // These users have no Space to check against; they manage the brokerage
+        // without needing a personal subscription.
       } catch (err: any) {
         if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err;
         console.error('[broker-layout] Broker-only owner subscription check error:', err);
-        redirect(`/subscribe?slug=${slug}`);
+        // Don't redirect broker_only users without a space to /subscribe —
+        // they have no slug and the subscription wall doesn't apply to them.
       }
     } else {
       // No space and not broker-only — shouldn't be here

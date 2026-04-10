@@ -140,7 +140,14 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
     e.preventDefault();
     if (!canAdvanceBrokerStep) return;
     if (brokerStep < brokerTotalSteps - 1) {
-      setBrokerStep(brokerStep + 1);
+      const newStep = brokerStep + 1;
+      setBrokerStep(newStep);
+      // Persist step progress to the server (non-blocking)
+      fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save_step', step: newStep }),
+      }).catch(() => {}); // non-blocking
       return;
     }
     // On the last step, trigger actual submit
@@ -151,7 +158,14 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
     e.preventDefault();
     if (!canAdvanceRealtorStep) return;
     if (realtorStep < realtorTotalSteps - 1) {
-      setRealtorStep(realtorStep + 1);
+      const newStep = realtorStep + 1;
+      setRealtorStep(newStep);
+      // Persist step progress to the server (non-blocking)
+      fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save_step', step: newStep }),
+      }).catch(() => {}); // non-blocking
       return;
     }
     // On the last step, trigger actual submit
@@ -199,6 +213,17 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
           throw new Error(d.error || 'Failed to save profile.');
         }
 
+        // Create the brokerage BEFORE marking onboarding complete —
+        // if brokerage creation fails, the user can retry without being
+        // stuck in a "completed but no brokerage" state.
+        const brokerRes = await fetch('/api/broker/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(brokerCreateBody()),
+        });
+        const brokerData = await brokerRes.json().catch(() => ({}));
+        if (!brokerRes.ok) throw new Error(brokerData.error || 'Failed to create brokerage.');
+
         // Mark onboarding complete with broker_only account type
         const completeRes = await fetch('/api/onboarding', {
           method: 'POST',
@@ -209,15 +234,6 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
           const d = await completeRes.json().catch(() => ({}));
           throw new Error(d.error || 'Failed to complete onboarding.');
         }
-
-        // Create the brokerage
-        const brokerRes = await fetch('/api/broker/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(brokerCreateBody()),
-        });
-        const brokerData = await brokerRes.json().catch(() => ({}));
-        if (!brokerRes.ok) throw new Error(brokerData.error || 'Failed to create brokerage.');
 
         confettiRef.current?.fire({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
         await new Promise(r => setTimeout(r, 800));
@@ -270,19 +286,8 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
         throw new Error(spaceData.error || 'Failed to create workspace.');
       }
 
-      // Mark onboarding complete
-      const accountType = role === 'broker' ? 'both' : 'realtor';
-      const completeRes2 = await fetch('/api/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'complete', accountType }),
-      });
-      if (!completeRes2.ok) {
-        const d = await completeRes2.json().catch(() => ({}));
-        throw new Error(d.error || 'Failed to complete onboarding.');
-      }
-
-      // If broker role, also create the brokerage and link the space to it
+      // If broker role, create the brokerage BEFORE marking onboarding complete —
+      // if brokerage creation fails the user can retry without being stuck.
       if (role === 'broker') {
         const brokerRes = await fetch('/api/broker/create', {
           method: 'POST',
@@ -301,7 +306,22 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
             body: JSON.stringify({ slug: spaceData.slug, brokerageId: newBrokerageId }),
           }).catch(() => {}); // Non-fatal — space still works without link
         }
+      }
 
+      // Mark onboarding complete — after brokerage creation (if applicable)
+      // so the user is never marked complete without a brokerage.
+      const accountType = role === 'broker' ? 'both' : 'realtor';
+      const completeRes2 = await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'complete', accountType }),
+      });
+      if (!completeRes2.ok) {
+        const d = await completeRes2.json().catch(() => ({}));
+        throw new Error(d.error || 'Failed to complete onboarding.');
+      }
+
+      if (role === 'broker') {
         confettiRef.current?.fire({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
         await new Promise(r => setTimeout(r, 800));
         router.push('/broker');

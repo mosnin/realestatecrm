@@ -123,7 +123,9 @@ export async function POST(req: Request) {
 
   if (membershipErr) {
     console.error('[broker/create] BrokerageMembership insert failed:', membershipErr);
-    // Brokerage was created — don't fail the whole flow for membership
+    // Rollback: delete the brokerage we just created since it's unusable without an owner membership
+    await supabase.from('Brokerage').delete().eq('id', brokerageId);
+    return NextResponse.json({ error: 'Failed to create brokerage membership' }, { status: 500 });
   }
 
   void audit({ actorClerkId: clerkId, action: 'CREATE', resource: 'Brokerage', resourceId: brokerageId, metadata: { name: trimmedName } });

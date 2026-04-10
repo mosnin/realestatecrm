@@ -33,6 +33,11 @@ type Step = {
   completed: boolean;
 };
 
+// NOTE: Dismiss state is stored in localStorage only, so it resets on new
+// devices / cleared storage. A proper fix would persist this to the DB
+// (e.g. a `dismissedOnboardingChecklist` column on the User table), but
+// that requires a schema migration. Keeping localStorage for now as a
+// low-priority known limitation.
 const STORAGE_KEY = 'chippi-onboarding-dismissed';
 
 export function OnboardingChecklist({ slug, hasLeads, hasContacts, hasTours, hasDeals }: OnboardingChecklistProps) {

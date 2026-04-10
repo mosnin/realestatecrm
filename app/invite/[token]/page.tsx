@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Building2, AlertTriangle, CheckCircle2 } from 'lucide-react';
@@ -27,6 +27,10 @@ export default async function AcceptInvitationPage({ params }: Params) {
   if (!userId) {
     redirect(`/sign-up?redirect_url=${encodeURIComponent(`/invite/${token}`)}`);
   }
+
+  // Fetch current user's email for mismatch detection
+  const user = await currentUser();
+  const currentEmail = user?.emailAddresses?.[0]?.emailAddress ?? '';
 
   // Fetch invitation directly from DB (avoids server-to-server HTTP which can fail on Vercel)
   let inv: InvitationDetail | null = null;
@@ -60,7 +64,7 @@ export default async function AcceptInvitationPage({ params }: Params) {
     fetchError = 'Could not load invitation.';
   }
   const isExpired = inv && new Date(inv.expiresAt) < new Date();
-  const isExpiredOrInvalid = inv?.status === 'expired' || isExpired;
+  const isExpiredOrInvalid = inv?.status === 'expired' || inv?.status === 'cancelled' || isExpired;
   const isAccepted = inv?.status === 'accepted';
 
   return (
@@ -104,10 +108,18 @@ export default async function AcceptInvitationPage({ params }: Params) {
             ) : isExpiredOrInvalid ? (
               <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400">
                 <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
-                <p className="text-sm">This invitation has expired or is no longer valid. Ask your broker to send a new one.</p>
+                <p className="text-sm">This invitation is no longer valid. Ask your broker to send a new one.</p>
               </div>
             ) : inv ? (
               <>
+                {currentEmail && inv.email && currentEmail.toLowerCase() !== inv.email.toLowerCase() && (
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                    <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+                    <p className="text-sm">
+                      You&apos;re signed in as <span className="font-semibold">{currentEmail}</span> but this invitation was sent to <span className="font-semibold">{inv.email}</span>. Please sign in with the correct account.
+                    </p>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm text-foreground leading-relaxed">
                     You've been invited to join{' '}
@@ -121,6 +133,11 @@ export default async function AcceptInvitationPage({ params }: Params) {
                   </p>
                 </div>
                 <AcceptButton token={token} />
+                {inv.expiresAt && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    This invitation expires on {new Date(inv.expiresAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}.
+                  </p>
+                )}
               </>
             ) : null}
           </div>
