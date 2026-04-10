@@ -402,18 +402,6 @@ export function CreateWorkspaceForm({ defaultName, userEmail, userImageUrl }: { 
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="bio">Bio <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <Textarea
-                  id="bio"
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  placeholder="Tell renters a bit about yourself (optional)"
-                  maxLength={500}
-                  rows={3}
-                />
-              </div>
-
               <div className="space-y-3">
                 <Label>Social links <span className="text-muted-foreground font-normal">(optional)</span></Label>
                 <div className="space-y-2">
