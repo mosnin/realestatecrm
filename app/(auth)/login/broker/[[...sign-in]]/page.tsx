@@ -11,7 +11,10 @@ export default async function BrokerSignInPage({
   searchParams: Promise<{ redirect_url?: string }>;
 }) {
   const { redirect_url } = await searchParams;
-  const safeInviteRedirect = redirect_url?.startsWith('/invite/') && !redirect_url.includes('..')
+  const SAFE_PREFIXES = ['/s/', '/broker', '/admin', '/invite/', '/subscribe', '/billing-required', '/authorize'];
+  const safeInviteRedirect = redirect_url
+    && SAFE_PREFIXES.some(p => redirect_url.startsWith(p))
+    && !redirect_url.includes('..')
     ? redirect_url
     : null;
   const postSignInUrl = safeInviteRedirect ?? '/auth/redirect?intent=broker';

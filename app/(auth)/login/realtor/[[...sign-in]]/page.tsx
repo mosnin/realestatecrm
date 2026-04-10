@@ -11,8 +11,11 @@ export default async function RealtorSignInPage({
   searchParams: Promise<{ redirect_url?: string }>;
 }) {
   const { redirect_url } = await searchParams;
-  // Validate redirect_url: only allow /invite/ paths, block path traversal
-  const isSafeRedirect = redirect_url?.startsWith('/invite/') && !redirect_url.includes('..');
+  // Validate redirect_url: allow safe internal paths, block path traversal
+  const SAFE_PREFIXES = ['/s/', '/broker', '/admin', '/invite/', '/subscribe', '/billing-required', '/authorize'];
+  const isSafeRedirect = redirect_url
+    && SAFE_PREFIXES.some(p => redirect_url.startsWith(p))
+    && !redirect_url.includes('..');
   const postSignInUrl = isSafeRedirect
     ? redirect_url!
     : '/auth/redirect?intent=realtor';

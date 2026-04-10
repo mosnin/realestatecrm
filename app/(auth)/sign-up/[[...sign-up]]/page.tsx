@@ -14,8 +14,11 @@ export default async function SignUpPage({
   const isBroker = intent === 'broker';
   const redirectIntent = isBroker ? 'broker' : 'realtor';
   const signInBase = isBroker ? '/login/broker' : '/login/realtor';
-  // Validate redirect_url: only allow /invite/ paths, block path traversal
-  const isSafeRedirect = redirect_url?.startsWith('/invite/') && !redirect_url.includes('..');
+  // Validate redirect_url: allow safe internal paths, block path traversal
+  const SAFE_PREFIXES = ['/s/', '/broker', '/admin', '/invite/', '/subscribe', '/billing-required', '/authorize'];
+  const isSafeRedirect = redirect_url
+    && SAFE_PREFIXES.some(p => redirect_url.startsWith(p))
+    && !redirect_url.includes('..');
   const signInUrl = isSafeRedirect
     ? `${signInBase}?redirect_url=${encodeURIComponent(redirect_url!)}`
     : signInBase;
