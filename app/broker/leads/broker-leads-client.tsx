@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Search, UserPlus, UserMinus, Check, PhoneIncoming, Users, CalendarClock, Handshake, ArrowRight, Clock, MessageSquare, ChevronDown, ChevronUp, Loader2, Home, Key, ArrowUpDown } from 'lucide-react';
+import { Search, UserPlus, UserMinus, Check, PhoneIncoming, Users, CalendarClock, Handshake, ArrowRight, Clock, MessageSquare, ChevronDown, ChevronUp, Loader2, Home, Key, ArrowUpDown, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -303,13 +303,32 @@ function LeadItem({
   lead,
   realtors,
   onAssigned,
+  onDeleted,
 }: {
   lead: LeadRow;
   realtors: RealtorOption[];
   onAssigned: (leadId: string, realtor: RealtorOption) => void;
+  onDeleted: (leadId: string) => void;
 }) {
   const [assigning, setAssigning] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/contacts/${lead.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed');
+      toast.success('Lead deleted');
+      onDeleted(lead.id);
+    } catch {
+      toast.error('Failed to delete lead');
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
 
   async function handleAssign(realtor: RealtorOption) {
     setAssigning(true);
@@ -372,6 +391,26 @@ function LeadItem({
 
         {/* Assign */}
         <RealtorPicker realtors={realtors} onSelect={(r) => handleAssign(r)} disabled={assigning} />
+
+        {/* Delete */}
+        {confirmDelete ? (
+          <div className="flex items-center gap-1">
+            <button onClick={handleDelete} disabled={deleting} className="px-2 py-1 text-[10px] font-medium rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50">
+              {deleting ? 'Deleting...' : 'Confirm'}
+            </button>
+            <button onClick={() => setConfirmDelete(false)} className="px-2 py-1 text-[10px] font-medium rounded border border-border hover:bg-muted">
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+            title="Delete lead"
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
       </div>
 
       {/* Notes panel */}
@@ -911,6 +950,7 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
                   lead={lead}
                   realtors={realtors}
                   onAssigned={handleAssigned}
+                  onDeleted={(id) => setUnassigned((prev) => prev.filter((l) => l.id !== id))}
                 />
               ))}
             </CardContent>
