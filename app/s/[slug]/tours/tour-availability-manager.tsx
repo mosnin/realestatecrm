@@ -275,20 +275,42 @@ export function TourAvailabilityManager({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-1">
-            {/* Header row */}
-            <div className="hidden sm:grid sm:grid-cols-[140px_60px_1fr] items-center gap-3 px-3 pb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Day
-              </span>
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-center">
-                Active
-              </span>
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Hours
-              </span>
-            </div>
+          {/* Global tour hours */}
+          <div className="flex items-center gap-3 rounded-lg bg-muted/40 border border-border px-4 py-3 mb-4">
+            <span className="text-sm font-medium min-w-[80px]">Tour hours</span>
+            <Select
+              value={String(settings.tourStartHour)}
+              onValueChange={(v) => updateSettings({ tourStartHour: Number(v) })}
+            >
+              <SelectTrigger className="w-[130px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIME_OPTIONS.filter((o) => Number(o.value) < settings.tourEndHour).map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-muted-foreground">to</span>
+            <Select
+              value={String(settings.tourEndHour)}
+              onValueChange={(v) => updateSettings({ tourEndHour: Number(v) })}
+            >
+              <SelectTrigger className="w-[130px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIME_OPTIONS.filter((o) => Number(o.value) > settings.tourStartHour).map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+                <SelectItem value="24">12:00 AM (midnight)</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-[11px] text-muted-foreground ml-1">Applies to all active days</span>
+          </div>
 
+          {/* Day toggles */}
+          <div className="space-y-1">
             {DAYS_OF_WEEK.map((day) => {
               const isActive = settings.tourDaysAvailable.includes(day.value);
               const isWeekend = day.value === 0 || day.value === 6;
@@ -297,88 +319,34 @@ export function TourAvailabilityManager({
                 <div
                   key={day.value}
                   className={cn(
-                    'grid grid-cols-1 sm:grid-cols-[140px_60px_1fr] items-center gap-3 rounded-lg px-3 py-3 transition-colors',
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors',
                     isActive
                       ? 'bg-primary/5 border border-primary/10'
                       : 'bg-muted/30 border border-transparent'
                   )}
                 >
-                  {/* Day name */}
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        'text-sm font-medium',
-                        isActive ? 'text-foreground' : 'text-muted-foreground'
-                      )}
-                    >
-                      {day.label}
-                    </span>
+                  <span
+                    className={cn(
+                      'text-sm font-medium flex-1',
+                      isActive ? 'text-foreground' : 'text-muted-foreground'
+                    )}
+                  >
+                    {day.label}
                     {isWeekend && (
-                      <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+                      <Badge variant="secondary" className="text-[10px] py-0 px-1.5 ml-2">
                         Weekend
                       </Badge>
                     )}
-                  </div>
-
-                  {/* Toggle */}
-                  <div className="flex justify-center">
-                    <Switch
-                      checked={isActive}
-                      onCheckedChange={() => toggleDay(day.value)}
-                    />
-                  </div>
-
-                  {/* Time pickers */}
-                  <div className="flex items-center gap-2">
-                    {isActive ? (
-                      <>
-                        <Select
-                          value={String(settings.tourStartHour)}
-                          onValueChange={(v) =>
-                            updateSettings({ tourStartHour: Number(v) })
-                          }
-                        >
-                          <SelectTrigger className="w-[130px] h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {TIME_OPTIONS.filter(
-                              (o) => Number(o.value) < settings.tourEndHour
-                            ).map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <span className="text-xs text-muted-foreground">to</span>
-                        <Select
-                          value={String(settings.tourEndHour)}
-                          onValueChange={(v) =>
-                            updateSettings({ tourEndHour: Number(v) })
-                          }
-                        >
-                          <SelectTrigger className="w-[130px] h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {TIME_OPTIONS.filter(
-                              (o) => Number(o.value) > settings.tourStartHour
-                            ).map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                            <SelectItem value="24">12:00 AM (midnight)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </>
-                    ) : (
-                      <span className="text-xs text-muted-foreground italic">
-                        Unavailable
-                      </span>
-                    )}
-                  </div>
+                  </span>
+                  {isActive && (
+                    <span className="text-xs text-muted-foreground">
+                      {TIME_OPTIONS.find((o) => o.value === String(settings.tourStartHour))?.label ?? ''} – {TIME_OPTIONS.find((o) => o.value === String(settings.tourEndHour))?.label ?? ''}
+                    </span>
+                  )}
+                  <Switch
+                    checked={isActive}
+                    onCheckedChange={() => toggleDay(day.value)}
+                  />
                 </div>
               );
             })}

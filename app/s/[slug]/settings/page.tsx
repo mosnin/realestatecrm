@@ -39,8 +39,29 @@ export default async function GeneralSettingsPage({
     );
   }
 
+  const subStatus = (space as any).stripeSubscriptionStatus ?? 'inactive';
+  const periodEnd = (space as any).stripePeriodEnd;
+  const isTrialing = subStatus === 'trialing';
+  const isActive = subStatus === 'active';
+
   return (
     <div className="space-y-6 max-w-3xl">
+      {/* Subscription status banner */}
+      {(isTrialing || isActive) && periodEnd && (
+        <div className={`rounded-lg border px-4 py-3 text-sm ${isTrialing ? 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300' : 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'}`}>
+          {isTrialing ? (
+            <>Trial ends on <strong>{new Date(periodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>. <a href={`/s/${slug}/billing`} className="underline font-medium">Manage billing</a></>
+          ) : (
+            <>Subscription renews on <strong>{new Date(periodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>. <a href={`/s/${slug}/billing`} className="underline font-medium">Manage billing</a></>
+          )}
+        </div>
+      )}
+      {subStatus === 'inactive' && (
+        <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          No active subscription. <a href={`/s/${slug}/billing`} className="underline font-medium text-primary">Start your free trial</a>
+        </div>
+      )}
+
       <div>
         <h1 className="text-xl font-semibold tracking-tight">General</h1>
         <p className="text-muted-foreground text-sm">Workspace name, slug, and contact information</p>
