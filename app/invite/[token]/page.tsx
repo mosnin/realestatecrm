@@ -25,7 +25,7 @@ export default async function AcceptInvitationPage({ params }: Params) {
   // Auth: must be signed in to accept
   const { userId } = await auth();
   if (!userId) {
-    redirect(`/sign-up?redirect_url=${encodeURIComponent(`/invite/${token}`)}`);
+    redirect(`/invite/${token}/sign-up`);
   }
 
   // Fetch current user's email for mismatch detection
