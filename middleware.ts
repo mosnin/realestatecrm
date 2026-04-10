@@ -147,12 +147,15 @@ export default clerkMiddleware(async (auth, request) => {
       // Redirect to login. Only pass redirect_url for safe dashboard pages —
       // never for /setup, /auth/redirect, etc. to avoid Clerk honouring a
       // redirect_url that skips the proper post-signup flow.
-      const signInUrl = new URL('/login/realtor', request.url);
+      // For invite pages, send to sign-up (invitees likely don't have accounts yet)
+      const isInvitePath = pathname.startsWith('/invite/');
+      const authPage = isInvitePath ? '/sign-up' : '/login/realtor';
+      const authUrl = new URL(authPage, request.url);
       const isSafeRedirect = SAFE_REDIRECT_PREFIXES.some((p) => pathname.startsWith(p));
       if (isSafeRedirect) {
-        signInUrl.searchParams.set('redirect_url', request.url);
+        authUrl.searchParams.set('redirect_url', pathname);
       }
-      return NextResponse.redirect(signInUrl);
+      return NextResponse.redirect(authUrl);
     }
 
     // Admin route protection — lightweight check in middleware.
