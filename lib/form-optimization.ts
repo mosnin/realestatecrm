@@ -364,7 +364,7 @@ export async function generateAISuggestions(
     const userPrompt = buildOptimizationUserPrompt(performance, formConfig);
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-mini',
       temperature: 0.3,
       max_tokens: 1500,
       response_format: {
