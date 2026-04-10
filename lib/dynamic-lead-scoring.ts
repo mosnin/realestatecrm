@@ -300,26 +300,25 @@ export async function scoreDynamicApplication(
     });
 
     // ── Step 3: Blend final score ───────────────────────────────────────
-    // The blend ratio adapts based on how much of the total scoring weight
-    // the deterministic engine actually covers. If rules only cover 50% of
-    // the weighted questions (e.g. number fields have no mappings), the
-    // deterministic influence is halved and AI picks up the slack.
+    // When a user has configured a scoring model, the deterministic score
+    // should be the primary signal — the user explicitly set their weights.
+    // AI serves as a secondary quality check, not the majority opinion.
     let finalScore: number;
     let scoreSource: string;
 
     if (deterministicResult.hasRules && aiResult) {
-      // Both available: adaptive weighted blend
-      // Base deterministic weight is 0.4, scaled by coverage fraction
-      const baseDeterministicWeight = 0.4;
+      // Both available: deterministic-primary blend
+      // With a scoring model (coverage ~1.0), deterministic gets 80% weight
+      // Without a model (legacy, coverage <1.0), AI gets more influence
       const coverage = deterministicResult.weightCoverage; // 0-1
-      const deterministicWeight = baseDeterministicWeight * coverage;
+      const deterministicWeight = coverage >= 0.8 ? 0.8 : 0.4 + (coverage * 0.4);
       const aiWeight = 1 - deterministicWeight;
 
       finalScore = Math.round(
         deterministicResult.score * deterministicWeight +
           aiResult.leadScore * aiWeight,
       );
-      scoreSource = coverage >= 0.8 ? 'hybrid' : 'hybrid_ai_heavy';
+      scoreSource = coverage >= 0.8 ? 'hybrid_model' : 'hybrid_ai_heavy';
 
       console.info('[dynamic-lead-scoring] blend weights', {
         contactId,
