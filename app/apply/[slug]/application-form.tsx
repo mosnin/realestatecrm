@@ -321,7 +321,7 @@ export function ApplicationForm({
         if (!get('phone').trim()) errs.phone = 'Phone number is required';
       }
       if (s === 3) {
-        if (!get('buyerBudget')) errs.buyerBudget = 'Please select your budget';
+        if (!get('buyerBudget').trim()) errs.buyerBudget = 'Please enter your budget';
       }
       // Step 4 (Pre-Approval): no required fields
       if (s === 5) {
@@ -357,10 +357,10 @@ export function ApplicationForm({
         if (!get('location').trim()) errs.location = 'Please enter your desired location';
       }
       if (s === 5) {
-        if (!get('budget')) errs.budget = 'Please select your budget';
+        if (!get('budget').trim()) errs.budget = 'Please enter your budget';
       }
       if (s === 6) {
-        if (!get('income')) errs.income = 'Please select your income range';
+        if (!get('income').trim()) errs.income = 'Please enter your income';
       }
       if (s === 7) {
         if (!get('employment')) errs.employment = 'Please select your work situation';
@@ -721,24 +721,18 @@ export function ApplicationForm({
         case 3:
           return (
             <div className="space-y-4">
-              <StepHeader title="What's your budget?" />
-              <div className="space-y-2.5">
-                {[
-                  { value: 'under_200k', label: 'Under $200K' },
-                  { value: '200k_350k', label: '$200K - $350K' },
-                  { value: '350k_500k', label: '$350K - $500K' },
-                  { value: '500k_750k', label: '$500K - $750K' },
-                  { value: '750k_1m', label: '$750K - $1M' },
-                  { value: '1m_plus', label: '$1M+' },
-                ].map((option) => (
-                  <SelectionCard
-                    key={option.value}
-                    label={option.label}
-                    selected={get('buyerBudget') === option.value}
-                    onClick={() => set('buyerBudget', option.value)}
-                    accentColor={accentColor}
-                  />
-                ))}
+              <StepHeader title="What's your purchase budget?" />
+              <div className="space-y-1.5">
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="e.g., 450000"
+                  value={get('buyerBudget')}
+                  onChange={(e) => set('buyerBudget', e.target.value)}
+                  className={cn('h-12 rounded-xl', errors.buyerBudget && 'border-destructive')}
+                  min={0}
+                />
+                <p className="text-xs text-muted-foreground">Enter your total purchase budget in dollars</p>
               </div>
               {errors.buyerBudget && <p className="text-xs text-destructive">{errors.buyerBudget}</p>}
             </div>
@@ -1059,22 +1053,17 @@ export function ApplicationForm({
         return (
           <div className="space-y-4">
             <StepHeader title="What's your monthly rent budget?" />
-            <div className="space-y-2.5">
-              {[
-                { value: 'under_1500', label: 'Under $1,500' },
-                { value: '1500_2000', label: '$1,500 - $2,000' },
-                { value: '2000_2500', label: '$2,000 - $2,500' },
-                { value: '2500_3500', label: '$2,500 - $3,500' },
-                { value: '3500_plus', label: '$3,500+' },
-              ].map((option) => (
-                <SelectionCard
-                  key={option.value}
-                  label={option.label}
-                  selected={get('budget') === option.value}
-                  onClick={() => set('budget', option.value)}
-                  accentColor={accentColor}
-                />
-              ))}
+            <div className="space-y-1.5">
+              <Input
+                type="number"
+                inputMode="numeric"
+                placeholder="e.g., 2500"
+                value={get('budget')}
+                onChange={(e) => set('budget', e.target.value)}
+                className={cn('h-12 rounded-xl', errors.budget && 'border-destructive')}
+                min={0}
+              />
+              <p className="text-xs text-muted-foreground">Enter your monthly budget in dollars</p>
             </div>
             {errors.budget && <p className="text-xs text-destructive">{errors.budget}</p>}
           </div>
@@ -1085,22 +1074,17 @@ export function ApplicationForm({
         return (
           <div className="space-y-4">
             <StepHeader title="What's your estimated monthly income?" />
-            <div className="space-y-2.5">
-              {[
-                { value: 'under_2000', label: 'Under $2,000' },
-                { value: '2000_3000', label: '$2,000 - $3,000' },
-                { value: '3000_4000', label: '$3,000 - $4,000' },
-                { value: '4000_6000', label: '$4,000 - $6,000' },
-                { value: '6000_plus', label: '$6,000+' },
-              ].map((option) => (
-                <SelectionCard
-                  key={option.value}
-                  label={option.label}
-                  selected={get('income') === option.value}
-                  onClick={() => set('income', option.value)}
-                  accentColor={accentColor}
-                />
-              ))}
+            <div className="space-y-1.5">
+              <Input
+                type="number"
+                inputMode="numeric"
+                placeholder="e.g., 5000"
+                value={get('income')}
+                onChange={(e) => set('income', e.target.value)}
+                className={cn('h-12 rounded-xl', errors.income && 'border-destructive')}
+                min={0}
+              />
+              <p className="text-xs text-muted-foreground">Enter your monthly income in dollars</p>
             </div>
             {errors.income && <p className="text-xs text-destructive">{errors.income}</p>}
           </div>

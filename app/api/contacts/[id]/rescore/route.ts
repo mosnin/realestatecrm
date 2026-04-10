@@ -44,9 +44,10 @@ export async function POST(
     (contact as Record<string, unknown>).formConfigSnapshot as IntakeFormConfig | null ?? null;
 
   let scoringModel: ScoringModel | null = null;
-  if (formConfig && contact.leadType) {
+  const resolvedLeadType = contact.leadType || (contact as any).formLeadType || 'rental';
+  if (formConfig) {
     try {
-      const scoringColumn = contact.leadType === 'buyer'
+      const scoringColumn = resolvedLeadType === 'buyer'
         ? 'buyerScoringModel'
         : 'rentalScoringModel';
       const { data: scoringSettings } = await supabase
@@ -84,7 +85,7 @@ export async function POST(
     applicationData: !formConfig
       ? (applicationData as (Record<string, unknown> & { legalName: string }) | null)
       : undefined,
-    leadType: contact.leadType,
+    leadType: resolvedLeadType as 'rental' | 'buyer',
   });
 
   const { error: updateError } = await supabase
