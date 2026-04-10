@@ -441,7 +441,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
             {selectedDate && selectedDaySlots && (
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Pick a time</p>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[400px] overflow-y-auto">
                   {selectedDaySlots.times.map((t) => (
                     <button
                       key={t}
