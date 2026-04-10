@@ -26,8 +26,6 @@ import { useRealtime } from '@/hooks/use-realtime';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AvailabilityOverrides } from './availability-overrides';
-import { PropertyProfiles } from './property-profiles';
 import { TourAvailabilityManager } from './tour-availability-manager';
 import { TourPrepCard } from '@/components/tours/tour-prep-card';
 import { TourTimeline } from '@/components/tours/tour-timeline';
