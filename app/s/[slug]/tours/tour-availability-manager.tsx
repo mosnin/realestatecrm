@@ -108,7 +108,7 @@ const TIME_OPTIONS = generateTimeOptions();
 const DEFAULT_SETTINGS: TourSettings = {
   tourDuration: 30,
   tourBufferMinutes: 0,
-  tourStartHour: 9,
+  tourStartHour: 7,
   tourEndHour: 17,
   tourDaysAvailable: [1, 2, 3, 4, 5],
   tourBlockedDates: [],

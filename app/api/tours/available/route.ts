@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   // If a property profile is specified, use its settings instead of defaults
   let duration = settings?.tourDuration ?? 30;
-  let startHour = settings?.tourStartHour ?? 9;
+  let startHour = settings?.tourStartHour ?? 7;
   let endHour = settings?.tourEndHour ?? 17;
   let daysAvailable: number[] = settings?.tourDaysAvailable ?? [1, 2, 3, 4, 5];
   let bufferMinutes = settings?.tourBufferMinutes ?? 0;
@@ -120,14 +120,30 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Generate slots day by day using timezone-aware date math
+  // Generate slots day by day using TIMEZONE-AWARE date math.
+  // Hours (startHour/endHour) are in the space's configured timezone,
+  // not UTC. We calculate the UTC offset for each day to generate
+  // correct ISO timestamps that render properly in any timezone.
+  function getTimezoneOffsetMs(date: Date, tz: string): number {
+    // Get the UTC time string for this date in the target timezone
+    const utcStr = date.toLocaleString('en-US', { timeZone: 'UTC' });
+    const tzStr = date.toLocaleString('en-US', { timeZone: tz });
+    const utcDate = new Date(utcStr);
+    const tzDate = new Date(tzStr);
+    return tzDate.getTime() - utcDate.getTime();
+  }
+
   const slots: { date: string; times: string[] }[] = [];
   const cursor = new Date(startDate);
-  cursor.setHours(0, 0, 0, 0);
+  cursor.setHours(12, 0, 0, 0); // Use noon to avoid DST edge cases
 
   for (let day = 0; day < 14; day++) {
-    const dayOfWeek = cursor.getDay();
-    const dateKey = cursor.toISOString().split('T')[0];
+    // Calculate this day's date in the space's timezone
+    const tzOffset = getTimezoneOffsetMs(cursor, timezone);
+    const localDate = new Date(cursor.getTime() + tzOffset);
+    const dayOfWeek = localDate.getDay();
+    const dateKey = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
+
     const override = overrideMap.get(dateKey);
 
     let dayAvailable = false;
@@ -150,9 +166,17 @@ export async function GET(req: NextRequest) {
       const daySlots: string[] = [];
       for (let hour = dayStart; hour < dayEnd; hour++) {
         for (let min = 0; min < 60; min += duration) {
-          const slotStart = new Date(cursor);
-          slotStart.setHours(hour, min, 0, 0);
-          const slotEnd = new Date(slotStart.getTime() + duration * 60_000);
+          // Create the slot time in the space's local timezone, then convert to UTC
+          // by subtracting the timezone offset
+          const localSlotMs = new Date(
+            localDate.getFullYear(),
+            localDate.getMonth(),
+            localDate.getDate(),
+            hour, min, 0, 0
+          ).getTime();
+          const utcSlotMs = localSlotMs - tzOffset;
+          const slotStart = new Date(utcSlotMs);
+          const slotEnd = new Date(utcSlotMs + duration * 60_000);
 
           if (slotStart.getTime() < now.getTime()) continue;
 
