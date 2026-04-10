@@ -163,7 +163,7 @@ function isChildActive(child: NavChild, pathname: string, base: string, searchPa
   if (child.exact) {
     // Exact match: pathname matches AND no filter query params present
     const currentParams = new URLSearchParams(searchParams || '');
-    const hasFilterParams = currentParams.has('type') || currentParams.has('tier');
+    const hasFilterParams = currentParams.has('type') || currentParams.has('tier') || currentParams.has('sort');
     return pathname === fullHref && !hasFilterParams;
   }
   return pathname.startsWith(fullHref);

@@ -245,6 +245,7 @@ export async function chatWithRAG(
     `You also manage real estate deals, notes, tours, and follow-ups.`,
     `Only reference data that appears in the CRM context below. Never fabricate client names, deal values, or contact details.`,
     `When asked about "recent" activity, prioritize items with the most recent dates.`,
+    `When asked about "leads" or "new leads", focus ONLY on contacts (not notes or deals). Leads are contacts with tags including "application-link" or "new-lead". Do not confuse workspace notes with lead information.`,
     ``,
     `## Editing CRM Data`,
     `When the user asks you to update, change, or edit a contact or deal, propose the change using this exact format:`,
@@ -270,7 +271,7 @@ export async function chatWithRAG(
   try {
     const openai = new OpenAI({ apiKey: openAIKey });
     const stream = await openai.chat.completions.create({
-      model: 'gpt-5.4-mini',
+      model: 'gpt-4o-mini',
       temperature: 0.2,
       max_tokens: 2000,
       stream: true,
