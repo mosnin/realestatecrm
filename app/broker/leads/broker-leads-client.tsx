@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Search, UserPlus, UserMinus, Check, PhoneIncoming, Users, CalendarClock, Handshake, ArrowRight, Clock, MessageSquare, ChevronDown, ChevronUp, Loader2, Home, Key, ArrowUpDown, Trash2 } from 'lucide-react';
+import { Search, UserPlus, UserMinus, Check, PhoneIncoming, Users, CalendarClock, Handshake, ArrowRight, Clock, MessageSquare, ChevronDown, ChevronUp, Loader2, Home, Key, ArrowUpDown, Trash2, LayoutGrid, List, Mail, Phone as PhoneIcon } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -721,8 +721,610 @@ function AssignedLeadItem({
   );
 }
 
+// ── Currency formatter ──────────────────────────────────────────────────────
+
+function formatCurrency(amount: number | null) {
+  if (amount == null) return null;
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
+}
+
+// ── Unassigned Lead Card (card view) ────────────────────────────────────────
+
+function LeadCard({
+  lead,
+  realtors,
+  onAssigned,
+  onDeleted,
+}: {
+  lead: LeadRow;
+  realtors: RealtorOption[];
+  onAssigned: (leadId: string, realtor: RealtorOption) => void;
+  onDeleted: (leadId: string) => void;
+}) {
+  const [assigning, setAssigning] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/contacts/${lead.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed');
+      toast.success('Lead deleted');
+      onDeleted(lead.id);
+    } catch {
+      toast.error('Failed to delete lead');
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
+
+  async function handleAssign(realtor: RealtorOption) {
+    setAssigning(true);
+    try {
+      const res = await fetch('/api/broker/assign-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId: lead.id, realtorUserId: realtor.userId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to assign lead');
+      }
+      toast.success(`Lead assigned to ${realtor.name ?? realtor.email}`);
+      onAssigned(lead.id, realtor);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to assign lead');
+    } finally {
+      setAssigning(false);
+    }
+  }
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-4 space-y-3">
+        {/* Header: name + badges */}
+        <div className="space-y-1.5">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-sm font-semibold truncate">{lead.name || 'Unnamed'}</h3>
+            {/* Delete button */}
+            {confirmDelete ? (
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button onClick={handleDelete} disabled={deleting} className="px-2 py-0.5 text-[10px] font-medium rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50">
+                  {deleting ? '...' : 'Yes'}
+                </button>
+                <button onClick={() => setConfirmDelete(false)} className="px-2 py-0.5 text-[10px] font-medium rounded border border-border hover:bg-muted">
+                  No
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex-shrink-0"
+                title="Delete lead"
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {leadTypeBadge(lead.leadType)}
+            {scoreBadge(lead.scoreLabel)}
+          </div>
+        </div>
+
+        {/* Contact info */}
+        <div className="space-y-1 text-xs text-muted-foreground">
+          {lead.email && (
+            <div className="flex items-center gap-1.5 truncate">
+              <Mail size={11} className="flex-shrink-0" />
+              <span className="truncate">{lead.email}</span>
+            </div>
+          )}
+          {lead.phone && (
+            <div className="flex items-center gap-1.5">
+              <PhoneIcon size={11} className="flex-shrink-0" />
+              <span>{lead.phone}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Budget + date */}
+        <div className="flex items-center justify-between text-xs">
+          {lead.budget != null ? (
+            <span className="font-medium text-foreground">{formatCurrency(lead.budget)}</span>
+          ) : (
+            <span className="text-muted-foreground">No budget</span>
+          )}
+          <span className="text-muted-foreground">{relativeTime(lead.createdAt)}</span>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 pt-1 border-t border-border">
+          <div className="flex-1">
+            <RealtorPicker realtors={realtors} onSelect={(r) => handleAssign(r)} disabled={assigning} />
+          </div>
+          <button
+            onClick={() => setShowNotes(!showNotes)}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:bg-muted transition-colors"
+            title="Notes"
+          >
+            <MessageSquare size={12} />
+            {showNotes ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+          </button>
+        </div>
+
+        {/* Notes panel */}
+        {showNotes && (
+          <div className="rounded-lg bg-muted/40 border border-border p-3">
+            <LeadNotes contactId={lead.id} />
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Unassigned Table View ───────────────────────────────────────────────────
+
+function UnassignedTableView({
+  leads,
+  realtors,
+  onAssigned,
+  onDeleted,
+}: {
+  leads: LeadRow[];
+  realtors: RealtorOption[];
+  onAssigned: (leadId: string, realtor: RealtorOption) => void;
+  onDeleted: (leadId: string) => void;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-border bg-muted/30 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="text-left px-4 py-2.5">Name</th>
+                <th className="text-left px-3 py-2.5">Type</th>
+                <th className="text-left px-3 py-2.5">Score</th>
+                <th className="text-left px-3 py-2.5 hidden md:table-cell">Email</th>
+                <th className="text-left px-3 py-2.5 hidden lg:table-cell">Phone</th>
+                <th className="text-right px-3 py-2.5 hidden sm:table-cell">Budget</th>
+                <th className="text-right px-3 py-2.5 hidden sm:table-cell">Date</th>
+                <th className="text-right px-4 py-2.5">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leads.map((lead) => (
+                <UnassignedTableRow key={lead.id} lead={lead} realtors={realtors} onAssigned={onAssigned} onDeleted={onDeleted} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function UnassignedTableRow({
+  lead,
+  realtors,
+  onAssigned,
+  onDeleted,
+}: {
+  lead: LeadRow;
+  realtors: RealtorOption[];
+  onAssigned: (leadId: string, realtor: RealtorOption) => void;
+  onDeleted: (leadId: string) => void;
+}) {
+  const [assigning, setAssigning] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/contacts/${lead.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed');
+      toast.success('Lead deleted');
+      onDeleted(lead.id);
+    } catch {
+      toast.error('Failed to delete lead');
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
+
+  async function handleAssign(realtor: RealtorOption) {
+    setAssigning(true);
+    try {
+      const res = await fetch('/api/broker/assign-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId: lead.id, realtorUserId: realtor.userId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to assign lead');
+      }
+      toast.success(`Lead assigned to ${realtor.name ?? realtor.email}`);
+      onAssigned(lead.id, realtor);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to assign lead');
+    } finally {
+      setAssigning(false);
+    }
+  }
+
+  return (
+    <tr className="border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors">
+      <td className="px-4 py-2.5 font-medium truncate max-w-[180px]">{lead.name || 'Unnamed'}</td>
+      <td className="px-3 py-2.5">{leadTypeBadge(lead.leadType)}</td>
+      <td className="px-3 py-2.5">{scoreBadge(lead.scoreLabel)}</td>
+      <td className="px-3 py-2.5 text-muted-foreground text-xs truncate max-w-[200px] hidden md:table-cell">{lead.email ?? '--'}</td>
+      <td className="px-3 py-2.5 text-muted-foreground text-xs hidden lg:table-cell">{lead.phone ?? '--'}</td>
+      <td className="px-3 py-2.5 text-right text-xs tabular-nums hidden sm:table-cell">{lead.budget != null ? formatCurrency(lead.budget) : '--'}</td>
+      <td className="px-3 py-2.5 text-right text-xs text-muted-foreground tabular-nums hidden sm:table-cell">{relativeTime(lead.createdAt)}</td>
+      <td className="px-4 py-2.5">
+        <div className="flex items-center justify-end gap-1.5">
+          <RealtorPicker realtors={realtors} onSelect={(r) => handleAssign(r)} disabled={assigning} />
+          {confirmDelete ? (
+            <div className="flex items-center gap-1">
+              <button onClick={handleDelete} disabled={deleting} className="px-2 py-1 text-[10px] font-medium rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50">
+                {deleting ? '...' : 'Yes'}
+              </button>
+              <button onClick={() => setConfirmDelete(false)} className="px-2 py-1 text-[10px] font-medium rounded border border-border hover:bg-muted">
+                No
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+              title="Delete lead"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ── Assigned Lead Card (card view) ──────────────────────────────────────────
+
+function AssignedLeadCard({
+  lead,
+  progress,
+  onUnassigned,
+}: {
+  lead: LeadRow;
+  progress?: AssignedLeadProgress;
+  onUnassigned?: (leadId: string, realtorName: string) => void;
+}) {
+  const [showNotes, setShowNotes] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [unassigning, setUnassigning] = useState(false);
+
+  const realtorName = progress?.realtorName ?? lead.assignedTo ?? 'this realtor';
+
+  async function handleUnassign() {
+    setUnassigning(true);
+    try {
+      const res = await fetch('/api/broker/unassign-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId: lead.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to unassign lead');
+      }
+      toast.success(`Lead unassigned from ${realtorName}`);
+      setConfirmOpen(false);
+      onUnassigned?.(lead.id, realtorName);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to unassign lead');
+    } finally {
+      setUnassigning(false);
+    }
+  }
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-4 space-y-3">
+        {/* Header: name + badges */}
+        <div className="space-y-1.5">
+          <h3 className="text-sm font-semibold truncate">{lead.name || 'Unnamed'}</h3>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {leadTypeBadge(lead.leadType)}
+            {progress ? stageBadge(progress.currentStage) : scoreBadge(lead.scoreLabel)}
+            {progress?.hasDeal && (
+              <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
+                <Handshake size={10} className="mr-1" />
+                Deal
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {/* Contact info */}
+        <div className="space-y-1 text-xs text-muted-foreground">
+          {lead.email && (
+            <div className="flex items-center gap-1.5 truncate">
+              <Mail size={11} className="flex-shrink-0" />
+              <span className="truncate">{lead.email}</span>
+            </div>
+          )}
+          {lead.phone && (
+            <div className="flex items-center gap-1.5">
+              <PhoneIcon size={11} className="flex-shrink-0" />
+              <span>{lead.phone}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Assignment info */}
+        <div className="space-y-1 text-xs">
+          {(progress?.realtorName ?? lead.assignedTo) && (
+            <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+              <Check size={11} />
+              <span className="font-medium">{progress?.realtorName ?? lead.assignedTo}</span>
+            </div>
+          )}
+          {progress && (
+            <div className="flex items-center gap-2">
+              {stageProgress(progress.currentStage)}
+              {progress.lastActivityAt && (
+                <span className="text-muted-foreground inline-flex items-center gap-1">
+                  <Clock size={10} />
+                  {relativeTime(progress.lastActivityAt)}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Budget + date */}
+        <div className="flex items-center justify-between text-xs">
+          {lead.budget != null ? (
+            <span className="font-medium text-foreground">{formatCurrency(lead.budget)}</span>
+          ) : (
+            <span className="text-muted-foreground">No budget</span>
+          )}
+          <span className="text-muted-foreground">{relativeTime(lead.createdAt)}</span>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 pt-1 border-t border-border">
+          <button
+            onClick={() => setConfirmOpen(true)}
+            disabled={unassigning}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-red-200 text-red-600 text-xs font-medium hover:bg-red-50 hover:border-red-300 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            title="Unassign lead"
+          >
+            <UserMinus size={12} />
+            Unassign
+          </button>
+          <button
+            onClick={() => setShowNotes(!showNotes)}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:bg-muted transition-colors ml-auto"
+            title="Notes"
+          >
+            <MessageSquare size={12} />
+            {showNotes ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+          </button>
+        </div>
+
+        {/* Notes panel */}
+        {showNotes && (
+          <div className="rounded-lg bg-muted/40 border border-border p-3">
+            <LeadNotes contactId={lead.id} />
+          </div>
+        )}
+      </CardContent>
+
+      {/* Unassign confirmation dialog */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unassign Lead</DialogTitle>
+            <DialogDescription>
+              Unassign <span className="font-medium text-foreground">{lead.name || 'this lead'}</span> from{' '}
+              <span className="font-medium text-foreground">{realtorName}</span>?
+              This will remove the lead from their CRM.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              onClick={() => setConfirmOpen(false)}
+              disabled={unassigning}
+              className="px-4 py-2 rounded-md border border-border text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUnassign}
+              disabled={unassigning}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {unassigning ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <UserMinus size={14} />
+              )}
+              Unassign
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+// ── Assigned Table View ─────────────────────────────────────────────────────
+
+function AssignedTableView({
+  leads,
+  assignedLeadProgress,
+  onUnassigned,
+}: {
+  leads: LeadRow[];
+  assignedLeadProgress: Record<string, AssignedLeadProgress>;
+  onUnassigned: (leadId: string, realtorName: string) => void;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-border bg-muted/30 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="text-left px-4 py-2.5">Name</th>
+                <th className="text-left px-3 py-2.5">Type</th>
+                <th className="text-left px-3 py-2.5">Score</th>
+                <th className="text-left px-3 py-2.5 hidden md:table-cell">Assigned To</th>
+                <th className="text-left px-3 py-2.5 hidden lg:table-cell">Stage</th>
+                <th className="text-right px-3 py-2.5 hidden sm:table-cell">Budget</th>
+                <th className="text-right px-3 py-2.5 hidden sm:table-cell">Date</th>
+                <th className="text-right px-4 py-2.5">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leads.map((lead) => (
+                <AssignedTableRow
+                  key={lead.id}
+                  lead={lead}
+                  progress={assignedLeadProgress[lead.id]}
+                  onUnassigned={onUnassigned}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AssignedTableRow({
+  lead,
+  progress,
+  onUnassigned,
+}: {
+  lead: LeadRow;
+  progress?: AssignedLeadProgress;
+  onUnassigned?: (leadId: string, realtorName: string) => void;
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [unassigning, setUnassigning] = useState(false);
+
+  const realtorName = progress?.realtorName ?? lead.assignedTo ?? 'this realtor';
+
+  async function handleUnassign() {
+    setUnassigning(true);
+    try {
+      const res = await fetch('/api/broker/unassign-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId: lead.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to unassign lead');
+      }
+      toast.success(`Lead unassigned from ${realtorName}`);
+      setConfirmOpen(false);
+      onUnassigned?.(lead.id, realtorName);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to unassign lead');
+    } finally {
+      setUnassigning(false);
+    }
+  }
+
+  return (
+    <>
+      <tr className="border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors">
+        <td className="px-4 py-2.5 font-medium truncate max-w-[180px]">{lead.name || 'Unnamed'}</td>
+        <td className="px-3 py-2.5">{leadTypeBadge(lead.leadType)}</td>
+        <td className="px-3 py-2.5">{progress ? stageBadge(progress.currentStage) : scoreBadge(lead.scoreLabel)}</td>
+        <td className="px-3 py-2.5 text-xs hidden md:table-cell">
+          <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400">
+            <Check size={10} />
+            {progress?.realtorName ?? lead.assignedTo ?? '--'}
+          </span>
+        </td>
+        <td className="px-3 py-2.5 text-xs hidden lg:table-cell">
+          {progress ? (
+            <div className="flex items-center gap-2">
+              {stageProgress(progress.currentStage)}
+            </div>
+          ) : '--'}
+        </td>
+        <td className="px-3 py-2.5 text-right text-xs tabular-nums hidden sm:table-cell">{lead.budget != null ? formatCurrency(lead.budget) : '--'}</td>
+        <td className="px-3 py-2.5 text-right text-xs text-muted-foreground tabular-nums hidden sm:table-cell">{relativeTime(lead.createdAt)}</td>
+        <td className="px-4 py-2.5">
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              onClick={() => setConfirmOpen(true)}
+              disabled={unassigning}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-red-200 text-red-600 text-xs font-medium hover:bg-red-50 hover:border-red-300 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+              title="Unassign lead"
+            >
+              <UserMinus size={12} />
+              <span className="hidden sm:inline">Unassign</span>
+            </button>
+          </div>
+        </td>
+      </tr>
+
+      {/* Unassign confirmation dialog */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unassign Lead</DialogTitle>
+            <DialogDescription>
+              Unassign <span className="font-medium text-foreground">{lead.name || 'this lead'}</span> from{' '}
+              <span className="font-medium text-foreground">{realtorName}</span>?
+              This will remove the lead from their CRM.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              onClick={() => setConfirmOpen(false)}
+              disabled={unassigning}
+              className="px-4 py-2 rounded-md border border-border text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUnassign}
+              disabled={unassigning}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {unassigning ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <UserMinus size={14} />
+              )}
+              Unassign
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
+type ViewMode = 'card' | 'table';
 type BrokerSortKey = 'newest' | 'oldest' | 'score' | 'score-low' | 'name-az' | 'name-za';
 type ScoreFilter = 'all' | 'hot' | 'warm' | 'cold';
 
@@ -743,6 +1345,7 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>('all');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<BrokerSortKey>('newest');
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
 
   // Count badges
   const allLeads = [...unassigned, ...assigned];
@@ -843,7 +1446,33 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
           className="w-full rounded-lg border border-border bg-card pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
         />
       </div>
-      <div className="flex gap-2 items-center">
+      <div className="flex gap-2 items-center flex-wrap">
+        {/* View toggle */}
+        <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
+          <button
+            onClick={() => setViewMode('card')}
+            className={`inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors ${
+              viewMode === 'card'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            title="Card view"
+          >
+            <LayoutGrid size={14} />
+          </button>
+          <button
+            onClick={() => setViewMode('table')}
+            className={`inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors ${
+              viewMode === 'table'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            title="Table view"
+          >
+            <List size={14} />
+          </button>
+        </div>
+
         {/* Sort dropdown */}
         <div className="relative">
           <select
@@ -934,6 +1563,25 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
               </p>
             </CardContent>
           </Card>
+        ) : viewMode === 'card' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredUnassigned.map((lead) => (
+              <LeadCard
+                key={lead.id}
+                lead={lead}
+                realtors={realtors}
+                onAssigned={handleAssigned}
+                onDeleted={(id) => setUnassigned((prev) => prev.filter((l) => l.id !== id))}
+              />
+            ))}
+          </div>
+        ) : viewMode === 'table' ? (
+          <UnassignedTableView
+            leads={filteredUnassigned}
+            realtors={realtors}
+            onAssigned={handleAssigned}
+            onDeleted={(id) => setUnassigned((prev) => prev.filter((l) => l.id !== id))}
+          />
         ) : (
           <Card>
             <CardContent className="p-0">
@@ -965,6 +1613,23 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
               <p className="text-sm text-muted-foreground">No assigned leads yet.</p>
             </CardContent>
           </Card>
+        ) : viewMode === 'card' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredAssigned.map((lead) => (
+              <AssignedLeadCard
+                key={lead.id}
+                lead={lead}
+                progress={assignedLeadProgress[lead.id]}
+                onUnassigned={handleUnassigned}
+              />
+            ))}
+          </div>
+        ) : viewMode === 'table' ? (
+          <AssignedTableView
+            leads={filteredAssigned}
+            assignedLeadProgress={assignedLeadProgress}
+            onUnassigned={handleUnassigned}
+          />
         ) : (
           <Card>
             <CardContent className="p-0">
