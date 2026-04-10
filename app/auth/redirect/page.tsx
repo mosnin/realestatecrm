@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -30,7 +30,29 @@ export default async function AuthRedirectPage({
     .maybeSingle();
 
   if (!user) {
-    // New user — send to setup regardless of intent
+    // New user — check if they have a pending invitation before sending to setup.
+    // This handles the case where Clerk's forceRedirectUrl didn't work and the
+    // user ended up here after signing up for a brokerage invitation.
+    try {
+      const clerkUser = await currentUser();
+      const email = clerkUser?.emailAddresses?.[0]?.emailAddress?.trim().toLowerCase();
+      if (email) {
+        const { data: pendingInvite } = await supabase
+          .from('Invitation')
+          .select('token')
+          .eq('email', email)
+          .eq('status', 'pending')
+          .gt('expiresAt', new Date().toISOString())
+          .order('createdAt', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (pendingInvite?.token) {
+          redirect(`/invite/${pendingInvite.token}`);
+        }
+      }
+    } catch {
+      // Non-blocking — fall through to setup if invite check fails
+    }
     redirect('/setup');
   }
 
