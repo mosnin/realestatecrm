@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AvailabilityOverrides } from './availability-overrides';
 import { PropertyProfiles } from './property-profiles';
+import { TourAvailabilityManager } from './tour-availability-manager';
 import { TourPrepCard } from '@/components/tours/tour-prep-card';
 import { TourTimeline } from '@/components/tours/tour-timeline';
 import { TourStatsStrip } from '@/components/tours/tour-stats-strip';
@@ -59,6 +60,15 @@ interface PropertyProfile {
   isActive: boolean;
 }
 
+interface TourSettings {
+  tourDuration: number;
+  tourBufferMinutes: number;
+  tourStartHour: number;
+  tourEndHour: number;
+  tourDaysAvailable: number[];
+  tourBlockedDates: string[];
+}
+
 interface ToursClientProps {
   slug: string;
   spaceId: string;
@@ -66,6 +76,7 @@ interface ToursClientProps {
   hasGoogleCalendar: boolean;
   bookingUrl: string;
   propertyProfiles?: PropertyProfile[];
+  tourSettings?: TourSettings;
 }
 
 const STATUS_CONFIG: Record<TourStatus, { label: string; color: string }> = {
@@ -78,7 +89,7 @@ const STATUS_CONFIG: Record<TourStatus, { label: string; color: string }> = {
 
 type FilterTab = 'upcoming' | 'past' | 'all' | 'availability';
 
-export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bookingUrl, propertyProfiles: initialProfiles = [] }: ToursClientProps) {
+export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bookingUrl, propertyProfiles: initialProfiles = [], tourSettings: initialTourSettings }: ToursClientProps) {
   const [tours, setTours] = useState<Tour[]>(initialTours);
   const [tab, setTab] = useState<FilterTab>('upcoming');
   const [copied, setCopied] = useState(false);
@@ -323,11 +334,12 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
       {/* Availability tab */}
       {tab === 'availability' && (
         <div className="space-y-8">
-          <PropertyProfiles slug={slug} profiles={profiles as any} onUpdate={setProfiles as any} />
-
-          <div className="border-t border-border pt-6">
-            <AvailabilityOverrides slug={slug} propertyProfiles={profiles} />
-          </div>
+          <TourAvailabilityManager
+            slug={slug}
+            initialSettings={initialTourSettings}
+            propertyProfiles={profiles}
+            onProfilesUpdate={setProfiles as any}
+          />
 
           {/* Embed Code */}
           <div className="border-t border-border pt-6 space-y-3">

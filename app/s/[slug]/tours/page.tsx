@@ -19,6 +19,21 @@ export default async function ToursPage({
   let tours: any[] = [];
   let hasGoogleCalendar = false;
   let propertyProfiles: any[] = [];
+  let tourSettings: {
+    tourDuration: number;
+    tourBufferMinutes: number;
+    tourStartHour: number;
+    tourEndHour: number;
+    tourDaysAvailable: number[];
+    tourBlockedDates: string[];
+  } = {
+    tourDuration: 30,
+    tourBufferMinutes: 0,
+    tourStartHour: 9,
+    tourEndHour: 17,
+    tourDaysAvailable: [1, 2, 3, 4, 5],
+    tourBlockedDates: [],
+  };
 
   // Fetch tours — this is the essential query
   try {
@@ -99,6 +114,26 @@ export default async function ToursPage({
     console.error('[tours] PropertyProfiles fetch failed', err);
   }
 
+  try {
+    const { data: settingsData } = await supabase
+      .from('SpaceSetting')
+      .select('tourDuration, tourBufferMinutes, tourStartHour, tourEndHour, tourDaysAvailable, tourBlockedDates')
+      .eq('spaceId', space.id)
+      .maybeSingle();
+    if (settingsData) {
+      tourSettings = {
+        tourDuration: settingsData.tourDuration ?? 30,
+        tourBufferMinutes: settingsData.tourBufferMinutes ?? 0,
+        tourStartHour: settingsData.tourStartHour ?? 9,
+        tourEndHour: settingsData.tourEndHour ?? 17,
+        tourDaysAvailable: settingsData.tourDaysAvailable ?? [1, 2, 3, 4, 5],
+        tourBlockedDates: settingsData.tourBlockedDates ?? [],
+      };
+    }
+  } catch (err) {
+    console.error('[tours] Tour settings fetch failed', err);
+  }
+
   return (
     <ToursClient
       slug={slug}
@@ -107,6 +142,7 @@ export default async function ToursPage({
       hasGoogleCalendar={hasGoogleCalendar}
       bookingUrl={`/book/${slug}`}
       propertyProfiles={propertyProfiles as any}
+      tourSettings={tourSettings}
     />
   );
 }

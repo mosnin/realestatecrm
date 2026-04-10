@@ -176,6 +176,28 @@ export async function PATCH(req: NextRequest) {
   if (consentCheckboxLabel !== undefined) settingsPayload.consentCheckboxLabel = consentCheckboxLabel || null;
   if (privacyPolicyHtml !== undefined) settingsPayload.privacyPolicyHtml = privacyPolicyHtml || null;
 
+  // Tour availability settings
+  if (typeof body.tourDuration === 'number' && [15, 30, 45, 60, 90, 120].includes(body.tourDuration)) {
+    settingsPayload.tourDuration = body.tourDuration;
+  }
+  if (typeof body.tourBufferMinutes === 'number' && [0, 15, 30, 45, 60].includes(body.tourBufferMinutes)) {
+    settingsPayload.tourBufferMinutes = body.tourBufferMinutes;
+  }
+  if (typeof body.tourStartHour === 'number' && body.tourStartHour >= 0 && body.tourStartHour <= 23) {
+    settingsPayload.tourStartHour = body.tourStartHour;
+  }
+  if (typeof body.tourEndHour === 'number' && body.tourEndHour >= 1 && body.tourEndHour <= 24) {
+    settingsPayload.tourEndHour = body.tourEndHour;
+  }
+  if (Array.isArray(body.tourDaysAvailable)) {
+    const validDays = body.tourDaysAvailable.filter((d: unknown) => typeof d === 'number' && d >= 0 && d <= 6);
+    settingsPayload.tourDaysAvailable = validDays;
+  }
+  if (Array.isArray(body.tourBlockedDates)) {
+    const validDates = body.tourBlockedDates.filter((d: unknown) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d as string));
+    settingsPayload.tourBlockedDates = validDates;
+  }
+
   const { error: settingsError } = await supabase
     .from('SpaceSetting')
     .upsert(settingsPayload, { onConflict: 'spaceId' })
