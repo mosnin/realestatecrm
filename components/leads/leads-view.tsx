@@ -369,7 +369,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
       if ('followUpAt' in patch) {
         toast.success(patch.followUpAt ? 'Follow-up date set' : 'Follow-up date cleared');
       } else if ('lastContactedAt' in patch) {
-        toast.success('Marked as contacted');
+        toast.success(patch.lastContactedAt ? 'Marked as contacted' : 'Contacted status removed');
       }
     } catch {
       toast.error('Failed to update lead');
@@ -889,17 +889,17 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                         onChange={(e) => patchLead(lead.id, { followUpAt: e.target.value || null })}
                       />
                     </label>
-                    {/* Mark contacted */}
+                    {/* Mark/unmark contacted */}
                     <button
                       type="button"
-                      onClick={() => patchLead(lead.id, { lastContactedAt: new Date().toISOString() })}
+                      onClick={() => patchLead(lead.id, { lastContactedAt: lead.lastContactedAt ? null : new Date().toISOString() })}
                       className={cn(
                         'inline-flex items-center gap-1 text-xs font-medium rounded-md px-2 py-1 transition-colors',
                         lead.lastContactedAt
                           ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20'
                           : 'text-muted-foreground bg-muted hover:text-foreground hover:bg-muted/80',
                       )}
-                      title="Mark as contacted now"
+                      title={lead.lastContactedAt ? 'Undo contacted status' : 'Mark as contacted now'}
                     >
                       <CheckCircle2 size={11} />
                       {lead.lastContactedAt ? 'Contacted' : 'Mark contacted'}

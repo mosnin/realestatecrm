@@ -35,7 +35,7 @@ function PreviewQuestion({ question }: { question: FormQuestion }) {
 
       {/* Render based on type */}
       {question.type === 'text' && (
-        <Input placeholder={question.placeholder || ''} disabled className="bg-muted/20" />
+        <Input placeholder={question.placeholder || ''} readOnly className="bg-muted/30 border-border" />
       )}
 
       {question.type === 'textarea' && (
@@ -43,19 +43,19 @@ function PreviewQuestion({ question }: { question: FormQuestion }) {
       )}
 
       {question.type === 'email' && (
-        <Input type="email" placeholder={question.placeholder || 'name@example.com'} disabled className="bg-muted/20" />
+        <Input type="email" placeholder={question.placeholder || 'name@example.com'} readOnly className="bg-muted/30 border-border" />
       )}
 
       {question.type === 'phone' && (
-        <Input type="tel" placeholder={question.placeholder || '(555) 123-4567'} disabled className="bg-muted/20" />
+        <Input type="tel" placeholder={question.placeholder || '(555) 123-4567'} readOnly className="bg-muted/30 border-border" />
       )}
 
       {question.type === 'number' && (
-        <Input type="number" placeholder={question.placeholder || '0'} disabled className="bg-muted/20" />
+        <Input type="number" placeholder={question.placeholder || '0'} readOnly className="bg-muted/30 border-border" />
       )}
 
       {question.type === 'date' && (
-        <Input type="date" disabled className="bg-muted/20" />
+        <Input type="date" readOnly className="bg-muted/30 border-border" />
       )}
 
       {question.type === 'select' && (
@@ -169,11 +169,7 @@ export function FormPreview({ config }: FormPreviewProps) {
         {/* Form header */}
         <div className="px-6 py-5 border-b border-border bg-muted/10">
           <h2 className="text-lg font-semibold">
-            {config.leadType === 'rental'
-              ? 'Rental Application'
-              : config.leadType === 'buyer'
-                ? 'Buyer Inquiry'
-                : 'Contact Form'}
+            Application Form Preview
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             Preview of how applicants will see your form

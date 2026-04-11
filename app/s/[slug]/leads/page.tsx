@@ -87,7 +87,7 @@ export default async function LeadsPage({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Leads</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Renter applications submitted via your intake link
+            Applications submitted via your intake link
           </p>
         </div>
         {unreadLeads.length > 0 && (
@@ -141,7 +141,7 @@ export default async function LeadsPage({
           </div>
           <p className="font-semibold text-foreground mb-1">No leads yet</p>
           <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-            Share your intake link and new renter applications will appear here.
+            Share your intake link and new applications will appear here.
           </p>
           <Link
             href={`/s/${slug}`}

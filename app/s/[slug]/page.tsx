@@ -110,7 +110,7 @@ export default async function DashboardPage({
 
   const stats = [
     { label: 'New leads', value: newLeadCount, sub: 'unread', icon: PhoneIncoming, accent: newLeadCount > 0, href: `/s/${slug}/leads` },
-    { label: 'Total leads', value: totalLeads, sub: `${rentalLeadCount} rental, ${buyerLeadCount} buyer`, icon: TrendingUp, accent: false, href: `/s/${slug}/leads` },
+    { label: 'Total leads', value: totalLeads, sub: 'total', icon: TrendingUp, accent: false, href: `/s/${slug}/leads` },
     { label: 'Clients', value: contactCount, sub: 'in CRM', icon: Users, accent: false, href: `/s/${slug}/contacts` },
     { label: 'Active deals', value: dealCount, sub: formatCurrency(totalValue), icon: Briefcase, accent: false, href: `/s/${slug}/deals` },
     { label: 'Tours', value: upcomingTourCount, sub: upcomingTourCount > 0 ? 'scheduled' : 'none', icon: CalendarDays, accent: upcomingTourCount > 0, href: `/s/${slug}/tours` },
@@ -176,7 +176,7 @@ export default async function DashboardPage({
         <ShareLinkCard
           icon={Link2}
           title="Intake link"
-          description="Receive renter applications"
+          description="Receive client applications"
           url={intakeUrl}
           previewHref={`/apply/${space.slug}`}
         />
@@ -213,7 +213,7 @@ export default async function DashboardPage({
                 </div>
                 <p className="text-sm font-medium text-foreground">No applications yet</p>
                 <p className="text-xs text-muted-foreground mt-1 max-w-[240px] mx-auto">
-                  Share your intake link to start receiving renter submissions.
+                  Share your intake link to start receiving applications.
                 </p>
               </CardContent>
             </Card>
