@@ -156,7 +156,7 @@ export default async function BrokerageApplyPage({
       agentPhoto={agentPhoto}
       pageTitle={pageTitle}
       pageIntro={pageIntro}
-      trustLine={`Your information is shared only with ${agentName} and used solely for rental inquiries.`}
+      trustLine={`Your information is shared only with ${agentName} and used solely for your inquiry.`}
       customization={customization}
     >
       <ApplicationFormLoader

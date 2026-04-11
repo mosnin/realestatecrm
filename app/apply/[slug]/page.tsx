@@ -179,7 +179,7 @@ export default async function PublicApplyPage({
         agentPhoto={agentPhoto}
         pageTitle={pageTitle}
         pageIntro={pageIntro}
-        trustLine={`Your information is shared only with ${agentName} and used solely for rental inquiries.`}
+        trustLine={`Your information is shared only with ${agentName} and used solely for your inquiry.`}
         customization={customization}
       >
         <ApplicationFormLoader slug={slug} spaceId={space.id} businessName={businessName} customization={customization} formConfig={resolvedFormConfig} rentalFormConfig={resolvedRentalFormConfig} buyerFormConfig={resolvedBuyerFormConfig} resumeToken={resumeToken} />

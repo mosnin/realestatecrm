@@ -16,19 +16,19 @@ import { Toaster } from 'sonner';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Chippi — AI-Powered CRM for Rental Agents',
-  description: 'Chippi helps rental agents close leases faster with AI lead scoring, automated follow-ups, tour scheduling, and a deal pipeline built for leasing. Start your 7-day free trial.',
-  keywords: ['CRM', 'real estate', 'rental agents', 'leasing', 'AI lead scoring', 'property management', 'deal pipeline', 'tour scheduling'],
+  title: 'Chippi — AI-Powered CRM for Real Estate Agents',
+  description: 'Chippi helps real estate agents close deals faster with AI lead scoring, automated follow-ups, tour scheduling, and a deal pipeline built for how realtors work. Start your 7-day free trial.',
+  keywords: ['CRM', 'real estate', 'realtors', 'AI lead scoring', 'property management', 'deal pipeline', 'tour scheduling', 'brokerages'],
   openGraph: {
-    title: 'Chippi — AI-Powered CRM for Rental Agents',
-    description: 'Score leads with AI, automate follow-ups, and manage your rental pipeline. Join 2,400+ agents closing leases faster with Chippi.',
+    title: 'Chippi — AI-Powered CRM for Real Estate Agents',
+    description: 'Score leads with AI, automate follow-ups, and manage your pipeline. Join agents closing deals faster with Chippi.',
     siteName: 'Chippi',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Chippi — AI-Powered CRM for Rental Agents',
-    description: 'Score leads with AI, automate follow-ups, and manage your rental pipeline. Join 2,400+ agents closing leases faster.',
+    title: 'Chippi — AI-Powered CRM for Real Estate Agents',
+    description: 'Score leads with AI, automate follow-ups, and manage your pipeline. Join agents closing deals faster.',
   },
   icons: {
     icon: '/chip-avatar.png',
