@@ -74,7 +74,7 @@ export function PublicPageShell({
   const fontClass = FONT_CLASS_MAP[customization?.font || 'system'] || '';
   const darkClass = customization?.darkMode ? 'dark' : '';
   const accentColor = customization?.accentColor || '#ff964f';
-  const hasSocial = customization?.socialLinks && Object.values(customization.socialLinks).some(Boolean);
+  const hasSocial = customization?.socialLinks && Object.values(customization.socialLinks).some((v) => typeof v === 'string' && v.trim().length > 0);
 
   return (
     <div
