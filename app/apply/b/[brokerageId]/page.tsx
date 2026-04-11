@@ -3,9 +3,26 @@ import { supabase } from '@/lib/supabase';
 import { PublicPageShell } from '@/components/public-page-shell';
 import { FormUnavailable } from '@/components/form-unavailable';
 import { ApplicationFormLoader } from '@/app/apply/[slug]/application-form-loader';
+import type { Metadata } from 'next';
 
 // Cache this page for 60 seconds — it's public and rarely changes.
 export const revalidate = 60;
+
+export async function generateMetadata({ params }: { params: Promise<{ brokerageId: string }> }): Promise<Metadata> {
+  const { brokerageId } = await params;
+  const { data: brokerage } = await supabase
+    .from('Brokerage')
+    .select('name')
+    .eq('id', brokerageId)
+    .maybeSingle();
+
+  const name = brokerage?.name || 'Application';
+  return {
+    title: `${name} — Application`,
+    description: `Submit your application to ${name}.`,
+    openGraph: { title: `${name} — Application`, description: `Submit your application to ${name}.` },
+  };
+}
 
 export default async function BrokerageApplyPage({
   params,

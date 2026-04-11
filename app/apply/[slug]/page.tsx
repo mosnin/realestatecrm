@@ -7,10 +7,30 @@ import { TrackingPixels } from '@/components/tracking-pixels';
 import { ApplicationFormLoader } from './application-form-loader';
 import { clerkClient } from '@clerk/nextjs/server';
 import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
+import type { Metadata } from 'next';
 
 // Cache this page for 60 seconds — it's public and rarely changes.
 // Eliminates cold-start latency for repeat visitors and crawlers.
 export const revalidate = 60;
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const space = await getSpaceFromSlug(slug);
+  if (!space) return { title: 'Application — Chippi' };
+
+  const { data: settings } = await supabase
+    .from('SpaceSetting')
+    .select('businessName')
+    .eq('spaceId', space.id)
+    .maybeSingle();
+
+  const name = settings?.businessName || space.name;
+  return {
+    title: `${name} — Application`,
+    description: `Submit your application to ${name}.`,
+    openGraph: { title: `${name} — Application`, description: `Submit your application to ${name}.` },
+  };
+}
 
 export default async function PublicApplyPage({
   params,
