@@ -84,8 +84,8 @@ export default async function PublicApplyPage({
     trackingPixels: TrackingPixelsType | null;
   } | null;
 
-  const pageTitle = settings?.intakePageTitle || 'Rental Application';
-  const pageIntro = settings?.intakePageIntro || "Share your rental preferences and we'll follow up with next steps.";
+  const pageTitle = settings?.intakePageTitle || 'Application';
+  const pageIntro = settings?.intakePageIntro || "Share your preferences and we'll follow up with next steps.";
   const businessName = settings?.businessName || space.name;
   const agentName = ownerData?.name || businessName;
 

@@ -111,8 +111,8 @@ export default async function BrokerageApplyPage({
   } | null;
 
   // Use brokerage name for title, fall back to space settings
-  const pageTitle = `${brokerage.name} Rental Application`;
-  const pageIntro = settings?.intakePageIntro || "Share your rental preferences and we'll follow up with next steps.";
+  const pageTitle = `${brokerage.name} Application`;
+  const pageIntro = settings?.intakePageIntro || "Share your preferences and we'll follow up with next steps.";
   const businessName = brokerage.name;
   const agentName = brokerage.name;
   // For brokerage forms, only show the logo — no circular avatar photo
