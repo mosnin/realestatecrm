@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronRight, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, CheckIcon, Check } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronRight, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check } from 'lucide-react';
 import { GlobalSearch } from './global-search';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
@@ -106,10 +106,10 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                     <button
                       type="button"
                       onClick={() => setMobileSwitcherOpen(!mobileSwitcherOpen)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-border bg-card hover:bg-muted transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md border border-border bg-card hover:bg-accent transition-colors text-left"
                     >
-                      <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        {pathname.startsWith('/broker') ? <Building2 size={16} className="text-primary" /> : <Briefcase size={16} className="text-primary" />}
+                      <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center flex-shrink-0">
+                        {pathname.startsWith('/broker') ? <Building2 size={16} className="text-foreground" /> : <Briefcase size={16} className="text-foreground" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold truncate">{pathname.startsWith('/broker') ? (brokerageName ?? 'Brokerage') : spaceName}</p>
@@ -124,45 +124,45 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                           onClick={() => { setMobileSwitcherOpen(false); setOpen(false); }}
                           className={cn(
                             'flex items-center gap-2.5 px-3 py-2.5 transition-colors',
-                            !pathname.startsWith('/broker') ? 'bg-primary/5' : 'hover:bg-muted'
+                            !pathname.startsWith('/broker') ? 'bg-accent' : 'hover:bg-accent'
                           )}
                         >
-                          <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <Briefcase size={16} className="text-primary" />
+                          <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center flex-shrink-0">
+                            <Briefcase size={16} className="text-foreground" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{spaceName}</p>
                             <p className="text-[10px] text-muted-foreground">Realtor Dashboard</p>
                           </div>
-                          {!pathname.startsWith('/broker') && <Check size={14} className="text-primary flex-shrink-0" />}
+                          {!pathname.startsWith('/broker') && <Check size={14} className="text-foreground flex-shrink-0" />}
                         </Link>
                         <div className="border-t border-border">
-                          <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">Brokerages</p>
+                          <p className="px-3 pt-2 pb-1 text-[10px] font-medium text-muted-foreground">Brokerages</p>
                           <Link
                             href="/broker"
                             onClick={() => { setMobileSwitcherOpen(false); setOpen(false); }}
                             className={cn(
                               'flex items-center gap-2.5 px-3 py-2.5 transition-colors',
-                              pathname.startsWith('/broker') ? 'bg-primary/5' : 'hover:bg-muted'
+                              pathname.startsWith('/broker') ? 'bg-accent' : 'hover:bg-accent'
                             )}
                           >
-                            <div className="w-8 h-8 rounded-md bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                              <Building2 size={16} className="text-amber-600" />
+                            <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center flex-shrink-0">
+                              <Building2 size={16} className="text-foreground" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{brokerageName ?? 'Brokerage'}</p>
                               <p className="text-[10px] text-muted-foreground">{brokerageRole === 'broker_owner' ? 'Owner' : brokerageRole === 'broker_admin' ? 'Admin' : 'Member'}</p>
                             </div>
-                            {pathname.startsWith('/broker') && <Check size={14} className="text-primary flex-shrink-0" />}
+                            {pathname.startsWith('/broker') && <Check size={14} className="text-foreground flex-shrink-0" />}
                           </Link>
                         </div>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border bg-card">
-                    <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Briefcase size={16} className="text-primary" />
+                  <div className="flex items-center gap-2.5 px-3 py-2 rounded-md border border-border bg-card">
+                    <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center flex-shrink-0">
+                      <Briefcase size={16} className="text-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate">{spaceName}</p>
@@ -175,7 +175,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
             <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-2 space-y-0.5">
               {!isBrokerOnly && !showBrokerMobileNavOnly && (
                 <>
-                  <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  <p className="px-3 pb-1.5 text-[10px] font-medium text-muted-foreground">
                     Workspace
                   </p>
                   {primaryNavItems.map((item) => {
@@ -190,10 +190,10 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                         href={href}
                         onClick={() => setOpen(false)}
                         className={cn(
-                          'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                          'group flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
                           isActive
-                            ? 'bg-primary text-primary-foreground shadow-sm'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                            ? 'bg-accent text-foreground font-medium'
+                            : 'text-muted-foreground font-normal hover:bg-accent hover:text-foreground'
                         )}
                       >
                         <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
@@ -207,7 +207,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                 <>
                   {brokerMobileNavSections.map((section) => (
                     <div key={section.title} className="pb-2">
-                      <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                      <p className="px-3 pb-1.5 text-[10px] font-medium text-muted-foreground">
                         {section.title}
                       </p>
                       {section.items.map((item) => {
@@ -220,10 +220,10 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                             href={item.href}
                             onClick={() => setOpen(false)}
                             className={cn(
-                              'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                              'group flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
                               isActive
-                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                                ? 'bg-accent text-foreground font-medium'
+                                : 'text-muted-foreground font-normal hover:bg-accent hover:text-foreground'
                             )}
                           >
                             <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
@@ -238,7 +238,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
             </nav>
             {isBroker && !showBrokerMobileNavOnly && (
               <div className="px-3 pb-2 space-y-0.5 border-t border-sidebar-border pt-3">
-                <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                <p className="px-3 pb-1.5 text-[10px] font-medium text-muted-foreground">
                   Team
                 </p>
                 {brokerMobileNavItems.map((item) => {
@@ -251,10 +251,10 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                       href={item.href}
                       onClick={() => setOpen(false)}
                       className={cn(
-                        'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                        'group flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
                         isActive
-                          ? 'bg-primary text-primary-foreground shadow-sm'
-                          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                          ? 'bg-accent text-foreground font-medium'
+                          : 'text-muted-foreground font-normal hover:bg-accent hover:text-foreground'
                       )}
                     >
                       <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
@@ -292,13 +292,13 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                     ]},
                   ].map((section) => (
                     <div key={section.label}>
-                      <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{section.label}</p>
+                      <p className="px-3 pb-1 pt-2 text-[10px] font-medium text-muted-foreground">{section.label}</p>
                       {section.items.map((item) => {
                         const isActive = item.href === `${base}/settings` ? pathname === item.href : pathname.startsWith(item.href);
                         return (
                           <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
-                            className={cn('group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
-                              isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                            className={cn('group flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
+                              isActive ? 'bg-accent text-foreground font-medium' : 'text-muted-foreground font-normal hover:bg-accent hover:text-foreground'
                             )}>
                             <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
                             {item.label}
@@ -310,7 +310,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                 </>
               ) : (
                 <>
-                  <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  <p className="px-3 pb-1.5 text-[10px] font-medium text-muted-foreground">
                     Account
                   </p>
                   {secondaryNavItems.map((item) => {
@@ -322,10 +322,10 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                         href={href}
                         onClick={() => setOpen(false)}
                         className={cn(
-                          'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                          'group flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
                           isActive
-                            ? 'bg-primary text-primary-foreground shadow-sm'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                            ? 'bg-accent text-foreground font-medium'
+                            : 'text-muted-foreground font-normal hover:bg-accent hover:text-foreground'
                         )}
                       >
                         <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
@@ -363,7 +363,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
               {!isBrokerOnly && slug && (
                 <Link
                   href={base}
-                  className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md border border-border hover:bg-muted transition-colors"
+                  className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md border border-border hover:bg-accent transition-colors"
                   title={`Switch to ${spaceName}`}
                 >
                   <ArrowLeftRight size={11} />
@@ -392,7 +392,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
               {isBroker && brokerageName && (
                 <Link
                   href="/broker"
-                  className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md border border-border hover:bg-muted transition-colors"
+                  className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md border border-border hover:bg-accent transition-colors"
                   title={`Switch to ${brokerageName}`}
                 >
                   <ArrowLeftRight size={11} />
@@ -417,13 +417,8 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
         >
           {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
         </Button>
-        <div className="relative">
-          <div className="[&_.cl-userButtonTrigger]:ring-2 [&_.cl-userButtonTrigger]:ring-blue-500 [&_.cl-userButtonTrigger]:ring-offset-2 [&_.cl-userButtonTrigger]:ring-offset-background [&_.cl-userButtonTrigger]:rounded-full">
-            <UserButton />
-          </div>
-          <span className="absolute -right-0.5 -bottom-0.5 inline-flex size-3.5 items-center justify-center rounded-full bg-blue-500 ring-2 ring-background">
-            <CheckIcon className="size-2 text-white" />
-          </span>
+        <div className="[&_.cl-userButtonTrigger]:rounded-full">
+          <UserButton />
         </div>
       </div>
     </header>
