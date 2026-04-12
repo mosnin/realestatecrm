@@ -59,7 +59,7 @@ export function KanbanColumn({
         ref={setNodeRef}
         className={`flex-1 min-h-24 rounded-lg transition-all duration-150 ${
           isOver
-            ? 'bg-primary/5 border-2 border-dashed border-primary/30'
+            ? 'bg-muted/50 border-2 border-dashed border-border'
             : 'bg-muted/20 border-2 border-transparent'
         } p-2`}
       >

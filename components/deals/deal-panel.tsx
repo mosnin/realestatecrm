@@ -208,7 +208,7 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
               className={cn(
                 'py-3 px-1 mr-6 text-sm font-medium border-b-2 transition-colors',
                 tab === t
-                  ? 'border-primary text-foreground'
+                  ? 'border-foreground text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               )}
             >

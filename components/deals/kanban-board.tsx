@@ -422,7 +422,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
               className={cn(
                 'px-2.5 py-1.5 flex items-center justify-center transition-colors',
                 view === 'list'
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-secondary text-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
               title="Table view"
@@ -435,7 +435,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
               className={cn(
                 'px-2.5 py-1.5 flex items-center justify-center transition-colors',
                 view === 'kanban'
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-secondary text-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
               title="Board view"
@@ -519,9 +519,9 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
             </div>
             <DragOverlay>
               {activeDeal && (
-                <div className="w-72 rounded-lg border border-primary/30 bg-card px-3.5 py-3 shadow-[0_8px_24px_-8px_rgba(13,148,136,0.35)] opacity-95 rotate-1">
+                <div className="w-72 rounded-lg border border-border bg-card px-3.5 py-3 shadow-lg opacity-95 rotate-1">
                   <div className="flex items-center gap-2">
-                    <GripVertical size={15} className="text-primary/50 flex-shrink-0" />
+                    <GripVertical size={15} className="text-muted-foreground/50 flex-shrink-0" />
                     <p className="font-semibold text-sm truncate">{activeDeal.title}</p>
                   </div>
                 </div>
