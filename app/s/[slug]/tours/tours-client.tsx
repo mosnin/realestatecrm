@@ -245,7 +245,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
               className={cn(
                 'px-2.5 py-1.5 flex items-center justify-center transition-colors',
                 view === 'table'
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-secondary text-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
               title="Table view"
@@ -258,7 +258,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
               className={cn(
                 'px-2.5 py-1.5 flex items-center justify-center transition-colors',
                 view === 'card'
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-secondary text-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
               title="Card view"
@@ -320,7 +320,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
             className={cn(
               'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
               tab === t
-                ? 'border-primary text-foreground'
+                ? 'border-foreground text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
           >
@@ -438,7 +438,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
                           {tour.Contact ? (
                             <a
                               href={`/s/${slug}/contacts/${tour.Contact.id}`}
-                              className="text-primary hover:underline"
+                              className="text-muted-foreground hover:text-foreground hover:underline"
                             >
                               {tour.Contact.name}
                             </a>
@@ -484,7 +484,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
                                 {tour.sourceDealId && (
                                   <a
                                     href={`/s/${slug}/deals/${tour.sourceDealId}`}
-                                    className="w-full block text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors text-primary"
+                                    className="w-full block text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors text-foreground"
                                   >
                                     View Deal
                                   </a>
@@ -526,8 +526,8 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
                 <div className="flex flex-col sm:flex-row sm:items-start gap-3">
                   {/* Date/time column */}
                   <div className="flex items-center gap-3 sm:min-w-[180px]">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <CalendarDays size={18} className="text-primary" />
+                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                      <CalendarDays size={18} className="text-muted-foreground" />
                     </div>
                     <div>
                       <p className="text-sm font-medium">{date}</p>
@@ -557,7 +557,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
                     {tour.Contact && (
                       <a
                         href={`/s/${slug}/contacts/${tour.Contact.id}`}
-                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline mt-1"
                       >
                         Linked: {tour.Contact.name}
                       </a>
@@ -635,7 +635,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
                           {tour.sourceDealId && (
                             <a
                               href={`/s/${slug}/deals/${tour.sourceDealId}`}
-                              className="w-full block text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors text-primary"
+                              className="w-full block text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors text-foreground"
                             >
                               View Deal
                             </a>
