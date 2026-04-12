@@ -352,7 +352,7 @@ export function ContactTable({ slug }: ContactTableProps) {
             <button
               type="button"
               onClick={() => setTagFilter('')}
-              className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 py-1 bg-primary text-primary-foreground"
+              className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 py-1 bg-foreground text-background"
             >
               <X size={10} />
               Clear tag
@@ -366,7 +366,7 @@ export function ContactTable({ slug }: ContactTableProps) {
               className={cn(
                 'inline-flex items-center text-xs font-medium rounded-full px-2.5 py-1 border transition-colors',
                 tagFilter === tag
-                  ? 'bg-primary/10 text-primary border-primary/30'
+                  ? 'bg-foreground text-background border-transparent'
                   : 'bg-muted text-muted-foreground border-transparent hover:text-foreground hover:bg-accent',
               )}
             >
@@ -387,7 +387,7 @@ export function ContactTable({ slug }: ContactTableProps) {
             className={cn(
               'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
               leadTypeFilter === key
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-foreground text-background'
                 : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
             )}
           >
@@ -508,7 +508,7 @@ export function ContactTable({ slug }: ContactTableProps) {
               className={cn(
                 'px-2.5 flex items-center justify-center transition-colors',
                 view === 'list'
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-secondary text-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
             >
@@ -520,7 +520,7 @@ export function ContactTable({ slug }: ContactTableProps) {
               className={cn(
                 'px-2.5 flex items-center justify-center transition-colors',
                 view === 'card'
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-secondary text-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
             >
@@ -667,7 +667,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                           <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
                             {getInitials(contact.name)}
                           </div>
-                          <Link href={`/s/${slug}/contacts/${contact.id}`} className="font-medium hover:text-primary transition-colors">
+                          <Link href={`/s/${slug}/contacts/${contact.id}`} className="font-medium hover:text-foreground transition-colors">
                             {contact.name}
                           </Link>
                         </div>
@@ -736,7 +736,7 @@ export function ContactTable({ slug }: ContactTableProps) {
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-lg border border-border bg-card shadow-lg px-4 py-3">
-          <CheckSquare size={14} className="text-primary" />
+          <CheckSquare size={14} className="text-foreground" />
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="h-4 w-px bg-border mx-1" />
           <Select onValueChange={(v) => handleBulkChangeType(v as Client['type'])}>
@@ -864,7 +864,7 @@ function ContactCard({
             <div className="min-w-0">
               <Link
                 href={`/s/${slug}/contacts/${contact.id}`}
-                className="font-semibold text-sm hover:text-primary transition-colors truncate block leading-tight"
+                className="font-semibold text-sm hover:text-foreground transition-colors truncate block leading-tight"
               >
                 {contact.name}
               </Link>

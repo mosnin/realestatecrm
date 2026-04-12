@@ -59,10 +59,10 @@ export function StageProgression({ contactId, currentType }: StageProgressionPro
               disabled={updating || isActive || isPast}
               className={cn(
                 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all',
-                isActive && 'ring-2 ring-primary/30',
+                isActive && 'ring-2 ring-border',
                 isPast && 'bg-muted text-muted-foreground',
-                isActive && 'bg-primary/10 text-primary',
-                isFuture && 'border border-dashed border-muted-foreground/30 text-muted-foreground hover:border-primary/50 hover:text-primary hover:bg-primary/5 cursor-pointer',
+                isActive && 'bg-secondary text-foreground',
+                isFuture && 'border border-dashed border-muted-foreground/30 text-muted-foreground hover:border-border hover:text-foreground hover:bg-muted/50 cursor-pointer',
                 (isActive || isPast) && 'cursor-default',
               )}
             >

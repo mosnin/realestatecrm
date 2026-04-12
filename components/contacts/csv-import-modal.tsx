@@ -256,7 +256,7 @@ export function CsvImportModal({ slug, onClose, onImported }: Props) {
                 <button
                   type="button"
                   onClick={downloadTemplate}
-                  className="inline-flex items-center gap-1.5 text-primary font-medium hover:underline"
+                  className="inline-flex items-center gap-1.5 text-foreground font-medium hover:underline"
                 >
                   <Download size={12} />
                   Download template CSV

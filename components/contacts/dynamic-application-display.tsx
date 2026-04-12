@@ -117,7 +117,7 @@ function FieldRow({ label, value }: { label: string; value: string }) {
           {parts!.map((tag, i) => (
             <span
               key={i}
-              className="inline-flex items-center text-xs font-medium rounded-full px-2 py-0.5 bg-primary/8 text-primary"
+              className="inline-flex items-center text-xs font-medium rounded-full px-2 py-0.5 bg-muted text-muted-foreground"
             >
               {tag}
             </span>

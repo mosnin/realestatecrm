@@ -45,9 +45,9 @@ export function ContactFollowUpField({ contactId, followUpAt: initialFollowUpAt,
     <div className="flex items-center gap-2 flex-wrap">
       {/* Follow-up date */}
       <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer group/fu">
-        <CalendarDays size={12} className={cn(followUpAt ? 'text-primary' : 'text-muted-foreground')} />
+        <CalendarDays size={12} className="text-muted-foreground" />
         {followUpAt ? (
-          <span className={cn('font-medium', isOverdue ? 'text-destructive' : 'text-primary')}>
+          <span className={cn('font-medium', isOverdue ? 'text-destructive' : 'text-foreground')}>
             {formatFollowUpDate(followUpAt)}
           </span>
         ) : (

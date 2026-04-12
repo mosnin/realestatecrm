@@ -74,7 +74,7 @@ export function ApplicationCompare({ slug, selectedIds, onClose }: ApplicationCo
         {/* Header */}
         <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2">
-            <GitCompare size={16} className="text-primary" />
+            <GitCompare size={16} className="text-muted-foreground" />
             <h2 className="text-sm font-semibold">Compare Applicants ({contacts.length})</h2>
           </div>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted">

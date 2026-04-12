@@ -278,7 +278,7 @@ export function ApplicationStatusManager({
           Applicant Messages
           {unreadCount > 0 && (
             <span
-              className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold"
+              className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-foreground text-background text-[10px] font-bold"
               aria-label={`${unreadCount} unread messages`}
             >
               {unreadCount}
@@ -324,7 +324,7 @@ export function ApplicationStatusManager({
                         className={cn(
                           'max-w-[80%] rounded-lg px-3 py-2 text-xs',
                           isRealtor
-                            ? 'bg-primary text-primary-foreground rounded-br-sm'
+                            ? 'bg-foreground text-background rounded-br-sm'
                             : 'bg-card border border-border rounded-bl-sm',
                         )}
                       >
@@ -377,7 +377,7 @@ export function ApplicationStatusManager({
                   className={cn(
                     'rounded-md min-w-[44px] min-h-[44px] flex items-center justify-center text-xs font-medium transition-colors',
                     messageText.trim() && !sendingMessage
-                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                      ? 'bg-foreground text-background hover:opacity-80'
                       : 'bg-muted text-muted-foreground cursor-not-allowed',
                   )}
                 >

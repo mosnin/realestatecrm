@@ -107,8 +107,8 @@ export function FollowUpSuggestions(props: FollowUpSuggestionsProps) {
   }
 
   return (
-    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2.5">
-      <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+    <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2.5">
+      <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
         <Sparkles size={13} />
         Suggested follow-ups
       </div>
@@ -138,7 +138,7 @@ export function FollowUpSuggestions(props: FollowUpSuggestionsProps) {
               <button
                 onClick={() => applySuggestion(i, s.delayHours)}
                 disabled={applying === i}
-                className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-md bg-foreground text-background hover:opacity-80 transition-opacity disabled:opacity-50"
               >
                 {applying === i ? <Loader2 size={12} className="animate-spin" /> : 'Set'}
               </button>
