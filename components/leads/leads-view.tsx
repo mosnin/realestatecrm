@@ -67,8 +67,8 @@ function ScoreHero({ lead }: { lead: Contact }) {
   const score = lead.leadScore != null ? Math.round(lead.leadScore) : null;
 
   return (
-    <div className={cn('flex items-center gap-3 rounded-lg px-4 py-3', tier.bg)}>
-      <div className={cn('w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 ring-2', tier.ring, tier.scoreBg)}>
+    <div className={cn('flex items-center gap-2.5 rounded-md bg-muted/40 pl-3 pr-4 py-2.5 border-l-2', tier.border)}>
+      <div className={cn('w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ring-2', tier.ring, tier.scoreBg)}>
         {score != null ? (
           <span className="text-white font-bold text-lg tabular-nums leading-none">{score}</span>
         ) : (
@@ -105,7 +105,7 @@ function ScoreHero({ lead }: { lead: Contact }) {
 function QChip({ icon: Icon, label, highlight, href }: { icon: React.ComponentType<{ size: number }>; label: string; highlight?: boolean; href?: string }) {
   const cls = cn(
     'inline-flex items-center gap-1.5 text-xs rounded-md px-2.5 py-1.5',
-    highlight ? 'bg-primary/8 text-primary font-medium' : 'bg-muted text-muted-foreground',
+    highlight ? 'bg-secondary text-foreground font-medium' : 'bg-muted text-muted-foreground',
   );
   if (href) {
     return (
@@ -485,7 +485,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                 className={cn(
                   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
                   tierFilter === key
-                    ? 'bg-primary text-primary-foreground'
+                    ? 'bg-foreground text-background'
                     : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
                 )}
               >
@@ -503,25 +503,30 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
         </div>
 
         {/* Lead type filter */}
-        <div className="flex gap-1">
-          {(['all', 'rental', 'buyer'] as const).map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setLeadTypeFilter(key)}
-              className={cn(
-                'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-                leadTypeFilter === key
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
-              )}
-            >
-              {key === 'all' ? 'All' : key === 'rental' ? 'Rental' : 'Buyer'}
-              <span className={cn('ml-1 tabular-nums', leadTypeFilter === key ? 'opacity-80' : 'opacity-60')}>
-                {key === 'all' ? filterCounts.all : filterCounts[key]}
-              </span>
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-muted-foreground select-none">Type:</span>
+          <div className="flex gap-1">
+            {(['all', 'rental', 'buyer'] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setLeadTypeFilter(key)}
+                className={cn(
+                  'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                  leadTypeFilter === key
+                    ? 'bg-foreground text-background'
+                    : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
+                )}
+              >
+                {key === 'all' ? 'All' : key === 'rental' ? 'Rental' : 'Buyer'}
+                {key !== 'all' && (
+                  <span className={cn('ml-1 tabular-nums', leadTypeFilter === key ? 'opacity-80' : 'opacity-60')}>
+                    {filterCounts[key]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex gap-2 ml-auto flex-wrap">
@@ -598,7 +603,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
               onClick={() => setView('card')}
               className={cn(
                 'px-2.5 py-1.5 flex items-center justify-center transition-colors',
-                view === 'card' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                view === 'card' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
             >
               <LayoutGrid size={15} />
@@ -608,7 +613,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
               onClick={() => setView('list')}
               className={cn(
                 'px-2.5 py-1.5 flex items-center justify-center transition-colors',
-                view === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                view === 'list' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
             >
               <List size={15} />
@@ -639,7 +644,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
             <button
               type="button"
               onClick={() => { setSearch(''); setTierFilter('all'); setLeadTypeFilter('all'); }}
-              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline underline-offset-2"
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:underline underline-offset-2"
             >
               <X size={11} />
               Clear all filters
@@ -697,13 +702,13 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                       <div className="flex items-center gap-2 flex-wrap">
                         <Link
                           href={`/s/${slug}/contacts/${lead.id}`}
-                          className="font-semibold text-[15px] leading-tight hover:text-primary transition-colors"
+                          className="font-semibold text-[15px] leading-tight hover:text-foreground transition-colors"
                         >
                           {lead.name}
                         </Link>
                         {/* Lead type badge */}
                         {lead.leadType === 'buyer' ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5 bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400 flex-shrink-0">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5 bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400 flex-shrink-0">
                             <Home size={9} />
                             Buyer
                           </span>
@@ -770,7 +775,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                   <button
                     type="button"
                     onClick={() => setConvertTarget(lead)}
-                    className="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-primary border border-border hover:border-primary/40 rounded-lg px-2.5 py-1.5 transition-colors"
+                    className="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:border-border rounded-lg px-2.5 py-1.5 transition-colors"
                   >
                     <UserCheck size={12} />
                     <span className="hidden sm:inline">Convert</span>
@@ -785,7 +790,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                 {/* Key qualification data */}
                 <div className="px-4 pb-3 flex flex-wrap gap-1.5">
                   {lead.leadType === 'buyer' && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5 bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400">
                       <Home size={9} />
                       Buyer
                     </span>
@@ -861,7 +866,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                 {/* Recommended action + follow-up row */}
                 <div className="px-4 pb-4 border-t border-border/60 pt-3 flex items-center justify-between gap-3 flex-wrap">
                   {details?.recommendedNextAction ? (
-                    <p className="text-xs text-primary font-medium flex items-center gap-1.5 min-w-0 flex-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5 min-w-0 flex-1">
                       <ArrowRight size={11} className="flex-shrink-0" />
                       <span className="truncate">{details.recommendedNextAction}</span>
                     </p>
@@ -871,11 +876,11 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {/* Follow-up date */}
                     <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer group/fu">
-                      <CalendarDays size={11} className={cn(lead.followUpAt ? 'text-primary' : 'text-muted-foreground')} />
+                      <CalendarDays size={11} className="text-muted-foreground" />
                       {lead.followUpAt ? (
                         <span className={cn(
                           'font-medium',
-                          new Date(lead.followUpAt) < new Date() ? 'text-destructive' : 'text-primary',
+                          new Date(lead.followUpAt) < new Date() ? 'text-destructive' : 'text-foreground',
                         )}>
                           {formatFollowUpDate(lead.followUpAt)}
                         </span>
@@ -970,9 +975,9 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-medium hover:text-primary transition-colors">{lead.name}</span>
+                              <span className="font-medium hover:text-foreground transition-colors">{lead.name}</span>
                               {lead.leadType === 'buyer' ? (
-                                <span className="text-[10px] font-semibold rounded-md px-1.5 py-0.5 bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400">Buyer</span>
+                                <span className="text-[10px] font-semibold rounded-md px-1.5 py-0.5 bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400">Buyer</span>
                               ) : (
                                 <span className="text-[10px] font-semibold rounded-md px-1.5 py-0.5 bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400">Rental</span>
                               )}
@@ -1012,10 +1017,10 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                       </td>
                       <td className="px-4 py-3 hidden xl:table-cell">
                         <label className="flex items-center gap-1 text-xs cursor-pointer">
-                          <CalendarDays size={10} className={lead.followUpAt ? 'text-primary' : 'text-muted-foreground'} />
+                          <CalendarDays size={10} className="text-muted-foreground" />
                           <span className={cn(
                             lead.followUpAt
-                              ? new Date(lead.followUpAt) < new Date() ? 'text-destructive font-medium' : 'text-primary font-medium'
+                              ? new Date(lead.followUpAt) < new Date() ? 'text-destructive font-medium' : 'text-foreground font-medium'
                               : 'text-muted-foreground',
                           )}>
                             {lead.followUpAt ? formatFollowUpDate(lead.followUpAt) : '—'}
@@ -1032,7 +1037,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                         <button
                           type="button"
                           onClick={() => setConvertTarget(lead)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary font-medium"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-medium"
                         >
                           <UserCheck size={12} />
                           Convert
@@ -1050,7 +1055,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-lg border border-border bg-card shadow-lg px-4 py-3">
-          <CheckSquare size={14} className="text-primary" />
+          <CheckSquare size={14} className="text-foreground" />
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="h-4 w-px bg-border mx-1" />
           <button
