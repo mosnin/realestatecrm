@@ -708,12 +708,12 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                         </Link>
                         {/* Lead type badge */}
                         {lead.leadType === 'buyer' ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5 bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400 flex-shrink-0">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground flex-shrink-0">
                             <Home size={9} />
                             Buyer
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5 bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400 flex-shrink-0">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground flex-shrink-0">
                             <Home size={9} />
                             Rental
                           </span>
@@ -790,7 +790,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                 {/* Key qualification data */}
                 <div className="px-4 pb-3 flex flex-wrap gap-1.5">
                   {lead.leadType === 'buyer' && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5 bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground">
                       <Home size={9} />
                       Buyer
                     </span>
@@ -977,9 +977,9 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                             <div className="flex items-center gap-2">
                               <span className="font-medium hover:text-foreground transition-colors">{lead.name}</span>
                               {lead.leadType === 'buyer' ? (
-                                <span className="text-[10px] font-semibold rounded-md px-1.5 py-0.5 bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400">Buyer</span>
+                                <span className="text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground">Buyer</span>
                               ) : (
-                                <span className="text-[10px] font-semibold rounded-md px-1.5 py-0.5 bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400">Rental</span>
+                                <span className="text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground">Rental</span>
                               )}
                               {isNew && (
                                 <span className="text-[10px] font-bold text-primary bg-primary/10 rounded-md px-1.5 py-0.5">NEW</span>

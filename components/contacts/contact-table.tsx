@@ -506,7 +506,7 @@ export function ContactTable({ slug }: ContactTableProps) {
               type="button"
               onClick={() => setView('list')}
               className={cn(
-                'px-2.5 flex items-center justify-center transition-colors',
+                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
                 view === 'list'
                   ? 'bg-secondary text-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted',
@@ -518,7 +518,7 @@ export function ContactTable({ slug }: ContactTableProps) {
               type="button"
               onClick={() => setView('card')}
               className={cn(
-                'px-2.5 flex items-center justify-center transition-colors',
+                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
                 view === 'card'
                   ? 'bg-secondary text-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted',
