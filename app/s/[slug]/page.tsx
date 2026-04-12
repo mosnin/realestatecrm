@@ -109,12 +109,12 @@ export default async function DashboardPage({
   const bookingUrl = intakeUrl.replace('/apply/', '/book/');
 
   const stats = [
-    { label: 'New leads', value: newLeadCount, sub: 'unread', icon: PhoneIncoming, accent: newLeadCount > 0, href: `/s/${slug}/leads` },
-    { label: 'Total leads', value: totalLeads, sub: 'total', icon: TrendingUp, accent: false, href: `/s/${slug}/leads` },
-    { label: 'Clients', value: contactCount, sub: 'in CRM', icon: Users, accent: false, href: `/s/${slug}/contacts` },
-    { label: 'Active deals', value: dealCount, sub: formatCurrency(totalValue), icon: Briefcase, accent: false, href: `/s/${slug}/deals` },
-    { label: 'Tours', value: upcomingTourCount, sub: upcomingTourCount > 0 ? 'scheduled' : 'none', icon: CalendarDays, accent: upcomingTourCount > 0, href: `/s/${slug}/tours` },
-    { label: 'Follow-ups', value: followUpDue, sub: followUpDue > 0 ? 'due now' : 'all clear', icon: AlertCircle, accent: followUpDue > 0, href: `/s/${slug}/follow-ups` },
+    { label: 'New leads', value: newLeadCount, sub: 'unread', icon: PhoneIncoming, accent: newLeadCount > 0, dotCls: 'bg-brand', href: `/s/${slug}/leads` },
+    { label: 'Total leads', value: totalLeads, sub: 'total', icon: TrendingUp, accent: false, dotCls: '', href: `/s/${slug}/leads` },
+    { label: 'Clients', value: contactCount, sub: 'in CRM', icon: Users, accent: false, dotCls: '', href: `/s/${slug}/contacts` },
+    { label: 'Active deals', value: dealCount, sub: formatCurrency(totalValue), icon: Briefcase, accent: false, dotCls: '', href: `/s/${slug}/deals` },
+    { label: 'Tours', value: upcomingTourCount, sub: upcomingTourCount > 0 ? 'scheduled' : 'none', icon: CalendarDays, accent: upcomingTourCount > 0, dotCls: 'bg-muted-foreground', href: `/s/${slug}/tours` },
+    { label: 'Follow-ups', value: followUpDue, sub: followUpDue > 0 ? 'due now' : 'all clear', icon: AlertCircle, accent: followUpDue > 0, dotCls: 'bg-destructive', href: `/s/${slug}/follow-ups` },
   ];
 
   return (
@@ -148,19 +148,19 @@ export default async function DashboardPage({
 
       {/* ── Summary stats ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {stats.map(({ label, value, sub, icon: Icon, accent, href }) => (
+        {stats.map(({ label, value, sub, icon: Icon, accent, dotCls, href }) => (
           <Link key={label} href={href}>
-            <Card className={`transition-shadow hover:shadow-md dark:hover:shadow-none ${accent ? 'border-primary/30 bg-primary/5' : ''}`}>
+            <Card className="transition-shadow hover:shadow-md dark:hover:shadow-none">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${accent ? 'bg-primary/10' : 'bg-muted'}`}>
-                    <Icon size={16} className={accent ? 'text-primary' : 'text-muted-foreground'} />
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-muted">
+                    <Icon size={16} className="text-muted-foreground" />
                   </div>
                   {accent && value > 0 && (
-                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    <span className={`w-2 h-2 rounded-full animate-pulse ${dotCls}`} />
                   )}
                 </div>
-                <p className={`text-2xl font-bold tabular-nums leading-tight ${accent ? 'text-primary' : 'text-foreground'}`}>
+                <p className="text-2xl font-bold tabular-nums leading-tight text-foreground">
                   {value}
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-1 leading-tight">{label}</p>
