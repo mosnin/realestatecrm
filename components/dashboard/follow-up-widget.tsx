@@ -102,36 +102,36 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
   const overdue = contacts.filter((c) => new Date(c.followUpAt) < new Date());
 
   return (
-    <div className="rounded-lg border border-amber-200 dark:border-amber-500/25 bg-amber-50/60 dark:bg-amber-500/5 overflow-hidden">
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
       {/* Header */}
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-accent transition-colors"
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-md bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-            <Calendar size={14} className="text-amber-600 dark:text-amber-400" />
+          <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+            <Calendar size={14} className="text-muted-foreground" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+            <p className="text-sm font-semibold text-foreground">
               Follow-ups due
             </p>
-            <p className="text-xs text-amber-700/70 dark:text-amber-400/70">
+            <p className="text-xs text-muted-foreground">
               {overdue.length} overdue · {contacts.length} total
             </p>
           </div>
         </div>
         {expanded ? (
-          <ChevronUp size={15} className="text-amber-600/60 dark:text-amber-400/60 flex-shrink-0" />
+          <ChevronUp size={15} className="text-muted-foreground/60 flex-shrink-0" />
         ) : (
-          <ChevronDown size={15} className="text-amber-600/60 dark:text-amber-400/60 flex-shrink-0" />
+          <ChevronDown size={15} className="text-muted-foreground/60 flex-shrink-0" />
         )}
       </button>
 
       {/* Contact rows */}
       {expanded && (
-        <div className="border-t border-amber-200/70 dark:border-amber-500/20 divide-y divide-amber-100 dark:divide-amber-500/10">
+        <div className="border-t border-border divide-y divide-border">
           {contacts.map((contact) => {
             const date = new Date(contact.followUpAt);
             const isOverdue = date < new Date();
@@ -146,7 +146,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
                 )}
               >
                 {/* Avatar */}
-                <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-700 dark:text-amber-300 font-semibold text-xs flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground font-semibold text-xs flex-shrink-0">
                   {contact.name.charAt(0).toUpperCase()}
                 </div>
 
@@ -155,7 +155,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
                   <div className="flex items-center gap-1.5">
                     <Link
                       href={`/s/${slug}/contacts/${contact.id}`}
-                      className="text-sm font-medium hover:text-primary transition-colors truncate"
+                      className="text-sm font-medium hover:text-foreground transition-colors truncate"
                     >
                       {contact.name}
                     </Link>
@@ -210,7 +210,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
                       onClick={() =>
                         setSnoozeOpen((prev) => (prev === contact.id ? null : contact.id))
                       }
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/15 transition-colors"
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                     >
                       <Timer size={14} />
                     </button>

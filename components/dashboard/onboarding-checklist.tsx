@@ -110,13 +110,13 @@ export function OnboardingChecklist({ slug, hasLeads, hasContacts, hasTours, has
   }
 
   return (
-    <Card className="border-primary/20 bg-primary/[0.02]">
+    <Card>
       <CardContent className="p-5">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Rocket size={15} className="text-primary" />
+            <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+              <Rocket size={15} className="text-muted-foreground" />
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">
@@ -143,7 +143,7 @@ export function OnboardingChecklist({ slug, hasLeads, hasContacts, hasTours, has
         {/* Progress bar */}
         <div className="h-1.5 bg-muted rounded-full mb-4 overflow-hidden">
           <div
-            className="h-full bg-primary rounded-full transition-all duration-500"
+            className="h-full bg-foreground rounded-full transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -162,9 +162,9 @@ export function OnboardingChecklist({ slug, hasLeads, hasContacts, hasTours, has
               )}
             >
               {step.completed ? (
-                <CheckCircle2 size={16} className="text-primary flex-shrink-0" />
+                <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
               ) : (
-                <Circle size={16} className="text-muted-foreground/40 flex-shrink-0 group-hover:text-primary/60" />
+                <Circle size={16} className="text-muted-foreground/40 flex-shrink-0 group-hover:text-muted-foreground" />
               )}
               <div className="flex-1 min-w-0">
                 <p className={cn(

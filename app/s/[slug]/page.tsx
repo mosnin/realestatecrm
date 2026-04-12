@@ -130,7 +130,7 @@ export default async function DashboardPage({
         <div className="flex items-center gap-3">
           <Link
             href={`/s/${slug}/leads`}
-            className="inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:underline underline-offset-2"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground font-medium hover:text-foreground hover:underline underline-offset-2"
           >
             View all leads <ArrowRight size={14} />
           </Link>
@@ -200,7 +200,7 @@ export default async function DashboardPage({
             <h2 className="text-sm font-semibold text-foreground">Recent applications</h2>
             <Link
               href={`/s/${slug}/leads`}
-              className="text-xs text-primary font-medium hover:underline underline-offset-2 flex items-center gap-1"
+              className="text-xs text-muted-foreground font-medium hover:text-foreground hover:underline underline-offset-2 flex items-center gap-1"
             >
               View all <ArrowRight size={12} />
             </Link>
@@ -229,15 +229,15 @@ export default async function DashboardPage({
                     null;
                   return (
                     <Link key={lead.id} href={`/s/${slug}/leads`} className="block">
-                      <div className={`flex items-center gap-3 px-5 py-3.5 hover:bg-muted/40 transition-colors ${isNew ? 'bg-primary/[0.03]' : ''}`}>
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                      <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted/40 transition-colors">
+                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground flex-shrink-0">
                           {lead.name?.split(' ')?.map((n: string) => n?.[0])?.join('')?.toUpperCase()?.slice(0, 2) || '??'}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-semibold truncate">{lead.name}</p>
                             {isNew && (
-                              <span className="inline-flex text-[10px] font-semibold text-primary bg-primary/10 rounded-md px-1.5 py-0.5 flex-shrink-0">
+                              <span className="inline-flex text-[10px] font-semibold text-brand bg-brand-subtle rounded-md px-1.5 py-0.5 flex-shrink-0">
                                 New
                               </span>
                             )}
@@ -271,7 +271,7 @@ export default async function DashboardPage({
                             </div>
                           ) : lead.scoringStatus === 'pending' ? (
                             <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/60 italic">
-                              <span className="w-3 h-3 rounded-full border-2 border-muted-foreground/30 border-t-primary animate-spin" />
+                              <span className="w-3 h-3 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
                               AI scoring
                             </span>
                           ) : null}
@@ -295,7 +295,7 @@ export default async function DashboardPage({
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-foreground">Pipeline</h2>
-              <Link href={`/s/${slug}/deals`} className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
+              <Link href={`/s/${slug}/deals`} className="text-xs text-muted-foreground font-medium hover:text-foreground hover:underline flex items-center gap-1">
                 View all <ArrowRight size={12} />
               </Link>
             </div>
@@ -312,7 +312,7 @@ export default async function DashboardPage({
                     </p>
                     <Link
                       href={`/s/${slug}/deals`}
-                      className="text-xs text-primary font-medium hover:underline mt-2 inline-flex items-center gap-1"
+                      className="text-xs text-muted-foreground font-medium hover:text-foreground hover:underline mt-2 inline-flex items-center gap-1"
                     >
                       Go to deals <ArrowRight size={11} />
                     </Link>
@@ -361,7 +361,7 @@ export default async function DashboardPage({
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-foreground">Upcoming tours</h2>
-              <Link href={`/s/${slug}/tours`} className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
+              <Link href={`/s/${slug}/tours`} className="text-xs text-muted-foreground font-medium hover:text-foreground hover:underline flex items-center gap-1">
                 View all <ArrowRight size={12} />
               </Link>
             </div>
@@ -377,7 +377,7 @@ export default async function DashboardPage({
                   </p>
                   <Link
                     href={`/s/${slug}/tours`}
-                    className="text-xs text-primary font-medium hover:underline mt-2 inline-flex items-center gap-1"
+                    className="text-xs text-muted-foreground font-medium hover:text-foreground hover:underline mt-2 inline-flex items-center gap-1"
                   >
                     Manage tours <ArrowRight size={11} />
                   </Link>
@@ -391,8 +391,8 @@ export default async function DashboardPage({
                     return (
                       <Link key={tour.id} href={`/s/${slug}/tours`} className="block">
                         <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
-                          <div className="w-11 h-11 rounded-lg bg-primary/8 border border-primary/15 flex flex-col items-center justify-center flex-shrink-0">
-                            <span className="text-[10px] font-semibold text-primary uppercase leading-none">
+                          <div className="w-11 h-11 rounded-lg bg-muted border border-border flex flex-col items-center justify-center flex-shrink-0">
+                            <span className="text-[10px] font-semibold text-muted-foreground uppercase leading-none">
                               {d.toLocaleDateString([], { month: 'short' })}
                             </span>
                             <span className="text-base font-bold text-foreground leading-tight">
@@ -449,8 +449,8 @@ function ShareLinkCard({
     <Card>
       <CardContent className="p-4">
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Icon size={16} className="text-primary" />
+          <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+            <Icon size={16} className="text-muted-foreground" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold leading-tight">{title}</p>
