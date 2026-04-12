@@ -469,7 +469,7 @@ export function CalendarView({
               setShowAddForm(!showAddForm);
               setFormDate(selectedDate);
             }}
-            className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-medium transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
             Add event
@@ -488,7 +488,7 @@ export function CalendarView({
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
                     required
-                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="Event title"
                   />
                 </div>
@@ -500,7 +500,7 @@ export function CalendarView({
                       value={formDate}
                       onChange={(e) => setFormDate(e.target.value)}
                       required
-                      className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                   <div>
@@ -509,7 +509,7 @@ export function CalendarView({
                       type="time"
                       value={formTime}
                       onChange={(e) => setFormTime(e.target.value)}
-                      className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                 </div>
@@ -519,7 +519,7 @@ export function CalendarView({
                     value={formDescription}
                     onChange={(e) => setFormDescription(e.target.value)}
                     rows={2}
-                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                     placeholder="Optional description"
                   />
                 </div>
@@ -533,7 +533,7 @@ export function CalendarView({
                         onClick={() => setFormColor(opt.value)}
                         className={`w-6 h-6 rounded-full ${opt.dot} transition-all ${
                           formColor === opt.value
-                            ? 'ring-2 ring-offset-2 ring-primary'
+                            ? 'ring-2 ring-offset-2 ring-foreground'
                             : 'opacity-50 hover:opacity-75'
                         }`}
                         title={opt.label}
@@ -545,7 +545,7 @@ export function CalendarView({
                   <button
                     type="submit"
                     disabled={formSubmitting}
-                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-80 disabled:opacity-50 transition-opacity"
                   >
                     {formSubmitting ? 'Saving...' : 'Save event'}
                   </button>
@@ -571,7 +571,7 @@ export function CalendarView({
         {/* Tours */}
         {selectedTours.map((tour) => (
           <Link key={tour.id} href={`/s/${slug}/tours`} className="block group">
-            <Card className="transition-colors group-hover:border-primary/30">
+            <Card className="transition-colors group-hover:border-border">
               <CardContent className="p-4 flex items-start gap-3">
                 <span className="mt-1 w-2 h-2 rounded-full bg-orange-500 shrink-0" />
                 <div className="flex-1 min-w-0 space-y-1">
@@ -607,7 +607,7 @@ export function CalendarView({
         {/* Contact follow-ups */}
         {selectedContacts.map((contact) => (
           <Link key={contact.id} href={`/s/${slug}/contacts/${contact.id}`} className="block group">
-            <Card className="transition-colors group-hover:border-primary/30">
+            <Card className="transition-colors group-hover:border-border">
               <CardContent className="p-4 flex items-start gap-3">
                 <span className="mt-1 w-2 h-2 rounded-full bg-blue-500 shrink-0" />
                 <div className="flex-1 min-w-0 space-y-1">
@@ -633,7 +633,7 @@ export function CalendarView({
         {/* Deal follow-ups */}
         {selectedDeals.map((deal) => (
           <Link key={deal.id} href={`/s/${slug}/deals/${deal.id}`} className="block group">
-            <Card className="transition-colors group-hover:border-primary/30">
+            <Card className="transition-colors group-hover:border-border">
               <CardContent className="p-4 flex items-start gap-3">
                 <span className="mt-1 w-2 h-2 rounded-full bg-purple-500 shrink-0" />
                 <div className="flex-1 min-w-0 space-y-1">
@@ -689,7 +689,7 @@ export function CalendarView({
             onClick={() => setView(mode)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               view === mode
-                ? 'border-primary text-primary'
+                ? 'border-foreground text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted'
             }`}
           >
@@ -770,13 +770,13 @@ export function CalendarView({
                         h-12 md:h-20 border-b border-r border-border p-1 md:p-2
                         text-left transition-colors relative
                         hover:bg-muted/30
-                        ${isSelected ? 'bg-primary/5 border-primary/30' : ''}
+                        ${isSelected ? 'bg-muted/40 border-border' : ''}
                       `}
                     >
                       <span
                         className={`
                           inline-flex items-center justify-center text-sm
-                          ${isToday ? 'w-7 h-7 rounded-full ring-2 ring-primary text-primary font-semibold' : ''}
+                          ${isToday ? 'w-7 h-7 rounded-full bg-foreground text-background font-semibold' : ''}
                         `}
                       >
                         {day}
@@ -826,7 +826,7 @@ export function CalendarView({
                       className={`
                         border-b border-r border-border p-2 text-center transition-colors
                         hover:bg-muted/30
-                        ${isSelected ? 'bg-primary/5' : ''}
+                        ${isSelected ? 'bg-muted/40' : ''}
                       `}
                     >
                       <div className="text-xs font-medium text-muted-foreground">
@@ -835,7 +835,7 @@ export function CalendarView({
                       <div
                         className={`
                           text-lg font-semibold mt-0.5
-                          ${isToday ? 'w-8 h-8 mx-auto rounded-full ring-2 ring-primary text-primary flex items-center justify-center' : ''}
+                          ${isToday ? 'w-8 h-8 mx-auto rounded-full bg-foreground text-background flex items-center justify-center' : ''}
                         `}
                       >
                         {d.getDate()}
@@ -854,7 +854,7 @@ export function CalendarView({
                       key={`events-${key}`}
                       className={`
                         border-r border-border p-1.5 min-h-[120px] transition-colors
-                        ${isSelected ? 'bg-primary/5' : ''}
+                        ${isSelected ? 'bg-muted/40' : ''}
                       `}
                     >
                       {renderMiniEvents(key)}
