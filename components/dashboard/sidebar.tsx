@@ -294,17 +294,12 @@ function CollapsibleNavItem({
         href={href}
         onClick={handleClick}
         className={cn(
-          'group relative flex items-center gap-2.5 min-h-[44px] h-11 px-2.5 rounded-lg text-sm transition-colors',
+          'group relative flex items-center gap-2.5 min-h-[44px] h-11 px-2.5 rounded-md text-sm transition-colors',
           isParentActive
-            ? 'bg-primary/10 text-foreground font-semibold'
-            : 'text-muted-foreground font-medium hover:bg-muted hover:text-foreground',
+            ? 'bg-accent text-foreground font-medium'
+            : 'text-muted-foreground font-normal hover:bg-accent hover:text-foreground',
         )}
       >
-        {/* Active indicator bar */}
-        {isParentActive && (
-          <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-primary" />
-        )}
-
         {item.isAI ? (
           <img
             src="/chip-avatar.png"
@@ -317,8 +312,8 @@ function CollapsibleNavItem({
             className={cn(
               'flex-shrink-0 transition-colors',
               isParentActive
-                ? 'text-primary'
-                : 'text-muted-foreground/60 group-hover:text-foreground',
+                ? 'text-foreground'
+                : 'text-muted-foreground group-hover:text-foreground',
             )}
           />
         )}
@@ -352,8 +347,8 @@ function CollapsibleNavItem({
                   className={cn(
                     'flex items-center min-h-[36px] h-9 px-2.5 rounded-md text-[13px] transition-colors',
                     childActive
-                      ? 'text-primary font-medium bg-primary/5'
-                      : 'text-muted-foreground font-normal hover:text-foreground hover:bg-muted/50',
+                      ? 'text-foreground font-medium'
+                      : 'text-muted-foreground font-normal hover:text-foreground hover:bg-accent',
                   )}
                 >
                   <span className="truncate">{child.label}</span>
@@ -373,7 +368,7 @@ function CollapsibleNavItem({
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-2 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 select-none">
+    <p className="px-2.5 pt-4 pb-1.5 text-[11px] font-medium text-muted-foreground select-none">
       {children}
     </p>
   );
@@ -400,22 +395,19 @@ function FlatNavItem({
     <Link
       href={href}
       className={cn(
-        'group relative flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sm font-medium transition-colors',
+        'group relative flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sm transition-colors',
         isActive
-          ? 'bg-primary/10 text-primary'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+          ? 'bg-accent text-foreground font-medium'
+          : 'text-muted-foreground font-normal hover:bg-accent hover:text-foreground',
       )}
     >
-      {isActive && (
-        <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-primary" />
-      )}
       <Icon
         size={16}
         className={cn(
           'flex-shrink-0 transition-colors',
           isActive
-            ? 'text-primary'
-            : 'text-muted-foreground/60 group-hover:text-foreground',
+            ? 'text-foreground'
+            : 'text-muted-foreground group-hover:text-foreground',
         )}
       />
       <span className="flex-1 truncate">{label}</span>
@@ -462,10 +454,10 @@ function WorkspaceSwitcher({
     <div ref={ref} className="relative mx-3">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md border border-border/60 bg-muted/30 hover:bg-muted hover:border-border transition-all text-left"
+        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md border border-border hover:bg-accent transition-colors text-left"
       >
-        <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <Icon size={14} className="text-primary" />
+        <div className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center flex-shrink-0">
+          <Icon size={14} className="text-foreground" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold truncate text-foreground leading-tight">
@@ -485,17 +477,17 @@ function WorkspaceSwitcher({
               href={base}
               onClick={() => setOpen(false)}
               className={cn(
-                'flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted transition-colors',
-                !isOnBrokerPage && 'bg-primary/5',
+                'flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-accent transition-colors',
+                !isOnBrokerPage && 'bg-accent',
               )}
             >
-              <Briefcase size={14} className="text-primary flex-shrink-0" />
+              <Briefcase size={14} className="text-foreground flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{spaceName}</p>
                 <p className="text-[10px] text-muted-foreground">Realtor Dashboard</p>
               </div>
               {!isOnBrokerPage && (
-                <Check size={14} className="text-primary flex-shrink-0" />
+                <Check size={14} className="text-foreground flex-shrink-0" />
               )}
             </Link>
           )}
@@ -512,11 +504,11 @@ function WorkspaceSwitcher({
                   href="/broker"
                   onClick={() => setOpen(false)}
                   className={cn(
-                    'flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted transition-colors',
-                    isOnBrokerPage && 'bg-primary/5',
+                    'flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-accent transition-colors',
+                    isOnBrokerPage && 'bg-accent',
                   )}
                 >
-                  <Building2 size={14} className="text-primary flex-shrink-0" />
+                  <Building2 size={14} className="text-foreground flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{b.name}</p>
                     <p className="text-[10px] text-muted-foreground">
@@ -528,7 +520,7 @@ function WorkspaceSwitcher({
                     </p>
                   </div>
                   {isOnBrokerPage && (
-                    <Check size={14} className="text-primary flex-shrink-0" />
+                    <Check size={14} className="text-foreground flex-shrink-0" />
                   )}
                 </Link>
               ))}
@@ -541,7 +533,7 @@ function WorkspaceSwitcher({
               <Link
                 href="/brokerage"
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
               >
                 <Plus size={14} className="flex-shrink-0" />
                 <span>Create or join a brokerage</span>
@@ -571,7 +563,7 @@ function UserFooter({
     <div className="px-3 py-3">
       <Link
         href={href}
-        className="group flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-muted transition-colors"
+        className="group flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-accent transition-colors"
       >
         {imageUrl ? (
           <img
@@ -580,7 +572,7 @@ function UserFooter({
             className="w-7 h-7 rounded-full flex-shrink-0 object-cover ring-1 ring-border"
           />
         ) : (
-          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs flex-shrink-0">
+          <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-foreground font-semibold text-xs flex-shrink-0">
             {displayName.charAt(0).toUpperCase()}
           </div>
         )}
@@ -647,14 +639,7 @@ function RealtorNav({
 
         if (item.badgeKey === 'leads' && unreadLeadCount > 0) {
           badge = (
-            <span
-              className={cn(
-                'inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums flex-shrink-0',
-                isParentActive
-                  ? 'bg-primary/20 text-primary'
-                  : 'bg-primary text-primary-foreground',
-              )}
-            >
+            <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-medium tabular-nums flex-shrink-0 bg-secondary text-muted-foreground">
               {unreadLeadCount > 99 ? '99+' : unreadLeadCount}
             </span>
           );
@@ -730,7 +715,7 @@ export function Sidebar({
         <div className="px-3 pb-1">
           <Link
             href="/broker"
-            className="group flex items-center gap-2 h-9 px-2.5 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="group flex items-center gap-2 h-9 px-2.5 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <ArrowLeft size={14} className="flex-shrink-0" />
             <span>Back to dashboard</span>
@@ -810,7 +795,7 @@ export function Sidebar({
                     'highlight' in item &&
                     (item as any).highlight &&
                     !isActive ? (
-                      <span className="inline-flex h-2 w-2 rounded-full bg-primary shrink-0" />
+                      <span className="inline-flex h-2 w-2 rounded-full bg-lead-hot shrink-0" />
                     ) : undefined;
                   return (
                     <FlatNavItem
