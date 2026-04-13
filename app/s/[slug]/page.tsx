@@ -130,7 +130,7 @@ export default async function DashboardPage({
   if (upcomingTourCount > 0) statusSegments.push({ label: `${upcomingTourCount} upcoming tour${upcomingTourCount === 1 ? '' : 's'}`, href: `/s/${slug}/tours`, tone: 'muted' });
 
   return (
-    <div className="space-y-3 max-w-[1320px]">
+    <div className="space-y-4 max-w-[1320px]">
 
       {/* ── Top strip — greeting + secondary status + primary CTA ──────────
           One explicit primary action ("View leads"). Status segments are
@@ -180,24 +180,34 @@ export default async function DashboardPage({
       </header>
 
       {/* ── Cockpit shell: desktop row2 (3-col) + row3 (2-col) ─────────── */}
-      <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-12 lg:gap-3 items-stretch">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:gap-4 items-stretch">
 
         {/* ── Center hero canvas — Follow-ups due (dominant) ───────────── */}
         <section className="order-1 lg:col-span-7 lg:col-start-3 lg:row-start-1 h-full" aria-label="Priority queue">
-          <SectionLabel>Follow-ups due</SectionLabel>
-          <div className="rounded-xl border border-border/80 bg-card p-0.5 h-full">
-            <FollowUpWidget slug={slug} contacts={followUpContacts} />
-          </div>
+          <Card className="h-full border-border/80">
+            <CardContent className="p-0">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <h2 className="text-sm font-semibold">Follow-ups due</h2>
+                <span className="text-[11px] text-muted-foreground">Priority queue</span>
+              </div>
+              <div className="p-1">
+                <FollowUpWidget slug={slug} contacts={followUpContacts} />
+              </div>
+            </CardContent>
+          </Card>
         </section>
 
         {/* ── Left compact metric stack (replaces wide KPI slab) ───────── */}
         <section className="order-3 lg:col-span-2 lg:col-start-1 lg:row-start-1 h-full" aria-label="Key metrics">
-          <SectionLabel>At a glance</SectionLabel>
-          <div className="space-y-1.5 h-full">
+          <Card className="h-full border-border/80">
+            <CardContent className="p-0">
+              <div className="px-3 py-2.5 border-b border-border">
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">At a glance</h2>
+              </div>
+              <div className="divide-y divide-border">
             {stats.slice(0, 4).map(({ label, value, sub, accent, dotCls, href }) => (
               <Link key={label} href={href} className="group block">
-                <Card className="border-border/80 transition-colors group-hover:bg-muted/30">
-                  <CardContent className="px-2.5 py-1.5">
+                  <div className="px-3 py-2 transition-colors group-hover:bg-muted/30">
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                         {label}
@@ -208,30 +218,29 @@ export default async function DashboardPage({
                       <p className="text-xl font-semibold tabular-nums leading-none">{value}</p>
                       <p className="mt-0.5 text-[11px] text-muted-foreground truncate">{sub}</p>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
               </Link>
             ))}
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         </section>
 
         {/* ── Right compact rail ────────────────────────────────────────── */}
         <div className="order-5 lg:col-span-3 lg:col-start-10 lg:row-start-1 space-y-2.5 h-full">
           <section aria-label="Pipeline snapshot">
-          <SectionLabel
-            trailing={
-              <Link
-                href={`/s/${slug}/deals`}
-                className="text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex items-center gap-0.5"
-              >
-                All deals <ArrowRight size={11} />
-              </Link>
-            }
-          >
-            Pipeline
-          </SectionLabel>
           <Card className="h-full">
-            <CardContent className="p-2.5">
+            <CardContent className="p-0">
+              <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
+                <h2 className="text-sm font-semibold">Pipeline</h2>
+                <Link
+                  href={`/s/${slug}/deals`}
+                  className="text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex items-center gap-0.5"
+                >
+                  All deals <ArrowRight size={11} />
+                </Link>
+              </div>
+              <div className="p-2.5">
               {dealsByStage.length === 0 ? (
                 <div className="py-3">
                   <div className="flex items-center gap-2.5">
@@ -282,26 +291,25 @@ export default async function DashboardPage({
                   </div>
                 </div>
               )}
+              </div>
             </CardContent>
           </Card>
           </section>
 
           <section aria-label="Upcoming tours">
-            <SectionLabel
-              trailing={
-                <Link
-                  href={`/s/${slug}/tours`}
-                  className="text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex items-center gap-0.5"
-                >
-                  All tours <ArrowRight size={11} />
-                </Link>
-              }
-            >
-              Upcoming tours
-            </SectionLabel>
             {upcomingTours.length === 0 ? (
               <Card>
-                <CardContent className="py-3 px-3">
+                <CardContent className="p-0">
+                  <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
+                    <h2 className="text-sm font-semibold">Upcoming tours</h2>
+                    <Link
+                      href={`/s/${slug}/tours`}
+                      className="text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex items-center gap-0.5"
+                    >
+                      All tours <ArrowRight size={11} />
+                    </Link>
+                  </div>
+                  <div className="py-3 px-3">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
                       <CalendarDays size={14} className="text-muted-foreground" />
@@ -313,10 +321,20 @@ export default async function DashboardPage({
                       </p>
                     </div>
                   </div>
+                  </div>
                 </CardContent>
               </Card>
             ) : (
               <Card>
+                <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
+                  <h2 className="text-sm font-semibold">Upcoming tours</h2>
+                  <Link
+                    href={`/s/${slug}/tours`}
+                    className="text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex items-center gap-0.5"
+                  >
+                    All tours <ArrowRight size={11} />
+                  </Link>
+                </div>
                 <div className="divide-y divide-border">
                   {upcomingTours.map((tour: any) => {
                     const d = new Date(tour.startsAt);
@@ -357,21 +375,19 @@ export default async function DashboardPage({
         </div>
 
         <section className="order-2 lg:col-span-9 lg:col-start-1 lg:row-start-2 h-full" aria-label="Recent applications">
-          <SectionLabel
-            trailing={
-              <Link
-                href={`/s/${slug}/leads`}
-                className="text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex items-center gap-0.5"
-              >
-                View all <ArrowRight size={11} />
-              </Link>
-            }
-          >
-            Recent applications
-          </SectionLabel>
           {recentLeads.length === 0 ? (
             <Card>
-              <CardContent className="py-4 px-4">
+              <CardContent className="p-0">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                  <h2 className="text-sm font-semibold">Recent applications</h2>
+                  <Link
+                    href={`/s/${slug}/leads`}
+                    className="text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex items-center gap-0.5"
+                  >
+                    View all <ArrowRight size={11} />
+                  </Link>
+                </div>
+                <div className="py-4 px-4">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                     <PhoneIncoming size={16} className="text-muted-foreground" />
@@ -391,10 +407,20 @@ export default async function DashboardPage({
                     Preview <ExternalLink size={11} />
                   </Link>
                 </div>
+                </div>
               </CardContent>
             </Card>
           ) : (
             <Card className="h-full">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <h2 className="text-sm font-semibold">Recent applications</h2>
+                <Link
+                  href={`/s/${slug}/leads`}
+                  className="text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex items-center gap-0.5"
+                >
+                  View all <ArrowRight size={11} />
+                </Link>
+              </div>
               <div className="divide-y divide-border">
                 {recentLeads.map((lead) => {
                   const isNew = lead.tags.includes('new-lead');
@@ -462,8 +488,10 @@ export default async function DashboardPage({
         </section>
 
         <section className="order-7 lg:col-span-3 lg:col-start-10 lg:row-start-2 h-full" aria-label="Tools">
-          <SectionLabel>Utilities</SectionLabel>
           <Card className="h-full">
+            <div className="px-3 py-2.5 border-b border-border">
+              <h2 className="text-sm font-semibold">Utilities</h2>
+            </div>
             <div className="grid grid-cols-1 divide-y divide-border">
               <ToolRow
                 icon={Link2}
@@ -494,26 +522,6 @@ export default async function DashboardPage({
           hasDeals={dealCount > 0}
         />
       </div>
-    </div>
-  );
-}
-
-// ── Section label ──────────────────────────────────────────────────────────
-// Calmer, operational: uppercase tracking-wide, muted, optional trailing link.
-
-function SectionLabel({
-  children,
-  trailing,
-}: {
-  children: React.ReactNode;
-  trailing?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-end justify-between mb-1.5">
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-        {children}
-      </h2>
-      {trailing}
     </div>
   );
 }
