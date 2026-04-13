@@ -29,10 +29,10 @@ const SNOOZE_OPTIONS = [
 ] as const;
 
 const SCORE_COLORS: Record<string, string> = {
-  hot: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
-  warm: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
-  cold: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
-  unqualified: 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400',
+  hot: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400',
+  warm: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+  cold: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
+  unqualified: 'bg-muted text-muted-foreground',
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -193,8 +193,8 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
                     className={cn(
                       'text-[11px] font-semibold rounded-md px-2 py-0.5',
                       isOverdue
-                        ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
-                        : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                        ? 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+                        : 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
                     )}
                   >
                     {isOverdue ? 'Overdue' : 'Due'}{' '}

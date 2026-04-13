@@ -150,7 +150,7 @@ export default async function DashboardPage({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {stats.map(({ label, value, sub, icon: Icon, accent, dotCls, href }) => (
           <Link key={label} href={href}>
-            <Card className="transition-shadow hover:shadow-md dark:hover:shadow-none">
+            <Card className="transition-colors hover:border-foreground/20 hover:bg-muted/30">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-muted">
@@ -223,9 +223,9 @@ export default async function DashboardPage({
                 {recentLeads.map((lead) => {
                   const isNew = lead.tags.includes('new-lead');
                   const scoreBadge =
-                    lead.scoreLabel === 'hot'  ? { label: 'Hot',  cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', barCls: 'bg-red-500' } :
-                    lead.scoreLabel === 'warm' ? { label: 'Warm', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', barCls: 'bg-amber-500' } :
-                    lead.scoreLabel === 'cold' ? { label: 'Cold', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-400', barCls: 'bg-slate-400' } :
+                    lead.scoreLabel === 'hot'  ? { label: 'Hot',  cls: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400', barCls: 'bg-red-500' } :
+                    lead.scoreLabel === 'warm' ? { label: 'Warm', cls: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400', barCls: 'bg-amber-500' } :
+                    lead.scoreLabel === 'cold' ? { label: 'Cold', cls: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400', barCls: 'bg-slate-400' } :
                     null;
                   return (
                     <Link key={lead.id} href={`/s/${slug}/leads`} className="block">
@@ -237,7 +237,7 @@ export default async function DashboardPage({
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-semibold truncate">{lead.name}</p>
                             {isNew && (
-                              <span className="inline-flex text-[10px] font-semibold text-brand bg-brand-subtle rounded-md px-1.5 py-0.5 flex-shrink-0">
+                              <span className="inline-flex text-[10px] font-semibold text-orange-700 bg-orange-50 dark:text-orange-400 dark:bg-orange-500/10 rounded-md px-1.5 py-0.5 flex-shrink-0">
                                 New
                               </span>
                             )}
