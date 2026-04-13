@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Mail,
   Phone,
-  FileText,
   ExternalLink,
   Briefcase,
   AlertTriangle,
@@ -33,7 +32,6 @@ import { ApplicationStatusManager } from '@/components/contacts/application-stat
 import { PdfExportButton } from '@/components/contacts/pdf-export-button';
 import { CollapsibleSection } from '@/components/contacts/collapsible-section';
 import { DynamicApplicationDisplay } from '@/components/contacts/dynamic-application-display';
-import { ClientNotesEditor } from '@/components/contacts/client-notes-editor';
 import { getInitials, formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug } from '@/lib/space';
 
@@ -106,7 +104,7 @@ export default async function ClientDetailPage({
   const app = contact.applicationData as ApplicationData | null;
   const details = contact.scoreDetails as LeadScoreDetails | null;
   const formSnapshot = contact.formConfigSnapshot as IntakeFormConfig | null;
-  const activeTab = (tab === 'overview' || tab === 'activity' || tab === 'intelligence' || tab === 'deals' || tab === 'notes')
+  const activeTab = (tab === 'overview' || tab === 'activity' || tab === 'intelligence' || tab === 'deals')
     ? tab
     : 'overview';
   const tabHref = (key: string) => `/s/${slug}/contacts/${contact.id}?tab=${key}`;
@@ -184,7 +182,6 @@ export default async function ClientDetailPage({
               <Link href={tabHref('activity')} className={`${activeTab === 'activity' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Activity</Link>
               <Link href={tabHref('intelligence')} className={`${activeTab === 'intelligence' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Intelligence</Link>
               <Link href={tabHref('deals')} className={`${activeTab === 'deals' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Deals</Link>
-              <Link href={tabHref('notes')} className={`${activeTab === 'notes' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Notes</Link>
             </div>
 
       {/* Smart follow-up suggestions */}
@@ -594,34 +591,6 @@ export default async function ClientDetailPage({
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Notes */}
-      {activeTab === 'notes' && (
-        <ClientNotesEditor contactId={contact.id} initialNotes={contact.notes ?? null} />
-      )}
-
-      {/* Additional notes from application */}
-      {activeTab === 'notes' && app?.additionalNotes && (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-border">
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <FileText size={14} className="text-muted-foreground" /> Applicant notes
-            </h2>
-          </div>
-          <div className="px-4 sm:px-6 py-4">
-            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-              {app.additionalNotes}
-            </p>
-          </div>
-        </div>
-      )}
-      {activeTab === 'notes' && !app?.additionalNotes && (
-        <div className="rounded-lg border border-dashed border-border bg-card px-4 sm:px-6 py-6 text-center">
-          <p className="text-xs text-muted-foreground">
-            No applicant-submitted notes yet.
-          </p>
         </div>
       )}
 
