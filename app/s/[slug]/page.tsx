@@ -109,24 +109,22 @@ export default async function DashboardPage({
   const bookingUrl = intakeUrl.replace('/apply/', '/book/');
 
   const stats = [
-    { label: 'New leads', value: newLeadCount, sub: 'unread', icon: PhoneIncoming, accent: newLeadCount > 0, dotCls: 'bg-brand', href: `/s/${slug}/leads` },
-    { label: 'Total leads', value: totalLeads, sub: 'total', icon: TrendingUp, accent: false, dotCls: '', href: `/s/${slug}/leads` },
-    { label: 'Clients', value: contactCount, sub: 'in CRM', icon: Users, accent: false, dotCls: '', href: `/s/${slug}/contacts` },
-    { label: 'Active deals', value: dealCount, sub: formatCurrency(totalValue), icon: Briefcase, accent: false, dotCls: '', href: `/s/${slug}/deals` },
-    { label: 'Tours', value: upcomingTourCount, sub: upcomingTourCount > 0 ? 'scheduled' : 'none', icon: CalendarDays, accent: upcomingTourCount > 0, dotCls: 'bg-muted-foreground', href: `/s/${slug}/tours` },
-    { label: 'Follow-ups', value: followUpDue, sub: followUpDue > 0 ? 'due now' : 'all clear', icon: AlertCircle, accent: followUpDue > 0, dotCls: 'bg-destructive', href: `/s/${slug}/follow-ups` },
+    { label: 'New leads',    value: newLeadCount,      sub: 'unread',                                             icon: PhoneIncoming, accent: newLeadCount > 0,      dotCls: 'bg-brand',             href: `/s/${slug}/leads` },
+    { label: 'Total leads',  value: totalLeads,         sub: 'total',                                              icon: TrendingUp,    accent: false,                 dotCls: '',                     href: `/s/${slug}/leads` },
+    { label: 'Clients',      value: contactCount,       sub: 'in CRM',                                             icon: Users,         accent: false,                 dotCls: '',                     href: `/s/${slug}/contacts` },
+    { label: 'Active deals', value: dealCount,          sub: formatCurrency(totalValue),                           icon: Briefcase,     accent: false,                 dotCls: '',                     href: `/s/${slug}/deals` },
+    { label: 'Tours',        value: upcomingTourCount,  sub: upcomingTourCount > 0 ? 'scheduled' : 'none',        icon: CalendarDays,  accent: upcomingTourCount > 0, dotCls: 'bg-muted-foreground',  href: `/s/${slug}/tours` },
+    { label: 'Follow-ups',   value: followUpDue,        sub: followUpDue > 0 ? 'due now' : 'all clear',           icon: AlertCircle,   accent: followUpDue > 0,       dotCls: 'bg-destructive',       href: `/s/${slug}/follow-ups` },
   ];
 
   return (
     <div className="space-y-6 max-w-[1120px]">
 
-      {/* ── Page header ──────────────────────────────────────────────────── */}
+      {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-xs text-muted-foreground">{getGreeting()}</p>
-          <h1 className="text-xl font-bold tracking-tight text-foreground mt-0.5">
-            {space.name}
-          </h1>
+          <h1 className="text-xl font-bold tracking-tight text-foreground mt-0.5">{space.name}</h1>
         </div>
         <Link
           href={`/s/${slug}/leads`}
@@ -136,7 +134,7 @@ export default async function DashboardPage({
         </Link>
       </div>
 
-      {/* ── Onboarding checklist ──────────────────────────────────────────── */}
+      {/* ── Onboarding checklist ─────────────────────────────────────────── */}
       <OnboardingChecklist
         slug={slug}
         hasLeads={totalLeads > 0}
@@ -145,138 +143,154 @@ export default async function DashboardPage({
         hasDeals={dealCount > 0}
       />
 
-      {/* ── KPI strip ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-        {stats.map(({ label, value, sub, icon: Icon, accent, dotCls, href }) => (
-          <Link key={label} href={href}>
-            <Card className="transition-colors hover:border-foreground/20 hover:bg-muted/30">
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-muted">
-                    <Icon size={14} className="text-muted-foreground" />
-                  </div>
-                  {accent && value > 0 && (
-                    <span className={`w-2 h-2 rounded-full animate-pulse ${dotCls}`} />
-                  )}
-                </div>
-                <p className="text-xl font-bold tabular-nums leading-tight text-foreground">
-                  {value}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{label}</p>
-                <p className="text-[10px] text-muted-foreground/70">{sub}</p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
+      {/*
+        ── Dashboard grid ────────────────────────────────────────────────────
+        Mobile  (flex-col):  priority queue → KPI → applications → right rail
+        Desktop (12-col grid):
+          Row 1 — KPI strip, cols 1–12
+          Row 2 — Priority queue, cols 1–8  │  Right rail top, cols 9–12
+          Row 3 — Applications,  cols 1–8  │  Right rail (spans rows 2–3)
+      */}
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:gap-6">
 
-      {/* ── Main grid: left primary column + right secondary rail ────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* ── Left primary column — priority queue + recent applications ── */}
-        <div className="lg:col-span-2 space-y-5">
-
-          {/* Priority queue — follow-ups due */}
+        {/* ── Priority queue — follow-ups due ──────────────────────────────
+            Mobile: order 1 (first, above KPI)
+            Desktop: row 2, cols 1–8                                       */}
+        <div className="order-1 lg:col-span-8 lg:row-start-2">
           <FollowUpWidget slug={slug} contacts={followUpContacts} />
+        </div>
 
-          {/* Recent applications */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-foreground">Recent applications</h2>
-              <Link
-                href={`/s/${slug}/leads`}
-                className="text-xs text-muted-foreground font-medium hover:text-foreground hover:underline underline-offset-2 flex items-center gap-1"
-              >
-                View all <ArrowRight size={12} />
+        {/* ── KPI strip ────────────────────────────────────────────────────
+            Mobile: order 2 (below follow-ups)
+            Desktop: row 1, cols 1–12 (full width)                         */}
+        <div className="order-2 lg:col-span-12 lg:row-start-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            {stats.map(({ label, value, sub, icon: Icon, accent, dotCls, href }) => (
+              <Link key={label} href={href}>
+                <Card className="transition-colors hover:border-foreground/20 hover:bg-muted/30">
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-muted">
+                        <Icon size={14} className="text-muted-foreground" />
+                      </div>
+                      {accent && value > 0 && (
+                        <span className={`w-2 h-2 rounded-full animate-pulse ${dotCls}`} />
+                      )}
+                    </div>
+                    <p className="text-xl font-bold tabular-nums leading-tight text-foreground">{value}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{label}</p>
+                    <p className="text-[10px] text-muted-foreground/70">{sub}</p>
+                  </CardContent>
+                </Card>
               </Link>
-            </div>
-            {recentLeads.length === 0 ? (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
-                    <PhoneIncoming size={20} className="text-muted-foreground" />
-                  </div>
-                  <p className="text-sm font-medium text-foreground">No applications yet</p>
-                  <p className="text-xs text-muted-foreground mt-1 max-w-[240px] mx-auto">
-                    Share your intake link to start receiving applications.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <div className="divide-y divide-border">
-                  {recentLeads.map((lead) => {
-                    const isNew = lead.tags.includes('new-lead');
-                    const scoreBadge =
-                      lead.scoreLabel === 'hot'  ? { label: 'Hot',  cls: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400', barCls: 'bg-red-500' } :
-                      lead.scoreLabel === 'warm' ? { label: 'Warm', cls: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400', barCls: 'bg-amber-500' } :
-                      lead.scoreLabel === 'cold' ? { label: 'Cold', cls: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400', barCls: 'bg-slate-400' } :
-                      null;
-                    return (
-                      <Link key={lead.id} href={`/s/${slug}/leads`} className="block">
-                        <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
-                          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground flex-shrink-0">
-                            {lead.name?.split(' ')?.map((n: string) => n?.[0])?.join('')?.toUpperCase()?.slice(0, 2) || '??'}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold truncate">{lead.name}</p>
-                              {isNew && (
-                                <span className="inline-flex text-[10px] font-semibold text-orange-700 bg-orange-50 dark:text-orange-400 dark:bg-orange-500/10 rounded-md px-1.5 py-0.5 flex-shrink-0">
-                                  New
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              {lead.phone && (
-                                <span className="text-xs text-muted-foreground">{lead.phone}</span>
-                              )}
-                              {lead.budget && (
-                                <span className="text-xs text-muted-foreground">
-                                  · {formatCurrency(lead.budget)}/mo
-                                </span>
-                              )}
-                              {lead.preferences && (
-                                <span className="text-xs text-muted-foreground truncate max-w-[140px]">
-                                  · {lead.preferences}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                            {lead.scoringStatus === 'scored' && lead.leadScore != null && scoreBadge ? (
-                              <div className="flex items-center gap-2">
-                                <div className="w-14 h-1.5 rounded-full bg-muted overflow-hidden hidden sm:block">
-                                  <div className={`h-full rounded-full ${scoreBadge.barCls}`} style={{ width: `${Math.min(100, lead.leadScore)}%` }} />
-                                </div>
-                                <span className={`inline-flex items-center gap-1 text-[11px] font-semibold rounded-md px-2 py-0.5 ${scoreBadge.cls}`}>
-                                  {Math.round(lead.leadScore)}
-                                  <span className="font-medium opacity-80">{scoreBadge.label}</span>
-                                </span>
-                              </div>
-                            ) : lead.scoringStatus === 'pending' ? (
-                              <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/60 italic">
-                                <span className="w-3 h-3 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
-                                AI scoring
-                              </span>
-                            ) : null}
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Clock size={11} />
-                              {timeAgo(new Date(lead.createdAt))}
-                            </span>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </Card>
-            )}
+            ))}
           </div>
         </div>
 
-        {/* ── Right secondary rail — pipeline + tours + tools ────────────── */}
-        <div className="space-y-5">
+        {/* ── Recent applications ──────────────────────────────────────────
+            Mobile: order 3 (below KPI)
+            Desktop: row 3, cols 1–8                                       */}
+        <div className="order-3 lg:col-span-8 lg:row-start-3">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-foreground">Recent applications</h2>
+            <Link
+              href={`/s/${slug}/leads`}
+              className="text-xs text-muted-foreground font-medium hover:text-foreground hover:underline underline-offset-2 flex items-center gap-1"
+            >
+              View all <ArrowRight size={12} />
+            </Link>
+          </div>
+          {recentLeads.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
+                  <PhoneIncoming size={20} className="text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium text-foreground">No applications yet</p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-[240px] mx-auto">
+                  Share your intake link to start receiving applications.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <div className="divide-y divide-border">
+                {recentLeads.map((lead) => {
+                  const isNew = lead.tags.includes('new-lead');
+                  const scoreBadge =
+                    lead.scoreLabel === 'hot'  ? { label: 'Hot',  cls: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400',   barCls: 'bg-red-500' } :
+                    lead.scoreLabel === 'warm' ? { label: 'Warm', cls: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400', barCls: 'bg-amber-500' } :
+                    lead.scoreLabel === 'cold' ? { label: 'Cold', cls: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',  barCls: 'bg-slate-400' } :
+                    null;
+                  return (
+                    <Link key={lead.id} href={`/s/${slug}/leads`} className="block">
+                      <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
+                        <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground flex-shrink-0">
+                          {lead.name?.split(' ')?.map((n: string) => n?.[0])?.join('')?.toUpperCase()?.slice(0, 2) || '??'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold truncate">{lead.name}</p>
+                            {isNew && (
+                              <span className="inline-flex text-[10px] font-semibold text-orange-700 bg-orange-50 dark:text-orange-400 dark:bg-orange-500/10 rounded-md px-1.5 py-0.5 flex-shrink-0">
+                                New
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            {lead.phone && (
+                              <span className="text-xs text-muted-foreground">{lead.phone}</span>
+                            )}
+                            {lead.budget && (
+                              <span className="text-xs text-muted-foreground">
+                                · {formatCurrency(lead.budget)}/mo
+                              </span>
+                            )}
+                            {lead.preferences && (
+                              <span className="text-xs text-muted-foreground truncate max-w-[140px]">
+                                · {lead.preferences}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                          {lead.scoringStatus === 'scored' && lead.leadScore != null && scoreBadge ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-14 h-1.5 rounded-full bg-muted overflow-hidden hidden sm:block">
+                                <div
+                                  className={`h-full rounded-full ${scoreBadge.barCls}`}
+                                  style={{ width: `${Math.min(100, lead.leadScore)}%` }}
+                                />
+                              </div>
+                              <span className={`inline-flex items-center gap-1 text-[11px] font-semibold rounded-md px-2 py-0.5 ${scoreBadge.cls}`}>
+                                {Math.round(lead.leadScore)}
+                                <span className="font-medium opacity-80">{scoreBadge.label}</span>
+                              </span>
+                            </div>
+                          ) : lead.scoringStatus === 'pending' ? (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/60 italic">
+                              <span className="w-3 h-3 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
+                              AI scoring
+                            </span>
+                          ) : null}
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock size={11} />
+                            {timeAgo(new Date(lead.createdAt))}
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* ── Right secondary rail ─────────────────────────────────────────
+            Mobile: order 4 (last, below applications)
+            Desktop: rows 2–3 (row-span-2), cols 9–12                     */}
+        <div className="order-4 lg:col-start-9 lg:col-span-4 lg:row-start-2 lg:row-span-2 space-y-5">
 
           {/* Pipeline summary */}
           <div>
@@ -418,7 +432,7 @@ export default async function DashboardPage({
             )}
           </div>
 
-          {/* Tools — intake + booking links */}
+          {/* Tools — intake and booking links */}
           <div>
             <h2 className="text-sm font-semibold text-foreground mb-3">Tools</h2>
             <div className="space-y-3">
