@@ -401,7 +401,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search deals…"
-              className="h-8 w-full sm:w-44 rounded-lg border border-border bg-muted/60 pl-8 pr-7 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background transition-colors"
+              className="h-8 w-full sm:w-44 rounded-lg border border-border bg-muted/60 pl-8 pr-7 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:bg-background transition-colors"
             />
             {searchQuery && (
               <button

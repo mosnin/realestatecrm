@@ -65,10 +65,10 @@ const STATUS_META = {
 const ACTIVITY_META = {
   note: { label: 'Note', icon: FileText, color: 'text-slate-500 dark:text-slate-400' },
   call: { label: 'Call', icon: PhoneCall, color: 'text-blue-500 dark:text-blue-400' },
-  email: { label: 'Email', icon: Mail, color: 'text-violet-500 dark:text-violet-400' },
+  email: { label: 'Email', icon: Mail, color: 'text-orange-500 dark:text-orange-400' },
   meeting: { label: 'Meeting', icon: Users, color: 'text-teal-500 dark:text-teal-400' },
   follow_up: { label: 'Follow-up', icon: Clock, color: 'text-amber-500 dark:text-amber-400' },
-  stage_change: { label: 'Stage change', icon: Activity, color: 'text-indigo-500 dark:text-indigo-400' },
+  stage_change: { label: 'Stage change', icon: Activity, color: 'text-muted-foreground' },
   status_change: { label: 'Status change', icon: CheckCircle2, color: 'text-green-500 dark:text-green-400' },
 };
 
