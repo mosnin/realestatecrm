@@ -132,9 +132,10 @@ export default async function DashboardPage({
   return (
     <div className="space-y-6 max-w-[1200px]">
 
-      {/* ── Top strip — greeting + compact live status ─────────────────────
-          Compressed header: no oversized hero, no standalone "View leads"
-          pill. Status segments carry the single-tap navigation. */}
+      {/* ── Top strip — greeting + secondary status + primary CTA ──────────
+          One explicit primary action ("View leads"). Status segments are
+          secondary quick links and sit between the title and the CTA.
+          No motion: pulses removed. */}
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
@@ -144,37 +145,38 @@ export default async function DashboardPage({
             {space.name}
           </h1>
         </div>
-        {statusSegments.length > 0 ? (
-          <nav className="flex flex-wrap items-center gap-1.5 flex-shrink-0" aria-label="Today's status">
-            {statusSegments.map((seg) => (
-              <Link
-                key={seg.label}
-                href={seg.href}
-                className={
-                  'inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-1 border transition-colors ' +
-                  (seg.tone === 'urgent'
-                    ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/25 dark:hover:bg-red-500/15'
-                    : seg.tone === 'accent'
-                    ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/25 dark:hover:bg-orange-500/15'
-                    : 'bg-muted/50 text-foreground border-border hover:bg-muted')
-                }
-              >
-                <span className={
-                  'w-1.5 h-1.5 rounded-full ' +
-                  (seg.tone === 'urgent' ? 'bg-red-500 animate-pulse' : seg.tone === 'accent' ? 'bg-brand animate-pulse' : 'bg-muted-foreground/50')
-                } />
-                {seg.label}
-              </Link>
-            ))}
-          </nav>
-        ) : (
+        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+          {statusSegments.length > 0 && (
+            <nav className="flex flex-wrap items-center gap-1.5" aria-label="Today's status">
+              {statusSegments.map((seg) => (
+                <Link
+                  key={seg.label}
+                  href={seg.href}
+                  className={
+                    'inline-flex items-center gap-1.5 text-[11px] font-medium rounded-full px-2 py-0.5 border transition-colors ' +
+                    (seg.tone === 'urgent'
+                      ? 'bg-red-50/60 text-red-700 border-red-200/70 hover:bg-red-50 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/25'
+                      : seg.tone === 'accent'
+                      ? 'bg-orange-50/60 text-orange-700 border-orange-200/70 hover:bg-orange-50 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/25'
+                      : 'bg-muted/40 text-foreground/80 border-border hover:bg-muted')
+                  }
+                >
+                  <span className={
+                    'w-1.5 h-1.5 rounded-full ' +
+                    (seg.tone === 'urgent' ? 'bg-red-500' : seg.tone === 'accent' ? 'bg-brand' : 'bg-muted-foreground/50')
+                  } />
+                  {seg.label}
+                </Link>
+              ))}
+            </nav>
+          )}
           <Link
             href={`/s/${slug}/leads`}
-            className="inline-flex items-center gap-1.5 text-xs font-medium bg-foreground text-background px-3 py-1.5 rounded-md hover:bg-foreground/90 transition-colors flex-shrink-0 self-start sm:self-auto"
+            className="inline-flex items-center gap-1.5 text-xs font-medium bg-foreground text-background px-3 py-1.5 rounded-md hover:bg-foreground/90 transition-colors"
           >
             View leads <ArrowRight size={12} />
           </Link>
-        )}
+        </div>
       </header>
 
       {/* ── Onboarding checklist (unchanged) ────────────────────────────── */}
@@ -186,16 +188,52 @@ export default async function DashboardPage({
         hasDeals={dealCount > 0}
       />
 
+      {/* ── KPI strip — compressed at-a-glance bar ──────────────────────────
+          Sits near the top so it retains orientation value, but is
+          deliberately thin (single Card, divided segments, no oversized
+          icon tiles) so it never outranks the follow-up queue below.
+          Single small dot only when there is unread/urgent state. */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-border">
+            {stats.map(({ label, value, sub, accent, dotCls, href }) => (
+              <Link
+                key={label}
+                href={href}
+                className="group px-3.5 py-2.5 hover:bg-muted/40 transition-colors"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em]">
+                    {label}
+                  </span>
+                  {accent && value > 0 ? (
+                    <span className={`w-1.5 h-1.5 rounded-full ${dotCls}`} />
+                  ) : (
+                    <ArrowRight size={10} className="text-muted-foreground/0 group-hover:text-muted-foreground/50 transition-colors" />
+                  )}
+                </div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-[20px] font-semibold tabular-nums leading-none text-foreground">
+                    {value}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground truncate">{sub}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       {/*
         ── Main grid ───────────────────────────────────────────────────────
         Asymmetric 12-col composition. Primary work zone on the left
         (cols 1–8) dominates; secondary insight rail on the right (cols
-        9–12) is narrower and denser. KPIs and tools demoted to full-width
-        bars beneath the work zone — never competing with it for attention.
+        9–12) is narrower and denser. Tools demoted to a full-width
+        utility bar beneath the work zone.
 
         Mobile (single column) stacks by priority:
-          1. Hero queue  2. New leads  3. Pipeline  4. Tours
-          5. KPI strip   6. Tools bar
+          1. Hero queue  2. Recent applications  3. Pipeline
+          4. Tours       5. Tools bar
       */}
       <div className="flex flex-col gap-5 lg:grid lg:grid-cols-12 lg:gap-5">
 
@@ -278,21 +316,23 @@ export default async function DashboardPage({
           </Card>
         </section>
 
-        {/* ── New leads (primary secondary module) ─────────────────────────
+        {/* ── Recent applications (primary secondary module) ───────────────
             Dense, easier to scan list. Under the hero queue on all widths.
-            Kept at cols 1–8 on desktop to mirror the queue. */}
-        <section className="order-2 lg:col-span-8" aria-label="New leads">
+            Kept at cols 1–8 on desktop to mirror the queue.
+            Label retained: rows are intake-form applications (filtered by
+            tags @> ['application-link']) — not specifically "new leads". */}
+        <section className="order-2 lg:col-span-8" aria-label="Recent applications">
           <SectionLabel
             trailing={
               <Link
                 href={`/s/${slug}/leads`}
                 className="text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex items-center gap-0.5"
               >
-                All leads <ArrowRight size={11} />
+                View all <ArrowRight size={11} />
               </Link>
             }
           >
-            New leads
+            Recent applications
           </SectionLabel>
           {recentLeads.length === 0 ? (
             <Card>
@@ -302,7 +342,7 @@ export default async function DashboardPage({
                     <PhoneIncoming size={16} className="text-muted-foreground" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-foreground">No leads yet</p>
+                    <p className="text-sm font-semibold text-foreground">No applications yet</p>
                     <p className="text-xs text-muted-foreground">
                       Share your intake link and applications will land here.
                     </p>
@@ -457,48 +497,11 @@ export default async function DashboardPage({
           )}
         </section>
 
-        {/* ── KPI strip — compressed ───────────────────────────────────────
-            Demoted below primary work. Single card, 5 divided segments.
-            Small icons replaced by uppercase section labels for a calmer,
-            more operational read. Not competing with work surfaces. */}
-        <section className="order-5 lg:col-span-12" aria-label="At a glance">
-          <Card>
-            <CardContent className="p-0">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-border">
-                {stats.map(({ label, value, sub, accent, dotCls, href }) => (
-                  <Link
-                    key={label}
-                    href={href}
-                    className="group px-3.5 py-3 hover:bg-muted/40 transition-colors"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em]">
-                        {label}
-                      </span>
-                      {accent && value > 0 ? (
-                        <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${dotCls}`} />
-                      ) : (
-                        <ArrowRight size={10} className="text-muted-foreground/0 group-hover:text-muted-foreground/50 transition-colors" />
-                      )}
-                    </div>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-[22px] font-semibold tabular-nums leading-none text-foreground">
-                        {value}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground truncate">{sub}</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
         {/* ── Compressed tools bar ─────────────────────────────────────────
             Intake + Booking collapsed into a single lighter bar. No
             decorative "Live" pulse; inline copy + preview actions
             preserve functionality. */}
-        <section className="order-6 lg:col-span-12" aria-label="Tools">
+        <section className="order-5 lg:col-span-12" aria-label="Tools">
           <Card>
             <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border">
               <ToolRow
