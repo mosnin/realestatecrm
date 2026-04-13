@@ -105,105 +105,78 @@ export default async function ClientDetailPage({
   const formSnapshot = contact.formConfigSnapshot as IntakeFormConfig | null;
 
   return (
-    <div className="max-w-4xl space-y-5">
-      {/* Back nav */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-muted-foreground">
-          <Link href={`/s/${slug}/contacts`}>
-            <ArrowLeft size={16} />
-          </Link>
-        </Button>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href={`/s/${slug}/contacts`} className="hover:text-foreground transition-colors">
-            Clients
-          </Link>
-          <span>/</span>
-          <span className="text-foreground font-medium">{contact.name}</span>
-        </div>
-      </div>
-
-      {/* Profile header card */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
-        {/* Identity section */}
-        <div className="px-4 py-4 sm:px-6 sm:py-5">
-          <div className="flex items-start gap-3 sm:gap-4">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-primary/10 flex items-center justify-center text-lg sm:text-xl font-bold text-primary flex-shrink-0">
-              {getInitials(contact.name)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg sm:text-xl font-semibold tracking-tight">{contact.name}</h1>
-                {contact.sourceLabel && (
-                  <span className="inline-flex items-center text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted">
-                    {contact.sourceLabel}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-3 mt-2 flex-wrap">
-                <StageProgression contactId={contact.id} currentType={contact.type} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Added {new Date(contact.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-              </p>
-            </div>
+    <div className="space-y-4 max-w-[1400px]">
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm">
+            <Link href={`/s/${slug}/contacts`} className="text-muted-foreground hover:text-foreground">Contacts</Link>
+            <span className="text-muted-foreground">/</span>
+            <span className="font-semibold">{contact.name}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/s/${slug}/contacts`}>
+                <ArrowLeft size={14} className="mr-1" /> Back
+              </Link>
+            </Button>
+            <Button size="sm" asChild>
+              <Link href={`/s/${slug}/deals`}>Create Deal</Link>
+            </Button>
           </div>
         </div>
 
-        {/* Contact info + follow-up row */}
-        <div className="px-4 sm:px-6 py-3 border-t border-border bg-muted/30">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            {contact.phone && (
-              <a
-                href={`tel:${contact.phone}`}
-                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-card border border-border hover:bg-muted/80 transition-colors text-foreground"
-              >
-                <Phone size={14} className="text-muted-foreground" />
-                {contact.phone}
-              </a>
-            )}
-            {contact.email && (
-              <a
-                href={`mailto:${contact.email}`}
-                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-card border border-border hover:bg-muted/80 transition-colors text-foreground truncate max-w-[280px]"
-              >
-                <Mail size={14} className="text-muted-foreground flex-shrink-0" />
-                <span className="truncate">{contact.email}</span>
-              </a>
-            )}
-            {contact.email && (
-              <ComposeEmailDialog
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="border-b lg:border-b-0 lg:border-r border-border p-4 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-lg font-bold text-primary flex-shrink-0">
+                {getInitials(contact.name)}
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl font-semibold leading-tight truncate">{contact.name}</h1>
+                <p className="text-sm text-muted-foreground truncate">{contact.sourceLabel ?? 'Intake lead'}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Added {new Date(contact.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {contact.email && <ComposeEmailDialog contactId={contact.id} contactName={contact.name} contactEmail={contact.email} />}
+              <Link href={`/s/${slug}/tours?schedule=${contact.id}`} className="inline-flex items-center justify-center gap-1 text-xs rounded-md border border-border py-2 hover:bg-muted transition-colors"><CalendarPlus size={12} /> Task</Link>
+              <Link href={`/s/${slug}/deals`} className="inline-flex items-center justify-center gap-1 text-xs rounded-md border border-border py-2 hover:bg-muted transition-colors"><Briefcase size={12} /> Deal</Link>
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-border p-3">
+              <p className="text-sm font-semibold">Contact details</p>
+              {contact.email && (
+                <a href={`mailto:${contact.email}`} className="block text-sm text-primary hover:underline break-all">{contact.email}</a>
+              )}
+              {contact.phone && (
+                <a href={`tel:${contact.phone}`} className="block text-sm text-primary hover:underline">{contact.phone}</a>
+              )}
+              {contact.address && <p className="text-sm text-muted-foreground">{contact.address}</p>}
+              <ContactFollowUpField
                 contactId={contact.id}
-                contactName={contact.name}
-                contactEmail={contact.email}
+                followUpAt={contact.followUpAt ? String(contact.followUpAt) : null}
+                lastContactedAt={contact.lastContactedAt ? String(contact.lastContactedAt) : null}
               />
-            )}
-            <div className="w-px h-5 bg-border hidden sm:block" />
-            <ContactFollowUpField
-              contactId={contact.id}
-              followUpAt={contact.followUpAt ? String(contact.followUpAt) : null}
-              lastContactedAt={contact.lastContactedAt ? String(contact.lastContactedAt) : null}
-            />
-          </div>
-        </div>
+            </div>
 
-        {/* Quick actions */}
-        <div className="px-4 sm:px-6 py-3 border-t border-border flex flex-wrap gap-2">
-          <Link
-            href={`/s/${slug}/tours?schedule=${contact.id}`}
-            className="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg border border-border hover:bg-accent transition-colors"
-          >
-            <CalendarPlus size={13} />
-            Schedule Tour
-          </Link>
-          <Link
-            href={`/s/${slug}/deals`}
-            className="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg border border-border hover:bg-accent transition-colors"
-          >
-            <Briefcase size={13} />
-            Create Deal
-          </Link>
-        </div>
-      </div>
+            <div className="space-y-2 rounded-lg border border-border p-3">
+              <p className="text-sm font-semibold">Pipeline stage</p>
+              <StageProgression contactId={contact.id} currentType={contact.type} />
+            </div>
+          </aside>
+
+          <main className="p-4 sm:p-5 space-y-4">
+            <div className="flex items-center gap-5 text-sm border-b border-border pb-2 overflow-x-auto">
+              <span className="font-medium border-b-2 border-foreground pb-2">Overview</span>
+              <span className="text-muted-foreground">Activity</span>
+              <span className="text-muted-foreground">Intelligence</span>
+              <span className="text-muted-foreground">Deals</span>
+              <span className="text-muted-foreground">Notes</span>
+              <span className="text-muted-foreground">Emails</span>
+            </div>
 
       {/* Smart follow-up suggestions */}
       <FollowUpSuggestions
@@ -766,6 +739,9 @@ export default async function ClientDetailPage({
               ))}
             </div>
           )}
+        </div>
+      </div>
+          </main>
         </div>
       </div>
     </div>
