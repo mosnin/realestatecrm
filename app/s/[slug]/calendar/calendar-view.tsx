@@ -378,7 +378,7 @@ export function CalendarView({
       <div className="flex gap-1 mt-0.5 md:mt-1 flex-wrap">
         {hasTours && <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />}
         {hasContacts && <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
-        {hasDeals && <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />}
+        {hasDeals && <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500" />}
         {hasCustom && (
           <span className={`text-[8px] leading-none ${colorToDotClass(customByDate.get(dateKey)![0].color)}`}>
             &#x2756;
@@ -421,7 +421,7 @@ export function CalendarView({
           <Link
             key={d.id}
             href={`/s/${slug}/deals/${d.id}`}
-            className="block text-[10px] leading-tight bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded px-1 py-0.5 truncate hover:bg-purple-100 dark:hover:bg-purple-950/50 transition-colors"
+            className="block text-[10px] leading-tight bg-muted/60 border border-border rounded px-1 py-0.5 truncate hover:bg-muted transition-colors"
           >
             <span className="font-medium">{d.title}</span>
           </Link>
@@ -635,7 +635,7 @@ export function CalendarView({
           <Link key={deal.id} href={`/s/${slug}/deals/${deal.id}`} className="block group">
             <Card className="transition-colors group-hover:border-border">
               <CardContent className="p-4 flex items-start gap-3">
-                <span className="mt-1 w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+                <span className="mt-1 w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 shrink-0" />
                 <div className="flex-1 min-w-0 space-y-1">
                   <span className="font-medium text-sm flex items-center gap-1">
                     <Briefcase className="h-3.5 w-3.5" />
@@ -798,7 +798,7 @@ export function CalendarView({
               <span className="w-2 h-2 rounded-full bg-blue-500" /> Contact follow-ups
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-purple-500" /> Deal follow-ups
+              <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500" /> Deal follow-ups
             </span>
             <span className="flex items-center gap-1.5">
               <span className="text-gray-500">&#x2756;</span> Custom events
