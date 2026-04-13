@@ -164,21 +164,30 @@ export default async function ClientDetailPage({
 
             <div className="space-y-2 rounded-lg border border-border p-3">
               <p className="text-sm font-semibold">Pipeline stage</p>
-              <StageProgression contactId={contact.id} currentType={contact.type} />
+              <div className="max-w-full overflow-x-auto pb-1">
+                <div className="min-w-max">
+                  <StageProgression contactId={contact.id} currentType={contact.type} />
+                </div>
+              </div>
             </div>
           </aside>
 
           <main className="p-4 sm:p-5 space-y-4">
             <div className="flex items-center gap-5 text-sm border-b border-border pb-2 overflow-x-auto">
-              <span className="font-medium border-b-2 border-foreground pb-2">Overview</span>
-              <span className="text-muted-foreground">Activity</span>
-              <span className="text-muted-foreground">Intelligence</span>
-              <span className="text-muted-foreground">Deals</span>
-              <span className="text-muted-foreground">Notes</span>
-              <span className="text-muted-foreground">Emails</span>
+              <a href="#overview" className="font-medium border-b-2 border-foreground pb-2 whitespace-nowrap">Overview</a>
+              <a href="#activity" className="text-muted-foreground hover:text-foreground whitespace-nowrap">Activity</a>
+              <a href="#intelligence" className="text-muted-foreground hover:text-foreground whitespace-nowrap">Intelligence</a>
+              <a href="#deals" className="text-muted-foreground hover:text-foreground whitespace-nowrap">Deals</a>
+              <a href="#notes" className="text-muted-foreground hover:text-foreground whitespace-nowrap">Notes</a>
+              {contact.email ? (
+                <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-foreground whitespace-nowrap">Emails</a>
+              ) : (
+                <span className="text-muted-foreground/50 whitespace-nowrap">Emails</span>
+              )}
             </div>
 
       {/* Smart follow-up suggestions */}
+      <div id="overview">
       <FollowUpSuggestions
         contactId={contact.id}
         scoreLabel={contact.scoreLabel}
@@ -187,10 +196,11 @@ export default async function ClientDetailPage({
         hasDeals={contact.dealContacts.length > 0}
         hasFollowUp={!!contact.followUpAt}
       />
+      </div>
 
       {/* ── AI Lead Score Card ── */}
       {contact.scoringStatus === 'scored' && contact.leadScore != null && (
-        <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-primary/40">
+        <div id="intelligence" className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-primary/40">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-primary" />
@@ -329,7 +339,7 @@ export default async function ClientDetailPage({
 
       {/* ── Unscored / failed — show score prompt ── */}
       {(contact.scoringStatus === 'failed' || contact.scoringStatus === 'unscored' || (contact.scoringStatus !== 'scored' && contact.scoringStatus !== 'pending')) && (
-        <div className="rounded-lg border border-border bg-card px-4 sm:px-6 py-5 flex items-center justify-between gap-4">
+        <div id="intelligence" className="rounded-lg border border-border bg-card px-4 sm:px-6 py-5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Sparkles size={16} className="text-muted-foreground" />
             <div>
@@ -588,7 +598,7 @@ export default async function ClientDetailPage({
 
       {/* Notes */}
       {contact.notes && (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div id="notes" className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="px-4 sm:px-6 py-4 border-b border-border">
             <h2 className="text-sm font-semibold flex items-center gap-2">
               <FileText size={14} className="text-muted-foreground" /> Notes
@@ -635,7 +645,9 @@ export default async function ClientDetailPage({
       )}
 
       {/* Activity log */}
-      <ContactActivityTab contactId={contact.id} contactCreatedAt={String(contact.createdAt)} />
+      <div id="activity">
+        <ContactActivityTab contactId={contact.id} contactCreatedAt={String(contact.createdAt)} />
+      </div>
 
       {/* Tour history */}
       {contact.tours.length > 0 && (
@@ -686,7 +698,7 @@ export default async function ClientDetailPage({
       )}
 
       {/* Associated deals */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-indigo-500/40">
+      <div id="deals" className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-indigo-500/40">
         <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
           <Briefcase size={14} className="text-indigo-600 dark:text-indigo-400" />
           <h2 className="text-sm font-semibold">Associated deals</h2>
