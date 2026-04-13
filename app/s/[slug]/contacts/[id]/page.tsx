@@ -46,10 +46,13 @@ function tierBadgeClasses(label: string) {
 
 export default async function ClientDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string; id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { slug, id } = await params;
+  const { tab } = await searchParams;
 
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
@@ -103,6 +106,10 @@ export default async function ClientDetailPage({
   const app = contact.applicationData as ApplicationData | null;
   const details = contact.scoreDetails as LeadScoreDetails | null;
   const formSnapshot = contact.formConfigSnapshot as IntakeFormConfig | null;
+  const activeTab = (tab === 'overview' || tab === 'activity' || tab === 'intelligence' || tab === 'deals' || tab === 'notes' || tab === 'emails')
+    ? tab
+    : 'overview';
+  const tabHref = (key: string) => `/s/${slug}/contacts/${contact.id}?tab=${key}`;
 
   return (
     <div className="space-y-4 max-w-[1400px]">
@@ -140,8 +147,7 @@ export default async function ClientDetailPage({
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              {contact.email && <ComposeEmailDialog contactId={contact.id} contactName={contact.name} contactEmail={contact.email} />}
+            <div className="grid grid-cols-2 gap-2">
               <Link href={`/s/${slug}/tours?schedule=${contact.id}`} className="inline-flex items-center justify-center gap-1 text-xs rounded-md border border-border py-2 hover:bg-muted transition-colors"><CalendarPlus size={12} /> Task</Link>
               <Link href={`/s/${slug}/deals`} className="inline-flex items-center justify-center gap-1 text-xs rounded-md border border-border py-2 hover:bg-muted transition-colors"><Briefcase size={12} /> Deal</Link>
             </div>
@@ -174,20 +180,16 @@ export default async function ClientDetailPage({
 
           <main className="p-4 sm:p-5 space-y-4">
             <div className="flex items-center gap-5 text-sm border-b border-border pb-2 overflow-x-auto">
-              <a href="#overview" className="font-medium border-b-2 border-foreground pb-2 whitespace-nowrap">Overview</a>
-              <a href="#activity" className="text-muted-foreground hover:text-foreground whitespace-nowrap">Activity</a>
-              <a href="#intelligence" className="text-muted-foreground hover:text-foreground whitespace-nowrap">Intelligence</a>
-              <a href="#deals" className="text-muted-foreground hover:text-foreground whitespace-nowrap">Deals</a>
-              <a href="#notes" className="text-muted-foreground hover:text-foreground whitespace-nowrap">Notes</a>
-              {contact.email ? (
-                <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-foreground whitespace-nowrap">Emails</a>
-              ) : (
-                <span className="text-muted-foreground/50 whitespace-nowrap">Emails</span>
-              )}
+              <Link href={tabHref('overview')} className={`${activeTab === 'overview' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Overview</Link>
+              <Link href={tabHref('activity')} className={`${activeTab === 'activity' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Activity</Link>
+              <Link href={tabHref('intelligence')} className={`${activeTab === 'intelligence' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Intelligence</Link>
+              <Link href={tabHref('deals')} className={`${activeTab === 'deals' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Deals</Link>
+              <Link href={tabHref('notes')} className={`${activeTab === 'notes' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Notes</Link>
+              <Link href={tabHref('emails')} className={`${activeTab === 'emails' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Emails</Link>
             </div>
 
       {/* Smart follow-up suggestions */}
-      <div id="overview">
+      {activeTab === 'overview' && (
       <FollowUpSuggestions
         contactId={contact.id}
         scoreLabel={contact.scoreLabel}
@@ -196,11 +198,11 @@ export default async function ClientDetailPage({
         hasDeals={contact.dealContacts.length > 0}
         hasFollowUp={!!contact.followUpAt}
       />
-      </div>
+      )}
 
       {/* ── AI Lead Score Card ── */}
-      {contact.scoringStatus === 'scored' && contact.leadScore != null && (
-        <div id="intelligence" className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-primary/40">
+      {activeTab === 'intelligence' && contact.scoringStatus === 'scored' && contact.leadScore != null && (
+        <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-primary/40">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-primary" />
@@ -338,8 +340,8 @@ export default async function ClientDetailPage({
       )}
 
       {/* ── Unscored / failed — show score prompt ── */}
-      {(contact.scoringStatus === 'failed' || contact.scoringStatus === 'unscored' || (contact.scoringStatus !== 'scored' && contact.scoringStatus !== 'pending')) && (
-        <div id="intelligence" className="rounded-lg border border-border bg-card px-4 sm:px-6 py-5 flex items-center justify-between gap-4">
+      {activeTab === 'intelligence' && (contact.scoringStatus === 'failed' || contact.scoringStatus === 'unscored' || (contact.scoringStatus !== 'scored' && contact.scoringStatus !== 'pending')) && (
+        <div className="rounded-lg border border-border bg-card px-4 sm:px-6 py-5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Sparkles size={16} className="text-muted-foreground" />
             <div>
@@ -354,7 +356,7 @@ export default async function ClientDetailPage({
       )}
 
       {/* ── Application Details (rich structured data) ── */}
-      {app ? (
+      {activeTab === 'overview' && (app ? (
         <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-emerald-500/40">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Application details</h2>
@@ -537,10 +539,10 @@ export default async function ClientDetailPage({
             )}
           </div>
         </div>
-      )}
+      ))}
 
       {/* ── Consent Record ── */}
-      {contact.consentGiven != null && (
+      {activeTab === 'overview' && contact.consentGiven != null && (
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
             <ShieldCheck size={14} className="text-muted-foreground" />
@@ -597,8 +599,8 @@ export default async function ClientDetailPage({
       )}
 
       {/* Notes */}
-      {contact.notes && (
-        <div id="notes" className="rounded-lg border border-border bg-card overflow-hidden">
+      {activeTab === 'notes' && contact.notes && (
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="px-4 sm:px-6 py-4 border-b border-border">
             <h2 className="text-sm font-semibold flex items-center gap-2">
               <FileText size={14} className="text-muted-foreground" /> Notes
@@ -613,7 +615,7 @@ export default async function ClientDetailPage({
       )}
 
       {/* Additional notes from application */}
-      {app?.additionalNotes && (
+      {activeTab === 'notes' && app?.additionalNotes && (
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="px-4 sm:px-6 py-4 border-b border-border">
             <h2 className="text-sm font-semibold flex items-center gap-2">
@@ -629,7 +631,7 @@ export default async function ClientDetailPage({
       )}
 
       {/* Tags */}
-      {contact.tags.filter((t) => t !== 'application-link' && t !== 'new-lead').length > 0 && (
+      {activeTab === 'overview' && contact.tags.filter((t) => t !== 'application-link' && t !== 'new-lead').length > 0 && (
         <div className="rounded-lg border border-border bg-card px-4 sm:px-6 py-4">
           <p className="text-xs font-medium text-muted-foreground mb-2">Tags</p>
           <div className="flex flex-wrap gap-1.5">
@@ -645,12 +647,12 @@ export default async function ClientDetailPage({
       )}
 
       {/* Activity log */}
-      <div id="activity">
+      {activeTab === 'activity' && (
         <ContactActivityTab contactId={contact.id} contactCreatedAt={String(contact.createdAt)} />
-      </div>
+      )}
 
       {/* Tour history */}
-      {contact.tours.length > 0 && (
+      {activeTab === 'activity' && contact.tours.length > 0 && (
         <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-amber-500/40">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
             <CalendarDays size={14} className="text-amber-600 dark:text-amber-400" />
@@ -698,7 +700,8 @@ export default async function ClientDetailPage({
       )}
 
       {/* Associated deals */}
-      <div id="deals" className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-indigo-500/40">
+      {activeTab === 'deals' && (
+      <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-indigo-500/40">
         <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
           <Briefcase size={14} className="text-indigo-600 dark:text-indigo-400" />
           <h2 className="text-sm font-semibold">Associated deals</h2>
@@ -753,6 +756,29 @@ export default async function ClientDetailPage({
           )}
         </div>
       </div>
+      )}
+
+      {activeTab === 'emails' && (
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 border-b border-border">
+            <h2 className="text-sm font-semibold">Email</h2>
+          </div>
+          <div className="px-4 sm:px-6 py-4 space-y-3">
+            {contact.email ? (
+              <>
+                <p className="text-sm text-muted-foreground">Compose an email to this contact.</p>
+                <ComposeEmailDialog
+                  contactId={contact.id}
+                  contactName={contact.name}
+                  contactEmail={contact.email}
+                />
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">No email is available for this contact.</p>
+            )}
+          </div>
+        </div>
+      )}
           </main>
         </div>
       </div>
