@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
-import { Phone, Flame, Thermometer, Snowflake, HelpCircle } from 'lucide-react';
+import { Phone, Flame, Thermometer, Snowflake, HelpCircle, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import type { Contact } from '@/lib/types';
 import { LeadsView } from '@/components/leads/leads-view';
@@ -81,9 +81,10 @@ export default async function LeadsPage({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 max-w-[1320px]">
       {/* Page header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="rounded-xl border border-border bg-card px-4 py-3 sm:px-5 sm:py-4">
+        <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Leads</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -91,16 +92,17 @@ export default async function LeadsPage({
           </p>
         </div>
         {unreadLeads.length > 0 && (
-          <div className="flex items-center gap-1.5 text-sm text-primary font-medium bg-primary/8 rounded-md px-3 py-1 flex-shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+          <div className="flex items-center gap-1.5 text-sm text-orange-700 dark:text-orange-400 font-medium bg-orange-50 dark:bg-orange-500/10 rounded-md px-3 py-1 flex-shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-brand" />
             {unreadLeads.length} new
           </div>
         )}
       </div>
+      </div>
 
       {/* Tier summary bar */}
       {leads.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
             {leads.length} {leads.length === 1 ? 'application' : 'applications'}
           </span>
@@ -119,7 +121,7 @@ export default async function LeadsPage({
               </div>
             )}
             {tierCounts.cold > 0 && (
-              <div className="flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-400">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300">
                 <Snowflake size={13} />
                 {tierCounts.cold} cold
               </div>
@@ -147,7 +149,7 @@ export default async function LeadsPage({
             href={`/s/${slug}`}
             className="inline-flex items-center gap-1.5 mt-4 text-sm text-primary font-medium hover:underline underline-offset-2"
           >
-            Get your intake link →
+            Get your intake link <ArrowRight size={13} />
           </Link>
         </div>
       ) : (
