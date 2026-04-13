@@ -677,7 +677,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
               <div
                 key={lead.id}
                 className={cn(
-                  'rounded-lg border bg-card overflow-hidden transition-all duration-150 hover:shadow-md',
+                  'group rounded-lg border bg-card overflow-hidden transition-all duration-150 hover:shadow-md',
                   isSelected ? 'border-primary/40 bg-primary/5' :
                   tierKey === 'hot' ? 'border-red-200/80 dark:border-red-800/50' :
                   tierKey === 'warm' ? 'border-amber-200/80 dark:border-amber-800/50' :
@@ -719,7 +719,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                           </span>
                         )}
                         {isNew && (
-                          <span className="inline-flex text-[10px] font-bold text-primary bg-primary/10 rounded-md px-2 py-0.5 flex-shrink-0">
+                          <span className="inline-flex text-[10px] font-bold bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 rounded-md px-2 py-0.5 flex-shrink-0">
                             NEW
                           </span>
                         )}
@@ -982,7 +982,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                                 <span className="text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground">Rental</span>
                               )}
                               {isNew && (
-                                <span className="text-[10px] font-bold text-primary bg-primary/10 rounded-md px-1.5 py-0.5">NEW</span>
+                                <span className="text-[10px] font-bold bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 rounded-md px-1.5 py-0.5">NEW</span>
                               )}
                             </div>
                           </div>

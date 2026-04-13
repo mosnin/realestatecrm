@@ -105,10 +105,10 @@ export type TierKey = keyof typeof LEAD_TIERS;
 export const ACTIVITY_META = {
   note:         { label: 'Note',          icon: FileText,     color: 'text-muted-foreground bg-muted' },
   call:         { label: 'Call',          icon: Phone,        color: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/10' },
-  email:        { label: 'Email',         icon: Mail,         color: 'text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-500/10' },
+  email:        { label: 'Email',         icon: Mail,         color: 'text-orange-700 bg-orange-50 dark:text-orange-400 dark:bg-orange-500/10' },
   meeting:      { label: 'Meeting',       icon: Calendar,     color: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10' },
   follow_up:    { label: 'Follow-up',     icon: MessageSquare,color: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10' },
-  stage_change: { label: 'Stage change',  icon: Activity,     color: 'text-indigo-700 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-500/10' },
+  stage_change: { label: 'Stage change',  icon: Activity,     color: 'text-muted-foreground bg-muted' },
   status_change:{ label: 'Status change', icon: CheckCircle2, color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-500/10' },
 } as const;
 
