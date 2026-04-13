@@ -187,7 +187,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
   const [tierFilter, setTierFilterState] = useState<TierFilter>(isValidTierFilter(paramTier) ? paramTier : 'all');
   const [leadTypeFilter, setLeadTypeFilterState] = useState<LeadTypeFilter>(isValidLeadType(paramType) ? paramType : 'all');
   const [sort, setSortState] = useState<SortKey>(isValidSort(paramSort) ? paramSort : 'newest');
-  const [view, setViewState] = useState<ViewMode>(isValidView(paramView) ? paramView : 'card');
+  const [view, setViewState] = useState<ViewMode>(isValidView(paramView) ? paramView : 'list');
   const [search, setSearch] = useState(paramSearch ?? '');
   const [convertTarget, setConvertTarget] = useState<Contact | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -209,7 +209,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
     setTierFilterState(isValidTierFilter(newTier) ? newTier : 'all');
     setLeadTypeFilterState(isValidLeadType(newType) ? newType : 'all');
     setSortState(isValidSort(newSort) ? newSort : 'newest');
-    setViewState(isValidView(newView) ? newView : 'card');
+    setViewState(isValidView(newView) ? newView : 'list');
     setSearch(newSearch ?? '');
   }, [searchParamsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -217,7 +217,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
   const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
     for (const [key, val] of Object.entries(updates)) {
-      if (val == null || val === '' || val === 'all' || (key === 'sort' && val === 'newest') || (key === 'view' && val === 'card')) {
+      if (val == null || val === '' || val === 'all' || (key === 'sort' && val === 'newest') || (key === 'view' && val === 'list')) {
         params.delete(key);
       } else {
         params.set(key, val);
@@ -701,7 +701,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Link
-                          href={`/s/${slug}/contacts/${lead.id}`}
+                          href={`/s/${slug}/leads/${lead.id}`}
                           className="font-semibold text-[15px] leading-tight hover:text-foreground transition-colors"
                         >
                           {lead.name}
@@ -772,14 +772,22 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                   </div>
 
                   {/* Convert button */}
-                  <button
-                    type="button"
-                    onClick={() => setConvertTarget(lead)}
-                    className="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:border-border rounded-lg px-2.5 py-1.5 transition-colors"
-                  >
-                    <UserCheck size={12} />
-                    <span className="hidden sm:inline">Convert</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setConvertTarget(lead)}
+                      className="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:border-border rounded-lg px-2.5 py-1.5 transition-colors"
+                    >
+                      <UserCheck size={12} />
+                      <span className="hidden sm:inline">Convert</span>
+                    </button>
+                    <Link
+                      href={`/s/${slug}/leads/${lead.id}`}
+                      className="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg px-2.5 py-1.5 transition-colors"
+                    >
+                      Open
+                    </Link>
+                  </div>
                 </div>
 
                 {/* Score hero */}
@@ -969,7 +977,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <Link href={`/s/${slug}/contacts/${lead.id}`} className="flex items-center gap-3">
+                        <Link href={`/s/${slug}/leads/${lead.id}`} className="flex items-center gap-3">
                           <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
                             {getInitials(lead.name)}
                           </div>
@@ -1034,14 +1042,19 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
                         </label>
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => setConvertTarget(lead)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-medium"
-                        >
-                          <UserCheck size={12} />
-                          Convert
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setConvertTarget(lead)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-medium"
+                          >
+                            <UserCheck size={12} />
+                            Convert
+                          </button>
+                          <Link href={`/s/${slug}/leads/${lead.id}`} className="text-xs text-muted-foreground hover:text-foreground font-medium">
+                            Open
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );

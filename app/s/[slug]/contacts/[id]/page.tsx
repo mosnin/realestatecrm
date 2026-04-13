@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Mail,
   Phone,
-  FileText,
   ExternalLink,
   Briefcase,
   AlertTriangle,
@@ -24,7 +23,6 @@ import {
 } from 'lucide-react';
 import type { Contact, ApplicationData, LeadScoreDetails, IntakeFormConfig } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
-import { ComposeEmailDialog } from '@/components/contacts/compose-email-dialog';
 import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-field';
 import { FollowUpSuggestions } from '@/components/contacts/follow-up-suggestions';
 import { StageProgression } from '@/components/contacts/stage-progression';
@@ -46,10 +44,13 @@ function tierBadgeClasses(label: string) {
 
 export default async function ClientDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string; id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { slug, id } = await params;
+  const { tab } = await searchParams;
 
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
@@ -103,109 +104,88 @@ export default async function ClientDetailPage({
   const app = contact.applicationData as ApplicationData | null;
   const details = contact.scoreDetails as LeadScoreDetails | null;
   const formSnapshot = contact.formConfigSnapshot as IntakeFormConfig | null;
+  const activeTab = (tab === 'overview' || tab === 'activity' || tab === 'intelligence' || tab === 'deals')
+    ? tab
+    : 'overview';
+  const tabHref = (key: string) => `/s/${slug}/contacts/${contact.id}?tab=${key}`;
 
   return (
-    <div className="max-w-4xl space-y-5">
-      {/* Back nav */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-muted-foreground">
-          <Link href={`/s/${slug}/contacts`}>
-            <ArrowLeft size={16} />
-          </Link>
-        </Button>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href={`/s/${slug}/contacts`} className="hover:text-foreground transition-colors">
-            Clients
-          </Link>
-          <span>/</span>
-          <span className="text-foreground font-medium">{contact.name}</span>
-        </div>
-      </div>
-
-      {/* Profile header card */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
-        {/* Identity section */}
-        <div className="px-4 py-4 sm:px-6 sm:py-5">
-          <div className="flex items-start gap-3 sm:gap-4">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-primary/10 flex items-center justify-center text-lg sm:text-xl font-bold text-primary flex-shrink-0">
-              {getInitials(contact.name)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg sm:text-xl font-semibold tracking-tight">{contact.name}</h1>
-                {contact.sourceLabel && (
-                  <span className="inline-flex items-center text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted">
-                    {contact.sourceLabel}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-3 mt-2 flex-wrap">
-                <StageProgression contactId={contact.id} currentType={contact.type} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Added {new Date(contact.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-              </p>
-            </div>
+    <div className="space-y-4 max-w-[1400px]">
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm">
+            <Link href={`/s/${slug}/contacts`} className="text-muted-foreground hover:text-foreground">Contacts</Link>
+            <span className="text-muted-foreground">/</span>
+            <span className="font-semibold">{contact.name}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/s/${slug}/contacts`}>
+                <ArrowLeft size={14} className="mr-1" /> Back
+              </Link>
+            </Button>
+            <Button size="sm" asChild>
+              <Link href={`/s/${slug}/deals`}>Create Deal</Link>
+            </Button>
           </div>
         </div>
 
-        {/* Contact info + follow-up row */}
-        <div className="px-4 sm:px-6 py-3 border-t border-border bg-muted/30">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            {contact.phone && (
-              <a
-                href={`tel:${contact.phone}`}
-                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-card border border-border hover:bg-muted/80 transition-colors text-foreground"
-              >
-                <Phone size={14} className="text-muted-foreground" />
-                {contact.phone}
-              </a>
-            )}
-            {contact.email && (
-              <a
-                href={`mailto:${contact.email}`}
-                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-card border border-border hover:bg-muted/80 transition-colors text-foreground truncate max-w-[280px]"
-              >
-                <Mail size={14} className="text-muted-foreground flex-shrink-0" />
-                <span className="truncate">{contact.email}</span>
-              </a>
-            )}
-            {contact.email && (
-              <ComposeEmailDialog
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="border-b lg:border-b-0 lg:border-r border-border p-4 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-lg font-bold text-primary flex-shrink-0">
+                {getInitials(contact.name)}
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl font-semibold leading-tight truncate">{contact.name}</h1>
+                <p className="text-sm text-muted-foreground truncate">{contact.sourceLabel ?? 'Intake lead'}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Added {new Date(contact.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Link href={`/s/${slug}/tours?schedule=${contact.id}`} className="inline-flex items-center justify-center gap-1 text-xs rounded-md border border-border py-2 hover:bg-muted transition-colors"><CalendarPlus size={12} /> Task</Link>
+              <Link href={`/s/${slug}/deals`} className="inline-flex items-center justify-center gap-1 text-xs rounded-md border border-border py-2 hover:bg-muted transition-colors"><Briefcase size={12} /> Deal</Link>
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-border p-3">
+              <p className="text-sm font-semibold">Contact details</p>
+              {contact.email && (
+                <a href={`mailto:${contact.email}`} className="block text-sm text-primary hover:underline break-all">{contact.email}</a>
+              )}
+              {contact.phone && (
+                <a href={`tel:${contact.phone}`} className="block text-sm text-primary hover:underline">{contact.phone}</a>
+              )}
+              {contact.address && <p className="text-sm text-muted-foreground">{contact.address}</p>}
+              <ContactFollowUpField
                 contactId={contact.id}
-                contactName={contact.name}
-                contactEmail={contact.email}
+                followUpAt={contact.followUpAt ? String(contact.followUpAt) : null}
+                lastContactedAt={contact.lastContactedAt ? String(contact.lastContactedAt) : null}
               />
-            )}
-            <div className="w-px h-5 bg-border hidden sm:block" />
-            <ContactFollowUpField
-              contactId={contact.id}
-              followUpAt={contact.followUpAt ? String(contact.followUpAt) : null}
-              lastContactedAt={contact.lastContactedAt ? String(contact.lastContactedAt) : null}
-            />
-          </div>
-        </div>
+            </div>
 
-        {/* Quick actions */}
-        <div className="px-4 sm:px-6 py-3 border-t border-border flex flex-wrap gap-2">
-          <Link
-            href={`/s/${slug}/tours?schedule=${contact.id}`}
-            className="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg border border-border hover:bg-accent transition-colors"
-          >
-            <CalendarPlus size={13} />
-            Schedule Tour
-          </Link>
-          <Link
-            href={`/s/${slug}/deals`}
-            className="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg border border-border hover:bg-accent transition-colors"
-          >
-            <Briefcase size={13} />
-            Create Deal
-          </Link>
-        </div>
-      </div>
+            <div className="space-y-2 rounded-lg border border-border p-3">
+              <p className="text-sm font-semibold">Pipeline stage</p>
+              <div className="max-w-full overflow-x-auto pb-1">
+                <div className="min-w-max">
+                  <StageProgression contactId={contact.id} currentType={contact.type} />
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <main className="p-4 sm:p-5 space-y-4">
+            <div className="flex items-center gap-5 text-sm border-b border-border pb-2 overflow-x-auto">
+              <Link href={tabHref('overview')} className={`${activeTab === 'overview' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Overview</Link>
+              <Link href={tabHref('activity')} className={`${activeTab === 'activity' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Activity</Link>
+              <Link href={tabHref('intelligence')} className={`${activeTab === 'intelligence' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Intelligence</Link>
+              <Link href={tabHref('deals')} className={`${activeTab === 'deals' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Deals</Link>
+            </div>
 
       {/* Smart follow-up suggestions */}
+      {activeTab === 'overview' && (
       <FollowUpSuggestions
         contactId={contact.id}
         scoreLabel={contact.scoreLabel}
@@ -214,9 +194,10 @@ export default async function ClientDetailPage({
         hasDeals={contact.dealContacts.length > 0}
         hasFollowUp={!!contact.followUpAt}
       />
+      )}
 
       {/* ── AI Lead Score Card ── */}
-      {contact.scoringStatus === 'scored' && contact.leadScore != null && (
+      {activeTab === 'intelligence' && contact.scoringStatus === 'scored' && contact.leadScore != null && (
         <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-primary/40">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -355,7 +336,7 @@ export default async function ClientDetailPage({
       )}
 
       {/* ── Unscored / failed — show score prompt ── */}
-      {(contact.scoringStatus === 'failed' || contact.scoringStatus === 'unscored' || (contact.scoringStatus !== 'scored' && contact.scoringStatus !== 'pending')) && (
+      {activeTab === 'intelligence' && (contact.scoringStatus === 'failed' || contact.scoringStatus === 'unscored' || (contact.scoringStatus !== 'scored' && contact.scoringStatus !== 'pending')) && (
         <div className="rounded-lg border border-border bg-card px-4 sm:px-6 py-5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Sparkles size={16} className="text-muted-foreground" />
@@ -371,7 +352,7 @@ export default async function ClientDetailPage({
       )}
 
       {/* ── Application Details (rich structured data) ── */}
-      {app ? (
+      {activeTab === 'overview' && (app ? (
         <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-emerald-500/40">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Application details</h2>
@@ -554,10 +535,10 @@ export default async function ClientDetailPage({
             )}
           </div>
         </div>
-      )}
+      ))}
 
       {/* ── Consent Record ── */}
-      {contact.consentGiven != null && (
+      {activeTab === 'overview' && contact.consentGiven != null && (
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
             <ShieldCheck size={14} className="text-muted-foreground" />
@@ -613,40 +594,8 @@ export default async function ClientDetailPage({
         </div>
       )}
 
-      {/* Notes */}
-      {contact.notes && (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-border">
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <FileText size={14} className="text-muted-foreground" /> Notes
-            </h2>
-          </div>
-          <div className="px-4 sm:px-6 py-4">
-            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-              {contact.notes}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Additional notes from application */}
-      {app?.additionalNotes && (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-border">
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <FileText size={14} className="text-muted-foreground" /> Applicant notes
-            </h2>
-          </div>
-          <div className="px-4 sm:px-6 py-4">
-            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-              {app.additionalNotes}
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Tags */}
-      {contact.tags.filter((t) => t !== 'application-link' && t !== 'new-lead').length > 0 && (
+      {activeTab === 'overview' && contact.tags.filter((t) => t !== 'application-link' && t !== 'new-lead').length > 0 && (
         <div className="rounded-lg border border-border bg-card px-4 sm:px-6 py-4">
           <p className="text-xs font-medium text-muted-foreground mb-2">Tags</p>
           <div className="flex flex-wrap gap-1.5">
@@ -662,10 +611,12 @@ export default async function ClientDetailPage({
       )}
 
       {/* Activity log */}
-      <ContactActivityTab contactId={contact.id} contactCreatedAt={String(contact.createdAt)} />
+      {activeTab === 'activity' && (
+        <ContactActivityTab contactId={contact.id} contactCreatedAt={String(contact.createdAt)} />
+      )}
 
       {/* Tour history */}
-      {contact.tours.length > 0 && (
+      {activeTab === 'activity' && contact.tours.length > 0 && (
         <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-amber-500/40">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
             <CalendarDays size={14} className="text-amber-600 dark:text-amber-400" />
@@ -713,6 +664,7 @@ export default async function ClientDetailPage({
       )}
 
       {/* Associated deals */}
+      {activeTab === 'deals' && (
       <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-indigo-500/40">
         <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
           <Briefcase size={14} className="text-indigo-600 dark:text-indigo-400" />
@@ -766,6 +718,11 @@ export default async function ClientDetailPage({
               ))}
             </div>
           )}
+        </div>
+      </div>
+      )}
+
+          </main>
         </div>
       </div>
     </div>
