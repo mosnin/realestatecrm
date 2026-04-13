@@ -33,6 +33,7 @@ import { ApplicationStatusManager } from '@/components/contacts/application-stat
 import { PdfExportButton } from '@/components/contacts/pdf-export-button';
 import { CollapsibleSection } from '@/components/contacts/collapsible-section';
 import { DynamicApplicationDisplay } from '@/components/contacts/dynamic-application-display';
+import { ClientNotesEditor } from '@/components/contacts/client-notes-editor';
 import { getInitials, formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug } from '@/lib/space';
 
@@ -597,19 +598,8 @@ export default async function ClientDetailPage({
       )}
 
       {/* Notes */}
-      {activeTab === 'notes' && contact.notes && (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-border">
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <FileText size={14} className="text-muted-foreground" /> Notes
-            </h2>
-          </div>
-          <div className="px-4 sm:px-6 py-4">
-            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-              {contact.notes}
-            </p>
-          </div>
-        </div>
+      {activeTab === 'notes' && (
+        <ClientNotesEditor contactId={contact.id} initialNotes={contact.notes ?? null} />
       )}
 
       {/* Additional notes from application */}
@@ -627,11 +617,10 @@ export default async function ClientDetailPage({
           </div>
         </div>
       )}
-      {activeTab === 'notes' && !contact.notes && !app?.additionalNotes && (
-        <div className="rounded-lg border border-dashed border-border bg-card px-4 sm:px-6 py-10 text-center">
-          <p className="text-sm font-medium text-foreground">No notes yet</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Notes from your team or from the application will appear here.
+      {activeTab === 'notes' && !app?.additionalNotes && (
+        <div className="rounded-lg border border-dashed border-border bg-card px-4 sm:px-6 py-6 text-center">
+          <p className="text-xs text-muted-foreground">
+            No applicant-submitted notes yet.
           </p>
         </div>
       )}
