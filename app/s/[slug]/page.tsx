@@ -109,12 +109,12 @@ export default async function DashboardPage({
   const bookingUrl = intakeUrl.replace('/apply/', '/book/');
 
   const stats = [
-    { label: 'New leads',    value: newLeadCount,      sub: 'unread',                                             icon: PhoneIncoming, accent: newLeadCount > 0,      dotCls: 'bg-brand',             href: `/s/${slug}/leads` },
-    { label: 'Total leads',  value: totalLeads,         sub: 'total',                                              icon: TrendingUp,    accent: false,                 dotCls: '',                     href: `/s/${slug}/leads` },
-    { label: 'Clients',      value: contactCount,       sub: 'in CRM',                                             icon: Users,         accent: false,                 dotCls: '',                     href: `/s/${slug}/contacts` },
-    { label: 'Active deals', value: dealCount,          sub: formatCurrency(totalValue),                           icon: Briefcase,     accent: false,                 dotCls: '',                     href: `/s/${slug}/deals` },
-    { label: 'Tours',        value: upcomingTourCount,  sub: upcomingTourCount > 0 ? 'scheduled' : 'none',        icon: CalendarDays,  accent: upcomingTourCount > 0, dotCls: 'bg-muted-foreground',  href: `/s/${slug}/tours` },
-    { label: 'Follow-ups',   value: followUpDue,        sub: followUpDue > 0 ? 'due now' : 'all clear',           icon: AlertCircle,   accent: followUpDue > 0,       dotCls: 'bg-destructive',       href: `/s/${slug}/follow-ups` },
+    { label: 'New leads',    value: newLeadCount,      sub: 'unread',                                             icon: PhoneIncoming, accent: newLeadCount > 0,      dotCls: 'bg-brand',             accentCardCls: newLeadCount > 0      ? 'bg-orange-50/60 dark:bg-orange-500/5 border-orange-200/60 dark:border-orange-500/20' : '', href: `/s/${slug}/leads` },
+    { label: 'Total leads',  value: totalLeads,         sub: 'total',                                              icon: TrendingUp,    accent: false,                 dotCls: '',                     accentCardCls: '',                                                                                                                      href: `/s/${slug}/leads` },
+    { label: 'Clients',      value: contactCount,       sub: 'in CRM',                                             icon: Users,         accent: false,                 dotCls: '',                     accentCardCls: '',                                                                                                                      href: `/s/${slug}/contacts` },
+    { label: 'Active deals', value: dealCount,          sub: formatCurrency(totalValue),                           icon: Briefcase,     accent: false,                 dotCls: '',                     accentCardCls: '',                                                                                                                      href: `/s/${slug}/deals` },
+    { label: 'Tours',        value: upcomingTourCount,  sub: upcomingTourCount > 0 ? 'scheduled' : 'none',        icon: CalendarDays,  accent: upcomingTourCount > 0, dotCls: 'bg-muted-foreground',  accentCardCls: '',                                                                                                                      href: `/s/${slug}/tours` },
+    { label: 'Follow-ups',   value: followUpDue,        sub: followUpDue > 0 ? 'due now' : 'all clear',           icon: AlertCircle,   accent: followUpDue > 0,       dotCls: 'bg-destructive',       accentCardCls: followUpDue > 0       ? 'bg-red-50/60 dark:bg-red-500/5 border-red-200/60 dark:border-red-500/20'       : '', href: `/s/${slug}/follow-ups` },
   ];
 
   return (
@@ -165,9 +165,9 @@ export default async function DashboardPage({
             Desktop: row 1, cols 1–12 (full width)                         */}
         <div className="order-2 lg:col-span-12 lg:row-start-1">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-            {stats.map(({ label, value, sub, icon: Icon, accent, dotCls, href }) => (
+            {stats.map(({ label, value, sub, icon: Icon, accent, dotCls, accentCardCls, href }) => (
               <Link key={label} href={href}>
-                <Card className="transition-colors hover:border-foreground/20 hover:bg-muted/30">
+                <Card className={`transition-colors hover:border-foreground/20 hover:bg-muted/30 ${accentCardCls}`}>
                   <CardContent className="p-3">
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-muted">
@@ -202,9 +202,9 @@ export default async function DashboardPage({
           </div>
           {recentLeads.length === 0 ? (
             <Card>
-              <CardContent className="p-8 text-center">
-                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
-                  <PhoneIncoming size={20} className="text-muted-foreground" />
+              <CardContent className="p-6 text-center">
+                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center mx-auto mb-2">
+                  <PhoneIncoming size={18} className="text-muted-foreground" />
                 </div>
                 <p className="text-sm font-medium text-foreground">No applications yet</p>
                 <p className="text-xs text-muted-foreground mt-1 max-w-[240px] mx-auto">

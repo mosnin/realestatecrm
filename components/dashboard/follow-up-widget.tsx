@@ -141,7 +141,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
               <div
                 key={contact.id}
                 className={cn(
-                  'flex items-center gap-3 px-5 py-3 transition-opacity',
+                  'flex items-center gap-3 px-4 py-3 transition-opacity',
                   isBusy && 'opacity-50'
                 )}
               >
@@ -245,7 +245,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
           })}
 
           {/* View all link */}
-          <div className="px-5 py-2.5">
+          <div className="px-4 py-2.5">
             <Link
               href={`/s/${slug}/follow-ups`}
               className="block w-full text-center text-xs font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
