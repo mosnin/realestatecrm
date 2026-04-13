@@ -130,7 +130,7 @@ export default async function DashboardPage({
   if (upcomingTourCount > 0) statusSegments.push({ label: `${upcomingTourCount} upcoming tour${upcomingTourCount === 1 ? '' : 's'}`, href: `/s/${slug}/tours`, tone: 'muted' });
 
   return (
-    <div className="space-y-4 max-w-[1200px]">
+    <div className="space-y-3 max-w-[1320px]">
 
       {/* ── Top strip — greeting + secondary status + primary CTA ──────────
           One explicit primary action ("View leads"). Status segments are
@@ -180,24 +180,24 @@ export default async function DashboardPage({
       </header>
 
       {/* ── Cockpit shell: desktop row2 (3-col) + row3 (2-col) ─────────── */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:gap-4">
+      <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-12 lg:gap-3 items-stretch">
 
         {/* ── Center hero canvas — Follow-ups due (dominant) ───────────── */}
-        <section className="order-1 lg:col-span-7 lg:col-start-3 lg:row-start-1" aria-label="Priority queue">
+        <section className="order-1 lg:col-span-7 lg:col-start-3 lg:row-start-1 h-full" aria-label="Priority queue">
           <SectionLabel>Follow-ups due</SectionLabel>
-          <div className="rounded-xl border border-border/80 bg-card p-0.5">
+          <div className="rounded-xl border border-border/80 bg-card p-0.5 h-full">
             <FollowUpWidget slug={slug} contacts={followUpContacts} />
           </div>
         </section>
 
         {/* ── Left compact metric stack (replaces wide KPI slab) ───────── */}
-        <section className="order-3 lg:col-span-2 lg:col-start-1 lg:row-start-1" aria-label="Key metrics">
+        <section className="order-3 lg:col-span-2 lg:col-start-1 lg:row-start-1 h-full" aria-label="Key metrics">
           <SectionLabel>At a glance</SectionLabel>
-          <div className="space-y-2">
+          <div className="space-y-1.5 h-full">
             {stats.slice(0, 4).map(({ label, value, sub, accent, dotCls, href }) => (
               <Link key={label} href={href} className="group block">
                 <Card className="border-border/80 transition-colors group-hover:bg-muted/30">
-                  <CardContent className="px-2.5 py-2">
+                  <CardContent className="px-2.5 py-1.5">
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                         {label}
@@ -216,7 +216,7 @@ export default async function DashboardPage({
         </section>
 
         {/* ── Right compact rail ────────────────────────────────────────── */}
-        <div className="order-5 lg:col-span-3 lg:col-start-10 lg:row-start-1 space-y-3">
+        <div className="order-5 lg:col-span-3 lg:col-start-10 lg:row-start-1 space-y-2.5 h-full">
           <section aria-label="Pipeline snapshot">
           <SectionLabel
             trailing={
@@ -230,8 +230,8 @@ export default async function DashboardPage({
           >
             Pipeline
           </SectionLabel>
-          <Card>
-            <CardContent className="p-3">
+          <Card className="h-full">
+            <CardContent className="p-2.5">
               {dealsByStage.length === 0 ? (
                 <div className="py-3">
                   <div className="flex items-center gap-2.5">
@@ -247,7 +247,7 @@ export default async function DashboardPage({
                   </div>
                 </div>
               ) : (
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   {dealsByStage.map((stage) => (
                     <div key={stage.id} className="space-y-1">
                       <div className="flex items-center justify-between gap-2">
@@ -276,7 +276,7 @@ export default async function DashboardPage({
                       </div>
                     </div>
                   ))}
-                  <div className="border-t border-border pt-2.5 flex items-center justify-between">
+                  <div className="border-t border-border pt-2 flex items-center justify-between">
                     <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</span>
                     <span className="text-sm font-semibold tabular-nums">{formatCurrency(totalValue)}</span>
                   </div>
@@ -301,7 +301,7 @@ export default async function DashboardPage({
             </SectionLabel>
             {upcomingTours.length === 0 ? (
               <Card>
-                <CardContent className="py-4 px-3.5">
+                <CardContent className="py-3 px-3">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
                       <CalendarDays size={14} className="text-muted-foreground" />
@@ -322,7 +322,7 @@ export default async function DashboardPage({
                     const d = new Date(tour.startsAt);
                     return (
                       <Link key={tour.id} href={`/s/${slug}/tours`} className="block">
-                        <div className="flex items-center gap-2.5 px-3 py-2 hover:bg-muted/40 transition-colors">
+                        <div className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-muted/40 transition-colors">
                           <div className="w-9 h-9 rounded-md bg-muted border border-border flex flex-col items-center justify-center flex-shrink-0">
                             <span className="text-[9px] font-semibold text-muted-foreground uppercase leading-none">
                               {d.toLocaleDateString([], { month: 'short' })}
@@ -356,7 +356,7 @@ export default async function DashboardPage({
           </section>
         </div>
 
-        <section className="order-2 lg:col-span-9 lg:col-start-1 lg:row-start-2" aria-label="Recent applications">
+        <section className="order-2 lg:col-span-9 lg:col-start-1 lg:row-start-2 h-full" aria-label="Recent applications">
           <SectionLabel
             trailing={
               <Link
@@ -371,7 +371,7 @@ export default async function DashboardPage({
           </SectionLabel>
           {recentLeads.length === 0 ? (
             <Card>
-              <CardContent className="py-5 px-4">
+              <CardContent className="py-4 px-4">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                     <PhoneIncoming size={16} className="text-muted-foreground" />
@@ -394,7 +394,7 @@ export default async function DashboardPage({
               </CardContent>
             </Card>
           ) : (
-            <Card>
+            <Card className="h-full">
               <div className="divide-y divide-border">
                 {recentLeads.map((lead) => {
                   const isNew = lead.tags.includes('new-lead');
@@ -461,9 +461,9 @@ export default async function DashboardPage({
           )}
         </section>
 
-        <section className="order-7 lg:col-span-3 lg:col-start-10 lg:row-start-2" aria-label="Tools">
+        <section className="order-7 lg:col-span-3 lg:col-start-10 lg:row-start-2 h-full" aria-label="Tools">
           <SectionLabel>Utilities</SectionLabel>
-          <Card>
+          <Card className="h-full">
             <div className="grid grid-cols-1 divide-y divide-border">
               <ToolRow
                 icon={Link2}
