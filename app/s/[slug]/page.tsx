@@ -183,7 +183,7 @@ export default async function DashboardPage({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-5">
 
         {/* ── Center hero canvas — Follow-ups due (dominant) ───────────── */}
-        <section className="order-1 lg:col-span-7 lg:row-start-1" aria-label="Priority queue">
+        <section className="order-1 lg:col-span-7 lg:col-start-3 lg:row-start-1" aria-label="Priority queue">
           <SectionLabel>Follow-ups due</SectionLabel>
           <div className="rounded-xl border border-border/80 bg-card p-1">
             <FollowUpWidget slug={slug} contacts={followUpContacts} />
@@ -191,7 +191,7 @@ export default async function DashboardPage({
         </section>
 
         {/* ── Left compact metric stack (replaces wide KPI slab) ───────── */}
-        <section className="order-3 lg:col-span-2 lg:row-start-1" aria-label="Key metrics">
+        <section className="order-3 lg:col-span-2 lg:col-start-1 lg:row-start-1" aria-label="Key metrics">
           <SectionLabel>At a glance</SectionLabel>
           <div className="space-y-2.5">
             {stats.slice(0, 4).map(({ label, value, sub, accent, dotCls, href }) => (
@@ -216,7 +216,7 @@ export default async function DashboardPage({
         </section>
 
         {/* ── Right compact rail ────────────────────────────────────────── */}
-        <div className="order-5 lg:col-span-3 lg:row-start-1 space-y-4">
+        <div className="order-5 lg:col-span-3 lg:col-start-10 lg:row-start-1 space-y-4">
           <section aria-label="Pipeline snapshot">
           <SectionLabel
             trailing={
@@ -356,7 +356,7 @@ export default async function DashboardPage({
           </section>
         </div>
 
-        <section className="order-2 lg:col-span-8 lg:row-start-2" aria-label="Recent applications">
+        <section className="order-2 lg:col-span-9 lg:col-start-1 lg:row-start-2" aria-label="Recent applications">
           <SectionLabel
             trailing={
               <Link
@@ -461,7 +461,7 @@ export default async function DashboardPage({
           )}
         </section>
 
-        <section className="order-7 lg:col-span-4 lg:row-start-2" aria-label="Tools">
+        <section className="order-7 lg:col-span-3 lg:col-start-10 lg:row-start-2" aria-label="Tools">
           <SectionLabel>Utilities</SectionLabel>
           <Card>
             <div className="grid grid-cols-1 divide-y divide-border">
