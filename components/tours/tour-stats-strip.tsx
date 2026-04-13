@@ -66,10 +66,10 @@ export function TourStatsStrip({ tours }: TourStatsStripProps) {
   const stats = computeStats(tours);
 
   const items = [
-    { label: 'This Week', value: String(stats.toursThisWeek), icon: CalendarDays, color: 'text-blue-500' },
+    { label: 'This Week', value: String(stats.toursThisWeek), icon: CalendarDays, color: 'text-orange-500' },
     { label: 'Conversion', value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-emerald-500' },
     { label: 'No-Show', value: `${stats.noShowRate}%`, icon: UserX, color: stats.noShowRate > 20 ? 'text-red-500' : 'text-amber-500' },
-    { label: 'Lead Time', value: stats.avgConfirmTime, icon: Clock, color: 'text-purple-500' },
+    { label: 'Lead Time', value: stats.avgConfirmTime, icon: Clock, color: 'text-muted-foreground' },
   ];
 
   return (

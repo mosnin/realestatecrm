@@ -295,7 +295,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search by guest, email, phone, or address…"
-          className="h-9 w-full rounded-lg border border-border bg-muted/60 pl-9 pr-8 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background transition-colors"
+          className="h-9 w-full rounded-lg border border-border bg-muted/60 pl-9 pr-8 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:bg-background transition-colors"
         />
         {searchQuery && (
           <button
