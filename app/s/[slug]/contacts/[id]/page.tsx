@@ -24,7 +24,6 @@ import {
 } from 'lucide-react';
 import type { Contact, ApplicationData, LeadScoreDetails, IntakeFormConfig } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
-import { ComposeEmailDialog } from '@/components/contacts/compose-email-dialog';
 import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-field';
 import { FollowUpSuggestions } from '@/components/contacts/follow-up-suggestions';
 import { StageProgression } from '@/components/contacts/stage-progression';
@@ -106,7 +105,7 @@ export default async function ClientDetailPage({
   const app = contact.applicationData as ApplicationData | null;
   const details = contact.scoreDetails as LeadScoreDetails | null;
   const formSnapshot = contact.formConfigSnapshot as IntakeFormConfig | null;
-  const activeTab = (tab === 'overview' || tab === 'activity' || tab === 'intelligence' || tab === 'deals' || tab === 'notes' || tab === 'emails')
+  const activeTab = (tab === 'overview' || tab === 'activity' || tab === 'intelligence' || tab === 'deals' || tab === 'notes')
     ? tab
     : 'overview';
   const tabHref = (key: string) => `/s/${slug}/contacts/${contact.id}?tab=${key}`;
@@ -185,7 +184,6 @@ export default async function ClientDetailPage({
               <Link href={tabHref('intelligence')} className={`${activeTab === 'intelligence' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Intelligence</Link>
               <Link href={tabHref('deals')} className={`${activeTab === 'deals' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Deals</Link>
               <Link href={tabHref('notes')} className={`${activeTab === 'notes' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Notes</Link>
-              <Link href={tabHref('emails')} className={`${activeTab === 'emails' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Emails</Link>
             </div>
 
       {/* Smart follow-up suggestions */}
@@ -629,6 +627,14 @@ export default async function ClientDetailPage({
           </div>
         </div>
       )}
+      {activeTab === 'notes' && !contact.notes && !app?.additionalNotes && (
+        <div className="rounded-lg border border-dashed border-border bg-card px-4 sm:px-6 py-10 text-center">
+          <p className="text-sm font-medium text-foreground">No notes yet</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Notes from your team or from the application will appear here.
+          </p>
+        </div>
+      )}
 
       {/* Tags */}
       {activeTab === 'overview' && contact.tags.filter((t) => t !== 'application-link' && t !== 'new-lead').length > 0 && (
@@ -758,27 +764,6 @@ export default async function ClientDetailPage({
       </div>
       )}
 
-      {activeTab === 'emails' && (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-border">
-            <h2 className="text-sm font-semibold">Email</h2>
-          </div>
-          <div className="px-4 sm:px-6 py-4 space-y-3">
-            {contact.email ? (
-              <>
-                <p className="text-sm text-muted-foreground">Compose an email to this contact.</p>
-                <ComposeEmailDialog
-                  contactId={contact.id}
-                  contactName={contact.name}
-                  contactEmail={contact.email}
-                />
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">No email is available for this contact.</p>
-            )}
-          </div>
-        </div>
-      )}
           </main>
         </div>
       </div>
