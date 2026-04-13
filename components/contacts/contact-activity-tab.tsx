@@ -36,9 +36,9 @@ const SYSTEM_META: Record<string, { label: string; icon: typeof CalendarDays; co
   tour_completed: { label: 'Tour completed', icon: CalendarDays, color: 'text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-slate-500/10' },
   tour_cancelled: { label: 'Tour cancelled', icon: CalendarDays, color: 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/10' },
   tour_no_show: { label: 'No-show', icon: CalendarDays, color: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10' },
-  deal_created: { label: 'Deal created', icon: Briefcase, color: 'text-indigo-700 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-500/10' },
+  deal_created: { label: 'Deal created', icon: Briefcase, color: 'text-muted-foreground bg-muted' },
   contact_created: { label: 'Contact added', icon: UserPlus, color: 'text-muted-foreground bg-muted' },
-  stage_change: { label: 'Stage change', icon: ArrowRight, color: 'text-indigo-700 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-500/10' },
+  stage_change: { label: 'Stage change', icon: ArrowRight, color: 'text-muted-foreground bg-muted' },
   status_change: { label: 'Status change', icon: FileText, color: 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-500/10' },
 };
 
