@@ -913,6 +913,13 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
         );
         const hasCandidates = candidates.length > 0;
         const { submitting, dealCount, targetStageId } = stageDelete;
+        // Guard against a previously-picked target being removed (e.g. via
+        // realtime sync in another tab) while this dialog is open. If the
+        // current selection is no longer a valid candidate, treat the target
+        // as unselected so the confirm button stays disabled until the user
+        // picks a fresh one.
+        const targetIsValidCandidate =
+          !!targetStageId && candidates.some((s) => s.id === targetStageId);
         return (
           <Dialog
             open
@@ -988,7 +995,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
                 <Button
                   variant="destructive"
                   onClick={confirmStageMigrationDelete}
-                  disabled={submitting || !hasCandidates || !targetStageId}
+                  disabled={submitting || !hasCandidates || !targetIsValidCandidate}
                 >
                   {submitting ? 'Deleting…' : 'Move deals & delete'}
                 </Button>
