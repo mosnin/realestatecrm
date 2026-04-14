@@ -87,7 +87,51 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
   const [view, setView] = useState<'kanban' | 'list'>('list');
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<
+    Set<'active' | 'won' | 'lost' | 'on_hold'>
+  >(new Set(['active']));
   const { confirm, ConfirmDialog } = useConfirm();
+
+  // Hydrate status filter from localStorage (SSR-safe).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = localStorage.getItem(`chippi:deals:statusFilter:${slug}`);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      const valid: Array<'active' | 'won' | 'lost' | 'on_hold'> = [
+        'active',
+        'won',
+        'lost',
+        'on_hold',
+      ];
+      const filtered = parsed.filter((v): v is 'active' | 'won' | 'lost' | 'on_hold' =>
+        typeof v === 'string' && (valid as string[]).includes(v),
+      );
+      setStatusFilter(new Set(filtered));
+    } catch {
+      // ignore malformed value
+    }
+  }, [slug]);
+
+  // Persist status filter.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(
+      `chippi:deals:statusFilter:${slug}`,
+      JSON.stringify(Array.from(statusFilter)),
+    );
+  }, [slug, statusFilter]);
+
+  function toggleStatus(status: 'active' | 'won' | 'lost' | 'on_hold') {
+    setStatusFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      return next;
+    });
+  }
 
   useEffect(() => {
     const stored =
@@ -470,12 +514,16 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   }
 
   const filteredStages = useMemo(() => {
-    if (!searchLower) return stages;
     return stages.map((s) => ({
       ...s,
-      deals: s.deals.filter(dealMatchesSearch),
+      deals: s.deals.filter(
+        (deal) =>
+          statusFilter.has(deal.status as 'active' | 'won' | 'lost' | 'on_hold') &&
+          dealMatchesSearch(deal),
+      ),
     }));
-  }, [stages, searchLower]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stages, searchLower, statusFilter]);
 
   const allDeals = filteredStages.flatMap((s) => s.deals);
 
@@ -520,8 +568,38 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
             )}
           </div>
 
+          {/* Status filter chips */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {(
+              [
+                { value: 'active', label: 'Active' },
+                { value: 'won', label: 'Won' },
+                { value: 'lost', label: 'Lost' },
+                { value: 'on_hold', label: 'On Hold' },
+              ] as const
+            ).map((opt) => {
+              const selected = statusFilter.has(opt.value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => toggleStatus(opt.value)}
+                  aria-pressed={selected}
+                  className={cn(
+                    'h-8 px-2.5 text-xs font-medium rounded-md border transition-colors',
+                    selected
+                      ? 'bg-secondary text-foreground border-border'
+                      : 'bg-transparent text-muted-foreground border-border hover:bg-muted hover:text-foreground',
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
           {/* View toggle */}
-          <div className="flex rounded-md border border-border overflow-hidden bg-card">
+          <div className="flex rounded-md border border-border overflow-hidden bg-card ml-auto">
             <button
               type="button"
               onClick={() => setView('list')}
@@ -552,7 +630,13 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
         </div>
       </div>
 
-      {view === 'kanban' ? (
+      {statusFilter.size === 0 ? (
+        <div className="rounded-lg border border-border bg-card px-4 py-12 text-center">
+          <p className="text-sm text-muted-foreground">
+            No status selected — pick at least one status above.
+          </p>
+        </div>
+      ) : view === 'kanban' ? (
         <>
         {/* Mobile stacked view */}
         <div className="md:hidden space-y-4">
