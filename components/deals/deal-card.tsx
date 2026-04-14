@@ -54,7 +54,13 @@ export function DealCard({ deal, onEdit, onDelete, onOpenPanel }: DealCardProps)
   const priority = PRIORITY_META[deal.priority];
   const statusBadge = deal.status && deal.status !== 'active' ? STATUS_BADGE[deal.status] : null;
   const followUpDate = deal.followUpAt ? new Date(deal.followUpAt) : null;
-  const followUpOverdue = followUpDate && followUpDate < new Date();
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const followUpOverdue = Boolean(
+    followUpDate &&
+      deal.status === 'active' &&
+      followUpDate.getTime() < startOfToday.getTime(),
+  );
 
   return (
     <div ref={setNodeRef} style={style} className="mb-2">
@@ -108,13 +114,16 @@ export function DealCard({ deal, onEdit, onDelete, onOpenPanel }: DealCardProps)
                 </span>
               )}
               {followUpDate && (
-                <span className={cn(
-                  'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold',
-                  followUpOverdue
-                    ? 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400'
-                    : 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-                )}>
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold',
+                    followUpOverdue
+                      ? 'bg-destructive/10 text-destructive border border-destructive/30'
+                      : 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+                  )}
+                >
                   <Calendar size={9} />
+                  {followUpOverdue ? 'Overdue · ' : ''}
                   {followUpDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </span>
               )}
