@@ -150,19 +150,45 @@ export default async function PublicApplyPage({
         .eq('id', space.brokerageId)
         .maybeSingle();
       if (brokerageData) {
-        resolvedRentalFormConfig = (brokerageData.brokerageRentalFormConfig ?? brokerageData.brokerageFormConfig ?? null) as IFC | null;
+        const legacySingle = (brokerageData.brokerageFormConfig ?? null) as IFC | null;
+        const legacySingleLeadType = legacySingle?.leadType === 'buyer' ? 'buyer' : 'rental';
+
+        resolvedRentalFormConfig = (brokerageData.brokerageRentalFormConfig ?? null) as IFC | null;
         resolvedBuyerFormConfig = (brokerageData.brokerageBuyerFormConfig ?? null) as IFC | null;
+
+        // Backwards compatibility for legacy single brokerage form config:
+        // route it to the correct lead type instead of always treating it as rental.
+        if (!resolvedRentalFormConfig && !resolvedBuyerFormConfig && legacySingle) {
+          if (legacySingleLeadType === 'buyer') {
+            resolvedBuyerFormConfig = legacySingle;
+          } else {
+            resolvedRentalFormConfig = legacySingle;
+          }
+        }
         // Legacy compat
-        resolvedFormConfig = (brokerageData.brokerageFormConfig ?? null) as IFC | null;
+        resolvedFormConfig = legacySingle;
       }
     } catch {
       // Brokerage fetch failed — fall back to legacy form
     }
   } else if (formConfigSource === 'custom') {
-    resolvedRentalFormConfig = settings?.rentalFormConfig ?? settings?.formConfig ?? null;
+    const legacySingle = settings?.formConfig ?? null;
+    const legacySingleLeadType = legacySingle?.leadType === 'buyer' ? 'buyer' : 'rental';
+
+    resolvedRentalFormConfig = settings?.rentalFormConfig ?? null;
     resolvedBuyerFormConfig = settings?.buyerFormConfig ?? null;
+
+    // Backwards compatibility for legacy single custom form config:
+    // route it by its own leadType, not always as rental.
+    if (!resolvedRentalFormConfig && !resolvedBuyerFormConfig && legacySingle) {
+      if (legacySingleLeadType === 'buyer') {
+        resolvedBuyerFormConfig = legacySingle;
+      } else {
+        resolvedRentalFormConfig = legacySingle;
+      }
+    }
     // Legacy compat
-    resolvedFormConfig = settings?.formConfig ?? null;
+    resolvedFormConfig = legacySingle;
   }
   // formConfigSource === 'legacy' → all resolved configs stay null → legacy form
 
