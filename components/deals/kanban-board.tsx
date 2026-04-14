@@ -62,6 +62,62 @@ type DealWithRelations = Deal & {
 
 type StageWithDeals = DealStage & { deals: DealWithRelations[] };
 
+interface SortableKanbanColumnProps {
+  stage: StageWithDeals;
+  deals: DealWithRelations[];
+  slug: string;
+  onAddDeal: (stageId: string) => void;
+  onEditDeal: (deal: DealWithRelations) => void;
+  onDeleteDeal: (id: string) => void;
+  onDeleteStage: (stage: DealStage) => void;
+  onOpenPanel: (deal: DealWithRelations) => void;
+  onDealCreated: () => void;
+}
+
+function SortableKanbanColumn({
+  stage,
+  deals,
+  slug,
+  onAddDeal,
+  onEditDeal,
+  onDeleteDeal,
+  onDeleteStage,
+  onOpenPanel,
+  onDealCreated,
+}: SortableKanbanColumnProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: `stage:${stage.id}` });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <KanbanColumn
+        stage={stage}
+        deals={deals}
+        slug={slug}
+        onAddDeal={onAddDeal}
+        onEditDeal={onEditDeal}
+        onDeleteDeal={onDeleteDeal}
+        onDeleteStage={onDeleteStage}
+        onOpenPanel={onOpenPanel}
+        onDealCreated={onDealCreated}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  );
+}
+
 const PRIORITY_META: Record<string, { label: string; className: string }> = {
   LOW: { label: 'Low', className: 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400' },
   MEDIUM: { label: 'Medium', className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' },
@@ -603,41 +659,6 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   const hasActiveFilter =
     !!searchLower || statusFilter.size < 4;
 
-  // Inner component so it can use useSortable inside the board's render tree
-  function SortableKanbanColumn({ stage, deals }: { stage: StageWithDeals; deals: DealWithRelations[] }) {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: `stage:${stage.id}` });
-
-    const style: React.CSSProperties = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.4 : 1,
-    };
-
-    return (
-      <div ref={setNodeRef} style={style}>
-        <KanbanColumn
-          stage={stage}
-          deals={deals}
-          slug={slug}
-          onAddDeal={openAddDeal}
-          onEditDeal={(deal) => setEditDeal(deal)}
-          onDeleteDeal={handleDeleteDeal}
-          onDeleteStage={handleDeleteStage}
-          onOpenPanel={(deal) => setPanelDeal(deal)}
-          onDealCreated={fetchData}
-          dragHandleProps={{ ...attributes, ...listeners }}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -815,6 +836,13 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
                     key={stage.id}
                     stage={stage}
                     deals={stage.deals}
+                    slug={slug}
+                    onAddDeal={openAddDeal}
+                    onEditDeal={(deal) => setEditDeal(deal)}
+                    onDeleteDeal={handleDeleteDeal}
+                    onDeleteStage={handleDeleteStage}
+                    onOpenPanel={(deal) => setPanelDeal(deal)}
+                    onDealCreated={fetchData}
                   />
                 ))}
               </div>
@@ -1016,6 +1044,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
       )}
 
       <DealPanel
+        key={panelDeal?.id ?? 'empty'}
         deal={panelDeal}
         open={!!panelDeal}
         onClose={() => setPanelDeal(null)}
