@@ -207,6 +207,7 @@ CREATE TABLE IF NOT EXISTS "Deal" (
   "followUpAt" timestamptz,
   "sourceTourId" text REFERENCES "Tour"(id) ON DELETE SET NULL,
   "commissionRate" NUMERIC(5,2) DEFAULT NULL,
+  "probability"    INTEGER DEFAULT NULL CHECK ("probability" >= 0 AND "probability" <= 100),
   "createdAt" timestamptz NOT NULL DEFAULT now(),
   "updatedAt" timestamptz NOT NULL DEFAULT now()
 );
@@ -447,6 +448,7 @@ ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "formConfigSnapshot"    jsonb DEF
 ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "formLeadType"         text;
 
 ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "commissionRate" NUMERIC(5,2) DEFAULT NULL;
+ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "probability" INTEGER DEFAULT NULL CHECK ("probability" >= 0 AND "probability" <= 100);
 
 -- ============================================================
 -- Indexes

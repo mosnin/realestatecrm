@@ -102,6 +102,15 @@ export async function PATCH(
     if (commissionRateVal !== null && commissionRateVal !== undefined && (isNaN(commissionRateVal) || commissionRateVal < 0 || commissionRateVal > 100)) {
       return NextResponse.json({ error: 'Invalid commissionRate (must be 0–100)' }, { status: 400 });
     }
+    const probabilityVal =
+      body.probability != null && body.probability !== ''
+        ? parseInt(String(body.probability), 10)
+        : body.probability === null
+          ? null
+          : undefined;
+    if (probabilityVal !== null && probabilityVal !== undefined && (isNaN(probabilityVal) || probabilityVal < 0 || probabilityVal > 100)) {
+      return NextResponse.json({ error: 'Invalid probability (must be 0–100)' }, { status: 400 });
+    }
 
     let closeDateVal: string | null = null;
     if (body.closeDate) {
@@ -185,6 +194,7 @@ export async function PATCH(
         ...(body.description !== undefined && { description: body.description ? String(body.description).slice(0, 5000) : null }),
         ...(body.value !== undefined && { value: valueVal }),
         ...(commissionRateVal !== undefined && { commissionRate: commissionRateVal }),
+        ...(probabilityVal !== undefined && { probability: probabilityVal }),
         ...(body.address !== undefined && { address: body.address ?? null }),
         ...(body.priority !== undefined && { priority: body.priority }),
         ...(body.closeDate !== undefined && { closeDate: closeDateVal }),

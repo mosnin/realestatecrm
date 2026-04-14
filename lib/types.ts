@@ -283,6 +283,7 @@ export type Deal = {
   status: 'active' | 'won' | 'lost' | 'on_hold';
   followUpAt: Date | null;
   commissionRate: number | null;
+  probability: number | null;
   createdAt: Date;
   updatedAt: Date;
 };

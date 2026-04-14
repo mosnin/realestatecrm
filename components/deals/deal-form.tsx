@@ -27,6 +27,7 @@ const schema = z.object({
   description: z.string().optional(),
   value: z.string().optional(),
   commissionRate: z.coerce.number().min(0).max(100).nullable().optional(),
+  probability: z.coerce.number().int().min(0).max(100).nullable().optional(),
   address: z.string().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']),
   closeDate: z.string().optional(),
@@ -157,6 +158,22 @@ export function DealForm({
             />
             {errors.commissionRate && (
               <p className="text-xs text-destructive">{errors.commissionRate.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="probability">Close probability (%)</Label>
+            <Input
+              id="probability"
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              placeholder="e.g. 75"
+              {...register('probability')}
+            />
+            {errors.probability && (
+              <p className="text-xs text-destructive">{errors.probability.message}</p>
             )}
           </div>
 

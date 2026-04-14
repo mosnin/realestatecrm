@@ -57,6 +57,7 @@ export async function GET(req: NextRequest) {
     description: row.description,
     value: row.value,
     commissionRate: row.commissionRate ?? null,
+    probability: row.probability ?? null,
     address: row.address,
     priority: row.priority,
     closeDate: row.closeDate,
@@ -83,7 +84,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { slug, title, description, value, commissionRate, address, priority, closeDate, stageId, contactIds } = body;
+  const { slug, title, description, value, commissionRate, probability, address, priority, closeDate, stageId, contactIds } = body;
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
@@ -147,6 +148,10 @@ export async function POST(req: NextRequest) {
   if (commissionRateVal !== null && (isNaN(commissionRateVal) || commissionRateVal < 0 || commissionRateVal > 100)) {
     return NextResponse.json({ error: 'Invalid commissionRate (must be 0–100)' }, { status: 400 });
   }
+  const probabilityVal = probability != null && probability !== '' ? parseInt(String(probability), 10) : null;
+  if (probabilityVal !== null && (isNaN(probabilityVal) || probabilityVal < 0 || probabilityVal > 100)) {
+    return NextResponse.json({ error: 'Invalid probability (must be 0–100)' }, { status: 400 });
+  }
   let closeDateVal: string | null = null;
   if (closeDate) {
     const d = new Date(closeDate);
@@ -161,6 +166,7 @@ export async function POST(req: NextRequest) {
     description: description || null,
     value: valueVal,
     commissionRate: commissionRateVal,
+    probability: probabilityVal,
     address: address || null,
     priority: priority || 'MEDIUM',
     closeDate: closeDateVal,

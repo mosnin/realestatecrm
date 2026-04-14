@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Briefcase, DollarSign, TrendingUp, CalendarClock, Percent } from 'lucide-react';
+import { Briefcase, DollarSign, TrendingUp, CalendarClock, Percent, Target } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
@@ -84,6 +84,17 @@ export function PipelineSummary({ slug, pipelineType }: PipelineSummaryProps) {
     const gciPartial = count > 0 && dealsWithCommission.length < count / 2;
     const gciLabel = `Est. GCI${gciPartial ? ' (partial)' : ''}`;
 
+    // Weighted Pipeline: sum(value * probability / 100) for active deals where both are set
+    const dealsWithProbability = activeDeals.filter(
+      (d) => typeof d.value === 'number' && typeof d.probability === 'number',
+    );
+    const weightedValue = dealsWithProbability.reduce(
+      (sum, d) => sum + (d.value! * d.probability!) / 100,
+      0,
+    );
+    const weightedPartial = count > 0 && dealsWithProbability.length < count / 2;
+    const weightedLabel = `Weighted Pipeline${weightedPartial ? ' (partial)' : ''}`;
+
     return [
       {
         label: 'Pipeline value',
@@ -120,11 +131,18 @@ export function PipelineSummary({ slug, pipelineType }: PipelineSummaryProps) {
         iconClassName:
           'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-400',
       },
+      {
+        label: weightedLabel,
+        value: formatCurrency(Math.round(weightedValue)),
+        icon: Target,
+        iconClassName:
+          'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400',
+      },
     ];
   }, [stages]);
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
       {stats.map((stat) => {
         const Icon = stat.icon;
         return (

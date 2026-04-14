@@ -359,6 +359,27 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
                     <span>Commission rate: {deal.commissionRate}%</span>
                   </div>
                 ) : null}
+                {deal.probability != null && (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        'inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold',
+                        deal.probability >= 70
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                          : deal.probability >= 40
+                          ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                          : 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400',
+                      )}
+                    >
+                      {deal.probability}% likely to close
+                    </span>
+                    {deal.value != null && (
+                      <span className="text-xs text-muted-foreground">
+                        Weighted: {formatCurrency(Math.round(deal.value * deal.probability / 100))}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Description */}
