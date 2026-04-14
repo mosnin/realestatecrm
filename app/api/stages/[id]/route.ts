@@ -109,7 +109,13 @@ export async function DELETE(
   }
 
   // targetStageId is taken from the query string (e.g. ?targetStageId=...).
-  const targetStageId = req.nextUrl.searchParams.get('targetStageId');
+  // Normalise whitespace-only / empty values to null so we treat them the
+  // same as "no target supplied" rather than issuing a DB lookup for a bad id.
+  const rawTargetStageId = req.nextUrl.searchParams.get('targetStageId');
+  const targetStageId =
+    typeof rawTargetStageId === 'string' && rawTargetStageId.trim().length > 0
+      ? rawTargetStageId.trim()
+      : null;
 
   const { data: existingRows, error: existingError } = await supabase
     .from('DealStage')
@@ -122,18 +128,27 @@ export async function DELETE(
   const stage = existingRows[0];
 
   // Count deals currently assigned to this stage within the space.
+  // We intentionally fail closed if the count comes back null/undefined: a
+  // missing count must not be coerced to zero, because that would let the
+  // subsequent DELETE cascade through and destroy any deals in the stage.
   const { count: dealCount, error: countError } = await supabase
     .from('Deal')
     .select('id', { count: 'exact', head: true })
     .eq('spaceId', space.id)
     .eq('stageId', id);
   if (countError) throw countError;
+  if (dealCount === null || dealCount === undefined) {
+    return NextResponse.json(
+      { error: 'Could not determine deal count for stage' },
+      { status: 500 },
+    );
+  }
 
-  const hasDeals = (dealCount ?? 0) > 0;
+  const hasDeals = dealCount > 0;
 
   if (hasDeals && !targetStageId) {
     return NextResponse.json(
-      { error: 'stage-has-deals', dealCount: dealCount ?? 0 },
+      { error: 'stage-has-deals', dealCount },
       { status: 400 },
     );
   }
@@ -187,7 +202,7 @@ export async function DELETE(
     resourceId: id,
     spaceId: space.id,
     metadata: hasDeals
-      ? { migratedDealCount: dealCount ?? 0, targetStageId }
+      ? { migratedDealCount: dealCount, targetStageId }
       : undefined,
   });
 
