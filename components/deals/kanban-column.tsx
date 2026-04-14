@@ -6,7 +6,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { DealCard } from './deal-card';
 import { Input } from '@/components/ui/input';
-import { Plus, LayoutList, SquarePen, Trash2 } from 'lucide-react';
+import { Plus, LayoutList, SquarePen, Trash2, GripVertical } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 
@@ -25,6 +25,8 @@ interface KanbanColumnProps {
   onDeleteStage: (stage: DealStage) => void;
   onOpenPanel: (deal: DealWithRelations) => void;
   onDealCreated: () => void;
+  /** Spread onto the drag handle element to enable column reordering */
+  dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
 }
 
 export function KanbanColumn({
@@ -37,6 +39,7 @@ export function KanbanColumn({
   onDeleteStage,
   onOpenPanel,
   onDealCreated,
+  dragHandleProps,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
 

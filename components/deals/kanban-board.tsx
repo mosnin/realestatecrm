@@ -12,7 +12,8 @@ import {
   useSensors,
   closestCorners,
 } from '@dnd-kit/core';
-import { arrayMove } from '@dnd-kit/sortable';
+import { arrayMove, SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { KanbanColumn } from './kanban-column';
 import { DealForm } from './deal-form';
 import { DealPanel } from './deal-panel';
@@ -85,6 +86,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   const [panelDeal, setPanelDeal] = useState<DealWithRelations | null>(null);
   const [defaultStageId, setDefaultStageId] = useState<string>('');
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
+  const [activeStageId, setActiveStageId] = useState<string | null>(null);
   const [view, setView] = useState<'kanban' | 'list'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<
@@ -196,8 +198,8 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   // Track whether a drag is in progress to avoid disrupting the UX with refetches
   const isDraggingRef = useRef(false);
   useEffect(() => {
-    isDraggingRef.current = activeDealId !== null;
-  }, [activeDealId]);
+    isDraggingRef.current = activeDealId !== null || activeStageId !== null;
+  }, [activeDealId, activeStageId]);
 
   // Refetch helper that skips when a drag is in progress.
   // Queues a refetch for when the drag ends via the pendingRefetchRef.
@@ -310,12 +312,20 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   }
 
   function handleDragStart(event: DragStartEvent) {
-    setActiveDealId(event.active.id as string);
+    const id = event.active.id.toString();
+    if (id.startsWith('stage:')) {
+      setActiveStageId(id.slice('stage:'.length));
+    } else {
+      setActiveDealId(id);
+    }
   }
 
   function handleDragOver(event: DragOverEvent) {
     const { active, over } = event;
     if (!over) return;
+
+    // Skip deal-over logic when a stage column is being dragged
+    if (active.id.toString().startsWith('stage:')) return;
 
     const activeStage = findStageForDeal(active.id as string);
     const overStage = stages.find(
@@ -340,6 +350,48 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
+
+    // ── Stage column reorder ──
+    if (active.id.toString().startsWith('stage:')) {
+      setActiveStageId(null);
+      if (!over) return;
+
+      const activeRawId = active.id.toString().slice('stage:'.length);
+      const overRawId = over.id.toString().startsWith('stage:')
+        ? over.id.toString().slice('stage:'.length)
+        : null;
+
+      if (!overRawId || activeRawId === overRawId) return;
+
+      const oldIndex = stages.findIndex((s) => s.id === activeRawId);
+      const newIndex = stages.findIndex((s) => s.id === overRawId);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      // Optimistic reorder
+      const reordered = arrayMove(stages, oldIndex, newIndex);
+      setStages(reordered);
+
+      // Persist to server in the background
+      const stageIds = reordered.map((s) => s.id);
+      try {
+        const res = await fetch('/api/stages/reorder', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stageIds }),
+        });
+        if (!res.ok) {
+          toast.error('Failed to save stage order');
+          // Revert to the original order on failure
+          setStages(stages);
+        }
+      } catch {
+        toast.error('Failed to save stage order');
+        setStages(stages);
+      }
+      return;
+    }
+
+    // ── Deal card move ──
     setActiveDealId(null);
     if (!over) return;
 
@@ -517,6 +569,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
 
   const allStages = stages as DealStage[];
   const activeDeal = stages.flatMap((s) => s.deals).find((d) => d.id === activeDealId);
+  const activeStage = activeStageId ? stages.find((s) => s.id === activeStageId) : null;
 
   const searchLower = searchQuery.toLowerCase().trim();
 
@@ -549,6 +602,41 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   );
   const hasActiveFilter =
     !!searchLower || statusFilter.size < 4;
+
+  // Inner component so it can use useSortable inside the board's render tree
+  function SortableKanbanColumn({ stage, deals }: { stage: StageWithDeals; deals: DealWithRelations[] }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: `stage:${stage.id}` });
+
+    const style: React.CSSProperties = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.4 : 1,
+    };
+
+    return (
+      <div ref={setNodeRef} style={style}>
+        <KanbanColumn
+          stage={stage}
+          deals={deals}
+          slug={slug}
+          onAddDeal={openAddDeal}
+          onEditDeal={(deal) => setEditDeal(deal)}
+          onDeleteDeal={handleDeleteDeal}
+          onDeleteStage={handleDeleteStage}
+          onOpenPanel={(deal) => setPanelDeal(deal)}
+          onDealCreated={fetchData}
+          dragHandleProps={{ ...attributes, ...listeners }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -717,22 +805,20 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
           >
-            <div className="flex gap-4 min-w-max">
-              {filteredStages.map((stage) => (
-                <KanbanColumn
-                  key={stage.id}
-                  stage={stage}
-                  deals={stage.deals}
-                  slug={slug}
-                  onAddDeal={openAddDeal}
-                  onEditDeal={(deal) => setEditDeal(deal)}
-                  onDeleteDeal={handleDeleteDeal}
-                  onDeleteStage={handleDeleteStage}
-                  onOpenPanel={(deal) => setPanelDeal(deal)}
-                  onDealCreated={fetchData}
-                />
-              ))}
-            </div>
+            <SortableContext
+              items={filteredStages.map((s) => `stage:${s.id}`)}
+              strategy={horizontalListSortingStrategy}
+            >
+              <div className="flex gap-4 min-w-max">
+                {filteredStages.map((stage) => (
+                  <SortableKanbanColumn
+                    key={stage.id}
+                    stage={stage}
+                    deals={stage.deals}
+                  />
+                ))}
+              </div>
+            </SortableContext>
             <DragOverlay>
               {activeDeal && (
                 <div className="w-72 rounded-lg border border-border bg-card px-3.5 py-3 shadow-lg opacity-95 rotate-1">
@@ -740,6 +826,22 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
                     <GripVertical size={15} className="text-muted-foreground/50 flex-shrink-0" />
                     <p className="font-semibold text-sm truncate">{activeDeal.title}</p>
                   </div>
+                </div>
+              )}
+              {activeStage && (
+                <div className="w-72 rounded-lg border-2 border-border bg-card shadow-xl opacity-90 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <GripVertical size={13} className="text-muted-foreground/50 flex-shrink-0 rotate-90" />
+                    <span
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: activeStage.color }}
+                    />
+                    <span className="font-semibold text-sm truncate">{activeStage.name}</span>
+                    <span className="text-[11px] text-muted-foreground bg-muted rounded-md px-2 py-0.5 font-medium tabular-nums">
+                      {activeStage.deals.length}
+                    </span>
+                  </div>
+                  <div className="h-16 rounded-md bg-muted/30 border border-dashed border-border" />
                 </div>
               )}
             </DragOverlay>
