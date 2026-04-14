@@ -1,14 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* HeroUI v3 styles (components + theme tokens for @heroui/react).
-   The project's own :root variables below intentionally override HeroUI's
-   layered theme tokens for shared names like --background/--foreground. */
-@import "@heroui/styles/base" layer(base);
-@import "@heroui/styles/components/index.css" layer(components);
-@import "@heroui/styles/themes/default";
-@import "@heroui/styles/utilities";
-@import "@heroui/styles/variants";
+/* HeroUI v3 styles */
+@import "@heroui/react/styles";
 
 @custom-variant dark (&:is(.dark *));
 

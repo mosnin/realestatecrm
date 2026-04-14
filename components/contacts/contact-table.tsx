@@ -43,7 +43,7 @@ import { CONTACT_STAGES } from '@/lib/constants';
 import { CsvImportModal } from './csv-import-modal';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Pagination } from '@heroui/react';
+import { TableContent, TableHeader, TableColumn, TableBody, TableRow, TableCell } from '@heroui/react';
 
 type Client = {
   id: string;
@@ -626,116 +626,124 @@ export function ContactTable({ slug }: ContactTableProps) {
 
       {/* ── List view ── */}
       {!loading && visibleContacts.length > 0 && view === 'list' && (
-        <Table
-          aria-label="Contacts list"
-          selectionMode="multiple"
-          selectedKeys={selectedIds}
-          onSelectionChange={(keys) => {
-            if (keys === 'all') {
-              setSelectedIds(new Set(visibleContacts.map((c) => c.id)));
-            } else {
-              setSelectedIds(new Set([...keys].map(String)));
-            }
-          }}
-          bottomContent={
-            pages > 1 ? (
-              <div className="flex justify-center py-2">
-                <Pagination
-                  total={pages}
-                  page={page}
-                  onChange={(p) => setPage(p)}
-                  size="sm"
-                  showControls
-                />
-              </div>
-            ) : null
-          }
-          classNames={{
-            wrapper: 'rounded-lg border border-border shadow-none p-0',
-            th: 'bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border',
-            td: 'py-3',
-            tr: 'border-b border-border last:border-0 hover:bg-muted/30 transition-colors',
-          }}
-        >
-          <TableHeader>
-            <TableColumn key="name">Name</TableColumn>
-            <TableColumn key="stage">Stage</TableColumn>
-            <TableColumn key="contact" className="hidden sm:table-cell">Contact</TableColumn>
-            <TableColumn key="budget" className="hidden md:table-cell">Budget</TableColumn>
-            <TableColumn key="preferences" className="hidden lg:table-cell">Preferences</TableColumn>
-            <TableColumn key="followup" className="hidden xl:table-cell">Follow-up</TableColumn>
-            <TableColumn key="actions" className="w-20">{''}</TableColumn>
-          </TableHeader>
-          <TableBody>
-            {paginatedContacts.map((contact) => {
-              const stage = STAGES.find((s) => s.key === contact.type)!;
-              return (
-                <TableRow key={contact.id} className="group">
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-                        {getInitials(contact.name)}
+        <div className="rounded-lg border border-border overflow-hidden">
+          <TableContent
+            aria-label="Contacts list"
+            selectionMode="multiple"
+            selectedKeys={selectedIds}
+            onSelectionChange={(keys) => {
+              if (keys === 'all') {
+                setSelectedIds(new Set(visibleContacts.map((c) => c.id)));
+              } else {
+                setSelectedIds(new Set([...keys].map(String)));
+              }
+            }}
+            className="min-w-full"
+          >
+            <TableHeader>
+              <TableColumn isRowHeader id="name" className="bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Name</TableColumn>
+              <TableColumn id="stage" className="bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Stage</TableColumn>
+              <TableColumn id="contact" className="hidden sm:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Contact</TableColumn>
+              <TableColumn id="budget" className="hidden md:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Budget</TableColumn>
+              <TableColumn id="preferences" className="hidden lg:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Preferences</TableColumn>
+              <TableColumn id="followup" className="hidden xl:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Follow-up</TableColumn>
+              <TableColumn id="actions" className="w-20 bg-muted/40 border-b border-border"> </TableColumn>
+            </TableHeader>
+            <TableBody>
+              {paginatedContacts.map((contact) => {
+                const stage = STAGES.find((s) => s.key === contact.type)!;
+                return (
+                  <TableRow key={contact.id} id={contact.id} className="group border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                    <TableCell className="py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
+                          {getInitials(contact.name)}
+                        </div>
+                        <Link href={`/s/${slug}/contacts/${contact.id}`} className="font-medium hover:text-foreground transition-colors">
+                          {contact.name}
+                        </Link>
                       </div>
-                      <Link href={`/s/${slug}/contacts/${contact.id}`} className="font-medium hover:text-foreground transition-colors">
-                        {contact.name}
-                      </Link>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className={cn('inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5', stage.className)}>
-                      {stage.label}
-                    </span>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <div className="space-y-0.5">
-                      {contact.email && (
-                        <a href={`mailto:${contact.email}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors truncate max-w-[180px]">
-                          <Mail size={10} className="flex-shrink-0" />{contact.email}
-                        </a>
-                      )}
-                      {contact.phone && (
-                        <a href={`tel:${contact.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                          <Phone size={10} className="flex-shrink-0" />{contact.phone}
-                        </a>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
-                    {contact.budget != null ? `${formatCurrency(contact.budget)}/mo` : '—'}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground max-w-[200px] truncate">
-                    {contact.preferences ?? '—'}
-                  </TableCell>
-                  <TableCell className="hidden xl:table-cell">
-                    {contact.followUpAt ? (
-                      <span className={cn(
-                        'inline-flex items-center gap-1 text-[11px] font-medium rounded px-1.5 py-0.5',
-                        new Date(contact.followUpAt) < new Date()
-                          ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
-                          : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-                      )}>
-                        <CalendarDays size={10} />
-                        {new Date(contact.followUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <span className={cn('inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5', stage.className)}>
+                        {stage.label}
                       </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                      <button type="button" onClick={() => setEditContact(contact)} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
-                        <Pencil size={13} />
-                      </button>
-                      <button type="button" onClick={() => handleDelete(contact.id)} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell py-3">
+                      <div className="space-y-0.5">
+                        {contact.email && (
+                          <a href={`mailto:${contact.email}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors truncate max-w-[180px]">
+                            <Mail size={10} className="flex-shrink-0" />{contact.email}
+                          </a>
+                        )}
+                        {contact.phone && (
+                          <a href={`tel:${contact.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                            <Phone size={10} className="flex-shrink-0" />{contact.phone}
+                          </a>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell py-3 text-xs text-muted-foreground">
+                      {contact.budget != null ? `${formatCurrency(contact.budget)}/mo` : '—'}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell py-3 text-xs text-muted-foreground max-w-[200px] truncate">
+                      {contact.preferences ?? '—'}
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell py-3">
+                      {contact.followUpAt ? (
+                        <span className={cn(
+                          'inline-flex items-center gap-1 text-[11px] font-medium rounded px-1.5 py-0.5',
+                          new Date(contact.followUpAt) < new Date()
+                            ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                        )}>
+                          <CalendarDays size={10} />
+                          {new Date(contact.followUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                        <button type="button" onClick={() => setEditContact(contact)} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+                          <Pencil size={13} />
+                        </button>
+                        <button type="button" onClick={() => handleDelete(contact.id)} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </TableContent>
+          {pages > 1 && (
+            <div className="flex items-center justify-center gap-1 py-2 border-t border-border">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="w-8 h-8 rounded-md flex items-center justify-center text-sm text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >‹</button>
+              {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={cn(
+                    'w-8 h-8 rounded-md flex items-center justify-center text-sm transition-colors',
+                    p === page ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:bg-muted'
+                  )}
+                >{p}</button>
+              ))}
+              <button
+                onClick={() => setPage((p) => Math.min(pages, p + 1))}
+                disabled={page === pages}
+                className="w-8 h-8 rounded-md flex items-center justify-center text-sm text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >›</button>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Bulk action bar */}

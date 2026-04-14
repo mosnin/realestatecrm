@@ -47,7 +47,7 @@ import { timeAgo, formatMoney, getInitials, formatFollowUpDate, toDateInputValue
 import { LEAD_TIERS, type TierKey } from '@/lib/constants';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Pagination } from '@heroui/react';
+import { TableContent, TableHeader, TableColumn, TableBody, TableRow, TableCell } from '@heroui/react';
 
 const TIERS = LEAD_TIERS;
 
@@ -933,131 +933,145 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
 
       {/* ── List view ── */}
       {view === 'list' && filtered.length > 0 && (
-        <Table
-          aria-label="Leads list"
-          selectionMode="multiple"
-          selectedKeys={selectedIds}
-          onSelectionChange={(keys) => {
-            if (keys === 'all') {
-              setSelectedIds(new Set(filtered.map((l) => l.id)));
-            } else {
-              setSelectedIds(new Set([...keys].map(String)));
-            }
-          }}
-          bottomContent={
-            pages > 1 ? (
-              <div className="flex justify-center py-2">
-                <Pagination total={pages} page={page} onChange={(p) => setPage(p)} size="sm" showControls />
-              </div>
-            ) : null
-          }
-          classNames={{
-            wrapper: 'rounded-lg border border-border shadow-none p-0',
-            th: 'bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border',
-            td: 'py-3',
-            tr: 'border-b border-border last:border-0 hover:bg-muted/30 transition-colors',
-          }}
-        >
-          <TableHeader>
-            <TableColumn key="name">Name</TableColumn>
-            <TableColumn key="score">Score</TableColumn>
-            <TableColumn key="contact" className="hidden sm:table-cell">Contact</TableColumn>
-            <TableColumn key="budget" className="hidden md:table-cell">Budget</TableColumn>
-            <TableColumn key="submitted" className="hidden lg:table-cell">Submitted</TableColumn>
-            <TableColumn key="followup" className="hidden xl:table-cell">Follow-up</TableColumn>
-            <TableColumn key="actions" className="w-24">{''}</TableColumn>
-          </TableHeader>
-          <TableBody>
-            {paginatedLeads.map((lead) => {
-              const isNew = newLeadIds.has(lead.id);
-              const app = lead.applicationData as ApplicationData | null;
-              const rawBudget = app?.monthlyRent ?? lead.budget;
-              const budgetDisplay = typeof rawBudget === 'string' ? rawBudget : rawBudget != null ? `${formatMoney(rawBudget)}/mo` : null;
-              const tierKey = getTierKey(lead);
-              const tier = TIERS[tierKey];
-              const score = lead.leadScore != null ? Math.round(lead.leadScore) : null;
+        <div className="rounded-lg border border-border overflow-hidden">
+          <TableContent
+            aria-label="Leads list"
+            selectionMode="multiple"
+            selectedKeys={selectedIds}
+            onSelectionChange={(keys) => {
+              if (keys === 'all') {
+                setSelectedIds(new Set(filtered.map((l) => l.id)));
+              } else {
+                setSelectedIds(new Set([...keys].map(String)));
+              }
+            }}
+            className="min-w-full"
+          >
+            <TableHeader>
+              <TableColumn isRowHeader id="name" className="bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Name</TableColumn>
+              <TableColumn id="score" className="bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Score</TableColumn>
+              <TableColumn id="contact" className="hidden sm:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Contact</TableColumn>
+              <TableColumn id="budget" className="hidden md:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Budget</TableColumn>
+              <TableColumn id="submitted" className="hidden lg:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Submitted</TableColumn>
+              <TableColumn id="followup" className="hidden xl:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Follow-up</TableColumn>
+              <TableColumn id="actions" className="w-24 bg-muted/40 border-b border-border"> </TableColumn>
+            </TableHeader>
+            <TableBody>
+              {paginatedLeads.map((lead) => {
+                const isNew = newLeadIds.has(lead.id);
+                const app = lead.applicationData as ApplicationData | null;
+                const rawBudget = app?.monthlyRent ?? lead.budget;
+                const budgetDisplay = typeof rawBudget === 'string' ? rawBudget : rawBudget != null ? `${formatMoney(rawBudget)}/mo` : null;
+                const tierKey = getTierKey(lead);
+                const tier = TIERS[tierKey];
+                const score = lead.leadScore != null ? Math.round(lead.leadScore) : null;
 
-              return (
-                <TableRow key={lead.id} className="group">
-                  <TableCell>
-                    <Link href={`/s/${slug}/leads/${lead.id}`} className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-                        {getInitials(lead.name)}
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium hover:text-foreground transition-colors">{lead.name}</span>
-                        <span className="text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground">
-                          {lead.leadType === 'buyer' ? 'Buyer' : 'Rental'}
-                        </span>
-                        {isNew && (
-                          <span className="text-[10px] font-bold bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 rounded-md px-1.5 py-0.5">NEW</span>
+                return (
+                  <TableRow key={lead.id} id={lead.id} className="group border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                    <TableCell className="py-3">
+                      <Link href={`/s/${slug}/leads/${lead.id}`} className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
+                          {getInitials(lead.name)}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium hover:text-foreground transition-colors">{lead.name}</span>
+                          <span className="text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground">
+                            {lead.leadType === 'buyer' ? 'Buyer' : 'Rental'}
+                          </span>
+                          {isNew && (
+                            <span className="text-[10px] font-bold bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 rounded-md px-1.5 py-0.5">NEW</span>
+                          )}
+                        </div>
+                      </Link>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <span className={cn('inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-1', tier.pill)}>
+                        {score != null ? `${score} · ` : ''}{tier.label}
+                      </span>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell py-3">
+                      <div className="space-y-0.5">
+                        {lead.email && (
+                          <a href={`mailto:${lead.email}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors truncate max-w-[180px]">
+                            <Mail size={10} className="flex-shrink-0" />{lead.email}
+                          </a>
+                        )}
+                        {lead.phone && (
+                          <a href={`tel:${lead.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                            <Phone size={10} className="flex-shrink-0" />{lead.phone}
+                          </a>
                         )}
                       </div>
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <span className={cn('inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-1', tier.pill)}>
-                      {score != null ? `${score} · ` : ''}{tier.label}
-                    </span>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <div className="space-y-0.5">
-                      {lead.email && (
-                        <a href={`mailto:${lead.email}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors truncate max-w-[180px]">
-                          <Mail size={10} className="flex-shrink-0" />{lead.email}
-                        </a>
-                      )}
-                      {lead.phone && (
-                        <a href={`tel:${lead.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                          <Phone size={10} className="flex-shrink-0" />{lead.phone}
-                        </a>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
-                    {budgetDisplay ?? '—'}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
-                    {timeAgo(new Date(lead.createdAt))}
-                  </TableCell>
-                  <TableCell className="hidden xl:table-cell">
-                    <label className="flex items-center gap-1 text-xs cursor-pointer">
-                      <CalendarDays size={10} className="text-muted-foreground" />
-                      <span className={cn(
-                        lead.followUpAt
-                          ? new Date(lead.followUpAt) < new Date() ? 'text-destructive font-medium' : 'text-foreground font-medium'
-                          : 'text-muted-foreground',
-                      )}>
-                        {lead.followUpAt ? formatFollowUpDate(lead.followUpAt) : '—'}
-                      </span>
-                      <input
-                        type="date"
-                        className="sr-only"
-                        value={toDateInputValue(lead.followUpAt)}
-                        onChange={(e) => patchLead(lead.id, { followUpAt: e.target.value || null })}
-                      />
-                    </label>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setConvertTarget(lead)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-medium"
-                      >
-                        <UserCheck size={12} />
-                        Convert
-                      </button>
-                      <Link href={`/s/${slug}/leads/${lead.id}`} className="text-xs text-muted-foreground hover:text-foreground font-medium">
-                        Open
-                      </Link>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell py-3 text-xs text-muted-foreground">
+                      {budgetDisplay ?? '—'}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell py-3 text-xs text-muted-foreground">
+                      {timeAgo(new Date(lead.createdAt))}
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell py-3">
+                      <label className="flex items-center gap-1 text-xs cursor-pointer">
+                        <CalendarDays size={10} className="text-muted-foreground" />
+                        <span className={cn(
+                          lead.followUpAt
+                            ? new Date(lead.followUpAt) < new Date() ? 'text-destructive font-medium' : 'text-foreground font-medium'
+                            : 'text-muted-foreground',
+                        )}>
+                          {lead.followUpAt ? formatFollowUpDate(lead.followUpAt) : '—'}
+                        </span>
+                        <input
+                          type="date"
+                          className="sr-only"
+                          value={toDateInputValue(lead.followUpAt)}
+                          onChange={(e) => patchLead(lead.id, { followUpAt: e.target.value || null })}
+                        />
+                      </label>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setConvertTarget(lead)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-medium"
+                        >
+                          <UserCheck size={12} />
+                          Convert
+                        </button>
+                        <Link href={`/s/${slug}/leads/${lead.id}`} className="text-xs text-muted-foreground hover:text-foreground font-medium">
+                          Open
+                        </Link>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </TableContent>
+          {pages > 1 && (
+            <div className="flex items-center justify-center gap-1 py-2 border-t border-border">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="w-8 h-8 rounded-md flex items-center justify-center text-sm text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >‹</button>
+              {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={cn(
+                    'w-8 h-8 rounded-md flex items-center justify-center text-sm transition-colors',
+                    p === page ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:bg-muted'
+                  )}
+                >{p}</button>
+              ))}
+              <button
+                onClick={() => setPage((p) => Math.min(pages, p + 1))}
+                disabled={page === pages}
+                className="w-8 h-8 rounded-md flex items-center justify-center text-sm text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >›</button>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Bulk action bar */}
