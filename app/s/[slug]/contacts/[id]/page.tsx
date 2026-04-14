@@ -71,7 +71,7 @@ export default async function ClientDetailPage({
       const { data: tourRows } = await supabase.from('Tour').select('id, guestName, startsAt, endsAt, status, propertyAddress').eq('contactId', id).order('startsAt', { ascending: false }).limit(10);
       contact = {
         ...c,
-        dealContacts: ((dealRows ?? []) as { Deal: { id: string; title: string; address: string | null; value: number | null; status: string; priority: string; DealStage: { name: string; color: string } } }[]).map((row) => ({
+        dealContacts: ((dealRows ?? []) as { Deal: { id: string; title: string; address: string | null; value: number | null; status: string; priority: string; DealStage: { name: string; color: string } | null } }[]).map((row) => ({
           deal: {
             id: row.Deal.id,
             title: row.Deal.title,
@@ -718,7 +718,7 @@ export default async function ClientDetailPage({
                     <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
                       {deal.value != null && (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-md px-1.5 py-0.5">
-                          ${deal.value.toLocaleString()}
+                          {formatCurrency(deal.value)}
                         </span>
                       )}
                       <span
