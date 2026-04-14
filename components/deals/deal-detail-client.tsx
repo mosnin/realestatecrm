@@ -10,11 +10,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Activity, Send } from 'lucide-react';
+import { Activity, Send, ArrowRight } from 'lucide-react';
 import type { DealActivity } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import * as LucideIcons from 'lucide-react';
+
+const STATUS_CHANGE_META: Record<string, { label: string; className: string }> = {
+  active: { label: 'Set to Active', className: 'bg-muted text-muted-foreground' },
+  won: { label: 'Marked as Won', className: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15' },
+  lost: { label: 'Marked as Lost', className: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
+  on_hold: { label: 'Put On Hold', className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' },
+};
+
+/**
+ * Parses stage names out of a stage_change content string like:
+ *   Moved from "Old Stage" to "New Stage"
+ * Returns { from, to } or null if the pattern doesn't match.
+ */
+function parseStageChangeContent(content: string | null): { from: string; to: string } | null {
+  if (!content) return null;
+  const match = content.match(/^Moved from "(.+)" to "(.+)"$/);
+  if (!match) return null;
+  return { from: match[1], to: match[2] };
+}
 
 interface Props {
   dealId: string;
@@ -103,18 +122,63 @@ export function DealDetailClient({ dealId, initialActivities, activityMeta }: Pr
           {activities.map((activity) => {
             const meta = activityMeta[activity.type] ?? activityMeta.note;
             const Icon = meta.icon;
+
+            // --- stage_change: parse from/to names out of content ---
+            const stageNames =
+              activity.type === 'stage_change'
+                ? parseStageChangeContent(activity.content)
+                : null;
+
+            // --- status_change: read toStatus from metadata ---
+            const toStatus =
+              activity.type === 'status_change' && activity.metadata
+                ? (activity.metadata.toStatus as string | undefined)
+                : undefined;
+            const statusChangeMeta =
+              toStatus ? STATUS_CHANGE_META[toStatus] ?? null : null;
+
             return (
               <div key={activity.id} className="flex gap-3">
                 <div className={cn('flex-shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center mt-0.5', meta.color)}>
                   <Icon size={13} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold">{meta.label}</span>
-                    <span className="text-[10px] text-muted-foreground">{timeAgo(new Date(activity.createdAt))}</span>
-                  </div>
-                  {activity.content && (
-                    <p className="text-sm text-muted-foreground mt-0.5 whitespace-pre-wrap">{activity.content}</p>
+                  {/* stage_change with parseable names */}
+                  {activity.type === 'stage_change' && stageNames ? (
+                    <>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="rounded-full px-2 py-0.5 text-xs bg-muted text-muted-foreground">{stageNames.from}</span>
+                        <ArrowRight size={11} className="text-muted-foreground flex-shrink-0" />
+                        <span className="rounded-full px-2 py-0.5 text-xs bg-muted text-muted-foreground">{stageNames.to}</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground mt-0.5 block">
+                        {timeAgo(new Date(activity.createdAt))}
+                      </span>
+                    </>
+                  ) : activity.type === 'status_change' && statusChangeMeta ? (
+                    /* status_change with known toStatus */
+                    <>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', statusChangeMeta.className)}>
+                          {statusChangeMeta.label}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground mt-0.5 block">
+                        {timeAgo(new Date(activity.createdAt))}
+                      </span>
+                    </>
+                  ) : (
+                    /* default rendering for note / call / email / meeting / follow_up,
+                       and fallback for stage_change / status_change with missing metadata */
+                    <>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold">{meta.label}</span>
+                        <span className="text-[10px] text-muted-foreground">{timeAgo(new Date(activity.createdAt))}</span>
+                      </div>
+                      {activity.content && (
+                        <p className="text-sm text-muted-foreground mt-0.5 whitespace-pre-wrap">{activity.content}</p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

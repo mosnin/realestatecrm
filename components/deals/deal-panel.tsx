@@ -35,6 +35,9 @@ import {
   Clock,
   Send,
   ExternalLink,
+  ArrowRight,
+  Tag,
+  Phone,
 } from 'lucide-react';
 import Link from 'next/link';
 import type { Deal, DealStage, Contact, DealContact, DealActivity } from '@/lib/types';
@@ -64,13 +67,32 @@ const STATUS_META = {
 
 const ACTIVITY_META = {
   note: { label: 'Note', icon: FileText, color: 'text-slate-500 dark:text-slate-400' },
-  call: { label: 'Call', icon: PhoneCall, color: 'text-blue-500 dark:text-blue-400' },
+  call: { label: 'Call', icon: Phone, color: 'text-blue-500 dark:text-blue-400' },
   email: { label: 'Email', icon: Mail, color: 'text-orange-500 dark:text-orange-400' },
   meeting: { label: 'Meeting', icon: Users, color: 'text-teal-500 dark:text-teal-400' },
   follow_up: { label: 'Follow-up', icon: Clock, color: 'text-amber-500 dark:text-amber-400' },
-  stage_change: { label: 'Stage change', icon: Activity, color: 'text-muted-foreground' },
-  status_change: { label: 'Status change', icon: CheckCircle2, color: 'text-green-500 dark:text-green-400' },
+  stage_change: { label: 'Stage change', icon: ArrowRight, color: 'text-muted-foreground' },
+  status_change: { label: 'Status change', icon: Tag, color: 'text-muted-foreground' },
 };
+
+const STATUS_CHANGE_META: Record<string, { label: string; className: string }> = {
+  active: { label: 'Set to Active', className: 'bg-muted text-muted-foreground' },
+  won: { label: 'Marked as Won', className: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15' },
+  lost: { label: 'Marked as Lost', className: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
+  on_hold: { label: 'Put On Hold', className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' },
+};
+
+/**
+ * Parses stage names out of a stage_change content string like:
+ *   Moved from "Old Stage" to "New Stage"
+ * Returns { from, to } or null if the pattern doesn't match.
+ */
+function parseStageChangeContent(content: string | null): { from: string; to: string } | null {
+  if (!content) return null;
+  const match = content.match(/^Moved from "(.+)" to "(.+)"$/);
+  if (!match) return null;
+  return { from: match[1], to: match[2] };
+}
 
 export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealPanelProps) {
   const [tab, setTab] = useState<'overview' | 'activity'>('overview');
@@ -371,20 +393,65 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
                   {activities.map((activity) => {
                     const meta = ACTIVITY_META[activity.type] ?? ACTIVITY_META.note;
                     const Icon = meta.icon;
+
+                    // --- stage_change: parse from/to names out of content ---
+                    const stageNames =
+                      activity.type === 'stage_change'
+                        ? parseStageChangeContent(activity.content)
+                        : null;
+
+                    // --- status_change: read toStatus from metadata ---
+                    const toStatus =
+                      activity.type === 'status_change' && activity.metadata
+                        ? (activity.metadata.toStatus as string | undefined)
+                        : undefined;
+                    const statusChangeMeta =
+                      toStatus ? STATUS_CHANGE_META[toStatus] ?? null : null;
+
                     return (
                       <div key={activity.id} className="flex gap-3">
                         <div className={cn('flex-shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center mt-0.5', meta.color)}>
                           <Icon size={13} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-foreground">{meta.label}</span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {relativeTime(new Date(activity.createdAt))}
-                            </span>
-                          </div>
-                          {activity.content && (
-                            <p className="text-sm text-muted-foreground mt-0.5 whitespace-pre-wrap">{activity.content}</p>
+                          {/* stage_change with parseable names */}
+                          {activity.type === 'stage_change' && stageNames ? (
+                            <>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="rounded-full px-2 py-0.5 text-xs bg-muted text-muted-foreground">{stageNames.from}</span>
+                                <ArrowRight size={11} className="text-muted-foreground flex-shrink-0" />
+                                <span className="rounded-full px-2 py-0.5 text-xs bg-muted text-muted-foreground">{stageNames.to}</span>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground mt-0.5 block">
+                                {relativeTime(new Date(activity.createdAt))}
+                              </span>
+                            </>
+                          ) : activity.type === 'status_change' && statusChangeMeta ? (
+                            /* status_change with known toStatus */
+                            <>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', statusChangeMeta.className)}>
+                                  {statusChangeMeta.label}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground mt-0.5 block">
+                                {relativeTime(new Date(activity.createdAt))}
+                              </span>
+                            </>
+                          ) : (
+                            /* default rendering for note / call / email / meeting / follow_up,
+                               and fallback for stage_change / status_change with missing metadata */
+                            <>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-foreground">{meta.label}</span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {relativeTime(new Date(activity.createdAt))}
+                                </span>
+                              </div>
+                              {activity.content && (
+                                <p className="text-sm text-muted-foreground mt-0.5 whitespace-pre-wrap">{activity.content}</p>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
