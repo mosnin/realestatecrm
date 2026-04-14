@@ -142,6 +142,17 @@ export function KanbanColumn({
       {/* Column header */}
       <div className="flex items-center justify-between mb-3 px-0.5">
         <div className="flex items-center gap-2 min-w-0">
+          {dragHandleProps && (
+            <button
+              type="button"
+              title="Drag to reorder stage"
+              aria-label={`Reorder stage ${stage.name}`}
+              className="hidden md:flex h-5 w-5 items-center justify-center rounded text-muted-foreground opacity-0 group-hover/column:opacity-100 hover:bg-muted cursor-grab active:cursor-grabbing transition-opacity flex-shrink-0"
+              {...dragHandleProps}
+            >
+              <GripVertical size={13} className="rotate-90" />
+            </button>
+          )}
           <span
             className="w-2.5 h-2.5 rounded-full flex-shrink-0"
             style={{ backgroundColor: stage.color }}
