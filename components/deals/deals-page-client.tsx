@@ -7,20 +7,30 @@ import { cn } from '@/lib/utils';
 
 export function DealsPageClient({ slug }: { slug: string }) {
   const [pipelineType, setPipelineType] = useState<'rental' | 'buyer'>('rental');
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    const stored =
-      typeof window !== 'undefined'
-        ? localStorage.getItem(`chippi:deals:pipeline:${slug}`)
-        : null;
-    if (stored === 'rental' || stored === 'buyer') setPipelineType(stored);
+    if (typeof window === 'undefined' || !slug) {
+      setHydrated(true);
+      return;
+    }
+    try {
+      const stored = localStorage.getItem(`chippi:deals:pipeline:${slug}`);
+      if (stored === 'rental' || stored === 'buyer') setPipelineType(stored);
+    } catch {
+      // localStorage unavailable (Safari private mode, disabled, etc.) — ignore.
+    }
+    setHydrated(true);
   }, [slug]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window === 'undefined' || !slug || !hydrated) return;
+    try {
       localStorage.setItem(`chippi:deals:pipeline:${slug}`, pipelineType);
+    } catch {
+      // quota exceeded / storage disabled — ignore.
     }
-  }, [slug, pipelineType]);
+  }, [slug, pipelineType, hydrated]);
 
   return (
     <div className="space-y-4">

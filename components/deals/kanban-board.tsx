@@ -92,37 +92,49 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   >(new Set(['active']));
   const { confirm, ConfirmDialog } = useConfirm();
 
+  const [prefsHydrated, setPrefsHydrated] = useState(false);
+
   // Hydrate status filter from localStorage (SSR-safe).
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const raw = localStorage.getItem(`chippi:deals:statusFilter:${slug}`);
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return;
-      const valid: Array<'active' | 'won' | 'lost' | 'on_hold'> = [
-        'active',
-        'won',
-        'lost',
-        'on_hold',
-      ];
-      const filtered = parsed.filter((v): v is 'active' | 'won' | 'lost' | 'on_hold' =>
-        typeof v === 'string' && (valid as string[]).includes(v),
-      );
-      setStatusFilter(new Set(filtered));
-    } catch {
-      // ignore malformed value
+    if (typeof window === 'undefined' || !slug) {
+      setPrefsHydrated(true);
+      return;
     }
+    try {
+      const raw = localStorage.getItem(`chippi:deals:statusFilter:${slug}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const valid: Array<'active' | 'won' | 'lost' | 'on_hold'> = [
+            'active',
+            'won',
+            'lost',
+            'on_hold',
+          ];
+          const filtered = parsed.filter((v): v is 'active' | 'won' | 'lost' | 'on_hold' =>
+            typeof v === 'string' && (valid as string[]).includes(v),
+          );
+          setStatusFilter(new Set(filtered));
+        }
+      }
+    } catch {
+      // ignore malformed value or storage access errors
+    }
+    setPrefsHydrated(true);
   }, [slug]);
 
   // Persist status filter.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(
-      `chippi:deals:statusFilter:${slug}`,
-      JSON.stringify(Array.from(statusFilter)),
-    );
-  }, [slug, statusFilter]);
+    if (typeof window === 'undefined' || !slug || !prefsHydrated) return;
+    try {
+      localStorage.setItem(
+        `chippi:deals:statusFilter:${slug}`,
+        JSON.stringify(Array.from(statusFilter)),
+      );
+    } catch {
+      // quota / storage disabled — ignore.
+    }
+  }, [slug, statusFilter, prefsHydrated]);
 
   function toggleStatus(status: 'active' | 'won' | 'lost' | 'on_hold') {
     setStatusFilter((prev) => {
@@ -134,18 +146,23 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   }
 
   useEffect(() => {
-    const stored =
-      typeof window !== 'undefined'
-        ? localStorage.getItem(`chippi:deals:view:${slug}`)
-        : null;
-    if (stored === 'kanban' || stored === 'list') setView(stored);
+    if (typeof window === 'undefined' || !slug) return;
+    try {
+      const stored = localStorage.getItem(`chippi:deals:view:${slug}`);
+      if (stored === 'kanban' || stored === 'list') setView(stored);
+    } catch {
+      // localStorage unavailable — ignore.
+    }
   }, [slug]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window === 'undefined' || !slug || !prefsHydrated) return;
+    try {
       localStorage.setItem(`chippi:deals:view:${slug}`, view);
+    } catch {
+      // quota / storage disabled — ignore.
     }
-  }, [slug, view]);
+  }, [slug, view, prefsHydrated]);
 
   // Stage deletion state: when a stage has deals, we prompt the user to pick
   // a migration target before calling DELETE with ?targetStageId=...
