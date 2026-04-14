@@ -99,7 +99,9 @@ export function DealCard({ deal, onEdit, onDelete, onOpenPanel }: DealCardProps)
     if (deal.status !== 'active' || !deal.updatedAt) return null;
     const raw = new Date(deal.updatedAt);
     if (isNaN(raw.getTime())) return null;
-    const diffMs = startOfToday.getTime() - raw.getTime();
+    const updatedDay = new Date(raw);
+    updatedDay.setHours(0, 0, 0, 0);
+    const diffMs = startOfToday.getTime() - updatedDay.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     if (diffDays <= 7) return null;
     const label = `${diffDays}d in stage`;
