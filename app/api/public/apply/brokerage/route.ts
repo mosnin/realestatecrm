@@ -114,44 +114,86 @@ async function fetchBrokerageFormConfig(
   return null;
 }
 
+type VisibilityCondition = {
+  questionId: string;
+  operator: 'equals' | 'not_equals' | 'contains';
+  value: string;
+} | undefined;
+
+function evaluateVisibility(
+  condition: VisibilityCondition,
+  answers: Record<string, unknown>,
+): boolean {
+  if (!condition) return true;
+
+  const raw = answers[condition.questionId];
+  const currentValue = Array.isArray(raw)
+    ? raw.join(',')
+    : raw == null
+      ? ''
+      : String(raw);
+
+  switch (condition.operator) {
+    case 'equals':
+      return currentValue === condition.value;
+    case 'not_equals':
+      return currentValue !== condition.value;
+    case 'contains':
+      return currentValue.includes(condition.value);
+    default:
+      return true;
+  }
+}
+
 /**
- * Build a Zod schema dynamically from the IntakeFormConfig.
+ * Build a visibility-aware Zod schema from the IntakeFormConfig.
+ * Required fields are only enforced when the corresponding section/question
+ * is visible for the current submission.
  */
-function buildDynamicSchema(config: IntakeFormConfig) {
+function buildDynamicSchemaForSubmission(
+  config: IntakeFormConfig,
+  submission: Record<string, unknown>,
+) {
   const shape: Record<string, z.ZodTypeAny> = {
     brokerageId: z.string().uuid(),
   };
 
   const allQuestions: FormQuestion[] = [];
   for (const section of config.sections) {
+    const sectionVisible = evaluateVisibility(section.visibleWhen, submission);
+
     for (const question of section.questions) {
       allQuestions.push(question);
 
       let fieldSchema: z.ZodTypeAny;
+      const required =
+        sectionVisible &&
+        evaluateVisibility(question.visibleWhen, submission) &&
+        question.required;
 
       switch (question.type) {
         case 'email':
-          fieldSchema = question.required
+          fieldSchema = required
             ? z.string().trim().min(1).email().max(255)
             : z.string().trim().email().max(255).optional().or(z.literal(''));
           break;
         case 'phone':
-          fieldSchema = question.required
+          fieldSchema = required
             ? z.string().trim().min(1).max(40)
             : z.string().trim().max(40).optional().or(z.literal(''));
           break;
         case 'number':
-          fieldSchema = question.required
+          fieldSchema = required
             ? z.union([z.number(), z.string()]).pipe(z.coerce.number())
             : z.union([z.number(), z.string(), z.null(), z.undefined()]).optional();
           break;
         case 'checkbox':
-          fieldSchema = question.required
+          fieldSchema = required
             ? z.boolean()
             : z.boolean().optional();
           break;
         case 'multi_select':
-          fieldSchema = question.required
+          fieldSchema = required
             ? z.array(z.string()).min(1)
             : z.array(z.string()).optional();
           break;
@@ -161,7 +203,7 @@ function buildDynamicSchema(config: IntakeFormConfig) {
         case 'select':
         case 'radio':
         default:
-          fieldSchema = question.required
+          fieldSchema = required
             ? z.string().trim().min(1).max(4000)
             : z.string().trim().max(4000).optional().or(z.literal(''));
           break;
@@ -277,7 +319,7 @@ export async function POST(req: NextRequest) {
         console.warn('[apply/brokerage] using legacy owner-only space fallback', {
           brokerageId: brokerage.id,
           ownerId: brokerage.ownerId,
-          spaceId: space.id,
+          spaceId: fallbackSpace.id,
         });
       }
     }
@@ -353,7 +395,10 @@ export async function POST(req: NextRequest) {
         leadType: resolvedLeadType,
         version: formConfig.version,
       });
-      const { schema: dynamicSchema } = buildDynamicSchema(formConfig);
+      const { schema: dynamicSchema } = buildDynamicSchemaForSubmission(
+        formConfig,
+        requestBody as Record<string, unknown>,
+      );
 
       const parsed = dynamicSchema.safeParse(requestBody);
       if (!parsed.success) {

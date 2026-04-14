@@ -1012,6 +1012,10 @@ export function DynamicApplicationForm({
     const submissionLeadType = resolvedLeadType === 'general' ? 'rental' : resolvedLeadType;
 
     const payload: Record<string, unknown> = {
+      // Include all visible dynamic answers at top-level so server-side dynamic
+      // schema validation (which is keyed by question.id) can validate custom
+      // questions/sections end-to-end.
+      ...flatAnswers,
       slug,
       leadType: submissionLeadType,
       formLeadType: submissionLeadType,

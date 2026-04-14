@@ -302,7 +302,7 @@ export async function chatWithRAG(
       : error?.status === 429
       ? 'AI rate limit reached. Please wait a moment and try again.'
       : error?.status === 404
-      ? 'The AI model was not found. Your API key may not have access to gpt-5.4-mini.'
+      ? 'The AI model was not found. Your API key may not have access to gpt-4.1-mini.'
       : error?.status === 500 || error?.status === 503
       ? 'OpenAI is experiencing issues. Please try again in a moment.'
       : `AI service error (${error?.status ?? 'unknown'}). Please try again.`;
