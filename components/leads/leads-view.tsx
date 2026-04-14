@@ -47,7 +47,6 @@ import { timeAgo, formatMoney, getInitials, formatFollowUpDate, toDateInputValue
 import { LEAD_TIERS, type TierKey } from '@/lib/constants';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { TableContent, TableHeader, TableColumn, TableBody, TableRow, TableCell } from '@heroui/react';
 
 const TIERS = LEAD_TIERS;
 
@@ -192,8 +191,6 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
   const [search, setSearch] = useState(paramSearch ?? '');
   const [convertTarget, setConvertTarget] = useState<Contact | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [page, setPage] = useState(1);
-  const rowsPerPage = 25;
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [saveViewName, setSaveViewName] = useState('');
   const [showSaveInput, setShowSaveInput] = useState(false);
@@ -351,9 +348,6 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
     // Default 'newest' is the original server order (createdAt desc)
     return list;
   }, [leads, tierFilter, leadTypeFilter, sort, search]);
-
-  const pages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
-  const paginatedLeads = filtered.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   function handleConverted(leadId: string) {
     setLeads((prev) => prev.filter((l) => l.id !== leadId));
@@ -934,143 +928,140 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
       {/* ── List view ── */}
       {view === 'list' && filtered.length > 0 && (
         <div className="rounded-lg border border-border overflow-hidden">
-          <TableContent
-            aria-label="Leads list"
-            selectionMode="multiple"
-            selectedKeys={selectedIds}
-            onSelectionChange={(keys) => {
-              if (keys === 'all') {
-                setSelectedIds(new Set(filtered.map((l) => l.id)));
-              } else {
-                setSelectedIds(new Set([...keys].map(String)));
-              }
-            }}
-            className="min-w-full"
-          >
-            <TableHeader>
-              <TableColumn isRowHeader id="name" className="bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Name</TableColumn>
-              <TableColumn id="score" className="bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Score</TableColumn>
-              <TableColumn id="contact" className="hidden sm:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Contact</TableColumn>
-              <TableColumn id="budget" className="hidden md:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Budget</TableColumn>
-              <TableColumn id="submitted" className="hidden lg:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Submitted</TableColumn>
-              <TableColumn id="followup" className="hidden xl:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Follow-up</TableColumn>
-              <TableColumn id="actions" className="w-24 bg-muted/40 border-b border-border"> </TableColumn>
-            </TableHeader>
-            <TableBody>
-              {paginatedLeads.map((lead) => {
-                const isNew = newLeadIds.has(lead.id);
-                const app = lead.applicationData as ApplicationData | null;
-                const rawBudget = app?.monthlyRent ?? lead.budget;
-                const budgetDisplay = typeof rawBudget === 'string' ? rawBudget : rawBudget != null ? `${formatMoney(rawBudget)}/mo` : null;
-                const tierKey = getTierKey(lead);
-                const tier = TIERS[tierKey];
-                const score = lead.leadScore != null ? Math.round(lead.leadScore) : null;
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/40">
+                  <th className="px-4 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.size === filtered.length && filtered.length > 0}
+                      onChange={toggleSelectAll}
+                      className="rounded border-border cursor-pointer"
+                    />
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Score</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Contact</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Budget</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Submitted</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden xl:table-cell">Follow-up</th>
+                  <th className="px-4 py-3 w-24" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-card">
+                {filtered.map((lead) => {
+                  const isNew = newLeadIds.has(lead.id);
+                  const app = lead.applicationData as ApplicationData | null;
+                  const rawBudget = app?.monthlyRent ?? lead.budget;
+                  const budgetDisplay = typeof rawBudget === 'string' ? rawBudget : rawBudget != null ? `${formatMoney(rawBudget)}/mo` : null;
+                  const tierKey = getTierKey(lead);
+                  const tier = TIERS[tierKey];
+                  const score = lead.leadScore != null ? Math.round(lead.leadScore) : null;
+                  const isSelected = selectedIds.has(lead.id);
 
-                return (
-                  <TableRow key={lead.id} id={lead.id} className="group border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                    <TableCell className="py-3">
-                      <Link href={`/s/${slug}/leads/${lead.id}`} className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-                          {getInitials(lead.name)}
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium hover:text-foreground transition-colors">{lead.name}</span>
-                          <span className="text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground">
-                            {lead.leadType === 'buyer' ? 'Buyer' : 'Rental'}
-                          </span>
-                          {isNew && (
-                            <span className="text-[10px] font-bold bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 rounded-md px-1.5 py-0.5">NEW</span>
+                  return (
+                    <tr
+                      key={lead.id}
+                      className={cn(
+                        'group hover:bg-muted/30 transition-colors',
+                        isSelected && 'bg-primary/5',
+                      )}
+                    >
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(lead.id)}
+                          className="rounded border-border cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link href={`/s/${slug}/leads/${lead.id}`} className="flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
+                            {getInitials(lead.name)}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium hover:text-foreground transition-colors">{lead.name}</span>
+                              {lead.leadType === 'buyer' ? (
+                                <span className="text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground">Buyer</span>
+                              ) : (
+                                <span className="text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground">Rental</span>
+                              )}
+                              {isNew && (
+                                <span className="text-[10px] font-bold bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 rounded-md px-1.5 py-0.5">NEW</span>
+                              )}
+                            </div>
+                          </div>
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={cn('inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-1', tier.pill)}>
+                          {score != null ? `${score} ·` : ''} {tier.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 hidden sm:table-cell">
+                        <div className="space-y-0.5">
+                          {lead.email && (
+                            <a href={`mailto:${lead.email}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors truncate max-w-[180px]">
+                              <Mail size={10} className="flex-shrink-0" />
+                              {lead.email}
+                            </a>
+                          )}
+                          {lead.phone && (
+                            <a href={`tel:${lead.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                              <Phone size={10} className="flex-shrink-0" />
+                              {lead.phone}
+                            </a>
                           )}
                         </div>
-                      </Link>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <span className={cn('inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-1', tier.pill)}>
-                        {score != null ? `${score} · ` : ''}{tier.label}
-                      </span>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell py-3">
-                      <div className="space-y-0.5">
-                        {lead.email && (
-                          <a href={`mailto:${lead.email}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors truncate max-w-[180px]">
-                            <Mail size={10} className="flex-shrink-0" />{lead.email}
-                          </a>
-                        )}
-                        {lead.phone && (
-                          <a href={`tel:${lead.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                            <Phone size={10} className="flex-shrink-0" />{lead.phone}
-                          </a>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell py-3 text-xs text-muted-foreground">
-                      {budgetDisplay ?? '—'}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell py-3 text-xs text-muted-foreground">
-                      {timeAgo(new Date(lead.createdAt))}
-                    </TableCell>
-                    <TableCell className="hidden xl:table-cell py-3">
-                      <label className="flex items-center gap-1 text-xs cursor-pointer">
-                        <CalendarDays size={10} className="text-muted-foreground" />
-                        <span className={cn(
-                          lead.followUpAt
-                            ? new Date(lead.followUpAt) < new Date() ? 'text-destructive font-medium' : 'text-foreground font-medium'
-                            : 'text-muted-foreground',
-                        )}>
-                          {lead.followUpAt ? formatFollowUpDate(lead.followUpAt) : '—'}
-                        </span>
-                        <input
-                          type="date"
-                          className="sr-only"
-                          value={toDateInputValue(lead.followUpAt)}
-                          onChange={(e) => patchLead(lead.id, { followUpAt: e.target.value || null })}
-                        />
-                      </label>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setConvertTarget(lead)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-medium"
-                        >
-                          <UserCheck size={12} />
-                          Convert
-                        </button>
-                        <Link href={`/s/${slug}/leads/${lead.id}`} className="text-xs text-muted-foreground hover:text-foreground font-medium">
-                          Open
-                        </Link>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </TableContent>
-          {pages > 1 && (
-            <div className="flex items-center justify-center gap-1 py-2 border-t border-border">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="w-8 h-8 rounded-md flex items-center justify-center text-sm text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >‹</button>
-              {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={cn(
-                    'w-8 h-8 rounded-md flex items-center justify-center text-sm transition-colors',
-                    p === page ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:bg-muted'
-                  )}
-                >{p}</button>
-              ))}
-              <button
-                onClick={() => setPage((p) => Math.min(pages, p + 1))}
-                disabled={page === pages}
-                className="w-8 h-8 rounded-md flex items-center justify-center text-sm text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >›</button>
-            </div>
-          )}
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">
+                        {budgetDisplay ?? '—'}
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
+                        {timeAgo(new Date(lead.createdAt))}
+                      </td>
+                      <td className="px-4 py-3 hidden xl:table-cell">
+                        <label className="flex items-center gap-1 text-xs cursor-pointer">
+                          <CalendarDays size={10} className="text-muted-foreground" />
+                          <span className={cn(
+                            lead.followUpAt
+                              ? new Date(lead.followUpAt) < new Date() ? 'text-destructive font-medium' : 'text-foreground font-medium'
+                              : 'text-muted-foreground',
+                          )}>
+                            {lead.followUpAt ? formatFollowUpDate(lead.followUpAt) : '—'}
+                          </span>
+                          <input
+                            type="date"
+                            className="sr-only"
+                            value={toDateInputValue(lead.followUpAt)}
+                            onChange={(e) => patchLead(lead.id, { followUpAt: e.target.value || null })}
+                          />
+                        </label>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setConvertTarget(lead)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-medium"
+                          >
+                            <UserCheck size={12} />
+                            Convert
+                          </button>
+                          <Link href={`/s/${slug}/leads/${lead.id}`} className="text-xs text-muted-foreground hover:text-foreground font-medium">
+                            Open
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

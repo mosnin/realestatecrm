@@ -23,6 +23,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useRealtime } from '@/hooks/use-realtime';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TourAvailabilityManager } from './tour-availability-manager';
@@ -30,7 +31,6 @@ import { TourPrepCard } from '@/components/tours/tour-prep-card';
 import { TourTimeline } from '@/components/tours/tour-timeline';
 import { TourStatsStrip } from '@/components/tours/tour-stats-strip';
 import { TourFeedbackBadge } from '@/components/tours/tour-feedback-badge';
-import { TableContent, TableHeader, TableColumn, TableBody, TableRow, TableCell } from '@heroui/react';
 
 type TourStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 
@@ -93,8 +93,6 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
   const [copied, setCopied] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const rowsPerPage = 20;
   const [searchQuery, setSearchQuery] = useState('');
   const [view, setView] = useState<'table' | 'card'>('table');
   const [convertingId, setConvertingId] = useState<string | null>(null);
@@ -148,8 +146,6 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
   });
 
   const upcomingCount = tours.filter((t) => new Date(t.startsAt) >= now && t.status !== 'cancelled').length;
-  const pages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
-  const paginatedTours = filtered.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   function copyLink() {
     const url = `${window.location.origin}${bookingUrl}`;
@@ -385,125 +381,129 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
         view === 'table' ? (
           /* ── Table view ── */
           <div className="rounded-lg border border-border overflow-hidden">
-            <TableContent
-              aria-label="Tours list"
-              className="min-w-full"
-            >
-              <TableHeader>
-                <TableColumn isRowHeader id="guest" className="bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Guest</TableColumn>
-                <TableColumn id="datetime" className="hidden sm:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Date &amp; Time</TableColumn>
-                <TableColumn id="property" className="hidden md:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Property</TableColumn>
-                <TableColumn id="status" className="bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Status</TableColumn>
-                <TableColumn id="contact" className="hidden lg:table-cell bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border">Contact</TableColumn>
-                <TableColumn id="actions" className="w-16 bg-muted/40 border-b border-border"> </TableColumn>
-              </TableHeader>
-              <TableBody>
-                {paginatedTours.map((tour) => {
-                  const { date, time } = formatDateTime(tour.startsAt);
-                  const endTime = formatDateTime(tour.endsAt).time;
-                  const dur = getDuration(tour.startsAt, tour.endsAt);
-                  const statusConf = STATUS_CONFIG[tour.status];
-                  const isPast = new Date(tour.startsAt) < now;
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Guest</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Date & Time</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Property</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Contact</th>
+                    <th className="px-4 py-3 w-16" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border bg-card">
+                  {filtered.map((tour) => {
+                    const { date, time } = formatDateTime(tour.startsAt);
+                    const endTime = formatDateTime(tour.endsAt).time;
+                    const dur = getDuration(tour.startsAt, tour.endsAt);
+                    const statusConf = STATUS_CONFIG[tour.status];
+                    const isPast = new Date(tour.startsAt) < now;
 
-                  return (
-                    <TableRow key={tour.id} id={tour.id} className={cn('group border-b border-border last:border-0 hover:bg-muted/30 transition-colors', isPast && tour.status !== 'completed' && 'opacity-70')}>
-                      <TableCell className="py-3">
-                        <div>
-                          <p className="font-medium">{tour.guestName}</p>
-                          <p className="text-xs text-muted-foreground">{tour.guestEmail}</p>
-                          {tour.guestPhone && <p className="text-xs text-muted-foreground sm:hidden">{tour.guestPhone}</p>}
-                          <p className="text-xs text-muted-foreground mt-0.5 sm:hidden">{date} {time}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell py-3">
-                        <p className="text-sm">{date}</p>
-                        <p className="text-xs text-muted-foreground">{time} – {endTime} ({dur} min)</p>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell py-3 text-xs text-muted-foreground">
-                        {tour.propertyAddress ? (
-                          <span className="flex items-center gap-1"><MapPin size={10} /> {tour.propertyAddress}</span>
-                        ) : '—'}
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap', statusConf.color)}>
-                          {statusConf.label}
-                        </span>
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell py-3 text-xs">
-                        {tour.Contact ? (
-                          <a href={`/s/${slug}/contacts/${tour.Contact.id}`} className="text-muted-foreground hover:text-foreground hover:underline">
-                            {tour.Contact.name}
-                          </a>
-                        ) : '—'}
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="relative">
-                          <button
-                            onClick={() => setActionMenuId(actionMenuId === tour.id ? null : tour.id)}
-                            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
-                          >
-                            <MoreHorizontal size={14} />
-                          </button>
-                          {actionMenuId === tour.id && (
-                            <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-border bg-card shadow-lg dark:shadow-none py-1">
-                              {tour.status === 'scheduled' && (
-                                <button onClick={() => updateStatus(tour.id, 'confirmed')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">Confirm</button>
-                              )}
-                              {(tour.status === 'scheduled' || tour.status === 'confirmed') && (
-                                <>
-                                  <button onClick={() => updateStatus(tour.id, 'completed')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">Mark Completed</button>
-                                  <button onClick={() => updateStatus(tour.id, 'no_show')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">Mark No-Show</button>
-                                  <button onClick={() => updateStatus(tour.id, 'cancelled')} className="w-full text-left px-3 py-1.5 text-xs text-destructive hover:bg-accent transition-colors">Cancel Tour</button>
-                                </>
-                              )}
-                              {(tour.status === 'completed' || tour.status === 'confirmed') && !tour.sourceDealId && (
-                                <button
-                                  onClick={() => { setActionMenuId(null); convertToDeal(tour.id); }}
-                                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors flex items-center gap-1.5"
-                                >
-                                  <Briefcase size={11} />
-                                  {convertingId === tour.id ? 'Creating...' : 'Create Deal'}
-                                </button>
-                              )}
-                              {tour.sourceDealId && (
-                                <a href={`/s/${slug}/deals/${tour.sourceDealId}`} className="w-full block text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors text-foreground">View Deal</a>
-                              )}
-                              {tour.status === 'cancelled' && (
-                                <button onClick={() => updateStatus(tour.id, 'scheduled')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">Reschedule</button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </TableContent>
-            {pages > 1 && (
-              <div className="flex items-center justify-center gap-1 py-2 border-t border-border">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="w-8 h-8 rounded-md flex items-center justify-center text-sm text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >‹</button>
-                {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setPage(p)}
-                    className={cn(
-                      'w-8 h-8 rounded-md flex items-center justify-center text-sm transition-colors',
-                      p === page ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:bg-muted'
-                    )}
-                  >{p}</button>
-                ))}
-                <button
-                  onClick={() => setPage((p) => Math.min(pages, p + 1))}
-                  disabled={page === pages}
-                  className="w-8 h-8 rounded-md flex items-center justify-center text-sm text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >›</button>
-              </div>
-            )}
+                    return (
+                      <tr
+                        key={tour.id}
+                        className={cn(
+                          'group hover:bg-muted/30 transition-colors',
+                          isPast && tour.status !== 'completed' && 'opacity-70',
+                        )}
+                      >
+                        <td className="px-4 py-3">
+                          <div>
+                            <p className="font-medium">{tour.guestName}</p>
+                            <p className="text-xs text-muted-foreground">{tour.guestEmail}</p>
+                            {tour.guestPhone && (
+                              <p className="text-xs text-muted-foreground sm:hidden">{tour.guestPhone}</p>
+                            )}
+                            {/* Show date on mobile since the date column is hidden */}
+                            <p className="text-xs text-muted-foreground mt-0.5 sm:hidden">{date} {time}</p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 hidden sm:table-cell">
+                          <p className="text-sm">{date}</p>
+                          <p className="text-xs text-muted-foreground">{time} – {endTime} ({dur} min)</p>
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">
+                          {tour.propertyAddress ? (
+                            <span className="flex items-center gap-1"><MapPin size={10} /> {tour.propertyAddress}</span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap', statusConf.color)}>
+                            {statusConf.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 hidden lg:table-cell text-xs">
+                          {tour.Contact ? (
+                            <a
+                              href={`/s/${slug}/contacts/${tour.Contact.id}`}
+                              className="text-muted-foreground hover:text-foreground hover:underline"
+                            >
+                              {tour.Contact.name}
+                            </a>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="relative">
+                            <button
+                              onClick={() => setActionMenuId(actionMenuId === tour.id ? null : tour.id)}
+                              className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
+                            >
+                              <MoreHorizontal size={14} />
+                            </button>
+                            {actionMenuId === tour.id && (
+                              <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-border bg-card shadow-lg dark:shadow-none py-1">
+                                {tour.status === 'scheduled' && (
+                                  <button onClick={() => updateStatus(tour.id, 'confirmed')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">
+                                    Confirm
+                                  </button>
+                                )}
+                                {(tour.status === 'scheduled' || tour.status === 'confirmed') && (
+                                  <>
+                                    <button onClick={() => updateStatus(tour.id, 'completed')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">
+                                      Mark Completed
+                                    </button>
+                                    <button onClick={() => updateStatus(tour.id, 'no_show')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">
+                                      Mark No-Show
+                                    </button>
+                                    <button onClick={() => updateStatus(tour.id, 'cancelled')} className="w-full text-left px-3 py-1.5 text-xs text-destructive hover:bg-accent transition-colors">
+                                      Cancel Tour
+                                    </button>
+                                  </>
+                                )}
+                                {(tour.status === 'completed' || tour.status === 'confirmed') && !tour.sourceDealId && (
+                                  <button
+                                    onClick={() => { setActionMenuId(null); convertToDeal(tour.id); }}
+                                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors flex items-center gap-1.5"
+                                  >
+                                    <Briefcase size={11} />
+                                    {convertingId === tour.id ? 'Creating...' : 'Create Deal'}
+                                  </button>
+                                )}
+                                {tour.sourceDealId && (
+                                  <a
+                                    href={`/s/${slug}/deals/${tour.sourceDealId}`}
+                                    className="w-full block text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors text-foreground"
+                                  >
+                                    View Deal
+                                  </a>
+                                )}
+                                {tour.status === 'cancelled' && (
+                                  <button onClick={() => updateStatus(tour.id, 'scheduled')} className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors">
+                                    Reschedule
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
           /* ── Card view (existing) ── */
