@@ -26,4 +26,4 @@ Multi-currency, MLS integration, document signing, email/SMS campaigns, property
 
 ## Technical Summary
 
-Next.js 15 (app router) with TypeScript and Tailwind CSS v4. Clerk for authentication. Supabase (PostgreSQL) for database. OpenAI for AI lead scoring and embeddings. Anthropic SDK for AI assistant. Resend for transactional email. Upstash Redis for rate limiting. Amplitude for product analytics. shadcn/ui components with Lucide icons. Framer Motion for animations. Recharts for charts. react-hook-form + Zod for forms. Deployed on Vercel.
+Next.js 15 (app router) with TypeScript and Tailwind CSS v4. Clerk for authentication. Supabase (PostgreSQL) for database. OpenAI for AI lead scoring, embeddings, and AI assistant. Resend for transactional email. Upstash Redis for rate limiting. Amplitude for product analytics. shadcn/ui components with Lucide icons. Framer Motion for animations. Recharts for charts. react-hook-form + Zod for forms. Deployed on Vercel.

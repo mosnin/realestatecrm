@@ -96,8 +96,7 @@ Upstash Redis (@upstash/redis) for rate limiting on auth and public API endpoint
 
 ### AI / ML
 
-- OpenAI SDK — lead scoring (gpt-4o-mini), embeddings (text-embedding-3-small), AI assistant
-- Anthropic SDK — alternative AI assistant backend (user-provided API key)
+- OpenAI SDK — lead scoring (gpt-4o-mini), embeddings (text-embedding-3-small), AI assistant (gpt-4.1-mini)
 - pgvector + match_documents RPC — vector similarity search for RAG context
 
 ### Drag and Drop

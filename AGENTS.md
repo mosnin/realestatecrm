@@ -10,7 +10,7 @@ All AI agents must read and follow this file before making any changes.
 
 Chippi is a self-serve SaaS for U.S. realtors focused on faster lead handling through intake, qualification, follow-up, and lightweight CRM workflows. The product emphasizes speed, clarity, and a polished brand experience for solo realtors handling renter and leasing leads.
 
-**Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind 4, Prisma 7 (PostgreSQL), Clerk (auth), OpenAI (scoring + embeddings), Anthropic SDK (assistant fallback), Zilliz/Milvus (vector search), Upstash Redis (legacy metadata), Vercel (deployment target).
+**Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind 4, Prisma 7 (PostgreSQL), Clerk (auth), OpenAI (scoring + embeddings + assistant), Zilliz/Milvus (vector search), Upstash Redis (legacy metadata), Vercel (deployment target).
 
 ---
 

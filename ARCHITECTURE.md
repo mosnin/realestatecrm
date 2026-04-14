@@ -24,7 +24,7 @@ System map for Chippi. Based on actual repository contents.
 | Auth | Clerk (`@clerk/nextjs@^7.0.1`) | Middleware-based route protection |
 | Database | Supabase PostgreSQL (`@supabase/supabase-js@^2.99.1`) | Service-role key, server-side only |
 | AI - scoring | OpenAI (`openai@^6.26.0`) | `gpt-4o-mini`, structured JSON output |
-| AI - assistant | OpenAI (preferred) + Anthropic SDK (`@anthropic-ai/sdk@^0.78.0`) fallback | `gpt-4o-mini` / `claude-sonnet-4-6` |
+| AI - assistant | OpenAI (`openai@^6.26.0`) | `gpt-4.1-mini` |
 | AI - embeddings | OpenAI `text-embedding-3-small` | 1536-dim vectors |
 | Vector DB | Supabase pgvector (`DocumentEmbedding` table) | Per-space rows, HNSW index, COSINE metric via `match_documents` RPC |
 | Cache/legacy | Upstash Redis (`@upstash/redis@^1.34.9`) | Slug metadata, admin path |
@@ -142,7 +142,7 @@ realestatecrm/
    → Contacts page: full CRUD with type filter
    → Deals page: kanban with stages and drag/reorder
 6. AI assistant:
-   → Streams response via OpenAI (preferred) or Anthropic (fallback)
+   → Streams response via OpenAI
    → Enriches with vector context from Supabase pgvector (scoped to caller's spaceId)
    → Persists messages to Message table
 ```

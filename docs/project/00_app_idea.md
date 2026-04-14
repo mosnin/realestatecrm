@@ -86,7 +86,6 @@ Multi-step inline onboarding flow triggered on first sign-in at `/`. Steps inclu
 - Clerk (authentication, user management, session handling)
 - Supabase (PostgreSQL database, RLS)
 - OpenAI (lead scoring via gpt-4o-mini, embeddings via text-embedding-3-small, AI assistant)
-- Anthropic (AI assistant alternative via user-provided API key)
 - Resend (transactional email — tour confirmations, waitlist notifications, broker notifications)
 - Upstash Redis (rate limiting)
 - Amplitude (product analytics)

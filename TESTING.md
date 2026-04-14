@@ -31,7 +31,6 @@ Dev server runs at `http://localhost:3000` with Turbopack.
 | Service | Required for | Env vars |
 |---|---|---|
 | OpenAI | Lead scoring, embeddings, AI assistant | `OPENAI_API_KEY` |
-| Anthropic | AI assistant fallback | `ANTHROPIC_API_KEY` |
 | Zilliz/Milvus | Vector search (RAG context) | `ZILLIZ_URI`, `ZILLIZ_TOKEN` |
 | Upstash Redis | Legacy admin/slug path | `KV_REST_API_URL`, `KV_REST_API_TOKEN` |
 
@@ -107,8 +106,7 @@ Run these after any change to confirm nothing is fundamentally broken:
 - [ ] Chat page (`/s/[slug]/ai`) loads
 - [ ] Sending a message streams a response
 - [ ] Messages are persisted in `Message` table (both user and assistant)
-- [ ] Missing both `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` returns explicit error text
-- [ ] Per-workspace Anthropic key in settings is used when set
+- [ ] Missing `OPENAI_API_KEY` returns explicit error text
 - [ ] Vector context enrichment works when Zilliz is configured (verify response references CRM data)
 - [ ] Chat works without Zilliz configured (RAG failure is silent)
 
@@ -126,7 +124,6 @@ Run these after any change to confirm nothing is fundamentally broken:
 - [ ] Settings page (`/s/[slug]/settings`) loads with current values
 - [ ] Saving settings persists changes
 - [ ] Workspace deletion works and redirects to `/`
-- [ ] Anthropic API key field saves and is used by AI assistant
 
 ### H. Billing checks
 

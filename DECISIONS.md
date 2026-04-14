@@ -68,18 +68,18 @@ Use this to record meaningful decisions and avoid re-litigating context. When a 
 
 ---
 
-## [CONFIRMED] OpenAI for scoring, dual-provider for assistant
+## [CONFIRMED] OpenAI for scoring, embeddings, and assistant
 
 - **Status**: [CONFIRMED] — implemented in `lib/lead-scoring.ts` and `lib/ai.ts`
-- **Decision**: Use OpenAI gpt-4o-mini for lead scoring (structured JSON output). For the AI assistant, prefer OpenAI when available, fall back to Anthropic.
-- **Context**: Scoring requires structured JSON output with strict schema validation. The assistant benefits from provider flexibility. Per-workspace Anthropic keys are stored in SpaceSetting for users who prefer Claude.
+- **Decision**: Use OpenAI exclusively — gpt-4o-mini for lead scoring (structured JSON output) and gpt-4.1-mini for the AI assistant.
+- **Context**: Scoring requires structured JSON output with strict schema validation. Consolidating on a single provider reduces complexity and surface area.
 - **Options considered**:
-  1. OpenAI only for everything
+  1. OpenAI only for everything (chosen)
   2. Anthropic only for everything
-  3. OpenAI for scoring + embeddings, dual-provider for assistant (chosen)
-- **Chosen option**: 3 — OpenAI handles scoring and embeddings (which already depend on OpenAI). Assistant supports both providers for flexibility.
-- **Expected impact**: Reliable scoring via structured output. Assistant flexibility for user preference.
-- **Risks**: Two provider dependencies increase surface area. Provider routing logic must be maintained carefully.
+  3. OpenAI for scoring + embeddings, dual-provider for assistant
+- **Chosen option**: 1 — OpenAI handles all AI workloads.
+- **Expected impact**: Reliable scoring via structured output. Simpler provider management.
+- **Risks**: Single provider dependency; mitigated by OpenAI's reliability.
 - **Follow-up review date**: [TBD]
 
 ---

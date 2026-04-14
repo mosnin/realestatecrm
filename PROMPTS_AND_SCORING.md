@@ -37,7 +37,7 @@ Yes. All are implemented and active.
 |---|---|---|
 | Main function | `lib/ai.ts` → `chatWithRAG()` | Entry point for assistant |
 | System prompt | `lib/ai.ts` → inline `systemPrompt` construction | Dynamic with space name + RAG context |
-| Provider routing | `lib/ai.ts` → OpenAI preferred, Anthropic fallback | Provider selection logic |
+| Provider routing | `lib/ai.ts` → OpenAI only | Provider selection logic |
 | API endpoint | `app/api/ai/chat/route.ts` | Authenticated streaming endpoint |
 | Message persistence | `app/api/ai/chat/route.ts` | Saves user + assistant messages to `Message` table |
 
@@ -157,23 +157,20 @@ On any scoring failure, the result must be:
 
 **Critical rule**: Scoring failures must **never** block lead persistence. The Contact is always saved regardless of scoring outcome.
 
-### Assistant fallback
+### Assistant error handling
 
 | Scenario | Behavior |
 |---|---|
-| No API keys configured | Returns text: "No AI API key configured. Add ANTHROPIC_API_KEY or OPENAI_API_KEY..." |
-| OpenAI available | Uses OpenAI gpt-4o-mini (preferred) |
-| OpenAI fails, Anthropic key valid | Falls back to Anthropic claude-sonnet-4-6 |
-| OpenAI fails, no valid Anthropic key | Returns error text |
-| Anthropic key validation | Must start with `sk-ant-` |
+| `OPENAI_API_KEY` not configured | Returns text: "No AI API key configured. Add OPENAI_API_KEY in your Vercel environment variables." |
+| OpenAI available | Uses OpenAI gpt-4.1-mini |
+| OpenAI fails (4xx/5xx) | Returns descriptive error text |
 | Zilliz/embeddings not configured | RAG context silently skipped; assistant still responds |
 
 ### Assistant model configuration
 
 | Provider | Model | Temperature | Max tokens |
 |---|---|---|---|
-| OpenAI | `gpt-4o-mini` | `0.2` | Default |
-| Anthropic | `claude-sonnet-4-6` | Default | `1024` |
+| OpenAI | `gpt-4.1-mini` | `0.2` | `2000` |
 
 ---
 
@@ -188,7 +185,7 @@ On any scoring failure, the result must be:
 5. Schema contracts (input shape, output shape, Zod validation)
 6. Fallback behavior and fallback text
 7. Persistence fields and status semantics
-8. Provider routing logic (OpenAI preferred, Anthropic fallback)
+8. Provider routing logic (OpenAI only)
 9. Embedding model or vector dimensions
 
 ### Process for authorized changes

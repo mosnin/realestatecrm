@@ -36,7 +36,7 @@ Chippi is a SaaS platform that helps realtors capture, qualify, and manage renta
 | UI | React 19, Tailwind CSS 4, shadcn/ui components |
 | Auth | Clerk |
 | Database | PostgreSQL via Supabase |
-| AI | OpenAI (scoring + embeddings), Anthropic (assistant fallback) |
+| AI | OpenAI (scoring + embeddings + assistant) |
 | Vector search | Supabase pgvector |
 | Email | Resend |
 | SMS | Telnyx |
@@ -101,8 +101,6 @@ Required variables:
 Optional:
 - `RESEND_API_KEY` + `RESEND_FROM_EMAIL` — Email notifications
 - `TELNYX_API_KEY` + `TELNYX_FROM_NUMBER` — SMS notifications
-- `ANTHROPIC_API_KEY` — AI assistant fallback
-
 See [ENVIRONMENT.md](./ENVIRONMENT.md) for the full reference.
 
 ### Install and run

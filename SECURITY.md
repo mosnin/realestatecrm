@@ -270,15 +270,7 @@ Implementation in `lib/rate-limit.ts` using Upstash Redis sliding-window counter
 | Supabase service role | Server env var | Server-side only, never exposed to client |
 | Clerk secret | Server env var | Server-side only |
 | OpenAI API key | Server env var | Server-side only |
-| Anthropic API key | Server env var + per-workspace `SpaceSetting.anthropicApiKey` | Server-side only |
 | Clerk publishable | `NEXT_PUBLIC_*` env var | Client-side (safe to expose) |
-
-### Per-workspace API keys
-
-- `SpaceSetting.anthropicApiKey` is stored in the database
-- Must start with `sk-ant-` (validated before use)
-- Used server-side only for AI assistant calls
-- Never returned to the client in API responses (or if returned, mask it)
 
 ---
 

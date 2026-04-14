@@ -77,7 +77,7 @@ Purpose: Conversational AI assistant with RAG context over the realtor's contact
 User action: Realtor chats with Chip at `/s/[slug]/ai`. Can ask about leads, get follow-up suggestions, analyze pipeline.
 System output: AI responses using conversation history + RAG context from DocumentEmbedding table (vector similarity search). Conversations persisted with titles.
 Required in v1: Yes
-Dependencies: OpenAI or Anthropic API key, DocumentEmbedding records
+Dependencies: OpenAI API key, DocumentEmbedding records
 Key states:
 - Loading: Typing indicator
 - Empty: Welcome message with suggested prompts

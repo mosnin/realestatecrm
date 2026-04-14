@@ -14,8 +14,7 @@ All variables found or inferable from code usage:
 | `SUPABASE_SERVICE_ROLE_KEY` | `lib/supabase.ts` | Server-side Supabase service role (bypasses RLS) | **Critical** | All DB operations fail |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk SDK (client-side) | Auth UI components (sign-in, sign-up) | **Critical** | Auth pages fail to render; sign-in/sign-up broken |
 | `CLERK_SECRET_KEY` | Clerk SDK (server-side) | Server-side auth verification, middleware | **Critical** | All protected routes fail; API auth returns errors |
-| `OPENAI_API_KEY` | `lib/lead-scoring.ts`, `lib/embeddings.ts`, `lib/ai.ts` | Lead scoring, text embeddings, AI assistant (primary) | **High** | Scoring fails (fallback to unscored); embeddings and vector sync fail; assistant may fall back to Anthropic |
-| `ANTHROPIC_API_KEY` | `lib/ai.ts` | AI assistant fallback provider | **Medium** | Assistant falls back to OpenAI if available; if neither key is set, assistant returns error message |
+| `OPENAI_API_KEY` | `lib/lead-scoring.ts`, `lib/embeddings.ts`, `lib/ai.ts` | Lead scoring, text embeddings, AI assistant | **High** | Scoring fails (fallback to unscored); embeddings and vector sync fail; assistant returns error message |
 | `KV_REST_API_URL` | `lib/redis.ts` | Upstash Redis endpoint | **Medium** | Legacy admin path and slug metadata fail |
 | `KV_REST_API_TOKEN` | `lib/redis.ts` | Upstash Redis authentication | **Medium** | Same as `KV_REST_API_URL` |
 | `NEXT_PUBLIC_ROOT_DOMAIN` | `lib/utils.ts` | Public URL/domain construction for intake links | **Medium** | Falls back to `workflowrouting.com` (prod) or `localhost:3000` (dev); intake link URLs may be wrong if not set correctly |
@@ -48,7 +47,6 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 | **Clerk** | Authentication, session management, route protection | `middleware.ts`, `app/(auth)/*`, all API routes using `auth()` |
 | **Supabase** | Source-of-truth for all app data (users, spaces, contacts, deals, stages, messages, embeddings) | `lib/supabase.ts`, `supabase/schema.sql` |
 | **OpenAI** | Lead scoring (gpt-4o-mini), text embeddings (text-embedding-3-small), AI assistant primary provider | `lib/lead-scoring.ts`, `lib/embeddings.ts`, `lib/ai.ts` |
-| **Anthropic** | AI assistant fallback provider. Per-workspace key support via SpaceSetting. | `lib/ai.ts` |
 | **Supabase pgvector** | Vector storage and similarity search for RAG-enriched AI assistant context, scoped per workspace | `lib/zilliz.ts`, `lib/vectorize.ts`, `supabase/schema.sql` (`DocumentEmbedding` table + `match_documents` RPC) |
 | **Resend** | Transactional email — sends lead notifications, tour confirmations/reminders/follow-ups, brokerage invitations, follow-up digests, and CRM emails | `lib/email.ts`, `lib/tour-emails.ts`, `app/api/public/apply/route.ts` |
 | **Telnyx** | SMS notifications — sends text messages to workspace owners for new leads, tour bookings, and deals (opt-in per workspace via settings) | `lib/sms.ts`, `lib/notify.ts` |
@@ -72,13 +70,12 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 
 | Variable | Why |
 |---|---|
-| `OPENAI_API_KEY` | Lead scoring and embeddings require it. Assistant can fall back to Anthropic but scoring cannot. Vector sync requires embeddings. |
+| `OPENAI_API_KEY` | Lead scoring, embeddings, and AI assistant all require it. Vector sync requires embeddings. |
 
 ### Nice to have / optional
 
 | Variable | Why |
 |---|---|
-| `ANTHROPIC_API_KEY` | Assistant fallback. Not needed if OpenAI key is set. |
 | `KV_REST_API_URL` + `KV_REST_API_TOKEN` | Legacy admin path. Core CRM works without it. |
 | `NEXT_PUBLIC_ROOT_DOMAIN` | Falls back to defaults. Set for correct intake link URLs. |
 | `NEXT_PUBLIC_APP_URL` | For correct contact links in notification emails. |
@@ -109,7 +106,6 @@ All `.env*` files are gitignored. Create a `.env.local` file locally with the re
 | Clerk | Yes | `@clerk/nextjs@^7.0.1` | Core auth, fully integrated |
 | Supabase | Yes | `@supabase/supabase-js@^2.99.1` | Core database, fully integrated |
 | OpenAI | Yes | `openai@^6.26.0` | Scoring + embeddings + assistant, fully integrated |
-| Anthropic | Yes | `@anthropic-ai/sdk@^0.78.0` | Assistant fallback, fully integrated |
 | Supabase pgvector | Yes (via Supabase) | Built into `@supabase/supabase-js` | Vector search for AI RAG context, optional |
 | Upstash Redis | Yes | `@upstash/redis@^1.34.9` | Legacy metadata path |
 | Vercel | Yes (packages) | `@vercel/analytics@^1.5.0`, `@vercel/speed-insights@^1.2.0` | Deployment target |
@@ -125,7 +121,6 @@ The `SpaceSetting` model stores per-workspace configuration:
 
 | Field | Purpose |
 |---|---|
-| `anthropicApiKey` | Per-workspace Anthropic API key for AI assistant |
 | `aiPersonalization` | AI personalization preferences (tone, style) |
 | `billingSettings` | Billing preferences (string, not yet functional) |
 | `phoneNumber` | Realtor's phone number |
