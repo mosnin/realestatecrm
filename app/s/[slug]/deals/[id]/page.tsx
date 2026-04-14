@@ -186,7 +186,8 @@ export default async function DealDetailPage({
                 value={value}
                 type="number"
                 label="Deal Value"
-                formatter={(v) => (v != null ? `$${Number(v).toLocaleString()}` : '')}
+                prefix="$"
+                displayValue={value != null ? `$${value.toLocaleString()}` : ''}
                 placeholder="Not set"
                 min={0}
                 step={1000}
@@ -202,7 +203,7 @@ export default async function DealDetailPage({
                 value={commissionRate}
                 type="number"
                 label="Commission Rate"
-                formatter={(v) => (v != null ? `${v}%` : '')}
+                suffix="%"
                 placeholder="Not set"
                 min={0}
                 max={100}
@@ -224,7 +225,7 @@ export default async function DealDetailPage({
                 value={probability}
                 type="number"
                 label="Probability"
-                formatter={(v) => (v != null ? `${v}%` : '')}
+                suffix="%"
                 placeholder="Not set"
                 min={0}
                 max={100}
@@ -241,9 +242,9 @@ export default async function DealDetailPage({
                 value={closeDate ? closeDate.substring(0, 10) : null}
                 type="date"
                 label="Close Date"
-                formatter={(v) =>
-                  v != null
-                    ? new Date(String(v)).toLocaleDateString('en-US', {
+                displayValue={
+                  closeDate
+                    ? new Date(closeDate).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',

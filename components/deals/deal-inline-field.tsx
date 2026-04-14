@@ -13,7 +13,16 @@ interface DealInlineFieldProps {
   value: string | number | null;
   type: 'text' | 'number' | 'date' | 'textarea';
   label: string;
-  formatter?: (v: string | number | null) => string;
+  /** Optional string prepended to the display value (e.g. "$") */
+  prefix?: string;
+  /** Optional string appended to the display value (e.g. "%") */
+  suffix?: string;
+  /**
+   * Override what is shown in read mode.
+   * Useful when the server needs to format the value differently from its raw form
+   * (e.g. a date passed as YYYY-MM-DD but displayed as "Apr 14, 2026").
+   */
+  displayValue?: string;
   placeholder?: string;
   min?: number;
   max?: number;
@@ -26,7 +35,9 @@ export function DealInlineField({
   value: initialValue,
   type,
   label,
-  formatter,
+  prefix,
+  suffix,
+  displayValue,
   placeholder = 'Not set',
   min,
   max,
@@ -97,12 +108,13 @@ export function DealInlineField({
     }
   }
 
-  const displayText =
-    value !== null && value !== undefined && String(value) !== ''
-      ? formatter
-        ? formatter(value)
-        : String(value)
-      : null;
+  // displayValue (from server) takes priority; then prefix+value+suffix; then null (shows placeholder)
+  const displayText = (() => {
+    if (displayValue !== undefined) return displayValue || null;
+    if (value === null || value === undefined || String(value) === '') return null;
+    const raw = String(value);
+    return `${prefix ?? ''}${raw}${suffix ?? ''}`;
+  })();
 
   if (editing) {
     const sharedProps = {
