@@ -63,6 +63,55 @@ export function DealCard({ deal, onEdit, onDelete, onOpenPanel }: DealCardProps)
       followUpDate.getTime() < startOfToday.getTime(),
   );
 
+  // --- Feature A: Close date countdown ---
+  // Only shown for active deals with a valid closeDate within 30 days.
+  const closeDateChip: { label: string; className: string } | null = (() => {
+    if (deal.status !== 'active' || !deal.closeDate) return null;
+    const raw = new Date(deal.closeDate);
+    if (isNaN(raw.getTime())) return null;
+    // Normalise closeDate to midnight local time so day-diff is date-only.
+    const closeDay = new Date(raw);
+    closeDay.setHours(0, 0, 0, 0);
+    const diffMs = closeDay.getTime() - startOfToday.getTime();
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) {
+      return { label: 'Closing today', className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' };
+    }
+    if (diffDays >= 1 && diffDays <= 7) {
+      return { label: `Closing in ${diffDays} day${diffDays === 1 ? '' : 's'}`, className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' };
+    }
+    if (diffDays >= 8 && diffDays <= 30) {
+      return { label: `Closing in ${diffDays} days`, className: 'bg-muted text-muted-foreground' };
+    }
+    if (diffDays < 0) {
+      const ago = Math.abs(diffDays);
+      return { label: `Closed ${ago} day${ago === 1 ? '' : 's'} ago`, className: 'bg-destructive/10 text-destructive border border-destructive/30' };
+    }
+    // >30 days out — omit chip
+    return null;
+  })();
+
+  // --- Feature B: Deal age / stage stuck indicator ---
+  // Uses updatedAt as a proxy for when the deal last changed stage. This is
+  // approximate — updatedAt is refreshed on any edit, not just stage changes.
+  const stageAgeChip: { label: string; className: string } | null = (() => {
+    if (deal.status !== 'active' || !deal.updatedAt) return null;
+    const raw = new Date(deal.updatedAt);
+    if (isNaN(raw.getTime())) return null;
+    const diffMs = startOfToday.getTime() - raw.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays <= 7) return null;
+    const label = `${diffDays}d in stage`;
+    if (diffDays >= 30) {
+      return { label, className: 'text-destructive' };
+    }
+    if (diffDays >= 15) {
+      return { label, className: 'text-amber-600 dark:text-amber-400' };
+    }
+    // 8–14 days: neutral/muted
+    return { label, className: 'text-muted-foreground' };
+  })();
+
   return (
     <div ref={setNodeRef} style={style} className="mb-2">
       <div
@@ -145,6 +194,29 @@ export function DealCard({ deal, onEdit, onDelete, onOpenPanel }: DealCardProps)
                   <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
                     +{deal.dealContacts.length - 2}
                   </Badge>
+                )}
+              </div>
+            )}
+
+            {/* Feature A & B: Close date countdown + stage stuck indicator.
+                Rendered below primary content to defer to deal title/value (Apple HIG: Deference). */}
+            {(closeDateChip || stageAgeChip) && (
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                {closeDateChip && (
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium',
+                      closeDateChip.className,
+                    )}
+                  >
+                    <Calendar size={9} />
+                    {closeDateChip.label}
+                  </span>
+                )}
+                {stageAgeChip && (
+                  <span className={cn('text-[10px] font-medium', stageAgeChip.className)}>
+                    {stageAgeChip.label}
+                  </span>
                 )}
               </div>
             )}
