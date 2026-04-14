@@ -2,6 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { GripVertical, Pencil, Trash2, DollarSign, Calendar, Trophy, XCircle, PauseCircle, RotateCcw } from 'lucide-react';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
@@ -36,13 +37,13 @@ const STATUS_BADGE: Record<string, { label: string; icon: React.ElementType; cla
 
 interface DealCardProps {
   deal: DealWithRelations;
-  onEdit: (deal: DealWithRelations) => void;
+  slug: string;
   onDelete: (id: string) => void;
-  onOpenPanel: (deal: DealWithRelations) => void;
   onStatusChange?: (deal: DealWithRelations, status: 'won' | 'lost' | 'on_hold' | 'active') => void;
 }
 
-export function DealCard({ deal, onEdit, onDelete, onOpenPanel, onStatusChange }: DealCardProps) {
+export function DealCard({ deal, slug, onDelete, onStatusChange }: DealCardProps) {
+  const router = useRouter();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: deal.id,
   });
@@ -124,7 +125,7 @@ export function DealCard({ deal, onEdit, onDelete, onOpenPanel, onStatusChange }
           deal.status === 'won' && 'border-green-200 dark:border-green-800',
           deal.status === 'lost' && 'opacity-60',
         )}
-        onClick={() => onOpenPanel(deal)}
+        onClick={() => router.push(`/s/${slug}/deals/${deal.id}`)}
       >
         <div className="flex items-start gap-2">
           {/* Drag handle — stops propagation so clicking it doesn't open the panel */}
@@ -254,7 +255,7 @@ export function DealCard({ deal, onEdit, onDelete, onOpenPanel, onStatusChange }
               type="button"
               title="Edit deal"
               className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              onClick={(e) => { e.stopPropagation(); onEdit(deal); }}
+              onClick={(e) => { e.stopPropagation(); router.push(`/s/${slug}/deals/${deal.id}`); }}
             >
               <Pencil size={12} />
             </button>

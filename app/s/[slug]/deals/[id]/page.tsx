@@ -5,14 +5,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { Button } from '@/components/ui/button';
 import {
   ArrowLeft,
-  MapPin,
-  Calendar,
-  DollarSign,
   Activity,
-  Trophy,
-  XCircle,
-  PauseCircle,
-  AlertTriangle,
   Users,
   FileText,
   PhoneCall,
@@ -20,21 +13,18 @@ import {
   Clock,
   CheckCircle2,
 } from 'lucide-react';
-import type { Contact, DealStage, DealActivity } from '@/lib/types';
+import type { DealStage, DealActivity, DealMilestone } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import { formatCompact } from '@/lib/formatting';
 import { DealDetailClient } from '@/components/deals/deal-detail-client';
-
-const STATUS_META = {
-  active: { label: 'Active', icon: Activity, className: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400' },
-  won: { label: 'Won', icon: Trophy, className: 'bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-400' },
-  lost: { label: 'Lost', icon: XCircle, className: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
-  on_hold: { label: 'On Hold', icon: PauseCircle, className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' },
-};
-
-const PRIORITY_META = {
-  LOW: { label: 'Low', className: 'text-muted-foreground bg-muted' },
-  MEDIUM: { label: 'Medium', className: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10' },
-  HIGH: { label: 'High', className: 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/10' },
-};
+import { DealInlineField } from '@/components/deals/deal-inline-field';
+import { DealFollowUpField } from '@/components/deals/deal-follow-up-field';
+import { DealStatusControl } from '@/components/deals/deal-status-control';
+import { DealStageSelector } from '@/components/deals/deal-stage-selector';
+import { DealContactsManager } from '@/components/deals/deal-contacts-manager';
+import { DealMilestones } from '@/components/deals/deal-milestones';
+import { DealPrioritySelector } from '@/components/deals/deal-priority-selector';
+import { DeleteDealButton } from '@/components/deals/deal-delete-button';
 
 const ACTIVITY_META: Record<string, { label: string; icon: typeof FileText; color: string }> = {
   note: { label: 'Note', icon: FileText, color: 'text-slate-500 dark:text-slate-400' },
@@ -48,18 +38,22 @@ const ACTIVITY_META: Record<string, { label: string; icon: typeof FileText; colo
 
 export default async function DealDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string; id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { slug, id } = await params;
+  const { tab } = await searchParams;
+  const activeTab = tab === 'activity' || tab === 'milestones' ? tab : 'overview';
 
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  let dealRow: any;
-  let stage: DealStage | null;
-  let dealContacts: any[];
+  let dealRow: Record<string, unknown>;
+  let dealContacts: { dealId: string; contactId: string; contact: { id: string; name: string; email: string | null; phone: string | null } | null }[];
   let activities: DealActivity[];
+  let allStages: DealStage[];
 
   try {
     const { data: dealData, error: dealError } = await supabase
@@ -71,22 +65,25 @@ export default async function DealDetailPage({
 
     if (dealError) throw dealError;
     if (!dealData) notFound();
-    dealRow = dealData;
+    dealRow = dealData as Record<string, unknown>;
 
-    const [stageResult, dcResult, activityResult] = await Promise.all([
-      supabase.from('DealStage').select('*').eq('id', dealRow.stageId).maybeSingle(),
+    const [stagesResult, dcResult, activityResult] = await Promise.all([
+      supabase.from('DealStage').select('*').eq('spaceId', space.id).order('position'),
       supabase.from('DealContact').select('dealId, contactId, Contact(id, name, type, email, phone)').eq('dealId', id),
       supabase.from('DealActivity').select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(100),
     ]);
 
-    stage = stageResult.data as DealStage | null;
-    dealContacts = ((dcResult.data ?? []) as any[]).map((row) => ({
-      dealId: row.dealId,
-      contactId: row.contactId,
-      contact: row.Contact
-        ? { id: row.Contact.id, name: row.Contact.name, type: row.Contact.type, email: row.Contact.email ?? null, phone: row.Contact.phone ?? null }
-        : null,
-    }));
+    allStages = (stagesResult.data ?? []) as DealStage[];
+    dealContacts = ((dcResult.data ?? []) as Record<string, unknown>[]).map((row) => {
+      const contact = row.Contact as { id: string; name: string; type: string; email: string | null; phone: string | null } | null;
+      return {
+        dealId: row.dealId as string,
+        contactId: row.contactId as string,
+        contact: contact
+          ? { id: contact.id, name: contact.name, email: contact.email ?? null, phone: contact.phone ?? null }
+          : null,
+      };
+    });
     activities = (activityResult.data ?? []) as DealActivity[];
   } catch (err) {
     console.error('[deal-detail] DB queries failed', err);
@@ -95,32 +92,40 @@ export default async function DealDetailPage({
         <div className="text-center space-y-4 p-8">
           <h1 className="text-xl font-semibold">Something went wrong</h1>
           <p className="text-sm text-muted-foreground">We couldn&apos;t load your data. This is usually temporary.</p>
-          <a href={`/s/${slug}/deals/${id}`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Try again</a>
+          <a
+            href={`/s/${slug}/deals/${id}`}
+            className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            Try again
+          </a>
         </div>
       </div>
     );
   }
 
-  const status = (dealRow.status ?? 'active') as keyof typeof STATUS_META;
-  const priority = (dealRow.priority ?? 'MEDIUM') as keyof typeof PRIORITY_META;
-  const statusMeta = STATUS_META[status] ?? STATUS_META.active;
-  const priorityMeta = PRIORITY_META[priority] ?? PRIORITY_META.MEDIUM;
-  const StatusIcon = statusMeta.icon;
+  const title = dealRow.title as string;
+  const stageId = dealRow.stageId as string;
+  const status = (dealRow.status ?? 'active') as 'active' | 'won' | 'lost' | 'on_hold';
+  const priority = (dealRow.priority ?? 'MEDIUM') as 'LOW' | 'MEDIUM' | 'HIGH';
+  const value = dealRow.value != null ? (dealRow.value as number) : null;
+  const commissionRate = dealRow.commissionRate != null ? (dealRow.commissionRate as number) : null;
+  const probability = dealRow.probability != null ? (dealRow.probability as number) : null;
+  const closeDate = dealRow.closeDate != null ? (dealRow.closeDate as string) : null;
+  const followUpAt = dealRow.followUpAt != null ? (dealRow.followUpAt as string) : null;
+  const address = dealRow.address != null ? (dealRow.address as string) : null;
+  const description = dealRow.description != null ? (dealRow.description as string) : null;
+  const milestones = (dealRow.milestones ?? []) as DealMilestone[];
+  const createdAt = dealRow.createdAt as string;
+  const updatedAt = dealRow.updatedAt as string;
 
-  const followUpRaw = dealRow.followUpAt ? new Date(dealRow.followUpAt) : null;
-  const followUpDate = followUpRaw && !isNaN(followUpRaw.getTime()) ? followUpRaw : null;
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const followUpOverdue = Boolean(
-    followUpDate &&
-      (dealRow.status ?? 'active') === 'active' &&
-      followUpDate.getTime() < startOfToday.getTime(),
-  );
+  const linkedContacts = dealContacts
+    .filter((dc) => dc.contact !== null)
+    .map((dc) => dc.contact!);
 
   return (
-    <div className="max-w-4xl space-y-5">
+    <div className="space-y-0">
       {/* Back nav */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 mb-4">
         <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-muted-foreground">
           <Link href={`/s/${slug}/deals`}>
             <ArrowLeft size={16} />
@@ -131,117 +136,229 @@ export default async function DealDetailPage({
             Pipeline
           </Link>
           <span>/</span>
-          <span className="text-foreground font-medium">{dealRow.title}</span>
+          <span className="text-foreground font-medium truncate max-w-xs">{title}</span>
         </div>
       </div>
 
-      {/* Header card */}
-      <div className="rounded-lg border border-border bg-card px-6 py-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight">{dealRow.title}</h1>
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md ${statusMeta.className}`}>
-                <StatusIcon size={11} />
-                {statusMeta.label}
-              </span>
-              {dealRow.value != null && (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-md px-2.5 py-1">
-                  <DollarSign size={11} />
-                  {dealRow.value?.toLocaleString() ?? '0'}
-                </span>
-              )}
-              <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-md ${priorityMeta.className}`}>
-                {priorityMeta.label} priority
-              </span>
-              {stage && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground bg-muted rounded-md px-2.5 py-1">
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
-                  {stage.name}
-                </span>
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        {/* Header bar with title + delete button */}
+        <div className="px-5 py-3.5 border-b border-border flex items-center justify-between gap-4">
+          <h1 className="text-base font-semibold truncate">{title}</h1>
+          <DeleteDealButton dealId={id} slug={slug} dealTitle={title} />
+        </div>
+
+        {/* Sidebar + main grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)]">
+
+          {/* LEFT SIDEBAR */}
+          <aside className="border-b lg:border-b-0 lg:border-r border-border p-5 space-y-5">
+
+            {/* Stage indicator */}
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Stage</p>
+              <DealStageSelector dealId={id} initialStageId={stageId} stages={allStages} />
+            </div>
+
+            {/* Status */}
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Status</p>
+              <DealStatusControl dealId={id} initialStatus={status} />
+            </div>
+
+            {/* Priority */}
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Priority</p>
+              <DealPrioritySelector dealId={id} initialPriority={priority} />
+            </div>
+
+            {/* Follow-up */}
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Follow-up</p>
+              <DealFollowUpField dealId={id} followUpAt={followUpAt} status={status} />
+            </div>
+
+            {/* Value */}
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Deal Value</p>
+              <DealInlineField
+                dealId={id}
+                field="value"
+                value={value}
+                type="number"
+                label="Deal Value"
+                formatter={(v) => (v != null ? `$${Number(v).toLocaleString()}` : '')}
+                placeholder="Not set"
+                min={0}
+                step={1000}
+              />
+            </div>
+
+            {/* Commission Rate */}
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Commission Rate</p>
+              <DealInlineField
+                dealId={id}
+                field="commissionRate"
+                value={commissionRate}
+                type="number"
+                label="Commission Rate"
+                formatter={(v) => (v != null ? `${v}%` : '')}
+                placeholder="Not set"
+                min={0}
+                max={100}
+                step={0.1}
+              />
+              {value != null && commissionRate != null && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  GCI: {formatCompact((value * commissionRate) / 100)}
+                </p>
               )}
             </div>
-          </div>
-        </div>
 
-        <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-4 text-sm text-muted-foreground">
-          {dealRow.address && (
-            <span className="flex items-center gap-1.5">
-              <MapPin size={13} className="flex-shrink-0" />
-              {dealRow.address}
-            </span>
-          )}
-          {dealRow.closeDate && (
-            <span className="flex items-center gap-1.5">
-              <Calendar size={13} className="flex-shrink-0" />
-              Close: {new Date(dealRow.closeDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-            </span>
-          )}
-          {followUpDate && (
-            <span className={`flex items-center gap-1.5 ${followUpOverdue ? 'text-destructive' : ''}`}>
-              <AlertTriangle size={13} className="flex-shrink-0" />
-              Follow-up: {followUpDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              {followUpOverdue && ' (overdue)'}
-            </span>
-          )}
-          <span className="flex items-center gap-1.5">
-            <Calendar size={13} className="flex-shrink-0" />
-            Created {new Date(dealRow.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-          </span>
-        </div>
-      </div>
+            {/* Probability */}
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Close Probability</p>
+              <DealInlineField
+                dealId={id}
+                field="probability"
+                value={probability}
+                type="number"
+                label="Probability"
+                formatter={(v) => (v != null ? `${v}%` : '')}
+                placeholder="Not set"
+                min={0}
+                max={100}
+                step={1}
+              />
+            </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Left: description + contacts */}
-        <div className="md:col-span-1 space-y-5">
-          {/* Linked contacts */}
-          <div className="rounded-lg border border-border bg-card px-5 py-4">
-            <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Users size={14} className="text-muted-foreground" />
-              Contacts
-            </h2>
-            {dealContacts.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No contacts linked.</p>
-            ) : (
-              <div className="space-y-2">
-                {dealContacts.map(({ contact }) =>
-                  contact ? (
-                    <Link
-                      key={contact.id}
-                      href={`/s/${slug}/contacts/${contact.id}`}
-                      className="flex items-center gap-2.5 group"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs flex-shrink-0">
-                        {contact.name?.charAt(0)?.toUpperCase() || '?'}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium group-hover:text-primary transition-colors truncate">{contact.name}</p>
-                        {contact.phone && <p className="text-xs text-muted-foreground truncate">{contact.phone}</p>}
-                      </div>
-                    </Link>
-                  ) : null
-                )}
+            {/* Close Date */}
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Expected Close</p>
+              <DealInlineField
+                dealId={id}
+                field="closeDate"
+                value={closeDate ? closeDate.substring(0, 10) : null}
+                type="date"
+                label="Close Date"
+                formatter={(v) =>
+                  v != null
+                    ? new Date(String(v)).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })
+                    : ''
+                }
+                placeholder="Not set"
+              />
+            </div>
+
+            {/* Contacts */}
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Contacts</p>
+              <DealContactsManager dealId={id} slug={slug} initialContacts={linkedContacts} />
+            </div>
+
+            {/* Timestamps */}
+            <div className="pt-2 border-t border-border space-y-1">
+              <p className="text-[11px] text-muted-foreground">
+                Created{' '}
+                {new Date(createdAt).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Updated{' '}
+                {new Date(updatedAt).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </p>
+            </div>
+          </aside>
+
+          {/* RIGHT MAIN — URL-driven tabs */}
+          <main className="p-5 min-h-[400px]">
+            {/* Tab nav */}
+            <div className="flex gap-0 border-b border-border mb-5 -mx-5 px-5">
+              {(
+                [
+                  ['overview', 'Overview'],
+                  ['activity', 'Activity'],
+                  ['milestones', 'Milestones'],
+                ] as [string, string][]
+              ).map(([key, label]) => (
+                <Link
+                  key={key}
+                  href={`/s/${slug}/deals/${id}?tab=${key}`}
+                  className={cn(
+                    'px-3 pb-3 text-sm font-medium border-b-2 transition-colors mr-1',
+                    activeTab === key
+                      ? 'border-foreground text-foreground'
+                      : 'border-transparent text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {label}
+                </Link>
+              ))}
+            </div>
+
+            {/* Tab content */}
+            {activeTab === 'overview' && (
+              <div className="space-y-5">
+                <div>
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Title</p>
+                  <DealInlineField
+                    dealId={id}
+                    field="title"
+                    value={title}
+                    type="text"
+                    label="Title"
+                    placeholder="Deal title"
+                  />
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Address</p>
+                  <DealInlineField
+                    dealId={id}
+                    field="address"
+                    value={address}
+                    type="text"
+                    label="Address"
+                    placeholder="Not set"
+                  />
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Notes</p>
+                  <DealInlineField
+                    dealId={id}
+                    field="description"
+                    value={description}
+                    type="textarea"
+                    label="Notes"
+                    placeholder="Add notes or description…"
+                  />
+                </div>
               </div>
             )}
-          </div>
 
-          {/* Description */}
-          {dealRow.description && (
-            <div className="rounded-lg border border-border bg-card px-5 py-4">
-              <h2 className="text-sm font-semibold mb-2">Notes</h2>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{dealRow.description}</p>
-            </div>
-          )}
-        </div>
+            {activeTab === 'activity' && (
+              <DealDetailClient
+                dealId={id}
+                slug={slug}
+                initialActivities={activities}
+                activityMeta={ACTIVITY_META}
+              />
+            )}
 
-        {/* Right: activity log */}
-        <div className="md:col-span-2">
-          <DealDetailClient
-            dealId={id}
-            slug={slug}
-            initialActivities={activities}
-            activityMeta={ACTIVITY_META}
-          />
+            {activeTab === 'milestones' && (
+              <DealMilestones dealId={id} initialMilestones={milestones} />
+            )}
+          </main>
         </div>
       </div>
     </div>

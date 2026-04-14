@@ -16,8 +16,6 @@ import {
 import { arrayMove, SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { KanbanColumn } from './kanban-column';
-import { DealForm } from './deal-form';
-import { DealPanel } from './deal-panel';
 import { Button } from '@/components/ui/button';
 import { LiquidMetalButton } from '@/components/ui/liquid-metal-button';
 import {
@@ -28,7 +26,6 @@ import {
   Pencil,
   Trash2,
   MapPin,
-  DollarSign,
   Search,
   X,
   Briefcase,
@@ -71,10 +68,8 @@ interface SortableKanbanColumnProps {
   deals: DealWithRelations[];
   slug: string;
   onAddDeal: (stageId: string) => void;
-  onEditDeal: (deal: DealWithRelations) => void;
   onDeleteDeal: (id: string) => void;
   onDeleteStage: (stage: DealStage) => void;
-  onOpenPanel: (deal: DealWithRelations) => void;
   onDealCreated: () => void;
   onStatusChange: (deal: DealWithRelations, status: 'won' | 'lost' | 'on_hold' | 'active') => void;
 }
@@ -84,10 +79,8 @@ function SortableKanbanColumn({
   deals,
   slug,
   onAddDeal,
-  onEditDeal,
   onDeleteDeal,
   onDeleteStage,
-  onOpenPanel,
   onDealCreated,
   onStatusChange,
 }: SortableKanbanColumnProps) {
@@ -113,10 +106,8 @@ function SortableKanbanColumn({
         deals={deals}
         slug={slug}
         onAddDeal={onAddDeal}
-        onEditDeal={onEditDeal}
         onDeleteDeal={onDeleteDeal}
         onDeleteStage={onDeleteStage}
-        onOpenPanel={onOpenPanel}
         onDealCreated={onDealCreated}
         onStatusChange={onStatusChange}
         dragHandleProps={{ ...attributes, ...listeners }}
@@ -144,9 +135,6 @@ interface KanbanBoardProps {
 export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   const router = useRouter();
   const [stages, setStages] = useState<StageWithDeals[]>([]);
-  const [contacts, setContacts] = useState<Pick<Contact, 'id' | 'name'>[]>([]);
-  const [editDeal, setEditDeal] = useState<DealWithRelations | null>(null);
-  const [panelDeal, setPanelDeal] = useState<DealWithRelations | null>(null);
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
   const [view, setView] = useState<'kanban' | 'list'>('list');
@@ -254,12 +242,8 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   );
 
   const fetchData = useCallback(async () => {
-    const [stagesRes, contactsRes] = await Promise.all([
-      fetch(`/api/stages?slug=${slug}&pipelineType=${pipelineType}`),
-      fetch(`/api/contacts?slug=${slug}`),
-    ]);
-    if (stagesRes.ok) setStages(await stagesRes.json());
-    if (contactsRes.ok) setContacts(await contactsRes.json());
+    const res = await fetch(`/api/stages?slug=${slug}&pipelineType=${pipelineType}`);
+    if (res.ok) setStages(await res.json());
   }, [slug, pipelineType]);
 
   useEffect(() => {
@@ -497,22 +481,6 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
     pendingRefetchRef.current = false;
   }
 
-  async function handleEditDeal(data: any) {
-    if (!editDeal) return;
-    try {
-      const res = await fetch(`/api/deals/${editDeal.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) toast.error('Failed to update deal');
-    } catch {
-      toast.error('Failed to update deal');
-    }
-    setEditDeal(null);
-    fetchData();
-  }
-
   async function handleDeleteDeal(id: string) {
     const deal = stages.flatMap((s) => s.deals).find((d) => d.id === id);
     const confirmed = await confirm({
@@ -530,7 +498,6 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
     } catch {
       toast.error('Failed to delete deal');
     }
-    if (panelDeal?.id === id) setPanelDeal(null);
     fetchData();
   }
 
@@ -600,22 +567,6 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
       toast.error('Failed to delete stage');
       setStageDelete((prev) => (prev ? { ...prev, submitting: false } : prev));
     }
-  }
-
-  async function handlePanelUpdate(id: string, updates: Partial<Deal>) {
-    try {
-      const res = await fetch(`/api/deals/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
-      if (!res.ok) toast.error('Failed to update deal');
-    } catch {
-      toast.error('Failed to update deal');
-    }
-    fetchData();
-    // Optimistically update panel deal
-    setPanelDeal((prev) => prev && prev.id === id ? { ...prev, ...updates } : prev);
   }
 
   function handleCardStatusChange(deal: DealWithRelations, status: 'won' | 'lost' | 'on_hold' | 'active') {
@@ -859,7 +810,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
                       <div
                         key={deal.id}
                         className="flex items-center gap-3 px-3 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
-                        onClick={() => setPanelDeal(deal)}
+                        onClick={() => router.push(`/s/${slug}/deals/${deal.id}`)}
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{deal.title}</p>
@@ -906,10 +857,8 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
                     deals={stage.deals}
                     slug={slug}
                     onAddDeal={openAddDeal}
-                    onEditDeal={(deal) => setEditDeal(deal)}
                     onDeleteDeal={handleDeleteDeal}
                     onDeleteStage={handleDeleteStage}
-                    onOpenPanel={(deal) => setPanelDeal(deal)}
                     onDealCreated={fetchData}
                     onStatusChange={handleCardStatusChange}
                   />
@@ -1002,7 +951,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
                       <tr
                         key={deal.id}
                         className="group hover:bg-muted/30 transition-colors cursor-pointer"
-                        onClick={() => setPanelDeal(deal)}
+                        onClick={() => router.push(`/s/${slug}/deals/${deal.id}`)}
                       >
                         <td className="px-4 py-3">
                           <div>
@@ -1054,7 +1003,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); setEditDeal(deal); }}
+                              onClick={(e) => { e.stopPropagation(); router.push(`/s/${slug}/deals/${deal.id}`); }}
                               className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                             >
                               <Pencil size={13} />
@@ -1078,40 +1027,6 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
         </div>
       )}
 
-      {editDeal && (
-        <DealForm
-          open={!!editDeal}
-          onOpenChange={(o) => !o && setEditDeal(null)}
-          onSubmit={handleEditDeal}
-          stages={allStages}
-          contacts={contacts}
-          defaultValues={{
-            title: editDeal.title,
-            description: editDeal.description ?? '',
-            value: editDeal.value?.toString() ?? '',
-            commissionRate: editDeal.commissionRate ?? undefined,
-            probability: editDeal.probability ?? undefined,
-            address: editDeal.address ?? '',
-            priority: editDeal.priority as any,
-            closeDate: editDeal.closeDate
-              ? new Date(editDeal.closeDate).toISOString().split('T')[0]
-              : '',
-            stageId: editDeal.stageId,
-            contactIds: editDeal.dealContacts.map((dc) => dc.contactId),
-          }}
-          title="Edit Deal"
-        />
-      )}
-
-      <DealPanel
-        key={panelDeal?.id ?? 'empty'}
-        deal={panelDeal}
-        open={!!panelDeal}
-        onClose={() => setPanelDeal(null)}
-        onEdit={(deal) => { setPanelDeal(null); setEditDeal(deal); }}
-        onUpdate={handlePanelUpdate}
-        slug={slug}
-      />
       {ConfirmDialog}
 
       {/* Won / Lost reason dialog */}

@@ -79,6 +79,13 @@ export async function checkRateLimit(
 
   try {
     const count = await redis.incr(key);
+    // null is returned by the no-op proxy when Redis env vars are missing.
+    // Treat it as a Redis failure and fall through to in-memory.
+    if (count === null) {
+      redisFailCount++;
+      const memCount = memIncr(key, windowSeconds);
+      return { allowed: memCount <= max };
+    }
     if (count === 1) await redis.expire(key, windowSeconds);
     redisFailCount = 0; // Reset on success
     return { allowed: count <= max };

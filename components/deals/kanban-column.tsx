@@ -20,10 +20,8 @@ interface KanbanColumnProps {
   deals: DealWithRelations[];
   slug: string;
   onAddDeal: (stageId: string) => void;
-  onEditDeal: (deal: DealWithRelations) => void;
   onDeleteDeal: (id: string) => void;
   onDeleteStage: (stage: DealStage) => void;
-  onOpenPanel: (deal: DealWithRelations) => void;
   onDealCreated: () => void;
   onStatusChange?: (deal: DealWithRelations, status: 'won' | 'lost' | 'on_hold' | 'active') => void;
   /** Spread onto the drag handle element to enable column reordering */
@@ -35,10 +33,8 @@ export function KanbanColumn({
   deals,
   slug,
   onAddDeal,
-  onEditDeal,
   onDeleteDeal,
   onDeleteStage,
-  onOpenPanel,
   onDealCreated,
   onStatusChange,
   dragHandleProps,
@@ -199,9 +195,8 @@ export function KanbanColumn({
             <DealCard
               key={deal.id}
               deal={deal}
-              onEdit={onEditDeal}
+              slug={slug}
               onDelete={onDeleteDeal}
-              onOpenPanel={onOpenPanel}
               onStatusChange={onStatusChange}
             />
           ))}

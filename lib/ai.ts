@@ -73,7 +73,7 @@ export async function chatWithRAG(
       .select('id, title, content, updatedAt')
       .eq('spaceId', spaceId)
       .order('updatedAt', { ascending: false })
-      .limit(20),
+      .limit(5),
     supabase
       .from('Tour')
       .select('id, guestName, guestEmail, propertyAddress, startsAt, endsAt, status')
@@ -189,10 +189,13 @@ export async function chatWithRAG(
   }
 
   // ── Notes context ──
+  // Only include notes when the user is explicitly asking about them, to prevent
+  // the AI from proactively citing notes in unrelated conversations.
   const notes = (allNotes ?? []) as any[];
-  if (notes.length) {
+  const queryMentionsNotes = /\bnotes?\b|\bwrote?\b|\bjotted?\b|\brecord(ed|s)?\b/i.test(queryText);
+  if (notes.length && queryMentionsNotes) {
     contextBlocks.push(
-      'Notes:\n' +
+      'Workspace Notes:\n' +
         notes
           .map((n) => {
             const sanitizedContent = sanitizeCrmText(n.content);
@@ -245,7 +248,8 @@ export async function chatWithRAG(
     `You also manage real estate deals, notes, tours, and follow-ups.`,
     `Only reference data that appears in the CRM context below. Never fabricate client names, deal values, or contact details.`,
     `When asked about "recent" activity, prioritize items with the most recent dates.`,
-    `When asked about "leads" or "new leads", focus ONLY on contacts (not notes or deals). Leads are contacts with tags including "application-link" or "new-lead". Do not confuse workspace notes with lead information.`,
+    `When asked about "leads" or "new leads", focus ONLY on contacts (not notes or deals). Leads are contacts with tags including "application-link" or "new-lead".`,
+    `Do NOT proactively mention or cite workspace notes unless the user explicitly asks about notes. Notes are only shown in context when the user's query is about notes.`,
     ``,
     `## Editing CRM Data`,
     `When the user asks you to update, change, or edit a contact or deal, propose the change using this exact format:`,
