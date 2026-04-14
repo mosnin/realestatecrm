@@ -34,6 +34,7 @@ export function KanbanColumn({
   onAddDeal,
   onEditDeal,
   onDeleteDeal,
+  onDeleteStage,
   onOpenPanel,
   onDealCreated,
 }: KanbanColumnProps) {
@@ -134,24 +135,35 @@ export function KanbanColumn({
   }
 
   return (
-    <div className="flex flex-col w-72 flex-shrink-0">
+    <div className="group/column flex flex-col w-72 flex-shrink-0">
       {/* Column header */}
       <div className="flex items-center justify-between mb-3 px-0.5">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <span
             className="w-2.5 h-2.5 rounded-full flex-shrink-0"
             style={{ backgroundColor: stage.color }}
           />
-          <span className="font-semibold text-sm">{stage.name}</span>
+          <span className="font-semibold text-sm truncate">{stage.name}</span>
           <span className="text-[11px] text-muted-foreground bg-muted rounded-md px-2 py-0.5 font-medium tabular-nums">
             {deals.length}
           </span>
         </div>
-        {totalValue > 0 && (
-          <span className="text-xs text-muted-foreground font-medium">
-            ${totalValue.toLocaleString()}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {totalValue > 0 && (
+            <span className="text-xs text-muted-foreground font-medium">
+              ${totalValue.toLocaleString()}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => onDeleteStage(stage)}
+            title="Delete stage"
+            aria-label={`Delete stage ${stage.name}`}
+            className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover/column:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-[opacity,colors]"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
       </div>
 
       {/* Drop zone */}

@@ -620,6 +620,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
                   onAddDeal={openAddDeal}
                   onEditDeal={(deal) => setEditDeal(deal)}
                   onDeleteDeal={handleDeleteDeal}
+                  onDeleteStage={handleDeleteStage}
                   onOpenPanel={(deal) => setPanelDeal(deal)}
                   onDealCreated={fetchData}
                 />
@@ -801,6 +802,100 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
         slug={slug}
       />
       {ConfirmDialog}
+
+      {/* Stage deletion / deal migration dialog */}
+      {stageDelete && (() => {
+        const candidates = stages.filter(
+          (s) =>
+            s.id !== stageDelete.stage.id &&
+            s.pipelineType === stageDelete.stage.pipelineType,
+        );
+        const hasCandidates = candidates.length > 0;
+        const { submitting, dealCount, targetStageId } = stageDelete;
+        return (
+          <Dialog
+            open
+            onOpenChange={(open) => {
+              if (!open && !submitting) setStageDelete(null);
+            }}
+          >
+            <DialogContent
+              className="sm:max-w-md"
+              onPointerDownOutside={(e) => {
+                if (submitting) e.preventDefault();
+              }}
+              onEscapeKeyDown={(e) => {
+                if (submitting) e.preventDefault();
+              }}
+            >
+              <DialogHeader>
+                <DialogTitle>Delete &quot;{stageDelete.stage.name}&quot;</DialogTitle>
+                <DialogDescription>
+                  This stage has {dealCount} deal{dealCount === 1 ? '' : 's'}.
+                  {hasCandidates
+                    ? ' Pick another stage to move them to before deleting.'
+                    : ' Create another stage in this pipeline before deleting this one.'}
+                </DialogDescription>
+              </DialogHeader>
+
+              {hasCandidates ? (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Move deals to
+                  </label>
+                  <Select
+                    value={targetStageId}
+                    onValueChange={(value) =>
+                      setStageDelete((prev) =>
+                        prev ? { ...prev, targetStageId: value } : prev,
+                      )
+                    }
+                    disabled={submitting}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a stage" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {candidates.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          <span className="flex items-center gap-2">
+                            <span
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: s.color }}
+                            />
+                            {s.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  There are no other stages in this pipeline to move deals to.
+                </p>
+              )}
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setStageDelete(null)}
+                  disabled={submitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={confirmStageMigrationDelete}
+                  disabled={submitting || !hasCandidates || !targetStageId}
+                >
+                  {submitting ? 'Deleting…' : 'Move deals & delete'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }
