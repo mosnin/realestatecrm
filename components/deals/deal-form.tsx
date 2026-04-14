@@ -26,8 +26,14 @@ const schema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
   value: z.string().optional(),
-  commissionRate: z.coerce.number().min(0).max(100).nullable().optional(),
-  probability: z.coerce.number().int().min(0).max(100).nullable().optional(),
+  commissionRate: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
+    z.number().min(0).max(100).nullable(),
+  ),
+  probability: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
+    z.number().int().min(0).max(100).nullable(),
+  ),
   address: z.string().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']),
   closeDate: z.string().optional(),
