@@ -30,7 +30,6 @@ import {
   DollarSign,
   MapPin,
   Calendar,
-  PhoneCall,
   Mail,
   Users,
   FileText,
@@ -128,6 +127,9 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
   const [milestones, setMilestones] = useState<DealMilestone[]>([]);
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
   const saveMilestonesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Stores the pre-change baseline for rollback when debouncing rapid saves.
+  // Captured on the first call in a debounce sequence; cleared after a successful save.
+  const saveMilestonesBaseRef = useRef<DealMilestone[] | null>(null);
   // Tracks whether the current label edit was cancelled via Escape (suppresses onBlur save)
   const labelEditCancelledRef = useRef(false);
 
@@ -156,9 +158,19 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
 
   const saveMilestones = useCallback(async (updated: DealMilestone[], previous: DealMilestone[]) => {
     if (!deal) return;
-    // Debounce rapid saves (e.g. while typing label)
+    // Debounce rapid saves (e.g. while typing label).
+    // On the first call in a sequence, capture the pre-change baseline for rollback.
+    // Subsequent calls within the debounce window only update `updated`; the baseline stays fixed
+    // so a failed save rolls back to the state before the entire debounced sequence, not just
+    // one keystroke back.
+    if (!saveMilestonesTimeoutRef.current) {
+      saveMilestonesBaseRef.current = previous;
+    }
     if (saveMilestonesTimeoutRef.current) clearTimeout(saveMilestonesTimeoutRef.current);
     saveMilestonesTimeoutRef.current = setTimeout(async () => {
+      saveMilestonesTimeoutRef.current = null;
+      const baseline = saveMilestonesBaseRef.current ?? previous;
+      saveMilestonesBaseRef.current = null;
       try {
         const res = await fetch(`/api/deals/${deal.id}`, {
           method: 'PATCH',
@@ -166,16 +178,16 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
           body: JSON.stringify({ milestones: updated }),
         });
         if (!res.ok) {
-          // Roll back optimistic update
-          setMilestones(previous);
+          // Roll back optimistic update to the pre-sequence baseline
+          setMilestones(baseline);
           toast.error('Failed to save milestones');
         } else {
           // Propagate to parent so the deal object stays in sync
           onUpdate(deal.id, { milestones: updated } as Partial<Deal>);
         }
       } catch {
-        // Roll back optimistic update
-        setMilestones(previous);
+        // Roll back optimistic update to the pre-sequence baseline
+        setMilestones(baseline);
         toast.error('Failed to save milestones');
       }
     }, 400);
@@ -201,6 +213,7 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
       if (saveMilestonesTimeoutRef.current) {
         clearTimeout(saveMilestonesTimeoutRef.current);
       }
+      saveMilestonesBaseRef.current = null;
     };
   }, []);
 

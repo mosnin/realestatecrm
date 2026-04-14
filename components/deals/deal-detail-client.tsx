@@ -14,7 +14,6 @@ import { Activity, Send, ArrowRight } from 'lucide-react';
 import type { DealActivity } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
-import * as LucideIcons from 'lucide-react';
 
 const STATUS_CHANGE_META: Record<string, { label: string; className: string }> = {
   active: { label: 'Set to Active', className: 'bg-muted text-muted-foreground' },
