@@ -25,6 +25,7 @@ interface KanbanColumnProps {
   onDeleteStage: (stage: DealStage) => void;
   onOpenPanel: (deal: DealWithRelations) => void;
   onDealCreated: () => void;
+  onStatusChange?: (deal: DealWithRelations, status: 'won' | 'lost' | 'on_hold' | 'active') => void;
   /** Spread onto the drag handle element to enable column reordering */
   dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
 }
@@ -39,6 +40,7 @@ export function KanbanColumn({
   onDeleteStage,
   onOpenPanel,
   onDealCreated,
+  onStatusChange,
   dragHandleProps,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
@@ -200,6 +202,7 @@ export function KanbanColumn({
               onEdit={onEditDeal}
               onDelete={onDeleteDeal}
               onOpenPanel={onOpenPanel}
+              onStatusChange={onStatusChange}
             />
           ))}
           {deals.length === 0 && !isOver && (

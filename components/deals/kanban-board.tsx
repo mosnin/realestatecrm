@@ -31,7 +31,10 @@ import {
   Search,
   X,
   Briefcase,
+  Trophy,
+  XCircle,
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { formatCurrency as _formatCurrency } from '@/lib/formatting';
@@ -72,6 +75,7 @@ interface SortableKanbanColumnProps {
   onDeleteStage: (stage: DealStage) => void;
   onOpenPanel: (deal: DealWithRelations) => void;
   onDealCreated: () => void;
+  onStatusChange: (deal: DealWithRelations, status: 'won' | 'lost' | 'on_hold' | 'active') => void;
 }
 
 function SortableKanbanColumn({
@@ -84,6 +88,7 @@ function SortableKanbanColumn({
   onDeleteStage,
   onOpenPanel,
   onDealCreated,
+  onStatusChange,
 }: SortableKanbanColumnProps) {
   const {
     attributes,
@@ -112,6 +117,7 @@ function SortableKanbanColumn({
         onDeleteStage={onDeleteStage}
         onOpenPanel={onOpenPanel}
         onDealCreated={onDealCreated}
+        onStatusChange={onStatusChange}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
     </div>
@@ -221,6 +227,18 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
       // quota / storage disabled — ignore.
     }
   }, [slug, view, prefsHydrated]);
+
+  // Won / Lost reason dialog (triggered from card quick-action buttons)
+  const WON_REASONS = ['Full price offer', 'Great negotiation', 'Client referral', 'Other'] as const;
+  const LOST_REASONS = ['Price too high', 'Chose another agent', 'Deal fell through', 'Financing issue', 'Other'] as const;
+
+  const [wonLostDialog, setWonLostDialog] = useState<{
+    deal: DealWithRelations;
+    status: 'won' | 'lost';
+  } | null>(null);
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [reasonNote, setReasonNote] = useState('');
+  const [statusChangePending, setStatusChangePending] = useState(false);
 
   // Stage deletion state: when a stage has deals, we prompt the user to pick
   // a migration target before calling DELETE with ?targetStageId=...
@@ -618,6 +636,71 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
     setPanelDeal((prev) => prev && prev.id === id ? { ...prev, ...updates } : prev);
   }
 
+  function handleCardStatusChange(deal: DealWithRelations, status: 'won' | 'lost' | 'on_hold' | 'active') {
+    if (status === 'won' || status === 'lost') {
+      setSelectedReason(null);
+      setReasonNote('');
+      setWonLostDialog({ deal, status });
+      return;
+    }
+    // on_hold and active: fire immediately, no dialog needed
+    applyStatusChange(deal, status, undefined, undefined);
+  }
+
+  async function applyStatusChange(
+    deal: DealWithRelations,
+    status: 'won' | 'lost' | 'on_hold' | 'active',
+    wonLostReason?: string,
+    wonLostNote?: string,
+  ) {
+    setStatusChangePending(true);
+    // Optimistic update
+    setStages((prev) =>
+      prev.map((s) => ({
+        ...s,
+        deals: s.deals.map((d) =>
+          d.id === deal.id ? { ...d, status } : d,
+        ),
+      })),
+    );
+    try {
+      const body: Record<string, unknown> = { slug, status };
+      if (wonLostReason) body.wonLostReason = wonLostReason;
+      if (wonLostNote) body.wonLostNote = wonLostNote;
+      const res = await fetch(`/api/deals/${deal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        toast.error('Failed to update status');
+        // Roll back optimistic update
+        fetchData();
+      } else {
+        const labelMap: Record<string, string> = {
+          won: 'Won',
+          lost: 'Lost',
+          on_hold: 'On Hold',
+          active: 'Active',
+        };
+        toast.success(`Deal marked as ${labelMap[status]}`);
+        fetchData();
+      }
+    } catch {
+      toast.error('Failed to update status');
+      fetchData();
+    } finally {
+      setStatusChangePending(false);
+    }
+  }
+
+  async function handleWonLostConfirm() {
+    if (!wonLostDialog || !selectedReason) return;
+    const { deal, status } = wonLostDialog;
+    setWonLostDialog(null);
+    await applyStatusChange(deal, status, selectedReason, reasonNote.trim() || undefined);
+  }
+
   function openAddDeal(stageId: string) {
     setDefaultStageId(stageId);
     setAddDealOpen(true);
@@ -843,6 +926,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
                     onDeleteStage={handleDeleteStage}
                     onOpenPanel={(deal) => setPanelDeal(deal)}
                     onDealCreated={fetchData}
+                    onStatusChange={handleCardStatusChange}
                   />
                 ))}
               </div>
@@ -1053,6 +1137,92 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
         slug={slug}
       />
       {ConfirmDialog}
+
+      {/* Won / Lost reason dialog */}
+      {wonLostDialog && (() => {
+        const { status } = wonLostDialog;
+        const reasons = status === 'won' ? WON_REASONS : LOST_REASONS;
+        const title = status === 'won' ? 'Mark as Won' : 'Mark as Lost';
+        const confirmLabel = status === 'won' ? 'Mark Won' : 'Mark Lost';
+        return (
+          <Dialog
+            open
+            onOpenChange={(open) => {
+              if (!open && !statusChangePending) setWonLostDialog(null);
+            }}
+          >
+            <DialogContent
+              className="sm:max-w-sm"
+              onPointerDownOutside={(e) => { if (statusChangePending) e.preventDefault(); }}
+              onEscapeKeyDown={(e) => { if (statusChangePending) e.preventDefault(); }}
+            >
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  {status === 'won' ? (
+                    <Trophy size={16} className="text-emerald-600" />
+                  ) : (
+                    <XCircle size={16} className="text-destructive" />
+                  )}
+                  {title}
+                </DialogTitle>
+                <DialogDescription>
+                  {status === 'won'
+                    ? 'What was the key reason this deal was won?'
+                    : 'What was the primary reason this deal was lost?'}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-1">
+                <div className="flex flex-wrap gap-2">
+                  {reasons.map((reason) => (
+                    <button
+                      key={reason}
+                      type="button"
+                      onClick={() => setSelectedReason(reason)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-md text-xs font-medium border transition-all',
+                        selectedReason === reason
+                          ? status === 'won'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30'
+                            : 'bg-destructive/10 text-destructive border-destructive/30'
+                          : 'bg-muted text-muted-foreground border-transparent hover:bg-accent hover:text-foreground',
+                      )}
+                    >
+                      {reason}
+                    </button>
+                  ))}
+                </div>
+                <Textarea
+                  value={reasonNote}
+                  onChange={(e) => setReasonNote(e.target.value)}
+                  placeholder="Add a note (optional)…"
+                  rows={2}
+                  className="resize-none text-sm"
+                  disabled={statusChangePending}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setWonLostDialog(null)}
+                  disabled={statusChangePending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant={status === 'won' ? 'default' : 'destructive'}
+                  onClick={handleWonLostConfirm}
+                  disabled={!selectedReason || statusChangePending}
+                  className={status === 'won' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : undefined}
+                >
+                  {statusChangePending ? 'Saving…' : confirmLabel}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
 
       {/* Stage deletion / deal migration dialog */}
       {stageDelete && (() => {

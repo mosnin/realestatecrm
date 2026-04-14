@@ -3,7 +3,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Badge } from '@/components/ui/badge';
-import { GripVertical, Pencil, Trash2, DollarSign, Calendar, Trophy, XCircle, PauseCircle } from 'lucide-react';
+import { GripVertical, Pencil, Trash2, DollarSign, Calendar, Trophy, XCircle, PauseCircle, RotateCcw } from 'lucide-react';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatCompact } from '@/lib/formatting';
@@ -39,9 +39,10 @@ interface DealCardProps {
   onEdit: (deal: DealWithRelations) => void;
   onDelete: (id: string) => void;
   onOpenPanel: (deal: DealWithRelations) => void;
+  onStatusChange?: (deal: DealWithRelations, status: 'won' | 'lost' | 'on_hold' | 'active') => void;
 }
 
-export function DealCard({ deal, onEdit, onDelete, onOpenPanel }: DealCardProps) {
+export function DealCard({ deal, onEdit, onDelete, onOpenPanel, onStatusChange }: DealCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: deal.id,
   });
@@ -251,6 +252,7 @@ export function DealCard({ deal, onEdit, onDelete, onOpenPanel }: DealCardProps)
           <div className="flex flex-col gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               type="button"
+              title="Edit deal"
               className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               onClick={(e) => { e.stopPropagation(); onEdit(deal); }}
             >
@@ -258,11 +260,56 @@ export function DealCard({ deal, onEdit, onDelete, onOpenPanel }: DealCardProps)
             </button>
             <button
               type="button"
+              title="Delete deal"
               className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
               onClick={(e) => { e.stopPropagation(); onDelete(deal.id); }}
             >
               <Trash2 size={12} />
             </button>
+            {onStatusChange && (
+              <>
+                {deal.status !== 'won' && deal.status !== 'lost' && deal.status !== 'on_hold' && (
+                  <button
+                    type="button"
+                    title="Mark as Won"
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-500/10 transition-colors"
+                    onClick={(e) => { e.stopPropagation(); onStatusChange(deal, 'won'); }}
+                  >
+                    <Trophy size={12} />
+                  </button>
+                )}
+                {deal.status !== 'lost' && deal.status !== 'won' && deal.status !== 'on_hold' && (
+                  <button
+                    type="button"
+                    title="Mark as Lost"
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                    onClick={(e) => { e.stopPropagation(); onStatusChange(deal, 'lost'); }}
+                  >
+                    <XCircle size={12} />
+                  </button>
+                )}
+                {deal.status !== 'on_hold' && deal.status !== 'won' && deal.status !== 'lost' && (
+                  <button
+                    type="button"
+                    title="Put On Hold"
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-500/10 transition-colors"
+                    onClick={(e) => { e.stopPropagation(); onStatusChange(deal, 'on_hold'); }}
+                  >
+                    <PauseCircle size={12} />
+                  </button>
+                )}
+                {deal.status !== 'active' && (
+                  <button
+                    type="button"
+                    title="Reopen (set Active)"
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    onClick={(e) => { e.stopPropagation(); onStatusChange(deal, 'active'); }}
+                  >
+                    <RotateCcw size={12} />
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
