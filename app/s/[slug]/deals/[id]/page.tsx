@@ -3,16 +3,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { Button } from '@/components/ui/button';
-import {
-  ArrowLeft,
-  Activity,
-  Users,
-  FileText,
-  PhoneCall,
-  Mail,
-  Clock,
-  CheckCircle2,
-} from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import type { DealStage, DealActivity, DealMilestone } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatCompact } from '@/lib/formatting';
@@ -26,15 +17,6 @@ import { DealMilestones } from '@/components/deals/deal-milestones';
 import { DealPrioritySelector } from '@/components/deals/deal-priority-selector';
 import { DeleteDealButton } from '@/components/deals/deal-delete-button';
 
-const ACTIVITY_META: Record<string, { label: string; icon: typeof FileText; color: string }> = {
-  note: { label: 'Note', icon: FileText, color: 'text-slate-500 dark:text-slate-400' },
-  call: { label: 'Call', icon: PhoneCall, color: 'text-blue-500 dark:text-blue-400' },
-  email: { label: 'Email', icon: Mail, color: 'text-violet-500 dark:text-violet-400' },
-  meeting: { label: 'Meeting', icon: Users, color: 'text-teal-500 dark:text-teal-400' },
-  follow_up: { label: 'Follow-up', icon: Clock, color: 'text-amber-500 dark:text-amber-400' },
-  stage_change: { label: 'Stage changed', icon: Activity, color: 'text-indigo-500 dark:text-indigo-400' },
-  status_change: { label: 'Status changed', icon: CheckCircle2, color: 'text-green-500 dark:text-green-400' },
-};
 
 export default async function DealDetailPage({
   params,
@@ -352,7 +334,6 @@ export default async function DealDetailPage({
                 dealId={id}
                 slug={slug}
                 initialActivities={activities}
-                activityMeta={ACTIVITY_META}
               />
             )}
 

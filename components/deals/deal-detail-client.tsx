@@ -10,10 +10,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Activity, Send, ArrowRight } from 'lucide-react';
+import { Activity, Send, ArrowRight, FileText, PhoneCall, Mail, Users, Clock, CheckCircle2 } from 'lucide-react';
 import type { DealActivity } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
+
+const ACTIVITY_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
+  note: { label: 'Note', icon: FileText, color: 'text-slate-500 dark:text-slate-400' },
+  call: { label: 'Call', icon: PhoneCall, color: 'text-blue-500 dark:text-blue-400' },
+  email: { label: 'Email', icon: Mail, color: 'text-violet-500 dark:text-violet-400' },
+  meeting: { label: 'Meeting', icon: Users, color: 'text-teal-500 dark:text-teal-400' },
+  follow_up: { label: 'Follow-up', icon: Clock, color: 'text-amber-500 dark:text-amber-400' },
+  stage_change: { label: 'Stage changed', icon: Activity, color: 'text-indigo-500 dark:text-indigo-400' },
+  status_change: { label: 'Status changed', icon: CheckCircle2, color: 'text-green-500 dark:text-green-400' },
+};
 
 const STATUS_CHANGE_META: Record<string, { label: string; className: string }> = {
   active: { label: 'Set to Active', className: 'bg-muted text-muted-foreground' },
@@ -38,10 +48,9 @@ interface Props {
   dealId: string;
   slug: string;
   initialActivities: DealActivity[];
-  activityMeta: Record<string, { label: string; icon: any; color: string }>;
 }
 
-export function DealDetailClient({ dealId, initialActivities, activityMeta }: Props) {
+export function DealDetailClient({ dealId, initialActivities }: Props) {
   const [activities, setActivities] = useState<DealActivity[]>(initialActivities);
   const [type, setType] = useState('note');
   const [content, setContent] = useState('');
