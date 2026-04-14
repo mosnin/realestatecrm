@@ -128,6 +128,8 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
   const [milestones, setMilestones] = useState<DealMilestone[]>([]);
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
   const saveMilestonesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks whether the current label edit was cancelled via Escape (suppresses onBlur save)
+  const labelEditCancelledRef = useRef(false);
 
   // Won/Lost reason dialog state
   const [wonLostDialog, setWonLostDialog] = useState<{ status: 'won' | 'lost' } | null>(null);
@@ -152,7 +154,7 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
     }
   }, [deal?.id, open]);
 
-  const saveMilestones = useCallback(async (updated: DealMilestone[]) => {
+  const saveMilestones = useCallback(async (updated: DealMilestone[], previous: DealMilestone[]) => {
     if (!deal) return;
     // Debounce rapid saves (e.g. while typing label)
     if (saveMilestonesTimeoutRef.current) clearTimeout(saveMilestonesTimeoutRef.current);
@@ -164,12 +166,16 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
           body: JSON.stringify({ milestones: updated }),
         });
         if (!res.ok) {
+          // Roll back optimistic update
+          setMilestones(previous);
           toast.error('Failed to save milestones');
         } else {
           // Propagate to parent so the deal object stays in sync
           onUpdate(deal.id, { milestones: updated } as Partial<Deal>);
         }
       } catch {
+        // Roll back optimistic update
+        setMilestones(previous);
         toast.error('Failed to save milestones');
       }
     }, 400);
@@ -188,6 +194,15 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
       setEditingLabelId(null);
     }
   }, [open]);
+
+  // Clear any pending debounced save on unmount to avoid state updates after unmount
+  useEffect(() => {
+    return () => {
+      if (saveMilestonesTimeoutRef.current) {
+        clearTimeout(saveMilestonesTimeoutRef.current);
+      }
+    };
+  }, []);
 
   async function handlePostActivity() {
     if (!deal || !activityContent.trim()) return;
@@ -504,12 +519,13 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
                     size="sm"
                     variant="outline"
                     onClick={() => {
+                      const previous = milestones;
                       const seeded: DealMilestone[] = DEFAULT_MILESTONES.map((m) => ({
                         ...m,
                         id: crypto.randomUUID(),
                       }));
                       setMilestones(seeded);
-                      saveMilestones(seeded);
+                      saveMilestones(seeded, previous);
                     }}
                   >
                     Use template
@@ -533,6 +549,7 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
                         type="checkbox"
                         checked={milestone.completed}
                         onChange={(e) => {
+                          const previous = milestones;
                           const updated = milestones.map((m) =>
                             m.id === milestone.id
                               ? {
@@ -543,7 +560,7 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
                               : m
                           );
                           setMilestones(updated);
-                          saveMilestones(updated);
+                          saveMilestones(updated, previous);
                         }}
                         className="mt-0.5 h-4 w-4 flex-shrink-0 cursor-pointer rounded border-input accent-primary"
                       />
@@ -558,18 +575,25 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
                             defaultValue={milestone.label}
                             className="w-full rounded border border-input bg-background px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                             onBlur={(e) => {
+                              if (labelEditCancelledRef.current) {
+                                labelEditCancelledRef.current = false;
+                                setEditingLabelId(null);
+                                return;
+                              }
+                              const previous = milestones;
                               const newLabel = e.target.value.trim() || milestone.label;
                               const updated = milestones.map((m) =>
                                 m.id === milestone.id ? { ...m, label: newLabel } : m
                               );
                               setMilestones(updated);
                               setEditingLabelId(null);
-                              saveMilestones(updated);
+                              saveMilestones(updated, previous);
                             }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') e.currentTarget.blur();
                               if (e.key === 'Escape') {
-                                setEditingLabelId(null);
+                                labelEditCancelledRef.current = true;
+                                e.currentTarget.blur();
                               }
                             }}
                           />
@@ -593,13 +617,14 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
                           type="date"
                           value={milestone.dueDate ?? ''}
                           onChange={(e) => {
+                            const previous = milestones;
                             const updated = milestones.map((m) =>
                               m.id === milestone.id
                                 ? { ...m, dueDate: e.target.value || null }
                                 : m
                             );
                             setMilestones(updated);
-                            saveMilestones(updated);
+                            saveMilestones(updated, previous);
                           }}
                           className="text-xs text-muted-foreground border-0 bg-transparent p-0 focus:outline-none focus:ring-0 cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
                           placeholder="No date"
@@ -611,9 +636,11 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
                       <button
                         type="button"
                         onClick={() => {
+                          const previous = milestones;
                           const updated = milestones.filter((m) => m.id !== milestone.id);
                           setMilestones(updated);
-                          saveMilestones(updated);
+                          if (editingLabelId === milestone.id) setEditingLabelId(null);
+                          saveMilestones(updated, previous);
                         }}
                         className="flex-shrink-0 mt-0.5 w-5 h-5 rounded flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-muted transition-all"
                         title="Remove milestone"
@@ -637,10 +664,11 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
                       completed: false,
                       completedAt: null,
                     };
+                    const previous = milestones;
                     const updated = [...milestones, newMilestone];
                     setMilestones(updated);
                     setEditingLabelId(newMilestone.id);
-                    saveMilestones(updated);
+                    saveMilestones(updated, previous);
                   }}
                   className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-muted w-full"
                 >
