@@ -269,6 +269,14 @@ export type LeadScoreDetails = {
 
 export type ClientType = 'QUALIFICATION' | 'TOUR' | 'APPLICATION';
 
+export interface DealMilestone {
+  id: string;           // crypto.randomUUID()
+  label: string;        // e.g. "Inspection period ends"
+  dueDate: string | null;   // ISO date string, nullable
+  completed: boolean;
+  completedAt: string | null; // ISO date string
+}
+
 export type Deal = {
   id: string;
   spaceId: string;
@@ -284,6 +292,7 @@ export type Deal = {
   followUpAt: Date | null;
   commissionRate: number | null;
   probability: number | null;
+  milestones: DealMilestone[];
   createdAt: Date;
   updatedAt: Date;
 };

@@ -89,6 +89,46 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
+    // Validate milestones
+    let milestonesVal: import('@/lib/types').DealMilestone[] | undefined = undefined;
+    if (body.milestones !== undefined) {
+      if (!Array.isArray(body.milestones)) {
+        return NextResponse.json({ error: 'milestones must be an array' }, { status: 400 });
+      }
+      const truncated = (body.milestones as unknown[]).slice(0, 20);
+      for (const item of truncated) {
+        if (typeof item !== 'object' || item === null) {
+          return NextResponse.json({ error: 'Each milestone must be an object' }, { status: 400 });
+        }
+        const m = item as Record<string, unknown>;
+        if (typeof m.id !== 'string') {
+          return NextResponse.json({ error: 'Milestone id must be a string' }, { status: 400 });
+        }
+        if (typeof m.label !== 'string' || (m.label as string).length > 120) {
+          return NextResponse.json({ error: 'Milestone label must be a string (max 120 chars)' }, { status: 400 });
+        }
+        if (typeof m.completed !== 'boolean') {
+          return NextResponse.json({ error: 'Milestone completed must be a boolean' }, { status: 400 });
+        }
+        if (m.dueDate !== null && m.dueDate !== undefined && typeof m.dueDate !== 'string') {
+          return NextResponse.json({ error: 'Milestone dueDate must be a string or null' }, { status: 400 });
+        }
+        if (m.completedAt !== null && m.completedAt !== undefined && typeof m.completedAt !== 'string') {
+          return NextResponse.json({ error: 'Milestone completedAt must be a string or null' }, { status: 400 });
+        }
+      }
+      milestonesVal = truncated.map((item) => {
+        const m = item as Record<string, unknown>;
+        return {
+          id: m.id as string,
+          label: (m.label as string).slice(0, 120),
+          dueDate: (m.dueDate as string | null | undefined) ?? null,
+          completed: m.completed as boolean,
+          completedAt: (m.completedAt as string | null | undefined) ?? null,
+        };
+      });
+    }
+
     const valueVal = body.value != null && body.value !== '' ? parseFloat(body.value) : null;
     if (valueVal !== null && isNaN(valueVal)) {
       return NextResponse.json({ error: 'Invalid value' }, { status: 400 });
@@ -202,6 +242,7 @@ export async function PATCH(
         ...(body.position !== undefined && { position: body.position }),
         ...(body.status !== undefined && { status: body.status }),
         ...(followUpAtVal !== undefined && { followUpAt: followUpAtVal }),
+        ...(milestonesVal !== undefined && { milestones: milestonesVal }),
         updatedAt: new Date().toISOString(),
       })
       .eq('id', id)

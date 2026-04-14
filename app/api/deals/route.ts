@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
     position: row.position,
     status: row.status,
     followUpAt: row.followUpAt,
+    milestones: row.milestones ?? [],
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     stage: row.DealStage
