@@ -53,7 +53,8 @@ export function DealCard({ deal, onEdit, onDelete, onOpenPanel }: DealCardProps)
 
   const priority = PRIORITY_META[deal.priority];
   const statusBadge = deal.status && deal.status !== 'active' ? STATUS_BADGE[deal.status] : null;
-  const followUpDate = deal.followUpAt ? new Date(deal.followUpAt) : null;
+  const followUpRaw = deal.followUpAt ? new Date(deal.followUpAt) : null;
+  const followUpDate = followUpRaw && !isNaN(followUpRaw.getTime()) ? followUpRaw : null;
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const followUpOverdue = Boolean(

@@ -107,8 +107,15 @@ export default async function DealDetailPage({
   const priorityMeta = PRIORITY_META[priority] ?? PRIORITY_META.MEDIUM;
   const StatusIcon = statusMeta.icon;
 
-  const followUpDate = dealRow.followUpAt ? new Date(dealRow.followUpAt) : null;
-  const followUpOverdue = followUpDate && followUpDate < new Date();
+  const followUpRaw = dealRow.followUpAt ? new Date(dealRow.followUpAt) : null;
+  const followUpDate = followUpRaw && !isNaN(followUpRaw.getTime()) ? followUpRaw : null;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const followUpOverdue = Boolean(
+    followUpDate &&
+      (dealRow.status ?? 'active') === 'active' &&
+      followUpDate.getTime() < startOfToday.getTime(),
+  );
 
   return (
     <div className="max-w-4xl space-y-5">

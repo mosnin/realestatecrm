@@ -139,8 +139,15 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
   if (!deal) return null;
 
   const statusMeta = STATUS_META[deal.status ?? 'active'];
-  const followUpDate = deal.followUpAt ? new Date(deal.followUpAt) : null;
-  const followUpOverdue = followUpDate && followUpDate < new Date();
+  const followUpRaw = deal.followUpAt ? new Date(deal.followUpAt) : null;
+  const followUpDate = followUpRaw && !isNaN(followUpRaw.getTime()) ? followUpRaw : null;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const followUpOverdue = Boolean(
+    followUpDate &&
+      (deal.status ?? 'active') === 'active' &&
+      followUpDate.getTime() < startOfToday.getTime(),
+  );
   const followUpInputValue = followUpDate
     ? new Date(followUpDate.getTime() - followUpDate.getTimezoneOffset() * 60000)
         .toISOString()
