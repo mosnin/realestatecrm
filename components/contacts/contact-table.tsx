@@ -43,6 +43,7 @@ import { CONTACT_STAGES } from '@/lib/constants';
 import { CsvImportModal } from './csv-import-modal';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Pagination } from '@heroui/react';
 
 type Client = {
   id: string;
@@ -86,6 +87,8 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [view, setView] = useState<'card' | 'list'>('list');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showCompare, setShowCompare] = useState(false);
+  const [page, setPage] = useState(1);
+  const rowsPerPage = 20;
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [saveViewName, setSaveViewName] = useState('');
   const [showSaveInput, setShowSaveInput] = useState(false);
@@ -295,6 +298,9 @@ export function ContactTable({ slug }: ContactTableProps) {
     }
     return list;
   })();
+
+  const pages = Math.max(1, Math.ceil(visibleContacts.length / rowsPerPage));
+  const paginatedContacts = visibleContacts.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   const contactViews = savedViews.filter((v) => v.page === 'contacts');
 
@@ -620,117 +626,116 @@ export function ContactTable({ slug }: ContactTableProps) {
 
       {/* ── List view ── */}
       {!loading && visibleContacts.length > 0 && view === 'list' && (
-        <div className="rounded-lg border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  <th className="px-4 py-3 w-8">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.size === visibleContacts.length && visibleContacts.length > 0}
-                      onChange={toggleSelectAll}
-                      className="rounded border-border cursor-pointer"
-                    />
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Stage</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Contact</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Budget</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Preferences</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden xl:table-cell">Follow-up</th>
-                  <th className="px-4 py-3 w-20" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border bg-card">
-                {visibleContacts.map((contact) => {
-                  const stage = STAGES.find((s) => s.key === contact.type)!;
-                  const isSelected = selectedIds.has(contact.id);
-                  return (
-                    <tr
-                      key={contact.id}
-                      className={cn(
-                        'group hover:bg-muted/30 transition-colors',
-                        isSelected && 'bg-primary/5',
+        <Table
+          aria-label="Contacts list"
+          selectionMode="multiple"
+          selectedKeys={selectedIds}
+          onSelectionChange={(keys) => {
+            if (keys === 'all') {
+              setSelectedIds(new Set(visibleContacts.map((c) => c.id)));
+            } else {
+              setSelectedIds(new Set([...keys].map(String)));
+            }
+          }}
+          bottomContent={
+            pages > 1 ? (
+              <div className="flex justify-center py-2">
+                <Pagination
+                  total={pages}
+                  page={page}
+                  onChange={(p) => setPage(p)}
+                  size="sm"
+                  showControls
+                />
+              </div>
+            ) : null
+          }
+          classNames={{
+            wrapper: 'rounded-lg border border-border shadow-none p-0',
+            th: 'bg-muted/40 text-muted-foreground text-[11px] font-semibold uppercase tracking-wide border-b border-border',
+            td: 'py-3',
+            tr: 'border-b border-border last:border-0 hover:bg-muted/30 transition-colors',
+          }}
+        >
+          <TableHeader>
+            <TableColumn key="name">Name</TableColumn>
+            <TableColumn key="stage">Stage</TableColumn>
+            <TableColumn key="contact" className="hidden sm:table-cell">Contact</TableColumn>
+            <TableColumn key="budget" className="hidden md:table-cell">Budget</TableColumn>
+            <TableColumn key="preferences" className="hidden lg:table-cell">Preferences</TableColumn>
+            <TableColumn key="followup" className="hidden xl:table-cell">Follow-up</TableColumn>
+            <TableColumn key="actions" className="w-20">{''}</TableColumn>
+          </TableHeader>
+          <TableBody>
+            {paginatedContacts.map((contact) => {
+              const stage = STAGES.find((s) => s.key === contact.type)!;
+              return (
+                <TableRow key={contact.id} className="group">
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
+                        {getInitials(contact.name)}
+                      </div>
+                      <Link href={`/s/${slug}/contacts/${contact.id}`} className="font-medium hover:text-foreground transition-colors">
+                        {contact.name}
+                      </Link>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className={cn('inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5', stage.className)}>
+                      {stage.label}
+                    </span>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    <div className="space-y-0.5">
+                      {contact.email && (
+                        <a href={`mailto:${contact.email}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors truncate max-w-[180px]">
+                          <Mail size={10} className="flex-shrink-0" />{contact.email}
+                        </a>
                       )}
-                    >
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleSelect(contact.id)}
-                          className="rounded border-border cursor-pointer"
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-                            {getInitials(contact.name)}
-                          </div>
-                          <Link href={`/s/${slug}/contacts/${contact.id}`} className="font-medium hover:text-foreground transition-colors">
-                            {contact.name}
-                          </Link>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={cn('inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5', stage.className)}>
-                          {stage.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
-                        <div className="space-y-0.5">
-                          {contact.email && (
-                            <a href={`mailto:${contact.email}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors truncate max-w-[180px]">
-                              <Mail size={10} className="flex-shrink-0" />
-                              {contact.email}
-                            </a>
-                          )}
-                          {contact.phone && (
-                            <a href={`tel:${contact.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                              <Phone size={10} className="flex-shrink-0" />
-                              {contact.phone}
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">
-                        {contact.budget != null ? `${formatCurrency(contact.budget)}/mo` : '—'}
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground max-w-[200px] truncate">
-                        {contact.preferences ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 hidden xl:table-cell">
-                        {contact.followUpAt ? (
-                          <span className={cn(
-                            'inline-flex items-center gap-1 text-[11px] font-medium rounded px-1.5 py-0.5',
-                            new Date(contact.followUpAt) < new Date()
-                              ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
-                              : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-                          )}>
-                            <CalendarDays size={10} />
-                            {new Date(contact.followUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                          <button type="button" onClick={() => setEditContact(contact)} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
-                            <Pencil size={13} />
-                          </button>
-                          <button type="button" onClick={() => handleDelete(contact.id)} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                      {contact.phone && (
+                        <a href={`tel:${contact.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                          <Phone size={10} className="flex-shrink-0" />{contact.phone}
+                        </a>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                    {contact.budget != null ? `${formatCurrency(contact.budget)}/mo` : '—'}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground max-w-[200px] truncate">
+                    {contact.preferences ?? '—'}
+                  </TableCell>
+                  <TableCell className="hidden xl:table-cell">
+                    {contact.followUpAt ? (
+                      <span className={cn(
+                        'inline-flex items-center gap-1 text-[11px] font-medium rounded px-1.5 py-0.5',
+                        new Date(contact.followUpAt) < new Date()
+                          ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+                          : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                      )}>
+                        <CalendarDays size={10} />
+                        {new Date(contact.followUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                      <button type="button" onClick={() => setEditContact(contact)} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+                        <Pencil size={13} />
+                      </button>
+                      <button type="button" onClick={() => handleDelete(contact.id)} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       )}
 
       {/* Bulk action bar */}

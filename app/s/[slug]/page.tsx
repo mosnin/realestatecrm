@@ -1,19 +1,22 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { currentUser } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   PhoneIncoming,
-  Users,
   Link2,
-  ArrowRight,
   ExternalLink,
   Clock,
   CalendarDays,
   AlertCircle,
   Briefcase,
   MapPin,
+  ChevronRight,
+  Settings,
+  BarChart3,
+  UserPlus,
+  ArrowRight,
 } from 'lucide-react';
 import type { Metadata } from 'next';
 import { buildIntakeUrl } from '@/lib/intake';
@@ -52,8 +55,14 @@ export default async function DashboardPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const space = await getSpaceFromSlug(slug);
+
+  const [space, clerkUser] = await Promise.all([
+    getSpaceFromSlug(slug),
+    currentUser(),
+  ]);
   if (!space) notFound();
+
+  const firstName = clerkUser?.firstName ?? space.name.split(' ')[0] ?? 'there';
 
   let contactCount = 0, dealCount = 0, newLeadCount = 0, totalLeads = 0, followUpDue = 0;
   let upcomingTourCount = 0;
@@ -91,7 +100,7 @@ export default async function DashboardPage({
           </div>
           <h1 className="text-xl font-semibold">Couldn&apos;t load your dashboard</h1>
           <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-            This is usually a temporary connection issue. Try refreshing the page. If it keeps happening, check your internet connection or try again in a few minutes.
+            This is usually a temporary connection issue. Try refreshing the page.
           </p>
           <a href={`/s/${slug}`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Refresh page</a>
         </div>
@@ -114,421 +123,389 @@ export default async function DashboardPage({
   const intakeUrl = buildIntakeUrl(space.slug);
   const bookingUrl = intakeUrl.replace('/apply/', '/book/');
 
-  // ── Compressed KPI strip (5 tiles; Total leads dropped — redundant with Leads page header)
-  const stats = [
-    { label: 'New leads',    value: newLeadCount,      sub: newLeadCount > 0 ? 'unread' : 'inbox clear', accent: newLeadCount > 0,      dotCls: 'bg-brand',        href: `/s/${slug}/leads` },
-    { label: 'Clients',      value: contactCount,       sub: contactCount === 1 ? 'contact' : 'contacts', accent: false,                dotCls: '',                href: `/s/${slug}/contacts` },
-    { label: 'Active deals', value: dealCount,          sub: formatCurrency(totalValue),                 accent: false,                 dotCls: '',                href: `/s/${slug}/deals` },
-    { label: 'Tours',        value: upcomingTourCount,  sub: upcomingTourCount > 0 ? 'scheduled' : 'none', accent: false,              dotCls: '',                href: `/s/${slug}/tours` },
-    { label: 'Follow-ups',   value: followUpDue,        sub: followUpDue > 0 ? 'due now' : 'all clear',  accent: followUpDue > 0,      dotCls: 'bg-destructive',  href: `/s/${slug}/follow-ups` },
+  // Today's tours for Important Actions
+  const todayTours = upcomingTours.filter(t =>
+    new Date(t.startsAt).toDateString() === new Date().toDateString()
+  );
+
+  // Build Important Actions list
+  const importantActions: Array<{
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    iconBg: string;
+    iconColor: string;
+    title: string;
+    sub: string;
+    href: string;
+  }> = [];
+
+  if (followUpDue > 0) {
+    importantActions.push({
+      icon: Clock,
+      iconBg: 'bg-red-50 dark:bg-red-500/10',
+      iconColor: 'text-red-600 dark:text-red-400',
+      title: `${followUpDue} follow-up${followUpDue === 1 ? '' : 's'} due`,
+      sub: 'Overdue — needs attention',
+      href: `/s/${slug}/follow-ups`,
+    });
+  }
+  if (newLeadCount > 0) {
+    importantActions.push({
+      icon: PhoneIncoming,
+      iconBg: 'bg-brand-subtle dark:bg-brand/10',
+      iconColor: 'text-brand',
+      title: `${newLeadCount} new lead${newLeadCount === 1 ? '' : 's'}`,
+      sub: 'Unread · review now',
+      href: `/s/${slug}/leads`,
+    });
+  }
+  if (todayTours.length > 0) {
+    const t = todayTours[0];
+    const d = new Date(t.startsAt);
+    importantActions.push({
+      icon: CalendarDays,
+      iconBg: 'bg-muted',
+      iconColor: 'text-muted-foreground',
+      title: `Tour with ${t.guestName}`,
+      sub: `Today at ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`,
+      href: `/s/${slug}/tours`,
+    });
+  }
+
+  const quickTiles = [
+    { icon: UserPlus,    label: 'Add Contact',    sub: `${contactCount} total`,                                          href: `/s/${slug}/contacts` },
+    { icon: Briefcase,   label: 'Create Deal',    sub: `${dealCount} active`,                                            href: `/s/${slug}/deals` },
+    { icon: CalendarDays,label: 'Schedule Tour',  sub: upcomingTourCount > 0 ? `${upcomingTourCount} upcoming` : 'None', href: `/s/${slug}/tours` },
+    { icon: BarChart3,   label: 'Analytics',      sub: 'View insights',                                                  href: `/s/${slug}/analytics` },
   ];
 
-  // ── Compact live status segments for the top strip
-  const statusSegments: { label: string; href: string; tone: 'urgent' | 'accent' | 'muted' }[] = [];
-  if (followUpDue > 0) statusSegments.push({ label: `${followUpDue} follow-up${followUpDue === 1 ? '' : 's'} due`, href: `/s/${slug}/follow-ups`, tone: 'urgent' });
-  if (newLeadCount > 0) statusSegments.push({ label: `${newLeadCount} new lead${newLeadCount === 1 ? '' : 's'}`, href: `/s/${slug}/leads`, tone: 'accent' });
-  if (upcomingTourCount > 0) statusSegments.push({ label: `${upcomingTourCount} upcoming tour${upcomingTourCount === 1 ? '' : 's'}`, href: `/s/${slug}/tours`, tone: 'muted' });
-
   return (
-    <div className="space-y-4 max-w-[1320px]">
+    <div className="space-y-5 max-w-[1320px]">
 
-      {/* ── Top strip — greeting + secondary status + primary CTA ──────────
-          One explicit primary action ("View leads"). Status segments are
-          secondary quick links and sit between the title and the CTA.
-          No motion: pulses removed. */}
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
-            {getGreeting()} · {formatToday()}
-          </p>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground leading-tight mt-0.5 truncate">
-            {space.name}
-          </h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
-          {statusSegments.length > 0 && (
-            <nav className="flex flex-wrap items-center gap-1.5" aria-label="Today's status">
-              {statusSegments.map((seg) => (
-                <Link
-                  key={seg.label}
-                  href={seg.href}
-                  className={
-                    'inline-flex items-center gap-1.5 text-[11px] font-medium rounded-full px-2 py-0.5 border transition-colors ' +
-                    (seg.tone === 'urgent'
-                      ? 'bg-red-50/60 text-red-700 border-red-200/70 hover:bg-red-50 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/25'
-                      : seg.tone === 'accent'
-                      ? 'bg-orange-50/60 text-orange-700 border-orange-200/70 hover:bg-orange-50 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/25'
-                      : 'bg-muted/40 text-foreground/80 border-border hover:bg-muted')
-                  }
-                >
-                  <span className={
-                    'w-1.5 h-1.5 rounded-full ' +
-                    (seg.tone === 'urgent' ? 'bg-red-500' : seg.tone === 'accent' ? 'bg-brand' : 'bg-muted-foreground/50')
-                  } />
-                  {seg.label}
-                </Link>
-              ))}
-            </nav>
-          )}
+      {/* ── 1. Hero ───────────────────────────────────────────────────── */}
+      <div className="relative rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
+        <div className="absolute inset-y-0 left-0 w-[3px] bg-brand/50 rounded-l-xl" />
+        <div className="flex items-center justify-between px-7 py-5">
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/60 mb-1.5">
+              {formatToday()}
+            </p>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              {getGreeting()}, {firstName}! 👋
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">Here&apos;s a look at your workspace</p>
+          </div>
           <Link
-            href={`/s/${slug}/leads`}
-            className="inline-flex items-center gap-1.5 text-xs font-medium bg-foreground text-background px-3 py-1.5 rounded-md hover:bg-foreground/90 transition-colors"
+            href={`/s/${slug}/settings/profile`}
+            className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium bg-foreground text-background px-3.5 py-2 rounded-lg hover:bg-foreground/90 transition-colors flex-shrink-0"
           >
-            View leads <ArrowRight size={12} />
+            Profile <ChevronRight size={12} />
           </Link>
         </div>
-      </header>
+      </div>
 
-      {/* ── Cockpit shell: desktop row2 (3-col) + row3 (2-col) ─────────── */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:gap-4 items-stretch">
-
-        {/* ── Center hero canvas — Follow-ups due (dominant) ───────────── */}
-        <section className="order-1 lg:col-span-7 lg:col-start-3 lg:row-start-1 h-full" aria-label="Priority queue">
-          <Card className="h-full border-border/80">
-            <CardContent className="p-0">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                <h2 className="text-sm font-semibold">Follow-ups due</h2>
-                <span className="text-[11px] text-muted-foreground">Priority queue</span>
-              </div>
-              <div className="p-1">
-                <FollowUpWidget slug={slug} contacts={followUpContacts} />
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        {/* ── Left compact metric stack (replaces wide KPI slab) ───────── */}
-        <section className="order-3 lg:col-span-2 lg:col-start-1 lg:row-start-1 h-full" aria-label="Key metrics">
-          <Card className="h-full border-border/80">
-            <CardContent className="p-0">
-              <div className="px-3 py-2.5 border-b border-border">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">At a glance</h2>
-              </div>
-              <div className="divide-y divide-border">
-            {stats.slice(0, 4).map(({ label, value, sub, accent, dotCls, href }) => (
-              <Link key={label} href={href} className="group block">
-                  <div className="px-3 py-2 transition-colors group-hover:bg-muted/30">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        {label}
-                      </span>
-                      {accent && value > 0 && <span className={`mt-0.5 w-1.5 h-1.5 rounded-full ${dotCls}`} />}
-                    </div>
-                    <div className="mt-1">
-                      <p className="text-xl font-semibold tabular-nums leading-none">{value}</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground truncate">{sub}</p>
-                    </div>
-                  </div>
+      {/* ── 2. Important Actions ──────────────────────────────────────── */}
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-2.5 px-0.5">
+          {importantActions.length > 0 ? `Important Actions (${importantActions.length})` : 'Status'}
+        </p>
+        {importantActions.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {importantActions.map((action) => (
+              <Link
+                key={action.title}
+                href={action.href}
+                className="group flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3.5 hover:bg-muted/30 transition-colors"
+              >
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${action.iconBg}`}>
+                  <action.icon size={16} className={action.iconColor} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">{action.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{action.sub}</p>
+                </div>
+                <ChevronRight size={15} className="text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors flex-shrink-0" />
               </Link>
             ))}
-              </div>
-            </CardContent>
-          </Card>
-        </section>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 bg-card border border-border rounded-xl px-5 py-3.5">
+            <div className="w-7 h-7 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center flex-shrink-0 text-emerald-600 dark:text-emerald-400 text-sm">✓</div>
+            <p className="text-sm text-muted-foreground">You&apos;re all caught up — no urgent actions right now.</p>
+          </div>
+        )}
+      </div>
 
-        {/* ── Right compact rail ────────────────────────────────────────── */}
-        <div className="order-5 lg:col-span-3 lg:col-start-10 lg:row-start-1 space-y-2.5 h-full">
-          <section aria-label="Pipeline snapshot">
-          <Card className="h-full">
-            <CardContent className="p-0">
-              <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
-                <h2 className="text-sm font-semibold">Pipeline</h2>
-                <Link
-                  href={`/s/${slug}/deals`}
-                  className="text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex items-center gap-0.5"
-                >
-                  All deals <ArrowRight size={11} />
-                </Link>
-              </div>
-              <div className="p-2.5">
-              {dealsByStage.length === 0 ? (
-                <div className="py-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-                      <Briefcase size={14} className="text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-foreground">No active deals</p>
-                      <p className="text-[11px] text-muted-foreground leading-tight">
-                        Convert a lead to start tracking.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {dealsByStage.map((stage) => (
-                    <div key={stage.id} className="space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span
-                            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: stage.color }}
-                          />
-                          <span className="text-[12px] font-medium truncate">{stage.name}</span>
-                          <span className="text-[10px] text-muted-foreground tabular-nums flex-shrink-0">
-                            · {stage.count}
-                          </span>
-                        </div>
-                        <span className="text-[12px] font-semibold flex-shrink-0 tabular-nums">
-                          {formatCurrency(stage.value)}
-                        </span>
-                      </div>
-                      <div className="h-[3px] rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${Math.max(6, (stage.count / totalDealsByStage) * 100)}%`,
-                            backgroundColor: stage.color,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                  <div className="border-t border-border pt-2 flex items-center justify-between">
-                    <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</span>
-                    <span className="text-sm font-semibold tabular-nums">{formatCurrency(totalValue)}</span>
-                  </div>
-                </div>
-              )}
-              </div>
-            </CardContent>
-          </Card>
-          </section>
-
-          <section aria-label="Upcoming tours">
-            {upcomingTours.length === 0 ? (
-              <Card>
-                <CardContent className="p-0">
-                  <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
-                    <h2 className="text-sm font-semibold">Upcoming tours</h2>
-                    <Link
-                      href={`/s/${slug}/tours`}
-                      className="text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex items-center gap-0.5"
-                    >
-                      All tours <ArrowRight size={11} />
-                    </Link>
-                  </div>
-                  <div className="py-3 px-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-                      <CalendarDays size={14} className="text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-foreground">No tours scheduled</p>
-                      <p className="text-[11px] text-muted-foreground leading-tight">
-                        Share your booking link.
-                      </p>
-                    </div>
-                  </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
-                  <h2 className="text-sm font-semibold">Upcoming tours</h2>
-                  <Link
-                    href={`/s/${slug}/tours`}
-                    className="text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex items-center gap-0.5"
-                  >
-                    All tours <ArrowRight size={11} />
-                  </Link>
-                </div>
-                <div className="divide-y divide-border">
-                  {upcomingTours.map((tour: any) => {
-                    const d = new Date(tour.startsAt);
-                    return (
-                      <Link key={tour.id} href={`/s/${slug}/tours`} className="block">
-                        <div className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-muted/40 transition-colors">
-                          <div className="w-9 h-9 rounded-md bg-muted border border-border flex flex-col items-center justify-center flex-shrink-0">
-                            <span className="text-[9px] font-semibold text-muted-foreground uppercase leading-none">
-                              {d.toLocaleDateString([], { month: 'short' })}
-                            </span>
-                            <span className="text-[13px] font-bold text-foreground leading-tight">
-                              {d.getDate()}
-                            </span>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-semibold truncate">{tour.guestName}</p>
-                            <div className="flex items-center gap-1 mt-0.5 text-[11px] text-muted-foreground">
-                              <Clock size={9} className="flex-shrink-0" />
-                              <span>
-                                {d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                              </span>
-                              {tour.propertyAddress && (
-                                <>
-                                  <MapPin size={9} className="flex-shrink-0 ml-0.5" />
-                                  <span className="truncate">{tour.propertyAddress}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </Card>
-            )}
-          </section>
+      {/* ── 3. Recent Applications ────────────────────────────────────── */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+          <h2 className="text-sm font-semibold">Recent Applications</h2>
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline text-[11px] text-muted-foreground">Connected Tools:</span>
+            <Link href={`/s/${slug}/intake`} className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2.5 py-0.5 bg-brand-subtle text-brand border border-brand/20 hover:bg-brand-subtle/70 transition-colors">
+              Intake Form
+            </Link>
+            <Link href={`/s/${slug}/intake`} className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted transition-colors" title="Intake settings">
+              <Settings size={13} />
+            </Link>
+          </div>
         </div>
 
-        <section className="order-2 lg:col-span-9 lg:col-start-1 lg:row-start-2 h-full" aria-label="Recent applications">
-          {recentLeads.length === 0 ? (
-            <Card>
-              <CardContent className="p-0">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                  <h2 className="text-sm font-semibold">Recent applications</h2>
-                  <Link
-                    href={`/s/${slug}/leads`}
-                    className="text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex items-center gap-0.5"
-                  >
-                    View all <ArrowRight size={11} />
-                  </Link>
-                </div>
-                <div className="py-4 px-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                    <PhoneIncoming size={16} className="text-muted-foreground" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-foreground">No applications yet</p>
-                    <p className="text-xs text-muted-foreground">
-                      Share your intake link and applications will land here.
-                    </p>
-                  </div>
-                  <Link
-                    href={`/apply/${space.slug}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline flex-shrink-0"
-                  >
-                    Preview <ExternalLink size={11} />
-                  </Link>
-                </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="h-full">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                <h2 className="text-sm font-semibold">Recent applications</h2>
-                <Link
-                  href={`/s/${slug}/leads`}
-                  className="text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex items-center gap-0.5"
-                >
-                  View all <ArrowRight size={11} />
-                </Link>
-              </div>
-              <div className="divide-y divide-border">
-                {recentLeads.map((lead) => {
-                  const isNew = lead.tags.includes('new-lead');
-                  // Cold retuned from blue → slate to stay clear of indigo territory.
-                  const scoreBadge =
-                    lead.scoreLabel === 'hot'  ? { label: 'Hot',  cls: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400',       barCls: 'bg-red-500' } :
-                    lead.scoreLabel === 'warm' ? { label: 'Warm', cls: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400', barCls: 'bg-amber-500' } :
-                    lead.scoreLabel === 'cold' ? { label: 'Cold', cls: 'bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300', barCls: 'bg-slate-400' } :
-                    null;
-                  return (
-                    <Link key={lead.id} href={`/s/${slug}/leads`} className="block">
-                      <div className="flex items-center gap-3 px-4 py-2 hover:bg-muted/40 transition-colors">
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[11px] font-bold text-muted-foreground flex-shrink-0">
-                          {lead.name?.split(' ')?.map((n: string) => n?.[0])?.join('')?.toUpperCase()?.slice(0, 2) || '??'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-sm font-semibold truncate">{lead.name}</p>
-                            {isNew && (
-                              <span className="inline-flex text-[10px] font-semibold text-orange-700 bg-orange-50 dark:text-orange-400 dark:bg-orange-500/10 rounded px-1.5 py-0.5 flex-shrink-0 leading-none">
-                                New
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap text-[11px] text-muted-foreground">
-                            {lead.phone && <span className="truncate">{lead.phone}</span>}
-                            {lead.budget && <span>· {formatCurrency(lead.budget)}/mo</span>}
-                            {lead.preferences && (
-                              <span className="truncate max-w-[140px]">· {lead.preferences}</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {lead.scoringStatus === 'scored' && lead.leadScore != null && scoreBadge ? (
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-10 h-1 rounded-full bg-muted overflow-hidden hidden sm:block">
-                                <div
-                                  className={`h-full rounded-full ${scoreBadge.barCls}`}
-                                  style={{ width: `${Math.min(100, lead.leadScore)}%` }}
-                                />
-                              </div>
-                              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold rounded px-1.5 py-0.5 leading-none ${scoreBadge.cls}`}>
-                                {Math.round(lead.leadScore)}
-                                <span className="font-medium opacity-80">{scoreBadge.label}</span>
-                              </span>
-                            </div>
-                          ) : lead.scoringStatus === 'pending' ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/70 italic">
-                              <span className="w-2.5 h-2.5 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
-                              scoring
-                            </span>
-                          ) : null}
-                          <span className="text-[11px] text-muted-foreground flex items-center gap-1 tabular-nums">
-                            <Clock size={10} />
-                            {timeAgo(new Date(lead.createdAt))}
-                          </span>
-                        </div>
+        {recentLeads.length === 0 ? (
+          <div className="flex items-center gap-4 px-5 py-5">
+            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+              <PhoneIncoming size={16} className="text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">No applications yet</p>
+              <p className="text-xs text-muted-foreground">Share your intake link and applications will appear here.</p>
+            </div>
+            <a href={`/apply/${space.slug}`} target="_blank" rel="noreferrer" className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground flex-shrink-0 transition-colors">
+              Preview <ExternalLink size={11} />
+            </a>
+          </div>
+        ) : (
+          <>
+            <div className="hidden sm:grid grid-cols-[140px_1fr_110px_72px] px-5 py-2 border-b border-border bg-muted/30">
+              {['Source', 'Name', 'Score', 'Time'].map((h, i) => (
+                <span key={h} className={`text-[10px] font-semibold uppercase tracking-wider text-muted-foreground ${i === 3 ? 'text-right' : ''}`}>{h}</span>
+              ))}
+            </div>
+            <div className="divide-y divide-border">
+              {recentLeads.map((lead) => {
+                const isNew = lead.tags.includes('new-lead');
+                const scoreBadge =
+                  lead.scoreLabel === 'hot'  ? { label: 'Hot',  cls: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400' } :
+                  lead.scoreLabel === 'warm' ? { label: 'Warm', cls: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' } :
+                  lead.scoreLabel === 'cold' ? { label: 'Cold', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300' } : null;
+                return (
+                  <Link key={lead.id} href={`/s/${slug}/leads`} className="flex sm:grid sm:grid-cols-[140px_1fr_110px_72px] items-center gap-3 sm:gap-0 px-5 py-3 hover:bg-muted/30 transition-colors">
+                    <div className="hidden sm:block">
+                      <span className="inline-flex items-center text-[11px] font-semibold rounded-full px-2.5 py-0.5 bg-brand-subtle text-brand border border-brand/20">Intake Form</span>
+                    </div>
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1 sm:flex-none">
+                      <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground flex-shrink-0">
+                        {lead.name?.split(' ').map((n: string) => n?.[0]).join('').toUpperCase().slice(0, 2) || '??'}
                       </div>
-                    </Link>
-                  );
-                })}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-medium truncate">{lead.name}</span>
+                          {isNew && <span className="inline-flex text-[10px] font-semibold rounded-full px-1.5 py-0.5 bg-brand-subtle text-brand flex-shrink-0 leading-none">New</span>}
+                        </div>
+                        {lead.phone && <p className="text-[11px] text-muted-foreground">{lead.phone}</p>}
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0">
+                      {lead.scoringStatus === 'scored' && lead.leadScore != null && scoreBadge ? (
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold rounded px-1.5 py-0.5 leading-none ${scoreBadge.cls}`}>
+                          {Math.round(lead.leadScore)} <span className="font-medium opacity-80">{scoreBadge.label}</span>
+                        </span>
+                      ) : lead.scoringStatus === 'pending' ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/60 italic">
+                          <span className="w-2.5 h-2.5 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />scoring
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="hidden sm:flex justify-end flex-shrink-0">
+                      <span className="text-[11px] text-muted-foreground tabular-nums">{timeAgo(new Date(lead.createdAt))}</span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+            <div className="border-t border-border px-5 py-2.5">
+              <Link href={`/s/${slug}/leads`} className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+                View all leads <ArrowRight size={11} />
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── 4. Follow-up Queue (conditional) ─────────────────────────── */}
+      {followUpContacts.length > 0 && (
+        <FollowUpWidget slug={slug} contacts={followUpContacts} />
+      )}
+
+      {/* ── 5. Pipeline ───────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+          <h2 className="text-sm font-semibold">Pipeline</h2>
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline text-[11px] text-muted-foreground">Connected Tools:</span>
+            <Link href={`/s/${slug}/deals`} className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2.5 py-0.5 bg-muted text-muted-foreground border border-border hover:bg-muted/70 transition-colors">
+              Deals Board
+            </Link>
+            <Link href={`/s/${slug}/settings`} className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted transition-colors" title="Pipeline settings">
+              <Settings size={13} />
+            </Link>
+          </div>
+        </div>
+
+        {/* Quick tiles */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-border">
+          {quickTiles.map((tile, i) => (
+            <Link
+              key={tile.label}
+              href={tile.href}
+              className={`group flex flex-col gap-2.5 p-4 hover:bg-muted/30 transition-colors${i > 0 ? ' border-l border-border' : ''}${i >= 2 ? ' border-t border-border sm:border-t-0' : ''}`}
+            >
+              <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center group-hover:bg-muted/60 transition-colors">
+                <tile.icon size={15} className="text-muted-foreground" />
               </div>
-            </Card>
+              <div>
+                <p className="text-xs font-semibold text-foreground">{tile.label}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{tile.sub}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+
+        {/* Deals table */}
+        {dealsByStage.length === 0 ? (
+          <div className="flex items-center gap-3 px-5 py-4">
+            <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+              <Briefcase size={14} className="text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">No active deals</p>
+              <p className="text-xs text-muted-foreground">Convert a lead or create a deal to get started.</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="hidden sm:grid grid-cols-[2fr_1fr_3fr_100px_88px] px-5 py-2 border-b border-border bg-muted/30">
+              {[['Stage', ''], ['Deals', ''], ['Progress', ''], ['Value', 'text-right'], ['', '']].map(([h, cls], i) => (
+                <span key={i} className={`text-[10px] font-semibold uppercase tracking-wider text-muted-foreground ${cls}`}>{h}</span>
+              ))}
+            </div>
+            <div className="divide-y divide-border">
+              {dealsByStage.map((stage) => (
+                <div key={stage.id} className="flex sm:grid sm:grid-cols-[2fr_1fr_3fr_100px_88px] items-center gap-3 sm:gap-0 px-5 py-3.5 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-none">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
+                    <span className="text-sm text-foreground truncate">{stage.name}</span>
+                  </div>
+                  <span className="hidden sm:block text-sm text-muted-foreground">{stage.count}</span>
+                  <div className="hidden sm:block pr-6">
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(6, (stage.count / totalDealsByStage) * 100)}%`, backgroundColor: stage.color }} />
+                    </div>
+                  </div>
+                  <span className="text-sm font-semibold tabular-nums text-right text-foreground flex-shrink-0">{formatCurrency(stage.value)}</span>
+                  <div className="hidden sm:flex justify-end flex-shrink-0">
+                    <Link href={`/s/${slug}/deals`} className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">
+                      See Deals <ArrowRight size={10} />
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-border px-5 py-2.5 flex items-center justify-between">
+              <span className="text-[11px] font-medium text-muted-foreground">Total pipeline</span>
+              <span className="text-sm font-semibold tabular-nums">{formatCurrency(totalValue)}</span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── 6. Lead Overview + Upcoming Tours ────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        {/* Lead metrics */}
+        <div className="lg:col-span-3 rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+            <h2 className="text-sm font-semibold">Lead Overview</h2>
+            <Link href={`/s/${slug}/analytics`} className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2.5 py-0.5 bg-muted text-muted-foreground border border-border hover:bg-muted/70 transition-colors">
+              Analytics
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-border">
+            <div className="p-5">
+              <p className="text-[11px] text-muted-foreground mb-1.5">Total Leads</p>
+              <p className="text-3xl font-semibold tabular-nums tracking-tight">{totalLeads}</p>
+              <div className="flex items-center flex-wrap gap-2 mt-2.5">
+                {newLeadCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2 py-0.5 bg-brand-subtle text-brand border border-brand/20">+{newLeadCount} new</span>
+                )}
+                <span className="text-[11px] text-muted-foreground">Rental: {rentalLeadCount} · Buyer: {buyerLeadCount}</span>
+              </div>
+            </div>
+            <div className="p-5">
+              <p className="text-[11px] text-muted-foreground mb-1.5">Pipeline Value</p>
+              <p className="text-3xl font-semibold tabular-nums tracking-tight">{formatCurrency(totalValue)}</p>
+              <p className="text-[11px] text-muted-foreground mt-2.5">
+                {dealCount === 0 ? 'No active deals' : `across ${dealCount} active deal${dealCount === 1 ? '' : 's'}`}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Upcoming tours */}
+        <div className="lg:col-span-2 rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+            <h2 className="text-sm font-semibold">Upcoming Tours</h2>
+            <Link href={`/s/${slug}/tours`} className="text-[11px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5">
+              All tours <ArrowRight size={10} />
+            </Link>
+          </div>
+          {upcomingTours.length === 0 ? (
+            <div className="flex items-center gap-3 px-5 py-5">
+              <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                <CalendarDays size={14} className="text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">No tours scheduled</p>
+                <p className="text-xs text-muted-foreground">Share your booking link to get started.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {upcomingTours.map((tour: any) => {
+                const d = new Date(tour.startsAt);
+                const isToday = d.toDateString() === new Date().toDateString();
+                return (
+                  <Link key={tour.id} href={`/s/${slug}/tours`} className="flex items-center gap-3 px-5 py-3 hover:bg-muted/30 transition-colors">
+                    <div className="w-9 h-9 rounded-lg bg-muted border border-border flex flex-col items-center justify-center flex-shrink-0">
+                      <span className="text-[9px] font-semibold text-muted-foreground uppercase leading-none">{d.toLocaleDateString([], { month: 'short' })}</span>
+                      <span className="text-[13px] font-bold leading-tight">{d.getDate()}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium truncate">{tour.guestName}</p>
+                        {isToday && <span className="inline-flex text-[10px] font-semibold rounded-full px-1.5 py-0.5 bg-brand-subtle text-brand leading-none flex-shrink-0">Today</span>}
+                      </div>
+                      <div className="flex items-center gap-1 mt-0.5 text-[11px] text-muted-foreground">
+                        <Clock size={9} className="flex-shrink-0" />
+                        <span>{d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+                        {tour.propertyAddress && (<><MapPin size={9} className="flex-shrink-0 ml-0.5" /><span className="truncate">{tour.propertyAddress}</span></>)}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           )}
-        </section>
-
-        <section className="order-7 lg:col-span-3 lg:col-start-10 lg:row-start-2 h-full" aria-label="Tools">
-          <Card className="h-full">
-            <div className="px-3 py-2.5 border-b border-border">
-              <h2 className="text-sm font-semibold">Utilities</h2>
-            </div>
-            <div className="grid grid-cols-1 divide-y divide-border">
-              <ToolRow
-                icon={Link2}
-                title="Intake link"
-                description="Receive applications"
-                url={intakeUrl}
-                previewHref={`/apply/${space.slug}`}
-              />
-              <ToolRow
-                icon={CalendarDays}
-                title="Tour booking"
-                description="Let prospects schedule"
-                url={bookingUrl}
-                previewHref={`/book/${space.slug}`}
-              />
-            </div>
-          </Card>
-        </section>
+        </div>
       </div>
 
-      {/* ── Onboarding checklist (conditional, demoted support module) ─── */}
+      {/* ── 7. Utilities ──────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
+        <div className="px-5 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold">Your Links</h2>
+        </div>
+        <div className="divide-y divide-border">
+          <ToolRow icon={Link2} title="Intake link" description="Receive applications" url={intakeUrl} previewHref={`/apply/${space.slug}`} />
+          <ToolRow icon={CalendarDays} title="Tour booking" description="Let prospects schedule" url={bookingUrl} previewHref={`/book/${space.slug}`} />
+        </div>
+      </div>
+
+      {/* ── 8. Onboarding Checklist ───────────────────────────────────── */}
       <div className="order-last">
-        <OnboardingChecklist
-          slug={slug}
-          hasLeads={totalLeads > 0}
-          hasContacts={contactCount > 0}
-          hasTours={upcomingTourCount > 0}
-          hasDeals={dealCount > 0}
-        />
+        <OnboardingChecklist slug={slug} hasLeads={totalLeads > 0} hasContacts={contactCount > 0} hasTours={upcomingTourCount > 0} hasDeals={dealCount > 0} />
       </div>
+
     </div>
   );
 }
-
-// ── Tool row — compressed utility treatment ────────────────────────────────
-// Preserves CopyLinkButton (copy action) and preview link. Single row, no
-// decorative status pulse, clearly secondary to primary work surfaces.
 
 function ToolRow({
   icon: Icon,
@@ -544,7 +521,7 @@ function ToolRow({
   previewHref: string;
 }) {
   return (
-    <div className="flex items-center gap-2.5 px-3 py-2.5">
+    <div className="flex items-center gap-2.5 px-4 py-3">
       <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
         <Icon size={13} className="text-muted-foreground" />
       </div>
@@ -553,20 +530,11 @@ function ToolRow({
           <p className="text-xs font-semibold leading-tight">{title}</p>
           <span className="text-[10px] text-muted-foreground/70">· {description}</span>
         </div>
-        <code className="block mt-0 text-[10px] font-mono text-muted-foreground truncate">
-          {url}
-        </code>
+        <code className="block mt-0 text-[10px] font-mono text-muted-foreground truncate">{url}</code>
       </div>
       <div className="flex items-center gap-1 flex-shrink-0">
         <CopyLinkButton url={url} />
-        <a
-          href={previewHref}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-border bg-card hover:bg-muted transition-colors"
-          aria-label={`Preview ${title}`}
-          title={`Preview ${title}`}
-        >
+        <a href={previewHref} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-border bg-card hover:bg-muted transition-colors" aria-label={`Preview ${title}`}>
           <ExternalLink size={12} />
         </a>
       </div>
