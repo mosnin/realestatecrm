@@ -128,7 +128,7 @@ export function DealDetailClient({ dealId, initialActivities }: Props) {
       ) : (
         <div className="space-y-3">
           {activities.map((activity) => {
-            const meta = activityMeta[activity.type] ?? activityMeta.note;
+            const meta = ACTIVITY_META[activity.type] ?? ACTIVITY_META.note;
             const Icon = meta.icon;
 
             // --- stage_change: parse from/to names out of content ---
