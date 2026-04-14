@@ -208,13 +208,20 @@ export async function PATCH(
     }
     if (statusChanged) {
       const labelMap: Record<string, string> = { active: 'Active', won: 'Won', lost: 'Lost', on_hold: 'On Hold' };
+      const statusMetadata: Record<string, unknown> = { fromStatus: existing.status, toStatus: body.status };
+      if ((body.status === 'won' || body.status === 'lost') && body.wonLostReason) {
+        statusMetadata.reason = String(body.wonLostReason).slice(0, 100);
+      }
+      if ((body.status === 'won' || body.status === 'lost') && body.wonLostNote) {
+        statusMetadata.note = String(body.wonLostNote).slice(0, 120);
+      }
       activityInserts.push({
         id: crypto.randomUUID(),
         dealId: id,
         spaceId: existing.spaceId,
         type: 'status_change',
         content: `Marked as ${labelMap[body.status] ?? body.status}`,
-        metadata: { fromStatus: existing.status, toStatus: body.status },
+        metadata: statusMetadata,
       });
     }
     if (activityInserts.length > 0) {

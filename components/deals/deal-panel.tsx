@@ -8,6 +8,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -75,6 +82,9 @@ const ACTIVITY_META = {
   status_change: { label: 'Status change', icon: Tag, color: 'text-muted-foreground' },
 };
 
+const WON_REASONS = ['Price', 'Relationship', 'Speed', 'Location', 'Other'] as const;
+const LOST_REASONS = ['Price too high', 'Financing fell through', 'Chose another agent', 'Timing', 'Property issue', 'Other'] as const;
+
 const STATUS_CHANGE_META: Record<string, { label: string; className: string }> = {
   active: { label: 'Set to Active', className: 'bg-muted text-muted-foreground' },
   won: { label: 'Marked as Won', className: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15' },
@@ -101,6 +111,11 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
   const [activityType, setActivityType] = useState<string>('note');
   const [activityContent, setActivityContent] = useState('');
   const [postingActivity, setPostingActivity] = useState(false);
+
+  // Won/Lost reason dialog state
+  const [wonLostDialog, setWonLostDialog] = useState<{ status: 'won' | 'lost' } | null>(null);
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [reasonNote, setReasonNote] = useState('');
 
   const fetchActivities = useCallback(async () => {
     if (!deal) return;
@@ -148,9 +163,31 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
     }
   }
 
-  async function handleStatusChange(newStatus: string) {
+  function handleStatusChange(newStatus: string) {
     if (!deal) return;
+    if (newStatus === 'won' || newStatus === 'lost') {
+      // Reset dialog state and open it
+      setSelectedReason(null);
+      setReasonNote('');
+      setWonLostDialog({ status: newStatus });
+      return;
+    }
     onUpdate(deal.id, { status: newStatus as Deal['status'] });
+  }
+
+  function handleWonLostConfirm() {
+    if (!deal || !wonLostDialog || !selectedReason) return;
+    onUpdate(deal.id, {
+      status: wonLostDialog.status as Deal['status'],
+      // @ts-expect-error — extra fields passed through to PATCH body
+      wonLostReason: selectedReason,
+      wonLostNote: reasonNote.trim() || undefined,
+    });
+    setWonLostDialog(null);
+  }
+
+  function handleWonLostCancel() {
+    setWonLostDialog(null);
   }
 
   async function handleFollowUpChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -433,7 +470,17 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
                                 <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', statusChangeMeta.className)}>
                                   {statusChangeMeta.label}
                                 </span>
+                                {activity.metadata?.reason && (
+                                  <span className="text-xs text-muted-foreground">
+                                    · Reason: {activity.metadata.reason as string}
+                                  </span>
+                                )}
                               </div>
+                              {activity.metadata?.note && (
+                                <p className="text-xs text-muted-foreground mt-0.5 italic">
+                                  &ldquo;{activity.metadata.note as string}&rdquo;
+                                </p>
+                              )}
                               <span className="text-[10px] text-muted-foreground mt-0.5 block">
                                 {relativeTime(new Date(activity.createdAt))}
                               </span>
@@ -463,6 +510,67 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
           )}
         </div>
       </SheetContent>
+
+      {/* Won/Lost reason dialog */}
+      <Dialog open={!!wonLostDialog} onOpenChange={(o) => { if (!o) handleWonLostCancel(); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {wonLostDialog?.status === 'won' ? 'Why was this deal won?' : 'Why was this deal lost?'}
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Reason chips */}
+          <div className="flex flex-wrap gap-2 py-1">
+            {(wonLostDialog?.status === 'won' ? WON_REASONS : LOST_REASONS).map((reason) => (
+              <button
+                key={reason}
+                type="button"
+                onClick={() => setSelectedReason(reason)}
+                className={cn(
+                  'text-xs font-medium px-3 py-1.5 rounded-full border transition-all',
+                  selectedReason === reason
+                    ? wonLostDialog?.status === 'won'
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-red-600 text-white border-red-600'
+                    : 'border-border bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'
+                )}
+              >
+                {reason}
+              </button>
+            ))}
+          </div>
+
+          {/* Optional note */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+              Note <span className="normal-case font-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              maxLength={120}
+              value={reasonNote}
+              onChange={(e) => setReasonNote(e.target.value)}
+              placeholder="Add a note…"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={handleWonLostCancel}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={!selectedReason}
+              onClick={handleWonLostConfirm}
+              className={wonLostDialog?.status === 'lost' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }
