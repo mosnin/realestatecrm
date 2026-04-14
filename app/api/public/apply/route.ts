@@ -123,45 +123,89 @@ async function fetchFormConfigForLeadType(
   return null;
 }
 
+type VisibilityCondition = {
+  questionId: string;
+  operator: 'equals' | 'not_equals' | 'contains';
+  value: string;
+} | undefined;
+
+function evaluateVisibility(
+  condition: VisibilityCondition,
+  answers: Record<string, unknown>,
+): boolean {
+  if (!condition) return true;
+
+  const raw = answers[condition.questionId];
+  const currentValue = Array.isArray(raw)
+    ? raw.join(',')
+    : raw == null
+      ? ''
+      : String(raw);
+
+  switch (condition.operator) {
+    case 'equals':
+      return currentValue === condition.value;
+    case 'not_equals':
+      return currentValue !== condition.value;
+    case 'contains':
+      return currentValue.includes(condition.value);
+    default:
+      return true;
+  }
+}
+
 /**
- * Build a Zod schema dynamically from the IntakeFormConfig.
- * The schema validates that required fields are present and types match.
+ * Build a dynamic Zod schema that only enforces "required" on fields that are
+ * visible for the current submission answers.
+ *
+ * Why: The client only submits answers from visible sections/questions.
+ * If a required question is hidden by visibleWhen rules, the server must not
+ * reject the submission for a missing hidden field.
  */
-function buildDynamicSchema(config: IntakeFormConfig) {
+function buildDynamicSchemaForSubmission(
+  config: IntakeFormConfig,
+  submission: Record<string, unknown>,
+) {
   const shape: Record<string, z.ZodTypeAny> = {
     slug: z.string().min(1),
   };
 
   const allQuestions: FormQuestion[] = [];
+
   for (const section of config.sections) {
+    const sectionVisible = evaluateVisibility(section.visibleWhen, submission);
+
     for (const question of section.questions) {
       allQuestions.push(question);
+      const questionVisible =
+        sectionVisible && evaluateVisibility(question.visibleWhen, submission);
 
       let fieldSchema: z.ZodTypeAny;
+      const required = questionVisible && question.required;
 
       switch (question.type) {
         case 'email':
-          fieldSchema = question.required
+          fieldSchema = required
             ? z.string().trim().min(1).email().max(255)
             : z.string().trim().email().max(255).optional().or(z.literal(''));
           break;
         case 'phone':
-          fieldSchema = question.required
+          fieldSchema = required
             ? z.string().trim().min(1).max(40)
             : z.string().trim().max(40).optional().or(z.literal(''));
           break;
         case 'number':
-          fieldSchema = question.required
+          fieldSchema = required
             ? z.union([z.number(), z.string()]).pipe(z.coerce.number())
             : z.union([z.number(), z.string(), z.null(), z.undefined()]).optional();
           break;
         case 'checkbox':
-          fieldSchema = question.required
+          fieldSchema = required
             ? z.boolean()
             : z.boolean().optional();
           break;
         case 'multi_select':
-          fieldSchema = question.required
+          fieldSchema = required
             ? z.array(z.string()).min(1)
             : z.array(z.string()).optional();
           break;
@@ -171,7 +215,7 @@ function buildDynamicSchema(config: IntakeFormConfig) {
         case 'select':
         case 'radio':
         default:
-          fieldSchema = question.required
+          fieldSchema = required
             ? z.string().trim().min(1).max(4000)
             : z.string().trim().max(4000).optional().or(z.literal(''));
           break;
@@ -181,7 +225,6 @@ function buildDynamicSchema(config: IntakeFormConfig) {
     }
   }
 
-  // Allow passthrough for extra fields (e.g. privacyConsent, completedSteps)
   return { schema: z.object(shape).passthrough(), allQuestions };
 }
 
@@ -316,13 +359,16 @@ export async function POST(req: NextRequest) {
     if (formConfig) {
       // ── Dynamic form config path ──────────────────────────────────────
       console.log('[apply] using dynamic form config', { spaceId: space.id, version: formConfig.version });
-      const { schema: dynamicSchema } = buildDynamicSchema(formConfig);
+      const { schema: dynamicSchema } = buildDynamicSchemaForSubmission(
+        formConfig,
+        requestBody as Record<string, unknown>,
+      );
 
       const parsed = dynamicSchema.safeParse(requestBody);
       if (!parsed.success) {
         console.warn('[apply] dynamic validation failed', { issues: parsed.error.issues });
         // Only return field-level path/message to the client, not full Zod internals
-        const safeIssues = parsed.error.issues.map(i => ({
+        const safeIssues = parsed.error.issues.map((i: z.ZodIssue) => ({
           path: i.path,
           message: i.message,
         }));
@@ -520,15 +566,18 @@ export async function POST(req: NextRequest) {
     if (insertError) throw insertError;
     const contact = contacts![0] as Contact;
     // Create initial status update record for audit trail
-    await supabase.from('ApplicationStatusUpdate').insert({
-      contactId: contact.id,
-      spaceId: space.id,
-      fromStatus: null,
-      toStatus: 'received',
-      note: null,
-    }).then(({ error: auditErr }) => {
-      if (auditErr) console.warn('[apply] Initial status audit insert failed (non-fatal):', auditErr);
-    });
+    const { error: statusAuditErr } = await supabase
+      .from('ApplicationStatusUpdate')
+      .insert({
+        contactId: contact.id,
+        spaceId: space.id,
+        fromStatus: null,
+        toStatus: 'received',
+        note: null,
+      });
+    if (statusAuditErr) {
+      console.warn('[apply] Initial status audit insert failed (non-fatal):', statusAuditErr);
+    }
 
     console.info('[apply] submission persisted', {
       contactId: contact.id,

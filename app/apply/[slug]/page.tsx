@@ -9,9 +9,10 @@ import { clerkClient } from '@clerk/nextjs/server';
 import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
 import type { Metadata } from 'next';
 
-// Cache this page for 60 seconds — it's public and rarely changes.
-// Eliminates cold-start latency for repeat visitors and crawlers.
-export const revalidate = 60;
+// Do not cache this page.
+// Intake form customization should appear immediately after save, and stale
+// cache windows can make newly added sections/questions look "missing".
+export const revalidate = 0;
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;

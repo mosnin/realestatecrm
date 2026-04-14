@@ -4,7 +4,6 @@ import { chatWithRAG } from '@/lib/ai';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
-import type { SpaceSetting } from '@/lib/types';
 
 
 /**
@@ -106,14 +105,6 @@ export async function POST(req: NextRequest) {
         }
       }
     }
-
-    // Use per-space API key if set, otherwise fall back to env var
-    const { data: settings, error: settingsError } = await supabase
-      .from('SpaceSetting')
-      .select('*')
-      .eq('spaceId', space.id)
-      .maybeSingle();
-    if (settingsError) throw settingsError;
 
     const stream = await chatWithRAG(messages, space.id, space.name);
 

@@ -342,14 +342,30 @@ export function computeModelBasedScore(
         }
       }
 
-      // Try option score matching for radio/select
+      // Try option score matching for radio/select/multi_select
       if (!matched && qModel.optionScores) {
-        const answerStr = String(answer).trim().toLowerCase();
-        for (const [optValue, optPoints] of Object.entries(qModel.optionScores)) {
-          if (optValue.toLowerCase() === answerStr) {
-            points = optPoints;
-            matched = true;
-            break;
+        if (Array.isArray(answer)) {
+          // multi_select: sum matched option scores, capped at 100
+          let total = 0;
+          for (const raw of answer) {
+            const answerStr = String(raw).trim().toLowerCase();
+            for (const [optValue, optPoints] of Object.entries(qModel.optionScores)) {
+              if (optValue.toLowerCase() === answerStr) {
+                total += optPoints;
+                break;
+              }
+            }
+          }
+          points = Math.min(100, total);
+          matched = points > 0;
+        } else {
+          const answerStr = String(answer).trim().toLowerCase();
+          for (const [optValue, optPoints] of Object.entries(qModel.optionScores)) {
+            if (optValue.toLowerCase() === answerStr) {
+              points = optPoints;
+              matched = true;
+              break;
+            }
           }
         }
       }

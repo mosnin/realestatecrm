@@ -72,7 +72,9 @@ function buildAIInput(formConfig: IntakeFormConfig) {
       if (q.required) entry.required = true;
 
       if (q.options && q.options.length > 0) {
-        entry.options = q.options.map((o) => o.label);
+        // Pass canonical option values so generated optionScores keys match
+        // submitted answer values at runtime.
+        entry.options = q.options.map((o) => o.value);
       }
 
       questions.push(entry);
