@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { KanbanBoard } from './kanban-board';
+import { PipelineSummary } from './pipeline-summary';
 import { cn } from '@/lib/utils';
 
 export function DealsPageClient({ slug }: { slug: string }) {
@@ -34,6 +35,8 @@ export function DealsPageClient({ slug }: { slug: string }) {
           Buyer Pipeline
         </button>
       </div>
+
+      <PipelineSummary slug={slug} pipelineType={pipelineType} />
 
       <KanbanBoard slug={slug} pipelineType={pipelineType} />
     </div>
