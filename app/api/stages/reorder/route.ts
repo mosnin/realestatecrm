@@ -24,6 +24,12 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'All stageIds must be non-empty strings' }, { status: 400 });
   }
 
+  // Reject duplicate stageIds to prevent ambiguous position assignment
+  const uniqueStageIds = Array.from(new Set(stageIds as string[]));
+  if (uniqueStageIds.length !== stageIds.length) {
+    return NextResponse.json({ error: 'stageIds must not contain duplicates' }, { status: 400 });
+  }
+
   // Validate all stageIds belong to the caller's space
   const { data: existingStages, error: fetchError } = await supabase
     .from('DealStage')
@@ -39,8 +45,8 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'One or more stageIds not found in this space' }, { status: 403 });
   }
 
-  // Update each stage's position to its index in the ordered array
-  await Promise.all(
+  // Update each stage's position to its index in the ordered array; surface any DB errors
+  const results = await Promise.all(
     stageIds.map((id, index) =>
       supabase
         .from('DealStage')
@@ -49,6 +55,8 @@ export async function PATCH(req: NextRequest) {
         .eq('spaceId', space.id),
     ),
   );
+  const firstError = results.find((r) => r.error)?.error;
+  if (firstError) throw firstError;
 
   return NextResponse.json({ ok: true });
 }

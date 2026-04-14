@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { slug, title, description, value, commissionRate, probability, address, priority, closeDate, stageId, contactIds } = body;
+  const { slug, title, description, value, commissionRate, probability, milestones, address, priority, closeDate, stageId, contactIds } = body;
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
@@ -160,6 +160,45 @@ export async function POST(req: NextRequest) {
     closeDateVal = d.toISOString();
   }
 
+  let milestonesVal: import('@/lib/types').DealMilestone[] = [];
+  if (milestones !== undefined) {
+    if (!Array.isArray(milestones)) {
+      return NextResponse.json({ error: 'milestones must be an array' }, { status: 400 });
+    }
+    const truncated = (milestones as unknown[]).slice(0, 20);
+    for (const item of truncated) {
+      if (typeof item !== 'object' || item === null) {
+        return NextResponse.json({ error: 'Each milestone must be an object' }, { status: 400 });
+      }
+      const m = item as Record<string, unknown>;
+      if (typeof m.id !== 'string') {
+        return NextResponse.json({ error: 'Milestone id must be a string' }, { status: 400 });
+      }
+      if (typeof m.label !== 'string' || (m.label as string).length > 120) {
+        return NextResponse.json({ error: 'Milestone label must be a string (max 120 chars)' }, { status: 400 });
+      }
+      if (typeof m.completed !== 'boolean') {
+        return NextResponse.json({ error: 'Milestone completed must be a boolean' }, { status: 400 });
+      }
+      if (m.dueDate !== null && m.dueDate !== undefined && typeof m.dueDate !== 'string') {
+        return NextResponse.json({ error: 'Milestone dueDate must be a string or null' }, { status: 400 });
+      }
+      if (m.completedAt !== null && m.completedAt !== undefined && typeof m.completedAt !== 'string') {
+        return NextResponse.json({ error: 'Milestone completedAt must be a string or null' }, { status: 400 });
+      }
+    }
+    milestonesVal = truncated.map((item) => {
+      const m = item as Record<string, unknown>;
+      return {
+        id: m.id as string,
+        label: (m.label as string).slice(0, 120),
+        dueDate: (m.dueDate as string | null | undefined) ?? null,
+        completed: m.completed as boolean,
+        completedAt: (m.completedAt as string | null | undefined) ?? null,
+      };
+    });
+  }
+
   const { data: dealRow, error: dealError } = await supabase.from('Deal').insert({
     id: dealId,
     spaceId: space.id,
@@ -168,6 +207,7 @@ export async function POST(req: NextRequest) {
     value: valueVal,
     commissionRate: commissionRateVal,
     probability: probabilityVal,
+    milestones: milestonesVal,
     address: address || null,
     priority: priority || 'MEDIUM',
     closeDate: closeDateVal,
