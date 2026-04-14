@@ -55,7 +55,7 @@ export default async function ClientDetailPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  let contact: (Contact & { dealContacts: { deal: { id: string; title: string; address: string | null; value: number | null; stage: { name: string; color: string } } }[]; tours: { id: string; startsAt: string; endsAt: string; status: string; propertyAddress: string | null }[] }) | null = null;
+  let contact: (Contact & { dealContacts: { deal: { id: string; title: string; address: string | null; value: number | null; status: string; priority: string; stage: { name: string; color: string } } }[]; tours: { id: string; startsAt: string; endsAt: string; status: string; propertyAddress: string | null }[] }) | null = null;
   try {
     const { data: contactData, error: contactError } = await supabase.from('Contact').select('*').eq('id', id).single();
     if (contactError && contactError.code === 'PGRST116') {
@@ -66,17 +66,19 @@ export default async function ClientDetailPage({
       const c = contactData as Contact;
       // Defence-in-depth: verify contact belongs to this workspace
       if (c.spaceId !== space.id) notFound();
-      const { data: dealRows, error: dealError } = await supabase.from('DealContact').select('Deal(id, title, address, value, DealStage(name, color))').eq('contactId', id);
+      const { data: dealRows, error: dealError } = await supabase.from('DealContact').select('Deal(id, title, address, value, status, priority, DealStage(name, color))').eq('contactId', id);
       if (dealError) throw dealError;
       const { data: tourRows } = await supabase.from('Tour').select('id, guestName, startsAt, endsAt, status, propertyAddress').eq('contactId', id).order('startsAt', { ascending: false }).limit(10);
       contact = {
         ...c,
-        dealContacts: ((dealRows ?? []) as { Deal: { id: string; title: string; address: string | null; value: number | null; DealStage: { name: string; color: string } } }[]).map((row) => ({
+        dealContacts: ((dealRows ?? []) as { Deal: { id: string; title: string; address: string | null; value: number | null; status: string; priority: string; DealStage: { name: string; color: string } } }[]).map((row) => ({
           deal: {
             id: row.Deal.id,
             title: row.Deal.title,
             address: row.Deal.address,
             value: row.Deal.value,
+            status: row.Deal.status ?? 'active',
+            priority: row.Deal.priority ?? 'MEDIUM',
             stage: {
               name: row.Deal.DealStage?.name ?? 'Unknown',
               color: row.Deal.DealStage?.color ?? '#94a3b8',
@@ -663,59 +665,79 @@ export default async function ClientDetailPage({
         </div>
       )}
 
-      {/* Associated deals */}
+      {/* Linked deals */}
       {activeTab === 'deals' && (
       <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-indigo-500/40">
         <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
           <Briefcase size={14} className="text-indigo-600 dark:text-indigo-400" />
-          <h2 className="text-sm font-semibold">Associated deals</h2>
+          <h2 className="text-sm font-semibold">Linked Deals</h2>
           {contact.dealContacts.length > 0 && (
-            <span className="ml-auto text-xs text-muted-foreground">{contact.dealContacts.length} deals</span>
+            <span className="ml-auto text-xs text-muted-foreground">{contact.dealContacts.length} {contact.dealContacts.length === 1 ? 'deal' : 'deals'}</span>
           )}
         </div>
         <div className="px-4 sm:px-6 py-3">
           {contact.dealContacts.length === 0 ? (
-            <div className="text-center py-4">
-              <p className="text-sm text-muted-foreground">No deals linked.</p>
+            <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+              <Briefcase size={24} className="text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">No deals linked yet — create a deal and link this contact.</p>
               <Link
                 href={`/s/${slug}/deals`}
-                className="text-xs text-primary font-medium hover:underline mt-1 inline-block"
+                className="mt-1 inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline"
               >
-                Go to deals →
+                Go to Deals <ExternalLink size={11} />
               </Link>
             </div>
           ) : (
-            <div className="space-y-2">
-              {contact.dealContacts.map(({ deal }) => (
-                <Link
-                  key={deal.id}
-                  href={`/s/${slug}/deals`}
-                  className="flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors group"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">{deal.title}</p>
-                    {deal.address && (
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        {deal.address}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                    {deal.value != null && (
-                      <p className="text-sm font-semibold tabular-nums">
-                        ${deal.value.toLocaleString()}
-                      </p>
-                    )}
-                    <span
-                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold text-white"
-                      style={{ backgroundColor: deal.stage.color }}
-                    >
-                      {deal.stage.name}
-                    </span>
-                    <ExternalLink size={13} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block" />
-                  </div>
-                </Link>
-              ))}
+            <div className="space-y-2 py-1">
+              {contact.dealContacts.map(({ deal }) => {
+                const priorityMeta: Record<string, { label: string; className: string }> = {
+                  LOW: { label: 'Low', className: 'bg-muted text-muted-foreground' },
+                  MEDIUM: { label: 'Medium', className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' },
+                  HIGH: { label: 'High', className: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
+                };
+                const statusMeta: Record<string, { label: string; className: string }> = {
+                  active: { label: 'Active', className: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400' },
+                  won: { label: 'Won', className: 'bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-400' },
+                  lost: { label: 'Lost', className: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
+                  on_hold: { label: 'On Hold', className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' },
+                };
+                const priority = priorityMeta[deal.priority] ?? priorityMeta.MEDIUM;
+                const status = statusMeta[deal.status] ?? statusMeta.active;
+                return (
+                  <Link
+                    key={deal.id}
+                    href={`/s/${slug}/deals/${deal.id}`}
+                    className="flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors group"
+                  >
+                    <div className="min-w-0">
+                      <p className={`text-sm font-medium leading-snug truncate ${deal.status === 'lost' ? 'line-through text-muted-foreground' : ''}`}>{deal.title}</p>
+                      {deal.address && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{deal.address}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                      {deal.value != null && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-md px-1.5 py-0.5">
+                          ${deal.value.toLocaleString()}
+                        </span>
+                      )}
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white"
+                        style={{ backgroundColor: deal.stage.color }}
+                      >
+                        {deal.stage.name}
+                      </span>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${status.className}`}>
+                        {status.label}
+                      </span>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${priority.className}`}>
+                        {priority.label}
+                      </span>
+                      <ExternalLink size={13} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block" />
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>
