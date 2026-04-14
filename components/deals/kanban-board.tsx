@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   DndContext,
   DragEndEvent,
@@ -141,12 +142,11 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
+  const router = useRouter();
   const [stages, setStages] = useState<StageWithDeals[]>([]);
   const [contacts, setContacts] = useState<Pick<Contact, 'id' | 'name'>[]>([]);
-  const [addDealOpen, setAddDealOpen] = useState(false);
   const [editDeal, setEditDeal] = useState<DealWithRelations | null>(null);
   const [panelDeal, setPanelDeal] = useState<DealWithRelations | null>(null);
-  const [defaultStageId, setDefaultStageId] = useState<string>('');
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
   const [view, setView] = useState<'kanban' | 'list'>('list');
@@ -497,24 +497,6 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
     pendingRefetchRef.current = false;
   }
 
-  async function handleAddDeal(data: any) {
-    try {
-      const res = await fetch('/api/deals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, slug }),
-      });
-      if (res.ok) {
-        toast.success('Deal created');
-      } else {
-        toast.error('Failed to create deal');
-      }
-    } catch {
-      toast.error('Failed to create deal');
-    }
-    fetchData();
-  }
-
   async function handleEditDeal(data: any) {
     if (!editDeal) return;
     try {
@@ -702,8 +684,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   }
 
   function openAddDeal(stageId: string) {
-    setDefaultStageId(stageId);
-    setAddDealOpen(true);
+    router.push(`/s/${slug}/deals/new?stageId=${stageId}`);
   }
 
   const allStages = stages as DealStage[];
@@ -756,8 +737,12 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
           <LiquidMetalButton
             label="Add deal"
             onClick={() => {
-              setDefaultStageId(stages[0]?.id ?? '');
-              setAddDealOpen(true);
+              const firstStageId = stages[0]?.id;
+              router.push(
+                firstStageId
+                  ? `/s/${slug}/deals/new?stageId=${firstStageId}`
+                  : `/s/${slug}/deals/new`,
+              );
             }}
           />
         </div>
@@ -1092,15 +1077,6 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
           </div>
         </div>
       )}
-
-      <DealForm
-        open={addDealOpen}
-        onOpenChange={setAddDealOpen}
-        onSubmit={handleAddDeal}
-        stages={allStages}
-        contacts={contacts}
-        defaultValues={{ stageId: defaultStageId }}
-      />
 
       {editDeal && (
         <DealForm
