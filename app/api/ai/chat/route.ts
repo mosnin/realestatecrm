@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     // Verify the authenticated user owns this space
     const { data: owner } = await supabase
       .from('User')
-      .select('id')
+      .select('id, name')
       .eq('clerkId', userId)
       .eq('id', space.ownerId)
       .maybeSingle();
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const stream = await chatWithRAG(messages, space.id, space.name);
+    const stream = await chatWithRAG(messages, space.id, space.name, null, owner.name);
 
     // Collect the full response text to save to DB (non-blocking)
     const [streamForResponse, streamForSave] = stream.tee();

@@ -199,7 +199,7 @@ export default async function ClientDetailPage({
       )}
 
       {/* ── AI Lead Score Card ── */}
-      {activeTab === 'intelligence' && contact.scoringStatus === 'scored' && contact.leadScore != null && (
+      {activeTab === 'intelligence' && contact.scoringStatus === 'scored' && (
         <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-primary/40">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -212,7 +212,7 @@ export default async function ClientDetailPage({
             {/* Score + tier + status badges */}
             <div>
               <div className="flex items-center gap-4 flex-wrap">
-                <span className="text-4xl font-bold tabular-nums">{Math.round(contact.leadScore)}</span>
+                <span className="text-4xl font-bold tabular-nums">{contact.leadScore != null ? Math.round(contact.leadScore) : '—'}</span>
                 <span className={`inline-flex text-xs font-semibold rounded-full px-3 py-1.5 uppercase ${tierBadgeClasses(contact.scoreLabel ?? 'cold')}`}>
                   {contact.scoreLabel}
                 </span>
@@ -333,6 +333,17 @@ export default async function ClientDetailPage({
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Scoring in progress ── */}
+      {activeTab === 'intelligence' && contact.scoringStatus === 'pending' && (
+        <div className="rounded-lg border border-border bg-card px-4 sm:px-6 py-5 flex items-center gap-3">
+          <Sparkles size={16} className="text-primary animate-pulse" />
+          <div>
+            <p className="text-sm font-medium">Scoring in progress…</p>
+            <p className="text-xs text-muted-foreground">Chip is analysing this contact. Refresh in a moment.</p>
           </div>
         </div>
       )}
