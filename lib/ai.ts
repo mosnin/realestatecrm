@@ -118,6 +118,17 @@ export async function chatWithRAG(
   }
 
   // ── Step 3: build context blocks, prioritising vector-matched records ─────
+  // Only inject each section when the query is relevant to that data type.
+  // This prevents the AI from cross-referencing unrelated data (e.g. surfacing
+  // tours when the user asks about contacts, or deals when they ask about tours).
+  const queryLower = queryText.toLowerCase();
+  const queryAboutContacts = /\b(contact|lead|client|applicant|prospect|renter|buyer|tenant|person|people|who)\b/.test(queryLower);
+  const queryAboutDeals = /\b(deal|pipeline|stage|closing|commission|offer|contract|value|property deal)\b/.test(queryLower);
+  const queryAboutTours = /\b(tour|booking|book|showing|schedule|visit|appointment|walk.?through)\b/.test(queryLower);
+  const queryAboutCalendar = /\b(calendar|event|meeting|appointment|schedule|upcoming|this week|today)\b/.test(queryLower);
+  // General / ambiguous query — include all relevant sections
+  const isGeneral = !queryAboutContacts && !queryAboutDeals && !queryAboutTours && !queryAboutCalendar;
+
   const contextBlocks: string[] = [];
 
   const contacts = (allContacts ?? []) as any[];
@@ -129,7 +140,7 @@ export async function chatWithRAG(
     ...contacts.filter((c) => !priorityContactIds.has(c.id)),
   ];
 
-  if (sortedContacts.length) {
+  if (sortedContacts.length && (queryAboutContacts || isGeneral)) {
     contextBlocks.push(
       'Contacts:\n' +
         sortedContacts
@@ -176,7 +187,7 @@ export async function chatWithRAG(
     ...deals.filter((d) => !priorityDealIds.has(d.id)),
   ];
 
-  if (sortedDeals.length) {
+  if (sortedDeals.length && (queryAboutDeals || isGeneral)) {
     contextBlocks.push(
       'Deals:\n' +
         sortedDeals
@@ -207,7 +218,7 @@ export async function chatWithRAG(
 
   // ── Upcoming tours context ──
   const tours = (allTours ?? []) as any[];
-  if (tours.length) {
+  if (tours.length && (queryAboutTours || queryAboutCalendar || isGeneral)) {
     contextBlocks.push(
       'Upcoming Tours:\n' +
         tours
@@ -217,8 +228,9 @@ export async function chatWithRAG(
   }
 
   // ── Follow-ups due ──
+  // Only include follow-ups when the query is contact/general — not when asking about deals or tours.
   const followUps = contacts.filter((c) => c.followUpAt);
-  if (followUps.length) {
+  if (followUps.length && (queryAboutContacts || isGeneral)) {
     contextBlocks.push(
       'Follow-ups Due:\n' +
         followUps
@@ -230,7 +242,7 @@ export async function chatWithRAG(
 
   // ── Calendar events ──
   const calEvents = (calendarResult?.data ?? []) as any[];
-  if (calEvents.length) {
+  if (calEvents.length && (queryAboutCalendar || isGeneral)) {
     contextBlocks.push(
       'Calendar Events:\n' +
         calEvents
@@ -248,8 +260,14 @@ export async function chatWithRAG(
     `You also manage real estate deals, notes, tours, and follow-ups.`,
     `Only reference data that appears in the CRM context below. Never fabricate client names, deal values, or contact details.`,
     `When asked about "recent" activity, prioritize items with the most recent dates.`,
-    `When asked about "leads" or "new leads", focus ONLY on contacts (not notes or deals). Leads are contacts with tags including "application-link" or "new-lead".`,
-    `Do NOT proactively mention or cite workspace notes unless the user explicitly asks about notes. Notes are only shown in context when the user's query is about notes.`,
+    ``,
+    `## Strict Data-Scope Rules`,
+    `- When the user asks about CONTACTS (people, leads, clients, applicants): respond ONLY from the Contacts section. Do NOT mention tours, deals, or notes unless the user explicitly asks for connections.`,
+    `- When the user asks about DEALS (pipeline, stages, values, closings): respond ONLY from the Deals section. Do NOT mention contacts, tours, or follow-ups unless explicitly asked.`,
+    `- When the user asks about TOURS (showings, bookings, schedules, visits): respond ONLY from the Upcoming Tours section. Do NOT mention contacts' other details or deals.`,
+    `- When the user asks about "leads" or "new leads": focus ONLY on contacts with tags including "application-link" or "new-lead". Do not mention notes, deals, or tours.`,
+    `- Do NOT proactively mention or cite workspace notes unless the user explicitly asks about notes.`,
+    `- Respond ONLY to what was asked. Never volunteer data from unrelated sections.`,
     ``,
     `## Editing CRM Data`,
     `When the user asks you to update, change, or edit a contact or deal, propose the change using this exact format:`,
