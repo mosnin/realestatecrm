@@ -1,12 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { KanbanBoard } from './kanban-board';
 import { PipelineSummary } from './pipeline-summary';
 import { cn } from '@/lib/utils';
 
 export function DealsPageClient({ slug }: { slug: string }) {
   const [pipelineType, setPipelineType] = useState<'rental' | 'buyer'>('rental');
+
+  useEffect(() => {
+    const stored =
+      typeof window !== 'undefined'
+        ? localStorage.getItem(`chippi:deals:pipeline:${slug}`)
+        : null;
+    if (stored === 'rental' || stored === 'buyer') setPipelineType(stored);
+  }, [slug]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`chippi:deals:pipeline:${slug}`, pipelineType);
+    }
+  }, [slug, pipelineType]);
 
   return (
     <div className="space-y-4">

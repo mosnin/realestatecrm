@@ -36,6 +36,21 @@ import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { formatCurrency as _formatCurrency } from '@/lib/formatting';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useRealtime } from '@/hooks/use-realtime';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
@@ -73,6 +88,29 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   const [view, setView] = useState<'kanban' | 'list'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const { confirm, ConfirmDialog } = useConfirm();
+
+  useEffect(() => {
+    const stored =
+      typeof window !== 'undefined'
+        ? localStorage.getItem(`chippi:deals:view:${slug}`)
+        : null;
+    if (stored === 'kanban' || stored === 'list') setView(stored);
+  }, [slug]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`chippi:deals:view:${slug}`, view);
+    }
+  }, [slug, view]);
+
+  // Stage deletion state: when a stage has deals, we prompt the user to pick
+  // a migration target before calling DELETE with ?targetStageId=...
+  const [stageDelete, setStageDelete] = useState<{
+    stage: DealStage;
+    dealCount: number;
+    targetStageId: string;
+    submitting: boolean;
+  } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -325,6 +363,74 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
     }
     if (panelDeal?.id === id) setPanelDeal(null);
     fetchData();
+  }
+
+  // Delete a stage. First tries a naive DELETE. If the API responds with
+  // `stage-has-deals`, opens a dialog where the user chooses a migration
+  // target (another stage of the same pipelineType) and we retry with
+  // ?targetStageId=... For an empty stage we still prompt to confirm.
+  async function handleDeleteStage(stage: DealStage) {
+    const confirmed = await confirm({
+      title: `Delete "${stage.name}"?`,
+      description:
+        'This stage will be removed from the pipeline. Deals in this stage will need to be moved first.',
+    });
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/stages/${stage.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Stage deleted');
+        fetchData();
+        return;
+      }
+      const body = await res
+        .json()
+        .catch(() => ({} as { error?: string; dealCount?: number }));
+      if (res.status === 400 && body?.error === 'stage-has-deals') {
+        // Need to pick a migration target.
+        const candidates = stages.filter(
+          (s) => s.id !== stage.id && s.pipelineType === stage.pipelineType,
+        );
+        setStageDelete({
+          stage,
+          dealCount: Number(body.dealCount ?? 0),
+          targetStageId: candidates[0]?.id ?? '',
+          submitting: false,
+        });
+      } else {
+        toast.error('Failed to delete stage');
+      }
+    } catch {
+      toast.error('Failed to delete stage');
+    }
+  }
+
+  async function confirmStageMigrationDelete() {
+    if (!stageDelete || !stageDelete.targetStageId) return;
+    setStageDelete((prev) => (prev ? { ...prev, submitting: true } : prev));
+    try {
+      const params = new URLSearchParams({
+        targetStageId: stageDelete.targetStageId,
+      });
+      const res = await fetch(
+        `/api/stages/${stageDelete.stage.id}?${params.toString()}`,
+        { method: 'DELETE' },
+      );
+      if (!res.ok) {
+        toast.error('Failed to delete stage');
+        setStageDelete((prev) => (prev ? { ...prev, submitting: false } : prev));
+        return;
+      }
+      toast.success(
+        `Moved ${stageDelete.dealCount} deal${stageDelete.dealCount === 1 ? '' : 's'} and deleted stage`,
+      );
+      setStageDelete(null);
+      fetchData();
+    } catch {
+      toast.error('Failed to delete stage');
+      setStageDelete((prev) => (prev ? { ...prev, submitting: false } : prev));
+    }
   }
 
   async function handlePanelUpdate(id: string, updates: Partial<Deal>) {
