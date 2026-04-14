@@ -49,7 +49,7 @@ import {
 import Link from 'next/link';
 import type { Deal, DealStage, Contact, DealContact, DealActivity } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { timeAgo as relativeTime } from '@/lib/formatting';
+import { timeAgo as relativeTime, formatCurrency } from '@/lib/formatting';
 
 type DealWithRelations = Deal & {
   stage: DealStage;
@@ -346,6 +346,19 @@ export function DealPanel({ deal, open, onClose, onEdit, onUpdate, slug }: DealP
                     <span>Close: {new Date(deal.closeDate).toLocaleDateString()}</span>
                   </div>
                 )}
+                {deal.commissionRate != null && deal.value != null ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <DollarSign size={14} className="flex-shrink-0" />
+                    <span>
+                      Commission: {deal.commissionRate}% = {formatCurrency(deal.value * deal.commissionRate / 100)}
+                    </span>
+                  </div>
+                ) : deal.commissionRate != null ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <DollarSign size={14} className="flex-shrink-0" />
+                    <span>Commission rate: {deal.commissionRate}%</span>
+                  </div>
+                ) : null}
               </div>
 
               {/* Description */}

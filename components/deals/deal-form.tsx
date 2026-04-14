@@ -26,6 +26,7 @@ const schema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
   value: z.string().optional(),
+  commissionRate: z.coerce.number().min(0).max(100).nullable().optional(),
   address: z.string().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']),
   closeDate: z.string().optional(),
@@ -141,6 +142,22 @@ export function DealForm({
           <div className="space-y-1">
             <Label htmlFor="value">Deal Value ($)</Label>
             <Input id="value" type="number" placeholder="500000" {...register('value')} />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="commissionRate">Commission rate (%)</Label>
+            <Input
+              id="commissionRate"
+              type="number"
+              min={0}
+              max={100}
+              step={0.1}
+              placeholder="e.g. 2.5"
+              {...register('commissionRate')}
+            />
+            {errors.commissionRate && (
+              <p className="text-xs text-destructive">{errors.commissionRate.message}</p>
+            )}
           </div>
 
           <div className="space-y-1">

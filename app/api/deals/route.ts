@@ -56,11 +56,14 @@ export async function GET(req: NextRequest) {
     title: row.title,
     description: row.description,
     value: row.value,
+    commissionRate: row.commissionRate ?? null,
     address: row.address,
     priority: row.priority,
     closeDate: row.closeDate,
     stageId: row.stageId,
     position: row.position,
+    status: row.status,
+    followUpAt: row.followUpAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     stage: row.DealStage
@@ -80,7 +83,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { slug, title, description, value, address, priority, closeDate, stageId, contactIds } = body;
+  const { slug, title, description, value, commissionRate, address, priority, closeDate, stageId, contactIds } = body;
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
@@ -140,6 +143,10 @@ export async function POST(req: NextRequest) {
   if (valueVal !== null && isNaN(valueVal)) {
     return NextResponse.json({ error: 'Invalid value' }, { status: 400 });
   }
+  const commissionRateVal = commissionRate != null && commissionRate !== '' ? parseFloat(commissionRate) : null;
+  if (commissionRateVal !== null && (isNaN(commissionRateVal) || commissionRateVal < 0 || commissionRateVal > 100)) {
+    return NextResponse.json({ error: 'Invalid commissionRate (must be 0–100)' }, { status: 400 });
+  }
   let closeDateVal: string | null = null;
   if (closeDate) {
     const d = new Date(closeDate);
@@ -153,6 +160,7 @@ export async function POST(req: NextRequest) {
     title,
     description: description || null,
     value: valueVal,
+    commissionRate: commissionRateVal,
     address: address || null,
     priority: priority || 'MEDIUM',
     closeDate: closeDateVal,

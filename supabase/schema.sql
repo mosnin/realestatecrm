@@ -206,6 +206,7 @@ CREATE TABLE IF NOT EXISTS "Deal" (
   status      text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'won', 'lost', 'on_hold')),
   "followUpAt" timestamptz,
   "sourceTourId" text REFERENCES "Tour"(id) ON DELETE SET NULL,
+  "commissionRate" NUMERIC(5,2) DEFAULT NULL,
   "createdAt" timestamptz NOT NULL DEFAULT now(),
   "updatedAt" timestamptz NOT NULL DEFAULT now()
 );
@@ -444,6 +445,8 @@ ALTER TABLE "Brokerage" ADD COLUMN IF NOT EXISTS "brokerageBuyerFormConfig"  jso
 
 ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "formConfigSnapshot"    jsonb DEFAULT NULL;
 ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "formLeadType"         text;
+
+ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "commissionRate" NUMERIC(5,2) DEFAULT NULL;
 
 -- ============================================================
 -- Indexes

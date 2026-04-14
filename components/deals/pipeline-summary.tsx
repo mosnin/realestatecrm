@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Briefcase, DollarSign, TrendingUp, CalendarClock } from 'lucide-react';
+import { Briefcase, DollarSign, TrendingUp, CalendarClock, Percent } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
@@ -73,6 +73,17 @@ export function PipelineSummary({ slug, pipelineType }: PipelineSummaryProps) {
       return cd.getFullYear() === currentYear && cd.getMonth() === currentMonth;
     }).length;
 
+    // Est. GCI: sum of (value * commissionRate / 100) for active deals where both fields are set
+    const dealsWithCommission = activeDeals.filter(
+      (d) => typeof d.value === 'number' && typeof d.commissionRate === 'number',
+    );
+    const estGci = dealsWithCommission.reduce(
+      (sum, d) => sum + (d.value! * d.commissionRate!) / 100,
+      0,
+    );
+    const gciPartial = count > 0 && dealsWithCommission.length < count / 2;
+    const gciLabel = `Est. GCI${gciPartial ? ' (partial)' : ''}`;
+
     return [
       {
         label: 'Pipeline value',
@@ -102,11 +113,18 @@ export function PipelineSummary({ slug, pipelineType }: PipelineSummaryProps) {
         iconClassName:
           'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400',
       },
+      {
+        label: gciLabel,
+        value: formatCurrency(Math.round(estGci)),
+        icon: Percent,
+        iconClassName:
+          'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-400',
+      },
     ];
   }, [stages]);
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
       {stats.map((stat) => {
         const Icon = stat.icon;
         return (

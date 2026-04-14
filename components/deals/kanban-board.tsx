@@ -1001,6 +1001,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
             title: editDeal.title,
             description: editDeal.description ?? '',
             value: editDeal.value?.toString() ?? '',
+            commissionRate: editDeal.commissionRate ?? undefined,
             address: editDeal.address ?? '',
             priority: editDeal.priority as any,
             closeDate: editDeal.closeDate

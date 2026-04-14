@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { GripVertical, Pencil, Trash2, DollarSign, Calendar, Trophy, XCircle, PauseCircle } from 'lucide-react';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { formatCompact } from '@/lib/formatting';
 
 type DealWithRelations = Deal & {
   stage: DealStage;
@@ -178,6 +179,12 @@ export function DealCard({ deal, onEdit, onDelete, onOpenPanel }: DealCardProps)
                 </span>
               )}
             </div>
+
+            {deal.value != null && deal.commissionRate != null && (
+              <p className="text-xs text-muted-foreground mt-1">
+                GCI: {formatCompact(deal.value * deal.commissionRate / 100)}
+              </p>
+            )}
 
             {deal.dealContacts.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
