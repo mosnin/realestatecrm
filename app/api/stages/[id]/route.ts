@@ -66,8 +66,35 @@ export async function PATCH(
   return NextResponse.json(stage);
 }
 
+/**
+ * Safe stage deletion with optional deal migration.
+ *
+ * The Deal.stageId FK is ON DELETE CASCADE (see supabase/setup.sql), so a
+ * naive delete would destroy every deal in the stage. This handler prevents
+ * that:
+ *
+ *   - If the stage has no deals -> delete it.
+ *   - If the stage has deals and no `targetStageId` query param is provided,
+ *     respond with 400 `{ error: 'stage-has-deals', dealCount }` so the UI
+ *     can prompt the user to pick a migration target.
+ *   - If `targetStageId` is provided, validate it belongs to the same space
+ *     and pipelineType (and isn't the stage being deleted), reassign the
+ *     deals, then delete the stage.
+ *
+ * Transactionality note:
+ *   Supabase's PostgREST client does not expose a single multi-statement
+ *   transaction for arbitrary UPDATE + DELETE pairs from the JS client, and
+ *   we don't have an RPC for this flow. We therefore issue the UPDATE first
+ *   and only proceed to the DELETE if it succeeds. If the UPDATE fails, no
+ *   state has changed and we return 500. If the DELETE fails after a
+ *   successful UPDATE, deals have already been safely migrated to the target
+ *   stage (they're not orphaned or lost) — the old stage simply remains,
+ *   and the user can retry. This "best effort, safe partial state" ordering
+ *   is preferred over the alternative (delete first, migrate second) which
+ *   would risk cascade-deleting deals on a partial failure.
+ */
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await requireAuth();
@@ -81,6 +108,9 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  // targetStageId is taken from the query string (e.g. ?targetStageId=...).
+  const targetStageId = req.nextUrl.searchParams.get('targetStageId');
+
   const { data: existingRows, error: existingError } = await supabase
     .from('DealStage')
     .select('*')
@@ -89,7 +119,65 @@ export async function DELETE(
   if (existingError) throw existingError;
   if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { error: deleteError } = await supabase.from('DealStage').delete().eq('id', id).eq('spaceId', space.id);
+  const stage = existingRows[0];
+
+  // Count deals currently assigned to this stage within the space.
+  const { count: dealCount, error: countError } = await supabase
+    .from('Deal')
+    .select('id', { count: 'exact', head: true })
+    .eq('spaceId', space.id)
+    .eq('stageId', id);
+  if (countError) throw countError;
+
+  const hasDeals = (dealCount ?? 0) > 0;
+
+  if (hasDeals && !targetStageId) {
+    return NextResponse.json(
+      { error: 'stage-has-deals', dealCount: dealCount ?? 0 },
+      { status: 400 },
+    );
+  }
+
+  if (hasDeals && targetStageId) {
+    if (targetStageId === id) {
+      return NextResponse.json(
+        { error: 'targetStageId must differ from the stage being deleted' },
+        { status: 400 },
+      );
+    }
+
+    // Validate target stage: must exist, same space, same pipelineType.
+    const { data: targetRows, error: targetError } = await supabase
+      .from('DealStage')
+      .select('id, spaceId, pipelineType')
+      .eq('id', targetStageId)
+      .eq('spaceId', space.id);
+    if (targetError) throw targetError;
+    if (!targetRows.length) {
+      return NextResponse.json({ error: 'Target stage not found' }, { status: 400 });
+    }
+    const target = targetRows[0];
+    if (target.pipelineType !== stage.pipelineType) {
+      return NextResponse.json(
+        { error: 'Target stage must have the same pipelineType' },
+        { status: 400 },
+      );
+    }
+
+    // Migrate deals first. If this fails, no state has changed.
+    const { error: migrateError } = await supabase
+      .from('Deal')
+      .update({ stageId: targetStageId })
+      .eq('spaceId', space.id)
+      .eq('stageId', id);
+    if (migrateError) throw migrateError;
+  }
+
+  const { error: deleteError } = await supabase
+    .from('DealStage')
+    .delete()
+    .eq('id', id)
+    .eq('spaceId', space.id);
   if (deleteError) throw deleteError;
 
   void audit({
@@ -98,6 +186,9 @@ export async function DELETE(
     resource: 'DealStage',
     resourceId: id,
     spaceId: space.id,
+    metadata: hasDeals
+      ? { migratedDealCount: dealCount ?? 0, targetStageId }
+      : undefined,
   });
 
   return NextResponse.json({ success: true });

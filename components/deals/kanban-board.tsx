@@ -510,10 +510,12 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
                   key={stage.id}
                   stage={stage}
                   deals={stage.deals}
+                  slug={slug}
                   onAddDeal={openAddDeal}
                   onEditDeal={(deal) => setEditDeal(deal)}
                   onDeleteDeal={handleDeleteDeal}
                   onOpenPanel={(deal) => setPanelDeal(deal)}
+                  onDealCreated={fetchData}
                 />
               ))}
             </div>
