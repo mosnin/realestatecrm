@@ -11,6 +11,7 @@ const openSans = Open_Sans({
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { ThemeProvider } from '@/components/theme-provider';
+import { Providers as HeroUIProviders } from '@/components/heroui-provider';
 import { AmplitudeProvider } from '@/components/amplitude-provider';
 import { Toaster } from 'sonner';
 import './globals.css';
@@ -58,9 +59,11 @@ export default async function RootLayout({
       </head>
       <body className={`${GeistSans.variable} ${openSans.variable} antialiased bg-background text-foreground`}>
         <ThemeProvider>
-          <AmplitudeProvider>
-            {children}
-          </AmplitudeProvider>
+          <HeroUIProviders>
+            <AmplitudeProvider>
+              {children}
+            </AmplitudeProvider>
+          </HeroUIProviders>
         </ThemeProvider>
         <Toaster richColors position="top-right" />
         <SpeedInsights />
