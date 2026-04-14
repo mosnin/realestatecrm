@@ -1,9 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* HeroUI v3 styles */
-@import "@heroui/react/styles";
-
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
