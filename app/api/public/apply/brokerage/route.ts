@@ -172,26 +172,42 @@ function buildDynamicSchemaForSubmission(
         question.required;
 
       switch (question.type) {
-        case 'email':
-          fieldSchema = required
+        case 'email': {
+          // Coerce booleans to string to handle edge cases like privacyConsent:true
+          // being sent in a field that shares an ID with a string-type question.
+          const emailBase = required
             ? z.string().trim().min(1).email().max(255)
             : z.string().trim().email().max(255).optional().or(z.literal(''));
+          fieldSchema = z.preprocess((v) => (typeof v === 'boolean' ? String(v) : v), emailBase);
           break;
-        case 'phone':
-          fieldSchema = required
+        }
+        case 'phone': {
+          const phoneBase = required
             ? z.string().trim().min(1).max(40)
             : z.string().trim().max(40).optional().or(z.literal(''));
+          fieldSchema = z.preprocess((v) => (typeof v === 'boolean' ? String(v) : v), phoneBase);
           break;
+        }
         case 'number':
           fieldSchema = required
             ? z.union([z.number(), z.string()]).pipe(z.coerce.number())
             : z.union([z.number(), z.string(), z.null(), z.undefined()]).optional();
           break;
-        case 'checkbox':
-          fieldSchema = required
-            ? z.boolean()
-            : z.boolean().optional();
+        case 'checkbox': {
+          // The question-renderer stores checkbox values as strings ('true'/'false').
+          // Coerce both string and boolean representations to boolean.
+          const boolCoerce = z.preprocess(
+            (v) => {
+              if (typeof v === 'boolean') return v;
+              if (v === 'true' || v === '1') return true;
+              if (v === 'false' || v === '0' || v === '' || v == null) return false;
+              return v;
+            },
+            z.boolean(),
+          );
+          fieldSchema = required ? boolCoerce : boolCoerce.optional();
           break;
+        }
         case 'multi_select':
           fieldSchema = required
             ? z.array(z.string()).min(1)
@@ -202,11 +218,16 @@ function buildDynamicSchemaForSubmission(
         case 'textarea':
         case 'select':
         case 'radio':
-        default:
-          fieldSchema = required
+        default: {
+          // Coerce booleans to string — handles the case where the client injects
+          // privacyConsent: true (boolean) and the form config has a question with
+          // that same ID typed as radio/text/select.
+          const strBase = required
             ? z.string().trim().min(1).max(4000)
             : z.string().trim().max(4000).optional().or(z.literal(''));
+          fieldSchema = z.preprocess((v) => (typeof v === 'boolean') ? (v ? 'true' : 'false') : v, strBase);
           break;
+        }
       }
 
       shape[question.id] = fieldSchema;
