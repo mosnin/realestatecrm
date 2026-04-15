@@ -27,6 +27,7 @@ export type AuditAction =
   | 'DELETE'
   | 'ACCESS'
   | 'LOGIN'
+  | 'LOGOUT'
   | 'ADMIN_ACTION';
 
 export interface AuditParams {

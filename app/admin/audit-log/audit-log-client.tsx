@@ -30,7 +30,7 @@ interface AuditLogClientProps {
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const ACTION_TYPES = ['CREATE', 'UPDATE', 'DELETE', 'ACCESS', 'LOGIN'] as const;
+const ACTION_TYPES = ['CREATE', 'UPDATE', 'DELETE', 'ACCESS', 'LOGIN', 'LOGOUT', 'ADMIN_ACTION'] as const;
 const RESOURCE_TYPES = [
   'Contact',
   'Deal',
@@ -39,6 +39,7 @@ const RESOURCE_TYPES = [
   'User',
   'Tour',
   'Invitation',
+  'Session',
   'AdminAction',
 ] as const;
 
@@ -47,7 +48,9 @@ const ACTION_BADGE_STYLES: Record<string, string> = {
   UPDATE: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
   DELETE: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
   ACCESS: 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400',
-  LOGIN: 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400',
+  LOGIN: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400',
+  LOGOUT: 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400',
+  ADMIN_ACTION: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
