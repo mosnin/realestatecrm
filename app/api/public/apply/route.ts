@@ -199,11 +199,22 @@ function buildDynamicSchemaForSubmission(
             ? z.union([z.number(), z.string()]).pipe(z.coerce.number())
             : z.union([z.number(), z.string(), z.null(), z.undefined()]).optional();
           break;
-        case 'checkbox':
-          fieldSchema = required
-            ? z.boolean()
-            : z.boolean().optional();
+        case 'checkbox': {
+          // The client stores checkbox answers as strings ('true'/'false') because
+          // the question-renderer's onChange fires `e.target.checked ? 'true' : 'false'`.
+          // Coerce both string and boolean representations to boolean.
+          const boolCoerce = z.preprocess(
+            (v) => {
+              if (typeof v === 'boolean') return v;
+              if (v === 'true' || v === '1') return true;
+              if (v === 'false' || v === '0' || v === '' || v == null) return false;
+              return v;
+            },
+            z.boolean(),
+          );
+          fieldSchema = required ? boolCoerce : boolCoerce.optional();
           break;
+        }
         case 'multi_select':
           fieldSchema = required
             ? z.array(z.string()).min(1)
