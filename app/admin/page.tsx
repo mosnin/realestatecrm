@@ -20,6 +20,9 @@ import {
   BarChart3,
   FileText,
   LayoutGrid,
+  Clock,
+  AlertCircle,
+  Moon,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
@@ -77,6 +80,32 @@ export default async function AdminOverviewPage() {
     createdAt: string;
     space: { slug: string } | null;
   }[] = [];
+
+  // At-risk lists
+  type AtRiskTrial = {
+    userId: string;
+    name: string | null;
+    email: string;
+    daysLeft: number;
+  };
+  type AtRiskPastDue = {
+    userId: string;
+    name: string | null;
+    email: string;
+    daysPastDue: number;
+  };
+  type AtRiskInactive = {
+    userId: string;
+    name: string | null;
+    email: string;
+    daysSinceLastContact: number | null;
+  };
+  let trialEndingSoon: AtRiskTrial[] = [];
+  let trialEndingSoonTotal = 0;
+  let pastDueList: AtRiskPastDue[] = [];
+  let pastDueTotal = 0;
+  let inactiveWorkspaces: AtRiskInactive[] = [];
+  let inactiveWorkspacesTotal = 0;
   let signupsByDay: { date: string; count: number }[] = [];
   let recentActivity: {
     type: 'signup' | 'lead' | 'deal' | 'brokerage';
@@ -303,6 +332,145 @@ export default async function AdminOverviewPage() {
     } catch (e) {
       console.error('[admin] Lead quality queries failed', e);
     }
+
+    // ── At-risk / churn alerts ────────────────────────────────────────
+    try {
+      const sevenDaysFromNow = new Date(now.getTime() + 7 * 86_400_000).toISOString();
+      const nowIso = now.toISOString();
+
+      const [trialRes, pastDueRes, oldSpacesRes] = await Promise.all([
+        // Trials ending within 7 days
+        supabase
+          .from('Space')
+          .select('id, ownerId, stripePeriodEnd, User!inner(id, name, email)')
+          .eq('stripeSubscriptionStatus', 'trialing')
+          .not('stripePeriodEnd', 'is', null)
+          .lte('stripePeriodEnd', sevenDaysFromNow)
+          .gte('stripePeriodEnd', nowIso)
+          .order('stripePeriodEnd', { ascending: true }),
+        // Past due spaces
+        supabase
+          .from('Space')
+          .select('id, ownerId, stripePeriodEnd, User!inner(id, name, email)')
+          .eq('stripeSubscriptionStatus', 'past_due')
+          .order('stripePeriodEnd', { ascending: true }),
+        // Spaces older than 30 days (candidates for "inactive")
+        supabase
+          .from('Space')
+          .select('id, ownerId, createdAt, User!inner(id, name, email)')
+          .lte('createdAt', thirtyDaysAgo)
+          .limit(500),
+      ]);
+
+      // Trial ending soon
+      const trialRows = (trialRes.data ?? []) as {
+        id: string;
+        ownerId: string;
+        stripePeriodEnd: string | null;
+        User: { id: string; name: string | null; email: string } | { id: string; name: string | null; email: string }[] | null;
+      }[];
+      trialEndingSoonTotal = trialRows.length;
+      trialEndingSoon = trialRows.slice(0, 5).map((r) => {
+        const u = Array.isArray(r.User) ? r.User[0] : r.User;
+        const periodEnd = r.stripePeriodEnd ? new Date(r.stripePeriodEnd).getTime() : now.getTime();
+        const daysLeft = Math.max(0, Math.ceil((periodEnd - now.getTime()) / 86_400_000));
+        return {
+          userId: u?.id ?? r.ownerId,
+          name: u?.name ?? null,
+          email: u?.email ?? '',
+          daysLeft,
+        };
+      });
+
+      // Past due
+      const pastDueRows = (pastDueRes.data ?? []) as {
+        id: string;
+        ownerId: string;
+        stripePeriodEnd: string | null;
+        User: { id: string; name: string | null; email: string } | { id: string; name: string | null; email: string }[] | null;
+      }[];
+      pastDueTotal = pastDueRows.length;
+      pastDueList = pastDueRows.slice(0, 5).map((r) => {
+        const u = Array.isArray(r.User) ? r.User[0] : r.User;
+        const periodEnd = r.stripePeriodEnd ? new Date(r.stripePeriodEnd).getTime() : now.getTime();
+        const daysPastDue = Math.max(0, Math.floor((now.getTime() - periodEnd) / 86_400_000));
+        return {
+          userId: u?.id ?? r.ownerId,
+          name: u?.name ?? null,
+          email: u?.email ?? '',
+          daysPastDue,
+        };
+      });
+
+      // Inactive workspaces: space older than 30d and no contact created in last 30d
+      const oldSpaceRows = (oldSpacesRes.data ?? []) as {
+        id: string;
+        ownerId: string;
+        createdAt: string;
+        User: { id: string; name: string | null; email: string } | { id: string; name: string | null; email: string }[] | null;
+      }[];
+      if (oldSpaceRows.length > 0) {
+        const spaceIds = oldSpaceRows.map((r) => r.id);
+        const recentContactsRes = await supabase
+          .from('Contact')
+          .select('spaceId, createdAt')
+          .in('spaceId', spaceIds)
+          .gte('createdAt', thirtyDaysAgo);
+        const activeSpaceIds = new Set(
+          ((recentContactsRes.data ?? []) as { spaceId: string }[])
+            .map((r) => r.spaceId)
+            .filter(Boolean)
+        );
+
+        // For spaces with NO recent contacts, find their most recent contact ever (for "days since")
+        const inactiveSpaces = oldSpaceRows.filter((r) => !activeSpaceIds.has(r.id));
+        inactiveWorkspacesTotal = inactiveSpaces.length;
+
+        const candidates = inactiveSpaces.slice(0, 10); // fetch more than 5, then sort
+        const lastContactMap = new Map<string, string | null>();
+        if (candidates.length > 0) {
+          const lastContactsRes = await supabase
+            .from('Contact')
+            .select('spaceId, createdAt')
+            .in(
+              'spaceId',
+              candidates.map((c) => c.id)
+            )
+            .order('createdAt', { ascending: false });
+          for (const c of (lastContactsRes.data ?? []) as {
+            spaceId: string;
+            createdAt: string;
+          }[]) {
+            if (!lastContactMap.has(c.spaceId)) {
+              lastContactMap.set(c.spaceId, c.createdAt);
+            }
+          }
+        }
+
+        inactiveWorkspaces = candidates
+          .map((r) => {
+            const u = Array.isArray(r.User) ? r.User[0] : r.User;
+            const last = lastContactMap.get(r.id);
+            const daysSince = last
+              ? Math.floor((now.getTime() - new Date(last).getTime()) / 86_400_000)
+              : null;
+            return {
+              userId: u?.id ?? r.ownerId,
+              name: u?.name ?? null,
+              email: u?.email ?? '',
+              daysSinceLastContact: daysSince,
+            };
+          })
+          .sort((a, b) => {
+            const av = a.daysSinceLastContact ?? Number.MAX_SAFE_INTEGER;
+            const bv = b.daysSinceLastContact ?? Number.MAX_SAFE_INTEGER;
+            return bv - av;
+          })
+          .slice(0, 5);
+      }
+    } catch (e) {
+      console.error('[admin] At-risk queries failed', e);
+    }
   } catch (err) {
     console.error('[admin] DB queries failed', { error: err });
     return (
@@ -516,6 +684,169 @@ export default async function AdminOverviewPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      </div>
+
+      {/* ── At Risk ──────────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">At Risk</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Trial ending soon */}
+          <Card className="rounded-xl border bg-card h-full">
+            <CardContent className="p-5 h-full flex flex-col">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-100 dark:bg-blue-500/15">
+                    <Clock size={15} className="text-blue-500" />
+                  </div>
+                  <p className="text-sm font-semibold truncate">Trial ending soon</p>
+                </div>
+                <span className="text-[10px] font-semibold rounded-full px-2 py-0.5 text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15 tabular-nums">
+                  {trialEndingSoonTotal}
+                </span>
+              </div>
+              {trialEndingSoon.length === 0 ? (
+                <p className="text-xs text-muted-foreground flex-1">
+                  No trials ending in the next 7 days.
+                </p>
+              ) : (
+                <div className="flex-1 -mx-2">
+                  {trialEndingSoon.map((u) => (
+                    <Link
+                      key={u.userId}
+                      href={`/admin/users/${u.userId}`}
+                      className="flex items-center justify-between gap-2 px-2 py-2 rounded hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold truncate">
+                          {u.name || u.email}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {u.email}
+                        </p>
+                      </div>
+                      <span className="text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0 text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15 tabular-nums">
+                        {u.daysLeft}d left
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+              <Link
+                href="/admin/users?filter=trialing"
+                className="text-xs text-primary font-medium hover:underline underline-offset-2 mt-3 self-start"
+              >
+                View all →
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* Past due */}
+          <Card className="rounded-xl border bg-card h-full">
+            <CardContent className="p-5 h-full flex flex-col">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-amber-100 dark:bg-amber-500/15">
+                    <AlertCircle size={15} className="text-amber-500" />
+                  </div>
+                  <p className="text-sm font-semibold truncate">Past due</p>
+                </div>
+                <span className="text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15 tabular-nums">
+                  {pastDueTotal}
+                </span>
+              </div>
+              {pastDueList.length === 0 ? (
+                <p className="text-xs text-muted-foreground flex-1">
+                  No past-due accounts. Nice.
+                </p>
+              ) : (
+                <div className="flex-1 -mx-2">
+                  {pastDueList.map((u) => (
+                    <Link
+                      key={u.userId}
+                      href={`/admin/users/${u.userId}`}
+                      className="flex items-center justify-between gap-2 px-2 py-2 rounded hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold truncate">
+                          {u.name || u.email}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {u.email}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end flex-shrink-0">
+                        <span className="text-[10px] font-semibold rounded-full px-2 py-0.5 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15 tabular-nums">
+                          {u.daysPastDue}d
+                        </span>
+                        <span className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
+                          ${formatCompact(97)}
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+              <Link
+                href="/admin/users?filter=past-due"
+                className="text-xs text-primary font-medium hover:underline underline-offset-2 mt-3 self-start"
+              >
+                View all →
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* Inactive workspaces */}
+          <Card className="rounded-xl border bg-card h-full">
+            <CardContent className="p-5 h-full flex flex-col">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-violet-100 dark:bg-violet-500/15">
+                    <Moon size={15} className="text-violet-500" />
+                  </div>
+                  <p className="text-sm font-semibold truncate">Inactive workspaces</p>
+                </div>
+                <span className="text-[10px] font-semibold rounded-full px-2 py-0.5 text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-500/15 tabular-nums">
+                  {inactiveWorkspacesTotal}
+                </span>
+              </div>
+              {inactiveWorkspaces.length === 0 ? (
+                <p className="text-xs text-muted-foreground flex-1">
+                  No inactive workspaces.
+                </p>
+              ) : (
+                <div className="flex-1 -mx-2">
+                  {inactiveWorkspaces.map((u) => (
+                    <Link
+                      key={u.userId}
+                      href={`/admin/users/${u.userId}`}
+                      className="flex items-center justify-between gap-2 px-2 py-2 rounded hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold truncate">
+                          {u.name || u.email}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {u.email}
+                        </p>
+                      </div>
+                      <span className="text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0 text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-500/15 tabular-nums">
+                        {u.daysSinceLastContact === null
+                          ? 'never'
+                          : `${u.daysSinceLastContact}d`}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+              <Link
+                href="/admin/users?filter=inactive"
+                className="text-xs text-primary font-medium hover:underline underline-offset-2 mt-3 self-start"
+              >
+                View all →
+              </Link>
+            </CardContent>
+          </Card>
         </div>
       </div>
 

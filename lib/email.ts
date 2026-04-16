@@ -735,6 +735,82 @@ export async function sendDraftResumeEmail(params: DraftResumeEmailParams): Prom
   }
 }
 
+// ── MFA enrollment prompt (sent by admin action) ─────────────────────────────
+
+export interface MfaEnrollmentPromptParams {
+  toEmail: string;
+  userName: string | null;
+}
+
+export async function sendMfaEnrollmentPrompt(params: MfaEnrollmentPromptParams): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('[email] RESEND_API_KEY not set — skipping MFA enrollment prompt');
+    return;
+  }
+  const { Resend } = await import('resend');
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const FROM = getFromAddress();
+
+  const { toEmail, userName } = params;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const accountSettingsUrl = `${appUrl}/settings/account`;
+  const name = esc(userName) || 'there';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f9fafb;padding:32px 16px">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
+        <tr><td style="background:#0f172a;padding:20px 28px">
+          <p style="margin:0;color:#94a3b8;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.05em">Account Security</p>
+          <p style="margin:4px 0 0;color:#ffffff;font-size:20px;font-weight:700">Enable two-factor authentication</p>
+        </td></tr>
+        <tr><td style="padding:24px 28px">
+          <p style="margin:0 0 16px;font-size:15px;color:#111827;line-height:1.6">Hi ${name},</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#374151;line-height:1.6">
+            To better protect your Chippi account, we recommend enabling two-factor authentication (2FA). 2FA adds a second layer of security by requiring a verification code in addition to your password when signing in.
+          </p>
+          <p style="margin:0 0 20px;font-size:14px;color:#374151;line-height:1.6">
+            You can set this up in under a minute from your account settings.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr><td>
+              <a href="${accountSettingsUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 22px;border-radius:8px">Enable 2FA now &rarr;</a>
+            </td></tr>
+          </table>
+          <p style="margin:20px 0 0;font-size:12px;color:#9ca3af;line-height:1.5">
+            If you didn&rsquo;t expect this email or have any questions, just reply to this message &mdash; we&rsquo;re happy to help.
+          </p>
+        </td></tr>
+        <tr><td style="padding:16px 28px;border-top:1px solid #f1f5f9">
+          <p style="margin:0;font-size:11px;color:#9ca3af">The Chippi team</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  try {
+    console.log('[email] Sending MFA enrollment prompt to:', toEmail, 'from:', FROM);
+    const result = await resend.emails.send({
+      from: `Chippi <${FROM}>`,
+      to: toEmail,
+      subject: 'Secure your Chippi account \u2014 enable two-factor authentication',
+      html,
+    });
+    if (result.error) {
+      console.error('[email] Resend API error (MFA prompt):', JSON.stringify(result.error));
+    } else {
+      console.log('[email] sendMfaEnrollmentPrompt result:', JSON.stringify(result.data));
+    }
+  } catch (err) {
+    console.error('[email] sendMfaEnrollmentPrompt FAILED:', err);
+  }
+}
+
 // ── Status update email (sent to applicant when status changes) ───────────────
 
 const STATUS_LABELS: Record<string, string> = {

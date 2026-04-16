@@ -113,14 +113,54 @@ export default async function AdminUserDetailPage({
   if (!userRow) notFound();
   const user = userRow as User;
 
-  // Check Clerk ban status (source of truth for suspension)
+  // Check Clerk ban status (source of truth for suspension) + MFA + sessions
   let isSuspended = false;
+  let twoFactorEnabled = false;
+  let totpEnabled = false;
+  let backupCodeEnabled = false;
+  let activeSessions: {
+    id: string;
+    lastActiveAt: number;
+    createdAt: number;
+    expireAt: number;
+    clientId: string;
+    ipAddress: string | null;
+    city: string | null;
+    country: string | null;
+    browserName: string | null;
+    deviceType: string | null;
+  }[] = [];
   try {
     const clerkUser = await clerkAdmin.users.getUser(user.clerkId);
     isSuspended = clerkUser.banned ?? false;
+    twoFactorEnabled = clerkUser.twoFactorEnabled ?? false;
+    totpEnabled = clerkUser.totpEnabled ?? false;
+    backupCodeEnabled = clerkUser.backupCodeEnabled ?? false;
   } catch {
     // Fall back to DB platformRole if Clerk lookup fails
-    isSuspended = user.platformRole === 'banned';
+    isSuspended = (user.platformRole as string) === 'banned';
+  }
+
+  try {
+    const sessResp = await clerkAdmin.sessions.getSessionList({
+      userId: user.clerkId,
+      status: 'active',
+    });
+    const list = Array.isArray(sessResp) ? sessResp : sessResp.data;
+    activeSessions = list.map((s) => ({
+      id: s.id,
+      lastActiveAt: s.lastActiveAt,
+      createdAt: s.createdAt,
+      expireAt: s.expireAt,
+      clientId: s.clientId,
+      ipAddress: s.latestActivity?.ipAddress ?? null,
+      city: s.latestActivity?.city ?? null,
+      country: s.latestActivity?.country ?? null,
+      browserName: s.latestActivity?.browserName ?? null,
+      deviceType: s.latestActivity?.deviceType ?? null,
+    }));
+  } catch {
+    activeSessions = [];
   }
 
   // Fetch space
@@ -471,6 +511,10 @@ export default async function AdminUserDetailPage({
         isSuspended={isSuspended}
         subscriptionStatus={subStatus ?? 'inactive'}
         stripePeriodEnd={periodEnd}
+        twoFactorEnabled={twoFactorEnabled}
+        totpEnabled={totpEnabled}
+        backupCodeEnabled={backupCodeEnabled}
+        activeSessions={activeSessions}
       />
     </div>
   );

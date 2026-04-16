@@ -26,7 +26,28 @@ import {
   DollarSign,
   ShieldBan,
   ShieldCheck,
+  LogIn,
+  Lock,
+  Monitor,
+  Smartphone,
+  Trash2,
+  ShieldAlert,
+  MailWarning,
+  X,
 } from 'lucide-react';
+
+interface ActiveSession {
+  id: string;
+  lastActiveAt: number;
+  createdAt: number;
+  expireAt: number;
+  clientId: string;
+  ipAddress: string | null;
+  city: string | null;
+  country: string | null;
+  browserName: string | null;
+  deviceType: string | null;
+}
 
 interface UserActionsProps {
   userId: string;
@@ -38,6 +59,20 @@ interface UserActionsProps {
   subscriptionStatus: string | null;
   stripePeriodEnd: string | null;
   isSuspended: boolean;
+  twoFactorEnabled: boolean;
+  totpEnabled: boolean;
+  backupCodeEnabled: boolean;
+  activeSessions: ActiveSession[];
+}
+
+function formatRelative(ts: number): string {
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return 'just now';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  const days = Math.floor(diff / 86_400_000);
+  if (days < 30) return `${days}d ago`;
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -74,6 +109,10 @@ export function UserActions({
   subscriptionStatus,
   stripePeriodEnd,
   isSuspended: isSuspendedInitial,
+  twoFactorEnabled,
+  totpEnabled,
+  backupCodeEnabled,
+  activeSessions,
 }: UserActionsProps) {
   const router = useRouter();
   const [resetLoading, setResetLoading] = useState(false);
@@ -93,6 +132,17 @@ export function UserActions({
   const [refundLoading, setRefundLoading] = useState(false);
   const [refundResult, setRefundResult] = useState<string | null>(null);
   const [refundOpen, setRefundOpen] = useState(false);
+  const [sessions, setSessions] = useState<ActiveSession[]>(activeSessions);
+  const [sessionBusy, setSessionBusy] = useState<string | null>(null);
+  const [sessionResult, setSessionResult] = useState<string | null>(null);
+  const [revokeAllLoading, setRevokeAllLoading] = useState(false);
+  const [impersonateLoading, setImpersonateLoading] = useState(false);
+  const [impersonateResult, setImpersonateResult] = useState<string | null>(null);
+  const [forceResetOpen, setForceResetOpen] = useState(false);
+  const [forceResetLoading, setForceResetLoading] = useState(false);
+  const [forceResetResult, setForceResetResult] = useState<string | null>(null);
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [mfaResult, setMfaResult] = useState<string | null>(null);
 
   async function handlePasswordReset() {
     setResetLoading(true);
@@ -224,6 +274,123 @@ export function UserActions({
       setRefundResult('Network error. Try again.');
     } finally {
       setRefundLoading(false);
+    }
+  }
+
+  async function handleImpersonate() {
+    setImpersonateLoading(true);
+    setImpersonateResult(null);
+    try {
+      const res = await fetch('/api/admin/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'impersonate_user', clerkId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        try { await navigator.clipboard.writeText(data.url); } catch { /* clipboard may be blocked */ }
+        window.open(data.url, '_blank', 'noopener,noreferrer');
+        setImpersonateResult('Sign-in link copied to clipboard and opened in a new tab.');
+      } else {
+        setImpersonateResult(data.error || 'Failed to create sign-in link.');
+      }
+    } catch {
+      setImpersonateResult('Network error. Try again.');
+    } finally {
+      setImpersonateLoading(false);
+    }
+  }
+
+  async function handleForcePasswordReset() {
+    setForceResetLoading(true);
+    setForceResetResult(null);
+    try {
+      const res = await fetch('/api/admin/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'force_password_reset', clerkId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setForceResetResult(data.message || 'Password reset forced.');
+        setSessions([]);
+        setForceResetOpen(false);
+        router.refresh();
+      } else {
+        setForceResetResult(data.error || 'Failed to force reset.');
+      }
+    } catch {
+      setForceResetResult('Network error. Try again.');
+    } finally {
+      setForceResetLoading(false);
+    }
+  }
+
+  async function handleRevokeSession(sessionId: string) {
+    setSessionBusy(sessionId);
+    setSessionResult(null);
+    try {
+      const res = await fetch('/api/admin/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'revoke_session', sessionId, clerkId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+        setSessionResult('Session revoked.');
+      } else {
+        setSessionResult(data.error || 'Failed to revoke session.');
+      }
+    } catch {
+      setSessionResult('Network error. Try again.');
+    } finally {
+      setSessionBusy(null);
+    }
+  }
+
+  async function handleRevokeAllSessions() {
+    setRevokeAllLoading(true);
+    setSessionResult(null);
+    try {
+      const res = await fetch('/api/admin/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'revoke_all_sessions', clerkId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSessions([]);
+        setSessionResult(data.message || 'All sessions revoked.');
+      } else {
+        setSessionResult(data.error || 'Failed to revoke sessions.');
+      }
+    } catch {
+      setSessionResult('Network error. Try again.');
+    } finally {
+      setRevokeAllLoading(false);
+    }
+  }
+
+  async function handleSendMfaPrompt() {
+    setMfaLoading(true);
+    setMfaResult(null);
+    try {
+      const res = await fetch('/api/admin/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_mfa_prompt', clerkId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMfaResult(data.message || 'MFA enrollment email sent.');
+      } else {
+        setMfaResult(data.error || 'Failed to send email.');
+      }
+    } catch {
+      setMfaResult('Network error. Try again.');
+    } finally {
+      setMfaLoading(false);
     }
   }
 
@@ -607,6 +774,185 @@ export function UserActions({
           {suspendResult && (
             <p className="text-xs text-muted-foreground">{suspendResult}</p>
           )}
+
+          <div className="border-t border-border" />
+
+          {/* Active sessions */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium flex items-center gap-1.5">
+                  <Monitor size={13} />
+                  Active sessions
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {sessions.length === 0
+                    ? 'No active sessions for this user.'
+                    : `${sessions.length} active session${sessions.length === 1 ? '' : 's'}.`}
+                </p>
+              </div>
+              {sessions.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRevokeAllSessions}
+                  disabled={revokeAllLoading}
+                  className="text-xs gap-1.5 flex-shrink-0 text-destructive hover:text-destructive"
+                >
+                  <Trash2 size={13} />
+                  {revokeAllLoading ? 'Revoking...' : 'Revoke all'}
+                </Button>
+              )}
+            </div>
+
+            {sessions.length > 0 && (
+              <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
+                {sessions.map((s) => {
+                  const DeviceIcon = s.deviceType === 'mobile' ? Smartphone : Monitor;
+                  const location = [s.city, s.country].filter(Boolean).join(', ');
+                  return (
+                    <div key={s.id} className="flex items-start gap-3 px-3 py-2.5">
+                      <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <DeviceIcon size={13} className="text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium truncate">
+                          {s.browserName || 'Unknown browser'}
+                          {s.deviceType ? ` · ${s.deviceType}` : ''}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                          {s.ipAddress || 'IP unknown'}
+                          {location ? ` · ${location}` : ''}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Last active {formatRelative(s.lastActiveAt)} · session{' '}
+                          <span className="font-mono">{s.id.slice(0, 10)}…</span>
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRevokeSession(s.id)}
+                        disabled={sessionBusy === s.id}
+                        className="text-[11px] h-7 gap-1 flex-shrink-0 text-destructive hover:text-destructive"
+                      >
+                        <X size={12} />
+                        {sessionBusy === s.id ? 'Revoking...' : 'Revoke'}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {sessionResult && (
+              <p className="text-xs text-muted-foreground">{sessionResult}</p>
+            )}
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* Security (MFA + force reset + impersonate) */}
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium flex items-center gap-1.5">
+                <ShieldAlert size={13} />
+                Security
+              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span
+                  className={
+                    'inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2 py-0.5 ' +
+                    (twoFactorEnabled
+                      ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15'
+                      : 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15')
+                  }
+                >
+                  <ShieldCheck size={11} />
+                  2FA {twoFactorEnabled ? 'enabled' : 'disabled'}
+                </span>
+                {totpEnabled && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full px-2 py-0.5 text-muted-foreground bg-muted">
+                    TOTP
+                  </span>
+                )}
+                {backupCodeEnabled && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full px-2 py-0.5 text-muted-foreground bg-muted">
+                    Backup codes
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSendMfaPrompt}
+                disabled={mfaLoading}
+                className="text-xs gap-1.5"
+              >
+                <MailWarning size={13} />
+                {mfaLoading ? 'Sending...' : 'Send MFA prompt'}
+              </Button>
+
+              <Dialog open={forceResetOpen} onOpenChange={setForceResetOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs gap-1.5 text-destructive hover:text-destructive"
+                  >
+                    <Lock size={13} />
+                    Force password reset
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Force password reset</DialogTitle>
+                    <DialogDescription>
+                      This will revoke all active sessions for <strong>{email}</strong> and
+                      flag their account so they must use the &quot;Forgot password&quot; flow
+                      to sign in again. Continue?
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setForceResetOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={handleForcePasswordReset}
+                      disabled={forceResetLoading}
+                    >
+                      <Lock size={14} />
+                      {forceResetLoading ? 'Forcing...' : 'Confirm force reset'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleImpersonate}
+                disabled={impersonateLoading}
+                className="text-xs gap-1.5"
+              >
+                <LogIn size={13} />
+                {impersonateLoading ? 'Creating link...' : 'Sign in as user'}
+              </Button>
+            </div>
+
+            {mfaResult && (
+              <p className="text-xs text-muted-foreground">{mfaResult}</p>
+            )}
+            {forceResetResult && (
+              <p className="text-xs text-muted-foreground">{forceResetResult}</p>
+            )}
+            {impersonateResult && (
+              <p className="text-xs text-muted-foreground">{impersonateResult}</p>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

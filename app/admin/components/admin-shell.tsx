@@ -11,6 +11,11 @@ import {
   Mail,
   CreditCard,
   ScrollText,
+  Megaphone,
+  Send,
+  LineChart,
+  BarChart3,
+  Activity,
   Menu,
   Sun,
   Moon,
@@ -29,14 +34,43 @@ import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { useState } from 'react';
 
-const navItems = [
-  { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
-  { href: '/admin/users', label: 'Users', icon: Users, exact: false },
-  { href: '/admin/brokerages', label: 'Brokerages', icon: Building2, exact: false },
-  { href: '/admin/spaces', label: 'Spaces', icon: Building, exact: false },
-  { href: '/admin/billing', label: 'Billing', icon: CreditCard, exact: false },
-  { href: '/admin/invitations', label: 'Invitations', icon: Mail, exact: false },
-  { href: '/admin/audit-log', label: 'Audit Log', icon: ScrollText, exact: false },
+const navSections = [
+  {
+    label: 'Management',
+    items: [
+      { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
+      { href: '/admin/users', label: 'Users', icon: Users, exact: false },
+      { href: '/admin/brokerages', label: 'Brokerages', icon: Building2, exact: false },
+      { href: '/admin/spaces', label: 'Spaces', icon: Building, exact: false },
+      { href: '/admin/billing', label: 'Billing', icon: CreditCard, exact: false },
+      { href: '/admin/invitations', label: 'Invitations', icon: Mail, exact: false },
+    ],
+  },
+  {
+    label: 'Growth',
+    items: [
+      { href: '/admin/broadcast', label: 'Broadcast', icon: Send, exact: false },
+      { href: '/admin/announcements', label: 'Announcements', icon: Megaphone, exact: false },
+      { href: '/admin/cohorts', label: 'Cohorts', icon: LineChart, exact: false },
+      { href: '/admin/form-analytics', label: 'Form Analytics', icon: BarChart3, exact: false },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { href: '/admin/scoring-health', label: 'Scoring Health', icon: Activity, exact: false },
+      { href: '/admin/audit-log', label: 'Audit Log', icon: ScrollText, exact: false },
+    ],
+  },
+];
+
+const navItems = navSections.flatMap((s) => s.items);
+const mobileNavItems = [
+  navSections[0].items[0], // Overview
+  navSections[0].items[1], // Users
+  navSections[0].items[2], // Brokerages
+  navSections[0].items[4], // Billing
+  navSections[2].items[1], // Audit Log
 ];
 
 function NavLink({
@@ -102,12 +136,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 pt-4 pb-2 space-y-0.5">
-          <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-            Management
-          </p>
-          {navItems.map((item) => (
-            <NavLink key={item.href} item={item} pathname={pathname} />
+        <nav className="flex-1 px-3 pt-4 pb-2 space-y-4 overflow-y-auto">
+          {navSections.map((section) => (
+            <div key={section.label} className="space-y-0.5">
+              <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                {section.label}
+              </p>
+              {section.items.map((item) => (
+                <NavLink key={item.href} item={item} pathname={pathname} />
+              ))}
+            </div>
           ))}
         </nav>
 
@@ -148,14 +186,21 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                     </span>
                   </SheetTitle>
                 </SheetHeader>
-                <nav className="px-3 py-4 space-y-0.5">
-                  {navItems.map((item) => (
-                    <NavLink
-                      key={item.href}
-                      item={item}
-                      pathname={pathname}
-                      onClick={() => setOpen(false)}
-                    />
+                <nav className="px-3 py-4 space-y-4 overflow-y-auto">
+                  {navSections.map((section) => (
+                    <div key={section.label} className="space-y-0.5">
+                      <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                        {section.label}
+                      </p>
+                      {section.items.map((item) => (
+                        <NavLink
+                          key={item.href}
+                          item={item}
+                          pathname={pathname}
+                          onClick={() => setOpen(false)}
+                        />
+                      ))}
+                    </div>
                   ))}
                   <div className="border-t border-sidebar-border mt-3 pt-3">
                     <Link
@@ -203,7 +248,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex safe-area-bottom">
-        {navItems.map((item) => {
+        {mobileNavItems.map((item) => {
           const isActive = item.exact
             ? pathname === item.href
             : pathname.startsWith(item.href);

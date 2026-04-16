@@ -13,6 +13,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Providers as HeroUIProviders } from '@/components/heroui-provider';
 import { AmplitudeProvider } from '@/components/amplitude-provider';
+import { PlatformBanner } from '@/components/platform-banner';
 import { Toaster } from 'sonner';
 import './globals.css';
 
@@ -48,7 +49,7 @@ export default async function RootLayout({
   const h = await headers();
   const isPublicPage = h.get('x-public-page') === '1';
 
-  const inner = (
+  const renderShell = (body: React.ReactNode) => (
     <html lang="en" suppressHydrationWarning>
       <head>
         <script
@@ -61,7 +62,7 @@ export default async function RootLayout({
         <ThemeProvider>
           <HeroUIProviders>
             <AmplitudeProvider>
-              {children}
+              {body}
             </AmplitudeProvider>
           </HeroUIProviders>
         </ThemeProvider>
@@ -71,6 +72,15 @@ export default async function RootLayout({
     </html>
   );
 
-  if (isPublicPage) return inner;
-  return <ClerkProvider>{inner}</ClerkProvider>;
+  if (isPublicPage) return renderShell(children);
+  return (
+    <ClerkProvider>
+      {renderShell(
+        <div>
+          <PlatformBanner />
+          {children}
+        </div>,
+      )}
+    </ClerkProvider>
+  );
 }

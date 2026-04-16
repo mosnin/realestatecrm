@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   const { action } = body;
 
-  const ALLOWED_ACTIONS = ['send_password_reset', 'repair_onboarding', 'update_subscription', 'suspend_user', 'unsuspend_user', 'comp_free_month', 'issue_refund'];
+  const ALLOWED_ACTIONS = ['send_password_reset', 'repair_onboarding', 'update_subscription', 'suspend_user', 'unsuspend_user', 'comp_free_month', 'issue_refund', 'impersonate_user', 'force_password_reset', 'revoke_session', 'revoke_all_sessions', 'send_mfa_prompt'];
   if (!ALLOWED_ACTIONS.includes(action as string)) {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   }
@@ -351,6 +351,174 @@ export async function POST(req: NextRequest) {
       const refund = await stripe.refunds.create({ invoice: invoiceId });
       logAdminAction({ actor: admin.userId, action: 'issue_refund', target: targetUserId, details: { invoiceId, refundId: refund.id, amount: refund.amount } });
       return NextResponse.json({ success: true, refundId: refund.id, amount: refund.amount });
+    }
+
+    // ── Impersonate user (create sign-in token) ─────────────────────────
+    if (action === 'impersonate_user') {
+      const { clerkId } = body as { clerkId: string };
+      if (!clerkId || typeof clerkId !== 'string') {
+        return NextResponse.json({ error: 'clerkId is required' }, { status: 400 });
+      }
+
+      try {
+        // Sign-in tokens expire quickly and are single-use; safer than a password reset for impersonation.
+        const token = await clerkClient.signInTokens.createSignInToken({
+          userId: clerkId,
+          expiresInSeconds: 600,
+        });
+
+        logAdminAction({
+          actor: admin.userId,
+          action: 'impersonate_user',
+          target: clerkId,
+          details: { tokenId: token.id, expiresInSeconds: 600 },
+        });
+
+        return NextResponse.json({
+          success: true,
+          url: token.url,
+          token: token.token,
+          expiresInSeconds: 600,
+          message: 'Sign-in link created. Open in an incognito/private window.',
+        });
+      } catch (err) {
+        console.error('[admin-action] impersonate_user failed', err);
+        logAdminAction({
+          actor: admin.userId,
+          action: 'impersonate_user_failed',
+          target: clerkId,
+          details: { error: err instanceof Error ? err.message : String(err) },
+        });
+        return NextResponse.json(
+          { error: 'Impersonation unavailable. Use the Clerk Dashboard to generate a sign-in link for this user.' },
+          { status: 500 }
+        );
+      }
+    }
+
+    // ── Force password reset on next login ──────────────────────────────
+    if (action === 'force_password_reset') {
+      const { clerkId } = body as { clerkId: string };
+      if (!clerkId || typeof clerkId !== 'string') {
+        return NextResponse.json({ error: 'clerkId is required' }, { status: 400 });
+      }
+
+      const clerkUser = await clerkClient.users.getUser(clerkId);
+      const primaryEmail = clerkUser.emailAddresses.find(
+        (e) => e.id === clerkUser.primaryEmailAddressId
+      );
+
+      // Revoke all active sessions so the user is forced to re-authenticate, and
+      // set a metadata flag the sign-in flow can read to require a password reset.
+      const sessions = await clerkClient.sessions.getSessionList({ userId: clerkId, status: 'active' });
+      const sessionList = Array.isArray(sessions) ? sessions : sessions.data;
+      await Promise.all(sessionList.map((s) => clerkClient.sessions.revokeSession(s.id).catch(() => null)));
+
+      await clerkClient.users.updateUserMetadata(clerkId, {
+        publicMetadata: {
+          ...(clerkUser.publicMetadata ?? {}),
+          mustResetPassword: true,
+          mustResetPasswordAt: new Date().toISOString(),
+        },
+      });
+
+      logAdminAction({
+        actor: admin.userId,
+        action: 'force_password_reset',
+        target: clerkId,
+        details: {
+          email: primaryEmail?.emailAddress ?? null,
+          sessionsRevoked: sessionList.length,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `All ${sessionList.length} active session(s) revoked. User must use "Forgot password" to sign in again.`,
+      });
+    }
+
+    // ── Revoke a single session ─────────────────────────────────────────
+    if (action === 'revoke_session') {
+      const { sessionId, clerkId } = body as { sessionId: string; clerkId?: string };
+      if (!sessionId || typeof sessionId !== 'string') {
+        return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
+      }
+
+      await clerkClient.sessions.revokeSession(sessionId);
+
+      logAdminAction({
+        actor: admin.userId,
+        action: 'revoke_session',
+        target: clerkId ?? sessionId,
+        details: { sessionId },
+      });
+
+      return NextResponse.json({ success: true, message: 'Session revoked.' });
+    }
+
+    // ── Revoke all sessions for a user ──────────────────────────────────
+    if (action === 'revoke_all_sessions') {
+      const { clerkId } = body as { clerkId: string };
+      if (!clerkId || typeof clerkId !== 'string') {
+        return NextResponse.json({ error: 'clerkId is required' }, { status: 400 });
+      }
+
+      const sessions = await clerkClient.sessions.getSessionList({ userId: clerkId, status: 'active' });
+      const sessionList = Array.isArray(sessions) ? sessions : sessions.data;
+      const results = await Promise.all(
+        sessionList.map((s) =>
+          clerkClient.sessions.revokeSession(s.id).then(
+            () => ({ id: s.id, ok: true }),
+            () => ({ id: s.id, ok: false }),
+          )
+        )
+      );
+      const revoked = results.filter((r) => r.ok).length;
+
+      logAdminAction({
+        actor: admin.userId,
+        action: 'revoke_all_sessions',
+        target: clerkId,
+        details: { total: sessionList.length, revoked },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Revoked ${revoked} of ${sessionList.length} active session(s).`,
+      });
+    }
+
+    // ── Send MFA enrollment prompt email ────────────────────────────────
+    if (action === 'send_mfa_prompt') {
+      const { clerkId } = body as { clerkId: string };
+      if (!clerkId || typeof clerkId !== 'string') {
+        return NextResponse.json({ error: 'clerkId is required' }, { status: 400 });
+      }
+
+      const clerkUser = await clerkClient.users.getUser(clerkId);
+      const primaryEmail = clerkUser.emailAddresses.find(
+        (e) => e.id === clerkUser.primaryEmailAddressId
+      );
+      if (!primaryEmail) {
+        return NextResponse.json({ error: 'User has no primary email address' }, { status: 400 });
+      }
+
+      const displayName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || null;
+      const { sendMfaEnrollmentPrompt } = await import('@/lib/email');
+      await sendMfaEnrollmentPrompt({ toEmail: primaryEmail.emailAddress, userName: displayName });
+
+      logAdminAction({
+        actor: admin.userId,
+        action: 'send_mfa_prompt',
+        target: clerkId,
+        details: { email: primaryEmail.emailAddress, twoFactorEnabled: clerkUser.twoFactorEnabled },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `MFA enrollment prompt sent to ${primaryEmail.emailAddress}.`,
+      });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
