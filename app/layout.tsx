@@ -13,7 +13,6 @@ import { ClerkProvider } from '@clerk/nextjs';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Providers as HeroUIProviders } from '@/components/heroui-provider';
 import { AmplitudeProvider } from '@/components/amplitude-provider';
-import { PlatformBanner } from '@/components/platform-banner';
 import { Toaster } from 'sonner';
 import './globals.css';
 
@@ -73,14 +72,5 @@ export default async function RootLayout({
   );
 
   if (isPublicPage) return renderShell(children);
-  return (
-    <ClerkProvider>
-      {renderShell(
-        <div>
-          <PlatformBanner />
-          {children}
-        </div>,
-      )}
-    </ClerkProvider>
-  );
+  return <ClerkProvider>{renderShell(children)}</ClerkProvider>;
 }
