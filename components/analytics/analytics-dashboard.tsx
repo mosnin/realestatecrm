@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   AreaChart,
   Area,
@@ -9,15 +9,20 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
   Cell,
   PieChart,
   Pie,
-  Legend,
 } from 'recharts';
 import { cn } from '@/lib/utils';
 import { formatCompact as formatCurrency } from '@/lib/formatting';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from '@/components/ui/chart';
+import type { ChartConfig } from '@/components/ui/chart';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -118,27 +123,6 @@ function StatCard({
   );
 }
 
-// ─── Custom tooltip ────────────────────────────────────────────────────────
-
-function ChartTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-md text-xs">
-      <p className="font-semibold text-foreground mb-1">{label}</p>
-      {payload.map((p: any) => (
-        <p key={p.dataKey} style={{ color: p.color ?? p.fill }}>
-          {p.name ?? p.dataKey}:{' '}
-          <span className="font-semibold">
-            {typeof p.value === 'number' && p.name === 'Value'
-              ? formatCurrency(p.value)
-              : p.value}
-          </span>
-        </p>
-      ))}
-    </div>
-  );
-}
-
 // ─── Section wrapper ───────────────────────────────────────────────────────
 
 function ChartSection({
@@ -162,22 +146,78 @@ function ChartSection({
   );
 }
 
+// ─── Chart configs ─────────────────────────────────────────────────────────
+
+const leadsOverTimeConfig = {
+  count: { label: 'Leads', color: 'hsl(var(--primary))' },
+} satisfies ChartConfig;
+
+const dealsByStageCountConfig = {
+  count: { label: 'Deals', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+const leadScoreBucketsConfig = {
+  count: { label: 'Leads', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+const employmentConfig = {
+  count: { label: 'Leads', color: 'hsl(var(--primary))' },
+} satisfies ChartConfig;
+
+const affordabilityConfig = {
+  'Passes 3x rule': { label: 'Passes 3x rule', color: '#10b981' },
+  'Below 3x rule': { label: 'Below 3x rule', color: '#f87171' },
+} satisfies ChartConfig;
+
+const moveInUrgencyConfig = {
+  count: { label: 'Leads', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+const screeningFlagsConfig = {
+  count: { label: 'Leads', color: '#f87171' },
+} satisfies ChartConfig;
+
+const leadStateConfig = {
+  count: { label: 'Leads', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+const topRiskFlagsConfig = {
+  count: { label: 'Leads', color: '#f59e0b' },
+} satisfies ChartConfig;
+
+const avgScoreConfig = {
+  avg: { label: 'Avg score', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+const dealsPerStageConfig = {
+  count: { label: 'Deals', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+const valuePerStageConfig = {
+  value: { label: 'Value', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+const contactsOverTimeConfig = {
+  count: { label: 'Contacts', color: '#6366f1' },
+} satisfies ChartConfig;
+
+const contactsByStageConfig = {
+  count: { label: 'Contacts', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+const leadTypeConfig = {
+  Buyer: { label: 'Buyer', color: '#3b82f6' },
+  Rental: { label: 'Rental', color: '#10b981' },
+} satisfies ChartConfig;
+
+const buyerBudgetConfig = {
+  count: { label: 'Buyers', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
 // ─── Main component ────────────────────────────────────────────────────────
 
 export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
   const [tab, setTab] = useState<Tab>('Overview');
-
-  // Detect dark mode for recharts SVG colors (CSS vars don't work in SVG fill attrs)
-  const [isDark, setIsDark] = useState(false);
-  useEffect(() => {
-    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
-    const observer = new MutationObserver(check);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-  const tickColor = isDark ? '#a1a1aa' : '#71717a';
-  const gridColor = isDark ? '#27272a' : '#e4e4e7';
 
   return (
     <div className="space-y-5">
@@ -218,45 +258,44 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
 
           <div className="grid sm:grid-cols-2 gap-4">
             <ChartSection title="Leads over time" sub="Applications submitted per month">
-              <ResponsiveContainer width="100%" height={200}>
+              <ChartContainer config={leadsOverTimeConfig} className="h-[200px] w-full">
                 <AreaChart data={data.leadsOverTime}>
                   <defs>
                     <linearGradient id="leadsGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05} />
+                      <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.05} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-                  <Tooltip content={<ChartTooltip />} />
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
                   <Area
                     type="monotone"
                     dataKey="count"
-                    name="Leads"
-                    stroke="hsl(var(--primary))"
+                    stroke="var(--color-count)"
                     fill="url(#leadsGrad)"
                     strokeWidth={2}
                     dot={false}
                   />
                 </AreaChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </ChartSection>
 
             <ChartSection title="Pipeline by stage" sub="Deals and value per stage">
-              <ResponsiveContainer width="100%" height={200}>
+              <ChartContainer config={dealsByStageCountConfig} className="h-[200px] w-full">
                 <BarChart data={data.dealsByStage} barSize={18}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="count" name="Deals" radius={[4, 4, 0, 0]}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                     {data.dealsByStage.map((entry) => (
                       <Cell key={entry.name} fill={entry.color} />
                     ))}
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </ChartSection>
           </div>
         </div>
@@ -281,39 +320,38 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
 
           <div className="grid sm:grid-cols-2 gap-4">
             <ChartSection title="Applications over time" sub="New leads submitted each month">
-              <ResponsiveContainer width="100%" height={220}>
+              <ChartContainer config={leadsOverTimeConfig} className="h-[220px] w-full">
                 <AreaChart data={data.leadsOverTime}>
                   <defs>
                     <linearGradient id="leadsGrad2" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05} />
+                      <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.05} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-                  <Tooltip content={<ChartTooltip />} />
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
                   <Area
                     type="monotone"
                     dataKey="count"
-                    name="Leads"
-                    stroke="hsl(var(--primary))"
+                    stroke="var(--color-count)"
                     fill="url(#leadsGrad2)"
                     strokeWidth={2}
-                    dot={{ r: 3, fill: 'hsl(var(--primary))' }}
+                    dot={{ r: 3, fill: 'var(--color-count)' }}
                   />
                 </AreaChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </ChartSection>
 
             <ChartSection title="Lead score distribution" sub="Leads grouped by AI score tier">
-              <ResponsiveContainer width="100%" height={220}>
+              <ChartContainer config={leadScoreBucketsConfig} className="h-[220px] w-full">
                 <BarChart data={data.leadScoreBuckets} barSize={32}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: tickColor }} stroke={tickColor} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="count" name="Leads" radius={[4, 4, 0, 0]}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 12 }} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                     {data.leadScoreBuckets.map((entry) => {
                       const colorMap: Record<string, string> = {
                         Hot: '#10b981',
@@ -325,7 +363,7 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                     })}
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </ChartSection>
           </div>
         </div>
@@ -365,27 +403,27 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
             {/* Employment breakdown */}
             {data.employmentBreakdown.length > 0 && (
               <ChartSection title="Employment status" sub="How leads are currently employed">
-                <ResponsiveContainer width="100%" height={220}>
+                <ChartContainer config={employmentConfig} className="h-[220px] w-full">
                   <BarChart
                     data={data.employmentBreakdown}
                     layout="vertical"
                     barSize={14}
                     margin={{ left: 0 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-                    <YAxis type="category" dataKey="label" tick={{ fontSize: 10, fill: tickColor }} stroke={tickColor} width={80} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="hsl(var(--primary))" />
+                    <CartesianGrid horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="label" tickLine={false} axisLine={false} tickMargin={8} width={80} tick={{ fontSize: 10 }} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="count" radius={[0, 4, 4, 0]} fill="var(--color-count)" />
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </ChartSection>
             )}
 
             {/* Affordability donut */}
             {data.affordabilityBuckets.length > 0 && (
               <ChartSection title="Income affordability" sub="Leads who meet the 3× monthly rent rule">
-                <ResponsiveContainer width="100%" height={220}>
+                <ChartContainer config={affordabilityConfig} className="h-[220px] w-full">
                   <PieChart>
                     <Pie
                       data={data.affordabilityBuckets}
@@ -393,7 +431,7 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                       nameKey="label"
                       cx="50%"
                       cy="50%"
-                      innerRadius={55}
+                      innerRadius={60}
                       outerRadius={85}
                       paddingAngle={3}
                     >
@@ -404,23 +442,23 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                         />
                       ))}
                     </Pie>
-                    <Tooltip content={<ChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartLegend content={<ChartLegendContent />} />
                   </PieChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </ChartSection>
             )}
 
             {/* Move-in urgency */}
             {data.moveInUrgency.length > 0 && (
               <ChartSection title="Move-in urgency" sub="How soon leads want to move in">
-                <ResponsiveContainer width="100%" height={200}>
+                <ChartContainer config={moveInUrgencyConfig} className="h-[200px] w-full">
                   <BarChart data={data.moveInUrgency} barSize={28}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: tickColor }} stroke={tickColor} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="count" name="Leads" radius={[4, 4, 0, 0]}>
+                    <CartesianGrid vertical={false} />
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 10 }} />
+                    <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                       {data.moveInUrgency.map((entry) => {
                         const colorMap: Record<string, string> = {
                           'Overdue': '#ef4444',
@@ -434,34 +472,34 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                       })}
                     </Bar>
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </ChartSection>
             )}
 
             {/* Screening flags */}
             {data.screeningFlags.length > 0 && (
               <ChartSection title="Screening flags" sub="Leads with disclosed issues">
-                <ResponsiveContainer width="100%" height={200}>
+                <ChartContainer config={screeningFlagsConfig} className="h-[200px] w-full">
                   <BarChart
                     data={data.screeningFlags}
                     layout="vertical"
                     barSize={14}
                     margin={{ left: 8 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-                    <YAxis type="category" dataKey="label" tick={{ fontSize: 10, fill: tickColor }} stroke={tickColor} width={90} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="#f87171" />
+                    <CartesianGrid horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="label" tickLine={false} axisLine={false} tickMargin={8} width={90} tick={{ fontSize: 10 }} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="count" radius={[0, 4, 4, 0]} fill="var(--color-count)" />
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </ChartSection>
             )}
 
             {/* Lead state distribution */}
             {data.leadStateDistribution.length > 0 && (
               <ChartSection title="AI lead state" sub="How the AI has categorized your leads">
-                <ResponsiveContainer width="100%" height={220}>
+                <ChartContainer config={leadStateConfig} className="h-[220px] w-full">
                   <PieChart>
                     <Pie
                       data={data.leadStateDistribution}
@@ -469,7 +507,7 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                       nameKey="label"
                       cx="50%"
                       cy="50%"
-                      innerRadius={50}
+                      innerRadius={60}
                       outerRadius={80}
                       paddingAngle={2}
                     >
@@ -478,43 +516,43 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                         return <Cell key={entry.label} fill={colors[i % colors.length]} />;
                       })}
                     </Pie>
-                    <Tooltip content={<ChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartLegend content={<ChartLegendContent />} />
                   </PieChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </ChartSection>
             )}
 
             {/* Top risk flags */}
             {data.topRiskFlags.length > 0 && (
               <ChartSection title="Top AI risk flags" sub="Most common risks flagged across leads">
-                <ResponsiveContainer width="100%" height={220}>
+                <ChartContainer config={topRiskFlagsConfig} className="h-[220px] w-full">
                   <BarChart
                     data={data.topRiskFlags}
                     layout="vertical"
                     barSize={12}
                     margin={{ left: 8 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-                    <YAxis type="category" dataKey="label" tick={{ fontSize: 9, fill: tickColor }} stroke={tickColor} width={100} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="#f59e0b" />
+                    <CartesianGrid horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="label" tickLine={false} axisLine={false} tickMargin={8} width={100} tick={{ fontSize: 9 }} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="count" radius={[0, 4, 4, 0]} fill="var(--color-count)" />
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </ChartSection>
             )}
 
             {/* Avg score by month */}
             {data.avgScoreByMonth.some((m) => m.avg != null) && (
               <ChartSection title="Avg lead score over time" sub="Monthly average AI qualification score">
-                <ResponsiveContainer width="100%" height={200}>
+                <ChartContainer config={avgScoreConfig} className="h-[200px] w-full">
                   <BarChart data={data.avgScoreByMonth} barSize={22}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="avg" name="Avg score" radius={[4, 4, 0, 0]}>
+                    <CartesianGrid vertical={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
+                    <YAxis domain={[0, 100]} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
                       {data.avgScoreByMonth.map((entry) => (
                         <Cell
                           key={entry.month}
@@ -528,7 +566,7 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                       ))}
                     </Bar>
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </ChartSection>
             )}
           </div>
@@ -580,40 +618,42 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
 
           <div className="grid sm:grid-cols-2 gap-4">
             <ChartSection title="Deals per stage" sub="Number of deals in each pipeline stage">
-              <ResponsiveContainer width="100%" height={220}>
+              <ChartContainer config={dealsPerStageConfig} className="h-[220px] w-full">
                 <BarChart data={data.dealsByStage} barSize={22}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="count" name="Deals" radius={[4, 4, 0, 0]}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                     {data.dealsByStage.map((entry) => (
                       <Cell key={entry.name} fill={entry.color} />
                     ))}
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </ChartSection>
 
             <ChartSection title="Value per stage" sub="Total deal value per pipeline stage">
-              <ResponsiveContainer width="100%" height={220}>
+              <ChartContainer config={valuePerStageConfig} className="h-[220px] w-full">
                 <BarChart data={data.dealsByStage} barSize={22}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
                   <YAxis
-                    tick={{ fontSize: 11, fill: tickColor }}
-                    stroke={tickColor}
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
                     width={48}
+                    tick={{ fontSize: 11 }}
                     tickFormatter={(v) => formatCurrency(v)}
                   />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="value" name="Value" radius={[4, 4, 0, 0]}>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                     {data.dealsByStage.map((entry) => (
                       <Cell key={entry.name} fill={entry.color} />
                     ))}
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </ChartSection>
           </div>
 
@@ -670,39 +710,38 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
 
           <div className="grid sm:grid-cols-2 gap-4">
             <ChartSection title="Contacts over time" sub="New contacts added each month">
-              <ResponsiveContainer width="100%" height={220}>
+              <ChartContainer config={contactsOverTimeConfig} className="h-[220px] w-full">
                 <AreaChart data={data.contactsOverTime}>
                   <defs>
                     <linearGradient id="contactsGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0.05} />
+                      <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.05} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-                  <Tooltip content={<ChartTooltip />} />
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
                   <Area
                     type="monotone"
                     dataKey="count"
-                    name="Contacts"
-                    stroke="#6366f1"
+                    stroke="var(--color-count)"
                     fill="url(#contactsGrad)"
                     strokeWidth={2}
-                    dot={{ r: 3, fill: '#6366f1' }}
+                    dot={{ r: 3, fill: 'var(--color-count)' }}
                   />
                 </AreaChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </ChartSection>
 
             <ChartSection title="Contacts by stage" sub="Current distribution across stages">
-              <ResponsiveContainer width="100%" height={220}>
+              <ChartContainer config={contactsByStageConfig} className="h-[220px] w-full">
                 <BarChart data={data.contactsByStage} barSize={32}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: tickColor }} stroke={tickColor} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="count" name="Contacts" radius={[4, 4, 0, 0]}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 12 }} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                     {data.contactsByStage.map((entry) => {
                       const colorMap: Record<string, string> = {
                         Qualifying: '#3b82f6',
@@ -715,7 +754,7 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                     })}
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </ChartSection>
           </div>
         </div>
@@ -742,7 +781,7 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
           <div className="grid sm:grid-cols-2 gap-4">
             {/* Buyer vs Rental breakdown */}
             <ChartSection title="Leads by type" sub="Buyer vs rental lead distribution">
-              <ResponsiveContainer width="100%" height={220}>
+              <ChartContainer config={leadTypeConfig} className="h-[220px] w-full">
                 <PieChart>
                   <Pie
                     data={[
@@ -753,29 +792,29 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                     nameKey="label"
                     cx="50%"
                     cy="50%"
-                    innerRadius={55}
+                    innerRadius={60}
                     outerRadius={85}
                     paddingAngle={3}
                   >
                     <Cell fill="#3b82f6" />
                     <Cell fill="#10b981" />
                   </Pie>
-                  <Tooltip content={<ChartTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <ChartLegend content={<ChartLegendContent />} />
                 </PieChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </ChartSection>
 
             {/* Buyer budget distribution */}
             {data.buyerBudgetDistribution.length > 0 && (
               <ChartSection title="Buyer budget distribution" sub="Budget ranges across buyer leads">
-                <ResponsiveContainer width="100%" height={220}>
+                <ChartContainer config={buyerBudgetConfig} className="h-[220px] w-full">
                   <BarChart data={data.buyerBudgetDistribution} barSize={28}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: tickColor }} stroke={tickColor} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="count" name="Buyers" radius={[4, 4, 0, 0]}>
+                    <CartesianGrid vertical={false} />
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 10 }} />
+                    <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                       {data.buyerBudgetDistribution.map((entry) => {
                         const colors: Record<string, string> = {
                           'Under $200K': '#94a3b8',
@@ -789,7 +828,7 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                       })}
                     </Bar>
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </ChartSection>
             )}
           </div>
