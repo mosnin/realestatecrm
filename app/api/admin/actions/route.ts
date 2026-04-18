@@ -345,8 +345,8 @@ export async function POST(req: NextRequest) {
 
       if (!space) return NextResponse.json({ error: 'No workspace found' }, { status: 404 });
 
-      // Only allow comp on non-active subscriptions
-      const allowedStatuses = ['canceled', 'past_due', 'inactive'];
+      // Only allow comp on non-active/non-trialing subscriptions
+      const allowedStatuses = ['canceled', 'past_due', 'unpaid', 'inactive'];
       if (!allowedStatuses.includes((space as any).stripeSubscriptionStatus ?? '')) {
         return NextResponse.json(
           { error: `Cannot comp a free month on a subscription with status '${(space as any).stripeSubscriptionStatus}'. Only allowed for: ${allowedStatuses.join(', ')}.` },
@@ -361,11 +361,11 @@ export async function POST(req: NextRequest) {
       let stripeUpdated = false;
       let stripeWarning: string | null = null;
 
-      // For past_due subscriptions the Stripe subscription still exists — push
-      // the trial_end forward so Stripe won't attempt to collect for 30 days.
-      // For canceled/inactive the subscription is gone in Stripe; we can only
-      // update the database as a manual billing override.
-      if (compSubId && compStatus === 'past_due') {
+      // For past_due and unpaid subscriptions the Stripe subscription still
+      // exists — push the trial_end forward so Stripe won't attempt to collect
+      // for 30 days.  For canceled/inactive the subscription is gone in Stripe;
+      // we can only update the database as a manual billing override.
+      if (compSubId && (compStatus === 'past_due' || compStatus === 'unpaid')) {
         try {
           const { getStripe } = await import('@/lib/stripe');
           const stripe = getStripe();
@@ -398,13 +398,10 @@ export async function POST(req: NextRequest) {
 
     // ── Issue refund ──────────────────────────────────────────────────────
     if (action === 'issue_refund') {
-      const { userId: targetUserId, invoiceId } = body as { userId: string; invoiceId: string };
+      const { userId: targetUserId } = body as { userId: string };
 
       if (!targetUserId || typeof targetUserId !== 'string') {
         return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-      }
-      if (!invoiceId || typeof invoiceId !== 'string') {
-        return NextResponse.json({ error: 'invoiceId is required — explicit invoice selection is mandatory' }, { status: 400 });
       }
 
       // Per-admin refund limit: 3 per day
@@ -423,8 +420,26 @@ export async function POST(req: NextRequest) {
 
       const stripe = (await import('@/lib/stripe')).getStripe();
 
-      const refund = await stripe.refunds.create({ invoice: invoiceId });
-      logAdminAction({ actor: admin.userId, action: 'issue_refund', target: targetUserId, details: { invoiceId, refundId: refund.id, amount: refund.amount } });
+      // Auto-look up the most recent paid invoice for this customer and
+      // refund its payment_intent.  stripe.refunds.create() does not accept
+      // an `invoice` parameter — it requires `charge` or `payment_intent`.
+      const invoices = await stripe.invoices.list({
+        customer: space.stripeCustomerId,
+        status: 'paid',
+        limit: 1,
+      });
+      const lastInvoice = invoices.data[0];
+      if (!lastInvoice) {
+        return NextResponse.json({ error: 'No paid invoice found for this customer.' }, { status: 404 });
+      }
+      if (!lastInvoice.payment_intent) {
+        return NextResponse.json({ error: 'Latest invoice has no associated payment intent.' }, { status: 400 });
+      }
+
+      const refund = await stripe.refunds.create({
+        payment_intent: lastInvoice.payment_intent as string,
+      });
+      logAdminAction({ actor: admin.userId, action: 'issue_refund', target: targetUserId, details: { invoiceId: lastInvoice.id, paymentIntent: lastInvoice.payment_intent, refundId: refund.id, amount: refund.amount } });
       return NextResponse.json({ success: true, refundId: refund.id, amount: refund.amount });
     }
 
