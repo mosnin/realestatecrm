@@ -202,7 +202,6 @@ export async function POST(req: NextRequest) {
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = `Chippi <${getFromAddress()}>`;
   const safeSubject = subject.replace(/[\r\n\t]/g, ' ').slice(0, 200);
-  const html = renderBroadcastHtml(subject, emailBody);
 
   let sentCount = 0;
   let failedCount = 0;
@@ -210,14 +209,16 @@ export async function POST(req: NextRequest) {
   for (let i = 0; i < users.length; i += BATCH_SIZE) {
     const batch = users.slice(i, i + BATCH_SIZE);
     const results = await Promise.allSettled(
-      batch.map((u) =>
-        resend.emails.send({
+      batch.map((u) => {
+        const personalizedBody = emailBody.replace(/\{name\}/g, escapeHtml(u.name ?? 'there'));
+        const html = renderBroadcastHtml(subject, personalizedBody);
+        return resend.emails.send({
           from: FROM,
           to: u.email,
           subject: safeSubject,
           html,
-        }),
-      ),
+        });
+      }),
     );
     for (const r of results) {
       if (r.status === 'fulfilled' && !r.value.error) sentCount++;

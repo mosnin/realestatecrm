@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', contact.id);
 
-      logAdminAction({
+      await logAdminAction({
         actor: admin.userId,
         action: 'retry_scoring',
         target: contact.id,
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
       .eq('id', contact.id);
     if (updateErr) throw updateErr;
 
-    logAdminAction({
+    await logAdminAction({
       actor: admin.userId,
       action: 'retry_scoring',
       target: contact.id,
