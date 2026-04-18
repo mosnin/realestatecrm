@@ -8,19 +8,43 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
   Cell,
   PieChart,
   Pie,
-  Legend,
 } from 'recharts';
-import { StatCard, ChartTooltip, ChartSection, useChartTheme, formatCurrency } from './chart-primitives';
+import { StatCard, ChartSection, formatCurrency } from './chart-primitives';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
+import type { ChartConfig } from '@/components/ui/chart';
 import type { PipelineAnalyticsData } from '@/lib/analytics-data';
 
-export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
-  const { tickColor, gridColor } = useChartTheme();
+const dealsByStageCountConfig = {
+  count: { label: 'Deals', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
 
+const dealsByStageValueConfig = {
+  value: { label: 'Value', color: 'hsl(var(--chart-2))' },
+} satisfies ChartConfig;
+
+const dealsOverTimeConfig = {
+  count: { label: 'Deals', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+const dealsByPriorityConfig = {
+  High: { label: 'High', color: 'hsl(var(--chart-4))' },
+  Medium: { label: 'Medium', color: 'hsl(var(--chart-5))' },
+  Low: { label: 'Low', color: 'hsl(var(--chart-2))' },
+  None: { label: 'None', color: 'hsl(var(--chart-3))' },
+} satisfies ChartConfig;
+
+const priorityColors: Record<string, string> = {
+  High: '#ef4444',
+  Medium: '#f59e0b',
+  Low: '#3b82f6',
+  None: '#94a3b8',
+};
+const priorityFallback = ['#10b981', '#3b82f6', '#f59e0b', '#94a3b8', '#f87171'];
+
+export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
   return (
     <div className="space-y-5">
       {/* Summary stats */}
@@ -42,74 +66,75 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
       {/* Charts row 1: stage distribution */}
       <div className="grid sm:grid-cols-2 gap-4">
         <ChartSection title="Deals per stage" sub="Number of deals in each pipeline stage">
-          <ResponsiveContainer width="100%" height={220}>
+          <ChartContainer config={dealsByStageCountConfig} className="h-[220px] w-full">
             <BarChart data={data.dealsByStage} barSize={22}>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-              <Tooltip content={<ChartTooltip />} />
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
+              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} />
+              <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="count" name="Deals" radius={[4, 4, 0, 0]}>
                 {data.dealsByStage.map((entry) => (
                   <Cell key={entry.name} fill={entry.color} />
                 ))}
               </Bar>
             </BarChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </ChartSection>
 
         <ChartSection title="Value per stage" sub="Total deal value per pipeline stage">
-          <ResponsiveContainer width="100%" height={220}>
+          <ChartContainer config={dealsByStageValueConfig} className="h-[220px] w-full">
             <BarChart data={data.dealsByStage} barSize={22}>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
               <YAxis
-                tick={{ fontSize: 11, fill: tickColor }}
-                stroke={tickColor}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
                 width={48}
                 tickFormatter={(v) => formatCurrency(v)}
               />
-              <Tooltip content={<ChartTooltip />} />
+              <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="value" name="Value" radius={[4, 4, 0, 0]}>
                 {data.dealsByStage.map((entry) => (
                   <Cell key={entry.name} fill={entry.color} />
                 ))}
               </Bar>
             </BarChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </ChartSection>
       </div>
 
       {/* Charts row 2: trends + priority */}
       <div className="grid sm:grid-cols-2 gap-4">
         <ChartSection title="Deals over time" sub="New deals created each month">
-          <ResponsiveContainer width="100%" height={220}>
+          <ChartContainer config={dealsOverTimeConfig} className="h-[220px] w-full">
             <AreaChart data={data.dealsOverTime}>
               <defs>
                 <linearGradient id="dealsGradPipeline" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0.05} />
+                  <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-              <Tooltip content={<ChartTooltip />} />
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
+              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} />
+              <ChartTooltip content={<ChartTooltipContent />} />
               <Area
                 type="monotone"
                 dataKey="count"
                 name="Deals"
-                stroke="#10b981"
+                stroke="var(--color-count)"
                 fill="url(#dealsGradPipeline)"
                 strokeWidth={2}
-                dot={{ r: 3, fill: '#10b981' }}
+                dot={{ r: 3, fill: 'var(--color-count)' }}
               />
             </AreaChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </ChartSection>
 
         {data.dealsByPriority.length > 0 && (
           <ChartSection title="Deals by priority" sub="Distribution across priority levels">
-            <ResponsiveContainer width="100%" height={220}>
+            <ChartContainer config={dealsByPriorityConfig} className="h-[220px] w-full">
               <PieChart>
                 <Pie
                   data={data.dealsByPriority}
@@ -121,20 +146,14 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
                   outerRadius={85}
                   paddingAngle={3}
                 >
-                  {data.dealsByPriority.map((entry, i) => {
-                    const colors: Record<string, string> = {
-                      High: '#ef4444', Medium: '#f59e0b', Low: '#3b82f6', None: '#94a3b8',
-                    };
-                    const fallback = ['#10b981', '#3b82f6', '#f59e0b', '#94a3b8', '#f87171'];
-                    return (
-                      <Cell key={entry.label} fill={colors[entry.label] ?? fallback[i % fallback.length]} />
-                    );
-                  })}
+                  {data.dealsByPriority.map((entry, i) => (
+                    <Cell key={entry.label} fill={priorityColors[entry.label] ?? priorityFallback[i % priorityFallback.length]} />
+                  ))}
                 </Pie>
-                <Tooltip content={<ChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <ChartTooltip content={<ChartTooltipContent nameKey="label" hideLabel />} />
+                <ChartLegend content={<ChartLegendContent nameKey="label" />} />
               </PieChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </ChartSection>
         )}
       </div>
