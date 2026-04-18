@@ -73,17 +73,26 @@ export async function POST(req: NextRequest) {
     }
 
     const tokens = await tokenRes.json();
+    if (!tokens.access_token) {
+      return NextResponse.json({ error: 'Invalid token response from Google' }, { status: 400 });
+    }
+
+    // Build the upsert payload — only update refreshToken if Google returned one
+    // (Google omits refresh_token on re-authorization if one already exists)
+    const upsertPayload: Record<string, unknown> = {
+      id: crypto.randomUUID(),
+      spaceId: space.id,
+      accessToken: tokens.access_token,
+      expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    if (tokens.refresh_token) {
+      upsertPayload.refreshToken = encrypt(tokens.refresh_token);
+    }
 
     const { error } = await supabase
       .from('GoogleCalendarToken')
-      .upsert({
-        id: crypto.randomUUID(),
-        spaceId: space.id,
-        accessToken: tokens.access_token,
-        refreshToken: encrypt(tokens.refresh_token),
-        expiresAt: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-        updatedAt: new Date().toISOString(),
-      }, { onConflict: 'spaceId' });
+      .upsert(upsertPayload, { onConflict: 'spaceId' });
     if (error) throw error;
 
     return NextResponse.json({ connected: true });
@@ -103,7 +112,7 @@ export async function POST(req: NextRequest) {
 
     const accessToken = await getValidAccessToken(tokenRow, space.id);
 
-    const { data: tour } = await supabase.from('Tour').select('*').eq('id', tourId).single();
+    const { data: tour } = await supabase.from('Tour').select('*').eq('id', tourId).maybeSingle();
     if (!tour) return NextResponse.json({ error: 'Tour not found' }, { status: 404 });
 
     const event = {

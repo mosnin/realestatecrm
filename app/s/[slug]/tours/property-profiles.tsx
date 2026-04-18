@@ -47,6 +47,7 @@ export function PropertyProfiles({ slug, profiles: initialProfiles, onUpdate }: 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Form state
@@ -149,26 +150,42 @@ export function PropertyProfiles({ slug, profiles: initialProfiles, onUpdate }: 
 
   async function handleDelete(id: string) {
     setDeletingId(id);
-    const res = await fetch(`/api/tours/properties/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      const next = profiles.filter((p) => p.id !== id);
-      setProfiles(next);
-      onUpdate(next);
+    try {
+      const res = await fetch(`/api/tours/properties/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        const next = profiles.filter((p) => p.id !== id);
+        setProfiles(next);
+        onUpdate(next);
+      } else {
+        setFormError('Failed to delete property');
+      }
+    } catch {
+      setFormError('Network error. Please try again.');
+    } finally {
+      setDeletingId(null);
     }
-    setDeletingId(null);
   }
 
   async function toggleActive(id: string, isActive: boolean) {
-    const res = await fetch(`/api/tours/properties/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isActive }),
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      const next = profiles.map((p) => (p.id === id ? updated : p));
-      setProfiles(next);
-      onUpdate(next);
+    setTogglingId(id);
+    try {
+      const res = await fetch(`/api/tours/properties/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        const next = profiles.map((p) => (p.id === id ? updated : p));
+        setProfiles(next);
+        onUpdate(next);
+      } else {
+        setFormError('Failed to update property status');
+      }
+    } catch {
+      setFormError('Network error. Please try again.');
+    } finally {
+      setTogglingId(null);
     }
   }
 
@@ -289,8 +306,8 @@ export function PropertyProfiles({ slug, profiles: initialProfiles, onUpdate }: 
                 </div>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
-                <button onClick={() => toggleActive(p.id, !p.isActive)} className={cn('w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors', p.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')} title={p.isActive ? 'Deactivate' : 'Activate'}>
-                  {p.isActive ? <Check size={14} /> : <X size={14} />}
+                <button onClick={() => toggleActive(p.id, !p.isActive)} disabled={togglingId === p.id} className={cn('w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors disabled:opacity-50', p.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')} title={p.isActive ? 'Deactivate' : 'Activate'}>
+                  {togglingId === p.id ? <Loader2 size={14} className="animate-spin" /> : p.isActive ? <Check size={14} /> : <X size={14} />}
                 </button>
                 <button onClick={() => startEdit(p)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground transition-colors" title="Edit">
                   <Pencil size={14} />

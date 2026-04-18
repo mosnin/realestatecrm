@@ -127,6 +127,7 @@ export function TourAvailabilityManager({
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [showPropertyProfiles, setShowPropertyProfiles] = useState(false);
   const [showOverrides, setShowOverrides] = useState(false);
@@ -164,6 +165,7 @@ export function TourAvailabilityManager({
 
   const handleSave = useCallback(async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       const res = await fetch('/api/spaces', {
         method: 'PATCH',
@@ -182,9 +184,13 @@ export function TourAvailabilityManager({
         setSaved(true);
         setDirty(false);
         setTimeout(() => setSaved(false), 3000);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setSaveError(data.error || 'Failed to save settings');
       }
     } catch (err) {
       console.error('[TourSettings] Save failed:', err);
+      setSaveError('Network error. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -463,6 +469,9 @@ export function TourAvailabilityManager({
           <Check size={14} />
           Availability saved successfully.
         </div>
+      )}
+      {saveError && (
+        <p className="text-sm text-destructive">{saveError}</p>
       )}
 
       {/* ── Section 4: Schedule Overrides (collapsed) ───────────────────────── */}

@@ -40,7 +40,25 @@ export async function POST(req: NextRequest) {
     .select('tourDuration')
     .eq('spaceId', space.id)
     .maybeSingle();
-  const duration = settings?.tourDuration ?? 30;
+  let duration = settings?.tourDuration ?? 30;
+
+  // Validate propertyProfileId belongs to this space before using it,
+  // and use its tour duration if available
+  let validPropertyProfileId: string | null = null;
+  if (propertyProfileId) {
+    const { data: profileRow } = await supabase
+      .from('TourPropertyProfile')
+      .select('id, tourDuration')
+      .eq('id', propertyProfileId)
+      .eq('spaceId', space.id)
+      .eq('isActive', true)
+      .maybeSingle();
+    if (profileRow) {
+      validPropertyProfileId = profileRow.id;
+      duration = profileRow.tourDuration;
+    }
+    // If profile not found or not active, proceed without it (don't block booking)
+  }
 
   const start = new Date(startsAt);
   if (isNaN(start.getTime())) {
@@ -90,22 +108,6 @@ export async function POST(req: NextRequest) {
     } else {
       console.error('[book] Auto-create contact failed:', createErr);
     }
-  }
-
-  // Validate propertyProfileId belongs to this space before using it
-  let validPropertyProfileId: string | null = null;
-  if (propertyProfileId) {
-    const { data: profileRow } = await supabase
-      .from('TourPropertyProfile')
-      .select('id')
-      .eq('id', propertyProfileId)
-      .eq('spaceId', space.id)
-      .eq('isActive', true)
-      .maybeSingle();
-    if (profileRow) {
-      validPropertyProfileId = profileRow.id;
-    }
-    // If profile not found or not active, proceed without it (don't block booking)
   }
 
   // Generate a cryptographically secure manage token (256-bit entropy)

@@ -81,6 +81,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Determine the next position in the first stage
+  const { data: maxPositionRow } = await supabase
+    .from('Deal')
+    .select('position')
+    .eq('stageId', firstStage.id)
+    .eq('spaceId', space.id)
+    .order('position', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextPosition = maxPositionRow ? maxPositionRow.position + 1 : 0;
+
   // Create the deal
   const dealId = crypto.randomUUID();
   const { data: deal, error: dealError } = await supabase
@@ -96,7 +107,7 @@ export async function POST(req: NextRequest) {
       stageId: firstStage.id,
       status: 'active',
       priority: 'MEDIUM',
-      position: 0,
+      position: nextPosition,
       milestones: [],
       sourceTourId: tourId,
     })

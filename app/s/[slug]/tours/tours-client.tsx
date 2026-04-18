@@ -96,6 +96,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
   const [searchQuery, setSearchQuery] = useState('');
   const [view, setView] = useState<'table' | 'card'>('table');
   const [convertingId, setConvertingId] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState(initialProfiles);
   const [embedCopied, setEmbedCopied] = useState(false);
   const router = useRouter();
@@ -155,16 +156,26 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
   }
 
   const updateStatus = useCallback(async (tourId: string, status: TourStatus) => {
-    const res = await fetch(`/api/tours/${tourId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      setTours((prev) => prev.map((t) => (t.id === tourId ? { ...t, ...updated } : t)));
-    }
+    setUpdatingId(tourId);
     setActionMenuId(null);
+    try {
+      const res = await fetch(`/api/tours/${tourId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setTours((prev) => prev.map((t) => (t.id === tourId ? { ...t, ...updated } : t)));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        console.error('[Tours] Status update failed:', data.error);
+      }
+    } catch (err) {
+      console.error('[Tours] Status update error:', err);
+    } finally {
+      setUpdatingId(null);
+    }
   }, []);
 
   const syncToGcal = useCallback(async (tourId: string) => {
@@ -448,9 +459,10 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
                           <div className="relative">
                             <button
                               onClick={() => setActionMenuId(actionMenuId === tour.id ? null : tour.id)}
-                              className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
+                              disabled={updatingId === tour.id || convertingId === tour.id}
+                              className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors disabled:opacity-50"
                             >
-                              <MoreHorizontal size={14} />
+                              {updatingId === tour.id ? <Loader2 size={14} className="animate-spin" /> : <MoreHorizontal size={14} />}
                             </button>
                             {actionMenuId === tour.id && (
                               <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-border bg-card shadow-lg dark:shadow-none py-1">
@@ -599,9 +611,10 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
                     <div className="relative">
                       <button
                         onClick={() => setActionMenuId(actionMenuId === tour.id ? null : tour.id)}
-                        className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
+                        disabled={updatingId === tour.id || convertingId === tour.id}
+                        className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors disabled:opacity-50"
                       >
-                        <MoreHorizontal size={14} />
+                        {updatingId === tour.id ? <Loader2 size={14} className="animate-spin" /> : <MoreHorizontal size={14} />}
                       </button>
                       {actionMenuId === tour.id && (
                         <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-border bg-card shadow-lg dark:shadow-none py-1">

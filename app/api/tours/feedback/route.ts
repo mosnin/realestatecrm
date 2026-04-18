@@ -8,7 +8,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
  * GET  — Get feedback for a tour (agent, authenticated).
  */
 export async function POST(req: NextRequest) {
-  const { tourId, token, rating, comment } = await req.json();
+  const { token, rating, comment } = await req.json();
 
   // Guest feedback must always be submitted via the manage token.
   // Accepting a bare tourId would allow anyone who guesses/enumerates a UUID
@@ -86,6 +86,7 @@ export async function GET(req: NextRequest) {
       .eq('tourId', tourId)
       .eq('spaceId', auth.space.id)
       .maybeSingle();
+    if (!data) return NextResponse.json(null);
     return NextResponse.json(data);
   }
 

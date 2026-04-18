@@ -66,7 +66,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
   const guestTz = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : '';
   const showTzNote = guestTz && guestTz !== timezone;
 
-  async function loadSlots(propId?: string | null) {
+  async function loadSlots(propId?: string | null, currentStep?: Step) {
     setLoading(true);
     setSelectedDate(null);
     setSelectedTime(null);
@@ -79,10 +79,14 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
         setSlots(data.slots ?? []);
         setEffectiveDuration(data.duration ?? defaultDuration);
         // If properties exist and we haven't shown the property picker yet
-        if (data.propertyProfiles?.length > 0 && !propId && step === 'date') {
+        // Use the passed-in step to avoid stale closure on the state variable
+        const stepAtLoad = currentStep ?? step;
+        if (data.propertyProfiles?.length > 0 && !propId && stepAtLoad === 'date') {
           setProperties(data.propertyProfiles);
           setStep('property');
         }
+      } else {
+        setError('Could not load availability');
       }
     } catch {
       setError('Could not load availability');
@@ -91,7 +95,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
     }
   }
 
-  useEffect(() => { loadSlots(); }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadSlots(null, 'date'); }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function selectProperty(id: string | null) {
     setSelectedPropertyId(id);
@@ -100,7 +104,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
       if (prop?.address) setPropertyAddress(prop.address);
     }
     setStep('date');
-    loadSlots(id);
+    loadSlots(id, 'date');
   }
 
   const selectedDaySlots = slots.find((s) => s.date === selectedDate);

@@ -55,6 +55,7 @@ export function AvailabilityOverrides({ slug, propertyProfiles = [] }: Availabil
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formDate, setFormDate] = useState('');
   const [formType, setFormType] = useState<'custom' | 'blocked'>('custom');
@@ -70,7 +71,13 @@ export function AvailabilityOverrides({ slug, propertyProfiles = [] }: Availabil
     setLoading(true);
     try {
       const res = await fetch(`/api/tours/overrides?slug=${encodeURIComponent(slug)}`);
-      if (res.ok) setOverrides(await res.json());
+      if (res.ok) {
+        setOverrides(await res.json());
+      } else {
+        setFormError('Failed to load schedule overrides');
+      }
+    } catch {
+      setFormError('Network error loading overrides');
     } finally {
       setLoading(false);
     }
@@ -131,8 +138,20 @@ export function AvailabilityOverrides({ slug, propertyProfiles = [] }: Availabil
   }
 
   async function handleDelete(id: string) {
-    const res = await fetch(`/api/tours/overrides/${id}`, { method: 'DELETE' });
-    if (res.ok) setOverrides((prev) => prev.filter((o) => o.id !== id));
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/tours/overrides/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setOverrides((prev) => prev.filter((o) => o.id !== id));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setFormError(data.error || 'Failed to delete override');
+      }
+    } catch {
+      setFormError('Network error. Please try again.');
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   const tomorrow = new Date();
@@ -369,10 +388,11 @@ export function AvailabilityOverrides({ slug, propertyProfiles = [] }: Availabil
                 </div>
                 <button
                   onClick={() => handleDelete(o.id)}
-                  className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-destructive transition-colors"
+                  disabled={deletingId === o.id}
+                  className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
                   title="Remove override"
                 >
-                  <Trash2 size={14} />
+                  {deletingId === o.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                 </button>
               </div>
             );

@@ -166,6 +166,14 @@ export async function GET(req: NextRequest) {
 
     if (dayAvailable) {
       const daySlots: string[] = [];
+      // End window in ms: dayEnd hours past midnight local
+      const dayEndMs = new Date(
+        localDate.getFullYear(),
+        localDate.getMonth(),
+        localDate.getDate(),
+        dayEnd % 24, dayEnd >= 24 ? 0 : 0, 0, 0
+      ).getTime() + (dayEnd >= 24 ? 24 * 60 * 60_000 : 0);
+
       for (let hour = dayStart; hour < dayEnd; hour++) {
         for (let min = 0; min < 60; min += duration) {
           // Create the slot time in the space's local timezone, then convert to UTC
@@ -176,6 +184,9 @@ export async function GET(req: NextRequest) {
             localDate.getDate(),
             hour, min, 0, 0
           ).getTime();
+          // Ensure the slot END fits within the available window
+          if (localSlotMs + duration * 60_000 > dayEndMs) continue;
+
           const utcSlotMs = localSlotMs - tzOffset;
           const slotStart = new Date(utcSlotMs);
           const slotEnd = new Date(utcSlotMs + duration * 60_000);

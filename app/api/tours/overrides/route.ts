@@ -67,6 +67,26 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
+  // Check for an existing override on this date+property combination and delete it first
+  // (handles NULL propertyProfileId case where upsert uniqueness may not work)
+  {
+    let existingQuery = supabase
+      .from('TourAvailabilityOverride')
+      .select('id')
+      .eq('spaceId', space.id)
+      .eq('date', date);
+    if (propertyProfileId) {
+      existingQuery = existingQuery.eq('propertyProfileId', propertyProfileId);
+    } else {
+      existingQuery = existingQuery.is('propertyProfileId', null);
+    }
+    const { data: existingRows } = await existingQuery;
+    if (existingRows && existingRows.length > 0) {
+      const ids = existingRows.map((r: { id: string }) => r.id);
+      await supabase.from('TourAvailabilityOverride').delete().in('id', ids);
+    }
+  }
+
   if (!isBlocked) {
     if (startHour == null || endHour == null) {
       return NextResponse.json({ error: 'startHour and endHour required when not blocked' }, { status: 400 });
@@ -89,21 +109,18 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('TourAvailabilityOverride')
-    .upsert(
-      {
-        id: crypto.randomUUID(),
-        spaceId: space.id,
-        propertyProfileId: propertyProfileId || null,
-        date,
-        isBlocked: !!isBlocked,
-        startHour: isBlocked ? null : startHour,
-        endHour: isBlocked ? null : endHour,
-        label: label?.trim() || null,
-        recurrence: rec,
-        endDate: rec !== 'none' ? (endDate || null) : null,
-      },
-      { onConflict: 'spaceId,date,propertyProfileId' }
-    )
+    .insert({
+      id: crypto.randomUUID(),
+      spaceId: space.id,
+      propertyProfileId: propertyProfileId || null,
+      date,
+      isBlocked: !!isBlocked,
+      startHour: isBlocked ? null : startHour,
+      endHour: isBlocked ? null : endHour,
+      label: label?.trim() || null,
+      recurrence: rec,
+      endDate: rec !== 'none' ? (endDate || null) : null,
+    })
     .select()
     .single();
   if (error) throw error;
