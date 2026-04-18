@@ -78,10 +78,28 @@ export async function POST(req: NextRequest) {
       });
       customerId = customer.id;
 
-      await supabase
+      // Conditional write: only persist if another request hasn't already set a customer ID.
+      // If this update affects 0 rows (stripeCustomerId was already set by a concurrent request),
+      // fetch the winner's customer ID and use that instead — abandoning the duplicate we just created.
+      const { data: updateResult } = await supabase
         .from('Space')
         .update({ stripeCustomerId: customerId })
-        .eq('id', space.id);
+        .eq('id', space.id)
+        .is('stripeCustomerId', null)
+        .select('stripeCustomerId')
+        .single();
+
+      if (!updateResult) {
+        // Another concurrent request already set a customer ID — fetch and use theirs
+        const { data: winner } = await supabase
+          .from('Space')
+          .select('stripeCustomerId')
+          .eq('id', space.id)
+          .single();
+        if (winner?.stripeCustomerId) {
+          customerId = winner.stripeCustomerId;
+        }
+      }
     }
 
     // Only grant a 7-day trial if the user has never used one before

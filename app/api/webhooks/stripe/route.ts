@@ -40,6 +40,10 @@ async function notifySubscriptionChange(subscriptionId: string, newStatus: strin
         subject: `Your Chippi subscription has been canceled`,
         body: `Your subscription for <strong>${space.name}</strong> has been canceled. You can resubscribe anytime from your billing page.`,
       },
+      trial_ending: {
+        subject: `Your Chippi trial ends in 3 days`,
+        body: `Your free trial for <strong>${space.name}</strong> ends in 3 days. Add a payment method to keep your access without interruption.`,
+      },
     };
 
     const msg = statusMessages[newStatus];
@@ -214,6 +218,48 @@ export async function POST(req: NextRequest) {
           })
           .eq('stripeSubscriptionId', subscription.id);
         try { await notifySubscriptionChange(subscription.id, 'canceled'); } catch (e) { console.error('[stripe-webhook] canceled notification failed:', e); }
+        break;
+      }
+
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object as Stripe.Invoice;
+        // Extract subscription ID — mirrors same logic as payment_failed
+        let paidSubId: string | undefined;
+        const paidInvoiceAny = invoice as any;
+        if (typeof paidInvoiceAny.subscription === 'string') {
+          paidSubId = paidInvoiceAny.subscription;
+        } else if (typeof paidInvoiceAny.subscription === 'object' && paidInvoiceAny.subscription?.id) {
+          paidSubId = paidInvoiceAny.subscription.id;
+        } else if (typeof invoice.parent?.subscription_details?.subscription === 'string') {
+          paidSubId = invoice.parent.subscription_details.subscription;
+        } else if (invoice.parent?.subscription_details?.subscription && typeof invoice.parent.subscription_details.subscription === 'object') {
+          paidSubId = (invoice.parent.subscription_details.subscription as any).id;
+        }
+
+        if (!paidSubId) break;
+
+        // Fetch live subscription to get authoritative status + period end
+        const paidSub = await stripe.subscriptions.retrieve(paidSubId);
+        const paidStatus = mapStatus(paidSub.status);
+
+        await supabase
+          .from('Space')
+          .update({
+            stripeSubscriptionStatus: paidStatus,
+            stripePeriodEnd: getPeriodEnd(paidSub),
+          })
+          .eq('stripeSubscriptionId', paidSubId);
+
+        // Notify only on active transition (payment recovered past_due subscription)
+        if (paidStatus === 'active') {
+          try { await notifySubscriptionChange(paidSubId, 'active'); } catch (e) { console.error('[stripe-webhook] payment_succeeded notification failed:', e); }
+        }
+        break;
+      }
+
+      case 'customer.subscription.trial_will_end': {
+        const trialSub = event.data.object as Stripe.Subscription;
+        try { await notifySubscriptionChange(trialSub.id, 'trial_ending'); } catch (e) { console.error('[stripe-webhook] trial_will_end notification failed:', e); }
         break;
       }
 
