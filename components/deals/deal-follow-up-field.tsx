@@ -37,10 +37,12 @@ export function DealFollowUpField({
     }
   }
 
-  const isOverdue =
-    followUpAt !== null &&
-    new Date(followUpAt) < new Date() &&
-    status === 'active';
+  const isOverdue = (() => {
+    if (!followUpAt || status !== 'active') return false;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    return new Date(followUpAt) < startOfToday;
+  })();
 
   return (
     <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer group/fu w-fit">

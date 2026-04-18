@@ -107,6 +107,8 @@ export function DealStatusControl({
     wonLostNote?: string,
   ) {
     const previous = status;
+    // Optimistic update so the badge reflects the new value immediately
+    setStatus(newStatus);
     setSaving(true);
 
     try {
@@ -121,10 +123,10 @@ export function DealStatusControl({
       });
       if (!res.ok) throw new Error('Failed to update status');
 
-      setStatus(newStatus);
       onStatusChange?.(newStatus);
       closePanel();
     } catch {
+      // Roll back the optimistic update
       setStatus(previous);
       toast.error('Failed to update status');
     } finally {

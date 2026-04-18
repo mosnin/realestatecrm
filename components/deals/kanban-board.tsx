@@ -425,6 +425,9 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
       const newIndex = stages.findIndex((s) => s.id === overRawId);
       if (oldIndex === -1 || newIndex === -1) return;
 
+      // Capture the pre-reorder state for rollback before the optimistic update.
+      const previousStages = stages;
+
       // Optimistic reorder
       const reordered = arrayMove(stages, oldIndex, newIndex);
       setStages(reordered);
@@ -440,11 +443,17 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
         if (!res.ok) {
           toast.error('Failed to save stage order');
           // Revert to the original order on failure
-          setStages(stages);
+          setStages(previousStages);
         }
       } catch {
         toast.error('Failed to save stage order');
-        setStages(stages);
+        setStages(previousStages);
+      } finally {
+        // Flush any realtime refetch that was queued during the drag
+        if (pendingRefetchRef.current) {
+          pendingRefetchRef.current = false;
+          fetchData();
+        }
       }
       return;
     }
@@ -459,7 +468,11 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
     if (!targetStage) return;
 
     const targetIndex = targetStage.deals.findIndex((d) => d.id === over.id);
-    const newPosition = targetIndex >= 0 ? targetIndex : targetStage.deals.length - 1;
+    // When dropped onto the column droppable (not onto a deal), targetIndex is -1.
+    // In that case place at end. After handleDragOver the dragged deal is already in
+    // targetStage.deals, so length - 1 gives the last (0-based) index.
+    // Math.max(0, …) ensures we never send a negative position to the API.
+    const newPosition = targetIndex >= 0 ? targetIndex : Math.max(0, targetStage.deals.length - 1);
 
     try {
       const res = await fetch('/api/deals/reorder', {
@@ -474,11 +487,11 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
       }
     } catch {
       toast.error('Failed to move deal');
+    } finally {
+      fetchData();
+      // Clear any queued realtime refetch since we just refetched
+      pendingRefetchRef.current = false;
     }
-
-    fetchData();
-    // Clear any queued realtime refetch since we just refetched
-    pendingRefetchRef.current = false;
   }
 
   async function handleDeleteDeal(id: string) {

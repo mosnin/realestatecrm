@@ -9,6 +9,7 @@ import { WizardStepContacts } from '@/components/deals/wizard-step-contacts';
 import { WizardStepPipeline } from '@/components/deals/wizard-step-pipeline';
 import { WizardStepDetails } from '@/components/deals/wizard-step-details';
 import { WizardStepNotes } from '@/components/deals/wizard-step-notes';
+import { toast } from 'sonner';
 
 type ContactResult = { id: string; name: string; email: string | null; leadType: 'rental' | 'buyer' };
 
@@ -32,12 +33,16 @@ export default function NewDealPage() {
   const [description, setDescription] = useState('');
   const [stageError, setStageError] = useState('');
   const [titleError, setTitleError] = useState('');
+  const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   function handleNext() {
     if (step === 1) {
-      const detectedPipelineType = selectedContacts.some(c => c.leadType === 'buyer') ? 'buyer' : 'rental';
-      setPipelineType(detectedPipelineType);
+      // Only auto-update pipelineType if contacts were actually selected.
+      if (selectedContacts.length > 0) {
+        const detected = selectedContacts.some(c => c.leadType === 'buyer') ? 'buyer' : 'rental';
+        setPipelineType(detected);
+      }
       setStep(2);
     } else if (step === 2) {
       if (!stageId) {
@@ -56,6 +61,7 @@ export default function NewDealPage() {
 
   async function handleSubmit() {
     setSubmitting(true);
+    setSubmitError('');
     try {
       const res = await fetch('/api/deals', {
         method: 'POST',
@@ -66,7 +72,7 @@ export default function NewDealPage() {
           stageId,
           priority,
           status: 'active',
-          ...(value && { value }),
+          ...(value && { value: parseFloat(value) }),
           ...(commissionRate && { commissionRate: parseFloat(commissionRate) }),
           ...(probability && { probability: parseInt(probability, 10) }),
           ...(closeDate && { closeDate }),
@@ -80,14 +86,24 @@ export default function NewDealPage() {
         router.push(`/s/${slug}/deals/${newDeal.id}`);
       } else {
         const body = await res.json().catch(() => ({}));
-        console.error('Failed to create deal:', (body as { error?: string }).error);
+        const message = (body as { error?: string }).error ?? 'Failed to create deal';
+        setSubmitError(message);
+        toast.error(message);
       }
+    } catch {
+      const message = 'Failed to create deal. Please try again.';
+      setSubmitError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
   }
 
-  const detectedPipelineType = selectedContacts.some(c => c.leadType === 'buyer') ? 'buyer' : 'rental';
+  // Only surface a detected pipeline type when at least one contact is selected.
+  // With no contacts, we have nothing to base the suggestion on.
+  const detectedPipelineType = selectedContacts.length > 0
+    ? (selectedContacts.some(c => c.leadType === 'buyer') ? 'buyer' : 'rental')
+    : null;
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)] max-w-lg mx-auto px-4 py-6">
@@ -161,7 +177,10 @@ export default function NewDealPage() {
       </div>
 
       {/* Navigation footer */}
-      <div className="mt-8 flex items-center justify-between gap-3 border-t border-border pt-4">
+      {submitError && (
+        <p className="text-sm text-destructive mt-4">{submitError}</p>
+      )}
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
         {step > 1 ? (
           <Button variant="outline" onClick={() => setStep((step - 1) as 1 | 2 | 3 | 4)}>
             Back

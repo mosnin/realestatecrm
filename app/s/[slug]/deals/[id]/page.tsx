@@ -55,6 +55,10 @@ export default async function DealDetailPage({
       supabase.from('DealActivity').select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(100),
     ]);
 
+    if (stagesResult.error) throw stagesResult.error;
+    if (dcResult.error) throw dcResult.error;
+    if (activityResult.error) throw activityResult.error;
+
     allStages = (stagesResult.data ?? []) as DealStage[];
     dealContacts = ((dcResult.data ?? []) as Record<string, unknown>[]).map((row) => {
       const contact = row.Contact as { id: string; name: string; type: string; email: string | null; phone: string | null } | null;

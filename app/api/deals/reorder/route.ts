@@ -9,6 +9,12 @@ export async function PATCH(req: NextRequest) {
 
   const { dealId, newStageId, newPosition } = await req.json();
 
+  if (!dealId || typeof dealId !== 'string') {
+    return NextResponse.json({ error: 'dealId is required' }, { status: 400 });
+  }
+  if (!newStageId || typeof newStageId !== 'string') {
+    return NextResponse.json({ error: 'newStageId is required' }, { status: 400 });
+  }
   if (typeof newPosition !== 'number' || !Number.isInteger(newPosition) || newPosition < 0) {
     return NextResponse.json({ error: 'newPosition must be a non-negative integer' }, { status: 400 });
   }
