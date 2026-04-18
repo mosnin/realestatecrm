@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -207,18 +208,22 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug, title: 'Untitled' }),
       });
-      if (res.ok) {
-        const note = await res.json();
-        const item: NoteListItem = {
-          id: note.id,
-          title: note.title,
-          icon: note.icon,
-          sortOrder: note.sortOrder,
-          updatedAt: note.updatedAt,
-        };
-        setNotes((prev) => [...prev, item]);
-        loadNote(note.id);
+      if (!res.ok) {
+        toast.error('Failed to create note');
+        return;
       }
+      const note = await res.json();
+      const item: NoteListItem = {
+        id: note.id,
+        title: note.title,
+        icon: note.icon,
+        sortOrder: note.sortOrder,
+        updatedAt: note.updatedAt,
+      };
+      setNotes((prev) => [...prev, item]);
+      loadNote(note.id);
+    } catch {
+      toast.error('Failed to create note');
     } finally {
       setCreating(false);
     }
@@ -227,7 +232,10 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
   const deleteNote = async (id: string) => {
     try {
       const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' });
-      if (!res.ok) return;
+      if (!res.ok) {
+        toast.error('Failed to delete note');
+        return;
+      }
       // Cancel any pending auto-save for this note before removing it
       if (saveTimeout.current) {
         clearTimeout(saveTimeout.current);
@@ -242,7 +250,7 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
         setSaveStatus('idle');
       }
     } catch {
-      // ignore
+      toast.error('Failed to delete note');
     }
   };
 
