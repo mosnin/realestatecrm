@@ -53,7 +53,7 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
   }
 
-  logAdminAction({ actor: admin.clerkUserId, action: 'delete_membership', target: id, details: {} });
+  await logAdminAction({ actor: admin.clerkUserId, action: 'delete_membership', target: id, details: {} });
 
   return NextResponse.json({ message: 'Membership removed' });
 }

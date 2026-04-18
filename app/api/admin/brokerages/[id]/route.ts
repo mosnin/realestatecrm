@@ -59,7 +59,7 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
   }
 
-  logAdminAction({ actor: admin.clerkUserId, action: 'delete_brokerage', target: id, details: {} });
+  await logAdminAction({ actor: admin.clerkUserId, action: 'delete_brokerage', target: id, details: {} });
 
   return NextResponse.json({ message: 'Brokerage deleted' });
 }
@@ -104,7 +104,7 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Brokerage not found' }, { status: 404 });
   }
 
-  logAdminAction({ actor: admin.clerkUserId, action: 'update_brokerage_status', target: id, details: { status } });
+  await logAdminAction({ actor: admin.clerkUserId, action: 'update_brokerage_status', target: id, details: { status } });
 
   return NextResponse.json({ brokerage: data });
 }

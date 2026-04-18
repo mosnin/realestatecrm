@@ -46,7 +46,7 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
   }
 
-  logAdminAction({ actor: admin.clerkUserId, action: 'update_invitation_status', target: id, details: { status } });
+  await logAdminAction({ actor: admin.clerkUserId, action: 'update_invitation_status', target: id, details: { status } });
 
   return NextResponse.json({ invitation: data });
 }

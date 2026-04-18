@@ -108,8 +108,10 @@ function RemoveMember({
     if (!confirm(`Remove ${label} from this brokerage?`)) return;
     setLoading(true);
     try {
-      await fetch(`/api/admin/memberships/${membershipId}`, { method: 'DELETE' });
-      onDone();
+      const res = await fetch(`/api/admin/memberships/${membershipId}`, { method: 'DELETE' });
+      if (res.ok) {
+        onDone();
+      }
     } finally {
       setLoading(false);
     }
@@ -139,12 +141,14 @@ function RevokeInvite({
     if (!confirm(`Revoke invitation to ${label}?`)) return;
     setLoading(true);
     try {
-      await fetch(`/api/admin/invitations/${invitationId}`, {
+      const res = await fetch(`/api/admin/invitations/${invitationId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'cancelled' }),
       });
-      onDone();
+      if (res.ok) {
+        onDone();
+      }
     } finally {
       setLoading(false);
     }
