@@ -84,14 +84,27 @@ export default async function CalendarPage({
     color: string;
   }[] = [];
 
+  let calendarNotes: {
+    id: string;
+    date: string;
+    note: string;
+  }[] = [];
+
   try {
-    const { data } = await supabase
-      .from('CalendarEvent')
-      .select('id, title, description, date, time, color')
-      .eq('spaceId', space.id);
-    customEvents = (data ?? []) as typeof customEvents;
+    const [eventsResult, notesResult] = await Promise.all([
+      supabase
+        .from('CalendarEvent')
+        .select('id, title, description, date, time, color')
+        .eq('spaceId', space.id),
+      supabase
+        .from('CalendarNote')
+        .select('id, date, note')
+        .eq('spaceId', space.id),
+    ]);
+    customEvents = (eventsResult.data ?? []) as typeof customEvents;
+    calendarNotes = (notesResult.data ?? []) as typeof calendarNotes;
   } catch {
-    // CalendarEvent table may not exist yet — ignore
+    // Tables may not exist yet — ignore
   }
 
   return (
@@ -108,6 +121,7 @@ export default async function CalendarPage({
         contactFollowUps={contactFollowUps}
         dealFollowUps={dealFollowUps}
         customEvents={customEvents}
+        calendarNotes={calendarNotes}
       />
     </div>
   );

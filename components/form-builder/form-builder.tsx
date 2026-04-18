@@ -65,8 +65,26 @@ const FIELD_TYPE_COLORS: Record<string, string> = {
   date:         'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
 };
 
+// Icon-only color classes (no bg/border) for use on icon elements
+const FIELD_TYPE_ICON_COLORS: Record<string, string> = {
+  text:         'text-blue-600 dark:text-blue-400',
+  textarea:     'text-purple-600 dark:text-purple-400',
+  email:        'text-sky-600 dark:text-sky-400',
+  phone:        'text-teal-600 dark:text-teal-400',
+  number:       'text-orange-600 dark:text-orange-400',
+  select:       'text-green-600 dark:text-green-400',
+  multi_select: 'text-emerald-600 dark:text-emerald-400',
+  radio:        'text-violet-600 dark:text-violet-400',
+  checkbox:     'text-pink-600 dark:text-pink-400',
+  date:         'text-amber-600 dark:text-amber-400',
+};
+
 function fieldTypeBadgeClass(type: string): string {
   return FIELD_TYPE_COLORS[type] ?? 'bg-muted text-muted-foreground border-border';
+}
+
+function fieldTypeIconClass(type: string): string {
+  return FIELD_TYPE_ICON_COLORS[type] ?? 'text-muted-foreground';
 }
 
 // ── Helpers ──
@@ -120,7 +138,7 @@ function PaletteItem({ type, label, icon: Icon, onClick }: { type: string; label
         isDragging && 'ring-2 ring-orange-300/50 dark:ring-orange-700/50',
       )}
     >
-      <Icon size={18} className={cn(fieldTypeBadgeClass(type).split(' ').find(c => c.startsWith('text-')) || 'text-muted-foreground')} />
+      <Icon size={18} className={fieldTypeIconClass(type)} />
       <span className="text-[11px] font-medium text-muted-foreground leading-tight">{label}</span>
       <GripVertical size={10} className="text-muted-foreground/30" />
     </div>
@@ -176,7 +194,7 @@ function SortableQuestion({
       >
         <GripVertical size={14} />
       </button>
-      {Icon && <Icon size={14} className={cn('flex-shrink-0', `${fieldTypeBadgeClass(question.type).split(' ').find(c => c.startsWith('text-'))}`)} />}
+      {Icon && <Icon size={14} className={cn('flex-shrink-0', fieldTypeIconClass(question.type))} />}
       <span className="text-sm font-medium truncate flex-1">{question.label}</span>
       <div className="flex items-center gap-1.5 flex-shrink-0">
         {/* Field type pill */}
