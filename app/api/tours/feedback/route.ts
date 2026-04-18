@@ -10,12 +10,15 @@ import { checkRateLimit } from '@/lib/rate-limit';
 export async function POST(req: NextRequest) {
   const { tourId, token, rating, comment } = await req.json();
 
-  if (!tourId && !token) {
-    return NextResponse.json({ error: 'tourId or token required' }, { status: 400 });
+  // Guest feedback must always be submitted via the manage token.
+  // Accepting a bare tourId would allow anyone who guesses/enumerates a UUID
+  // to spam or overwrite feedback without any guest-side authorization.
+  if (!token) {
+    return NextResponse.json({ error: 'token required' }, { status: 400 });
   }
 
-  // Rate limit by tourId or token to prevent spam
-  const rlKey = `feedback:${token || tourId}`;
+  // Rate limit by token to prevent spam
+  const rlKey = `feedback:${token}`;
   const { allowed } = await checkRateLimit(rlKey, 3, 3600);
   if (!allowed) return NextResponse.json({ error: 'Too many attempts' }, { status: 429 });
 
@@ -23,23 +26,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Rating must be 1-5' }, { status: 400 });
   }
 
-  // Verify tour access — either by manage token or by tourId
+  // Verify tour access via manage token only
   let tour: any = null;
-  if (token) {
-    const { data } = await supabase
-      .from('Tour')
-      .select('id, spaceId, status')
-      .eq('manageToken', token)
-      .maybeSingle();
-    tour = data;
-  } else if (tourId) {
-    const { data } = await supabase
-      .from('Tour')
-      .select('id, spaceId, status')
-      .eq('id', tourId)
-      .maybeSingle();
-    tour = data;
-  }
+  const { data } = await supabase
+    .from('Tour')
+    .select('id, spaceId, status')
+    .eq('manageToken', token)
+    .maybeSingle();
+  tour = data;
 
   if (!tour) {
     return NextResponse.json({ error: 'Tour not found' }, { status: 404 });
@@ -90,6 +84,7 @@ export async function GET(req: NextRequest) {
       .from('TourFeedback')
       .select('*')
       .eq('tourId', tourId)
+      .eq('spaceId', auth.space.id)
       .maybeSingle();
     return NextResponse.json(data);
   }

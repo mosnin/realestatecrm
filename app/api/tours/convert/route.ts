@@ -94,8 +94,10 @@ export async function POST(req: NextRequest) {
       address: tour.propertyAddress || null,
       description: `Converted from tour on ${new Date(tour.startsAt).toLocaleDateString()}${tour.notes ? `\n\nTour notes: ${tour.notes}` : ''}`,
       stageId: firstStage.id,
+      status: 'active',
       priority: 'MEDIUM',
       position: 0,
+      milestones: [],
       sourceTourId: tourId,
     })
     .select()

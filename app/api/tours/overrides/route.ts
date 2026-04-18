@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
         recurrence: rec,
         endDate: rec !== 'none' ? (endDate || null) : null,
       },
-      { onConflict: 'spaceId,date' }
+      { onConflict: 'spaceId,date,propertyProfileId' }
     )
     .select()
     .single();

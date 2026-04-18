@@ -92,6 +92,22 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Validate propertyProfileId belongs to this space before using it
+  let validPropertyProfileId: string | null = null;
+  if (propertyProfileId) {
+    const { data: profileRow } = await supabase
+      .from('TourPropertyProfile')
+      .select('id')
+      .eq('id', propertyProfileId)
+      .eq('spaceId', space.id)
+      .eq('isActive', true)
+      .maybeSingle();
+    if (profileRow) {
+      validPropertyProfileId = profileRow.id;
+    }
+    // If profile not found or not active, proceed without it (don't block booking)
+  }
+
   // Generate a cryptographically secure manage token (256-bit entropy)
   const tokenBytes = new Uint8Array(32);
   crypto.getRandomValues(tokenBytes);
@@ -111,7 +127,7 @@ export async function POST(req: NextRequest) {
     p_notes: notes?.trim() || null,
     p_starts_at: start.toISOString(),
     p_ends_at: end.toISOString(),
-    p_property_profile_id: propertyProfileId || null,
+    p_property_profile_id: validPropertyProfileId,
     p_manage_token: manageToken,
   });
   if (rpcError) throw rpcError;

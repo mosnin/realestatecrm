@@ -25,6 +25,14 @@ export async function GET(
   const space = await getSpaceForUser(userId);
   if (!space || tour.spaceId !== space.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+  // Fetch space timezone for correct date/time display
+  const { data: spaceSettings } = await supabase
+    .from('SpaceSetting')
+    .select('timezone')
+    .eq('spaceId', space.id)
+    .maybeSingle();
+  const timezone = spaceSettings?.timezone || 'America/New_York';
+
   // Build the prep card from CRM data
   const prep: {
     guestName: string;
@@ -45,8 +53,8 @@ export async function GET(
     guestEmail: tour.guestEmail,
     guestPhone: tour.guestPhone,
     propertyAddress: tour.propertyAddress,
-    tourDate: new Date(tour.startsAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
-    tourTime: new Date(tour.startsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+    tourDate: new Date(tour.startsAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: timezone }),
+    tourTime: new Date(tour.startsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: timezone }),
     duration: Math.round((new Date(tour.endsAt).getTime() - new Date(tour.startsAt).getTime()) / 60000),
     contactHighlights: [],
     scoreInfo: null,
@@ -84,10 +92,10 @@ export async function GET(
         if (app.employmentStatus) prep.applicationHighlights.push(`Employment: ${app.employmentStatus}`);
         if (app.monthlyGrossIncome) prep.applicationHighlights.push(`Monthly income: $${Number(app.monthlyGrossIncome).toLocaleString()}`);
         if (app.monthlyRent) prep.applicationHighlights.push(`Current rent: $${Number(app.monthlyRent).toLocaleString()}/mo`);
-        if (app.leaseTerm) prep.applicationHighlights.push(`Preferred lease: ${app.leaseTerm}`);
+        if (app.leaseTermPreference) prep.applicationHighlights.push(`Preferred lease: ${app.leaseTermPreference}`);
         if (app.hasPets) prep.applicationHighlights.push(`Has pets: ${app.petDetails || 'Yes'}`);
-        if (app.numberOfAdults || app.numberOfChildren) {
-          prep.applicationHighlights.push(`Household: ${app.numberOfAdults || 0} adults, ${app.numberOfChildren || 0} children`);
+        if (app.adultsOnApplication || app.childrenOrDependents) {
+          prep.applicationHighlights.push(`Household: ${app.adultsOnApplication || 0} adults, ${app.childrenOrDependents || 0} children`);
         }
       }
 

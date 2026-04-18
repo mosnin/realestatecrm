@@ -5,10 +5,9 @@ import { getSpaceForUser } from '@/lib/space';
 import { sendTourFollowUp, type TourEmailData } from '@/lib/tour-emails';
 
 async function resolveTour(userId: string, tourId: string) {
-  const { data: rows, error } = await supabase.from('Tour').select('*').eq('id', tourId);
+  const { data: tour, error } = await supabase.from('Tour').select('*').eq('id', tourId).maybeSingle();
   if (error) throw error;
-  if (!rows?.length) return null;
-  const tour = rows[0];
+  if (!tour) return null;
   const space = await getSpaceForUser(userId);
   if (!space || tour.spaceId !== space.id) return null;
   return { tour, space };
@@ -48,6 +47,16 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
   }
 
+  // Enforce valid status transitions to prevent bypassing business rules
+  if (body.status !== undefined && body.status !== ctx.tour.status) {
+    const current = ctx.tour.status as string;
+    const next = body.status as string;
+    // Once a tour is completed or no_show, it cannot be moved back to active states
+    if ((current === 'completed' || current === 'no_show') && (next === 'scheduled' || next === 'confirmed')) {
+      return NextResponse.json({ error: `Cannot transition from '${current}' to '${next}'` }, { status: 400 });
+    }
+  }
+
   // Whitelist and validate allowed fields
   const update: Record<string, unknown> = { updatedAt: new Date().toISOString() };
   if (body.status !== undefined) update.status = body.status;
@@ -81,6 +90,12 @@ export async function PATCH(
     if (isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid endsAt' }, { status: 400 });
     update.endsAt = d.toISOString();
   }
+  // Cross-validate the effective start/end range
+  const effectiveStart = update.startsAt ?? ctx.tour.startsAt;
+  const effectiveEnd = update.endsAt ?? ctx.tour.endsAt;
+  if (new Date(effectiveEnd as string) <= new Date(effectiveStart as string)) {
+    return NextResponse.json({ error: 'endsAt must be after startsAt' }, { status: 400 });
+  }
   if (body.contactId !== undefined) update.contactId = body.contactId || null;
 
   const { data, error } = await supabase
@@ -105,6 +120,7 @@ export async function PATCH(
     supabase.from('ContactActivity').insert({
       id: crypto.randomUUID(),
       contactId: data.contactId,
+      spaceId: ctx.space.id,
       type: 'follow_up',
       content: `Auto follow-up set for 24h after tour completion${data.propertyAddress ? ` — ${data.propertyAddress}` : ''}`,
     }).then(({ error: actErr }) => { if (actErr) console.error('[tour] Activity log failed:', actErr); });

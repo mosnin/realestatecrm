@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
+import { decrypt } from '@/lib/crypto';
 
 /** Public endpoint — returns available time slots for the next 14 days. */
 export async function GET(req: NextRequest) {
@@ -49,7 +50,8 @@ export async function GET(req: NextRequest) {
 
   // Determine date range in agent's timezone
   const now = new Date();
-  const startDate = dateStr ? new Date(dateStr + 'T00:00:00') : now;
+  // Parse the date string as UTC midnight to avoid local-timezone shifts
+  const startDate = dateStr ? new Date(dateStr + 'T00:00:00Z') : now;
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + 14);
 
@@ -277,19 +279,24 @@ async function getValidGCalToken(tokenRow: any, spaceId: string): Promise<string
     body: new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
       client_secret: GOOGLE_CLIENT_SECRET,
-      refresh_token: tokenRow.refreshToken,
+      refresh_token: decrypt(tokenRow.refreshToken),
       grant_type: 'refresh_token',
     }),
   });
 
-  if (!res.ok) throw new Error('Failed to refresh Google token');
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    console.error('[availability] GCal token refresh failed:', res.status, errText);
+    throw new Error('Failed to refresh Google token');
+  }
   const tokens = await res.json();
+  if (!tokens.access_token) throw new Error('No access_token in Google refresh response');
 
   await supabase
     .from('GoogleCalendarToken')
     .update({
       accessToken: tokens.access_token,
-      expiresAt: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
       updatedAt: new Date().toISOString(),
     })
     .eq('spaceId', spaceId);

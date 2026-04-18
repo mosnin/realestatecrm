@@ -36,6 +36,9 @@ export async function POST(req: NextRequest) {
     if (tour.status === 'completed') {
       return NextResponse.json({ error: 'Cannot cancel a completed tour' }, { status: 400 });
     }
+    if (tour.status === 'no_show') {
+      return NextResponse.json({ error: 'Cannot cancel a no-show tour' }, { status: 400 });
+    }
     // Don't allow cancellation within 1 hour of tour
     const hourBefore = new Date(new Date(tour.startsAt).getTime() - 60 * 60 * 1000);
     if (new Date() > hourBefore) {

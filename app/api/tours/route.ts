@@ -71,12 +71,13 @@ export async function POST(req: NextRequest) {
       spaceId: space.id,
       contactId: validContactId,
       guestName: guestName.trim(),
-      guestEmail: guestEmail.trim(),
+      guestEmail: guestEmail.trim().toLowerCase(),
       guestPhone: guestPhone?.trim() || null,
       propertyAddress: propertyAddress?.trim() || null,
       notes: notes?.trim() || null,
       startsAt: start.toISOString(),
       endsAt: end.toISOString(),
+      status: 'scheduled',
     })
     .select()
     .single();

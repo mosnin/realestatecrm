@@ -133,7 +133,9 @@ export async function POST(req: NextRequest) {
         }
       );
       if (!res.ok) {
-        googleEventId = null; // Re-create if update fails
+        // Clear the stale event ID in the DB so it gets re-created on retry
+        await supabase.from('Tour').update({ googleEventId: null }).eq('id', tourId);
+        googleEventId = null; // Re-create below
       }
     }
 
@@ -187,14 +189,19 @@ async function getValidAccessToken(tokenRow: any, spaceId: string): Promise<stri
     }),
   });
 
-  if (!res.ok) throw new Error('Failed to refresh Google token');
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    console.error('[gcal] Token refresh failed:', res.status, errText);
+    throw new Error('Failed to refresh Google token');
+  }
   const tokens = await res.json();
+  if (!tokens.access_token) throw new Error('No access_token in Google refresh response');
 
   await supabase
     .from('GoogleCalendarToken')
     .update({
       accessToken: tokens.access_token,
-      expiresAt: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
       updatedAt: new Date().toISOString(),
     })
     .eq('spaceId', spaceId);

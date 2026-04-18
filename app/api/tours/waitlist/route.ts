@@ -40,10 +40,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'guestName, guestEmail, preferredDate required' }, { status: 400 });
   }
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(guestEmail.trim())) {
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(guestEmail.trim()) || guestEmail.length > 254) {
     return NextResponse.json({ error: 'Invalid email' }, { status: 400 });
   }
+
+  // Input length validation
+  if (guestName.length > 200) return NextResponse.json({ error: 'Name too long' }, { status: 400 });
+  if (guestPhone && guestPhone.length > 50) return NextResponse.json({ error: 'Phone too long' }, { status: 400 });
+  if (notes && notes.length > 2000) return NextResponse.json({ error: 'Notes too long' }, { status: 400 });
 
   const space = await getSpaceFromSlug(slug);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
