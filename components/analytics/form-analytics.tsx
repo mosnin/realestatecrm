@@ -7,8 +7,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
   Cell,
 } from 'recharts';
 import { cn } from '@/lib/utils';
@@ -22,6 +20,12 @@ import {
   AlertTriangle,
   UserPlus,
 } from 'lucide-react';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@/components/ui/chart';
+import type { ChartConfig } from '@/components/ui/chart';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -134,23 +138,6 @@ function StatCard({
       {sub && (
         <p className="text-xs text-muted-foreground mt-1">{sub}</p>
       )}
-    </div>
-  );
-}
-
-// ── Custom tooltip ────────────────────────────────────────────────────────────
-
-function ChartTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-lg text-xs">
-      <p className="font-semibold text-foreground mb-1">{label}</p>
-      {payload.map((p: any) => (
-        <p key={p.dataKey} style={{ color: p.color ?? p.fill }}>
-          {p.name ?? p.dataKey}:{' '}
-          <span className="font-semibold tabular-nums">{fmtNum(p.value)}</span>
-        </p>
-      ))}
     </div>
   );
 }
@@ -285,6 +272,16 @@ function LoadingSkeleton() {
   );
 }
 
+// ── Chart configs ─────────────────────────────────────────────────────────────
+
+const funnelChartConfig = {
+  users: { label: 'Users', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+const avgTimeChartConfig = {
+  seconds: { label: 'Avg seconds', color: 'hsl(var(--primary))' },
+} satisfies ChartConfig;
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function FormAnalytics({
@@ -300,22 +297,6 @@ export function FormAnalytics({
   const [data, setData] = useState<FormAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Detect dark mode for recharts SVG colors
-  const [isDark, setIsDark] = useState(false);
-  useEffect(() => {
-    const check = () =>
-      setIsDark(document.documentElement.classList.contains('dark'));
-    check();
-    const observer = new MutationObserver(check);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    });
-    return () => observer.disconnect();
-  }, []);
-  const tickColor = isDark ? '#a1a1aa' : '#71717a';
-  const gridColor = isDark ? '#27272a' : '#e4e4e7';
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -524,17 +505,15 @@ export function FormAnalytics({
           title="Completion Funnel"
           sub="Users retained at each step"
         >
-          <ResponsiveContainer width="100%" height={240}>
+          <ChartContainer config={funnelChartConfig} className="h-[240px] w-full">
             <BarChart data={funnelChartData} barSize={32}>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke={gridColor}
-                vertical={false}
-              />
+              <CartesianGrid vertical={false} />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 10, fill: tickColor }}
-                stroke={tickColor}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                tick={{ fontSize: 10 }}
                 interval={0}
                 angle={-20}
                 textAnchor="end"
@@ -542,18 +521,20 @@ export function FormAnalytics({
               />
               <YAxis
                 allowDecimals={false}
-                tick={{ fontSize: 11, fill: tickColor }}
-                stroke={tickColor}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
                 width={36}
+                tick={{ fontSize: 11 }}
               />
-              <Tooltip content={<ChartTooltip />} />
-              <Bar dataKey="users" name="Users" radius={[6, 6, 0, 0]}>
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Bar dataKey="users" radius={[6, 6, 0, 0]}>
                 {funnelChartData.map((entry, i) => (
                   <Cell key={i} fill={entry.color} />
                 ))}
               </Bar>
             </BarChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </ChartSection>
 
         {/* Drop-off analysis */}
@@ -612,41 +593,40 @@ export function FormAnalytics({
             title="Average Time per Step"
             sub="How long users spend on each form section"
           >
-            <ResponsiveContainer width="100%" height={240}>
+            <ChartContainer config={avgTimeChartConfig} className="h-[240px] w-full">
               <BarChart
                 data={avgTimeData}
                 layout="vertical"
                 barSize={16}
                 margin={{ left: 0 }}
               >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke={gridColor}
-                  horizontal={false}
-                />
+                <CartesianGrid horizontal={false} />
                 <XAxis
                   type="number"
                   allowDecimals={false}
-                  tick={{ fontSize: 11, fill: tickColor }}
-                  stroke={tickColor}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 11 }}
                   unit="s"
                 />
                 <YAxis
                   type="category"
                   dataKey="name"
-                  tick={{ fontSize: 10, fill: tickColor }}
-                  stroke={tickColor}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
                   width={90}
+                  tick={{ fontSize: 10 }}
                 />
-                <Tooltip content={<ChartTooltip />} />
+                <ChartTooltip content={<ChartTooltipContent />} />
                 <Bar
                   dataKey="seconds"
-                  name="Avg seconds"
                   radius={[0, 6, 6, 0]}
-                  fill="hsl(var(--primary))"
+                  fill="var(--color-seconds)"
                 />
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </ChartSection>
         )}
 
