@@ -34,6 +34,13 @@ export function DealsPageClient({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">Deals</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Track your rental and buyer pipeline from lead to close
+        </p>
+      </div>
+
       {/* Pipeline toggle */}
       <div className="flex gap-1 bg-muted/50 rounded-lg p-1 w-fit">
         <button

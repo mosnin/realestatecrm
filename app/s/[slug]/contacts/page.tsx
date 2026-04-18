@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { getSpaceFromSlug } from '@/lib/space';
 import { ContactTable } from '@/components/contacts/contact-table';
 
-export default async function ClientsPage({
+export default async function ContactsPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
@@ -14,9 +14,9 @@ export default async function ClientsPage({
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Clients</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Contacts</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Manage your renter pipeline from qualification to application
+          Manage your contacts and renter pipeline from qualification to application
         </p>
       </div>
       <ContactTable slug={slug} />
