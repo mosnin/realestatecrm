@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { getSpaceForUser } from '@/lib/space';
+import { getSpaceForUser, getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
@@ -23,8 +23,17 @@ export async function POST(req: Request) {
   const { slug } = await req.json();
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
-  const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'No workspace' }, { status: 403 });
+  // Verify that the requested slug belongs to the authenticated user's own space.
+  // Without this check any authenticated user could obtain a full-context session
+  // for another user's workspace by supplying their slug.
+  const [space, userSpace] = await Promise.all([
+    getSpaceFromSlug(slug),
+    getSpaceForUser(userId),
+  ]);
+  if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
+  if (!userSpace || userSpace.id !== space.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   // Build CRM context for the voice session
   const [{ data: contacts }, { data: deals }, { data: notes }, { data: tours }, calResult] = await Promise.all([
@@ -54,15 +63,16 @@ export async function POST(req: Request) {
       .gte('startsAt', new Date().toISOString())
       .order('startsAt', { ascending: true })
       .limit(15),
-    Promise.resolve(
-      supabase
-        .from('CalendarEvent')
-        .select('title, date, time, description')
-        .eq('spaceId', space.id)
-        .gte('date', new Date().toISOString().slice(0, 10))
-        .order('date', { ascending: true })
-        .limit(10)
-    ).catch(() => ({ data: [] })),
+    supabase
+      .from('CalendarEvent')
+      .select('title, date, time, description')
+      .eq('spaceId', space.id)
+      .gte('date', new Date().toISOString().slice(0, 10))
+      .order('date', { ascending: true })
+      .limit(10)
+      .throwOnError()
+      .then((res) => res as { data: any[] })
+      .catch(() => ({ data: [] as any[] })),
   ]);
 
   const contactCtx = (contacts ?? []).map((c: any) =>
@@ -120,7 +130,7 @@ export async function POST(req: Request) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-realtime-preview',
+        model: 'gpt-4o-realtime-preview-2024-12-17',
         voice: 'coral',
         instructions,
         modalities: ['audio', 'text'],
@@ -137,9 +147,14 @@ export async function POST(req: Request) {
     }
 
     const data = await tokenRes.json();
+    const token = data.client_secret?.value;
+    if (!token) {
+      console.error('[realtime-session] OpenAI returned no client_secret.value:', JSON.stringify(data));
+      return NextResponse.json({ error: 'Session token missing in OpenAI response' }, { status: 500 });
+    }
     return NextResponse.json({
-      token: data.client_secret?.value,
-      expiresAt: data.client_secret?.expires_at,
+      token,
+      expiresAt: data.client_secret?.expires_at ?? null,
     });
   } catch (err) {
     console.error('[realtime-session] error:', err);

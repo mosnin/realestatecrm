@@ -177,13 +177,19 @@ export async function DELETE(
     .select('*')
     .eq('id', id)
     .eq('spaceId', space.id);
-  if (contactError) throw contactError;
+  if (contactError) {
+    console.error('[contacts/DELETE] fetch error:', contactError);
+    return NextResponse.json({ error: 'Failed to fetch contact' }, { status: 500 });
+  }
   if (!contactRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const contact = contactRows[0];
 
   const { error: deleteError } = await supabase.from('Contact').delete().eq('id', id);
-  if (deleteError) throw deleteError;
+  if (deleteError) {
+    console.error('[contacts/DELETE] delete error:', deleteError);
+    return NextResponse.json({ error: 'Failed to delete contact' }, { status: 500 });
+  }
   deleteContactVector(contact.spaceId, id).catch(console.error);
   void audit({
     actorClerkId: userId,

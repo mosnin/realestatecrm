@@ -167,12 +167,17 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
           if (res.ok) {
             const updated = await res.json();
             setSaveStatus('saved');
-            // Update sidebar title
+            // Update sidebar title and the active note detail's updatedAt
             setNotes((prev) =>
               prev.map((n) =>
                 n.id === noteId ? { ...n, title: updated.title, updatedAt: updated.updatedAt } : n,
               ),
             );
+            setNoteDetail((prev) =>
+              prev && prev.id === noteId ? { ...prev, updatedAt: updated.updatedAt } : prev,
+            );
+            // Reset to idle after briefly showing "Saved"
+            setTimeout(() => setSaveStatus('idle'), 2000);
           }
         } catch {
           setSaveStatus('idle');
@@ -221,13 +226,20 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
 
   const deleteNote = async (id: string) => {
     try {
-      await fetch(`/api/notes/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' });
+      if (!res.ok) return;
+      // Cancel any pending auto-save for this note before removing it
+      if (saveTimeout.current) {
+        clearTimeout(saveTimeout.current);
+        saveTimeout.current = null;
+      }
       setNotes((prev) => prev.filter((n) => n.id !== id));
       if (activeId === id) {
         setActiveId(null);
         setNoteDetail(null);
         setTitle('');
         setContent('');
+        setSaveStatus('idle');
       }
     } catch {
       // ignore
@@ -592,7 +604,7 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
                   value={content}
                   onChange={handleContentInput}
                   onKeyDown={handleContentKeyDown}
-                  onBlur={() => setTimeout(() => closeMention(), 200)}
+                  onBlur={() => setTimeout(() => { closeMention(); closeSlash(); }, 200)}
                   placeholder=""
                   className="relative w-full min-h-[50vh] text-base bg-transparent border-none outline-none resize-none leading-relaxed text-transparent caret-foreground"
                   spellCheck={false}
@@ -638,7 +650,6 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
                     ))}
                   </div>
                 )}
-              </div>
 
                 {/* Slash command dropdown */}
                 {slashOpen && slashPos && filteredSlashCommands.length > 0 && (
@@ -665,6 +676,7 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
                     ))}
                   </div>
                 )}
+              </div>
             </div>
 
             {/* Status bar with export buttons */}

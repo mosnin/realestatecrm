@@ -51,6 +51,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      { error: 'AI optimization is not configured on this server.' },
+      { status: 503 },
+    );
+  }
+
   // Check cache (unless explicitly asked to skip)
   const skipCache = body.skipCache === true;
   if (!skipCache) {

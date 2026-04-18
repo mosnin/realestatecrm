@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { sendEmailFromCRM } from '@/lib/email';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(
   req: NextRequest,
@@ -11,6 +12,12 @@ export async function POST(
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
+
+  // Rate limit: max 20 emails per user per hour
+  const { allowed } = await checkRateLimit(`email:${userId}`, 20, 3600);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Rate limit exceeded. Please try again later.' }, { status: 429 });
+  }
 
   const { id } = await params;
 

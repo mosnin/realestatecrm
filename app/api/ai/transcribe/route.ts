@@ -14,6 +14,11 @@ export async function POST(req: NextRequest) {
   if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
 
   try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: 'OpenAI not configured' }, { status: 500 });
+    }
+
     const formData = await req.formData();
     const audioFile = formData.get('audio') as File;
     if (!audioFile) return NextResponse.json({ error: 'No audio file' }, { status: 400 });
@@ -23,7 +28,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Audio file too large' }, { status: 400 });
     }
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = new OpenAI({ apiKey });
 
     const transcription = await openai.audio.transcriptions.create({
       file: audioFile,

@@ -17,6 +17,15 @@ export default async function AIPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
+  // Verify the authenticated user owns this space
+  const { data: spaceOwner } = await supabase
+    .from('User')
+    .select('id')
+    .eq('clerkId', userId)
+    .eq('id', space.ownerId)
+    .maybeSingle();
+  if (!spaceOwner) notFound();
+
   // Load conversations for this space
   let conversations: Conversation[] = [];
   let initialMessages: { role: 'user' | 'assistant'; content: string }[] = [];

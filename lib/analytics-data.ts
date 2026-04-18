@@ -354,8 +354,8 @@ export function buildLeadsAnalyticsData(raw: RawData): LeadsAnalyticsData {
   };
   for (const l of buyerLeads) {
     const app = l.applicationData;
-    const raw = app?.preApprovalAmount ?? app?.monthlyRent;
-    const budget = typeof raw === 'string' ? parseFloat(raw.replace(/[^0-9.]/g, '')) : (typeof raw === 'number' ? raw : null);
+    const rawBudget = app?.buyerBudget ?? app?.preApprovalAmount ?? app?.monthlyRent;
+    const budget = typeof rawBudget === 'string' ? parseFloat(rawBudget.replace(/[^0-9.]/g, '')) : (typeof rawBudget === 'number' ? rawBudget : null);
     if (budget == null || isNaN(budget)) continue;
     if (budget < 200000) buyerBudgetBuckets['Under $200K']++;
     else if (budget < 400000) buyerBudgetBuckets['$200K-$400K']++;

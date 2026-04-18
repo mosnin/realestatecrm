@@ -23,7 +23,10 @@ export async function GET(req: NextRequest) {
     .select('id, name, phone, followUpAt, spaceId')
     .lte('followUpAt', now.toISOString())
     .gte('followUpAt', yesterday.toISOString());
-  if (contactError) throw contactError;
+  if (contactError) {
+    console.error('[cron/follow-up-reminders] DB query failed', contactError);
+    return NextResponse.json({ error: 'DB query failed' }, { status: 500 });
+  }
 
   if (!contacts?.length) return NextResponse.json({ sent: 0 });
 

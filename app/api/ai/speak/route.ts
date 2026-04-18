@@ -19,10 +19,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Text required' }, { status: 400 });
     }
 
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: 'OpenAI not configured' }, { status: 500 });
+    }
+
     // Limit text length for TTS
     const truncated = text.slice(0, 4096);
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = new OpenAI({ apiKey });
 
     const mp3 = await openai.audio.speech.create({
       model: 'tts-1',

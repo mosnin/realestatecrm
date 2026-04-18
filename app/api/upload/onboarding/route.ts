@@ -60,9 +60,20 @@ export async function POST(req: NextRequest) {
     const bucket = 'branding';
 
     // Ensure bucket exists
-    const { data: buckets } = await supabase.storage.listBuckets();
+    const { data: buckets, error: listErr } = await supabase.storage.listBuckets();
+    if (listErr) {
+      console.error('[upload/onboarding] failed to list buckets:', listErr);
+      return NextResponse.json({ error: 'Could not verify storage configuration.' }, { status: 500 });
+    }
     if (!buckets?.find((b: { name: string }) => b.name === bucket)) {
-      await supabase.storage.createBucket(bucket, { public: true });
+      const { error: createErr } = await supabase.storage.createBucket(bucket, { public: true });
+      if (createErr) {
+        console.error('[upload/onboarding] failed to create bucket:', createErr);
+        return NextResponse.json(
+          { error: 'Storage bucket "branding" does not exist and could not be created automatically.' },
+          { status: 500 },
+        );
+      }
     }
 
     const { error: uploadError } = await supabase.storage

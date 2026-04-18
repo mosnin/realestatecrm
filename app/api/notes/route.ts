@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('Note')
-    .insert({ spaceId: space.id, title: (title || 'Untitled').slice(0, 200), sortOrder })
+    .insert({ spaceId: space.id, title: (title || 'Untitled').slice(0, 200), content: '', sortOrder })
     .select()
     .single();
 

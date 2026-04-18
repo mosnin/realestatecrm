@@ -15,28 +15,34 @@ export function ContactFollowUpField({ contactId, followUpAt: initialFollowUpAt,
   const [followUpAt, setFollowUpAt] = useState(initialFollowUpAt);
   const [lastContactedAt, setLastContactedAt] = useState(initialLastContactedAt);
 
-  async function patch(data: Record<string, unknown>) {
+  async function patch(data: Record<string, unknown>): Promise<boolean> {
     try {
-      await fetch(`/api/contacts/${contactId}`, {
+      const res = await fetch(`/api/contacts/${contactId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
+      return res.ok;
     } catch (err) {
       console.error('[follow-up] Patch failed:', err);
+      return false;
     }
   }
 
-  function handleFollowUpChange(value: string) {
+  async function handleFollowUpChange(value: string) {
     const next = value || null;
+    const prev = followUpAt;
     setFollowUpAt(next);
-    patch({ followUpAt: next });
+    const ok = await patch({ followUpAt: next });
+    if (!ok) setFollowUpAt(prev);
   }
 
-  function handleMarkContacted() {
+  async function handleMarkContacted() {
+    const prev = lastContactedAt;
     const now = new Date().toISOString();
     setLastContactedAt(now);
-    patch({ lastContactedAt: now });
+    const ok = await patch({ lastContactedAt: now });
+    if (!ok) setLastContactedAt(prev);
   }
 
   const isOverdue = followUpAt && new Date(followUpAt) < new Date();

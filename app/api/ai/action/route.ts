@@ -216,7 +216,19 @@ async function handleContactUpdate(
   if (body.notes !== undefined) updates.notes = body.notes ?? null;
   if (body.preferences !== undefined) updates.preferences = body.preferences ?? null;
   if (body.tags !== undefined) updates.tags = body.tags ?? [];
-  if (body.sourceLabel !== undefined) updates.sourceLabel = body.sourceLabel;
+  // Note: sourceLabel is intentionally excluded from CONTACT_ALLOWED_FIELDS
+  // and is therefore always stripped by the whitelist before reaching here.
+  if (body.followUpAt !== undefined) {
+    if (!body.followUpAt) {
+      updates.followUpAt = null;
+    } else {
+      const d = new Date(String(body.followUpAt));
+      if (isNaN(d.getTime())) {
+        return NextResponse.json({ error: 'Invalid followUpAt date' }, { status: 400 });
+      }
+      updates.followUpAt = d.toISOString();
+    }
+  }
   if (body.budget !== undefined) {
     const budgetVal = body.budget != null && body.budget !== '' ? parseFloat(String(body.budget)) : null;
     if (budgetVal !== null && isNaN(budgetVal)) {
@@ -285,6 +297,7 @@ async function handleDealUpdate(
   if (body.value !== undefined) updateObj.value = valueVal;
   if (body.address !== undefined) updateObj.address = body.address ?? null;
   if (body.priority !== undefined) updateObj.priority = body.priority;
+  if (body.stageId !== undefined) updateObj.stageId = body.stageId;
   if (body.status !== undefined) updateObj.status = body.status;
   if (body.closeDate !== undefined) {
     if (!body.closeDate) {
@@ -308,7 +321,7 @@ async function handleDealUpdate(
     return NextResponse.json({ error: 'Failed to update deal' }, { status: 500 });
   }
 
-  syncDeal(updated as Deal & { stage: DealStage | null }).catch(console.error);
+  syncDeal(updated as Deal & { stage?: { name: string } }).catch(console.error);
   void audit({ actorClerkId: userId, action: 'UPDATE', resource: 'Deal', resourceId: deal.id, spaceId, req });
 
   return NextResponse.json(updated);

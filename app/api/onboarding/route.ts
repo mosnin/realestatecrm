@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
 import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
 import { sendWelcomeEmail } from '@/lib/email';
+import { checkRateLimit } from '@/lib/rate-limit';
 import type { User, Space, SpaceSetting } from '@/lib/types';
 
 export async function GET() {
@@ -80,6 +81,12 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Rate limit: 30 onboarding actions per minute per user
+  const { allowed } = await checkRateLimit(`onboarding:${userId}`, 30, 60);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
 
   let body: Record<string, unknown>;
   try {
@@ -178,10 +185,14 @@ export async function POST(req: NextRequest) {
 
     if (action === 'save_step') {
       const { step } = body as { step: number };
+      const stepNum = typeof step === 'number' ? step : parseInt(String(step), 10);
+      if (!Number.isInteger(stepNum) || stepNum < 1 || stepNum > 10) {
+        return NextResponse.json({ error: 'Invalid step value' }, { status: 400 });
+      }
       const { error } = await supabase
         .from('User')
         .update({
-          onboardingCurrentStep: step,
+          onboardingCurrentStep: stepNum,
           onboardingStartedAt: user.onboardingStartedAt ?? new Date().toISOString(),
         })
         .eq('id', user.id);
@@ -290,13 +301,13 @@ export async function POST(req: NextRequest) {
       if (bio) userUpdates.bio = String(bio).slice(0, 500);
       if (socialLinks && typeof socialLinks === 'object') {
         const allowed = ['instagram', 'linkedin', 'facebook', 'tiktok', 'twitter', 'youtube'];
-        const sanitized: Record<string, string> = {};
+        const sanitizedLinks: Record<string, string> = {};
         for (const key of allowed) {
           if (typeof (socialLinks as any)[key] === 'string') {
-            sanitized[key] = String((socialLinks as any)[key]).slice(0, 500);
+            sanitizedLinks[key] = String((socialLinks as any)[key]).slice(0, 500);
           }
         }
-        userUpdates.socialLinks = sanitized;
+        userUpdates.socialLinks = sanitizedLinks;
       }
       if (websiteUrl) userUpdates.websiteUrl = String(websiteUrl).slice(0, 500);
       if (mlsId) userUpdates.mlsId = String(mlsId).slice(0, 50);
@@ -508,7 +519,8 @@ export async function POST(req: NextRequest) {
       if (user.onboard) {
         const accountType = (body as { accountType?: string }).accountType;
         if (accountType && ['realtor', 'broker_only', 'both'].includes(accountType)) {
-          await supabase.from('User').update({ accountType }).eq('id', user.id);
+          const { error: acctErr } = await supabase.from('User').update({ accountType }).eq('id', user.id);
+          if (acctErr) console.error('[onboarding] accountType update failed', acctErr);
         }
         return NextResponse.json({
           success: true,

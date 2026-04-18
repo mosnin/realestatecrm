@@ -26,42 +26,52 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { id } = await params;
-  const conv = await getConversationAndVerifyOwner(id, userId);
-  if (!conv) return NextResponse.json({ error: 'Not found or Forbidden' }, { status: 404 });
+    const { id } = await params;
+    const conv = await getConversationAndVerifyOwner(id, userId);
+    if (!conv) return NextResponse.json({ error: 'Not found or Forbidden' }, { status: 404 });
 
-  const { title } = await req.json();
-  if (!title || typeof title !== 'string') {
-    return NextResponse.json({ error: 'title required' }, { status: 400 });
+    const { title } = await req.json();
+    if (!title || typeof title !== 'string') {
+      return NextResponse.json({ error: 'title required' }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from('Conversation')
+      .update({ title: title.trim(), updatedAt: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) return NextResponse.json({ error: 'Failed to rename conversation' }, { status: 500 });
+
+    return NextResponse.json(data);
+  } catch (err) {
+    console.error('[conversations/[id]] PATCH error:', err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
-
-  const { data, error } = await supabase
-    .from('Conversation')
-    .update({ title: title.trim(), updatedAt: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single();
-  if (error) throw error;
-
-  return NextResponse.json(data);
 }
 
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { id } = await params;
-  const conv = await getConversationAndVerifyOwner(id, userId);
-  if (!conv) return NextResponse.json({ error: 'Not found or Forbidden' }, { status: 404 });
+    const { id } = await params;
+    const conv = await getConversationAndVerifyOwner(id, userId);
+    if (!conv) return NextResponse.json({ error: 'Not found or Forbidden' }, { status: 404 });
 
-  const { error } = await supabase.from('Conversation').delete().eq('id', id).eq('spaceId', conv.spaceId);
-  if (error) throw error;
+    const { error } = await supabase.from('Conversation').delete().eq('id', id).eq('spaceId', conv.spaceId);
+    if (error) return NextResponse.json({ error: 'Failed to delete conversation' }, { status: 500 });
 
-  return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('[conversations/[id]] DELETE error:', err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
 }

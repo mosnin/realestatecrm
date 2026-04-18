@@ -171,7 +171,7 @@ export function ChatInterface({
     return results;
   }, [slug]);
 
-  async function handleSend(text: string, mentions: MentionItem[]) {
+  const handleSend = useCallback(async function handleSend(text: string, mentions: MentionItem[]) {
     if (!text || inFlightRef.current) return;
     setLastAssistantMsg(null);
 
@@ -259,12 +259,7 @@ export function ChatInterface({
       inFlightRef.current = false;
       setIsStreaming(false);
     }
-  }
-
-  const handleVoiceTranscription = useCallback((text: string) => {
-    // Send the transcribed text as a regular chat message
-    handleSend(text, []);
-  }, [handleSend]);
+  }, [slug, activeConversationId, messages, conversations]);
 
   const handleAction = useCallback(async (action: CRMAction): Promise<ActionResult> => {
     try {

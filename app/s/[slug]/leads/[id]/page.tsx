@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
-import { getSpaceFromSlug } from '@/lib/space';
+import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-field';
@@ -34,8 +35,15 @@ export default async function LeadDetailPage({
 }) {
   const { slug, id } = await params;
 
+  const { userId } = await auth();
+  if (!userId) redirect('/login/realtor');
+
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
+
+  // Verify the authenticated user owns this space
+  const userSpace = await getSpaceForUser(userId);
+  if (!userSpace || userSpace.id !== space.id) notFound();
 
   const { data, error } = await supabase.from('Contact').select('*').eq('id', id).single();
   if (error?.code === 'PGRST116') notFound();

@@ -26,7 +26,10 @@ export async function GET(req: NextRequest) {
     .select('rentalFormConfig, buyerFormConfig, formConfig, formConfigSource, rentalScoringModel, buyerScoringModel')
     .eq('spaceId', space.id)
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    console.error('[form-config] GET query failed', error);
+    return NextResponse.json({ error: 'Failed to fetch form config' }, { status: 500 });
+  }
 
   // Backwards compatibility: if rentalFormConfig is null but old formConfig exists, use it
   let rentalFormConfig = settings?.rentalFormConfig ?? null;

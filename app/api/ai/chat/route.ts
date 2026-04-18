@@ -106,7 +106,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const stream = await chatWithRAG(messages, space.id, space.name, null, owner.name);
+    // Truncate conversation history to the last 20 messages to prevent context
+    // window overflows. The system prompt already contains substantial CRM context.
+    const MAX_HISTORY = 20;
+    const truncatedMessages = messages.length > MAX_HISTORY
+      ? messages.slice(messages.length - MAX_HISTORY)
+      : messages;
+
+    const stream = await chatWithRAG(truncatedMessages, space.id, space.name, null, owner.name);
 
     // Collect the full response text to save to DB (non-blocking)
     const [streamForResponse, streamForSave] = stream.tee();

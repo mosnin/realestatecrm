@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
+import { checkRateLimit } from '@/lib/rate-limit';
 import type { Contact, IntakeFormConfig } from '@/lib/types';
 import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 
@@ -13,6 +14,12 @@ export async function POST(
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
+
+  // Rate limit: max 10 rescore requests per user per hour
+  const { allowed } = await checkRateLimit(`rescore:${userId}`, 10, 3600);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Rate limit exceeded. Please try again later.' }, { status: 429 });
+  }
 
   const { id } = await params;
 
@@ -26,7 +33,10 @@ export async function POST(
     .select('*')
     .eq('id', id)
     .eq('spaceId', space.id);
-  if (fetchError) throw fetchError;
+  if (fetchError) {
+    console.error('[rescore] Fetch error:', fetchError);
+    return NextResponse.json({ error: 'Failed to fetch contact' }, { status: 500 });
+  }
   if (!rows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const contact = rows[0] as Contact;
@@ -71,22 +81,33 @@ export async function POST(
   // otherwise fall back to legacy scoring via the same entry point.
   const applicationData = contact.applicationData as Record<string, unknown> | null;
 
-  const result = await scoreLeadApplicationDynamic({
-    contactId: id,
-    formConfig,
-    answers: formConfig && applicationData
-      ? (applicationData as Record<string, string | string[] | number | boolean>)
-      : undefined,
-    scoringModel,
-    name: contact.name,
-    email: contact.email,
-    phone: contact.phone ?? '',
-    budget: contact.budget,
-    applicationData: !formConfig
-      ? (applicationData as (Record<string, unknown> & { legalName: string }) | null)
-      : undefined,
-    leadType: resolvedLeadType as 'rental' | 'buyer',
-  });
+  let result;
+  try {
+    result = await scoreLeadApplicationDynamic({
+      contactId: id,
+      formConfig,
+      answers: formConfig && applicationData
+        ? (applicationData as Record<string, string | string[] | number | boolean>)
+        : undefined,
+      scoringModel,
+      name: contact.name,
+      email: contact.email,
+      phone: contact.phone ?? '',
+      budget: contact.budget,
+      applicationData: !formConfig
+        ? (applicationData as (Record<string, unknown> & { legalName: string }) | null)
+        : undefined,
+      leadType: resolvedLeadType as 'rental' | 'buyer',
+    });
+  } catch (scoringErr) {
+    // Reset status to 'failed' so the contact is not stuck in 'pending'
+    await supabase
+      .from('Contact')
+      .update({ scoringStatus: 'failed', updatedAt: new Date().toISOString() })
+      .eq('id', id);
+    console.error('[rescore] Scoring failed:', scoringErr);
+    return NextResponse.json({ error: 'Scoring failed' }, { status: 500 });
+  }
 
   const { error: updateError } = await supabase
     .from('Contact')
@@ -100,7 +121,10 @@ export async function POST(
     })
     .eq('id', id);
 
-  if (updateError) throw updateError;
+  if (updateError) {
+    console.error('[rescore] Update error:', updateError);
+    return NextResponse.json({ error: 'Failed to save score' }, { status: 500 });
+  }
 
   return NextResponse.json(result);
 }

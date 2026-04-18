@@ -36,12 +36,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'File type not supported' }, { status: 400 });
   }
 
-  // Validate file magic numbers to prevent MIME spoofing
-  const header = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  // Validate file magic numbers to prevent MIME spoofing.
+  // WEBP magic is "WEBP" at bytes 8-11, so we need 12 bytes.
+  const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
   const isPdf = header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46; // %PDF
   const isJpeg = header[0] === 0xFF && header[1] === 0xD8;
   const isPng = header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47;
-  const isWebp = header[8 - 4] === 0x57 && header[8 - 3] === 0x45 && header[8 - 2] === 0x42 && header[8 - 1] === 0x50; // WEBP at offset 8
+  const isWebp = header.length >= 12 && header[8] === 0x57 && header[9] === 0x45 && header[10] === 0x42 && header[11] === 0x50; // WEBP at offset 8
   const isDoc = header[0] === 0xD0 && header[1] === 0xCF; // OLE2 (DOC)
   const isDocx = header[0] === 0x50 && header[1] === 0x4B; // ZIP (DOCX)
   if (!isPdf && !isJpeg && !isPng && !isWebp && !isDoc && !isDocx) {
@@ -50,7 +51,10 @@ export async function POST(req: NextRequest) {
 
   // Verify access — guest uploads are restricted to recently-created public
   // intake contacts to prevent arbitrary file uploads to any contact.
+  // NOTE: resolvedUploadedBy is derived from the auth path taken, NOT from the
+  // request body, to prevent callers from spoofing the uploadedBy value.
   let resolvedSpaceId: string;
+  let resolvedUploadedBy: string;
   if (uploadedBy === 'guest') {
     const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const { data: guestContact } = await supabase
@@ -64,6 +68,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Contact not found or upload window expired' }, { status: 404 });
     }
     resolvedSpaceId = guestContact.spaceId;
+    resolvedUploadedBy = 'guest';
   } else {
     const auth = await requireContactAccess(contactId);
     if (auth instanceof NextResponse) return auth;
@@ -77,6 +82,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
     }
     resolvedSpaceId = authedContact.spaceId;
+    resolvedUploadedBy = 'agent';
   }
 
   // Store file as base64 data URL (MVP approach — replace with S3 in production)
@@ -93,12 +99,15 @@ export async function POST(req: NextRequest) {
       fileType: file.type,
       fileSize: file.size,
       storageKey,
-      uploadedBy,
+      uploadedBy: resolvedUploadedBy,
     })
     .select('id, fileName, fileType, fileSize, createdAt')
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[documents] insert failed', error);
+    return NextResponse.json({ error: 'Failed to save document' }, { status: 500 });
+  }
 
   return NextResponse.json(doc, { status: 201 });
 }

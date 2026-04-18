@@ -140,8 +140,9 @@ export function ContactActivityTab({ contactId, contactCreatedAt }: { contactId:
       }
     } catch {
       setPostError('Network error. Please try again.');
+    } finally {
+      setPosting(false);
     }
-    setPosting(false);
   }
 
   return (

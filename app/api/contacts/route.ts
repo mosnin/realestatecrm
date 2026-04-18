@@ -46,7 +46,10 @@ export async function GET(req: NextRequest) {
   const { data: contacts, error } = await query
     .order('createdAt', { ascending: false })
     .range(offset, offset + limit - 1);
-  if (error) throw error;
+  if (error) {
+    console.error('[contacts/GET] query error:', error);
+    return NextResponse.json({ error: 'Failed to fetch contacts' }, { status: 500 });
+  }
 
   return NextResponse.json(contacts as Contact[]);
 }
@@ -88,7 +91,10 @@ export async function POST(req: NextRequest) {
     properties: propsVal,
     tags: tagsVal,
   }).select().single();
-  if (error) throw error;
+  if (error) {
+    console.error('[contacts/POST] insert error:', error);
+    return NextResponse.json({ error: 'Failed to create contact' }, { status: 500 });
+  }
 
   // Async vectorization — don't block the response
   syncContact(contact as Contact).catch(console.error);

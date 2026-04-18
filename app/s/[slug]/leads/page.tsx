@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { getSpaceFromSlug } from '@/lib/space';
+import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { Phone, Flame, Thermometer, Snowflake, HelpCircle, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import type { Contact } from '@/lib/types';
@@ -19,6 +19,10 @@ export default async function LeadsPage({
   const { slug } = await params;
   const space = await getSpaceFromSlug(slug);
   if (!space) redirect('/');
+
+  // Verify the authenticated user owns this space
+  const userSpace = await getSpaceForUser(userId);
+  if (!userSpace || userSpace.id !== space.id) redirect('/');
 
   let leads: Contact[] = [];
   try {

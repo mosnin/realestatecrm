@@ -126,11 +126,12 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
   const handleMarkDone = useCallback(async (id: string) => {
     markBusy(id);
     try {
-      await fetch(`/api/contacts/${id}`, {
+      const res = await fetch(`/api/contacts/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ followUpAt: null, lastContactedAt: new Date().toISOString() }),
       });
+      if (!res.ok) { toast.error('Failed to update'); return; }
       setContacts(prev => prev.filter(c => c.id !== id));
       toast.success('Follow-up completed');
     } catch { toast.error('Failed to update'); }
@@ -143,11 +144,12 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
     const newDate = new Date(Date.now() + hours * 3600 * 1000).toISOString();
     try {
       const endpoint = isDeal ? `/api/deals/${id}` : `/api/contacts/${id}`;
-      await fetch(endpoint, {
+      const res = await fetch(endpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ followUpAt: newDate }),
       });
+      if (!res.ok) { toast.error('Failed to snooze'); return; }
       if (isDeal) {
         setDeals(prev => prev.map(d => d.id === id ? { ...d, followUpAt: newDate } : d));
       } else {
@@ -161,11 +163,12 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
   const handleMarkDealDone = useCallback(async (id: string) => {
     markBusy(id);
     try {
-      await fetch(`/api/deals/${id}`, {
+      const res = await fetch(`/api/deals/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ followUpAt: null }),
       });
+      if (!res.ok) { toast.error('Failed to update'); return; }
       setDeals(prev => prev.filter(d => d.id !== id));
       toast.success('Deal follow-up completed');
     } catch { toast.error('Failed to update'); }

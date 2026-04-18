@@ -21,7 +21,10 @@ export async function GET(
     .eq('spaceId', space.id)
     .order('createdAt', { ascending: false })
     .range(offset, offset + limit - 1);
-  if (error) throw error;
+  if (error) {
+    console.error('[activity/GET] query error:', error);
+    return NextResponse.json({ error: 'Failed to fetch activities' }, { status: 500 });
+  }
 
   return NextResponse.json(data ?? []);
 }
@@ -62,7 +65,10 @@ export async function POST(
     })
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    console.error('[activity/POST] insert error:', error);
+    return NextResponse.json({ error: 'Failed to save activity' }, { status: 500 });
+  }
 
   return NextResponse.json(data, { status: 201 });
 }

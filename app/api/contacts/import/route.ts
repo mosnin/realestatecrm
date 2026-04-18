@@ -56,7 +56,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No valid rows (name is required)' }, { status: 400 });
 
   const { error } = await supabase.from('Contact').insert(inserts);
-  if (error) throw error;
+  if (error) {
+    console.error('[import] insert error:', error);
+    return NextResponse.json({ error: 'Failed to import contacts' }, { status: 500 });
+  }
 
   return NextResponse.json({ created: inserts.length });
 }

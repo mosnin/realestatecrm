@@ -128,10 +128,15 @@ export function ContactTable({ slug }: ContactTableProps) {
   }
 
   const fetchContacts = useCallback(async () => {
-    const params = new URLSearchParams({ slug, search, type: typeFilter });
-    const res = await fetch(`/api/contacts?${params}`);
-    if (res.ok) setContacts(await res.json());
-    setLoading(false);
+    try {
+      const params = new URLSearchParams({ slug, search, type: typeFilter });
+      const res = await fetch(`/api/contacts?${params}`);
+      if (res.ok) setContacts(await res.json());
+    } catch (err) {
+      console.error('[contact-table] fetchContacts failed:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [slug, search, typeFilter]);
 
   useEffect(() => {
@@ -153,21 +158,29 @@ export function ContactTable({ slug }: ContactTableProps) {
   }, []);
 
   async function handleAdd(data: any) {
-    await fetch('/api/contacts', {
+    const res = await fetch('/api/contacts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, slug }),
     });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error ?? 'Failed to add contact');
+    }
     fetchContacts();
   }
 
   async function handleEdit(data: any) {
     if (!editContact) return;
-    await fetch(`/api/contacts/${editContact.id}`, {
+    const res = await fetch(`/api/contacts/${editContact.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error ?? 'Failed to update contact');
+    }
     setEditContact(null);
     fetchContacts();
   }
@@ -217,28 +230,46 @@ export function ContactTable({ slug }: ContactTableProps) {
     });
     if (!confirmed) return;
     try {
-      await Promise.all(ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })));
-      toast.success(`Deleted ${ids.length} contacts`);
+      const results = await Promise.allSettled(ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })));
+      const failures = results.filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));
+      if (failures.length === 0) {
+        toast.success(`Deleted ${ids.length} contacts`);
+      } else if (failures.length === ids.length) {
+        toast.error('Failed to delete contacts');
+      } else {
+        toast.success(`Deleted ${ids.length - failures.length} contacts`);
+        toast.error(`${failures.length} failed to delete`);
+      }
     } catch {
       toast.error('Failed to delete contacts');
+    } finally {
+      setSelectedIds(new Set());
+      fetchContacts();
     }
-    setSelectedIds(new Set());
-    fetchContacts();
   }
 
   async function handleBulkChangeType(newType: Client['type']) {
     const ids = [...selectedIds];
-    await Promise.all(
-      ids.map((id) =>
-        fetch(`/api/contacts/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: newType }),
-        }),
-      ),
-    );
-    setSelectedIds(new Set());
-    fetchContacts();
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          fetch(`/api/contacts/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: newType }),
+          }),
+        ),
+      );
+      const failures = results.filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));
+      if (failures.length > 0) {
+        toast.error(`${failures.length} contact${failures.length !== 1 ? 's' : ''} failed to update`);
+      }
+    } catch {
+      toast.error('Failed to update contacts');
+    } finally {
+      setSelectedIds(new Set());
+      fetchContacts();
+    }
   }
 
   function handleExportSelected() {

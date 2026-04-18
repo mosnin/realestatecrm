@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { requireSpaceOwner } from '@/lib/api-auth';
-import { getSpaceFromSlug } from '@/lib/space';
 
 // ── Validation schemas ──────────────────────────────────────────────────────
 

@@ -27,7 +27,6 @@ import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-fi
 import { FollowUpSuggestions } from '@/components/contacts/follow-up-suggestions';
 import { StageProgression } from '@/components/contacts/stage-progression';
 import { RescoreButton } from '@/components/contacts/rescore-button';
-import { ApplicationStatusControl } from '@/components/contacts/application-status-control';
 import { ApplicationStatusManager } from '@/components/contacts/application-status-manager';
 import { PdfExportButton } from '@/components/contacts/pdf-export-button';
 import { CollapsibleSection } from '@/components/contacts/collapsible-section';
@@ -71,7 +70,7 @@ export default async function ClientDetailPage({
       const { data: tourRows } = await supabase.from('Tour').select('id, guestName, startsAt, endsAt, status, propertyAddress').eq('contactId', id).order('startsAt', { ascending: false }).limit(10);
       contact = {
         ...c,
-        dealContacts: ((dealRows ?? []) as { Deal: { id: string; title: string; address: string | null; value: number | null; status: string; priority: string; DealStage: { name: string; color: string } | null } }[]).map((row) => ({
+        dealContacts: ((dealRows ?? []) as unknown as { Deal: { id: string; title: string; address: string | null; value: number | null; status: string; priority: string; DealStage: { name: string; color: string } | null } }[]).map((row) => ({
           deal: {
             id: row.Deal.id,
             title: row.Deal.title,
@@ -534,11 +533,11 @@ export default async function ClientDetailPage({
                 <p className="text-sm text-foreground">{contact.preferences}</p>
               </div>
             )}
-            {contact.properties.length > 0 && (
+            {(contact.properties ?? []).length > 0 && (
               <div className="sm:col-span-2">
                 <p className="text-xs text-muted-foreground mb-2">Properties of interest</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {contact.properties.map((property) => (
+                  {(contact.properties ?? []).map((property) => (
                     <Badge key={property} variant="secondary" className="text-xs font-medium">
                       {property}
                     </Badge>
@@ -608,11 +607,11 @@ export default async function ClientDetailPage({
       )}
 
       {/* Tags */}
-      {activeTab === 'overview' && contact.tags.filter((t) => t !== 'application-link' && t !== 'new-lead').length > 0 && (
+      {activeTab === 'overview' && (contact.tags ?? []).filter((t) => t !== 'application-link' && t !== 'new-lead').length > 0 && (
         <div className="rounded-lg border border-border bg-card px-4 sm:px-6 py-4">
           <p className="text-xs font-medium text-muted-foreground mb-2">Tags</p>
           <div className="flex flex-wrap gap-1.5">
-            {contact.tags
+            {(contact.tags ?? [])
               .filter((t) => t !== 'application-link' && t !== 'new-lead')
               .map((tag) => (
                 <Badge key={tag} variant="outline" className="text-xs">

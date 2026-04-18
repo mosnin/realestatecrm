@@ -62,6 +62,13 @@ export async function POST(req: NextRequest) {
 
   const formConfig = parsed.data;
 
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      { error: 'AI scoring is not configured on this server.' },
+      { status: 503 },
+    );
+  }
+
   try {
     const scoringModel = await generateScoringModel(formConfig);
 

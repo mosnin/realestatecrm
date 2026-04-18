@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const parsed = sendLinkSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Invalid request data', issues: parsed.error.issues },
+      { error: 'Invalid request data' },
       { status: 400 },
     );
   }

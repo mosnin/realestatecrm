@@ -143,7 +143,7 @@ export function VoiceMode({ open, onClose, slug, onTranscript }: VoiceModeProps)
       await pc.setLocalDescription(offer);
 
       // 7. Send offer to OpenAI Realtime API
-      const sdpRes = await fetch('https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview', {
+      const sdpRes = await fetch('https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -174,7 +174,7 @@ export function VoiceMode({ open, onClose, slug, onTranscript }: VoiceModeProps)
     if (!open && state !== 'idle') {
       cleanup();
     }
-  }, [open]);
+  }, [open, state, connect, cleanup]);
 
   // Mute/unmute
   const toggleMute = useCallback(() => {

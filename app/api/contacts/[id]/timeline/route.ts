@@ -96,14 +96,16 @@ export async function GET(
     }
   }
 
-  // Fetch deals linked to this contact
+  // Fetch deals linked to this contact — scope to the user's space via the
+  // joined Deal record to prevent cross-tenant data leakage.
   const { data: dealLinks } = await supabase
     .from('DealContact')
-    .select('Deal(id, title, createdAt, address)')
+    .select('Deal(id, title, createdAt, address, spaceId)')
     .eq('contactId', contactId);
 
   for (const row of (dealLinks ?? []) as any[]) {
-    if (row.Deal) {
+    // Only include deals belonging to the same space as the contact
+    if (row.Deal && row.Deal.spaceId === space.id) {
       events.push({
         id: `deal-${row.Deal.id}-created`,
         kind: 'deal',

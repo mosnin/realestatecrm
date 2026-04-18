@@ -290,9 +290,11 @@ function LoadingSkeleton() {
 export function FormAnalytics({
   slug,
   standalone = false,
+  showRecentLeads = false,
 }: {
   slug: string;
   standalone?: boolean;
+  showRecentLeads?: boolean;
 }) {
   const [days, setDays] = useState(30);
   const [data, setData] = useState<FormAnalyticsResponse | null>(null);
@@ -689,7 +691,7 @@ export function FormAnalytics({
       </div>
 
       {/* Recent leads */}
-      {standalone && data.recentLeads && data.recentLeads.length > 0 && (
+      {(standalone || showRecentLeads) && data.recentLeads && data.recentLeads.length > 0 && (
         <div className="rounded-xl border border-border bg-card">
           <div className="px-4 sm:px-5 py-4 border-b border-border">
             <div className="flex items-center gap-2">

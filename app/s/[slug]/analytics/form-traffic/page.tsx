@@ -23,7 +23,7 @@ export default async function FormTrafficAnalyticsPage({
           Completion funnel, drop-off analysis, and form performance metrics
         </p>
       </div>
-      <FormAnalytics slug={slug} />
+      <FormAnalytics slug={slug} showRecentLeads />
     </div>
   );
 }
