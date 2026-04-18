@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sparkles, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function RescoreButton({ contactId, onComplete }: Props) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,8 +27,7 @@ export function RescoreButton({ contactId, onComplete }: Props) {
         setDone(true);
         toast.success('Lead re-scored');
         onComplete?.(data);
-        // Refresh the page after a moment so the new score renders
-        setTimeout(() => window.location.reload(), 800);
+        setTimeout(() => router.refresh(), 800);
       } else {
         toast.error('Scoring failed — try again');
         setError('Re-score failed. Please try again.');

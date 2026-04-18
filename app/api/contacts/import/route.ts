@@ -36,21 +36,24 @@ export async function POST(req: NextRequest) {
   const now = new Date().toISOString();
   const inserts = rows
     .filter((r) => r.name?.trim())
-    .map((r) => ({
-      id: crypto.randomUUID(),
-      spaceId: space.id,
-      name: r.name.trim(),
-      phone: r.phone?.trim() || null,
-      email: r.email?.trim() || null,
-      budget: r.budget != null && !isNaN(parseFloat(String(r.budget))) && parseFloat(String(r.budget)) >= 0 ? parseFloat(String(r.budget)) : null,
-      type: r.type && VALID_TYPES.has(r.type) ? r.type : 'QUALIFICATION',
-      notes: r.notes?.trim() || null,
-      tags: [],
-      properties: [],
-      scoringStatus: 'unscored',
-      createdAt: now,
-      updatedAt: now,
-    }));
+    .map((r) => {
+      const name = r.name.trim().slice(0, 200);
+      return {
+        id: crypto.randomUUID(),
+        spaceId: space.id,
+        name,
+        phone: r.phone?.trim().slice(0, 20) || null,
+        email: r.email?.trim().slice(0, 254) || null,
+        budget: r.budget != null && !isNaN(parseFloat(String(r.budget))) && parseFloat(String(r.budget)) >= 0 ? parseFloat(String(r.budget)) : null,
+        type: r.type && VALID_TYPES.has(r.type) ? r.type : 'QUALIFICATION',
+        notes: r.notes?.trim().slice(0, 5000) || null,
+        tags: [],
+        properties: [],
+        scoringStatus: 'unscored',
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
 
   if (inserts.length === 0)
     return NextResponse.json({ error: 'No valid rows (name is required)' }, { status: 400 });

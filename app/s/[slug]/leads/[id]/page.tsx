@@ -38,6 +38,10 @@ export default async function LeadDetailPage({
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
 
+  // Validate UUID format to avoid unnecessary DB round-trips
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_REGEX.test(id)) notFound();
+
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
@@ -45,12 +49,17 @@ export default async function LeadDetailPage({
   const userSpace = await getSpaceForUser(userId);
   if (!userSpace || userSpace.id !== space.id) notFound();
 
-  const { data, error } = await supabase.from('Contact').select('*').eq('id', id).single();
+  const { data, error } = await supabase
+    .from('Contact')
+    .select('*')
+    .eq('id', id)
+    .eq('spaceId', space.id)
+    .single();
   if (error?.code === 'PGRST116') notFound();
   if (error) throw error;
 
   const lead = data as Contact;
-  if (lead.spaceId !== space.id || !lead.tags?.includes('application-link')) notFound();
+  if (!lead.tags?.includes('application-link')) notFound();
 
   const app = lead.applicationData as ApplicationData | null;
   const details = lead.scoreDetails as LeadScoreDetails | null;

@@ -66,7 +66,8 @@ export default async function LeadsPage({
           return supabase
             .from('Contact')
             .update({ tags: newTags, updatedAt: new Date().toISOString() })
-            .eq('id', lead.id);
+            .eq('id', lead.id)
+            .eq('spaceId', space.id);
         }),
       );
     } catch {

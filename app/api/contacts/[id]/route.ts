@@ -108,17 +108,23 @@ export async function PATCH(
       updatedAt: new Date().toISOString(),
     };
 
-    if (body.name !== undefined) updates.name = body.name;
-    if (body.email !== undefined) updates.email = body.email ?? null;
-    if (body.phone !== undefined) updates.phone = body.phone ?? null;
-    if (body.address !== undefined) updates.address = body.address ?? null;
-    if (body.notes !== undefined) updates.notes = body.notes ?? null;
-    if (body.preferences !== undefined) updates.preferences = body.preferences ?? null;
+    if (body.name !== undefined) {
+      const name = typeof body.name === 'string' ? body.name.trim() : '';
+      if (!name || name.length > 200) {
+        return NextResponse.json({ error: 'Name is required (max 200 characters)' }, { status: 400 });
+      }
+      updates.name = name;
+    }
+    if (body.email !== undefined) updates.email = body.email ? String(body.email).slice(0, 254) : null;
+    if (body.phone !== undefined) updates.phone = body.phone ? String(body.phone).slice(0, 20) : null;
+    if (body.address !== undefined) updates.address = body.address ? String(body.address).slice(0, 500) : null;
+    if (body.notes !== undefined) updates.notes = body.notes ? String(body.notes).slice(0, 5000) : null;
+    if (body.preferences !== undefined) updates.preferences = body.preferences ? String(body.preferences).slice(0, 5000) : null;
     if (body.properties !== undefined) updates.properties = body.properties ?? [];
     if (body.tags !== undefined) updates.tags = body.tags ?? [];
     if (body.followUpAt !== undefined) updates.followUpAt = body.followUpAt;
     if (body.lastContactedAt !== undefined) updates.lastContactedAt = body.lastContactedAt;
-    if (body.sourceLabel !== undefined) updates.sourceLabel = body.sourceLabel;
+    if (body.sourceLabel !== undefined) updates.sourceLabel = body.sourceLabel ? String(body.sourceLabel).slice(0, 200) : null;
 
     if (body.budget !== undefined) {
       const budgetVal = body.budget != null && body.budget !== '' ? parseFloat(body.budget) : null;
@@ -185,7 +191,11 @@ export async function DELETE(
 
   const contact = contactRows[0];
 
-  const { error: deleteError } = await supabase.from('Contact').delete().eq('id', id);
+  const { error: deleteError } = await supabase
+    .from('Contact')
+    .delete()
+    .eq('id', id)
+    .eq('spaceId', space.id);
   if (deleteError) {
     console.error('[contacts/DELETE] delete error:', deleteError);
     return NextResponse.json({ error: 'Failed to delete contact' }, { status: 500 });

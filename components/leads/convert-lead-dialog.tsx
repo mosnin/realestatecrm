@@ -43,7 +43,7 @@ export function ConvertLeadDialog({
       }
       const contact = await getRes.json();
 
-      const newTags = (contact.tags ?? currentTags).filter(
+      const newTags = (contact.tags ?? []).filter(
         (t: string) => t !== 'application-link' && t !== 'new-lead',
       );
 
