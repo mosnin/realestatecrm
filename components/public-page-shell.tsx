@@ -78,7 +78,7 @@ export function PublicPageShell({
 
   return (
     <div
-      className={`min-h-screen bg-muted/50 dark:bg-background ${fontClass} ${darkClass}`.trim()}
+      className={`min-h-screen bg-gray-50 dark:bg-gray-900 ${fontClass} ${darkClass}`.trim()}
       style={{ '--intake-accent': accentColor } as React.CSSProperties}
     >
       {/* ── Floating pill header ─────────────────────────────────────────── */}
@@ -214,7 +214,7 @@ export function PublicPageMinimalShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-muted/50 dark:bg-background flex flex-col">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
       <div className="px-3 pt-3 sm:px-4 sm:pt-4">
         <header className="max-w-lg mx-auto rounded-full bg-card/95 backdrop-blur-md border border-border shadow-sm px-4 py-2">
           <div className="flex items-center justify-between">

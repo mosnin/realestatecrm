@@ -50,6 +50,25 @@ import {
 import { QUESTION_TYPES, getQuestionTypeConfig } from './question-types';
 import type { IntakeFormConfig, FormSection, FormQuestion } from './types';
 
+// ── Field type color map ──
+
+const FIELD_TYPE_COLORS: Record<string, string> = {
+  text:         'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+  textarea:     'bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+  email:        'bg-sky-50 dark:bg-sky-950/30 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800',
+  phone:        'bg-teal-50 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800',
+  number:       'bg-orange-50 dark:bg-orange-950/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+  select:       'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800',
+  multi_select: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+  radio:        'bg-violet-50 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800',
+  checkbox:     'bg-pink-50 dark:bg-pink-950/30 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800',
+  date:         'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+};
+
+function fieldTypeBadgeClass(type: string): string {
+  return FIELD_TYPE_COLORS[type] ?? 'bg-muted text-muted-foreground border-border';
+}
+
 // ── Helpers ──
 
 function generateId() {
@@ -150,18 +169,23 @@ function SortableQuestion({
       )}
     >
       <button
-        className="flex-shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground touch-none"
+        className="flex-shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors touch-none"
+        title="Drag to reorder"
         {...attributes}
         {...listeners}
       >
         <GripVertical size={14} />
       </button>
-      {Icon && <Icon size={14} className="flex-shrink-0 text-muted-foreground" />}
+      {Icon && <Icon size={14} className={cn('flex-shrink-0', `${fieldTypeBadgeClass(question.type).split(' ').find(c => c.startsWith('text-'))}`)} />}
       <span className="text-sm font-medium truncate flex-1">{question.label}</span>
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        {question.required && (
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Required</Badge>
-        )}
+        {/* Field type pill */}
+        <span className={cn('hidden sm:inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-5', fieldTypeBadgeClass(question.type))}>
+          {question.type.replace('_', ' ')}
+        </span>
+        {question.required ? (
+          <span className="text-[10px] font-semibold text-rose-500" title="Required field">&#42;</span>
+        ) : null}
         {question.system && (
           <Lock size={12} className="text-muted-foreground" />
         )}

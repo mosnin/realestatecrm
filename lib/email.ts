@@ -42,6 +42,7 @@ export interface NewLeadEmailParams {
   name: string;
   phone: string;
   email?: string | null;
+  budget?: number | null;
   leadScore?: number | null;
   scoreLabel?: string | null;
   scoreSummary?: string | null;
@@ -61,7 +62,7 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
   const FROM = getFromAddress();
   console.log('[EMAIL-DEBUG] 2. Resend initialized, API key prefix:', process.env.RESEND_API_KEY?.slice(0, 8));
 
-  const { toEmail, spaceName, spaceSlug, contactId, name, phone, email, leadScore, scoreLabel, scoreSummary, applicationData: app, formConfigSnapshot } = params;
+  const { toEmail, spaceName, spaceSlug, contactId, name, phone, email, budget, leadScore, scoreLabel, scoreSummary, applicationData: app, formConfigSnapshot } = params;
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
   const contactUrl = `${appUrl}/s/${spaceSlug}/contacts/${contactId}`;
