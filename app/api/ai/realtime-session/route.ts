@@ -63,16 +63,20 @@ export async function POST(req: Request) {
       .gte('startsAt', new Date().toISOString())
       .order('startsAt', { ascending: true })
       .limit(15),
-    supabase
-      .from('CalendarEvent')
-      .select('title, date, time, description')
-      .eq('spaceId', space.id)
-      .gte('date', new Date().toISOString().slice(0, 10))
-      .order('date', { ascending: true })
-      .limit(10)
-      .throwOnError()
-      .then((res) => res as { data: any[] })
-      .catch(() => ({ data: [] as any[] })),
+    (async () => {
+      try {
+        const res = await supabase
+          .from('CalendarEvent')
+          .select('title, date, time, description')
+          .eq('spaceId', space.id)
+          .gte('date', new Date().toISOString().slice(0, 10))
+          .order('date', { ascending: true })
+          .limit(10);
+        return res;
+      } catch {
+        return { data: [] as any[] };
+      }
+    })(),
   ]);
 
   const contactCtx = (contacts ?? []).map((c: any) =>

@@ -83,16 +83,20 @@ export async function chatWithRAG(
       .gte('startsAt', new Date(Date.now() - 7 * 86400000).toISOString())
       .order('startsAt', { ascending: true })
       .limit(30),
-    supabase
-      .from('CalendarEvent')
-      .select('id, title, description, date, time')
-      .eq('spaceId', spaceId)
-      .gte('date', new Date().toISOString().slice(0, 10))
-      .order('date', { ascending: true })
-      .limit(20)
-      .throwOnError()
-      .then((res) => res as { data: any[] })
-      .catch(() => ({ data: [] as any[] })),
+    (async () => {
+      try {
+        const res = await supabase
+          .from('CalendarEvent')
+          .select('id, title, description, date, time')
+          .eq('spaceId', spaceId)
+          .gte('date', new Date().toISOString().slice(0, 10))
+          .order('date', { ascending: true })
+          .limit(20);
+        return res;
+      } catch {
+        return { data: [] as any[] };
+      }
+    })(),
   ]);
 
   // Fetch deal↔contact links scoped to this space's deal IDs only
