@@ -28,13 +28,14 @@ export default async function AdminInvitationsPage() {
     );
   }
 
-  const invs = (invitations ?? []) as Array<{
+  const invs = (invitations ?? []) as unknown as Array<{
     id: string;
     email: string;
     roleToAssign: string;
     status: string;
     expiresAt: string;
     createdAt: string;
+    brokerageId: string | null;
     Brokerage: { name: string } | null;
   }>;
 

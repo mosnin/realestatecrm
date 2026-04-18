@@ -635,7 +635,7 @@ export default async function AdminOverviewPage() {
           {[
             {
               label: 'MRR',
-              value: `$${formatCompact(mrr)}`,
+              value: formatCompact(mrr),
               sub: `${activeSubscriptions} active subs`,
               icon: DollarSign,
               color: 'text-emerald-500',
