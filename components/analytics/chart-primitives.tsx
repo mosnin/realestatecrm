@@ -1,26 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { formatCompact as formatCurrency } from '@/lib/formatting';
 
-// ── Dark mode hook for recharts colors ────────────────────────────────────
+// ── Re-export shadcn chart primitives ─────────────────────────────────────
 
-export function useChartTheme() {
-  const [isDark, setIsDark] = useState(false);
-  useEffect(() => {
-    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
-    const observer = new MutationObserver(check);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
-  return {
-    isDark,
-    tickColor: isDark ? '#a1a1aa' : '#71717a',
-    gridColor: isDark ? '#27272a' : '#e4e4e7',
-  };
-}
+export {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from '@/components/ui/chart';
+export type { ChartConfig } from '@/components/ui/chart';
 
 // ── Stat card ─────────────────────────────────────────────────────────────
 
@@ -28,37 +19,19 @@ export function StatCard({
   label,
   value,
   sub,
+  trend,
 }: {
   label: string;
   value: string | number;
   sub?: string;
+  trend?: string;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-3 sm:px-5 sm:py-4">
+    <div className="rounded-lg border border-border bg-card px-4 py-3 sm:px-5 sm:py-4">
       <p className="text-xs text-muted-foreground font-medium">{label}</p>
       <p className="text-xl sm:text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
       {sub && <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">{sub}</p>}
-    </div>
-  );
-}
-
-// ── Chart tooltip ─────────────────────────────────────────────────────────
-
-export function ChartTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-md text-xs">
-      <p className="font-semibold text-foreground mb-1">{label}</p>
-      {payload.map((p: any) => (
-        <p key={p.dataKey} style={{ color: p.color ?? p.fill }}>
-          {p.name ?? p.dataKey}:{' '}
-          <span className="font-semibold">
-            {typeof p.value === 'number' && p.name === 'Value'
-              ? formatCurrency(p.value)
-              : p.value}
-          </span>
-        </p>
-      ))}
+      {trend && <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">{trend}</p>}
     </div>
   );
 }
