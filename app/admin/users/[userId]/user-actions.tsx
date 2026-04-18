@@ -143,6 +143,7 @@ export function UserActions({
   const [forceResetResult, setForceResetResult] = useState<string | null>(null);
   const [mfaLoading, setMfaLoading] = useState(false);
   const [mfaResult, setMfaResult] = useState<string | null>(null);
+  const [trialDays, setTrialDays] = useState(14);
 
   async function handlePasswordReset() {
     setResetLoading(true);
@@ -225,9 +226,10 @@ export function UserActions({
   }
 
   function handleExtendTrial() {
-    const fourteenDays = new Date();
-    fourteenDays.setDate(fourteenDays.getDate() + 14);
-    handleUpdateSubscription('trialing', fourteenDays.toISOString());
+    const days = Math.max(1, Math.min(365, trialDays || 14));
+    const end = new Date();
+    end.setDate(end.getDate() + days);
+    handleUpdateSubscription('trialing', end.toISOString());
   }
 
   async function handleCompFreeMonth() {
@@ -597,16 +599,29 @@ export function UserActions({
                     <Gift size={13} />
                     Comp account (1 yr)
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleExtendTrial}
-                    disabled={subLoading}
-                    className="text-xs gap-1.5"
-                  >
-                    <Clock size={13} />
-                    Extend trial (14 days)
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={trialDays}
+                      onChange={(e) => setTrialDays(Math.max(1, Math.min(365, Number(e.target.value) || 1)))}
+                      disabled={subLoading}
+                      className="w-16 text-xs rounded-md border border-border bg-card px-2 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-ring"
+                      aria-label="Trial days"
+                    />
+                    <span className="text-xs text-muted-foreground">days</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleExtendTrial}
+                      disabled={subLoading}
+                      className="text-xs gap-1.5"
+                    >
+                      <Clock size={13} />
+                      Extend trial
+                    </Button>
+                  </div>
                 </div>
               </div>
 
