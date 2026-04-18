@@ -341,13 +341,13 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
               value={
                 data.affordabilityBuckets.length > 0
                   ? `${Math.round(
-                      ((data.affordabilityBuckets.find((b) => b.label === 'Passes 3× rule')?.count ?? 0) /
+                      ((data.affordabilityBuckets.find((b) => b.label === 'Passes 3x rule')?.count ?? 0) /
                         data.affordabilityBuckets.reduce((s, b) => s + b.count, 0)) *
                         100,
                     )}%`
                   : '—'
               }
-              sub="pass 3× rent rule"
+              sub="pass 3x rent rule"
             />
             <StatCard
               label="Screening flags"
@@ -423,9 +423,10 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                     <Bar dataKey="count" name="Leads" radius={[4, 4, 0, 0]}>
                       {data.moveInUrgency.map((entry) => {
                         const colorMap: Record<string, string> = {
+                          'Overdue': '#ef4444',
                           '≤ 30 days': '#10b981',
-                          '31–60 days': '#f59e0b',
-                          '61–90 days': '#94a3b8',
+                          '31-60 days': '#f59e0b',
+                          '61-90 days': '#94a3b8',
                           '90+ days': '#cbd5e1',
                           'Not provided': '#e2e8f0',
                         };
@@ -552,17 +553,14 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
               value={formatCurrency(data.totalPipelineValue)}
             />
             <StatCard
-              label="Avg deal size"
-              value={
-                data.totalDeals > 0
-                  ? formatCurrency(Math.round(data.totalPipelineValue / data.totalDeals))
-                  : '—'
-              }
+              label="Pipeline value"
+              value={formatCurrency(data.totalPipelineValue)}
+              sub="active deals"
             />
             <StatCard
               label="Win rate"
-              value={data.totalDeals > 0 ? `${data.dealWinRate}%` : '—'}
-              sub="deals closed as won"
+              value={data.dealWinRate > 0 ? `${data.dealWinRate}%` : '—'}
+              sub="won / (won + lost)"
             />
           </div>
 
@@ -781,10 +779,10 @@ export function AnalyticsDashboard({ data }: { data: AnalyticsData }) {
                       {data.buyerBudgetDistribution.map((entry) => {
                         const colors: Record<string, string> = {
                           'Under $200K': '#94a3b8',
-                          '$200K–$400K': '#3b82f6',
-                          '$400K–$600K': '#10b981',
-                          '$600K–$800K': '#f59e0b',
-                          '$800K–$1M': '#f97316',
+                          '$200K-$400K': '#3b82f6',
+                          '$400K-$600K': '#10b981',
+                          '$600K-$800K': '#f59e0b',
+                          '$800K-$1M': '#f97316',
                           'Over $1M': '#ef4444',
                         };
                         return <Cell key={entry.label} fill={colors[entry.label] ?? '#94a3b8'} />;

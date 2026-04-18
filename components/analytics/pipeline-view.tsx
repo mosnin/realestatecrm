@@ -26,14 +26,15 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
       {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Total deals" value={data.totalDeals} />
-        <StatCard label="Pipeline value" value={formatCurrency(data.totalPipelineValue)} />
+        <StatCard label="Pipeline value" value={formatCurrency(data.totalPipelineValue)} sub="active deals only" />
         <StatCard
           label="Avg deal size"
-          value={data.totalDeals > 0 ? formatCurrency(data.avgDealSize) : '--'}
+          value={data.activeDeals > 0 ? formatCurrency(data.avgDealSize) : '--'}
+          sub="active deals"
         />
         <StatCard
           label="Win rate"
-          value={data.totalDeals > 0 ? `${data.dealWinRate}%` : '--'}
+          value={data.wonDeals + data.lostDeals > 0 ? `${data.dealWinRate}%` : '--'}
           sub={`${data.wonDeals} won / ${data.lostDeals} lost`}
         />
       </div>
@@ -139,7 +140,7 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
       </div>
 
       {/* Win rate visual */}
-      {data.totalDeals > 0 && (
+      {data.wonDeals + data.lostDeals > 0 && (
         <ChartSection title="Win/Loss breakdown" sub="Deal outcomes at a glance">
           <div className="flex flex-col items-center justify-center py-4">
             <div className="relative w-32 h-32">

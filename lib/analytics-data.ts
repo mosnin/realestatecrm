@@ -104,6 +104,7 @@ export interface ToursAnalyticsData {
   totalTours: number;
   completedTours: number;
   cancelledTours: number;
+  noShowTours: number;
   scheduledTours: number;
   toursConvertedToDeals: number;
   tourConversionRate: number;
@@ -113,6 +114,7 @@ export interface ToursAnalyticsData {
 
 export interface PipelineAnalyticsData {
   totalDeals: number;
+  activeDeals: number;
   totalPipelineValue: number;
   dealWinRate: number;
   wonDeals: number;
@@ -211,8 +213,8 @@ export function buildOverviewData(raw: RawData): OverviewData {
   return {
     totalLeads: leads.length,
     totalContacts: raw.contacts.length,
-    totalDeals: raw.deals.length,
-    totalPipelineValue: raw.deals.reduce((s, d) => s + (d.value ?? 0), 0),
+    totalDeals: raw.deals.filter((d) => d.status === 'active').length,
+    totalPipelineValue: raw.deals.filter((d) => d.status === 'active').reduce((s, d) => s + (d.value ?? 0), 0),
     leadsOverTime,
     dealsByStage,
   };
@@ -234,10 +236,10 @@ export function buildLeadsAnalyticsData(raw: RawData): LeadsAnalyticsData {
       : null;
 
   const leadScoreBuckets = [
-    { label: 'Hot', count: leads.filter((l) => l.scoreLabel === 'hot').length },
-    { label: 'Warm', count: leads.filter((l) => l.scoreLabel === 'warm').length },
-    { label: 'Cold', count: leads.filter((l) => l.scoreLabel === 'cold').length },
-    { label: 'Unscored', count: leads.filter((l) => !l.scoreLabel || l.scoringStatus !== 'scored').length },
+    { label: 'Hot', count: leads.filter((l) => l.scoringStatus === 'scored' && l.scoreLabel === 'hot').length },
+    { label: 'Warm', count: leads.filter((l) => l.scoringStatus === 'scored' && l.scoreLabel === 'warm').length },
+    { label: 'Cold', count: leads.filter((l) => l.scoringStatus === 'scored' && l.scoreLabel === 'cold').length },
+    { label: 'Unscored', count: leads.filter((l) => l.scoringStatus !== 'scored' || !l.scoreLabel).length },
   ];
 
   // Lead state distribution
@@ -329,14 +331,15 @@ export function buildLeadsAnalyticsData(raw: RawData): LeadsAnalyticsData {
 
   // Move-in urgency
   const urgencyBuckets: Record<string, number> = {
-    '≤ 30 days': 0, '31-60 days': 0, '61-90 days': 0, '90+ days': 0, 'Not provided': 0,
+    'Overdue': 0, '≤ 30 days': 0, '31-60 days': 0, '61-90 days': 0, '90+ days': 0, 'Not provided': 0,
   };
   for (const l of leadsWithApp) {
     const date = l.applicationData?.targetMoveInDate;
     if (!date) { urgencyBuckets['Not provided']++; continue; }
     const d = daysUntil(date);
     if (d == null) { urgencyBuckets['Not provided']++; continue; }
-    if (d <= 30) urgencyBuckets['≤ 30 days']++;
+    if (d < 0) urgencyBuckets['Overdue']++;
+    else if (d <= 30) urgencyBuckets['≤ 30 days']++;
     else if (d <= 60) urgencyBuckets['31-60 days']++;
     else if (d <= 90) urgencyBuckets['61-90 days']++;
     else urgencyBuckets['90+ days']++;
@@ -408,12 +411,14 @@ export function buildClientsAnalyticsData(raw: RawData): ClientsAnalyticsData {
 
   const contactFunnel = [
     { label: 'Qualifying', count: qualCount, rate: 100 },
-    { label: 'Tour', count: tourCount, rate: qualCount > 0 ? Math.round((tourCount / qualCount) * 100) : 0 },
-    { label: 'Applied', count: appCount, rate: tourCount > 0 ? Math.round((appCount / tourCount) * 100) : 0 },
+    // Each subsequent rate is relative to the top of the funnel (qualCount) so the
+    // funnel bars are always decreasing and rates stay ≤ 100%.
+    { label: 'Tour', count: tourCount, rate: qualCount > 0 ? Math.min(100, Math.round((tourCount / qualCount) * 100)) : 0 },
+    { label: 'Applied', count: appCount, rate: qualCount > 0 ? Math.min(100, Math.round((appCount / qualCount) * 100)) : 0 },
   ];
 
-  const totalClients = nonLeadContacts.length;
-  const leadToClientRate = leads.length > 0 ? Math.round((totalClients / leads.length) * 100) : 0;
+  // Lead-to-client rate: fraction of leads that advanced to APPLICATION stage
+  const leadToClientRate = leads.length > 0 ? Math.min(100, Math.round((appCount / leads.length) * 100)) : 0;
 
   return {
     totalContacts: raw.contacts.length,
@@ -432,18 +437,31 @@ export function buildToursAnalyticsData(raw: RawData): ToursAnalyticsData {
   const totalTours = allTours.length;
   const completedTours = allTours.filter((t) => t.status === 'completed').length;
   const cancelledTours = allTours.filter((t) => t.status === 'cancelled').length;
-  const scheduledTours = allTours.filter((t) => t.status === 'scheduled').length;
-  const toursConvertedToDeals = raw.deals.filter((d) => d.sourceTourId != null).length;
-  const tourConversionRate = completedTours > 0 ? Math.round((toursConvertedToDeals / completedTours) * 100) : 0;
+  const noShowTours = allTours.filter((t) => t.status === 'no_show').length;
+  const scheduledTours = allTours.filter((t) => t.status === 'scheduled' || t.status === 'confirmed').length;
+  // Count unique tours that generated at least one deal (not total deals from tours)
+  const tourIdsWithDeals = new Set(
+    raw.deals.filter((d) => d.sourceTourId != null).map((d) => d.sourceTourId!),
+  );
+  const toursConvertedToDeals = tourIdsWithDeals.size;
+  const tourConversionRate = completedTours > 0 ? Math.min(100, Math.round((toursConvertedToDeals / completedTours) * 100)) : 0;
 
-  // Tours by status
+  // Tours by status — use human-readable labels for known statuses
+  const STATUS_LABELS: Record<string, string> = {
+    completed: 'Completed',
+    scheduled: 'Scheduled',
+    confirmed: 'Confirmed',
+    cancelled: 'Cancelled',
+    no_show: 'No-show',
+  };
   const statusCounts: Record<string, number> = {};
   for (const t of allTours) {
     const s = t.status || 'unknown';
-    statusCounts[s] = (statusCounts[s] ?? 0) + 1;
+    const label = STATUS_LABELS[s] ?? (s.charAt(0).toUpperCase() + s.slice(1));
+    statusCounts[label] = (statusCounts[label] ?? 0) + 1;
   }
   const toursByStatus = Object.entries(statusCounts)
-    .map(([label, count]) => ({ label: label.charAt(0).toUpperCase() + label.slice(1), count }))
+    .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count);
 
   const toursOverTime = buildMonthBuckets(
@@ -455,6 +473,7 @@ export function buildToursAnalyticsData(raw: RawData): ToursAnalyticsData {
     totalTours,
     completedTours,
     cancelledTours,
+    noShowTours,
     scheduledTours,
     toursConvertedToDeals,
     tourConversionRate,
@@ -469,9 +488,13 @@ export function buildPipelineAnalyticsData(raw: RawData): PipelineAnalyticsData 
 
   const wonDeals = deals.filter((d) => d.status === 'won').length;
   const lostDeals = deals.filter((d) => d.status === 'lost').length;
-  const dealWinRate = deals.length > 0 ? Math.round((wonDeals / deals.length) * 100) : 0;
-  const totalPipelineValue = deals.reduce((s, d) => s + (d.value ?? 0), 0);
-  const avgDealSize = deals.length > 0 ? Math.round(totalPipelineValue / deals.length) : 0;
+  // Win rate = won / (won + lost) — only count decided deals, not active/on_hold
+  const decidedDeals = wonDeals + lostDeals;
+  const dealWinRate = decidedDeals > 0 ? Math.round((wonDeals / decidedDeals) * 100) : 0;
+  // Pipeline value only includes active deals (not won/lost/on_hold)
+  const activeDeals = deals.filter((d) => d.status === 'active');
+  const totalPipelineValue = activeDeals.reduce((s, d) => s + (d.value ?? 0), 0);
+  const avgDealSize = activeDeals.length > 0 ? Math.round(totalPipelineValue / activeDeals.length) : 0;
 
   const dealsByStage = raw.stages.map((stage) => {
     const stageDeals = deals.filter((d) => d.stageId === stage.id);
@@ -500,6 +523,7 @@ export function buildPipelineAnalyticsData(raw: RawData): PipelineAnalyticsData 
 
   return {
     totalDeals: deals.length,
+    activeDeals: activeDeals.length,
     totalPipelineValue,
     dealWinRate,
     wonDeals,

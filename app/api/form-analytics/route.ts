@@ -295,7 +295,7 @@ export async function GET(req: NextRequest) {
         i === 0 ? startSessions.size : funnelData[i - 1].uniqueSessions;
       const dropOff =
         prevCount > 0
-          ? Math.round(((prevCount - step.uniqueSessions) / prevCount) * 100)
+          ? Math.max(0, Math.min(100, Math.round(((prevCount - step.uniqueSessions) / prevCount) * 100)))
           : 0;
       return {
         stepIndex: step.stepIndex,

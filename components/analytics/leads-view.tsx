@@ -162,7 +162,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
                 <Bar dataKey="count" name="Leads" radius={[4, 4, 0, 0]}>
                   {data.moveInUrgency.map((entry) => {
                     const colorMap: Record<string, string> = {
-                      '≤ 30 days': '#10b981', '31-60 days': '#f59e0b', '61-90 days': '#94a3b8', '90+ days': '#cbd5e1', 'Not provided': '#e2e8f0',
+                      'Overdue': '#ef4444', '≤ 30 days': '#10b981', '31-60 days': '#f59e0b', '61-90 days': '#94a3b8', '90+ days': '#cbd5e1', 'Not provided': '#e2e8f0',
                     };
                     return <Cell key={entry.label} fill={colorMap[entry.label] ?? '#94a3b8'} />;
                   })}

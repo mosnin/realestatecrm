@@ -35,7 +35,7 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Total tours" value={data.totalTours} sub="all time" />
         <StatCard label="Completed" value={data.completedTours} sub="tours finished" />
-        <StatCard label="Scheduled" value={data.scheduledTours} sub="upcoming" />
+        <StatCard label="Cancelled / No-show" value={data.cancelledTours + data.noShowTours} sub={`${data.noShowTours} no-show`} />
         <StatCard
           label="Tour-to-deal rate"
           value={data.completedTours > 0 ? `${data.tourConversionRate}%` : '--'}
