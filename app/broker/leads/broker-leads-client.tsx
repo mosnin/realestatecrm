@@ -1322,6 +1322,277 @@ function AssignedTableRow({
   );
 }
 
+// ── Add Lead Dialog ───────────────────────────────────────────────────────────
+
+function AddLeadDialog({
+  open,
+  onOpenChange,
+  onLeadAdded,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onLeadAdded: (lead: LeadRow) => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [leadType, setLeadType] = useState<'rental' | 'buyer'>('rental');
+  const [budget, setBudget] = useState('');
+  const [notes, setNotes] = useState('');
+
+  function resetForm() {
+    setFirstName('');
+    setLastName('');
+    setEmail('');
+    setPhone('');
+    setLeadType('rental');
+    setBudget('');
+    setNotes('');
+    setErrors({});
+  }
+
+  function handleOpenChange(val: boolean) {
+    if (!val) resetForm();
+    onOpenChange(val);
+  }
+
+  function validate(): boolean {
+    const next: Record<string, string> = {};
+    if (!firstName.trim()) next.firstName = 'First name is required';
+    if (!lastName.trim()) next.lastName = 'Last name is required';
+    if (!email.trim()) {
+      next.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      next.email = 'Invalid email address';
+    }
+    if (budget !== '' && (isNaN(Number(budget)) || Number(budget) <= 0)) {
+      next.budget = 'Budget must be a positive number';
+    }
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!validate()) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/brokerages/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: email.trim(),
+          phone: phone.trim() || undefined,
+          leadType,
+          budget: budget !== '' ? Number(budget) : null,
+          notes: notes.trim() || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to add lead');
+      }
+
+      const data = await res.json();
+      const newLead: LeadRow = {
+        id: data.contact.id,
+        name: data.contact.name,
+        email: data.contact.email,
+        phone: data.contact.phone,
+        budget: data.contact.budget,
+        scoreLabel: data.contact.scoreLabel,
+        leadScore: data.contact.leadScore,
+        leadType: data.contact.leadType,
+        moveTiming: null,
+        createdAt: data.contact.createdAt,
+        assignedTo: null,
+        assignedAt: null,
+      };
+
+      toast.success(`Lead added: ${data.contact.name}`);
+      onLeadAdded(newLead);
+      handleOpenChange(false);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to add lead');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const inputClass =
+    'w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50';
+  const labelClass = 'block text-xs font-medium text-foreground mb-1';
+  const errorClass = 'mt-1 text-[11px] text-destructive';
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Lead</DialogTitle>
+          <DialogDescription>
+            Manually add a new lead to the brokerage pipeline.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+          {/* Name row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>
+                First name <span className="text-destructive">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Jane"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className={inputClass}
+                disabled={submitting}
+                autoComplete="given-name"
+              />
+              {errors.firstName && <p className={errorClass}>{errors.firstName}</p>}
+            </div>
+            <div>
+              <label className={labelClass}>
+                Last name <span className="text-destructive">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Smith"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className={inputClass}
+                disabled={submitting}
+                autoComplete="family-name"
+              />
+              {errors.lastName && <p className={errorClass}>{errors.lastName}</p>}
+            </div>
+          </div>
+
+          {/* Email */}
+          <div>
+            <label className={labelClass}>
+              Email <span className="text-destructive">*</span>
+            </label>
+            <input
+              type="email"
+              placeholder="jane@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={inputClass}
+              disabled={submitting}
+              autoComplete="email"
+            />
+            {errors.email && <p className={errorClass}>{errors.email}</p>}
+          </div>
+
+          {/* Phone */}
+          <div>
+            <label className={labelClass}>Phone</label>
+            <input
+              type="tel"
+              placeholder="+1 (555) 000-0000"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className={inputClass}
+              disabled={submitting}
+              autoComplete="tel"
+            />
+          </div>
+
+          {/* Lead type toggle */}
+          <div>
+            <label className={labelClass}>
+              Lead type <span className="text-destructive">*</span>
+            </label>
+            <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5 w-fit">
+              {(['rental', 'buyer'] as const).map((lt) => (
+                <button
+                  key={lt}
+                  type="button"
+                  onClick={() => setLeadType(lt)}
+                  disabled={submitting}
+                  className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 ${
+                    leadType === lt
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {lt === 'rental' ? (
+                    <><Home size={13} /> Renter</>
+                  ) : (
+                    <><Key size={13} /> Buyer</>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Budget */}
+          <div>
+            <label className={labelClass}>Budget</label>
+            <input
+              type="number"
+              placeholder="e.g. 2500"
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+              className={inputClass}
+              disabled={submitting}
+              min="0"
+              step="any"
+            />
+            {errors.budget && <p className={errorClass}>{errors.budget}</p>}
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className={labelClass}>Notes</label>
+            <textarea
+              placeholder="Any relevant details about this lead..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              className={`${inputClass} resize-none`}
+              disabled={submitting}
+            />
+          </div>
+
+          <DialogFooter className="pt-2">
+            <button
+              type="button"
+              onClick={() => handleOpenChange(false)}
+              disabled={submitting}
+              className="px-4 py-2 rounded-md border border-border text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {submitting ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Plus size={14} />
+              )}
+              {submitting ? 'Adding...' : 'Add Lead'}
+            </button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 type ViewMode = 'card' | 'table';
@@ -1346,6 +1617,7 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<BrokerSortKey>('newest');
   const [viewMode, setViewMode] = useState<ViewMode>('card');
+  const [addLeadOpen, setAddLeadOpen] = useState(false);
 
   // Count badges
   const allLeads = [...unassigned, ...assigned];
@@ -1432,8 +1704,20 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
     setTab('unassigned');
   }
 
+  function handleLeadAdded(lead: LeadRow) {
+    setUnassigned((prev) => [lead, ...prev]);
+    setTab('unassigned');
+  }
+
   return (
     <div className="space-y-4">
+    {/* Add Lead Dialog */}
+    <AddLeadDialog
+      open={addLeadOpen}
+      onOpenChange={setAddLeadOpen}
+      onLeadAdded={handleLeadAdded}
+    />
+
     {/* Search and controls */}
     <div className="flex flex-col sm:flex-row gap-2.5">
       <div className="relative flex-1">
@@ -1447,6 +1731,15 @@ export function BrokerLeadsClient({ unassignedLeads, assignedLeads, realtors, as
         />
       </div>
       <div className="flex gap-2 items-center flex-wrap">
+        {/* Add Lead button */}
+        <button
+          onClick={() => setAddLeadOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          <Plus size={14} />
+          Add Lead
+        </button>
+
         {/* View toggle */}
         <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
           <button
