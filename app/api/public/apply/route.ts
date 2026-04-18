@@ -243,7 +243,12 @@ function buildDynamicSchemaForSubmission(
  * Extract standard contact fields from dynamic form submission.
  */
 function extractContactFields(data: Record<string, unknown>, config: IntakeFormConfig) {
-  const name = (data.name as string) ?? '';
+  // Support split first/last name fields (new default) or legacy single name field
+  const firstName = typeof data.firstName === 'string' ? data.firstName.trim() : '';
+  const lastName = typeof data.lastName === 'string' ? data.lastName.trim() : '';
+  const name = firstName && lastName
+    ? `${firstName} ${lastName}`
+    : firstName || lastName || ((data.name as string) ?? '');
   const email = (data.email as string) || null;
   const phone = (data.phone as string) ?? '';
 
@@ -673,6 +678,7 @@ export async function POST(req: NextRequest) {
       name: contactName,
       phone: contactPhone ?? null,
       email: contactEmail ?? null,
+      budget: contactBudget,
       leadScore: scoring.leadScore,
       scoreLabel: scoring.scoreLabel,
       scoreSummary: scoring.scoreSummary,

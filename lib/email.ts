@@ -83,6 +83,7 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
     detailRows = [
       row('Phone', phone),
       row('Email', email),
+      row('Budget', budget != null ? fmt(budget) : null),
       ...displayFields.map((f) => row(f.label, f.value)),
     ].filter(Boolean).join('');
   } else {
@@ -90,6 +91,7 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
     detailRows = [
       row('Phone', phone),
       row('Email', email),
+      row('Budget', budget != null ? fmt(budget) : null),
       row('Property', app.propertyAddress),
       row('Move-in date', app.targetMoveInDate),
       row('Monthly rent', app.monthlyRent != null ? fmt(app.monthlyRent) : null),

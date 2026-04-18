@@ -95,6 +95,7 @@ export interface NotifyNewLeadParams {
   name: string;
   phone: string;
   email?: string | null;
+  budget?: number | null;
   leadScore?: number | null;
   scoreLabel?: string | null;
   scoreSummary?: string | null;
@@ -124,6 +125,7 @@ export async function notifyNewLead(params: NotifyNewLeadParams): Promise<void> 
         name: params.name,
         phone: params.phone,
         email: params.email,
+        budget: params.budget,
         leadScore: params.leadScore,
         scoreLabel: params.scoreLabel,
         scoreSummary: params.scoreSummary,

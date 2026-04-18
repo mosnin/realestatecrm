@@ -116,11 +116,11 @@ function PaletteItem({ type, label, icon: Icon, onClick }: { type: string; label
       {...listeners}
       onClick={onClick}
       className={cn(
-        'flex flex-col items-center justify-center gap-1.5 rounded-lg border border-border bg-card p-3 cursor-grab text-center hover:border-primary/40 hover:bg-accent/50 transition-colors active:cursor-grabbing',
-        isDragging && 'ring-2 ring-primary/30',
+        'flex flex-col items-center justify-center gap-1.5 rounded-lg border border-border bg-card p-3 cursor-grab text-center hover:border-orange-300 dark:hover:border-orange-700 hover:bg-orange-50/50 dark:hover:bg-orange-950/10 transition-colors active:cursor-grabbing',
+        isDragging && 'ring-2 ring-orange-300/50 dark:ring-orange-700/50',
       )}
     >
-      <Icon size={18} className="text-muted-foreground" />
+      <Icon size={18} className={cn(fieldTypeBadgeClass(type).split(' ').find(c => c.startsWith('text-')) || 'text-muted-foreground')} />
       <span className="text-[11px] font-medium text-muted-foreground leading-tight">{label}</span>
       <GripVertical size={10} className="text-muted-foreground/30" />
     </div>
@@ -280,11 +280,12 @@ function SortableSection({
     >
       {/* Section header */}
       <div
-        className="flex items-center gap-2 px-4 py-3 bg-muted/30 border-b border-border cursor-pointer"
+        className="flex items-center gap-2 px-4 py-3 bg-orange-50 dark:bg-orange-950/20 border-b border-orange-200 dark:border-orange-800 cursor-pointer"
         onClick={() => onSelectSection(section.id)}
       >
         <button
-          className="flex-shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground touch-none"
+          className="flex-shrink-0 cursor-grab active:cursor-grabbing text-orange-400 dark:text-orange-600 hover:text-orange-600 dark:hover:text-orange-400 transition-colors touch-none"
+          title="Drag to reorder section"
           {...attributes}
           {...listeners}
           onClick={(e) => e.stopPropagation()}
@@ -302,7 +303,7 @@ function SortableSection({
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <p className="text-sm font-semibold truncate">{section.title}</p>
+            <p className="text-sm font-semibold truncate text-orange-900 dark:text-orange-100">{section.title}</p>
             {section.visibleWhen && (
               <Badge variant="outline" className="text-[10px] flex-shrink-0 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 gap-1">
                 <Eye size={10} />
@@ -328,7 +329,7 @@ function SortableSection({
             </p>
           )}
         </div>
-        <Badge variant="outline" className="text-[10px] flex-shrink-0">
+        <Badge variant="outline" className="text-[10px] flex-shrink-0 border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300 bg-orange-50/50 dark:bg-orange-950/10">
           {section.questions.length} {section.questions.length === 1 ? 'question' : 'questions'}
         </Badge>
       </div>
@@ -1134,8 +1135,8 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
         {/* Left Panel - Palette */}
         <div className="w-full lg:w-48 flex-shrink-0">
           <div className="rounded-xl border border-border bg-card overflow-hidden sticky top-4">
-            <div className="px-4 py-3 border-b border-border bg-muted/20">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Field Types</p>
+            <div className="px-4 py-3 border-b border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20">
+              <p className="text-xs font-semibold text-orange-700 dark:text-orange-300 uppercase tracking-wider">Field Types</p>
             </div>
             <div className="p-3">
               <div className="grid grid-cols-2 lg:grid-cols-2 gap-2">
@@ -1191,8 +1192,8 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
         {/* Right Panel - Property Editor */}
         <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
           <div className="rounded-xl border border-border bg-card overflow-hidden sticky top-4">
-            <div className="px-4 py-3 border-b border-border bg-muted/20">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Properties</p>
+            <div className="px-4 py-3 border-b border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20">
+              <p className="text-xs font-semibold text-orange-700 dark:text-orange-300 uppercase tracking-wider">Properties</p>
             </div>
             <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 160px)' }}>
               <div className="p-4">
