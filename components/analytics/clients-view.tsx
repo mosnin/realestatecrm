@@ -8,16 +8,26 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { StatCard, ChartTooltip, ChartSection, useChartTheme } from './chart-primitives';
+import { StatCard, ChartSection } from './chart-primitives';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@/components/ui/chart';
+import type { ChartConfig } from '@/components/ui/chart';
 import type { ClientsAnalyticsData } from '@/lib/analytics-data';
 
-export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
-  const { tickColor, gridColor } = useChartTheme();
+const contactsOverTimeConfig = {
+  count: { label: 'Contacts', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
 
+const contactsByStageConfig = {
+  count: { label: 'Contacts', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
   return (
     <div className="space-y-5">
       {/* Summary stats */}
@@ -36,39 +46,38 @@ export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
       {/* Charts */}
       <div className="grid sm:grid-cols-2 gap-4">
         <ChartSection title="Contacts over time" sub="New contacts added each month">
-          <ResponsiveContainer width="100%" height={220}>
+          <ChartContainer config={contactsOverTimeConfig} className="h-[220px] w-full">
             <AreaChart data={data.contactsOverTime}>
               <defs>
                 <linearGradient id="contactsGradClients" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0.05} />
+                  <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-              <Tooltip content={<ChartTooltip />} />
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
+              <ChartTooltip content={<ChartTooltipContent />} />
               <Area
                 type="monotone"
                 dataKey="count"
-                name="Contacts"
-                stroke="#6366f1"
+                stroke="var(--color-count)"
                 fill="url(#contactsGradClients)"
                 strokeWidth={2}
-                dot={{ r: 3, fill: '#6366f1' }}
+                dot={{ r: 3, fill: 'var(--color-count)' }}
               />
             </AreaChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </ChartSection>
 
         <ChartSection title="Contacts by stage" sub="Current distribution across stages">
-          <ResponsiveContainer width="100%" height={220}>
+          <ChartContainer config={contactsByStageConfig} className="h-[220px] w-full">
             <BarChart data={data.contactsByStage} barSize={32}>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 12, fill: tickColor }} stroke={tickColor} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-              <Tooltip content={<ChartTooltip />} />
-              <Bar dataKey="count" name="Contacts" radius={[4, 4, 0, 0]}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 12 }} />
+              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                 {data.contactsByStage.map((entry) => {
                   const colorMap: Record<string, string> = {
                     Qualifying: '#3b82f6', Tour: '#f59e0b', Applied: '#10b981',
@@ -77,7 +86,7 @@ export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
                 })}
               </Bar>
             </BarChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </ChartSection>
       </div>
 

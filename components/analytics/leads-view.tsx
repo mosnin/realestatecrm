@@ -8,19 +8,91 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
   Cell,
   PieChart,
   Pie,
-  Legend,
 } from 'recharts';
-import { StatCard, ChartTooltip, ChartSection, useChartTheme } from './chart-primitives';
+import {
+  StatCard,
+  ChartSection,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from './chart-primitives';
+import type { ChartConfig } from './chart-primitives';
 import type { LeadsAnalyticsData } from '@/lib/analytics-data';
 
-export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
-  const { tickColor, gridColor } = useChartTheme();
+const leadsVolumeConfig = {
+  count: { label: 'Leads', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
 
+const scoreBucketsConfig = {
+  count: { label: 'Leads', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+const employmentConfig = {
+  count: { label: 'Leads', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+const affordabilityConfig = {
+  'Passes 3x rule': { label: 'Passes 3x rule', color: '#10b981' },
+  'Below 3x rule': { label: 'Below 3x rule', color: '#f87171' },
+} satisfies ChartConfig;
+
+const urgencyConfig = {
+  count: { label: 'Leads', color: 'hsl(var(--chart-2))' },
+} satisfies ChartConfig;
+
+const screeningConfig = {
+  count: { label: 'Leads', color: '#f87171' },
+} satisfies ChartConfig;
+
+const leadStateConfig = {
+  count: { label: 'Leads', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+const riskFlagsConfig = {
+  count: { label: 'Leads', color: 'hsl(var(--chart-4))' },
+} satisfies ChartConfig;
+
+const avgScoreConfig = {
+  avg: { label: 'Avg score', color: 'hsl(var(--chart-2))' },
+} satisfies ChartConfig;
+
+const buyerBudgetConfig = {
+  count: { label: 'Buyers', color: 'hsl(var(--chart-1))' },
+} satisfies ChartConfig;
+
+const SCORE_BUCKET_COLORS: Record<string, string> = {
+  Hot: '#10b981',
+  Warm: '#f59e0b',
+  Cold: '#94a3b8',
+  Unscored: '#cbd5e1',
+};
+
+const URGENCY_COLORS: Record<string, string> = {
+  Overdue: '#ef4444',
+  '≤ 30 days': '#10b981',
+  '31-60 days': '#f59e0b',
+  '61-90 days': '#94a3b8',
+  '90+ days': '#cbd5e1',
+  'Not provided': '#e2e8f0',
+};
+
+const LEAD_STATE_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#94a3b8', '#f87171'];
+
+const BUYER_BUDGET_COLORS: Record<string, string> = {
+  'Under $200K': '#94a3b8',
+  '$200K-$400K': '#3b82f6',
+  '$400K-$600K': '#10b981',
+  '$600K-$800K': '#f59e0b',
+  '$800K-$1M': '#f97316',
+  'Over $1M': '#ef4444',
+};
+
+export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
   return (
     <div className="space-y-5">
       {/* Summary stats */}
@@ -46,48 +118,71 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
       {/* Charts row 1: volume + scoring */}
       <div className="grid sm:grid-cols-2 gap-4">
         <ChartSection title="Lead volume over time" sub="New leads submitted each month">
-          <ResponsiveContainer width="100%" height={220}>
+          <ChartContainer config={leadsVolumeConfig} className="h-[220px] w-full">
             <AreaChart data={data.leadsOverTime}>
               <defs>
                 <linearGradient id="leadsGradLeads" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05} />
+                  <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-              <Tooltip content={<ChartTooltip />} />
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis
+                dataKey="month"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                tick={{ fontSize: 11 }}
+              />
+              <YAxis
+                allowDecimals={false}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                width={32}
+                tick={{ fontSize: 11 }}
+              />
+              <ChartTooltip content={<ChartTooltipContent />} />
               <Area
                 type="monotone"
                 dataKey="count"
                 name="Leads"
-                stroke="hsl(var(--primary))"
+                stroke="var(--color-count)"
                 fill="url(#leadsGradLeads)"
                 strokeWidth={2}
-                dot={{ r: 3, fill: 'hsl(var(--primary))' }}
+                dot={{ r: 3, fill: 'var(--color-count)' }}
               />
             </AreaChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </ChartSection>
 
         <ChartSection title="Score distribution" sub="Leads grouped by AI score tier">
-          <ResponsiveContainer width="100%" height={220}>
+          <ChartContainer config={scoreBucketsConfig} className="h-[220px] w-full">
             <BarChart data={data.leadScoreBuckets} barSize={32}>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 12, fill: tickColor }} stroke={tickColor} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-              <Tooltip content={<ChartTooltip />} />
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                tick={{ fontSize: 12 }}
+              />
+              <YAxis
+                allowDecimals={false}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                width={32}
+                tick={{ fontSize: 11 }}
+              />
+              <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="count" name="Leads" radius={[4, 4, 0, 0]}>
-                {data.leadScoreBuckets.map((entry) => {
-                  const colorMap: Record<string, string> = {
-                    Hot: '#10b981', Warm: '#f59e0b', Cold: '#94a3b8', Unscored: '#cbd5e1',
-                  };
-                  return <Cell key={entry.label} fill={colorMap[entry.label] ?? '#94a3b8'} />;
-                })}
+                {data.leadScoreBuckets.map((entry) => (
+                  <Cell key={entry.label} fill={SCORE_BUCKET_COLORS[entry.label] ?? '#94a3b8'} />
+                ))}
               </Bar>
             </BarChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </ChartSection>
       </div>
 
@@ -123,140 +218,242 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
       <div className="grid sm:grid-cols-2 gap-4">
         {data.employmentBreakdown.length > 0 && (
           <ChartSection title="Employment status" sub="How leads are currently employed">
-            <ResponsiveContainer width="100%" height={220}>
+            <ChartContainer config={employmentConfig} className="h-[220px] w-full">
               <BarChart data={data.employmentBreakdown} layout="vertical" barSize={14} margin={{ left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
-                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-                <YAxis type="category" dataKey="label" tick={{ fontSize: 10, fill: tickColor }} stroke={tickColor} width={80} />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="hsl(var(--primary))" />
+                <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                <XAxis
+                  type="number"
+                  allowDecimals={false}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 11 }}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  width={80}
+                  tick={{ fontSize: 10 }}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="var(--color-count)" />
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </ChartSection>
         )}
 
         {data.affordabilityBuckets.length > 0 && (
           <ChartSection title="Income affordability" sub="Leads who meet the 3x monthly rent rule">
-            <ResponsiveContainer width="100%" height={220}>
+            <ChartContainer config={affordabilityConfig} className="h-[220px] w-full">
               <PieChart>
-                <Pie data={data.affordabilityBuckets} dataKey="count" nameKey="label" cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}>
+                <Pie
+                  data={data.affordabilityBuckets}
+                  dataKey="count"
+                  nameKey="label"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={3}
+                >
                   {data.affordabilityBuckets.map((entry, i) => (
                     <Cell key={entry.label} fill={i === 0 ? '#10b981' : '#f87171'} />
                   ))}
                 </Pie>
-                <Tooltip content={<ChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                <ChartLegend content={<ChartLegendContent nameKey="label" />} />
               </PieChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </ChartSection>
         )}
 
         {data.moveInUrgency.length > 0 && (
           <ChartSection title="Move-in urgency" sub="How soon leads want to move in">
-            <ResponsiveContainer width="100%" height={200}>
+            <ChartContainer config={urgencyConfig} className="h-[200px] w-full">
               <BarChart data={data.moveInUrgency} barSize={28}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: tickColor }} stroke={tickColor} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-                <Tooltip content={<ChartTooltip />} />
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 10 }}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  width={32}
+                  tick={{ fontSize: 11 }}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
                 <Bar dataKey="count" name="Leads" radius={[4, 4, 0, 0]}>
-                  {data.moveInUrgency.map((entry) => {
-                    const colorMap: Record<string, string> = {
-                      'Overdue': '#ef4444', '≤ 30 days': '#10b981', '31-60 days': '#f59e0b', '61-90 days': '#94a3b8', '90+ days': '#cbd5e1', 'Not provided': '#e2e8f0',
-                    };
-                    return <Cell key={entry.label} fill={colorMap[entry.label] ?? '#94a3b8'} />;
-                  })}
+                  {data.moveInUrgency.map((entry) => (
+                    <Cell key={entry.label} fill={URGENCY_COLORS[entry.label] ?? '#94a3b8'} />
+                  ))}
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </ChartSection>
         )}
 
         {data.screeningFlags.length > 0 && (
           <ChartSection title="Screening flags" sub="Leads with disclosed issues">
-            <ResponsiveContainer width="100%" height={200}>
+            <ChartContainer config={screeningConfig} className="h-[200px] w-full">
               <BarChart data={data.screeningFlags} layout="vertical" barSize={14} margin={{ left: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
-                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-                <YAxis type="category" dataKey="label" tick={{ fontSize: 10, fill: tickColor }} stroke={tickColor} width={90} />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="#f87171" />
+                <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                <XAxis
+                  type="number"
+                  allowDecimals={false}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 11 }}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  width={90}
+                  tick={{ fontSize: 10 }}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="var(--color-count)" />
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </ChartSection>
         )}
 
         {data.leadStateDistribution.length > 0 && (
           <ChartSection title="AI lead state" sub="How the AI has categorized your leads">
-            <ResponsiveContainer width="100%" height={220}>
+            <ChartContainer config={leadStateConfig} className="h-[220px] w-full">
               <PieChart>
-                <Pie data={data.leadStateDistribution} dataKey="count" nameKey="label" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2}>
-                  {data.leadStateDistribution.map((entry, i) => {
-                    const colors = ['#10b981', '#3b82f6', '#f59e0b', '#94a3b8', '#f87171'];
-                    return <Cell key={entry.label} fill={colors[i % colors.length]} />;
-                  })}
+                <Pie
+                  data={data.leadStateDistribution}
+                  dataKey="count"
+                  nameKey="label"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={2}
+                >
+                  {data.leadStateDistribution.map((entry, i) => (
+                    <Cell key={entry.label} fill={LEAD_STATE_COLORS[i % LEAD_STATE_COLORS.length]} />
+                  ))}
                 </Pie>
-                <Tooltip content={<ChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                <ChartLegend content={<ChartLegendContent nameKey="label" />} />
               </PieChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </ChartSection>
         )}
 
         {data.topRiskFlags.length > 0 && (
           <ChartSection title="Top AI risk flags" sub="Most common risks flagged across leads">
-            <ResponsiveContainer width="100%" height={220}>
+            <ChartContainer config={riskFlagsConfig} className="h-[220px] w-full">
               <BarChart data={data.topRiskFlags} layout="vertical" barSize={12} margin={{ left: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
-                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-                <YAxis type="category" dataKey="label" tick={{ fontSize: 9, fill: tickColor }} stroke={tickColor} width={100} />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="#f59e0b" />
+                <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                <XAxis
+                  type="number"
+                  allowDecimals={false}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 11 }}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  width={100}
+                  tick={{ fontSize: 9 }}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]} fill="var(--color-count)" />
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </ChartSection>
         )}
 
         {data.avgScoreByMonth.some((m) => m.avg != null) && (
           <ChartSection title="Avg lead score over time" sub="Monthly average AI qualification score">
-            <ResponsiveContainer width="100%" height={200}>
+            <ChartContainer config={avgScoreConfig} className="h-[200px] w-full">
               <BarChart data={data.avgScoreByMonth} barSize={22}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-                <Tooltip content={<ChartTooltip />} />
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="month"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 11 }}
+                />
+                <YAxis
+                  domain={[0, 100]}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  width={32}
+                  tick={{ fontSize: 11 }}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
                 <Bar dataKey="avg" name="Avg score" radius={[4, 4, 0, 0]}>
                   {data.avgScoreByMonth.map((entry) => (
                     <Cell
                       key={entry.month}
-                      fill={entry.avg == null ? '#e2e8f0' : entry.avg >= 75 ? '#10b981' : entry.avg >= 45 ? '#f59e0b' : '#94a3b8'}
+                      fill={
+                        entry.avg == null
+                          ? '#e2e8f0'
+                          : entry.avg >= 75
+                          ? '#10b981'
+                          : entry.avg >= 45
+                          ? '#f59e0b'
+                          : '#94a3b8'
+                      }
                     />
                   ))}
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </ChartSection>
         )}
 
         {data.buyerBudgetDistribution.length > 0 && (
           <ChartSection title="Buyer budget distribution" sub="Budget ranges across buyer leads">
-            <ResponsiveContainer width="100%" height={220}>
+            <ChartContainer config={buyerBudgetConfig} className="h-[220px] w-full">
               <BarChart data={data.buyerBudgetDistribution} barSize={28}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: tickColor }} stroke={tickColor} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tickColor }} stroke={tickColor} width={28} />
-                <Tooltip content={<ChartTooltip />} />
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 10 }}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  width={32}
+                  tick={{ fontSize: 11 }}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
                 <Bar dataKey="count" name="Buyers" radius={[4, 4, 0, 0]}>
-                  {data.buyerBudgetDistribution.map((entry) => {
-                    const colors: Record<string, string> = {
-                      'Under $200K': '#94a3b8', '$200K-$400K': '#3b82f6', '$400K-$600K': '#10b981',
-                      '$600K-$800K': '#f59e0b', '$800K-$1M': '#f97316', 'Over $1M': '#ef4444',
-                    };
-                    return <Cell key={entry.label} fill={colors[entry.label] ?? '#94a3b8'} />;
-                  })}
+                  {data.buyerBudgetDistribution.map((entry) => (
+                    <Cell key={entry.label} fill={BUYER_BUDGET_COLORS[entry.label] ?? '#94a3b8'} />
+                  ))}
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </ChartSection>
         )}
       </div>
