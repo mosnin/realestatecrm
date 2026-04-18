@@ -173,6 +173,32 @@ export async function PATCH(
     const stageChanged = body.stageId && body.stageId !== existing.stageId;
     const statusChanged = body.status && body.status !== existing.status;
 
+    // Validate stageId belongs to this space BEFORE any mutations so an
+    // invalid stageId cannot leave the row in a partially-updated state.
+    if (body.stageId !== undefined) {
+      const { data: stageCheck } = await supabase
+        .from('DealStage')
+        .select('id')
+        .eq('id', body.stageId)
+        .eq('spaceId', space.id)
+        .maybeSingle();
+      if (!stageCheck) {
+        return NextResponse.json({ error: 'Invalid stage' }, { status: 400 });
+      }
+    }
+
+    // Validate title/description lengths and priority enum
+    if (body.title !== undefined && (typeof body.title !== 'string' || body.title.length > 255)) {
+      return NextResponse.json({ error: 'Title must be under 255 chars' }, { status: 400 });
+    }
+    if (body.description !== undefined && typeof body.description === 'string' && body.description.length > 5000) {
+      return NextResponse.json({ error: 'Description must be under 5000 chars' }, { status: 400 });
+    }
+    const VALID_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH'];
+    if (body.priority !== undefined && !VALID_PRIORITIES.includes(body.priority)) {
+      return NextResponse.json({ error: 'Invalid priority' }, { status: 400 });
+    }
+
     // Handle dealContacts replacement — verify all contacts belong to this space
     if (body.contactIds) {
       const { error: delError } = await supabase.from('DealContact').delete().eq('dealId', id);
@@ -200,31 +226,6 @@ export async function PATCH(
           }
         }
       }
-    }
-
-    // Validate stageId belongs to this space before updating
-    if (body.stageId !== undefined) {
-      const { data: stageCheck } = await supabase
-        .from('DealStage')
-        .select('id')
-        .eq('id', body.stageId)
-        .eq('spaceId', space.id)
-        .maybeSingle();
-      if (!stageCheck) {
-        return NextResponse.json({ error: 'Invalid stage' }, { status: 400 });
-      }
-    }
-
-    // Validate title/description lengths and priority enum
-    if (body.title !== undefined && (typeof body.title !== 'string' || body.title.length > 255)) {
-      return NextResponse.json({ error: 'Title must be under 255 chars' }, { status: 400 });
-    }
-    if (body.description !== undefined && typeof body.description === 'string' && body.description.length > 5000) {
-      return NextResponse.json({ error: 'Description must be under 5000 chars' }, { status: 400 });
-    }
-    const VALID_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH'];
-    if (body.priority !== undefined && !VALID_PRIORITIES.includes(body.priority)) {
-      return NextResponse.json({ error: 'Invalid priority' }, { status: 400 });
     }
 
     const { data: dealRow, error: updateError } = await supabase

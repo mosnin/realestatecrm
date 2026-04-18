@@ -26,6 +26,11 @@ export async function PATCH(req: Request, { params }: Params) {
 
   const { id: membershipId } = await params;
 
+  // Prevent actors from changing their own role (self-escalation / accidental self-demotion)
+  if (membershipId === ctx.membership.id) {
+    return NextResponse.json({ error: 'You cannot change your own role' }, { status: 403 });
+  }
+
   let role: string;
   try {
     ({ role } = await req.json());
@@ -61,10 +66,14 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ message: 'Role unchanged' }, { status: 200 });
   }
 
+  // Scope the update to both the membership ID and brokerage ID to prevent
+  // a TOCTOU race where membership might have moved brokerages between the
+  // fetch above and this write.
   const { error: updateErr } = await supabase
     .from('BrokerageMembership')
     .update({ role })
-    .eq('id', membershipId);
+    .eq('id', membershipId)
+    .eq('brokerageId', ctx.brokerage.id);
 
   if (updateErr) {
     console.error('[broker/members/role] update failed', updateErr);

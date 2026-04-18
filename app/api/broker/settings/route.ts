@@ -99,16 +99,14 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
   }
 
-  if (Object.keys(updates).length > 0) {
-    const { error: updateErr } = await supabase
-      .from('Brokerage')
-      .update(updates)
-      .eq('id', ctx.brokerage.id);
+  const { error: updateErr } = await supabase
+    .from('Brokerage')
+    .update(updates)
+    .eq('id', ctx.brokerage.id);
 
-    if (updateErr) {
-      console.error('[broker/settings] update failed', updateErr);
-      return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
-    }
+  if (updateErr) {
+    console.error('[broker/settings] update failed', updateErr);
+    return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
   }
 
   void audit({

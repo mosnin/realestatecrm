@@ -78,6 +78,9 @@ export async function POST(req: NextRequest) {
       .eq('spaceId', brokerSpace.id)
       .maybeSingle();
 
+    // Check the primary-space error before branching to the secondary lookup
+    if (contactError) throw contactError;
+
     // Also check contacts with brokerageId (brokerage-level leads)
     let brokerContact = contact;
     if (!brokerContact) {
@@ -90,7 +93,6 @@ export async function POST(req: NextRequest) {
       if (brokerageContactError) throw brokerageContactError;
       brokerContact = brokerageContact;
     }
-    if (contactError) throw contactError;
     if (!brokerContact) {
       return NextResponse.json(
         { error: 'Contact not found in your brokerage space' },
@@ -133,6 +135,32 @@ export async function POST(req: NextRequest) {
     }
 
     const { assignedContactId, assignedSpaceId, assignedTo, assignedToName } = meta;
+
+    // ── Validate the assigned contact's space belongs to a brokerage member ──
+    // Prevents corrupted/tampered metadata from deleting arbitrary contacts.
+    if (assignedSpaceId) {
+      const { data: assignedSpace } = await supabase
+        .from('Space')
+        .select('ownerId')
+        .eq('id', assignedSpaceId)
+        .maybeSingle();
+
+      if (assignedSpace) {
+        const { data: assignedMembership } = await supabase
+          .from('BrokerageMembership')
+          .select('id')
+          .eq('brokerageId', brokerage.id)
+          .eq('userId', assignedSpace.ownerId)
+          .maybeSingle();
+
+        if (!assignedMembership) {
+          return NextResponse.json(
+            { error: 'Assigned contact does not belong to a member of this brokerage' },
+            { status: 403 },
+          );
+        }
+      }
+    }
 
     // ── Fetch the admin's name for audit logging ─────────────────────────
     const { data: adminUser } = await supabase

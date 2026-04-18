@@ -71,14 +71,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Verify the contact exists in the broker's space ──────────────────
-    const { data: contact, error: contactError } = await supabase
+    // ── Verify the contact belongs to this brokerage ─────────────────────
+    // Accept contacts in the broker owner's space (legacy path) OR contacts
+    // where brokerageId is explicitly set (modern intake path).
+    const { data: contactInSpace, error: contactError } = await supabase
       .from('Contact')
       .select('*')
       .eq('id', contactId)
       .eq('spaceId', brokerSpace.id)
       .maybeSingle();
     if (contactError) throw contactError;
+
+    let contact = contactInSpace;
+    if (!contact) {
+      const { data: contactByBrokerageId, error: brokerageContactError } = await supabase
+        .from('Contact')
+        .select('*')
+        .eq('id', contactId)
+        .eq('brokerageId', brokerage.id)
+        .maybeSingle();
+      if (brokerageContactError) throw brokerageContactError;
+      contact = contactByBrokerageId;
+    }
+
     if (!contact) {
       return NextResponse.json(
         { error: 'Contact not found in your brokerage space' },

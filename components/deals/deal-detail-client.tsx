@@ -50,7 +50,7 @@ interface Props {
   initialActivities: DealActivity[];
 }
 
-export function DealDetailClient({ dealId, initialActivities }: Props) {
+export function DealDetailClient({ dealId, slug: _slug, initialActivities }: Props) {
   const [activities, setActivities] = useState<DealActivity[]>(initialActivities);
   const [type, setType] = useState('note');
   const [content, setContent] = useState('');

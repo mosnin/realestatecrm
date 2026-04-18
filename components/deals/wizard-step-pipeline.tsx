@@ -31,17 +31,28 @@ export function WizardStepPipeline({
     async function fetchStages() {
       setLoadingStages(true);
       try {
-        const res = await fetch(`/api/stages?slug=${encodeURIComponent(slug)}`);
+        // Include pipelineType so the API can auto-create default buyer stages
+        // when the buyer pipeline doesn't exist yet.
+        const res = await fetch(
+          `/api/stages?slug=${encodeURIComponent(slug)}&pipelineType=${pipelineType}`,
+        );
         if (res.ok) {
-          const data: DealStage[] = await res.json();
-          setAllStages(data);
+          // The response is StageWithDeals[]; spread stages from all pipeline types
+          // returned so switching pipelines doesn't clear previously loaded stages.
+          const data: (DealStage & { deals?: unknown[] })[] = await res.json();
+          setAllStages((prev) => {
+            // Merge: replace stages of the fetched pipelineType, keep others
+            const others = prev.filter((s) => s.pipelineType !== pipelineType);
+            const incoming = data.map(({ deals: _deals, ...s }) => s as DealStage);
+            return [...others, ...incoming];
+          });
         }
       } finally {
         setLoadingStages(false);
       }
     }
     fetchStages();
-  }, [slug]);
+  }, [slug, pipelineType]);
 
   const filteredStages = allStages
     .filter((s) => s.pipelineType === pipelineType)

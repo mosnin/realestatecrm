@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 interface DeleteDealButtonProps {
   dealId: string;
@@ -22,7 +23,11 @@ export function DeleteDealButton({ dealId, slug, dealTitle }: DeleteDealButtonPr
       const res = await fetch(`/api/deals/${dealId}`, { method: 'DELETE' });
       if (res.ok) {
         router.push(`/s/${slug}/deals`);
+      } else {
+        toast.error('Failed to delete deal');
       }
+    } catch {
+      toast.error('Failed to delete deal');
     } finally {
       setDeleting(false);
     }

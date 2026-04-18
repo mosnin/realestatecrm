@@ -48,19 +48,27 @@ export function DealInlineField({
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  // Prevents the onBlur handler from triggering a second save when Enter already
+  // called save() and unmounted the input (blur fires after setEditing(false)).
+  const saveCalledRef = useRef(false);
 
   function startEditing() {
+    saveCalledRef.current = false;
     setDraft(value !== null && value !== undefined ? String(value) : '');
     setEditing(true);
     setTimeout(() => inputRef.current?.focus(), 0);
   }
 
   function cancelEditing() {
+    saveCalledRef.current = false;
     setEditing(false);
     setDraft('');
   }
 
   const save = useCallback(async () => {
+    // Guard against double-invocation (Enter keydown + subsequent blur)
+    if (saveCalledRef.current) return;
+    saveCalledRef.current = true;
     setEditing(false);
 
     // Parse the draft value
@@ -75,7 +83,10 @@ export function DealInlineField({
     }
 
     // No change — skip the PATCH
-    if (next === value) return;
+    if (next === value) {
+      saveCalledRef.current = false;
+      return;
+    }
 
     const previous = value;
     setValue(next);
@@ -93,6 +104,7 @@ export function DealInlineField({
       toast.error(`Failed to update ${label.toLowerCase()}`);
     } finally {
       setSaving(false);
+      saveCalledRef.current = false;
     }
   }, [draft, value, type, dealId, field, label]);
 

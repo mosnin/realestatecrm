@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 type Priority = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -29,6 +30,9 @@ export function DealPrioritySelector({ dealId, initialPriority }: DealPrioritySe
 
   async function handleChange(value: string) {
     const next = value as Priority;
+    const previous = priority;
+    // Optimistic update so the badge reflects the new value immediately
+    setPriority(next);
     setSaving(true);
     try {
       const res = await fetch(`/api/deals/${dealId}`, {
@@ -36,9 +40,13 @@ export function DealPrioritySelector({ dealId, initialPriority }: DealPrioritySe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ priority: next }),
       });
-      if (res.ok) {
-        setPriority(next);
+      if (!res.ok) {
+        setPriority(previous);
+        toast.error('Failed to update priority');
       }
+    } catch {
+      setPriority(previous);
+      toast.error('Failed to update priority');
     } finally {
       setSaving(false);
     }

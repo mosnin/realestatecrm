@@ -23,11 +23,7 @@ export async function GET() {
     .select('userId')
     .eq('brokerageId', brokerage.id);
 
-  const members = (memberships ?? []) as Array<{
-    userId: string;
-    User: { id: string; name: string | null; email: string } | null;
-  }>;
-  const memberUserIds = members.map((m) => m.userId);
+  const memberUserIds = (memberships ?? []).map((m: { userId: string }) => m.userId);
 
   if (memberUserIds.length === 0) {
     const csv = 'Name,Email,Phone,Lead Type,Budget,Score,Score Label,Status,Property Address,Notes,Move-in Date,Employment,Income,Assigned To,Created At\n';
@@ -39,13 +35,14 @@ export async function GET() {
     });
   }
 
-  // ── Get spaces owned by members ─────────────────────────────────────────
-  const { data: spaces } = await supabase
-    .from('Space')
-    .select('id, ownerId')
-    .in('ownerId', memberUserIds);
+  // ── Get spaces owned by members + user profiles in parallel ───────────
+  const [spacesRes, usersRes] = await Promise.all([
+    supabase.from('Space').select('id, ownerId').in('ownerId', memberUserIds),
+    supabase.from('User').select('id, name, email').in('id', memberUserIds),
+  ]);
 
-  const spaceIds = (spaces ?? []).map((s) => s.id);
+  const spaces = spacesRes.data ?? [];
+  const spaceIds = spaces.map((s) => s.id);
   if (spaceIds.length === 0) {
     const csv = 'Name,Email,Phone,Lead Type,Budget,Score,Score Label,Status,Property Address,Notes,Move-in Date,Employment,Income,Assigned To,Created At\n';
     return new NextResponse(csv, {
@@ -57,10 +54,13 @@ export async function GET() {
   }
 
   // Build lookup: spaceId -> member name
+  const userMap = new Map(
+    (usersRes.data ?? []).map((u: { id: string; name: string | null; email: string }) => [u.id, u]),
+  );
   const spaceToMember: Record<string, string> = {};
-  for (const sp of spaces ?? []) {
-    const member = members.find((m) => m.userId === sp.ownerId);
-    spaceToMember[sp.id] = member?.User?.name ?? member?.User?.email ?? 'Unknown';
+  for (const sp of spaces) {
+    const u = userMap.get(sp.ownerId);
+    spaceToMember[sp.id] = u?.name ?? u?.email ?? 'Unknown';
   }
 
   // ── Fetch all contacts from member spaces ──────────────────────────────

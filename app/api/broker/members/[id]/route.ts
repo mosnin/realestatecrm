@@ -49,11 +49,13 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Only the owner can remove admins' }, { status: 403 });
   }
 
-  // Delete the membership
+  // Delete the membership — scope to brokerageId as well to prevent a TOCTOU
+  // race between the fetch above and this write.
   const { error: deleteErr } = await supabase
     .from('BrokerageMembership')
     .delete()
-    .eq('id', membershipId);
+    .eq('id', membershipId)
+    .eq('brokerageId', ctx.brokerage.id);
 
   if (deleteErr) {
     console.error('[broker/members/delete] delete failed', deleteErr);

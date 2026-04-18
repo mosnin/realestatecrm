@@ -36,9 +36,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Max 50 invitations per batch' }, { status: 400 });
   }
 
-  // Rate limit: shared key + budget with single-invite endpoint, 100 total per hour
-  const { allowed } = await checkRateLimit(`broker:invite:${ctx.dbUserId}`, 100, 3600);
-  if (!allowed) {
+  // Rate limit: consume one token per invitation in this batch so that bulk
+  // requests can't bypass the shared 100-per-hour budget with a single API call.
+  // We loop up to entries.length times, stopping as soon as a call is denied.
+  let rateLimited = false;
+  for (let i = 0; i < entries.length; i++) {
+    const { allowed } = await checkRateLimit(`broker:invite:${ctx.dbUserId}`, 100, 3600);
+    if (!allowed) {
+      rateLimited = true;
+      break;
+    }
+  }
+  if (rateLimited) {
     return NextResponse.json({ error: 'Too many invitations. Try again in an hour.' }, { status: 429 });
   }
 

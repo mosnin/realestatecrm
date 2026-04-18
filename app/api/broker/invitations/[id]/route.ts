@@ -36,10 +36,13 @@ export async function PATCH(_req: Request, { params }: Params) {
     return NextResponse.json({ error: `Cannot cancel an invitation with status: ${inv.status}` }, { status: 409 });
   }
 
+  // Scope the update to brokerageId as well to prevent a TOCTOU race between
+  // the fetch above and this write.
   const { error } = await supabase
     .from('Invitation')
     .update({ status: 'cancelled' })
-    .eq('id', invitationId);
+    .eq('id', invitationId)
+    .eq('brokerageId', ctx.brokerage.id);
 
   if (error) {
     console.error('[broker/invitations/cancel] update failed', error);
