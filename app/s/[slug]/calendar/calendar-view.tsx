@@ -11,6 +11,7 @@ import {
   Briefcase,
   Plus,
   X,
+  StickyNote,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -51,13 +52,41 @@ interface CustomEvent {
 
 type ViewMode = 'month' | 'week' | 'day';
 
+interface CalendarNote {
+  id: string;
+  date: string;
+  note: string;
+}
+
 interface CalendarViewProps {
   slug: string;
   tours: Tour[];
   contactFollowUps: ContactFollowUp[];
   dealFollowUps: DealFollowUp[];
   customEvents: CustomEvent[];
+  calendarNotes: CalendarNote[];
 }
+
+type UrgencyLevel = 'overdue' | 'today' | 'soon' | 'upcoming';
+
+function getUrgency(followUpAt: string): UrgencyLevel {
+  const now = new Date();
+  const due = new Date(followUpAt);
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dueStart = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  const diffDays = Math.round((dueStart.getTime() - todayStart.getTime()) / 86400000);
+  if (diffDays < 0) return 'overdue';
+  if (diffDays === 0) return 'today';
+  if (diffDays <= 3) return 'soon';
+  return 'upcoming';
+}
+
+const URGENCY_CHIP: Record<UrgencyLevel, { label: string; className: string }> = {
+  overdue: { label: 'Overdue', className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+  today:   { label: 'Today',   className: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' },
+  soon:    { label: 'Soon',    className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
+  upcoming:{ label: 'Upcoming',className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -148,6 +177,7 @@ export function CalendarView({
   contactFollowUps,
   dealFollowUps,
   customEvents: initialCustomEvents,
+  calendarNotes: initialCalendarNotes,
 }: CalendarViewProps) {
   const today = new Date();
   const todayKey = toDateKey(today);
@@ -158,7 +188,11 @@ export function CalendarView({
   const [currentDate, setCurrentDate] = useState(today);
   const [selectedDate, setSelectedDate] = useState<string>(todayKey);
   const [customEvents, setCustomEvents] = useState<CustomEvent[]>(initialCustomEvents);
+  const [calendarNotes, setCalendarNotes] = useState<CalendarNote[]>(initialCalendarNotes);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddNote, setShowAddNote] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [noteSubmitting, setNoteSubmitting] = useState(false);
   const [formSubmitting, setFormSubmitting] = useState(false);
 
   // Add-event form state
@@ -212,6 +246,16 @@ export function CalendarView({
     }
     return map;
   }, [customEvents]);
+
+  const notesByDate = useMemo(() => {
+    const map = new Map<string, CalendarNote[]>();
+    for (const n of calendarNotes) {
+      const arr = map.get(n.date) ?? [];
+      arr.push(n);
+      map.set(n.date, arr);
+    }
+    return map;
+  }, [calendarNotes]);
 
   // ── Navigation ───────────────────────────────────────────────────────────
 
@@ -276,7 +320,7 @@ export function CalendarView({
     setFormSubmitting(true);
 
     try {
-      const res = await fetch(`/api/calendar-events`, {
+      const res = await fetch(`/api/calendar/events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -307,11 +351,43 @@ export function CalendarView({
 
   async function handleDeleteEvent(id: string) {
     try {
-      const res = await fetch(`/api/calendar-events/${id}`, {
-        method: 'DELETE',
-      });
+      const res = await fetch(`/api/calendar/events?id=${id}`, { method: 'DELETE' });
       if (res.ok) {
         setCustomEvents((prev) => prev.filter((e) => e.id !== id));
+      }
+    } catch {
+      // Silently fail
+    }
+  }
+
+  async function handleAddNote(e: React.FormEvent) {
+    e.preventDefault();
+    if (!noteText.trim()) return;
+    setNoteSubmitting(true);
+    try {
+      const res = await fetch('/api/calendar/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, date: selectedDate, note: noteText.trim() }),
+      });
+      if (res.ok) {
+        const newNote: CalendarNote = await res.json();
+        setCalendarNotes((prev) => [...prev, newNote]);
+        setNoteText('');
+        setShowAddNote(false);
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setNoteSubmitting(false);
+    }
+  }
+
+  async function handleDeleteNote(id: string) {
+    try {
+      const res = await fetch(`/api/calendar/notes?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setCalendarNotes((prev) => prev.filter((n) => n.id !== id));
       }
     } catch {
       // Silently fail
@@ -324,8 +400,9 @@ export function CalendarView({
   const selectedContacts = selectedDate ? contactsByDate.get(selectedDate) ?? [] : [];
   const selectedDeals = selectedDate ? dealsByDate.get(selectedDate) ?? [] : [];
   const selectedCustom = selectedDate ? customByDate.get(selectedDate) ?? [] : [];
+  const selectedNotes = selectedDate ? notesByDate.get(selectedDate) ?? [] : [];
   const hasSelectedEvents =
-    selectedTours.length + selectedContacts.length + selectedDeals.length + selectedCustom.length > 0;
+    selectedTours.length + selectedContacts.length + selectedDeals.length + selectedCustom.length + selectedNotes.length > 0;
 
   // ── Month grid computation ───────────────────────────────────────────────
 
@@ -464,16 +541,22 @@ export function CalendarView({
               year: 'numeric',
             })}
           </h3>
-          <button
-            onClick={() => {
-              setShowAddForm(!showAddForm);
-              setFormDate(selectedDate);
-            }}
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-medium transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add event
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setShowAddNote(!showAddNote); setShowAddForm(false); }}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-medium transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add note
+            </button>
+            <button
+              onClick={() => { setShowAddForm(!showAddForm); setShowAddNote(false); setFormDate(selectedDate); }}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-medium transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add event
+            </button>
+          </div>
         </div>
 
         {/* Inline add-event form */}
@@ -562,7 +645,45 @@ export function CalendarView({
           </Card>
         )}
 
-        {!hasSelectedEvents && !showAddForm && (
+        {/* Inline add-note form */}
+        {showAddNote && (
+          <Card>
+            <CardContent className="p-4">
+              <form onSubmit={handleAddNote} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Note *</label>
+                  <textarea
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    rows={3}
+                    required
+                    autoFocus
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                    placeholder="Add a note for this date…"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={noteSubmitting}
+                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-80 disabled:opacity-50 transition-opacity"
+                  >
+                    {noteSubmitting ? 'Saving…' : 'Save note'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddNote(false)}
+                    className="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+
+        {!hasSelectedEvents && !showAddForm && !showAddNote && (
           <p className="text-sm text-muted-foreground">
             No events on this day.
           </p>
@@ -605,30 +726,39 @@ export function CalendarView({
         ))}
 
         {/* Contact follow-ups */}
-        {selectedContacts.map((contact) => (
-          <Link key={contact.id} href={`/s/${slug}/contacts/${contact.id}`} className="block group">
-            <Card className="transition-colors group-hover:border-border">
-              <CardContent className="p-4 flex items-start gap-3">
-                <span className="mt-1 w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                <div className="flex-1 min-w-0 space-y-1">
-                  <span className="font-medium text-sm">{contact.name}</span>
-                  {contact.phone && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Phone className="h-3 w-3" />
-                      {contact.phone}
-                    </p>
-                  )}
-                  {contact.email && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Mail className="h-3 w-3" />
-                      {contact.email}
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+        {selectedContacts.map((contact) => {
+          const urgency = getUrgency(contact.followUpAt);
+          const chip = URGENCY_CHIP[urgency];
+          return (
+            <Link key={contact.id} href={`/s/${slug}/contacts/${contact.id}`} className="block group">
+              <Card className="transition-colors group-hover:border-border">
+                <CardContent className="p-4 flex items-start gap-3">
+                  <span className="mt-1 w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm">{contact.name}</span>
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${chip.className}`}>
+                        {chip.label}
+                      </span>
+                    </div>
+                    {contact.phone && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Phone className="h-3 w-3" />
+                        {contact.phone}
+                      </p>
+                    )}
+                    {contact.email && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Mail className="h-3 w-3" />
+                        {contact.email}
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          );
+        })}
 
         {/* Deal follow-ups */}
         {selectedDeals.map((deal) => (
@@ -645,6 +775,25 @@ export function CalendarView({
               </CardContent>
             </Card>
           </Link>
+        ))}
+
+        {/* Notes */}
+        {selectedNotes.map((n) => (
+          <Card key={n.id} className="border-yellow-200 dark:border-yellow-800/40">
+            <CardContent className="p-4 flex items-start gap-3">
+              <StickyNote className="mt-0.5 h-4 w-4 text-yellow-500 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm whitespace-pre-wrap break-words">{n.note}</p>
+              </div>
+              <button
+                onClick={() => handleDeleteNote(n.id)}
+                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                title="Delete note"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </CardContent>
+          </Card>
         ))}
 
         {/* Custom events */}

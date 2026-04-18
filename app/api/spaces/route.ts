@@ -22,7 +22,16 @@ export async function GET(req: NextRequest) {
   const [{ data: settings }, { data: owner }] = await Promise.all([
     supabase
       .from('SpaceSetting')
-      .select('notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, phoneNumber')
+      .select(
+        'notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, phoneNumber,' +
+        'bio, socialLinks, businessName, realtorPhotoUrl, privacyPolicyHtml,' +
+        'intakeAccentColor, intakeBorderRadius, intakeFont, intakeDarkMode,' +
+        'intakeHeaderBgColor, intakeHeaderGradient, intakeFaviconUrl, logoUrl,' +
+        'intakePageTitle, intakePageIntro, intakeVideoUrl,' +
+        'intakeThankYouTitle, intakeThankYouMessage, intakeConfirmationEmail,' +
+        'intakeDisclaimerText, intakeFooterLinks,' +
+        'myConnections'
+      )
       .eq('spaceId', userSpace.id)
       .maybeSingle(),
     supabase
@@ -34,6 +43,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     settings: {
+      // Notification settings
       notifications: settings?.notifications ?? true,
       smsNotifications: settings?.smsNotifications ?? false,
       notifyNewLeads: settings?.notifyNewLeads ?? true,
@@ -41,6 +51,31 @@ export async function GET(req: NextRequest) {
       notifyNewDeals: settings?.notifyNewDeals ?? true,
       notifyFollowUps: settings?.notifyFollowUps ?? true,
       phoneNumber: settings?.phoneNumber ?? '',
+      myConnections: settings?.myConnections ?? '',
+      // Profile settings
+      bio: settings?.bio ?? '',
+      socialLinks: settings?.socialLinks ?? { instagram: '', linkedin: '', facebook: '' },
+      businessName: settings?.businessName ?? '',
+      realtorPhotoUrl: settings?.realtorPhotoUrl ?? '',
+      privacyPolicyHtml: settings?.privacyPolicyHtml ?? '',
+      // Appearance settings
+      intakeAccentColor: settings?.intakeAccentColor ?? '#ff964f',
+      intakeBorderRadius: settings?.intakeBorderRadius ?? 'rounded',
+      intakeFont: settings?.intakeFont ?? 'system',
+      intakeDarkMode: settings?.intakeDarkMode ?? false,
+      intakeHeaderBgColor: settings?.intakeHeaderBgColor ?? '',
+      intakeHeaderGradient: settings?.intakeHeaderGradient ?? '',
+      intakeFaviconUrl: settings?.intakeFaviconUrl ?? '',
+      logoUrl: settings?.logoUrl ?? '',
+      // Content settings
+      intakePageTitle: settings?.intakePageTitle ?? 'Rental Application',
+      intakePageIntro: settings?.intakePageIntro ?? '',
+      intakeVideoUrl: settings?.intakeVideoUrl ?? '',
+      intakeThankYouTitle: settings?.intakeThankYouTitle ?? '',
+      intakeThankYouMessage: settings?.intakeThankYouMessage ?? '',
+      intakeConfirmationEmail: settings?.intakeConfirmationEmail ?? '',
+      intakeDisclaimerText: settings?.intakeDisclaimerText ?? '',
+      intakeFooterLinks: settings?.intakeFooterLinks ?? [],
     },
     ownerEmail: owner?.email ?? '',
   });
@@ -50,7 +85,13 @@ export async function PATCH(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const body = await req.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+
   const {
     slug,
     emoji,
@@ -63,7 +104,8 @@ export async function PATCH(req: NextRequest) {
   } = body;
 
   // Sanitize and cap all free-text fields to prevent storage DoS and injection
-  const name            = typeof body.name            === 'string' ? body.name.slice(0, 100)            : '';
+  // name: use undefined when absent so we can skip it; empty string is a valid (cleared) name
+  const name            = typeof body.name            === 'string' ? body.name.slice(0, 100)            : undefined;
   // phoneNumber: use undefined (not null) when absent so we can skip it in the upsert
   const phoneNumber     = typeof body.phoneNumber     === 'string' ? body.phoneNumber.slice(0, 50)       : undefined;
   const myConnections   = typeof body.myConnections   === 'string' ? body.myConnections.slice(0, 500)    : undefined;
@@ -72,6 +114,25 @@ export async function PATCH(req: NextRequest) {
   const bio             = typeof body.bio             === 'string' ? body.bio.slice(0, 500)             : undefined;
   const socialLinks     = body.socialLinks && typeof body.socialLinks === 'object' ? body.socialLinks    : undefined;
   const logoUrl         = typeof body.logoUrl         === 'string' ? body.logoUrl.slice(0, 500)         : undefined;
+  const realtorPhotoUrl = typeof body.realtorPhotoUrl === 'string' ? body.realtorPhotoUrl.slice(0, 500)  : undefined;
+  const businessName    = typeof body.businessName    === 'string' ? body.businessName.slice(0, 200)     : undefined;
+  // Appearance fields
+  const intakeAccentColor    = typeof body.intakeAccentColor    === 'string' ? body.intakeAccentColor.slice(0, 50)    : undefined;
+  const intakeBorderRadius   = body.intakeBorderRadius === 'rounded' || body.intakeBorderRadius === 'sharp' ? body.intakeBorderRadius : undefined;
+  const intakeFont           = body.intakeFont === 'system' || body.intakeFont === 'serif' || body.intakeFont === 'mono' ? body.intakeFont : undefined;
+  const intakeDarkMode       = typeof body.intakeDarkMode === 'boolean' ? body.intakeDarkMode : undefined;
+  const intakeHeaderBgColor  = typeof body.intakeHeaderBgColor  === 'string' ? body.intakeHeaderBgColor.slice(0, 100)  : (body.intakeHeaderBgColor === null ? null : undefined);
+  const intakeHeaderGradient = typeof body.intakeHeaderGradient === 'string' ? body.intakeHeaderGradient.slice(0, 200) : (body.intakeHeaderGradient === null ? null : undefined);
+  const intakeFaviconUrl     = typeof body.intakeFaviconUrl     === 'string' ? body.intakeFaviconUrl.slice(0, 500)     : (body.intakeFaviconUrl === null ? null : undefined);
+  // Content fields
+  const intakePageTitle         = typeof body.intakePageTitle         === 'string' ? body.intakePageTitle.slice(0, 200)         : undefined;
+  const intakePageIntro         = typeof body.intakePageIntro         === 'string' ? body.intakePageIntro.slice(0, 500)         : undefined;
+  const intakeVideoUrl          = typeof body.intakeVideoUrl          === 'string' ? body.intakeVideoUrl.slice(0, 500)          : (body.intakeVideoUrl === null ? null : undefined);
+  const intakeThankYouTitle     = typeof body.intakeThankYouTitle     === 'string' ? body.intakeThankYouTitle.slice(0, 200)     : (body.intakeThankYouTitle === null ? null : undefined);
+  const intakeThankYouMessage   = typeof body.intakeThankYouMessage   === 'string' ? body.intakeThankYouMessage.slice(0, 2000)  : (body.intakeThankYouMessage === null ? null : undefined);
+  const intakeConfirmationEmail = typeof body.intakeConfirmationEmail === 'string' ? body.intakeConfirmationEmail.slice(0, 5000) : (body.intakeConfirmationEmail === null ? null : undefined);
+  const intakeDisclaimerText    = typeof body.intakeDisclaimerText    === 'string' ? body.intakeDisclaimerText.slice(0, 2000)   : (body.intakeDisclaimerText === null ? null : undefined);
+  const intakeFooterLinks       = Array.isArray(body.intakeFooterLinks) ? body.intakeFooterLinks : undefined;
 
   // Legal & compliance fields
   const rawPrivacyPolicyUrl = typeof body.privacyPolicyUrl === 'string' ? body.privacyPolicyUrl.trim().slice(0, 500) : undefined;
@@ -97,7 +158,10 @@ export async function PATCH(req: NextRequest) {
     .from('Space')
     .select('id, slug, name, emoji, createdAt, ownerId')
     .eq('slug', slug);
-  if (spaceError) throw spaceError;
+  if (spaceError) {
+    console.error('[PATCH /api/spaces] Space lookup error:', spaceError);
+    return NextResponse.json({ error: 'Database error. Please try again.' }, { status: 500 });
+  }
   if (!spaceRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const space = spaceRows[0];
@@ -108,7 +172,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const updateFields: Record<string, unknown> = {};
-  if (name) updateFields.name = name;
+  if (name !== undefined) updateFields.name = name;
   if (emoji !== undefined) updateFields.emoji = emoji;
   if (body.brokerageId && typeof body.brokerageId === 'string') {
     updateFields.brokerageId = body.brokerageId;
@@ -145,7 +209,8 @@ export async function PATCH(req: NextRequest) {
       if (errMsg.includes('duplicate key') || errMsg.includes('unique') || updateError.code === '23505') {
         return NextResponse.json({ error: 'That slug is already taken' }, { status: 409 });
       }
-      throw updateError;
+      console.error('[PATCH /api/spaces] Space update error:', updateError);
+      return NextResponse.json({ error: 'Database error. Please try again.' }, { status: 500 });
     }
     updatedRows = data!;
   } else {
@@ -172,9 +237,28 @@ export async function PATCH(req: NextRequest) {
   if (bio !== undefined) settingsPayload.bio = bio;
   if (socialLinks !== undefined) settingsPayload.socialLinks = socialLinks;
   if (logoUrl !== undefined) settingsPayload.logoUrl = logoUrl;
+  if (realtorPhotoUrl !== undefined) settingsPayload.realtorPhotoUrl = realtorPhotoUrl;
+  if (businessName !== undefined) settingsPayload.businessName = businessName;
   if (rawPrivacyPolicyUrl !== undefined) settingsPayload.privacyPolicyUrl = rawPrivacyPolicyUrl || null;
   if (consentCheckboxLabel !== undefined) settingsPayload.consentCheckboxLabel = consentCheckboxLabel || null;
   if (privacyPolicyHtml !== undefined) settingsPayload.privacyPolicyHtml = privacyPolicyHtml || null;
+  // Appearance fields
+  if (intakeAccentColor !== undefined) settingsPayload.intakeAccentColor = intakeAccentColor;
+  if (intakeBorderRadius !== undefined) settingsPayload.intakeBorderRadius = intakeBorderRadius;
+  if (intakeFont !== undefined) settingsPayload.intakeFont = intakeFont;
+  if (intakeDarkMode !== undefined) settingsPayload.intakeDarkMode = intakeDarkMode;
+  if (intakeHeaderBgColor !== undefined) settingsPayload.intakeHeaderBgColor = intakeHeaderBgColor;
+  if (intakeHeaderGradient !== undefined) settingsPayload.intakeHeaderGradient = intakeHeaderGradient;
+  if (intakeFaviconUrl !== undefined) settingsPayload.intakeFaviconUrl = intakeFaviconUrl;
+  // Content fields
+  if (intakePageTitle !== undefined) settingsPayload.intakePageTitle = intakePageTitle;
+  if (intakePageIntro !== undefined) settingsPayload.intakePageIntro = intakePageIntro;
+  if (intakeVideoUrl !== undefined) settingsPayload.intakeVideoUrl = intakeVideoUrl;
+  if (intakeThankYouTitle !== undefined) settingsPayload.intakeThankYouTitle = intakeThankYouTitle;
+  if (intakeThankYouMessage !== undefined) settingsPayload.intakeThankYouMessage = intakeThankYouMessage;
+  if (intakeConfirmationEmail !== undefined) settingsPayload.intakeConfirmationEmail = intakeConfirmationEmail;
+  if (intakeDisclaimerText !== undefined) settingsPayload.intakeDisclaimerText = intakeDisclaimerText;
+  if (intakeFooterLinks !== undefined) settingsPayload.intakeFooterLinks = intakeFooterLinks;
 
   // Tour availability settings
   if (typeof body.tourDuration === 'number' && [15, 30, 45, 60, 90, 120].includes(body.tourDuration)) {
@@ -202,7 +286,10 @@ export async function PATCH(req: NextRequest) {
     .from('SpaceSetting')
     .upsert(settingsPayload, { onConflict: 'spaceId' })
     .select();
-  if (settingsError) throw settingsError;
+  if (settingsError) {
+    console.error('[PATCH /api/spaces] Settings upsert error:', settingsError);
+    return NextResponse.json({ error: 'Failed to save settings. Please try again.' }, { status: 500 });
+  }
 
   // Update Redis cache
   const updatedSpace = updatedRows![0];
@@ -226,13 +313,24 @@ export async function DELETE(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { slug } = await req.json();
+  let slug: string;
+  try {
+    const body = await req.json();
+    slug = body.slug;
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+
+  if (!slug) return NextResponse.json({ error: 'Missing slug' }, { status: 400 });
 
   const { data: spaceRows, error: spaceError } = await supabase
     .from('Space')
     .select('id, slug, name, emoji, createdAt, ownerId')
     .eq('slug', slug);
-  if (spaceError) throw spaceError;
+  if (spaceError) {
+    console.error('[DELETE /api/spaces] Space lookup error:', spaceError);
+    return NextResponse.json({ error: 'Database error. Please try again.' }, { status: 500 });
+  }
   if (!spaceRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const space = spaceRows[0];
@@ -259,7 +357,10 @@ export async function DELETE(req: NextRequest) {
     .from('Space')
     .delete()
     .eq('slug', slug);
-  if (deleteError) throw deleteError;
+  if (deleteError) {
+    console.error('[DELETE /api/spaces] Delete error:', deleteError);
+    return NextResponse.json({ error: 'Failed to delete workspace. Please try again.' }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true });
 }

@@ -88,11 +88,10 @@ export default function AppearanceSettingsPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch('/api/onboarding', {
-        method: 'POST',
+      const res = await fetch('/api/spaces', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'create_space',
           slug,
           intakeAccentColor,
           intakeBorderRadius,

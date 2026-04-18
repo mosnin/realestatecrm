@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { requireSpaceOwner } from '@/lib/api-auth';
+import { requireSpaceOwner, requireAuth } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { getSpaceForUser } from '@/lib/space';
 
 // GET /api/calendar/notes?slug=xxx&month=YYYY-MM — list notes for a space/month
 export async function GET(req: NextRequest) {
@@ -63,4 +64,26 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: 'Failed to create note' }, { status: 500 });
   return NextResponse.json(data, { status: 201 });
+}
+
+// DELETE /api/calendar/notes?id=xxx — delete a note
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get('id');
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+  const { userId } = authResult;
+
+  const space = await getSpaceForUser(userId);
+  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const { error } = await supabase
+    .from('CalendarNote')
+    .delete()
+    .eq('id', id)
+    .eq('spaceId', space.id);
+
+  if (error) return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
+  return NextResponse.json({ success: true });
 }

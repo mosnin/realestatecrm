@@ -83,17 +83,18 @@ export default function ProfileSettingsPage() {
         console.warn('[profile] Clerk user.update() failed, saving name to DB only:', clerkErr);
       }
 
-      // Update space settings (bio, social links, photo, phone, businessName)
-      const res = await fetch('/api/onboarding', {
-        method: 'POST',
+      // Update space settings (bio, social links, photo, phone, businessName, privacyPolicyHtml)
+      const res = await fetch('/api/spaces', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'create_space',
           slug,
           bio: bio.trim() || null,
           socialLinks,
           realtorPhotoUrl: realtorPhotoUrl.trim() || null,
           privacyPolicyHtml: privacyPolicyHtml || null,
+          phoneNumber: phone,
+          businessName,
         }),
       });
       if (!res.ok) {
@@ -101,7 +102,7 @@ export default function ProfileSettingsPage() {
         throw new Error(d.error || 'Failed to save profile settings.');
       }
 
-      // Save profile (name, phone, businessName)
+      // Save the user's name to their User record
       const profileRes = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
