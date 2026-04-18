@@ -309,13 +309,24 @@ export type DealActivity = {
 
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH';
 
+export type Pipeline = {
+  id: string;
+  spaceId: string;
+  name: string;
+  color: string;
+  emoji: string | null;
+  position: number;
+  createdAt: Date;
+};
+
 export type DealStage = {
   id: string;
   spaceId: string;
   name: string;
   color: string;
   position: number;
-  pipelineType: 'rental' | 'buyer';
+  pipelineType: string | null;
+  pipelineId: string | null;
 };
 
 export type DealContact = {

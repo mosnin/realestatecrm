@@ -38,6 +38,8 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronDown,
+  Check,
+  Palette,
 } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
@@ -137,10 +139,10 @@ function formatCurrency(n: number | null) {
 
 interface KanbanBoardProps {
   slug: string;
-  pipelineType: 'rental' | 'buyer';
+  pipelineId: string;
 }
 
-export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
+export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
   const router = useRouter();
   const [stages, setStages] = useState<StageWithDeals[]>([]);
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
@@ -259,6 +261,42 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   const [bulkStageTarget, setBulkStageTarget] = useState('');
   const [bulkPending, setBulkPending] = useState(false);
 
+  // Inline "Add Stage" state for the kanban view
+  const [addingStage, setAddingStage] = useState(false);
+  const [newStageName, setNewStageName] = useState('');
+  const [newStageColor, setNewStageColor] = useState('#6b7280');
+  const [addingStageSubmitting, setAddingStageSubmitting] = useState(false);
+  const newStageRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (addingStage && newStageRef.current) newStageRef.current.focus();
+  }, [addingStage]);
+
+  async function handleAddStage() {
+    const name = newStageName.trim();
+    if (!name) return;
+    setAddingStageSubmitting(true);
+    try {
+      const res = await fetch('/api/stages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, name, color: newStageColor, pipelineId }),
+      });
+      if (!res.ok) {
+        toast.error('Failed to create stage');
+        return;
+      }
+      setAddingStage(false);
+      setNewStageName('');
+      setNewStageColor('#6b7280');
+      fetchData();
+    } catch {
+      toast.error('Failed to create stage');
+    } finally {
+      setAddingStageSubmitting(false);
+    }
+  }
+
   // Stage deletion state: when a stage has deals, we prompt the user to pick
   // a migration target before calling DELETE with ?targetStageId=...
   const [stageDelete, setStageDelete] = useState<{
@@ -273,9 +311,9 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
   );
 
   const fetchData = useCallback(async () => {
-    const res = await fetch(`/api/stages?slug=${slug}&pipelineType=${pipelineType}`);
+    const res = await fetch(`/api/stages?slug=${encodeURIComponent(slug)}&pipelineId=${encodeURIComponent(pipelineId)}`);
     if (res.ok) setStages(await res.json());
-  }, [slug, pipelineType]);
+  }, [slug, pipelineId]);
 
   useEffect(() => {
     fetchData();
@@ -569,9 +607,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
         .catch(() => ({} as { error?: string; dealCount?: number }));
       if (res.status === 400 && body?.error === 'stage-has-deals') {
         // Need to pick a migration target.
-        const candidates = stages.filter(
-          (s) => s.id !== stage.id && s.pipelineType === stage.pipelineType,
-        );
+        const candidates = stages.filter((s) => s.id !== stage.id);
         setStageDelete({
           stage,
           dealCount: Number(body.dealCount ?? 0),
@@ -1243,7 +1279,7 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
               items={filteredStages.map((s) => `stage:${s.id}`)}
               strategy={horizontalListSortingStrategy}
             >
-              <div className="flex gap-4 min-w-max">
+              <div className="flex gap-4 min-w-max items-start">
                 {filteredStages.map((stage) => (
                   <SortableKanbanColumn
                     key={stage.id}
@@ -1257,6 +1293,86 @@ export function KanbanBoard({ slug, pipelineType }: KanbanBoardProps) {
                     onStatusChange={handleCardStatusChange}
                   />
                 ))}
+
+                {/* Inline "Add Stage" card */}
+                <div className="w-72 flex-shrink-0">
+                  {addingStage ? (
+                    <div className="rounded-lg border border-primary bg-card p-3 space-y-2.5">
+                      <input
+                        ref={newStageRef}
+                        value={newStageName}
+                        onChange={(e) => setNewStageName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleAddStage();
+                          if (e.key === 'Escape') { setAddingStage(false); setNewStageName(''); }
+                        }}
+                        placeholder="Stage name…"
+                        disabled={addingStageSubmitting}
+                        className="w-full text-sm bg-muted/50 border border-border rounded-md px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-ring"
+                        maxLength={100}
+                      />
+                      <div className="flex items-center gap-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              <span
+                                className="w-4 h-4 rounded-full border border-border"
+                                style={{ backgroundColor: newStageColor }}
+                              />
+                              <Palette size={11} />
+                              Color
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" className="w-44 p-2">
+                            <div className="grid grid-cols-6 gap-1.5">
+                              {['#6b7280','#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#78716c'].map((c) => (
+                                <button
+                                  key={c}
+                                  type="button"
+                                  onClick={() => setNewStageColor(c)}
+                                  className="w-6 h-6 rounded-md transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring"
+                                  style={{ backgroundColor: c }}
+                                  aria-label={c}
+                                >
+                                  {c === newStageColor && <Check size={10} className="text-white mx-auto" />}
+                                </button>
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                        <div className="flex items-center gap-1 ml-auto">
+                          <button
+                            type="button"
+                            onClick={handleAddStage}
+                            disabled={!newStageName.trim() || addingStageSubmitting}
+                            className="h-6 px-2.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-colors"
+                          >
+                            {addingStageSubmitting ? 'Adding…' : 'Add'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setAddingStage(false); setNewStageName(''); }}
+                            className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted transition-colors"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setAddingStage(true)}
+                      className="w-full flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-border hover:bg-muted/30 transition-colors"
+                    >
+                      <Plus size={14} />
+                      Add stage
+                    </button>
+                  )}
+                </div>
               </div>
             </SortableContext>
             <DragOverlay>

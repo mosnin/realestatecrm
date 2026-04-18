@@ -161,10 +161,10 @@ export async function DELETE(
       );
     }
 
-    // Validate target stage: must exist, same space, same pipelineType.
+    // Validate target stage: must exist, same space, same pipeline.
     const { data: targetRows, error: targetError } = await supabase
       .from('DealStage')
-      .select('id, spaceId, pipelineType')
+      .select('id, spaceId, pipelineType, pipelineId')
       .eq('id', targetStageId)
       .eq('spaceId', space.id);
     if (targetError) throw targetError;
@@ -172,9 +172,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Target stage not found' }, { status: 400 });
     }
     const target = targetRows[0];
-    if (target.pipelineType !== stage.pipelineType) {
+    // Prefer pipelineId comparison when available; fall back to pipelineType for legacy stages.
+    const sameGroup = stage.pipelineId && target.pipelineId
+      ? target.pipelineId === stage.pipelineId
+      : target.pipelineType === stage.pipelineType;
+    if (!sameGroup) {
       return NextResponse.json(
-        { error: 'Target stage must have the same pipelineType' },
+        { error: 'Target stage must belong to the same pipeline' },
         { status: 400 },
       );
     }

@@ -9,7 +9,7 @@ import type { Deal, DealStage } from '@/lib/types';
 
 interface PipelineSummaryProps {
   slug: string;
-  pipelineType: 'rental' | 'buyer';
+  pipelineId: string;
 }
 
 type StageWithDeals = DealStage & { deals: Deal[] };
@@ -21,7 +21,7 @@ interface Stat {
   iconClassName: string;
 }
 
-export function PipelineSummary({ slug, pipelineType }: PipelineSummaryProps) {
+export function PipelineSummary({ slug, pipelineId }: PipelineSummaryProps) {
   const [stages, setStages] = useState<StageWithDeals[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,7 +31,7 @@ export function PipelineSummary({ slug, pipelineType }: PipelineSummaryProps) {
       setLoading(true);
       try {
         const res = await fetch(
-          `/api/stages?slug=${encodeURIComponent(slug)}&pipelineType=${pipelineType}`,
+          `/api/stages?slug=${encodeURIComponent(slug)}&pipelineId=${encodeURIComponent(pipelineId)}`,
         );
         if (!res.ok) {
           if (!cancelled) setStages([]);
@@ -49,7 +49,7 @@ export function PipelineSummary({ slug, pipelineType }: PipelineSummaryProps) {
     return () => {
       cancelled = true;
     };
-  }, [slug, pipelineType]);
+  }, [slug, pipelineId]);
 
   const stats: Stat[] = useMemo(() => {
     const activeDeals = stages
