@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
 
       const { data: spaceData, error: spaceLookupError } = await supabase
         .from('Space')
-        .select('id')
+        .select('id, stripeSubscriptionId')
         .eq('ownerId', userId)
         .maybeSingle();
 
@@ -180,10 +180,49 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'No space found for this user' }, { status: 404 });
       }
 
-      const updatePayload: Record<string, unknown> = { stripeSubscriptionStatus: status };
-      if (periodEnd) {
-        updatePayload.stripePeriodEnd = periodEnd;
+      // ── Sync to Stripe first ────────────────────────────────────────────
+      // Supabase mirrors Stripe via webhook. If we only update Supabase,
+      // the next webhook event will overwrite our change with Stripe's truth
+      // and the user will be charged on the original schedule.
+      let stripeUpdated = false;
+      let stripeWarning: string | null = null;
+      const subId = (spaceData as any).stripeSubscriptionId as string | null;
+
+      if (subId) {
+        try {
+          const { getStripe } = await import('@/lib/stripe');
+          const stripe = getStripe();
+
+          if (status === 'trialing' && periodEnd) {
+            await stripe.subscriptions.update(subId, {
+              trial_end: Math.floor(new Date(periodEnd).getTime() / 1000),
+              proration_behavior: 'none',
+            });
+            stripeUpdated = true;
+          } else if (status === 'active') {
+            // End the trial immediately and activate the subscription
+            await stripe.subscriptions.update(subId, {
+              trial_end: 'now',
+              proration_behavior: 'none',
+            });
+            stripeUpdated = true;
+          } else if (status === 'canceled') {
+            await stripe.subscriptions.cancel(subId);
+            stripeUpdated = true;
+          } else {
+            stripeWarning = `Status '${status}' cannot be set via API — only database was updated.`;
+          }
+        } catch (stripeErr: any) {
+          console.error('[admin/update_subscription] Stripe update failed', { stripeErr, subId, status });
+          stripeWarning = `Stripe update failed: ${stripeErr.message}. Database updated but billing may not reflect this change until manually corrected in Stripe.`;
+        }
+      } else {
+        stripeWarning = 'No Stripe subscription on record — database updated only. Stripe has no record of this change.';
       }
+
+      // Always mirror to Supabase as our local cache
+      const updatePayload: Record<string, unknown> = { stripeSubscriptionStatus: status };
+      if (periodEnd) updatePayload.stripePeriodEnd = periodEnd;
 
       const { error: updateError } = await supabase
         .from('Space')
@@ -196,10 +235,14 @@ export async function POST(req: NextRequest) {
         actor: admin.userId,
         action: 'update_subscription',
         target: userId,
-        details: { status, periodEnd: periodEnd ?? null, spaceId: spaceData.id },
+        details: { status, periodEnd: periodEnd ?? null, spaceId: spaceData.id, stripeUpdated, stripeWarning },
       });
 
-      return NextResponse.json({ success: true, message: `Subscription status updated to '${status}'.` });
+      const message = stripeWarning
+        ? `Database updated. ⚠️ ${stripeWarning}`
+        : `Subscription updated to '${status}'${stripeUpdated ? ' in Stripe and database' : ''}.`;
+
+      return NextResponse.json({ success: true, message, stripeUpdated, stripeWarning: stripeWarning ?? undefined });
     }
 
     // ── Suspend user ─────────────────────────────────────────────────────
@@ -296,7 +339,7 @@ export async function POST(req: NextRequest) {
 
       const { data: space } = await supabase
         .from('Space')
-        .select('id, stripeSubscriptionStatus')
+        .select('id, stripeSubscriptionStatus, stripeSubscriptionId')
         .eq('ownerId', targetUserId)
         .maybeSingle();
 
@@ -304,21 +347,53 @@ export async function POST(req: NextRequest) {
 
       // Only allow comp on non-active subscriptions
       const allowedStatuses = ['canceled', 'past_due', 'inactive'];
-      if (!allowedStatuses.includes(space.stripeSubscriptionStatus ?? '')) {
+      if (!allowedStatuses.includes((space as any).stripeSubscriptionStatus ?? '')) {
         return NextResponse.json(
-          { error: `Cannot comp a free month on a subscription with status '${space.stripeSubscriptionStatus}'. Only allowed for: ${allowedStatuses.join(', ')}.` },
+          { error: `Cannot comp a free month on a subscription with status '${(space as any).stripeSubscriptionStatus}'. Only allowed for: ${allowedStatuses.join(', ')}.` },
           { status: 400 },
         );
       }
 
       const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const compSubId = (space as any).stripeSubscriptionId as string | null;
+      const compStatus = (space as any).stripeSubscriptionStatus as string;
+
+      let stripeUpdated = false;
+      let stripeWarning: string | null = null;
+
+      // For past_due subscriptions the Stripe subscription still exists — push
+      // the trial_end forward so Stripe won't attempt to collect for 30 days.
+      // For canceled/inactive the subscription is gone in Stripe; we can only
+      // update the database as a manual billing override.
+      if (compSubId && compStatus === 'past_due') {
+        try {
+          const { getStripe } = await import('@/lib/stripe');
+          const stripe = getStripe();
+          await stripe.subscriptions.update(compSubId, {
+            trial_end: Math.floor(new Date(periodEnd).getTime() / 1000),
+            proration_behavior: 'none',
+          });
+          stripeUpdated = true;
+        } catch (stripeErr: any) {
+          console.error('[admin/comp_free_month] Stripe update failed', { stripeErr, compSubId });
+          stripeWarning = `Stripe update failed: ${stripeErr.message}. Database updated but Stripe may still attempt to collect payment.`;
+        }
+      } else {
+        stripeWarning = `Subscription is '${compStatus}' — Stripe has no active subscription to update. Database marked active for 30 days as a manual override. If you need to re-activate billing, create a new subscription in the Stripe dashboard.`;
+      }
+
       await supabase.from('Space').update({
         stripeSubscriptionStatus: 'active',
         stripePeriodEnd: periodEnd,
       }).eq('id', space.id);
 
-      logAdminAction({ actor: admin.userId, action: 'comp_free_month', target: targetUserId, details: { periodEnd } });
-      return NextResponse.json({ success: true, periodEnd });
+      logAdminAction({ actor: admin.userId, action: 'comp_free_month', target: targetUserId, details: { periodEnd, stripeUpdated, stripeWarning } });
+
+      const message = stripeWarning
+        ? `Database updated. ⚠️ ${stripeWarning}`
+        : 'Free month applied in Stripe and database. User will not be charged for 30 days.';
+
+      return NextResponse.json({ success: true, periodEnd, stripeUpdated, message });
     }
 
     // ── Issue refund ──────────────────────────────────────────────────────
