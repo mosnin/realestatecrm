@@ -25,6 +25,7 @@ import {
   Palette,
   Shield,
   Flame,
+  Bot,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -121,6 +122,12 @@ export const realtorNavItems: NavItem[] = [
     href: '/notes',
     label: 'Notes',
     icon: FileText,
+  },
+  {
+    href: '/agent',
+    label: 'Agent',
+    icon: Bot,
+    badgeKey: 'agentDrafts',
   },
   {
     href: '/ai',
