@@ -36,8 +36,12 @@ class Settings(BaseSettings):
     worker_model: str = Field(default="gpt-4o-mini")
 
     # Safety limits
-    max_react_iterations: int = Field(default=10)
+    max_react_iterations: int = Field(default=6)       # max tool-call turns per agent
     default_daily_token_budget: int = Field(default=50_000)
+
+    # Context window management
+    memory_chars_budget: int = Field(default=3_000)   # ~750 tokens for memory injection
+    max_output_tokens: int = Field(default=1_000)      # cap LLM output per turn
 
     model_config = {"populate_by_name": True, "env_file": ".env.local"}
 

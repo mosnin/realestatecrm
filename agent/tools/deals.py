@@ -10,6 +10,14 @@ from agents import RunContextWrapper, function_tool
 from db import supabase
 from security.context import AgentContext
 
+_CLIP = 300
+
+
+def _trim(value: Any, max_chars: int = _CLIP) -> Any:
+    if isinstance(value, str) and len(value) > max_chars:
+        return value[:max_chars - 1] + "…"
+    return value
+
 
 @function_tool
 async def list_deals(
@@ -38,19 +46,30 @@ async def get_deal(
     ctx: RunContextWrapper[AgentContext],
     deal_id: str,
 ) -> dict[str, Any] | None:
-    """Fetch full details for a single deal by ID."""
+    """Fetch details for a single deal by ID.
+
+    milestones are excluded (large JSON array not needed for agent decisions).
+    """
     space_id = ctx.context.space_id
     db = await supabase()
 
     result = await (
         db.table("Deal")
-        .select("*")
+        .select(
+            "id,title,value,status,priority,closeDate,stageId,probability,"
+            "commissionRate,followUpAt,address,description,createdAt,updatedAt"
+        )
         .eq("id", deal_id)
         .eq("spaceId", space_id)
         .single()
         .execute()
     )
-    return result.data
+    if not result.data:
+        return None
+    row = result.data
+    row["description"] = _trim(row.get("description"))
+    row["address"] = _trim(row.get("address"))
+    return row
 
 
 @function_tool

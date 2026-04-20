@@ -86,16 +86,37 @@ async def prune_expired(space_id: str) -> int:
     return len(result.data) if result.data else 0
 
 
-async def format_memories_for_prompt(memories: list[dict[str, Any]]) -> str:
-    """Render memories as a compact text block for injection into agent prompts."""
+async def format_memories_for_prompt(
+    memories: list[dict[str, Any]],
+    max_chars: int = 3_000,
+) -> str:
+    """Render memories as a compact text block for injection into agent prompts.
+
+    Respects max_chars budget. High-importance memories are already first
+    (callers sort by importance DESC). Individual entries are capped at 200 chars
+    so one verbose memory can't crowd out the rest.
+    """
     if not memories:
         return ""
 
-    lines = ["## What you already know (from previous runs)"]
-    for m in memories:
-        entity_label = ""
-        if m.get("entityId"):
-            entity_label = f" [about {m.get('entityType', 'entity')} {m['entityId'][:8]}]"
-        lines.append(f"- {m['content']}{entity_label}")
+    header = "## What you already know (from previous runs)\n"
+    lines: list[str] = []
+    remaining = max_chars - len(header)
 
-    return "\n".join(lines)
+    for m in memories:
+        content = m["content"]
+        if len(content) > 200:
+            content = content[:197] + "…"
+
+        entity_label = ""
+        if m.get("entityId") and m.get("entityType") != "space":
+            entity_label = f" [{m.get('entityType', 'entity')} {m['entityId'][:8]}]"
+
+        line = f"- {content}{entity_label}"
+        if remaining - len(line) - 1 < 0:
+            lines.append("- (additional memories omitted — budget reached)")
+            break
+        lines.append(line)
+        remaining -= len(line) + 1  # +1 for newline
+
+    return header + "\n".join(lines)

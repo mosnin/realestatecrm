@@ -23,7 +23,7 @@ import uuid
 from datetime import datetime, timezone
 
 import structlog
-from agents import Runner, RunConfig
+from agents import Runner, RunConfig, ModelSettings
 
 from config import settings
 from db import supabase
@@ -117,7 +117,9 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
         entity_id=space.id,
         limit=15,
     )
-    memory_context = await format_memories_for_prompt(space_memories)
+    memory_context = await format_memories_for_prompt(
+        space_memories, max_chars=settings.memory_chars_budget
+    )
 
     ctx = AgentContext.from_settings(agent_settings, run_id=run_id, space_name=space.name)
 
@@ -154,6 +156,10 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
         model=settings.orchestrator_model,
         max_turns=settings.max_react_iterations,
         tracing_disabled=False,
+        model_settings=ModelSettings(
+            max_tokens=settings.max_output_tokens,
+            truncation="auto",  # SDK auto-trims oldest context if window fills up
+        ),
     )
 
     # If there are triggers, prioritise the relevant agents regardless of schedule

@@ -10,6 +10,15 @@ from agents import RunContextWrapper, function_tool
 from db import supabase
 from security.context import AgentContext
 
+_CLIP = 300  # max chars for any free-text field returned to the agent
+
+
+def _trim(value: Any, max_chars: int = _CLIP) -> Any:
+    """Truncate a string field so tool results don't bloat the context window."""
+    if isinstance(value, str) and len(value) > max_chars:
+        return value[:max_chars - 1] + "…"
+    return value
+
 
 @function_tool
 async def list_contacts(
@@ -46,19 +55,34 @@ async def get_contact(
     ctx: RunContextWrapper[AgentContext],
     contact_id: str,
 ) -> dict[str, Any] | None:
-    """Fetch full details for a single contact by ID."""
+    """Fetch details for a single contact by ID.
+
+    Large blobs (applicationData, formConfigSnapshot, scoreDetails) are
+    excluded — they can exceed 10 KB and are not needed for agent decisions.
+    """
     space_id = ctx.context.space_id
     db = await supabase()
 
     result = await (
         db.table("Contact")
-        .select("*")
+        .select(
+            "id,name,email,phone,leadType,leadScore,scoreLabel,scoringStatus,"
+            "scoreSummary,followUpAt,lastContactedAt,type,tags,status,"
+            "budget,preferences,notes,createdAt,updatedAt"
+        )
         .eq("id", contact_id)
         .eq("spaceId", space_id)  # tenant isolation — never skip this
         .single()
         .execute()
     )
-    return result.data
+    if not result.data:
+        return None
+    row = result.data
+    # Truncate free-text fields that can be arbitrarily long
+    for field in ("scoreSummary", "preferences", "notes"):
+        if field in row:
+            row[field] = _trim(row[field])
+    return row
 
 
 @function_tool
@@ -73,14 +97,17 @@ async def get_contact_activity(
 
     result = await (
         db.table("ContactActivity")
-        .select("id,type,content,metadata,createdAt")
+        .select("id,type,content,createdAt")  # metadata omitted — often large JSON
         .eq("contactId", contact_id)
         .eq("spaceId", space_id)
         .order("createdAt", desc=True)
         .limit(limit)
         .execute()
     )
-    return result.data or []
+    rows = result.data or []
+    for row in rows:
+        row["content"] = _trim(row.get("content"))
+    return rows
 
 
 @function_tool
