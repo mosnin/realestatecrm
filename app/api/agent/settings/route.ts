@@ -44,7 +44,7 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json();
 
   const validAutonomy = ['autonomous', 'draft_required', 'suggest_only'];
-  const validAgents = ['lead_nurture', 'deal_sentinel', 'long_term_nurture'];
+  const validAgents = ['lead_nurture', 'deal_sentinel', 'long_term_nurture', 'lead_scorer'];
 
   const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
 

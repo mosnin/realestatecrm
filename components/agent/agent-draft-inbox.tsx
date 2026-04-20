@@ -306,7 +306,12 @@ export function AgentDraftInbox({ slug }: Props) {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    void load();
+    // Poll every 30 s so new agent drafts appear without a manual refresh
+    const timer = setInterval(() => { void load(); }, 30_000);
+    return () => clearInterval(timer);
+  }, [load]);
 
   async function handleAction(
     draftId: string,

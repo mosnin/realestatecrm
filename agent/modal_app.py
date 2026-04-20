@@ -129,6 +129,46 @@ async def run_space(space_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Web endpoint — on-demand run from the UI (POST /api/agent/run-now)
+# ---------------------------------------------------------------------------
+
+@app.function(secrets=secrets, timeout=270)
+@modal.web_endpoint(method="POST")
+async def run_now_webhook(item: dict) -> dict:
+    """HTTP webhook for triggering runs from the Next.js UI.
+
+    After deploying, set MODAL_WEBHOOK_URL in your Next.js env to the URL
+    printed by `modal deploy`. Secured with AGENT_INTERNAL_SECRET.
+    """
+    import sys, os
+    sys.path.insert(0, "/app")
+
+    secret = item.get("secret", "") or ""
+    expected = os.environ.get("AGENT_INTERNAL_SECRET", "")
+    if not expected or secret != expected:
+        return {"error": "Unauthorized"}
+
+    space_id = item.get("space_id", "")
+
+    from orchestrator import run_all_spaces, run_agent_for_space
+    if space_id:
+        from db import supabase
+        from schemas import AgentSettings, Space
+        db = await supabase()
+        sr = await db.table("AgentSettings").select("*").eq("spaceId", space_id).single().execute()
+        spr = await db.table("Space").select("id,slug,name").eq("id", space_id).single().execute()
+        if sr.data and spr.data:
+            await run_agent_for_space(
+                Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"]),
+                AgentSettings.model_validate(sr.data),
+            )
+    else:
+        await run_all_spaces()
+
+    return {"ok": True, "space_id": space_id or "all"}
+
+
+# ---------------------------------------------------------------------------
 # Local dev entrypoint
 # ---------------------------------------------------------------------------
 

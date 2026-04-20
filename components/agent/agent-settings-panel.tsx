@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Bot, Loader2, Save, Play, CheckCircle2, Circle,
-  Zap, Shield, Eye, UserCheck, Briefcase,
+  Bot, Loader2, Play, CheckCircle2, Circle,
+  Zap, Shield, Eye, UserCheck, Briefcase, Clock, TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -19,10 +19,16 @@ interface AgentSettings {
   enabledAgents: string[];
 }
 
+interface AgentUsage {
+  used: number;
+  limit: number;
+  pct: number;
+  resetsAt: string;
+}
+
 interface AgentStatus {
   pendingDrafts: number;
   lastRunAt: string | null;
-  totalActionsToday: number;
 }
 
 const AUTONOMY_OPTIONS = [
@@ -53,25 +59,39 @@ const AUTONOMY_OPTIONS = [
 const AGENT_OPTIONS = [
   {
     value: 'lead_nurture',
-    label: 'Lead Nurture Agent',
-    description: 'Identifies leads that haven\'t been contacted in 7+ days and drafts personalised follow-ups.',
+    label: 'Lead Nurture',
+    description: 'Drafts personalised follow-ups for leads not contacted in 7+ days.',
     icon: UserCheck,
     iconClass: 'text-emerald-500',
   },
   {
     value: 'deal_sentinel',
-    label: 'Deal Sentinel Agent',
-    description: 'Flags stalled deals, warns on approaching close dates, schedules reminders.',
+    label: 'Deal Sentinel',
+    description: 'Flags stalled deals and warns on approaching close dates.',
     icon: Briefcase,
     iconClass: 'text-violet-500',
+  },
+  {
+    value: 'long_term_nurture',
+    label: 'Long-Term Nurture',
+    description: 'Re-engages cold leads at 30, 60, 90, and 180+ day intervals.',
+    icon: Clock,
+    iconClass: 'text-sky-500',
+  },
+  {
+    value: 'lead_scorer',
+    label: 'Lead Scorer',
+    description: 'Re-scores contacts whose activity makes their current score stale.',
+    icon: TrendingUp,
+    iconClass: 'text-orange-500',
   },
 ] as const;
 
 const BUDGET_PRESETS = [
-  { label: '10k', value: 10_000, desc: '~40 checks/day' },
-  { label: '25k', value: 25_000, desc: '~100 checks/day' },
-  { label: '50k', value: 50_000, desc: '~200 checks/day' },
-  { label: '100k', value: 100_000, desc: '~400 checks/day' },
+  { label: '10k', value: 10_000, desc: '~40 runs/day' },
+  { label: '25k', value: 25_000, desc: '~100 runs/day' },
+  { label: '50k', value: 50_000, desc: '~200 runs/day' },
+  { label: '100k', value: 100_000, desc: '~400 runs/day' },
 ] as const;
 
 function timeAgo(dateStr: string): string {
@@ -84,25 +104,34 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function timeUntil(dateStr: string): string {
+  const diff = new Date(dateStr).getTime() - Date.now();
+  const hrs = Math.floor(diff / 3_600_000);
+  return hrs > 0 ? `${hrs}h` : 'soon';
+}
+
 interface Props { slug: string; }
 
 export function AgentSettingsPanel({ slug }: Props) {
   const [settings, setSettings] = useState<AgentSettings | null>(null);
+  const [usage, setUsage] = useState<AgentUsage | null>(null);
   const [status, setStatus] = useState<AgentStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedField, setSavedField] = useState<string | null>(null);
   const [triggeringRun, setTriggeringRun] = useState(false);
+  const [runResult, setRunResult] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [settingsRes, draftsRes, activityRes] = await Promise.all([
+    const [settingsRes, usageRes, draftsRes, activityRes] = await Promise.all([
       fetch('/api/agent/settings'),
+      fetch('/api/agent/usage'),
       fetch('/api/agent/drafts?status=pending&limit=1'),
       fetch('/api/agent/activity?limit=1'),
     ]);
     if (settingsRes.ok) setSettings(await settingsRes.json());
+    if (usageRes.ok) setUsage(await usageRes.json());
 
-    // Build status from available data
     let pendingDrafts = 0;
     if (draftsRes.ok) {
       const drafts = await draftsRes.json();
@@ -113,11 +142,11 @@ export function AgentSettingsPanel({ slug }: Props) {
       const activity = await activityRes.json();
       lastRunAt = activity[0]?.createdAt ?? null;
     }
-    setStatus({ pendingDrafts, lastRunAt, totalActionsToday: 0 });
+    setStatus({ pendingDrafts, lastRunAt });
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   async function saveField(patch: Partial<AgentSettings>, fieldKey: string) {
     if (!settings) return;
@@ -145,18 +174,31 @@ export function AgentSettingsPanel({ slug }: Props) {
     const next = current.includes(agent)
       ? current.filter((a) => a !== agent)
       : [...current, agent];
-    const updated = { ...settings, enabledAgents: next };
-    setSettings(updated);
-    saveField({ enabledAgents: next }, `agent_${agent}`);
+    setSettings({ ...settings, enabledAgents: next });
+    void saveField({ enabledAgents: next }, `agent_${agent}`);
   }
 
   async function triggerRun() {
     setTriggeringRun(true);
-    // In production this would call Modal's API to trigger a run.
-    // For now show a helpful message with the CLI command.
-    await new Promise((r) => setTimeout(r, 800));
-    setTriggeringRun(false);
-    alert('To trigger a manual run:\n\nmodal run agent/modal_app.py\n\nor target a specific space:\n\nmodal run agent/modal_app.py --space-id YOUR_SPACE_ID');
+    setRunResult(null);
+    try {
+      const res = await fetch('/api/agent/run-now', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json() as { triggered: boolean; method?: string; note?: string };
+        if (data.triggered) {
+          setRunResult(data.method === 'modal' ? 'Run started!' : (data.note ?? 'Queued for next heartbeat'));
+          // Refresh status after a moment
+          setTimeout(() => void load(), 3000);
+        } else {
+          setRunResult('Could not trigger run — check Modal deployment');
+        }
+      }
+    } catch {
+      setRunResult('Network error');
+    } finally {
+      setTriggeringRun(false);
+      setTimeout(() => setRunResult(null), 5000);
+    }
   }
 
   if (loading || !settings) {
@@ -169,13 +211,16 @@ export function AgentSettingsPanel({ slug }: Props) {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      {/* Status widget */}
-      <div className="rounded-xl border bg-card p-4">
+
+      {/* Status + Run Now */}
+      <div className="rounded-xl border bg-card p-4 space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className={cn(
               'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0',
-              settings.enabled ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-muted text-muted-foreground',
+              settings.enabled
+                ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400'
+                : 'bg-muted text-muted-foreground',
             )}>
               <Bot size={18} />
             </div>
@@ -193,32 +238,63 @@ export function AgentSettingsPanel({ slug }: Props) {
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {status?.lastRunAt
-                  ? `Last run ${timeAgo(status.lastRunAt)} · runs every ${settings.heartbeatIntervalMinutes} min`
+                  ? `Last run ${timeAgo(status.lastRunAt)} · every ${settings.heartbeatIntervalMinutes} min`
                   : 'No runs yet'}
                 {status?.pendingDrafts ? ` · ${status.pendingDrafts} draft${status.pendingDrafts !== 1 ? 's' : ''} awaiting review` : ''}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1.5 text-xs"
-              onClick={triggerRun}
-              disabled={triggeringRun || !settings.enabled}
-            >
-              {triggeringRun ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-              Run now
-            </Button>
+            <div className="flex flex-col items-end gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => void triggerRun()}
+                disabled={triggeringRun || !settings.enabled}
+              >
+                {triggeringRun ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+                Run now
+              </Button>
+              {runResult && (
+                <p className="text-[10px] text-muted-foreground">{runResult}</p>
+              )}
+            </div>
             <Switch
               checked={settings.enabled}
               onCheckedChange={(v) => {
                 setSettings({ ...settings, enabled: v });
-                saveField({ enabled: v }, 'enabled');
+                void saveField({ enabled: v }, 'enabled');
               }}
             />
           </div>
         </div>
+
+        {/* Token usage meter */}
+        {usage && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Today&apos;s usage — {usage.used.toLocaleString()} / {usage.limit.toLocaleString()} tokens
+              </span>
+              <span className={cn(
+                'font-medium',
+                usage.pct >= 90 ? 'text-destructive' : usage.pct >= 70 ? 'text-amber-500' : 'text-muted-foreground',
+              )}>
+                {usage.pct}% · resets in {timeUntil(usage.resetsAt)}
+              </span>
+            </div>
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  'h-full rounded-full transition-all',
+                  usage.pct >= 90 ? 'bg-destructive' : usage.pct >= 70 ? 'bg-amber-400' : 'bg-primary',
+                )}
+                style={{ width: `${usage.pct}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Autonomy level */}
@@ -226,7 +302,7 @@ export function AgentSettingsPanel({ slug }: Props) {
         <div>
           <Label className="text-sm font-semibold">How much should the agent do on its own?</Label>
           <p className="text-xs text-muted-foreground mt-0.5">
-            You can change this at any time. We recommend starting with "Draft + approval".
+            We recommend starting with &quot;Draft + approval&quot; — you stay in control.
           </p>
         </div>
         <div className="space-y-2">
@@ -238,7 +314,7 @@ export function AgentSettingsPanel({ slug }: Props) {
                 key={opt.value}
                 onClick={() => {
                   setSettings({ ...settings, autonomyLevel: opt.value });
-                  saveField({ autonomyLevel: opt.value }, 'autonomyLevel');
+                  void saveField({ autonomyLevel: opt.value }, 'autonomyLevel');
                 }}
                 className={cn(
                   'w-full text-left p-4 rounded-xl border transition-all',
@@ -253,8 +329,7 @@ export function AgentSettingsPanel({ slug }: Props) {
                     <div className="flex items-center gap-2">
                       {selected
                         ? <CheckCircle2 size={14} className="text-primary flex-shrink-0" />
-                        : <Circle size={14} className="text-muted-foreground/40 flex-shrink-0" />
-                      }
+                        : <Circle size={14} className="text-muted-foreground/40 flex-shrink-0" />}
                       <span className="text-sm font-medium">{opt.label}</span>
                       {'recommended' in opt && opt.recommended && (
                         <span className="text-[10px] bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded-full">
@@ -282,10 +357,7 @@ export function AgentSettingsPanel({ slug }: Props) {
             const Icon = opt.icon;
             const enabled = (settings.enabledAgents ?? []).includes(opt.value);
             return (
-              <div
-                key={opt.value}
-                className="flex items-center gap-4 p-4 rounded-xl border bg-card"
-              >
+              <div key={opt.value} className="flex items-center gap-4 p-4 rounded-xl border bg-card">
                 <div className={cn('w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center flex-shrink-0', opt.iconClass)}>
                   <Icon size={15} />
                 </div>
@@ -309,7 +381,7 @@ export function AgentSettingsPanel({ slug }: Props) {
         <div>
           <Label className="text-sm font-semibold">Daily token budget</Label>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Limits how much OpenAI usage the agent can consume per day for this workspace. Resets at midnight UTC.
+            Limits OpenAI usage per day for this workspace. Resets at midnight UTC.
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -318,7 +390,7 @@ export function AgentSettingsPanel({ slug }: Props) {
               key={preset.value}
               onClick={() => {
                 setSettings({ ...settings, dailyTokenBudget: preset.value });
-                saveField({ dailyTokenBudget: preset.value }, 'budget');
+                void saveField({ dailyTokenBudget: preset.value }, 'budget');
               }}
               className={cn(
                 'flex flex-col items-center px-4 py-2.5 rounded-xl border text-sm transition-all',
