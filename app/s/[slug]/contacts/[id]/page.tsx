@@ -33,6 +33,7 @@ import { CollapsibleSection } from '@/components/contacts/collapsible-section';
 import { DynamicApplicationDisplay } from '@/components/contacts/dynamic-application-display';
 import { getInitials, formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug } from '@/lib/space';
+import { AgentContactPanel } from '@/components/agent/agent-contact-panel';
 
 
 function tierBadgeClasses(label: string) {
@@ -361,6 +362,11 @@ export default async function ClientDetailPage({
           </div>
           <RescoreButton contactId={contact.id} />
         </div>
+      )}
+
+      {/* ── Agent Intelligence Panel ── */}
+      {activeTab === 'intelligence' && (
+        <AgentContactPanel contactId={contact.id} slug={slug} />
       )}
 
       {/* ── Application Details (rich structured data) ── */}

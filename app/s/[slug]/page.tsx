@@ -24,6 +24,7 @@ import { CopyLinkButton } from './copy-link-button';
 import { timeAgo, formatCurrency } from '@/lib/formatting';
 import { FollowUpWidget, type FollowUpContact } from '@/components/dashboard/follow-up-widget';
 import { OnboardingChecklist } from '@/components/dashboard/onboarding-checklist';
+import { AgentInsightsWidget } from '@/components/agent/agent-insights-widget';
 
 export async function generateMetadata({
   params,
@@ -487,7 +488,10 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      {/* ── 7. Utilities ──────────────────────────────────────────────── */}
+      {/* ── 7. Agent Insights ────────────────────────────────────────── */}
+      <AgentInsightsWidget slug={slug} />
+
+      {/* ── 8. Utilities ──────────────────────────────────────────────── */}
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
         <div className="px-5 py-3 border-b border-border">
           <h2 className="text-sm font-semibold">Your Links</h2>
@@ -498,7 +502,7 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      {/* ── 8. Onboarding Checklist ───────────────────────────────────── */}
+      {/* ── 9. Onboarding Checklist ───────────────────────────────────── */}
       <div className="order-last">
         <OnboardingChecklist slug={slug} hasLeads={totalLeads > 0} hasContacts={contactCount > 0} hasTours={upcomingTourCount > 0} hasDeals={dealCount > 0} />
       </div>

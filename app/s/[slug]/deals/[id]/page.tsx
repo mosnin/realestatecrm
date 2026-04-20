@@ -16,6 +16,7 @@ import { DealContactsManager } from '@/components/deals/deal-contacts-manager';
 import { DealMilestones } from '@/components/deals/deal-milestones';
 import { DealPrioritySelector } from '@/components/deals/deal-priority-selector';
 import { DeleteDealButton } from '@/components/deals/deal-delete-button';
+import { AgentDealPanel } from '@/components/agent/agent-deal-panel';
 
 
 export default async function DealDetailPage({
@@ -330,6 +331,7 @@ export default async function DealDetailPage({
                     placeholder="Add notes or description…"
                   />
                 </div>
+                <AgentDealPanel dealId={id} />
               </div>
             )}
 
