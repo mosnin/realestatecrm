@@ -51,9 +51,22 @@ export async function PATCH(
     );
   }
 
+  const patch: Record<string, unknown> = {
+    status: newStatus,
+    updatedAt: new Date().toISOString(),
+  };
+
+  // Allow the realtor to edit content before approving
+  if (newStatus === 'approved' && body.content !== undefined) {
+    if (typeof body.content !== 'string' || body.content.trim().length === 0) {
+      return NextResponse.json({ error: 'content must be a non-empty string' }, { status: 400 });
+    }
+    patch.content = body.content.trim();
+  }
+
   const { data: updated, error: updateError } = await supabase
     .from('AgentDraft')
-    .update({ status: newStatus, updatedAt: new Date().toISOString() })
+    .update(patch)
     .eq('id', id)
     .eq('spaceId', space.id)
     .select()
@@ -67,7 +80,11 @@ export async function PATCH(
     resource: 'AgentDraft',
     resourceId: id,
     spaceId: space.id,
-    metadata: { newStatus, contactId: existing.contactId },
+    metadata: {
+      newStatus,
+      contactId: existing.contactId,
+      contentEdited: newStatus === 'approved' && body.content !== undefined && body.content.trim() !== existing.content,
+    },
   });
 
   return NextResponse.json(updated);

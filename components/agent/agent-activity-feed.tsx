@@ -1,8 +1,15 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { CheckCircle2, Clock, AlertCircle, Lightbulb, Bot, Loader2 } from 'lucide-react';
+import {
+  CheckCircle2, Clock, AlertCircle, Lightbulb, Bot, Loader2,
+  User, Briefcase,
+} from 'lucide-react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -11,19 +18,40 @@ function timeAgo(dateStr: string): string {
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
 }
 
-interface ActivityContact {
-  id: string;
-  name: string;
+// Convert snake_case action type to a human-readable sentence
+const ACTION_LABELS: Record<string, string> = {
+  create_draft_message: 'Drafted message',
+  set_contact_follow_up: 'Scheduled follow-up',
+  set_deal_follow_up: 'Scheduled deal follow-up',
+  log_agent_observation: 'Logged observation',
+  update_lead_score: 'Updated lead score',
+  update_deal_probability: 'Updated deal probability',
+  create_follow_up_reminder: 'Created reminder',
+  log_observation: 'Logged observation',
+  store_memory: 'Stored insight',
+};
+
+function formatActionType(t: string): string {
+  return ACTION_LABELS[t] ?? t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-interface ActivityDeal {
-  id: string;
-  title: string;
+const AGENT_LABELS: Record<string, string> = {
+  lead_nurture: 'Lead Nurture',
+  deal_sentinel: 'Deal Sentinel',
+  long_term_nurture: 'Long-term Nurture',
+};
+
+function formatAgentType(t: string): string {
+  return AGENT_LABELS[t] ?? t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+// ─── types ────────────────────────────────────────────────────────────────────
+
+interface ActivityContact { id: string; name: string; }
+interface ActivityDeal { id: string; title: string; }
 
 interface ActivityEntry {
   id: string;
@@ -40,49 +68,151 @@ interface ActivityEntry {
   Deal: ActivityDeal | null;
 }
 
-interface Props {
-  slug: string;
+interface RunGroup {
+  runId: string;
+  agentType: string;
+  entries: ActivityEntry[];
+  startedAt: string;
 }
+
+interface Props { slug: string; }
+
+type Filter = 'all' | 'completed' | 'queued_for_approval' | 'failed';
+
+// ─── outcome config ───────────────────────────────────────────────────────────
 
 const OUTCOME_CONFIG = {
   completed: {
     icon: CheckCircle2,
-    className: 'text-emerald-500',
-    label: 'Completed',
+    dotClass: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400',
+    label: 'Done',
   },
   queued_for_approval: {
     icon: Clock,
-    className: 'text-amber-500',
+    dotClass: 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400',
     label: 'Awaiting approval',
   },
   suggested: {
     icon: Lightbulb,
-    className: 'text-blue-500',
+    dotClass: 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400',
     label: 'Suggested',
   },
   failed: {
     icon: AlertCircle,
-    className: 'text-destructive',
+    dotClass: 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400',
     label: 'Failed',
   },
 } as const;
 
-function formatAgentType(t: string) {
-  return t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+// ─── RunGroup component ───────────────────────────────────────────────────────
+
+function RunGroupCard({ group, slug }: { group: RunGroup; slug: string }) {
+  const completedCount = group.entries.filter((e) => e.outcome === 'completed').length;
+  const draftCount = group.entries.filter((e) => e.outcome === 'queued_for_approval').length;
+  const failedCount = group.entries.filter((e) => e.outcome === 'failed').length;
+
+  return (
+    <div className="rounded-xl border bg-card overflow-hidden">
+      {/* Run header */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b bg-muted/30">
+        <div className="flex items-center gap-2">
+          <Bot size={13} className="text-primary" />
+          <span className="text-xs font-semibold text-foreground">
+            {formatAgentType(group.agentType)}
+          </span>
+          <span className="text-xs text-muted-foreground">·</span>
+          <span className="text-xs text-muted-foreground">{group.entries.length} action{group.entries.length !== 1 ? 's' : ''}</span>
+          {completedCount > 0 && (
+            <span className="text-[11px] bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 font-medium px-1.5 py-0.5 rounded-full">
+              {completedCount} done
+            </span>
+          )}
+          {draftCount > 0 && (
+            <span className="text-[11px] bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 font-medium px-1.5 py-0.5 rounded-full">
+              {draftCount} draft{draftCount !== 1 ? 's' : ''}
+            </span>
+          )}
+          {failedCount > 0 && (
+            <span className="text-[11px] bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400 font-medium px-1.5 py-0.5 rounded-full">
+              {failedCount} failed
+            </span>
+          )}
+        </div>
+        <span className="text-[11px] text-muted-foreground">{timeAgo(group.startedAt)}</span>
+      </div>
+
+      {/* Entries */}
+      <div className="divide-y divide-border/50">
+        {group.entries.map((entry) => {
+          const cfg = OUTCOME_CONFIG[entry.outcome] ?? OUTCOME_CONFIG.completed;
+          const Icon = cfg.icon;
+
+          return (
+            <div key={entry.id} className="flex items-start gap-3 px-4 py-3">
+              <div className={cn('w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5', cfg.dotClass)}>
+                <Icon size={12} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span className="text-sm font-medium">{formatActionType(entry.actionType)}</span>
+
+                  {/* Contact link */}
+                  {entry.Contact && (
+                    <Link
+                      href={`/s/${slug}/contacts/${entry.Contact.id}`}
+                      className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline underline-offset-2"
+                    >
+                      <User size={10} />
+                      {entry.Contact.name}
+                    </Link>
+                  )}
+
+                  {/* Deal link */}
+                  {entry.Deal && (
+                    <Link
+                      href={`/s/${slug}/deals`}
+                      className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline underline-offset-2"
+                    >
+                      <Briefcase size={10} />
+                      {entry.Deal.title}
+                    </Link>
+                  )}
+
+                  <span className="text-[11px] text-muted-foreground ml-auto flex-shrink-0">{cfg.label}</span>
+                </div>
+
+                {entry.reasoning && (
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    {entry.reasoning}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
-function formatActionType(t: string) {
-  return t.replace(/_/g, ' ');
-}
+// ─── Main component ───────────────────────────────────────────────────────────
+
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'queued_for_approval', label: 'Awaiting approval' },
+  { key: 'failed', label: 'Failed' },
+];
 
 export function AgentActivityFeed({ slug }: Props) {
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<Filter>('all');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/agent/activity?limit=50`);
+      const res = await fetch('/api/agent/activity?limit=100');
       if (res.ok) setEntries(await res.json());
     } finally {
       setLoading(false);
@@ -91,77 +221,82 @@ export function AgentActivityFeed({ slug }: Props) {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16 text-muted-foreground">
-        <Loader2 size={20} className="animate-spin mr-2" />
-        Loading activity…
-      </div>
-    );
+  const filtered = filter === 'all' ? entries : entries.filter((e) => e.outcome === filter);
+
+  // Group consecutive entries by runId, preserving chronological order
+  const runs: RunGroup[] = [];
+  for (const entry of filtered) {
+    const last = runs[runs.length - 1];
+    if (last && last.runId === entry.runId) {
+      last.entries.push(entry);
+    } else {
+      runs.push({
+        runId: entry.runId,
+        agentType: entry.agentType,
+        entries: [entry],
+        startedAt: entry.createdAt,
+      });
+    }
   }
 
-  if (entries.length === 0) {
+  if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground gap-3">
-        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-          <Bot size={22} />
-        </div>
-        <div>
-          <p className="font-medium text-foreground">No activity yet</p>
-          <p className="text-sm mt-0.5">Agent actions will appear here once the agent runs.</p>
-        </div>
+      <div className="space-y-3">
+        {[1, 2].map((n) => <div key={n} className="h-28 rounded-xl bg-muted/40 animate-pulse" />)}
       </div>
     );
   }
 
   return (
-    <div className="space-y-1">
-      {entries.map((entry, i) => {
-        const config = OUTCOME_CONFIG[entry.outcome] ?? OUTCOME_CONFIG.completed;
-        const Icon = config.icon;
-        const isLast = i === entries.length - 1;
-
-        return (
-          <div key={entry.id} className="flex gap-3 group">
-            {/* Timeline line */}
-            <div className="flex flex-col items-center">
-              <div className={cn('w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-0.5', config.className)}>
-                <Icon size={13} />
-              </div>
-              {!isLast && <div className="w-px flex-1 bg-border mt-1 mb-1" />}
-            </div>
-
-            {/* Content */}
-            <div className={cn('pb-4 min-w-0 flex-1', isLast && 'pb-0')}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium leading-snug">
-                    {formatActionType(entry.actionType)}
-                    {entry.Contact && (
-                      <span className="text-muted-foreground font-normal"> · {entry.Contact.name}</span>
-                    )}
-                    {entry.Deal && (
-                      <span className="text-muted-foreground font-normal"> · {entry.Deal.title}</span>
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {formatAgentType(entry.agentType)} · {config.label}
-                  </p>
-                </div>
-                <span className="text-[11px] text-muted-foreground flex-shrink-0 mt-0.5">
-                  {timeAgo(entry.createdAt)}
-                </span>
-              </div>
-
-              {entry.reasoning && (
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  {entry.reasoning}
-                </p>
+    <div className="space-y-4">
+      {/* Filter tabs */}
+      <div className="flex items-center gap-1 flex-wrap">
+        {FILTERS.map(({ key, label }) => {
+          const count = key === 'all' ? entries.length : entries.filter((e) => e.outcome === key).length;
+          if (key !== 'all' && count === 0) return null;
+          return (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className={cn(
+                'inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors',
+                filter === key
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:text-foreground',
               )}
-            </div>
+            >
+              {label}
+              <span className={cn('text-[10px] rounded-full px-1', filter === key ? 'bg-primary-foreground/20' : 'bg-background/60')}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+        <Button variant="ghost" size="sm" onClick={load} className="h-7 text-xs gap-1.5 ml-auto">
+          <Loader2 size={11} className={loading ? 'animate-spin' : 'hidden'} />
+          Refresh
+        </Button>
+      </div>
+
+      {runs.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+          <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
+            <Bot size={24} className="text-muted-foreground" />
           </div>
-        );
-      })}
+          <div>
+            <p className="font-semibold text-foreground">No activity yet</p>
+            <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+              Agent actions will appear here as it monitors your leads and deals.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {runs.map((group) => (
+            <RunGroupCard key={group.runId} group={group} slug={slug} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

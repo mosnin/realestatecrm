@@ -14,6 +14,7 @@ from agents import RunContextWrapper, function_tool
 
 from db import supabase
 from security.context import AgentContext
+from tools.streaming import publish_event
 
 
 @function_tool
@@ -68,6 +69,15 @@ async def create_draft_message(
     }
 
     result = await db.table("AgentDraft").insert(draft).execute()
+
+    contact_name = check.data[0].get("name", "contact") if check.data else "contact"
+    await publish_event(
+        ctx.context,
+        "draft",
+        f"Draft {channel.upper()} for {contact_name} — awaiting your approval",
+        metadata={"contactId": contact_id, "channel": channel},
+    )
+
     return result.data[0] if result.data else draft
 
 

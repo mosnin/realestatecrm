@@ -26,6 +26,7 @@ from db import supabase
 from schemas import AgentSettings, Space
 from security.budget import check_budget, record_usage
 from security.context import AgentContext
+from tools.streaming import publish_event
 
 logger = structlog.get_logger(__name__)
 
@@ -81,6 +82,7 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
     ctx = AgentContext.from_settings(agent_settings, run_id=run_id, space_name=space.name)
 
     log.info("agent_run_started", enabled_agents=agent_settings.enabled_agents)
+    await publish_event(ctx, "info", f"Agent started for workspace '{space.name}'")
     total_tokens = 0
 
     # Import agents lazily so Modal only loads them when needed
@@ -98,15 +100,22 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
         tracing_disabled=False,  # enables OpenAI traces dashboard
     )
 
+    AGENT_DISPLAY_NAMES = {
+        "lead_nurture": "Lead Nurture Agent",
+        "deal_sentinel": "Deal Sentinel Agent",
+    }
+
     for agent_name in agent_settings.enabled_agents:
         factory = agent_registry.get(agent_name)
         if not factory:
             log.warning("unknown_agent_skipped", agent=agent_name)
             continue
 
+        display_name = AGENT_DISPLAY_NAMES.get(agent_name, agent_name)
         agent = factory()
         agent_log = log.bind(agent=agent_name)
         agent_log.info("agent_started")
+        await publish_event(ctx, "info", f"Starting {display_name}…", agent_type=agent_name)
 
         try:
             prompt = _build_agent_prompt(agent_name, space, ctx)
@@ -125,9 +134,11 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
                 ctx.tokens_used += run_tokens
 
             agent_log.info("agent_completed", tokens=total_tokens)
+            await publish_event(ctx, "action", f"{display_name} finished", agent_type=agent_name)
 
-        except Exception:
+        except Exception as exc:
             agent_log.exception("agent_run_failed")
+            await publish_event(ctx, "error", f"{display_name} encountered an error: {exc}", agent_type=agent_name)
             # Continue to next agent — don't let one failure kill the run
 
     # Record total usage against budget
@@ -173,3 +184,12 @@ async def run_all_spaces() -> None:
     )
 
     log.info("heartbeat_finished", spaces_processed=len(spaces))
+
+
+async def _finish_run(ctx: AgentContext, total_tokens: int) -> None:
+    await publish_event(
+        ctx,
+        "complete",
+        f"Run complete — {total_tokens:,} tokens used",
+        metadata={"totalTokens": total_tokens},
+    )
