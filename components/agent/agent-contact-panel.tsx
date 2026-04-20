@@ -231,7 +231,7 @@ export function AgentContactPanel({ contactId, slug }: { contactId: string; slug
     await fetch(`/api/agent/drafts/${draftId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'approve', content }),
+      body: JSON.stringify({ status: 'approved', content }),
     });
     setData(prev => prev ? {
       ...prev,
@@ -243,7 +243,7 @@ export function AgentContactPanel({ contactId, slug }: { contactId: string; slug
     await fetch(`/api/agent/drafts/${draftId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'dismiss' }),
+      body: JSON.stringify({ status: 'dismissed' }),
     });
     setData(prev => prev ? {
       ...prev,

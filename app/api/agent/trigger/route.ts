@@ -2,10 +2,10 @@
  * POST /api/agent/trigger
  *
  * Pushes an event into the Redis trigger queue for a space so the next
- * agent heartbeat processes it promptly. Called automatically by the app
- * when key events occur (new lead, tour completed, deal stage change).
+ * agent heartbeat processes it promptly.
  *
- * Secured with Clerk auth — only authenticated space members can trigger.
+ * Secured with Clerk auth. Rate-limited to 20 triggers per space per minute
+ * to prevent Redis abuse.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,6 +14,9 @@ import { getSpaceForUser } from '@/lib/space';
 
 const VALID_EVENTS = ['new_lead', 'tour_completed', 'deal_stage_changed', 'application_submitted'] as const;
 type TriggerEvent = typeof VALID_EVENTS[number];
+
+const RATE_LIMIT = 20;     // max triggers per window
+const RATE_WINDOW_S = 60;  // 1 minute window
 
 export async function POST(req: NextRequest) {
   const authResult = await requireAuth();
@@ -32,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   if (!event || !VALID_EVENTS.includes(event)) {
     return NextResponse.json(
-      { error: `event must be one of: ${VALID_EVENTS.join(', ')}` },
+      { error: 'Invalid event type' },
       { status: 400 },
     );
   }
@@ -41,8 +44,27 @@ export async function POST(req: NextRequest) {
   const kvToken = process.env.KV_REST_API_TOKEN;
 
   if (!kvUrl || !kvToken) {
-    // Redis not configured — silently succeed (agent will pick up next heartbeat anyway)
     return NextResponse.json({ queued: false, reason: 'Redis not configured' });
+  }
+
+  // Rate limit: increment a per-space-per-minute counter
+  const rateKey = `agent:trigger-rate:${space.id}:${Math.floor(Date.now() / 60_000)}`;
+  const rateRes = await fetch(`${kvUrl}/incr/${encodeURIComponent(rateKey)}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${kvToken}` },
+  });
+  if (rateRes.ok) {
+    const { result: count } = await rateRes.json() as { result: number };
+    if (count === 1) {
+      // First request in this window — set TTL so the key self-cleans
+      await fetch(`${kvUrl}/expire/${encodeURIComponent(rateKey)}/${RATE_WINDOW_S * 2}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${kvToken}` },
+      });
+    }
+    if (count > RATE_LIMIT) {
+      return NextResponse.json({ error: 'Too many triggers — slow down' }, { status: 429 });
+    }
   }
 
   const trigger = JSON.stringify({
@@ -55,7 +77,6 @@ export async function POST(req: NextRequest) {
 
   const key = `agent:triggers:${space.id}`;
 
-  // RPUSH so orchestrator can LRANGE + delete in order
   const res = await fetch(`${kvUrl}/rpush/${encodeURIComponent(key)}`, {
     method: 'POST',
     headers: {

@@ -2,19 +2,11 @@
  * GET /api/agent/stream?runId=...
  *
  * Server-Sent Events endpoint. The browser subscribes here to receive
- * live task updates from the Modal agent in real-time — like watching
- * Claude Code run but for the background agent.
+ * live task updates from the Modal agent in real-time.
  *
- * The agent publishes events to Redis via POST /api/agent/events.
- * This endpoint reads from that Redis list on a short poll interval
- * and streams new events to the browser as they arrive.
- *
- * Connection lifecycle:
- *   1. Browser opens SSE connection with a runId
- *   2. We poll Redis every 500ms for new events past the last cursor
- *   3. Each event is flushed immediately to the browser
- *   4. When the agent sends a 'complete' event, we send it and close
- *   5. Request timeout or client disconnect also close the stream
+ * Security: spaceId is derived from the authenticated user's session.
+ * The Redis key is agent:stream:{spaceId}:{runId} — a user can only
+ * ever read keys scoped to their own verified space.
  */
 
 import { NextRequest } from 'next/server';
@@ -28,7 +20,9 @@ const redis = new Redis({
 });
 
 const POLL_INTERVAL_MS = 600;
-const MAX_STREAM_DURATION_MS = 5 * 60 * 1000; // 5 minutes max
+const MAX_STREAM_DURATION_MS = 5 * 60 * 1000;
+// Loose UUID format check — prevents abuse with huge/malformed runIds
+const RUN_ID_RE = /^[0-9a-f-]{8,36}$/i;
 
 function eventKey(spaceId: string, runId: string): string {
   return `agent:stream:${spaceId}:${runId}`;
@@ -46,8 +40,8 @@ export async function GET(req: NextRequest) {
   }
 
   const runId = req.nextUrl.searchParams.get('runId');
-  if (!runId) {
-    return new Response('Missing runId', { status: 400 });
+  if (!runId || !RUN_ID_RE.test(runId)) {
+    return new Response('Invalid runId', { status: 400 });
   }
 
   const key = eventKey(space.id, runId);
@@ -55,6 +49,8 @@ export async function GET(req: NextRequest) {
 
   let cursor = 0;
   const startedAt = Date.now();
+  // Flag set by cancel() when client disconnects so the poll loop exits promptly
+  let clientGone = false;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -62,11 +58,9 @@ export async function GET(req: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${data}\n\n`));
       }
 
-      // Send initial connected event
       send(JSON.stringify({ type: 'connected', message: 'Connected to agent stream', ts: Date.now() }));
 
-      while (true) {
-        // Timeout guard
+      while (!clientGone) {
         if (Date.now() - startedAt > MAX_STREAM_DURATION_MS) {
           send(JSON.stringify({ type: 'timeout', message: 'Stream timeout', ts: Date.now() }));
           controller.close();
@@ -74,15 +68,14 @@ export async function GET(req: NextRequest) {
         }
 
         try {
-          // Read all events past the current cursor
           const events = await redis.lrange(key, cursor, -1);
 
           for (const event of events) {
+            if (clientGone) break;
             const str = typeof event === 'string' ? event : JSON.stringify(event);
             send(str);
             cursor++;
 
-            // Close stream after completion event
             const parsed = typeof event === 'string' ? JSON.parse(event) : event;
             if (parsed.type === 'complete' || parsed.type === 'error') {
               controller.close();
@@ -90,17 +83,17 @@ export async function GET(req: NextRequest) {
             }
           }
         } catch {
-          // Redis error — send keepalive and continue
+          // Redis error — keep alive
         }
 
-        // Keepalive comment every poll to prevent connection timeout
         controller.enqueue(encoder.encode(': keepalive\n\n'));
-
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        await new Promise<void>((r) => setTimeout(r, POLL_INTERVAL_MS));
       }
+
+      controller.close();
     },
     cancel() {
-      // Client disconnected — nothing to clean up, Redis key expires naturally
+      clientGone = true;
     },
   });
 
@@ -109,7 +102,7 @@ export async function GET(req: NextRequest) {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no', // disable Nginx buffering
+      'X-Accel-Buffering': 'no',
     },
   });
 }

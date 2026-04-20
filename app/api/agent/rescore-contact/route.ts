@@ -17,8 +17,14 @@ import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 
 export async function POST(req: NextRequest) {
+  // Fail loudly on missing secret — misconfiguration should be caught immediately
+  if (!AGENT_INTERNAL_SECRET) {
+    console.error('[agent/rescore-contact] AGENT_INTERNAL_SECRET is not configured');
+    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 503 });
+  }
+
   const auth = req.headers.get('authorization');
-  if (!AGENT_INTERNAL_SECRET || auth !== `Bearer ${AGENT_INTERNAL_SECRET}`) {
+  if (auth !== `Bearer ${AGENT_INTERNAL_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

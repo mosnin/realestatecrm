@@ -89,7 +89,17 @@ async def pop_triggers(space_id: str) -> list[dict]:
         items = await r.lrange(key, 0, 9)   # pop up to 10 triggers
         if items:
             await r.delete(key)
-        return [json.loads(i) if isinstance(i, str) else i for i in (items or [])]
+        parsed = []
+        for item in (items or []):
+            try:
+                obj = json.loads(item) if isinstance(item, str) else item
+                if not isinstance(obj, dict) or "event" not in obj:
+                    logger.warning("trigger_malformed", item=str(item)[:100])
+                    continue
+                parsed.append(obj)
+            except (json.JSONDecodeError, Exception):
+                logger.warning("trigger_parse_error", item=str(item)[:100])
+        return parsed
     except Exception:
         return []
 
@@ -242,8 +252,10 @@ def _build_agent_prompt(
 
     trigger_context = ""
     if triggers:
-        events = [t.get("event", "unknown") for t in triggers]
-        trigger_context = f"\n\nTriggered by recent events: {', '.join(events)}. Prioritise contacts/deals related to these events."
+        _valid = {"new_lead", "tour_completed", "deal_stage_changed", "application_submitted"}
+        events = [t["event"] for t in triggers if t.get("event") in _valid]
+        if events:
+            trigger_context = f"\n\nTriggered by recent events: {', '.join(events)}. Prioritise contacts/deals related to these events."
 
     return (
         f"You are running as the {agent_name} agent for the real estate workspace '{space.name}'.\n"

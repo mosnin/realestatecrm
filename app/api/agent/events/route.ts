@@ -2,11 +2,11 @@
  * POST /api/agent/events
  *
  * Receives real-time event updates FROM the Modal agent and stores them
- * in an Upstash Redis list per space. The browser SSE endpoint reads
- * from these lists to stream live progress to the UI.
+ * in Upstash Redis. The SSE endpoint (/api/agent/stream) reads from these
+ * lists to stream live progress to the UI.
  *
- * Secured with AGENT_INTERNAL_SECRET — only trusted agent infrastructure
- * should call this endpoint.
+ * Secured with AGENT_INTERNAL_SECRET — fails loudly if secret is not set
+ * in production so misconfiguration is caught at startup, not at runtime.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -18,15 +18,21 @@ const redis = new Redis({
 });
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
+const VALID_TYPES = new Set(['info', 'action', 'draft', 'complete', 'error', 'warning']);
 
 function eventKey(spaceId: string, runId: string): string {
   return `agent:stream:${spaceId}:${runId}`;
 }
 
 export async function POST(req: NextRequest) {
-  // Authenticate the call — only the Modal agent should hit this
+  // Fail loudly on missing secret so misconfiguration surfaces immediately
+  if (!AGENT_INTERNAL_SECRET) {
+    console.error('[agent/events] AGENT_INTERNAL_SECRET is not configured');
+    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 503 });
+  }
+
   const auth = req.headers.get('authorization');
-  if (!AGENT_INTERNAL_SECRET || auth !== `Bearer ${AGENT_INTERNAL_SECRET}`) {
+  if (auth !== `Bearer ${AGENT_INTERNAL_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -37,20 +43,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
+  // Sanitise event type — reject unknown types rather than forwarding them
+  if (!VALID_TYPES.has(type)) {
+    return NextResponse.json({ error: 'Invalid event type' }, { status: 400 });
+  }
+
   const event = JSON.stringify({
-    type,       // 'info' | 'action' | 'draft' | 'complete' | 'error'
-    message,    // human-readable description of what the agent is doing
-    agentType,
+    type,
+    message: String(message).slice(0, 1_000), // cap to prevent huge payloads reaching browser
+    agentType: agentType ? String(agentType).slice(0, 50) : '',
     metadata: metadata ?? {},
     ts: Date.now(),
   });
 
   const key = eventKey(spaceId, runId);
 
-  // Push event to a capped list. Expires after 2 hours so stale runs auto-clean.
   await redis.rpush(key, event);
-  await redis.ltrim(key, -500, -1);   // keep last 500 events
-  await redis.expire(key, 7_200);     // 2 hour TTL
+  await redis.ltrim(key, -500, -1);
+  await redis.expire(key, 7_200);
 
   return NextResponse.json({ ok: true });
 }

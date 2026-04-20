@@ -49,5 +49,6 @@ async def publish_event(
                 json=payload,
                 headers={"Authorization": f"Bearer {settings.agent_internal_secret}"},
             )
-    except Exception:
-        pass  # never let streaming failures interrupt agent work
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).debug("Event publish failed (non-critical): %s", exc)

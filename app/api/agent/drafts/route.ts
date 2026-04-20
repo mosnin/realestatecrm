@@ -12,7 +12,8 @@ export async function GET(req: NextRequest) {
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const status = req.nextUrl.searchParams.get('status') ?? 'pending';
-  const limit = Math.min(parseInt(req.nextUrl.searchParams.get('limit') ?? '50'), 100);
+  const limitParam = parseInt(req.nextUrl.searchParams.get('limit') ?? '50', 10);
+  const limit = Math.min(isNaN(limitParam) ? 50 : limitParam, 100);
 
   const { data, error } = await supabase
     .from('AgentDraft')
