@@ -186,16 +186,20 @@ export default async function ClientDetailPage({
               <Link href={tabHref('deals')} className={`${activeTab === 'deals' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Deals</Link>
             </div>
 
-      {/* Smart follow-up suggestions */}
+      {/* Next-best-action: AI suggestions + drafts surface at the top of Overview
+          so the realtor can approve/send without navigating to Intelligence. */}
       {activeTab === 'overview' && (
-      <FollowUpSuggestions
-        contactId={contact.id}
-        scoreLabel={contact.scoreLabel}
-        contactType={contact.type}
-        hasTours={contact.tours.length > 0}
-        hasDeals={contact.dealContacts.length > 0}
-        hasFollowUp={!!contact.followUpAt}
-      />
+        <>
+          <AgentContactPanel contactId={contact.id} slug={slug} />
+          <FollowUpSuggestions
+            contactId={contact.id}
+            scoreLabel={contact.scoreLabel}
+            contactType={contact.type}
+            hasTours={contact.tours.length > 0}
+            hasDeals={contact.dealContacts.length > 0}
+            hasFollowUp={!!contact.followUpAt}
+          />
+        </>
       )}
 
       {/* ── AI Lead Score Card ── */}

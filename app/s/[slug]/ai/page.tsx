@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ChatInterface } from '@/components/ai/chat-interface';
+import { AssistantTabs } from '@/components/assistant/assistant-tabs';
 import type { Conversation } from '@/lib/types';
 
 export default async function AIPage({
@@ -60,14 +61,25 @@ export default async function AIPage({
     // fall back to empty state
   }
 
+  const { count: pendingDrafts } = await supabase
+    .from('AgentDraft')
+    .select('id', { count: 'exact', head: true })
+    .eq('spaceId', space.id)
+    .eq('status', 'pending');
+
   return (
-    <div className="h-full">
-      <ChatInterface
-        slug={slug}
-        initialMessages={initialMessages}
-        initialConversations={conversations}
-        initialConversationId={initialConversationId}
-      />
+    <div className="flex h-full flex-col">
+      <div className="px-1 pt-1">
+        <AssistantTabs slug={slug} pendingDrafts={pendingDrafts ?? 0} />
+      </div>
+      <div className="flex-1 min-h-0">
+        <ChatInterface
+          slug={slug}
+          initialMessages={initialMessages}
+          initialConversations={conversations}
+          initialConversationId={initialConversationId}
+        />
+      </div>
     </div>
   );
 }
