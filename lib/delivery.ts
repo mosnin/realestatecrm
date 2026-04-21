@@ -1,8 +1,8 @@
 /**
  * Draft delivery — routes approved agent drafts to the right channel.
  *
- * Email  → Resend (RESEND_API_KEY + FROM_EMAIL required)
- * SMS    → Twilio REST API (TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN + TWILIO_FROM_NUMBER)
+ * Email  → Resend        (RESEND_API_KEY + FROM_EMAIL required)
+ * SMS    → Telnyx REST   (TELNYX_API_KEY + TELNYX_FROM_NUMBER required)
  * Note   → no external delivery; treated as immediately "sent" (internal log only)
  *
  * Returns a DeliveryResult so the caller can decide the final draft status:
@@ -54,30 +54,27 @@ async function deliverEmail(
     const { error } = await resend.emails.send({
       from,
       to: contact.email,
-      subject: draft.subject ?? `A message for you`,
+      subject: draft.subject ?? 'A message for you',
       text: draft.content,
     });
 
-    if (error) {
-      return { sent: false, method: 'email', error: error.message };
-    }
+    if (error) return { sent: false, method: 'email', error: error.message };
     return { sent: true, method: 'email' };
   } catch (err) {
     return { sent: false, method: 'email', error: String(err) };
   }
 }
 
-// ─── SMS via Twilio REST API ──────────────────────────────────────────────────
+// ─── SMS via Telnyx REST API ──────────────────────────────────────────────────
 
 async function deliverSms(
   draft: DraftPayload,
   contact: ContactPayload,
 ): Promise<DeliveryResult> {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const fromNumber = process.env.TWILIO_FROM_NUMBER;
+  const apiKey = process.env.TELNYX_API_KEY;
+  const fromNumber = process.env.TELNYX_FROM_NUMBER;
 
-  if (!accountSid || !authToken || !fromNumber) {
+  if (!apiKey || !fromNumber) {
     return { sent: false, method: 'sms', error: 'not_configured' };
   }
   if (!contact.phone) {
@@ -85,30 +82,25 @@ async function deliverSms(
   }
 
   try {
-    const creds = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
-    const res = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${creds}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          From: fromNumber,
-          To: contact.phone,
-          Body: draft.content,
-        }).toString(),
+    const res = await fetch('https://api.telnyx.com/v2/messages', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-    );
+      body: JSON.stringify({
+        from: fromNumber,
+        to: contact.phone,
+        text: draft.content,
+      }),
+    });
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      return {
-        sent: false,
-        method: 'sms',
-        error: (body as { message?: string }).message ?? `Twilio error ${res.status}`,
-      };
+      const errMsg =
+        (body as { errors?: { detail?: string }[] }).errors?.[0]?.detail ??
+        `Telnyx error ${res.status}`;
+      return { sent: false, method: 'sms', error: errMsg };
     }
     return { sent: true, method: 'sms' };
   } catch (err) {
@@ -136,7 +128,7 @@ export async function sendDraft(
     case 'sms':
       return deliverSms(draft, contact);
     case 'note':
-      // Notes are internal — no external delivery needed; mark as sent immediately
+      // Notes are internal — no external delivery; mark as sent immediately
       return { sent: true, method: 'note' };
   }
 }

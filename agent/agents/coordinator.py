@@ -44,6 +44,11 @@ a focused brief. You do not perform CRM actions yourself.
 
 ## Routing rules
 
+Activate tour_followup_agent when:
+- A "tour_completed" trigger is active.
+- Pass the contactId from the trigger in your brief (e.g. "contactId: abc-123").
+- This runs FIRST — tour follow-up is the most time-sensitive action.
+
 Activate lead_nurture_agent when:
 - stale_leads > 0  (contacts inactive 7+ days with no follow-up scheduled)
 - OR a "new_lead" trigger is active
@@ -57,17 +62,18 @@ Activate long_term_nurture_agent when:
 - cold_leads_30d > 3  (meaningful pool of leads inactive 30+ days)
 
 Activate lead_scorer_agent when:
-- A "tour_completed" or "application_submitted" trigger is active
+- An "application_submitted" trigger is active
 - OR cold_leads_30d > 8  (many contacts likely have stale scores from engagement decay)
+- Note: tour_completed rescoring is handled by tour_followup_agent via store_observation;
+  lead_scorer only needs to run if application_submitted or broad decay is detected.
 
 ## Rules
 - ONLY hand off to agents that appear in the enabled_agents list from the survey result.
 - Maintain this order when multiple agents are needed:
-  lead_nurture → deal_sentinel → long_term_nurture → lead_scorer
-  This ordering is intentional: active-lead follow-up before pipeline monitoring,
-  pipeline monitoring before cold-lead re-engagement, scoring last.
-- Your handoff brief must be specific. Instead of "do your job", say:
-  "There are 6 stale leads. Focus on the ones inactive the longest first."
+  tour_followup → lead_nurture → deal_sentinel → long_term_nurture → lead_scorer
+  tour_followup runs first because it is time-critical (same-day post-tour outreach).
+- Your handoff brief must be specific. Include contactIds for event-driven agents.
+  Example: "tour_completed trigger received. contactId: abc-123. Follow up immediately."
 - Do not activate an agent simply because it is enabled — only when a concrete
   signal exists (non-zero count or matching trigger).
 """.strip()
@@ -168,8 +174,14 @@ def make_coordinator_agent(enabled_agents: list[str]) -> Agent:
     from agents.lead_nurture import make_lead_nurture_agent
     from agents.lead_scorer import make_lead_scorer_agent
     from agents.long_term_nurture import make_long_term_nurture_agent
+    from agents.tour_followup import make_tour_followup_agent
 
     _registry: dict[str, tuple[Callable, str, str]] = {
+        "tour_followup": (
+            make_tour_followup_agent,
+            "Tour Follow-Up Agent",
+            "contacts who just completed a tour and need an immediate, personalised follow-up",
+        ),
         "lead_nurture": (
             make_lead_nurture_agent,
             "Lead Nurture Agent",
@@ -192,8 +204,8 @@ def make_coordinator_agent(enabled_agents: list[str]) -> Agent:
         ),
     }
 
-    # Enforce consistent activation order regardless of storage order
-    _order = ["lead_nurture", "deal_sentinel", "long_term_nurture", "lead_scorer"]
+    # tour_followup runs first — same-day post-tour outreach is time-critical
+    _order = ["tour_followup", "lead_nurture", "deal_sentinel", "long_term_nurture", "lead_scorer"]
     ordered = [name for name in _order if name in enabled_agents]
 
     handoffs_list = []

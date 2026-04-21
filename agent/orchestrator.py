@@ -217,12 +217,21 @@ def _build_coordinator_prompt(
     trigger_section = ""
     if triggers:
         _valid = {"new_lead", "tour_completed", "deal_stage_changed", "application_submitted"}
-        events = [t["event"] for t in triggers if t.get("event") in _valid]
-        if events:
-            trigger_section = (
-                f"\n\nActive triggers (factor these into routing decisions): "
-                f"{', '.join(events)}"
-            )
+        lines = []
+        for t in triggers:
+            event = t.get("event", "")
+            if event not in _valid:
+                continue
+            # Surface contactId and dealId so event-driven agents (e.g. tour_followup)
+            # know exactly which entity to act on without scanning the whole workspace.
+            parts = [f"- {event}"]
+            if t.get("contactId"):
+                parts.append(f"contactId: {t['contactId']}")
+            if t.get("dealId"):
+                parts.append(f"dealId: {t['dealId']}")
+            lines.append("  ".join(parts))
+        if lines:
+            trigger_section = "\n\nActive triggers:\n" + "\n".join(lines)
 
     return (
         f"Workspace: '{space.name}'\n"

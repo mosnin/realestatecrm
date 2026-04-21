@@ -342,7 +342,7 @@ function DeliveryBanner({
         <span>
           Draft approved and copied to clipboard.{' '}
           <span className="text-foreground/70">
-            Add <code className="text-[11px] bg-muted px-1 rounded">{methodLabel === 'email' ? 'RESEND_API_KEY + FROM_EMAIL' : 'TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN + TWILIO_FROM_NUMBER'}</code> to enable auto-send.
+            Add <code className="text-[11px] bg-muted px-1 rounded">{methodLabel === 'email' ? 'RESEND_API_KEY + FROM_EMAIL' : 'TELNYX_API_KEY + TELNYX_FROM_NUMBER'}</code> to enable auto-send.
           </span>
         </span>
         <button onClick={onClose} className="ml-auto flex-shrink-0 text-muted-foreground hover:text-foreground">

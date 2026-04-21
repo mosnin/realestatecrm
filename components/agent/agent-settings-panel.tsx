@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Bot, Loader2, Play, CheckCircle2, Circle,
-  Zap, Shield, Eye, UserCheck, Briefcase, Clock, TrendingUp,
+  Zap, Shield, Eye, UserCheck, Briefcase, Clock, TrendingUp, CalendarCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -84,6 +84,13 @@ const AGENT_OPTIONS = [
     description: 'Re-scores contacts whose activity makes their current score stale.',
     icon: TrendingUp,
     iconClass: 'text-orange-500',
+  },
+  {
+    value: 'tour_followup',
+    label: 'Tour Follow-Up',
+    description: 'Instantly drafts a personal follow-up when a contact completes a tour.',
+    icon: CalendarCheck,
+    iconClass: 'text-rose-500',
   },
 ] as const;
 
