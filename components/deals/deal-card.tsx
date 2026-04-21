@@ -21,10 +21,13 @@ import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatCompact } from '@/lib/formatting';
 import { dealHealth, inferNextAction, HEALTH_META } from '@/lib/deals/health';
+import { summarizeChecklist, type DealChecklistItem } from '@/lib/deals/checklist';
 
 type DealWithRelations = Deal & {
   stage: DealStage;
   dealContacts: (DealContact & { contact: Pick<Contact, 'id' | 'name'> })[];
+  /** Optional — stages endpoint attaches a minimal projection for the card chip. */
+  checklist?: Pick<DealChecklistItem, 'completedAt' | 'dueAt' | 'label'>[];
 };
 
 const PRIORITY_META: Record<string, { label: string; className: string }> = {
@@ -68,6 +71,7 @@ export function DealCard({ deal, slug, onDelete, onStatusChange, nextStage, onAd
   const healthMeta = HEALTH_META[health.state];
   const nextAction = inferNextAction(deal);
   const isActive = deal.status === 'active';
+  const checklistSummary = summarizeChecklist(deal.checklist ?? []);
 
   const canAdvance = isActive && nextStage && onAdvanceStage;
 
@@ -147,6 +151,24 @@ export function DealCard({ deal, slug, onDelete, onStatusChange, nextStage, onAd
               <p className="text-xs text-muted-foreground mt-1">
                 GCI: {formatCompact(deal.value * deal.commissionRate / 100)}
               </p>
+            )}
+
+            {/* Closing checklist chip — compact progress + next item. */}
+            {checklistSummary && (
+              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-muted-foreground">
+                <CheckCircle2 size={11} className={cn(
+                  checklistSummary.anyOverdue ? 'text-red-500' : 'text-muted-foreground',
+                )} />
+                <span className="font-medium">
+                  {checklistSummary.complete}/{checklistSummary.total}
+                </span>
+                {checklistSummary.nextLabel && !checklistSummary.anyOverdue && (
+                  <span className="truncate">· next: {checklistSummary.nextLabel}</span>
+                )}
+                {checklistSummary.anyOverdue && (
+                  <span className="text-red-700 dark:text-red-400 font-medium truncate">· overdue</span>
+                )}
+              </div>
             )}
 
             {deal.dealContacts.length > 0 && (

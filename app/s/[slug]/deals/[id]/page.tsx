@@ -14,9 +14,11 @@ import { DealStatusControl } from '@/components/deals/deal-status-control';
 import { DealStageSelector } from '@/components/deals/deal-stage-selector';
 import { DealContactsManager } from '@/components/deals/deal-contacts-manager';
 import { DealMilestones } from '@/components/deals/deal-milestones';
+import { DealChecklist } from '@/components/deals/deal-checklist';
 import { DealPrioritySelector } from '@/components/deals/deal-priority-selector';
 import { DeleteDealButton } from '@/components/deals/deal-delete-button';
 import { AgentDealPanel } from '@/components/agent/agent-deal-panel';
+import type { DealChecklistItem } from '@/lib/deals/checklist';
 
 
 export default async function DealDetailPage({
@@ -28,7 +30,7 @@ export default async function DealDetailPage({
 }) {
   const { slug, id } = await params;
   const { tab } = await searchParams;
-  const activeTab = tab === 'activity' || tab === 'milestones' ? tab : 'overview';
+  const activeTab = tab === 'activity' || tab === 'checklist' || tab === 'milestones' ? tab : 'overview';
 
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
@@ -37,6 +39,7 @@ export default async function DealDetailPage({
   let dealContacts: { dealId: string; contactId: string; contact: { id: string; name: string; email: string | null; phone: string | null } | null }[];
   let activities: DealActivity[];
   let allStages: DealStage[];
+  let checklist: DealChecklistItem[];
 
   try {
     const { data: dealData, error: dealError } = await supabase
@@ -50,17 +53,20 @@ export default async function DealDetailPage({
     if (!dealData) notFound();
     dealRow = dealData as Record<string, unknown>;
 
-    const [stagesResult, dcResult, activityResult] = await Promise.all([
+    const [stagesResult, dcResult, activityResult, checklistResult] = await Promise.all([
       supabase.from('DealStage').select('*').eq('spaceId', space.id).order('position'),
       supabase.from('DealContact').select('dealId, contactId, Contact(id, name, type, email, phone)').eq('dealId', id),
       supabase.from('DealActivity').select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(100),
+      supabase.from('DealChecklistItem').select('*').eq('dealId', id).order('position', { ascending: true }),
     ]);
 
     if (stagesResult.error) throw stagesResult.error;
     if (dcResult.error) throw dcResult.error;
     if (activityResult.error) throw activityResult.error;
+    if (checklistResult.error) throw checklistResult.error;
 
     allStages = (stagesResult.data ?? []) as DealStage[];
+    checklist = (checklistResult.data ?? []) as DealChecklistItem[];
     dealContacts = ((dcResult.data ?? []) as Record<string, unknown>[]).map((row) => {
       const contact = row.Contact as { id: string; name: string; type: string; email: string | null; phone: string | null } | null;
       return {
@@ -276,8 +282,8 @@ export default async function DealDetailPage({
               {(
                 [
                   ['overview', 'Overview'],
+                  ['checklist', 'Closing checklist'],
                   ['activity', 'Activity'],
-                  ['milestones', 'Milestones'],
                 ] as [string, string][]
               ).map(([key, label]) => (
                 <Link
@@ -343,6 +349,12 @@ export default async function DealDetailPage({
               />
             )}
 
+            {activeTab === 'checklist' && (
+              <DealChecklist dealId={id} initial={checklist} />
+            )}
+
+            {/* Legacy milestones tab kept reachable via explicit ?tab=milestones
+                for any pre-existing bookmarks; no longer in the tab bar. */}
             {activeTab === 'milestones' && (
               <DealMilestones dealId={id} initialMilestones={milestones} />
             )}

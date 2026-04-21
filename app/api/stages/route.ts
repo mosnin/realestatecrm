@@ -56,6 +56,19 @@ export async function GET(req: NextRequest) {
     dealContactRows = data || [];
   }
 
+  // Fetch checklist items for these deals — used for the per-card progress chip.
+  // We only select the minimal fields needed for the summary (completedAt, dueAt,
+  // label) so the payload doesn't balloon with long custom labels.
+  let checklistRows: Array<{ dealId: string; completedAt: string | null; dueAt: string | null; label: string }> = [];
+  if (dealIds.length > 0) {
+    const { data, error: clError } = await supabase
+      .from('DealChecklistItem')
+      .select('dealId, completedAt, dueAt, label')
+      .in('dealId', dealIds);
+    if (clError) throw clError;
+    checklistRows = (data as typeof checklistRows) || [];
+  }
+
   // Group dealContacts by dealId
   const dcByDeal = new Map<string, any[]>();
   for (const dc of dealContactRows) {
@@ -68,6 +81,14 @@ export async function GET(req: NextRequest) {
     dcByDeal.set(dc.dealId, arr);
   }
 
+  // Group checklist items by dealId
+  const checklistByDeal = new Map<string, typeof checklistRows>();
+  for (const item of checklistRows) {
+    const arr = checklistByDeal.get(item.dealId) || [];
+    arr.push(item);
+    checklistByDeal.set(item.dealId, arr);
+  }
+
   // Group deals by stageId
   const dealsByStage = new Map<string, any[]>();
   for (const deal of dealRows) {
@@ -75,6 +96,7 @@ export async function GET(req: NextRequest) {
     arr.push({
       ...deal,
       dealContacts: dcByDeal.get(deal.id) || [],
+      checklist: checklistByDeal.get(deal.id) || [],
     });
     dealsByStage.set(deal.stageId, arr);
   }
