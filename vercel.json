@@ -1,0 +1,36 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/follow-up-reminders",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/broker-weekly-report",
+      "schedule": "0 9 * * 1"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/mcp/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "https://claude.ai" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, DELETE, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
+      ]
+    },
+    {
+      "source": "/api/mcp",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "https://claude.ai" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
+      ]
+    },
+    {
+      "source": "/.well-known/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "https://claude.ai" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,162 @@
+"""Pydantic models mirroring the TypeScript types in lib/types.ts.
+
+Keep in sync with supabase/schema.sql and lib/types.ts.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+
+# ---------------------------------------------------------------------------
+# Enums / Literals
+# ---------------------------------------------------------------------------
+
+LeadType = Literal["rental", "buyer"]
+DealStatus = Literal["active", "won", "lost", "on_hold"]
+Priority = Literal["LOW", "MEDIUM", "HIGH"]
+ContactType = Literal["QUALIFICATION", "TOUR", "APPLICATION"]
+AutonommyLevel = Literal["autonomous", "draft_required", "suggest_only"]
+DraftChannel = Literal["sms", "email", "note"]
+DraftStatus = Literal["pending", "approved", "dismissed", "sent"]
+AgentType = Literal["lead_nurture", "deal_sentinel", "long_term_nurture"]
+ActionOutcome = Literal["completed", "queued_for_approval", "suggested", "failed"]
+MemoryType = Literal["fact", "preference", "observation", "reminder"]
+EntityType = Literal["contact", "deal", "space"]
+
+
+# ---------------------------------------------------------------------------
+# CRM entities (read from DB)
+# ---------------------------------------------------------------------------
+
+class Contact(BaseModel):
+    id: str
+    space_id: str = Field(alias="spaceId")
+    name: str
+    email: str | None = None
+    phone: str | None = None
+    lead_type: LeadType | None = Field(None, alias="leadType")
+    address: str | None = None
+    notes: str | None = None
+    budget: float | None = None
+    tags: list[str] = Field(default_factory=list)
+    lead_score: int | None = Field(None, alias="leadScore")
+    score_label: str | None = Field(None, alias="scoreLabel")
+    follow_up_at: datetime | None = Field(None, alias="followUpAt")
+    last_contacted_at: datetime | None = Field(None, alias="lastContactedAt")
+    type: ContactType = "QUALIFICATION"
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")
+
+    model_config = {"populate_by_name": True}
+
+
+class DealMilestone(BaseModel):
+    id: str
+    label: str
+    due_date: str | None = Field(None, alias="dueDate")
+    completed: bool = False
+    completed_at: datetime | None = Field(None, alias="completedAt")
+
+    model_config = {"populate_by_name": True}
+
+
+class Deal(BaseModel):
+    id: str
+    space_id: str = Field(alias="spaceId")
+    title: str
+    description: str | None = None
+    value: float | None = None
+    address: str | None = None
+    priority: Priority = "MEDIUM"
+    close_date: str | None = Field(None, alias="closeDate")
+    stage_id: str | None = Field(None, alias="stageId")
+    status: DealStatus = "active"
+    follow_up_at: datetime | None = Field(None, alias="followUpAt")
+    commission_rate: float | None = Field(None, alias="commissionRate")
+    probability: int | None = None
+    milestones: list[DealMilestone] = Field(default_factory=list)
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")
+
+    model_config = {"populate_by_name": True}
+
+
+class Space(BaseModel):
+    id: str
+    slug: str
+    name: str
+
+
+# ---------------------------------------------------------------------------
+# Agent tables
+# ---------------------------------------------------------------------------
+
+class AgentSettings(BaseModel):
+    id: str
+    space_id: str = Field(alias="spaceId")
+    enabled: bool = False
+    autonomy_level: AutonommyLevel = Field("suggest_only", alias="autonomyLevel")
+    daily_token_budget: int = Field(50_000, alias="dailyTokenBudget")
+    heartbeat_interval_minutes: int = Field(15, alias="heartbeatIntervalMinutes")
+    enabled_agents: list[str] = Field(default_factory=lambda: ["lead_nurture"], alias="enabledAgents")
+
+    model_config = {"populate_by_name": True}
+
+
+class AgentDraft(BaseModel):
+    id: str
+    space_id: str = Field(alias="spaceId")
+    contact_id: str | None = Field(None, alias="contactId")
+    deal_id: str | None = Field(None, alias="dealId")
+    channel: DraftChannel
+    subject: str | None = None
+    content: str
+    reasoning: str | None = None
+    priority: int = 0
+    status: DraftStatus = "pending"
+    created_at: datetime = Field(alias="createdAt")
+
+    model_config = {"populate_by_name": True}
+
+
+class AgentActivityLogEntry(BaseModel):
+    id: str
+    space_id: str = Field(alias="spaceId")
+    run_id: str = Field(alias="runId")
+    agent_type: str = Field(alias="agentType")
+    action_type: str = Field(alias="actionType")
+    reasoning: str | None = None
+    outcome: ActionOutcome
+    related_contact_id: str | None = Field(None, alias="relatedContactId")
+    related_deal_id: str | None = Field(None, alias="relatedDealId")
+    reversible: bool = True
+    metadata: dict[str, Any] | None = None
+    created_at: datetime = Field(alias="createdAt")
+
+    model_config = {"populate_by_name": True}
+
+
+# ---------------------------------------------------------------------------
+# Internal agent types
+# ---------------------------------------------------------------------------
+
+class ActionPlan(BaseModel):
+    """Structured output from the orchestrator reasoning step."""
+    summary: str
+    actions: list[PlannedAction]
+    skip_reason: str | None = None
+
+
+class PlannedAction(BaseModel):
+    agent_type: AgentType
+    action_type: str
+    contact_id: str | None = None
+    deal_id: str | None = None
+    reasoning: str
+    requires_approval: bool = False
+    priority: int = 0
+    params: dict[str, Any] = Field(default_factory=dict)

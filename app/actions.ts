@@ -1,69 +1,34 @@
 'use server';
 
+import { auth } from '@clerk/nextjs/server';
 import { redis } from '@/lib/redis';
-import { isValidIcon } from '@/lib/subdomains';
+import { supabase } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
-import { rootDomain, protocol } from '@/lib/utils';
+import { getSpaceForUser } from '@/lib/space';
 
-export async function createSubdomainAction(
+export async function deleteSlugAction(
   prevState: any,
   formData: FormData
 ) {
-  const subdomain = formData.get('subdomain') as string;
-  const icon = formData.get('icon') as string;
+  const { userId } = await auth();
+  if (!userId) return { error: 'Unauthorized' };
 
-  if (!subdomain || !icon) {
-    return { success: false, error: 'Subdomain and icon are required' };
-  }
+  const slug = formData.get('slug') as string;
 
-  if (!isValidIcon(icon)) {
-    return {
-      subdomain,
-      icon,
-      success: false,
-      error: 'Please enter a valid emoji (maximum 10 characters)'
-    };
-  }
+  const { data: space, error } = await supabase
+    .from('Space')
+    .select('*')
+    .eq('slug', slug)
+    .maybeSingle();
+  if (error) return { error: 'Database error' };
+  if (!space) return { error: 'Space not found' };
 
-  const sanitizedSubdomain = subdomain.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const userSpace = await getSpaceForUser(userId);
+  if (!userSpace || space.id !== userSpace.id) return { error: 'Forbidden' };
 
-  if (sanitizedSubdomain !== subdomain) {
-    return {
-      subdomain,
-      icon,
-      success: false,
-      error:
-        'Subdomain can only have lowercase letters, numbers, and hyphens. Please try again.'
-    };
-  }
-
-  const subdomainAlreadyExists = await redis.get(
-    `subdomain:${sanitizedSubdomain}`
-  );
-  if (subdomainAlreadyExists) {
-    return {
-      subdomain,
-      icon,
-      success: false,
-      error: 'This subdomain is already taken'
-    };
-  }
-
-  await redis.set(`subdomain:${sanitizedSubdomain}`, {
-    emoji: icon,
-    createdAt: Date.now()
-  });
-
-  redirect(`${protocol}://${sanitizedSubdomain}.${rootDomain}`);
-}
-
-export async function deleteSubdomainAction(
-  prevState: any,
-  formData: FormData
-) {
-  const subdomain = formData.get('subdomain');
-  await redis.del(`subdomain:${subdomain}`);
+  await redis.del(`slug:${slug}`).catch(() => null);
+  const { error: deleteError } = await supabase.from('Space').delete().eq('slug', slug);
+  if (deleteError) return { error: 'Failed to delete space' };
   revalidatePath('/admin');
-  return { success: 'Domain deleted successfully' };
+  return { success: 'Space deleted successfully' };
 }
