@@ -4,12 +4,18 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   CheckCircle, XCircle, MessageSquare, Mail, StickyNote,
   Bot, Loader2, RefreshCw, Pencil, Copy, Check, ChevronDown,
-  ChevronUp, AlertTriangle,
+  ChevronUp, AlertTriangle, Send, TriangleAlert,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+
+interface DeliveryResult {
+  sent: boolean;
+  method: 'email' | 'sms' | 'note';
+  error?: string;
+}
 
 interface DraftContact {
   id: string;
@@ -79,7 +85,7 @@ function DraftCard({
 }: {
   draft: AgentDraft;
   slug: string;
-  onAction: (id: string, status: 'approved' | 'dismissed', content?: string) => Promise<void>;
+  onAction: (id: string, status: 'approved' | 'dismissed', content?: string) => Promise<DeliveryResult | null>;
 }) {
   const [editing, setEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(draft.content);
@@ -106,9 +112,11 @@ function DraftCard({
 
   async function handleApprove() {
     setActioning('approved');
-    // Copy to clipboard so the realtor can paste immediately
-    try { await navigator.clipboard.writeText(editedContent); } catch { /* ignore */ }
-    await onAction(draft.id, 'approved', isEdited ? editedContent : undefined);
+    const result = await onAction(draft.id, 'approved', isEdited ? editedContent : undefined);
+    // Fall back to clipboard copy when delivery isn't configured or failed
+    if (!result?.sent) {
+      try { await navigator.clipboard.writeText(editedContent); } catch { /* ignore */ }
+    }
     setActioning(null);
   }
 
@@ -289,12 +297,89 @@ function DraftCard({
   );
 }
 
+// ─── DeliveryBanner ────────────────────────────────────────────────────────
+
+const DELIVERY_LABELS: Record<'email' | 'sms' | 'note', string> = {
+  email: 'email',
+  sms: 'SMS',
+  note: 'note',
+};
+
+function DeliveryBanner({
+  feedback,
+  onClose,
+}: {
+  feedback: DeliveryFeedback;
+  onClose: () => void;
+}) {
+  const { result, contactName } = feedback;
+  const isNotConfigured = result.error === 'not_configured';
+  const methodLabel = DELIVERY_LABELS[result.method];
+
+  if (result.sent) {
+    const msg =
+      result.method === 'note'
+        ? contactName ? `Note logged for ${contactName}` : 'Note logged'
+        : contactName
+        ? `Sent to ${contactName} via ${methodLabel}`
+        : `Sent via ${methodLabel}`;
+
+    return (
+      <div className="flex items-center gap-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-400">
+        <Send size={14} className="flex-shrink-0" />
+        <span className="font-medium">{msg}</span>
+        <button onClick={onClose} className="ml-auto text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300">
+          <XCircle size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  if (isNotConfigured) {
+    return (
+      <div className="flex items-start gap-2.5 rounded-lg bg-muted/50 border border-border px-3 py-2.5 text-sm text-muted-foreground">
+        <Copy size={14} className="flex-shrink-0 mt-0.5" />
+        <span>
+          Draft approved and copied to clipboard.{' '}
+          <span className="text-foreground/70">
+            Add <code className="text-[11px] bg-muted px-1 rounded">{methodLabel === 'email' ? 'RESEND_API_KEY + FROM_EMAIL' : 'TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN + TWILIO_FROM_NUMBER'}</code> to enable auto-send.
+          </span>
+        </span>
+        <button onClick={onClose} className="ml-auto flex-shrink-0 text-muted-foreground hover:text-foreground">
+          <XCircle size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-400">
+      <TriangleAlert size={14} className="flex-shrink-0 mt-0.5" />
+      <span>
+        <span className="font-medium">Delivery failed</span>
+        {' — '}draft approved but {methodLabel} not sent.{' '}
+        {result.error && <span className="opacity-75">{result.error}</span>}
+      </span>
+      <button onClick={onClose} className="ml-auto flex-shrink-0 text-amber-500 hover:text-amber-700 dark:hover:text-amber-300">
+        <XCircle size={14} />
+      </button>
+    </div>
+  );
+}
+
 // ─── Main component ────────────────────────────────────────────────────────
+
+interface DeliveryFeedback {
+  contactName: string | null;
+  result: DeliveryResult;
+}
 
 export function AgentDraftInbox({ slug }: Props) {
   const [drafts, setDrafts] = useState<AgentDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [approvingAll, setApprovingAll] = useState(false);
+  const [deliveryFeedback, setDeliveryFeedback] = useState<DeliveryFeedback | null>(null);
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -313,11 +398,17 @@ export function AgentDraftInbox({ slug }: Props) {
     return () => clearInterval(timer);
   }, [load]);
 
+  function showFeedback(contactName: string | null, result: DeliveryResult) {
+    if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+    setDeliveryFeedback({ contactName, result });
+    feedbackTimer.current = setTimeout(() => setDeliveryFeedback(null), 5_000);
+  }
+
   async function handleAction(
     draftId: string,
     status: 'approved' | 'dismissed',
     content?: string,
-  ) {
+  ): Promise<DeliveryResult | null> {
     const body: Record<string, unknown> = { status };
     if (content !== undefined) body.content = content;
 
@@ -326,9 +417,18 @@ export function AgentDraftInbox({ slug }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (res.ok) {
-      setDrafts((prev) => prev.filter((d) => d.id !== draftId));
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    setDrafts((prev) => prev.filter((d) => d.id !== draftId));
+
+    if (status === 'approved' && data.deliveryResult) {
+      const contactName = drafts.find((d) => d.id === draftId)?.Contact?.name ?? null;
+      showFeedback(contactName, data.deliveryResult as DeliveryResult);
+      return data.deliveryResult as DeliveryResult;
     }
+    return null;
   }
 
   async function approveAll() {
@@ -404,10 +504,10 @@ export function AgentDraftInbox({ slug }: Props) {
         </div>
       </div>
 
-      {/* Approved-copies notice */}
-      <p className="text-[11px] text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
-        Approving a draft copies it to your clipboard so you can paste it into SMS or email immediately.
-      </p>
+      {/* Delivery feedback banner */}
+      {deliveryFeedback && (
+        <DeliveryBanner feedback={deliveryFeedback} onClose={() => setDeliveryFeedback(null)} />
+      )}
 
       {/* Draft cards */}
       {drafts.map((draft) => (
