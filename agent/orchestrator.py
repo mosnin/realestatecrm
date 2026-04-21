@@ -24,11 +24,12 @@ from datetime import datetime, timezone
 
 import structlog
 from agents import Runner, RunConfig, ModelSettings
+from agents import InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 
 from config import settings
 from db import supabase
 from memory.store import format_memories_for_prompt, load_memories, prune_expired, save_memory
-from schemas import AgentSettings, Space
+from schemas import AgentSettings, CoordinatorRunReport, Space
 from security.budget import check_budget, record_usage
 from security.context import AgentContext
 from tools.streaming import publish_event
@@ -163,6 +164,8 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
     )
 
     total_tokens = 0
+    report: CoordinatorRunReport | None = None
+
     try:
         result = await Runner.run(
             coordinator,
@@ -176,25 +179,61 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
             total_tokens = getattr(usage, "total_tokens", 0)
             ctx.tokens_used = total_tokens
 
-        log.info("coordinator_run_completed", total_tokens=total_tokens)
+        report = result.final_output if isinstance(result.final_output, CoordinatorRunReport) else None
+        log.info("coordinator_run_completed", total_tokens=total_tokens,
+                 agents_activated=report.agents_activated if report else [])
+
+    except InputGuardrailTripwireTriggered as exc:
+        info = exc.guardrail_result.output.output_info or {}
+        pending = info.get("pending_drafts", "?")
+        reason = info.get("reason", "Too many pending drafts")
+        log.info("agent_run_blocked_input_guardrail", pending_drafts=pending)
+        await publish_event(
+            ctx, "info",
+            f"Run skipped — {pending} draft(s) awaiting review. Review your inbox first.",
+            agent_type="coordinator",
+        )
+        return
+
+    except OutputGuardrailTripwireTriggered as exc:
+        info = exc.guardrail_result.output.output_info or {}
+        log.warning("agent_run_output_guardrail_tripped", issues=info.get("issues"))
+        await publish_event(
+            ctx, "error",
+            "Run completed but the summary report failed validation — results are in the activity log.",
+            agent_type="coordinator",
+        )
+        # Fall through — still record usage and emit complete event
 
     except Exception as exc:
         log.exception("coordinator_run_failed")
         await publish_event(ctx, "error", f"Coordinator error: {exc}", agent_type="coordinator")
 
-    # Store a run-summary memory so future runs have continuity
+    # Store a structured run-summary memory so future runs have typed continuity
     if total_tokens > 0:
+        if report:
+            memory_content = (
+                f"Run {report.run_date}: {report.overall_summary} "
+                f"Agents: {', '.join(report.agents_activated) or 'none'}. "
+                f"Drafts: {report.total_drafts_created}, "
+                f"Follow-ups: {report.total_follow_ups_set}."
+            )
+            memory_importance = 0.1 if report.nothing_to_do else 0.35
+        else:
+            memory_content = (
+                f"Agent run on {datetime.now(timezone.utc).strftime('%Y-%m-%d')} — "
+                f"{len(agent_settings.enabled_agents)} specialist(s) available, "
+                f"{total_tokens:,} tokens used."
+            )
+            memory_importance = 0.2
+
         await save_memory(
             space_id=space.id,
             entity_type="space",
             entity_id=space.id,
             memory_type="observation",
-            content=(
-                f"Agent run on {datetime.now(timezone.utc).strftime('%Y-%m-%d')} — "
-                f"coordinator with {len(agent_settings.enabled_agents)} specialist(s) available, "
-                f"{total_tokens:,} tokens used."
-            ),
-            importance=0.2,
+            content=memory_content,
+            importance=memory_importance,
         )
         await record_usage(space.id, total_tokens)
 

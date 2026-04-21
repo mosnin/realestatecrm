@@ -160,3 +160,20 @@ class PlannedAction(BaseModel):
     requires_approval: bool = False
     priority: int = 0
     params: dict[str, Any] = Field(default_factory=dict)
+
+
+class CoordinatorRunReport(BaseModel):
+    """Structured summary produced by the Coordinator at the end of every run.
+
+    Stored as a high-level space memory so future runs have a typed record of
+    what happened. Ground-truth action counts are in AgentActivityLog; the
+    counts here are the coordinator's best-effort estimates from specialist outputs.
+    """
+
+    workspace_name: str
+    run_date: str                           # ISO date YYYY-MM-DD
+    agents_activated: list[str] = Field(default_factory=list)
+    total_drafts_created: int = 0
+    total_follow_ups_set: int = 0
+    overall_summary: str                    # 1-2 sentence narrative of the run
+    nothing_to_do: bool = False             # True when workspace was healthy and no agents ran

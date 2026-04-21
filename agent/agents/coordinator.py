@@ -7,10 +7,16 @@ a real signal to act on.
 Handoff flow:
   CoordinatorAgent
     → survey_workspace()            ← lightweight DB snapshot
+    → handoff tour_followup         ← if tour_completed trigger (time-critical)
     → handoff lead_nurture          ← if stale leads or new_lead trigger
     → handoff deal_sentinel         ← if stalled/at-risk deals
     → handoff long_term_nurture     ← if cold-lead pool is meaningful
-    → handoff lead_scorer           ← if tour/application trigger or mass decay
+    → handoff lead_scorer           ← if application trigger or mass score decay
+    → CoordinatorRunReport          ← structured summary stored as space memory
+
+Guardrails:
+  Input  — pending_drafts_guardrail: blocks run if ≥10 unreviewed drafts
+  Output — run_integrity_guardrail:  validates CoordinatorRunReport before storage
 """
 
 from __future__ import annotations
@@ -23,8 +29,9 @@ from agents import Agent, RunContextWrapper, function_tool, handoff
 
 from config import settings
 from db import supabase
+from schemas import CoordinatorRunReport
 from security.context import AgentContext
-from tools.activities import log_activity_run
+from security.guardrails import pending_drafts_guardrail, run_integrity_guardrail
 from tools.streaming import publish_event
 
 COORDINATOR_INSTRUCTIONS = """
@@ -37,10 +44,8 @@ a focused brief. You do not perform CRM actions yourself.
 2. Based on the counts and active triggers, decide which specialists to activate.
 3. Hand off to each relevant specialist in the prescribed order, passing a specific
    brief that tells them exactly what signals you found.
-4. After all handoffs complete, you are done.
-5. If nothing needs attention (all counts are 0 and no triggers), call log_activity_run
-   with agent_type="coordinator", action_type="survey", outcome="completed",
-   reasoning="Workspace healthy — no agent activation needed." and stop.
+4. After all handoffs complete (or if nothing needed to run), produce your final
+   CoordinatorRunReport output (see "Final output" section below).
 
 ## Routing rules
 
@@ -76,6 +81,19 @@ Activate lead_scorer_agent when:
   Example: "tour_completed trigger received. contactId: abc-123. Follow up immediately."
 - Do not activate an agent simply because it is enabled — only when a concrete
   signal exists (non-zero count or matching trigger).
+
+## Final output
+After all work is done, produce a CoordinatorRunReport with these fields:
+- workspace_name: the workspace name from your brief
+- run_date: today's date as YYYY-MM-DD
+- agents_activated: list of specialist names you handed off to (empty list if none)
+- total_drafts_created: your best estimate of total drafts created across all specialists
+  (read from their final messages; use 0 if unknown)
+- total_follow_ups_set: your best estimate of total follow-ups scheduled
+  (read from their final messages; use 0 if unknown)
+- overall_summary: 1-2 sentences describing what happened this run
+- nothing_to_do: true ONLY if all counts were 0, no triggers were active, and no
+  agents ran. False in all other cases.
 """.strip()
 
 
@@ -225,10 +243,13 @@ def make_coordinator_agent(enabled_agents: list[str]) -> Agent:
         )
         handoffs_list.append(h)
 
-    return Agent[None](
+    return Agent[CoordinatorRunReport](
         name="Chippi Coordinator",
         model=settings.orchestrator_model,
         instructions=COORDINATOR_INSTRUCTIONS,
-        tools=[survey_workspace, log_activity_run],
+        tools=[survey_workspace],
         handoffs=handoffs_list,
+        output_type=CoordinatorRunReport,
+        input_guardrails=[pending_drafts_guardrail],
+        output_guardrails=[run_integrity_guardrail],
     )
