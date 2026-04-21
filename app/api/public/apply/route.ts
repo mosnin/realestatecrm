@@ -19,6 +19,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { formConfigSchema, type IntakeFormConfig, type FormQuestion } from '@/lib/form-config-schema';
 import { getFormConfigs, getDefaultFormConfig } from '@/lib/form-builder';
 import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
+import { logger } from '@/lib/logger';
 
 /** Parse budget/rent range strings like 'under_1500', '1500_2000', '1m_plus' to a midpoint number. */
 function parseBudgetToNumber(val: unknown): number | null {
@@ -76,7 +77,7 @@ async function fetchFormConfigForLeadType(
 
     if (config) return config;
   } catch (err) {
-    console.warn('[apply] getFormConfigs failed, trying legacy fetch', { spaceId, err });
+    logger.warn('[apply] getFormConfigs failed, trying legacy fetch', { spaceId }, err);
   }
 
   // Legacy fallback: try the single formConfig column directly
@@ -117,7 +118,7 @@ async function fetchFormConfigForLeadType(
       }
     }
   } catch (err) {
-    console.warn('[apply] legacy fetchFormConfig also failed', { spaceId, err });
+    logger.warn('[apply] legacy fetchFormConfig also failed', { spaceId }, err);
   }
 
   return null;
@@ -289,7 +290,7 @@ export async function POST(req: NextRequest) {
   try {
     requestBody = await req.json();
   } catch (error) {
-    console.warn('[apply] invalid JSON body', { error });
+    logger.warn('[apply] invalid JSON body', undefined, error);
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
@@ -325,11 +326,10 @@ export async function POST(req: NextRequest) {
         formConfig = formConfigSchema.parse(rawConfig);
       }
     } catch (err) {
-      console.warn('[apply] form config invalid or fetch failed, falling back to legacy', {
+      logger.warn('[apply] form config invalid or fetch failed, falling back to legacy', {
         spaceId: space.id,
         leadType: resolvedLeadType,
-        err,
-      });
+      }, err);
       formConfig = null;
     }
 
@@ -349,11 +349,10 @@ export async function POST(req: NextRequest) {
           scoringModel = (scoringSettings as Record<string, unknown>)[scoringColumn] as ScoringModel | null;
         }
       } catch (err) {
-        console.warn('[apply] scoring model fetch failed (non-fatal, will use legacy scoring)', {
+        logger.warn('[apply] scoring model fetch failed (non-fatal, will use legacy scoring)', {
           spaceId: space.id,
           leadType: resolvedLeadType,
-          err,
-        });
+        }, err);
       }
     }
 
@@ -374,7 +373,7 @@ export async function POST(req: NextRequest) {
 
     if (formConfig) {
       // ── Dynamic form config path ──────────────────────────────────────
-      console.log('[apply] using dynamic form config', { spaceId: space.id, version: formConfig.version });
+      logger.debug('[apply] using dynamic form config', { spaceId: space.id, version: formConfig.version });
       const { schema: dynamicSchema } = buildDynamicSchemaForSubmission(
         formConfig,
         requestBody as Record<string, unknown>,
@@ -382,7 +381,7 @@ export async function POST(req: NextRequest) {
 
       const parsed = dynamicSchema.safeParse(requestBody);
       if (!parsed.success) {
-        console.warn('[apply] dynamic validation failed', { issues: parsed.error.issues });
+        logger.warn('[apply] dynamic validation failed', { issues: parsed.error.issues });
         // Only return field-level path/message to the client, not full Zod internals
         const safeIssues = parsed.error.issues.map((i: z.ZodIssue) => ({
           path: i.path,
@@ -419,7 +418,7 @@ export async function POST(req: NextRequest) {
       // ── Legacy path (backwards compatible) ────────────────────────────
       const parsed = publicApplicationSchema.safeParse(requestBody);
       if (!parsed.success) {
-        console.warn('[apply] validation failed', { issues: parsed.error.issues });
+        logger.warn('[apply] validation failed', { issues: parsed.error.issues });
         return NextResponse.json({ error: 'Invalid submission data' }, { status: 400 });
       }
 
@@ -465,7 +464,7 @@ export async function POST(req: NextRequest) {
       const lockResult = await redis.set(idempotencyKey, '1', { nx: true, ex: 120 });
       idempotencyLockAcquired = lockResult === 'OK';
     } catch (error) {
-      console.warn('[apply] idempotency lock unavailable; using DB fallback', { error, spaceId: space.id });
+      logger.warn('[apply] idempotency lock unavailable; using DB fallback', { spaceId: space.id }, error);
     }
 
     // Expanded window: 5 minutes (was 2 minutes)
@@ -518,7 +517,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!idempotencyLockAcquired) {
-      console.info('[apply] proceeding without distributed lock', {
+      logger.info('[apply] proceeding without distributed lock', {
         spaceId: space.id,
         slug: slugForFingerprint,
         fingerprint,
@@ -539,7 +538,7 @@ export async function POST(req: NextRequest) {
       spaceBusinessName = spaceSetting?.businessName ?? null;
       intakeConfirmationEmail = spaceSetting?.intakeConfirmationEmail ?? null;
     } catch (err) {
-      console.warn('[apply] failed to fetch space settings', { spaceId: space.id, err });
+      logger.warn('[apply] failed to fetch space settings', { spaceId: space.id }, err);
     }
 
     const contactInsert: Record<string, unknown> = {
@@ -592,10 +591,10 @@ export async function POST(req: NextRequest) {
         note: null,
       });
     if (statusAuditErr) {
-      console.warn('[apply] Initial status audit insert failed (non-fatal):', statusAuditErr);
+      logger.warn('[apply] initial status audit insert failed (non-fatal)', { contactId: contact.id }, statusAuditErr);
     }
 
-    console.info('[apply] submission persisted', {
+    logger.info('[apply] submission persisted', {
       contactId: contact.id,
       spaceId: space.id,
       slug: slugForFingerprint,
@@ -643,16 +642,16 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', contact.id);
       if (scoreUpdateError) {
-        console.error('[apply] scoring update failed', { contactId: contact.id, scoreUpdateError });
+        logger.error('[apply] scoring update failed', { contactId: contact.id }, scoreUpdateError);
       } else {
-        console.info('[apply] scoring persisted', {
+        logger.info('[apply] scoring persisted', {
           contactId: contact.id,
           scoringStatus: scoring.scoringStatus,
           scoreLabel: scoring.scoreLabel,
         });
       }
     } catch (error) {
-      console.error('[apply] scoring failed', { contactId: contact.id, error });
+      logger.error('[apply] scoring failed', { contactId: contact.id }, error);
       try {
         await supabase
           .from('Contact')
@@ -665,7 +664,7 @@ export async function POST(req: NextRequest) {
           })
           .eq('id', contact.id);
       } catch (fallbackErr) {
-        console.error('[apply] fallback scoring state failed', { contactId: contact.id, fallbackErr });
+        logger.error('[apply] fallback scoring state failed', { contactId: contact.id }, fallbackErr);
       }
     }
 
@@ -684,7 +683,7 @@ export async function POST(req: NextRequest) {
       scoreSummary: scoring.scoreSummary,
       applicationData,
     }).catch((notifyErr) => {
-      console.error('[apply] Realtor notification failed:', notifyErr);
+      logger.error('[apply] realtor notification failed', { contactId: contact.id }, notifyErr);
     });
 
     const applicantConfirmation = contactEmail
@@ -698,12 +697,12 @@ export async function POST(req: NextRequest) {
           customMessage: intakeConfirmationEmail,
           statusPortalToken,
         }).catch((confirmErr) => {
-          console.error('[apply] Applicant confirmation email failed:', confirmErr);
+          logger.error('[apply] applicant confirmation email failed', { contactId: contact.id }, confirmErr);
         })
       : Promise.resolve();
 
     await Promise.all([realtorNotification, applicantConfirmation]);
-    console.log('[apply] Notifications dispatched');
+    logger.debug('[apply] notifications dispatched', { contactId: contact.id });
 
     return NextResponse.json(
       {
@@ -714,10 +713,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('[apply] unhandled submission failure', {
-      slug: rawSlug,
-      error,
-    });
+    logger.error('[apply] unhandled submission failure', { slug: rawSlug }, error);
     return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 });
   }
 }

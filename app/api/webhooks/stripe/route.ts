@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { getStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import { redis } from '@/lib/redis';
+import { logger } from '@/lib/logger';
 
 /** Send a subscription status email to the space owner (non-blocking). */
 async function notifySubscriptionChange(subscriptionId: string, newStatus: string) {
@@ -64,10 +65,10 @@ async function notifySubscriptionChange(subscriptionId: string, newStatus: strin
 </div>`,
     });
     if (result.error) {
-      console.error('[stripe-webhook] Resend API error:', JSON.stringify(result.error));
+      logger.error('[stripe-webhook] Resend API error', { resendError: result.error });
     }
   } catch (err) {
-    console.error('[stripe-webhook] subscription email failed:', err);
+    logger.error('[stripe-webhook] subscription email failed', undefined, err);
   }
 }
 
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
   const stripe = getStripe();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
-    console.error('[stripe-webhook] Missing STRIPE_WEBHOOK_SECRET');
+    logger.error('[stripe-webhook] Missing STRIPE_WEBHOOK_SECRET');
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
   }
 
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err: any) {
-    console.error('[stripe-webhook] Signature verification failed:', err.message);
+    logger.error('[stripe-webhook] signature verification failed', undefined, err);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
@@ -153,7 +154,7 @@ export async function POST(req: NextRequest) {
           .maybeSingle();
 
         if (targetSpace && targetSpace.stripeCustomerId && targetSpace.stripeCustomerId !== (session.customer as string)) {
-          console.error('[stripe webhook] checkout spaceId mismatch — rejecting metadata poisoning attempt', {
+          logger.error('[stripe-webhook] checkout spaceId mismatch — rejecting metadata poisoning attempt', {
             spaceId,
             existingCustomer: targetSpace.stripeCustomerId,
             sessionCustomer: session.customer,
@@ -188,7 +189,7 @@ export async function POST(req: NextRequest) {
             .maybeSingle();
 
           if (existingSpace && existingSpace.stripeCustomerId && existingSpace.stripeCustomerId !== subscription.customer) {
-            console.error('[stripe webhook] spaceId metadata mismatch — space belongs to different customer', {
+            logger.error('[stripe-webhook] spaceId metadata mismatch — space belongs to different customer', {
               spaceId,
               spaceCustomer: existingSpace.stripeCustomerId,
               webhookCustomer: subscription.customer,
@@ -204,7 +205,7 @@ export async function POST(req: NextRequest) {
             .eq('stripeSubscriptionId', subscription.id);
         }
         // Notify owner of status change
-        try { await notifySubscriptionChange(subscription.id, newStatus); } catch (e) { console.error('[stripe-webhook] subscription notification failed:', e); }
+        try { await notifySubscriptionChange(subscription.id, newStatus); } catch (e) { logger.error('[stripe-webhook] subscription notification failed', undefined, e); }
         break;
       }
 
@@ -217,7 +218,7 @@ export async function POST(req: NextRequest) {
             stripePeriodEnd: getPeriodEnd(subscription),
           })
           .eq('stripeSubscriptionId', subscription.id);
-        try { await notifySubscriptionChange(subscription.id, 'canceled'); } catch (e) { console.error('[stripe-webhook] canceled notification failed:', e); }
+        try { await notifySubscriptionChange(subscription.id, 'canceled'); } catch (e) { logger.error('[stripe-webhook] canceled notification failed', undefined, e); }
         break;
       }
 
@@ -252,14 +253,14 @@ export async function POST(req: NextRequest) {
 
         // Notify only on active transition (payment recovered past_due subscription)
         if (paidStatus === 'active') {
-          try { await notifySubscriptionChange(paidSubId, 'active'); } catch (e) { console.error('[stripe-webhook] payment_succeeded notification failed:', e); }
+          try { await notifySubscriptionChange(paidSubId, 'active'); } catch (e) { logger.error('[stripe-webhook] payment_succeeded notification failed', undefined, e); }
         }
         break;
       }
 
       case 'customer.subscription.trial_will_end': {
         const trialSub = event.data.object as Stripe.Subscription;
-        try { await notifySubscriptionChange(trialSub.id, 'trial_ending'); } catch (e) { console.error('[stripe-webhook] trial_will_end notification failed:', e); }
+        try { await notifySubscriptionChange(trialSub.id, 'trial_ending'); } catch (e) { logger.error('[stripe-webhook] trial_will_end notification failed', undefined, e); }
         break;
       }
 
@@ -283,9 +284,9 @@ export async function POST(req: NextRequest) {
             .from('Space')
             .update({ stripeSubscriptionStatus: 'past_due' })
             .eq('stripeSubscriptionId', subId);
-          try { await notifySubscriptionChange(subId, 'past_due'); } catch (e) { console.error('[stripe-webhook] past_due notification failed:', e); }
+          try { await notifySubscriptionChange(subId, 'past_due'); } catch (e) { logger.error('[stripe-webhook] past_due notification failed', undefined, e); }
         } else {
-          console.warn('[stripe-webhook] invoice.payment_failed: could not extract subscription ID', {
+          logger.warn('[stripe-webhook] invoice.payment_failed: could not extract subscription ID', {
             invoiceId: invoice.id,
           });
         }
@@ -297,7 +298,7 @@ export async function POST(req: NextRequest) {
         break;
     }
   } catch (err) {
-    console.error(`[stripe-webhook] Error processing ${event.type}:`, err);
+    logger.error('[stripe-webhook] error processing event', { eventType: event.type }, err);
     return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 });
   }
 

@@ -6,21 +6,23 @@
  * Gracefully no-ops when credentials are missing.
  */
 
+import { logger } from '@/lib/logger';
+
 // Log a clear warning at module load time if Telnyx env vars are missing
 if (!process.env.TELNYX_API_KEY) {
-  console.warn('[sms] WARNING: TELNYX_API_KEY is not set — all SMS notifications will be skipped');
+  logger.warn('[sms] TELNYX_API_KEY is not set — SMS notifications will be skipped');
 }
 if (!process.env.TELNYX_FROM_NUMBER) {
-  console.warn('[sms] WARNING: TELNYX_FROM_NUMBER is not set — all SMS notifications will be skipped');
+  logger.warn('[sms] TELNYX_FROM_NUMBER is not set — SMS notifications will be skipped');
 } else if (!/^\+\d{10,15}$/.test(process.env.TELNYX_FROM_NUMBER)) {
-  console.warn(`[sms] WARNING: TELNYX_FROM_NUMBER "${process.env.TELNYX_FROM_NUMBER}" does not look like a valid E.164 phone number (expected +XXXXXXXXXXX)`);
+  logger.warn('[sms] TELNYX_FROM_NUMBER is not a valid E.164 phone number');
 }
 
 let telnyxClient: any = null;
 
 async function getClient() {
   if (!process.env.TELNYX_API_KEY) {
-    console.warn('[sms] Cannot create Telnyx client — TELNYX_API_KEY is not set');
+    logger.warn('[sms] Cannot create Telnyx client — TELNYX_API_KEY missing');
     return null;
   }
   if (!telnyxClient) {
@@ -30,7 +32,7 @@ async function getClient() {
       const TelnyxConstructor = telnyx.Telnyx ?? telnyx.default;
       telnyxClient = new TelnyxConstructor({ apiKey: process.env.TELNYX_API_KEY });
     } catch (err) {
-      console.error('[sms] Failed to initialize Telnyx SDK:', err);
+      logger.error('[sms] Failed to initialize Telnyx SDK', undefined, err);
       return null;
     }
   }
@@ -51,16 +53,18 @@ export async function sendSMS(params: SendSMSParams): Promise<boolean> {
   const fromNumber = process.env.TELNYX_FROM_NUMBER;
 
   if (!client || !fromNumber) {
-    console.log(
-      `[sms] (skipped) Missing Telnyx credentials — TELNYX_API_KEY: ${process.env.TELNYX_API_KEY ? 'set' : 'MISSING'}, TELNYX_FROM_NUMBER: ${fromNumber ? 'set' : 'MISSING'}. To: ${params.to}`,
-    );
+    logger.warn('[sms] skipped — Telnyx credentials missing', {
+      apiKeySet: Boolean(process.env.TELNYX_API_KEY),
+      fromNumberSet: Boolean(fromNumber),
+      to: params.to,
+    });
     return false;
   }
 
   // Basic phone validation — must look like a phone number
   const cleaned = params.to.replace(/[^\d+]/g, '');
   if (cleaned.length < 10) {
-    console.warn(`[sms] Invalid phone number (too short after cleaning): "${params.to}" -> "${cleaned}"`);
+    logger.warn('[sms] invalid phone number (too short)', { to: params.to });
     return false;
   }
 
@@ -69,35 +73,31 @@ export async function sendSMS(params: SendSMSParams): Promise<boolean> {
 
   // Validate E.164 format: + followed by 10-15 digits
   if (!/^\+\d{10,15}$/.test(toNumber)) {
-    console.warn(`[sms] Phone number not valid E.164 format: "${toNumber}" (original: "${params.to}")`);
+    logger.warn('[sms] phone number not valid E.164', { to: toNumber });
     return false;
   }
 
   // Block premium-rate numbers to prevent toll fraud
   const premiumPrefixes = ['+1900', '+1976', '+44870', '+44871', '+44872', '+44090', '+44091'];
   if (premiumPrefixes.some((prefix) => toNumber.startsWith(prefix))) {
-    console.warn(`[sms] Blocked premium-rate number: "${toNumber}"`);
+    logger.warn('[sms] blocked premium-rate number', { to: toNumber });
     return false;
   }
 
   try {
-    console.log(`[sms] Sending to ${toNumber} from ${fromNumber} (body length: ${params.body.length})`);
     const response = await client.messages.send({
       from: fromNumber,
       to: toNumber,
       text: params.body,
     });
-    console.log(`[sms] Sent to ${toNumber} (message id: ${response?.data?.id ?? 'unknown'})`);
+    logger.info('[sms] sent', { to: toNumber, messageId: response?.data?.id ?? 'unknown', bodyLength: params.body.length });
     return true;
   } catch (err: any) {
-    console.error(`[sms] Send failed to ${toNumber}:`, {
-      message: err?.message,
+    logger.error('[sms] send failed', {
+      to: toNumber,
       status: err?.statusCode ?? err?.status,
       code: err?.code,
-      errors: err?.errors ?? err?.rawErrors,
-      // Include the full error for debugging in non-production
-      ...(process.env.NODE_ENV !== 'production' && { fullError: err }),
-    });
+    }, err);
     return false;
   }
 }

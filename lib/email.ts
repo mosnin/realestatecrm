@@ -1,5 +1,6 @@
 import type { ApplicationData, IntakeFormConfig } from '@/lib/types';
 import { getSubmissionDisplay, formatAnswerValue } from '@/lib/form-versioning';
+import { logger } from '@/lib/logger';
 
 /**
  * Normalize RESEND_FROM_EMAIL — if someone sets it to just a domain like
@@ -52,15 +53,13 @@ export interface NewLeadEmailParams {
 }
 
 export async function sendNewLeadNotification(params: NewLeadEmailParams): Promise<void> {
-  console.log('[EMAIL-DEBUG] 1. sendNewLeadNotification called');
   if (!process.env.RESEND_API_KEY) {
-    console.warn('[email] RESEND_API_KEY not set — skipping email');
+    logger.warn('[email] RESEND_API_KEY not set — skipping email');
     return;
   }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = getFromAddress();
-  console.log('[EMAIL-DEBUG] 2. Resend initialized, API key prefix:', process.env.RESEND_API_KEY?.slice(0, 8));
 
   const { toEmail, spaceName, spaceSlug, contactId, name, phone, email, budget, leadScore, scoreLabel, scoreSummary, applicationData: app, formConfigSnapshot } = params;
 
@@ -150,22 +149,19 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
   const safeScoreLabel = (scoreLabel ?? '').replace(/[\r\n\t]/g, ' ');
 
   try {
-    console.log('[EMAIL-DEBUG] 3. About to call resend.emails.send, to:', toEmail, 'from:', FROM);
-    console.log('[email] Sending new lead notification to:', toEmail, 'from:', FROM);
     const result = await resend.emails.send({
       from: FROM,
       to: toEmail,
       subject: `New lead: ${safeSubjectName}${leadScore != null ? ` · ${Math.round(leadScore)} ${safeScoreLabel}` : ''}`,
       html,
     });
-    console.log('[EMAIL-DEBUG] 4. Send result:', JSON.stringify(result));
     if (result.error) {
-      console.error('[email] Resend API error (new lead):', JSON.stringify(result.error));
+      logger.error('[email] new lead: Resend API error', { to: toEmail, resendError: result.error });
     } else {
-      console.log('[email] Send result:', JSON.stringify(result.data));
+      logger.info('[email] new lead sent', { to: toEmail, messageId: result.data?.id });
     }
   } catch (err) {
-    console.error('[email] SEND FAILED:', err);
+    logger.error('[email] new lead send failed', { to: toEmail }, err);
   }
 }
 
@@ -177,7 +173,7 @@ export interface FollowUpDigestParams {
 }
 
 export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<void> {
-  if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
+  if (!process.env.RESEND_API_KEY) { logger.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = getFromAddress();
@@ -237,7 +233,6 @@ export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<
 
   const safeSpaceName = spaceName.replace(/[\r\n\t]/g, ' ').slice(0, 100);
   try {
-    console.log('[email] Sending sendFollowUpDigest to:', toEmail, 'from:', FROM);
     const result = await resend.emails.send({
       from: FROM,
       to: toEmail,
@@ -245,12 +240,12 @@ export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<
       html,
     });
     if (result.error) {
-      console.error('[email] Resend API error (follow-up digest):', JSON.stringify(result.error));
+      logger.error('[email] follow-up digest: Resend API error', { to: toEmail, resendError: result.error });
     } else {
-      console.log('[email] sendFollowUpDigest result:', JSON.stringify(result.data));
+      logger.info('[email] follow-up digest sent', { to: toEmail, messageId: result.data?.id });
     }
   } catch (err) {
-    console.error('[email] sendFollowUpDigest FAILED:', err);
+    logger.error('[email] follow-up digest failed', { to: toEmail }, err);
   }
 }
 
@@ -263,7 +258,7 @@ export interface SendEmailFromCRMParams {
 }
 
 export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<void> {
-  if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
+  if (!process.env.RESEND_API_KEY) { logger.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = getFromAddress();
@@ -291,7 +286,6 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
 
   const safeSubject = subject.replace(/[\r\n\t]/g, ' ').slice(0, 200);
   try {
-    console.log('[email] Sending sendEmailFromCRM to:', toEmail, 'from:', FROM);
     const result = await resend.emails.send({
       from: `${fromName.replace(/[\r\n\t<>"]/g, ' ').slice(0, 100)} <${FROM}>`,
       to: toEmail,
@@ -300,12 +294,12 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
       html,
     });
     if (result.error) {
-      console.error('[email] Resend API error (CRM email):', JSON.stringify(result.error));
+      logger.error('[email] CRM email: Resend API error', { to: toEmail, resendError: result.error });
     } else {
-      console.log('[email] sendEmailFromCRM result:', JSON.stringify(result.data));
+      logger.info('[email] CRM email sent', { to: toEmail, messageId: result.data?.id });
     }
   } catch (err) {
-    console.error('[email] sendEmailFromCRM FAILED:', err);
+    logger.error('[email] CRM email failed', { to: toEmail }, err);
   }
 }
 
@@ -321,7 +315,7 @@ export interface NewDealEmailParams {
 }
 
 export async function sendNewDealNotification(params: NewDealEmailParams): Promise<void> {
-  if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
+  if (!process.env.RESEND_API_KEY) { logger.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = getFromAddress();
@@ -370,7 +364,6 @@ export async function sendNewDealNotification(params: NewDealEmailParams): Promi
 
   const safeDealTitle = dealTitle.replace(/[\r\n\t]/g, ' ').slice(0, 200);
   try {
-    console.log('[email] Sending sendNewDealNotification to:', toEmail, 'from:', FROM);
     const result = await resend.emails.send({
       from: FROM,
       to: toEmail,
@@ -378,12 +371,12 @@ export async function sendNewDealNotification(params: NewDealEmailParams): Promi
       html,
     });
     if (result.error) {
-      console.error('[email] Resend API error (new deal):', JSON.stringify(result.error));
+      logger.error('[email] new deal: Resend API error', { to: toEmail, resendError: result.error });
     } else {
-      console.log('[email] sendNewDealNotification result:', JSON.stringify(result.data));
+      logger.info('[email] new deal sent', { to: toEmail, messageId: result.data?.id });
     }
   } catch (err) {
-    console.error('[email] sendNewDealNotification FAILED:', err);
+    logger.error('[email] new deal failed', { to: toEmail }, err);
   }
 }
 
@@ -396,7 +389,7 @@ export interface BrokerageInvitationEmailParams {
 }
 
 export async function sendBrokerageInvitation(params: BrokerageInvitationEmailParams): Promise<void> {
-  if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
+  if (!process.env.RESEND_API_KEY) { logger.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = getFromAddress();
@@ -444,7 +437,6 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
 </html>`;
 
   try {
-    console.log('[email] Sending sendBrokerageInvitation to:', toEmail, 'from:', FROM);
     const result = await resend.emails.send({
       from: FROM,
       to: toEmail,
@@ -452,12 +444,12 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
       html,
     });
     if (result.error) {
-      console.error('[email] Resend API error (brokerage invitation):', JSON.stringify(result.error));
+      logger.error('[email] brokerage invitation: Resend API error', { to: toEmail, resendError: result.error });
     } else {
-      console.log('[email] sendBrokerageInvitation result:', JSON.stringify(result.data));
+      logger.info('[email] brokerage invitation sent', { to: toEmail, messageId: result.data?.id });
     }
   } catch (err) {
-    console.error('[email] sendBrokerageInvitation FAILED:', err);
+    logger.error('[email] brokerage invitation failed', { to: toEmail }, err);
   }
 }
 
@@ -478,7 +470,7 @@ export interface ApplicationConfirmationParams {
 
 export async function sendApplicationConfirmation(params: ApplicationConfirmationParams): Promise<void> {
   if (!process.env.RESEND_API_KEY) {
-    console.warn('[email] RESEND_API_KEY not set — skipping applicant confirmation');
+    logger.warn('[email] RESEND_API_KEY not set — skipping applicant confirmation');
     return;
   }
   const { Resend } = await import('resend');
@@ -535,7 +527,6 @@ export async function sendApplicationConfirmation(params: ApplicationConfirmatio
   const safeSubjectBiz = businessName.replace(/[\r\n\t]/g, ' ').slice(0, 150);
 
   try {
-    console.log('[email] Sending application confirmation to:', toEmail, 'from:', FROM);
     const result = await resend.emails.send({
       from: `${businessName.replace(/[\r\n\t<>"]/g, ' ').slice(0, 100)} <${FROM}>`,
       to: toEmail,
@@ -543,12 +534,12 @@ export async function sendApplicationConfirmation(params: ApplicationConfirmatio
       html,
     });
     if (result.error) {
-      console.error('[email] Resend API error (application confirmation):', JSON.stringify(result.error));
+      logger.error('[email] application confirmation: Resend API error', { to: toEmail, resendError: result.error });
     } else {
-      console.log('[email] sendApplicationConfirmation result:', JSON.stringify(result.data));
+      logger.info('[email] application confirmation sent', { to: toEmail, messageId: result.data?.id });
     }
   } catch (err) {
-    console.error('[email] sendApplicationConfirmation FAILED:', err);
+    logger.error('[email] application confirmation failed', { to: toEmail }, err);
   }
 }
 
@@ -560,7 +551,7 @@ export async function sendWelcomeEmail(params: {
   spaceName?: string | null;
   spaceSlug?: string | null;
 }): Promise<void> {
-  if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY not set — skipping'); return; }
+  if (!process.env.RESEND_API_KEY) { logger.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = getFromAddress();
@@ -615,7 +606,6 @@ export async function sendWelcomeEmail(params: {
 </div>`;
 
   try {
-    console.log('[email] Sending sendWelcomeEmail to:', toEmail, 'from:', FROM);
     const result = await resend.emails.send({
       from: `Chippi <${FROM}>`,
       to: toEmail,
@@ -623,12 +613,12 @@ export async function sendWelcomeEmail(params: {
       html,
     });
     if (result.error) {
-      console.error('[email] Resend API error (welcome email):', JSON.stringify(result.error));
+      logger.error('[email] welcome: Resend API error', { to: toEmail, resendError: result.error });
     } else {
-      console.log('[email] sendWelcomeEmail result:', JSON.stringify(result.data));
+      logger.info('[email] welcome sent', { to: toEmail, messageId: result.data?.id });
     }
   } catch (err) {
-    console.error('[email] sendWelcomeEmail FAILED:', err);
+    logger.error('[email] welcome failed', { to: toEmail }, err);
   }
 }
 
@@ -642,7 +632,7 @@ export interface DraftResumeEmailParams {
 
 export async function sendDraftResumeEmail(params: DraftResumeEmailParams): Promise<void> {
   if (!process.env.RESEND_API_KEY) {
-    console.warn('[email] RESEND_API_KEY not set — skipping draft resume email');
+    logger.warn('[email] RESEND_API_KEY not set — skipping draft resume email');
     return;
   }
   const { Resend } = await import('resend');
@@ -720,7 +710,6 @@ export async function sendDraftResumeEmail(params: DraftResumeEmailParams): Prom
   ].join('\n');
 
   try {
-    console.log('[email] Sending draft resume email to:', toEmail, 'from:', FROM);
     const result = await resend.emails.send({
       from: `${businessName.replace(/[\r\n\t<>"]/g, ' ').slice(0, 100)} <${FROM}>`,
       to: toEmail,
@@ -729,12 +718,12 @@ export async function sendDraftResumeEmail(params: DraftResumeEmailParams): Prom
       text,
     });
     if (result.error) {
-      console.error('[email] Resend API error (draft resume):', JSON.stringify(result.error));
+      logger.error('[email] draft resume: Resend API error', { to: toEmail, resendError: result.error });
     } else {
-      console.log('[email] sendDraftResumeEmail result:', JSON.stringify(result.data));
+      logger.info('[email] draft resume sent', { to: toEmail, messageId: result.data?.id });
     }
   } catch (err) {
-    console.error('[email] sendDraftResumeEmail FAILED:', err);
+    logger.error('[email] draft resume failed', { to: toEmail }, err);
   }
 }
 
@@ -747,7 +736,7 @@ export interface MfaEnrollmentPromptParams {
 
 export async function sendMfaEnrollmentPrompt(params: MfaEnrollmentPromptParams): Promise<void> {
   if (!process.env.RESEND_API_KEY) {
-    console.warn('[email] RESEND_API_KEY not set — skipping MFA enrollment prompt');
+    logger.warn('[email] RESEND_API_KEY not set — skipping MFA enrollment prompt');
     return;
   }
   const { Resend } = await import('resend');
@@ -797,7 +786,6 @@ export async function sendMfaEnrollmentPrompt(params: MfaEnrollmentPromptParams)
 </html>`;
 
   try {
-    console.log('[email] Sending MFA enrollment prompt to:', toEmail, 'from:', FROM);
     const result = await resend.emails.send({
       from: `Chippi <${FROM}>`,
       to: toEmail,
@@ -805,12 +793,12 @@ export async function sendMfaEnrollmentPrompt(params: MfaEnrollmentPromptParams)
       html,
     });
     if (result.error) {
-      console.error('[email] Resend API error (MFA prompt):', JSON.stringify(result.error));
+      logger.error('[email] MFA prompt: Resend API error', { to: toEmail, resendError: result.error });
     } else {
-      console.log('[email] sendMfaEnrollmentPrompt result:', JSON.stringify(result.data));
+      logger.info('[email] MFA prompt sent', { to: toEmail, messageId: result.data?.id });
     }
   } catch (err) {
-    console.error('[email] sendMfaEnrollmentPrompt FAILED:', err);
+    logger.error('[email] MFA prompt failed', { to: toEmail }, err);
   }
 }
 
@@ -839,7 +827,7 @@ export interface StatusUpdateEmailParams {
 
 export async function sendStatusUpdateEmail(params: StatusUpdateEmailParams): Promise<void> {
   if (!process.env.RESEND_API_KEY) {
-    console.warn('[email] RESEND_API_KEY not set — skipping status update email');
+    logger.warn('[email] RESEND_API_KEY not set — skipping status update email');
     return;
   }
   const { Resend } = await import('resend');
@@ -929,7 +917,6 @@ export async function sendStatusUpdateEmail(params: StatusUpdateEmailParams): Pr
   const safeSubjectBiz = businessName.replace(/[\r\n\t]/g, ' ').slice(0, 150);
 
   try {
-    console.log('[email] Sending status update email to:', toEmail, 'from:', FROM);
     const result = await resend.emails.send({
       from: `${businessName.replace(/[\r\n\t<>"]/g, ' ').slice(0, 100)} <${FROM}>`,
       to: toEmail,
@@ -937,11 +924,11 @@ export async function sendStatusUpdateEmail(params: StatusUpdateEmailParams): Pr
       html,
     });
     if (result.error) {
-      console.error('[email] Resend API error (status update):', JSON.stringify(result.error));
+      logger.error('[email] status update: Resend API error', { to: toEmail, resendError: result.error });
     } else {
-      console.log('[email] sendStatusUpdateEmail result:', JSON.stringify(result.data));
+      logger.info('[email] status update sent', { to: toEmail, messageId: result.data?.id });
     }
   } catch (err) {
-    console.error('[email] sendStatusUpdateEmail FAILED:', err);
+    logger.error('[email] status update failed', { to: toEmail }, err);
   }
 }

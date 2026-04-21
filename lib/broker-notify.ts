@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 
 export type BrokerNotificationType =
   | 'member_joined'
@@ -34,6 +35,6 @@ export async function notifyBroker(params: NotifyBrokerParams): Promise<void> {
       read: false,
     });
   } catch (err) {
-    console.error('[broker-notify] failed to create notification', { err, type, brokerageId });
+    logger.error('[broker-notify] failed to create notification', { type, brokerageId }, err);
   }
 }

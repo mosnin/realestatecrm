@@ -16,6 +16,7 @@ import { Webhook } from 'svix';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import { getClientIp } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 // Svix header names used for webhook signature verification
 const SVIX_ID_HEADER = 'svix-id';
@@ -38,7 +39,7 @@ interface ClerkSessionPayload {
 export async function POST(req: NextRequest) {
   const secret = process.env.CLERK_WEBHOOK_SECRET;
   if (!secret) {
-    console.error('[clerk-webhook] CLERK_WEBHOOK_SECRET is not configured');
+    logger.error('[clerk-webhook] CLERK_WEBHOOK_SECRET is not configured');
     return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
   }
 
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
       'svix-signature': svixSignature,
     }) as ClerkSessionPayload;
   } catch (err) {
-    console.error('[clerk-webhook] signature verification failed', { err });
+    logger.error('[clerk-webhook] signature verification failed', undefined, err);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
@@ -98,10 +99,9 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      console.info('[clerk-webhook] login recorded', {
+      logger.info('[clerk-webhook] login recorded', {
         clerkUserId,
         sessionId: data.id,
-        ip,
       });
     } else if (type === 'session.ended' || type === 'session.removed' || type === 'session.revoked') {
       const { data: userRow } = await supabase
@@ -124,19 +124,19 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      console.info('[clerk-webhook] logout recorded', {
+      logger.info('[clerk-webhook] logout recorded', {
         clerkUserId,
         sessionId: data.id,
         eventType: type,
       });
     } else {
       // Acknowledge but ignore other event types
-      console.debug('[clerk-webhook] unhandled event type', { type });
+      logger.debug('[clerk-webhook] unhandled event type', { type });
     }
   } catch (err) {
     // Log error but return 200 so Clerk doesn't retry — the audit utility
     // already handles its own errors gracefully.
-    console.error('[clerk-webhook] processing failed', { type, clerkUserId, err });
+    logger.error('[clerk-webhook] processing failed', { type, clerkUserId }, err);
   }
 
   return NextResponse.json({ received: true }, { status: 200 });

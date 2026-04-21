@@ -19,6 +19,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { getClientIp } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 import type { NextRequest } from 'next/server';
 
 export type AuditAction =
@@ -71,9 +72,9 @@ export async function audit(params: AuditParams): Promise<void> {
       metadata: metadata ?? null,
     });
     if (error) {
-      console.error('[audit] failed to persist audit event', { error, action, resource, resourceId });
+      logger.error('[audit] failed to persist audit event', { action, resource, resourceId }, error);
     }
   } catch (err) {
-    console.error('[audit] unexpected error', { err, action, resource, resourceId });
+    logger.error('[audit] unexpected error', { action, resource, resourceId }, err);
   }
 }
