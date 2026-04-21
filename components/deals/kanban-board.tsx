@@ -82,6 +82,8 @@ interface SortableKanbanColumnProps {
   onDeleteStage: (stage: DealStage) => void;
   onDealCreated: () => void;
   onStatusChange: (deal: DealWithRelations, status: 'won' | 'lost' | 'on_hold' | 'active') => void;
+  nextStage?: DealStage | null;
+  onAdvanceStage?: (deal: DealWithRelations, nextStageId: string) => void;
 }
 
 function SortableKanbanColumn({
@@ -93,6 +95,8 @@ function SortableKanbanColumn({
   onDeleteStage,
   onDealCreated,
   onStatusChange,
+  nextStage,
+  onAdvanceStage,
 }: SortableKanbanColumnProps) {
   const {
     attributes,
@@ -120,6 +124,8 @@ function SortableKanbanColumn({
         onDeleteStage={onDeleteStage}
         onDealCreated={onDealCreated}
         onStatusChange={onStatusChange}
+        nextStage={nextStage}
+        onAdvanceStage={onAdvanceStage}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
     </div>
@@ -718,6 +724,48 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
     router.push(`/s/${slug}/deals/new?stageId=${stageId}`);
   }
 
+  /**
+   * Advance a deal to the next stage. Uses the same reorder endpoint the drag
+   * handler uses so the server-side position rebalancing stays consistent.
+   * Optimistically moves the card, toasts on success/failure.
+   */
+  async function handleAdvanceStage(deal: DealWithRelations, nextStageId: string) {
+    const nextStage = stages.find((s) => s.id === nextStageId);
+    if (!nextStage) return;
+
+    // Optimistic move — pop from current stage, append to next stage.
+    setStages((prev) =>
+      prev.map((s) => {
+        if (s.id === deal.stageId) {
+          return { ...s, deals: s.deals.filter((d) => d.id !== deal.id) };
+        }
+        if (s.id === nextStageId) {
+          return { ...s, deals: [...s.deals, { ...deal, stageId: nextStageId, stage: nextStage }] };
+        }
+        return s;
+      }),
+    );
+
+    try {
+      const newPosition = nextStage.deals.length;
+      const res = await fetch('/api/deals/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealId: deal.id, newStageId: nextStageId, newPosition }),
+      });
+      if (res.ok) {
+        toast.success(`Advanced to ${nextStage.name}`);
+      } else {
+        toast.error('Could not advance deal');
+      }
+    } catch {
+      toast.error('Could not advance deal');
+    } finally {
+      fetchData();
+      pendingRefetchRef.current = false;
+    }
+  }
+
   // CSV export
   function exportCSV() {
     const headers = ['Title', 'Stage', 'Status', 'Value', 'Commission Rate', 'Probability', 'Priority', 'Address', 'Contacts', 'Close Date', 'Follow Up', 'Created'];
@@ -1280,7 +1328,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
               strategy={horizontalListSortingStrategy}
             >
               <div className="flex gap-4 min-w-max items-start">
-                {filteredStages.map((stage) => (
+                {filteredStages.map((stage, idx) => (
                   <SortableKanbanColumn
                     key={stage.id}
                     stage={stage}
@@ -1291,6 +1339,8 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                     onDeleteStage={handleDeleteStage}
                     onDealCreated={fetchData}
                     onStatusChange={handleCardStatusChange}
+                    nextStage={filteredStages[idx + 1] ?? null}
+                    onAdvanceStage={handleAdvanceStage}
                   />
                 ))}
 

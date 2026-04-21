@@ -4,10 +4,23 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
-import { GripVertical, Pencil, Trash2, DollarSign, Calendar, Trophy, XCircle, PauseCircle, RotateCcw } from 'lucide-react';
+import {
+  GripVertical,
+  Pencil,
+  Trash2,
+  DollarSign,
+  Calendar,
+  Trophy,
+  XCircle,
+  PauseCircle,
+  RotateCcw,
+  ArrowRight,
+  CheckCircle2,
+} from 'lucide-react';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatCompact } from '@/lib/formatting';
+import { dealHealth, inferNextAction, HEALTH_META } from '@/lib/deals/health';
 
 type DealWithRelations = Deal & {
   stage: DealStage;
@@ -15,18 +28,9 @@ type DealWithRelations = Deal & {
 };
 
 const PRIORITY_META: Record<string, { label: string; className: string }> = {
-  LOW: {
-    label: 'Low',
-    className: 'bg-muted text-muted-foreground',
-  },
-  MEDIUM: {
-    label: 'Medium',
-    className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
-  },
-  HIGH: {
-    label: 'High',
-    className: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400',
-  },
+  LOW: { label: 'Low', className: 'bg-muted text-muted-foreground' },
+  MEDIUM: { label: 'Medium', className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' },
+  HIGH: { label: 'High', className: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
 };
 
 const STATUS_BADGE: Record<string, { label: string; icon: React.ElementType; className: string }> = {
@@ -40,13 +44,15 @@ interface DealCardProps {
   slug: string;
   onDelete: (id: string) => void;
   onStatusChange?: (deal: DealWithRelations, status: 'won' | 'lost' | 'on_hold' | 'active') => void;
+  /** Next stage in this pipeline — drives the "Advance stage" button. Null when this is the last stage. */
+  nextStage?: DealStage | null;
+  /** Called when the realtor clicks the "Advance" button. */
+  onAdvanceStage?: (deal: DealWithRelations, nextStageId: string) => void;
 }
 
-export function DealCard({ deal, slug, onDelete, onStatusChange }: DealCardProps) {
+export function DealCard({ deal, slug, onDelete, onStatusChange, nextStage, onAdvanceStage }: DealCardProps) {
   const router = useRouter();
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: deal.id,
-  });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: deal.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -56,66 +62,14 @@ export function DealCard({ deal, slug, onDelete, onStatusChange }: DealCardProps
 
   const priority = PRIORITY_META[deal.priority];
   const statusBadge = deal.status && deal.status !== 'active' ? STATUS_BADGE[deal.status] : null;
-  const followUpRaw = deal.followUpAt ? new Date(deal.followUpAt) : null;
-  const followUpDate = followUpRaw && !isNaN(followUpRaw.getTime()) ? followUpRaw : null;
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const followUpOverdue = Boolean(
-    followUpDate &&
-      deal.status === 'active' &&
-      followUpDate.getTime() < startOfToday.getTime(),
-  );
 
-  // --- Feature A: Close date countdown ---
-  // Only shown for active deals with a valid closeDate within 30 days.
-  const closeDateChip: { label: string; className: string } | null = (() => {
-    if (deal.status !== 'active' || !deal.closeDate) return null;
-    const raw = new Date(deal.closeDate);
-    if (isNaN(raw.getTime())) return null;
-    // Normalise closeDate to midnight local time so day-diff is date-only.
-    const closeDay = new Date(raw);
-    closeDay.setHours(0, 0, 0, 0);
-    const diffMs = closeDay.getTime() - startOfToday.getTime();
-    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) {
-      return { label: 'Closing today', className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' };
-    }
-    if (diffDays >= 1 && diffDays <= 7) {
-      return { label: `Closing in ${diffDays} day${diffDays === 1 ? '' : 's'}`, className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' };
-    }
-    if (diffDays >= 8 && diffDays <= 30) {
-      return { label: `Closing in ${diffDays} days`, className: 'bg-muted text-muted-foreground' };
-    }
-    if (diffDays < 0) {
-      const ago = Math.abs(diffDays);
-      return { label: `Closed ${ago} day${ago === 1 ? '' : 's'} ago`, className: 'bg-destructive/10 text-destructive border border-destructive/30' };
-    }
-    // >30 days out — omit chip
-    return null;
-  })();
+  // ── Health dot & next action — replace the old "probability %" noise ────
+  const health = dealHealth(deal);
+  const healthMeta = HEALTH_META[health.state];
+  const nextAction = inferNextAction(deal);
+  const isActive = deal.status === 'active';
 
-  // --- Feature B: Deal age / stage stuck indicator ---
-  // Uses updatedAt as a proxy for when the deal last changed stage. This is
-  // approximate — updatedAt is refreshed on any edit, not just stage changes.
-  const stageAgeChip: { label: string; className: string } | null = (() => {
-    if (deal.status !== 'active' || !deal.updatedAt) return null;
-    const raw = new Date(deal.updatedAt);
-    if (isNaN(raw.getTime())) return null;
-    const updatedDay = new Date(raw);
-    updatedDay.setHours(0, 0, 0, 0);
-    const diffMs = startOfToday.getTime() - updatedDay.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays <= 7) return null;
-    const label = `${diffDays}d in stage`;
-    if (diffDays >= 30) {
-      return { label, className: 'text-destructive' };
-    }
-    if (diffDays >= 15) {
-      return { label, className: 'text-amber-600 dark:text-amber-400' };
-    }
-    // 8–14 days: neutral/muted
-    return { label, className: 'text-muted-foreground' };
-  })();
+  const canAdvance = isActive && nextStage && onAdvanceStage;
 
   return (
     <div ref={setNodeRef} style={style} className="mb-2">
@@ -134,17 +88,41 @@ export function DealCard({ deal, slug, onDelete, onStatusChange }: DealCardProps
             {...listeners}
             className="mt-1 text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing flex-shrink-0 transition-colors"
             onClick={(e) => e.stopPropagation()}
+            aria-label="Reorder deal"
           >
             <GripVertical size={15} />
           </button>
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <p className={cn('font-semibold text-sm leading-tight truncate', deal.status === 'lost' && 'line-through text-muted-foreground')}>
-              {deal.title}
-            </p>
+            {/* Title row with health dot */}
+            <div className="flex items-center gap-1.5">
+              {isActive && (
+                <span
+                  className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', healthMeta.dotClass)}
+                  title={health.reason ? `${healthMeta.label} — ${health.reason}` : healthMeta.label}
+                  aria-label={`Health: ${healthMeta.label}${health.reason ? `, ${health.reason}` : ''}`}
+                />
+              )}
+              <p className={cn('font-semibold text-sm leading-tight truncate', deal.status === 'lost' && 'line-through text-muted-foreground')}>
+                {deal.title}
+              </p>
+            </div>
+
             {deal.address && (
               <p className="text-xs text-muted-foreground truncate mt-0.5">{deal.address}</p>
+            )}
+
+            {/* Next-action line — the most important thing on the card */}
+            {nextAction && (
+              <p className={cn(
+                'text-xs font-medium mt-1.5 truncate',
+                health.state === 'stuck' ? 'text-red-700 dark:text-red-400'
+                  : health.state === 'at-risk' ? 'text-amber-700 dark:text-amber-400'
+                  : 'text-foreground',
+              )}>
+                Next: {nextAction.label}
+              </p>
             )}
 
             <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -154,32 +132,13 @@ export function DealCard({ deal, slug, onDelete, onStatusChange }: DealCardProps
                   {deal.value.toLocaleString()}
                 </span>
               )}
-              <span
-                className={cn(
-                  'inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold',
-                  priority.className
-                )}
-              >
+              <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold', priority.className)}>
                 {priority.label}
               </span>
               {statusBadge && (
                 <span className={cn('inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold', statusBadge.className)}>
                   <statusBadge.icon size={9} />
                   {statusBadge.label}
-                </span>
-              )}
-              {followUpDate && (
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold',
-                    followUpOverdue
-                      ? 'bg-destructive/10 text-destructive border border-destructive/30'
-                      : 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
-                  )}
-                >
-                  <Calendar size={9} />
-                  {followUpOverdue ? 'Overdue · ' : ''}
-                  {followUpDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </span>
               )}
             </div>
@@ -189,31 +148,11 @@ export function DealCard({ deal, slug, onDelete, onStatusChange }: DealCardProps
                 GCI: {formatCompact(deal.value * deal.commissionRate / 100)}
               </p>
             )}
-            {deal.probability != null && (
-              <div className="mt-1">
-                <span
-                  className={cn(
-                    'inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold border',
-                    deal.probability >= 70
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30'
-                      : deal.probability >= 40
-                      ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/30'
-                      : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/30',
-                  )}
-                >
-                  {deal.probability}%
-                </span>
-              </div>
-            )}
 
             {deal.dealContacts.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
                 {deal.dealContacts.slice(0, 2).map(({ contact }) => (
-                  <Badge
-                    key={contact.id}
-                    variant="outline"
-                    className="text-[10px] py-0 px-1.5 h-4 font-normal"
-                  >
+                  <Badge key={contact.id} variant="outline" className="text-[10px] py-0 px-1.5 h-4 font-normal">
                     {contact.name}
                   </Badge>
                 ))}
@@ -225,31 +164,25 @@ export function DealCard({ deal, slug, onDelete, onStatusChange }: DealCardProps
               </div>
             )}
 
-            {/* Feature A & B: Close date countdown + stage stuck indicator.
-                Rendered below primary content to defer to deal title/value (Apple HIG: Deference). */}
-            {(closeDateChip || stageAgeChip) && (
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                {closeDateChip && (
-                  <span
-                    className={cn(
-                      'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium',
-                      closeDateChip.className,
-                    )}
-                  >
-                    <Calendar size={9} />
-                    {closeDateChip.label}
-                  </span>
-                )}
-                {stageAgeChip && (
-                  <span className={cn('text-[10px] font-medium', stageAgeChip.className)}>
-                    {stageAgeChip.label}
-                  </span>
-                )}
-              </div>
+            {/* Advance-stage button — one-tap primary action on each card. Visible only
+                for active deals that have a next stage in this pipeline. */}
+            {canAdvance && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAdvanceStage(deal, nextStage.id);
+                }}
+                className="mt-2.5 w-full inline-flex items-center justify-center gap-1 rounded-md border border-border bg-muted/40 hover:bg-foreground hover:text-background hover:border-foreground text-[11px] font-semibold py-1.5 px-2 transition-colors"
+                title={`Move to ${nextStage.name}`}
+              >
+                <ArrowRight size={11} />
+                <span className="truncate">Advance to {nextStage.name}</span>
+              </button>
             )}
           </div>
 
-          {/* Actions */}
+          {/* Hover actions */}
           <div className="flex flex-col gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               type="button"
@@ -313,6 +246,14 @@ export function DealCard({ deal, slug, onDelete, onStatusChange }: DealCardProps
             )}
           </div>
         </div>
+
+        {/* Won-deal check chip */}
+        {deal.status === 'won' && (
+          <div className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-green-700 dark:text-green-400">
+            <CheckCircle2 size={10} />
+            Closed
+          </div>
+        )}
       </div>
     </div>
   );
