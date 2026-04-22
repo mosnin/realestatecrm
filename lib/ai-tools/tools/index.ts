@@ -16,6 +16,14 @@ import { sendEmailTool } from './send-email';
 import { sendSmsTool } from './send-sms';
 import { updateContactTool } from './update-contact';
 
+/**
+ * Domain tools only. The orchestrator's `delegate_to_subagent` tool is
+ * intentionally NOT in this list — it gets added at the `registry` layer.
+ * That separation breaks the cycle where delegate-to-subagent needs
+ * skills/registry which needs ALL_TOOLS for validation. It also keeps this
+ * list safe to pass into `validateSkill` as a pool of tools a sub-agent is
+ * allowed to use (sub-agents calling sub-agents isn't a feature we want).
+ */
 export const ALL_TOOLS: ToolDefinition[] = [
   // Read-only
   searchContactsTool as ToolDefinition,

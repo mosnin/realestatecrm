@@ -13,6 +13,13 @@ vi.mock('@/lib/ai-tools/registry', () => ({
   toolRequiresApproval: () => false,
 }));
 
+// Rate limit is allowed by default; tests can override per-case via
+// rateLimitAllowed.
+let rateLimitAllowed = true;
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: vi.fn(async () => ({ allowed: rateLimitAllowed, remaining: 0, resetAt: 0 })),
+}));
+
 // Import AFTER mocking so the real module binds to the mock.
 import { executeTool, executionToModelMessage } from '@/lib/ai-tools/execute';
 
@@ -27,6 +34,7 @@ function makeCtx(overrides: Partial<ToolContext> = {}): ToolContext {
 
 beforeEach(() => {
   currentTool = null;
+  rateLimitAllowed = true;
 });
 
 describe('executeTool', () => {
@@ -139,6 +147,40 @@ describe('executeTool', () => {
     expect(out.ok).toBe(true);
     expect(out.args).toEqual({ name: 'Jane' });
     expect(out.result?.summary).toBe('Hello, Jane.');
+  });
+
+  it('returns rate_limited and does NOT run the handler when the per-tool limit is exceeded', async () => {
+    const handler = vi.fn(async () => ({ summary: 'should not run' }));
+    currentTool = defineTool({
+      name: 'limited',
+      description: 't',
+      parameters: z.object({}),
+      requiresApproval: false,
+      rateLimit: { max: 3, windowSeconds: 60 },
+      handler,
+    });
+    rateLimitAllowed = false;
+    const out = await executeTool('limited', {}, makeCtx());
+    expect(out.ok).toBe(false);
+    expect(out.error?.code).toBe('rate_limited');
+    expect(out.error?.message).toMatch(/limited/);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('skips the rate-limit check when the tool has no rateLimit configured', async () => {
+    const handler = vi.fn(async () => ({ summary: 'ok' }));
+    currentTool = defineTool({
+      name: 'uncapped',
+      description: 't',
+      parameters: z.object({}),
+      requiresApproval: false,
+      handler,
+    });
+    // Even with rateLimitAllowed=false, an uncapped tool should still run.
+    rateLimitAllowed = false;
+    const out = await executeTool('uncapped', {}, makeCtx());
+    expect(out.ok).toBe(true);
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 });
 

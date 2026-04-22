@@ -8,16 +8,27 @@
  */
 
 import { ALL_TOOLS } from './tools';
+import { delegateToSubagentTool } from './tools/delegate-to-subagent';
 import type { ToolDefinition } from './types';
 
+// The orchestrator-facing tool set = domain tools + the meta delegation
+// tool. Keeping delegateToSubagentTool outside ./tools/index.ts breaks a
+// latent cycle: delegate → skills/registry → tools (for skill-allowlist
+// validation). Adding it here means validateSkill still sees a clean
+// domain-only pool and can't accidentally permit sub-agent recursion.
+const COMBINED: ToolDefinition[] = [
+  ...ALL_TOOLS,
+  delegateToSubagentTool as ToolDefinition,
+];
+
 const REGISTRY: Map<string, ToolDefinition> = new Map(
-  ALL_TOOLS.map((t) => [t.name, t as ToolDefinition]),
+  COMBINED.map((t) => [t.name, t as ToolDefinition]),
 );
 
 // Guardrail: duplicate names would silently lose a tool on Map insertion.
-if (REGISTRY.size !== ALL_TOOLS.length) {
+if (REGISTRY.size !== COMBINED.length) {
   const seen = new Set<string>();
-  for (const t of ALL_TOOLS) {
+  for (const t of COMBINED) {
     if (seen.has(t.name)) {
       throw new Error(`Duplicate tool name in registry: ${t.name}`);
     }
