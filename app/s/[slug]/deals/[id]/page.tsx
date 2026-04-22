@@ -15,6 +15,7 @@ import { DealStageSelector } from '@/components/deals/deal-stage-selector';
 import { DealContactsManager } from '@/components/deals/deal-contacts-manager';
 import { DealMilestones } from '@/components/deals/deal-milestones';
 import { DealChecklist } from '@/components/deals/deal-checklist';
+import { DealNextActionField } from '@/components/deals/deal-next-action-field';
 import { DealPrioritySelector } from '@/components/deals/deal-priority-selector';
 import { DeleteDealButton } from '@/components/deals/deal-delete-button';
 import { AgentDealPanel } from '@/components/agent/agent-deal-panel';
@@ -107,6 +108,8 @@ export default async function DealDetailPage({
   const followUpAt = dealRow.followUpAt != null ? (dealRow.followUpAt as string) : null;
   const address = dealRow.address != null ? (dealRow.address as string) : null;
   const description = dealRow.description != null ? (dealRow.description as string) : null;
+  const nextAction = dealRow.nextAction != null ? (dealRow.nextAction as string) : null;
+  const nextActionDueAt = dealRow.nextActionDueAt != null ? (dealRow.nextActionDueAt as string) : null;
   const milestones = (dealRow.milestones ?? []) as DealMilestone[];
   const createdAt = dealRow.createdAt as string;
   const updatedAt = dealRow.updatedAt as string;
@@ -304,6 +307,11 @@ export default async function DealDetailPage({
             {/* Tab content */}
             {activeTab === 'overview' && (
               <div className="space-y-5">
+                <DealNextActionField
+                  dealId={id}
+                  initialAction={nextAction}
+                  initialDueAt={nextActionDueAt}
+                />
                 <div>
                   <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Title</p>
                   <DealInlineField

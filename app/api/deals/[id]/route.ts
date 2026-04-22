@@ -170,6 +170,26 @@ export async function PATCH(
       }
     }
 
+    // next-action: free-form string + optional due timestamp.
+    let nextActionVal: string | null | undefined = undefined;
+    if (body.nextAction !== undefined) {
+      if (body.nextAction === null || body.nextAction === '') {
+        nextActionVal = null;
+      } else {
+        nextActionVal = String(body.nextAction).trim().slice(0, 280);
+      }
+    }
+    let nextActionDueAtVal: string | null | undefined = undefined;
+    if (body.nextActionDueAt !== undefined) {
+      if (!body.nextActionDueAt) {
+        nextActionDueAtVal = null;
+      } else {
+        const d = new Date(body.nextActionDueAt);
+        if (isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid nextActionDueAt' }, { status: 400 });
+        nextActionDueAtVal = d.toISOString();
+      }
+    }
+
     const stageChanged = body.stageId && body.stageId !== existing.stageId;
     const statusChanged = body.status && body.status !== existing.status;
 
@@ -244,6 +264,8 @@ export async function PATCH(
         ...(body.status !== undefined && { status: body.status }),
         ...(followUpAtVal !== undefined && { followUpAt: followUpAtVal }),
         ...(milestonesVal !== undefined && { milestones: milestonesVal }),
+        ...(nextActionVal !== undefined && { nextAction: nextActionVal }),
+        ...(nextActionDueAtVal !== undefined && { nextActionDueAt: nextActionDueAtVal }),
         updatedAt: new Date().toISOString(),
       })
       .eq('id', id)

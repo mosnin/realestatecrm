@@ -77,9 +77,10 @@ export default async function DashboardPage({
   let recentLeads: { id: string; name: string; phone: string | null; budget: number | null; preferences: string | null; createdAt: Date; tags: string[]; leadScore: number | null; scoreLabel: string | null; scoringStatus: string | null }[] = [];
   let followUpContacts: FollowUpContact[] = [];
   let upcomingTours: { id: string; guestName: string; startsAt: string; endsAt: string; propertyAddress: string | null; status: string }[] = [];
+  let overdueNextActions: { id: string; title: string; nextAction: string; nextActionDueAt: string }[] = [];
 
   try {
-    [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads, followUpDue, followUpContacts, upcomingTourCount, upcomingTours, buyerLeadCount, rentalLeadCount, pendingDraftCount] =
+    [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads, followUpDue, followUpContacts, upcomingTourCount, upcomingTours, buyerLeadCount, rentalLeadCount, pendingDraftCount, overdueNextActions] =
       await Promise.all([
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).is('brokerageId', null).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
         supabase.from('Deal').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
@@ -95,6 +96,19 @@ export default async function DashboardPage({
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).is('brokerageId', null).eq('leadType', 'buyer').contains('tags', ['application-link']).then(r => r.count ?? 0),
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).is('brokerageId', null).eq('leadType', 'rental').contains('tags', ['application-link']).then(r => r.count ?? 0),
         supabase.from('AgentDraft').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).eq('status', 'pending').then(r => r.count ?? 0),
+        // Deals with a realtor-authored next action that's overdue — surface in
+        // the Today inbox. Scoped to active deals only.
+        supabase
+          .from('Deal')
+          .select('id, title, nextAction, nextActionDueAt')
+          .eq('spaceId', space.id)
+          .eq('status', 'active')
+          .not('nextAction', 'is', null)
+          .not('nextActionDueAt', 'is', null)
+          .lte('nextActionDueAt', new Date().toISOString())
+          .order('nextActionDueAt', { ascending: true })
+          .limit(5)
+          .then(r => (r.data ?? []) as { id: string; title: string; nextAction: string; nextActionDueAt: string }[]),
       ]);
   } catch (err) {
     logger.error('[space-home] DB queries failed', { slug }, err);
@@ -158,6 +172,36 @@ export default async function DashboardPage({
       title: `${followUpDue} follow-up${followUpDue === 1 ? '' : 's'} overdue`,
       sub: 'These people were expecting to hear from you today.',
       href: `/s/${slug}/follow-ups`,
+      cta: 'Open',
+      urgent: true,
+    });
+  }
+  // Overdue next actions on deals — one row per deal up to 3, the rest rolled
+  // into a "deals" link.
+  const visibleNextActions = overdueNextActions.slice(0, 3);
+  for (const d of visibleNextActions) {
+    todayItems.push({
+      key: `next-${d.id}`,
+      icon: ArrowRight,
+      iconBg: 'bg-red-50 dark:bg-red-500/10',
+      iconColor: 'text-red-600 dark:text-red-400',
+      title: d.nextAction,
+      sub: `${d.title} · overdue`,
+      href: `/s/${slug}/deals/${d.id}`,
+      cta: 'Open',
+      urgent: true,
+    });
+  }
+  if (overdueNextActions.length > visibleNextActions.length) {
+    const rest = overdueNextActions.length - visibleNextActions.length;
+    todayItems.push({
+      key: 'next-actions-more',
+      icon: ArrowRight,
+      iconBg: 'bg-red-50 dark:bg-red-500/10',
+      iconColor: 'text-red-600 dark:text-red-400',
+      title: `${rest} more overdue deal ${rest === 1 ? 'action' : 'actions'}`,
+      sub: 'Open the deals board to triage.',
+      href: `/s/${slug}/deals`,
       cta: 'Open',
       urgent: true,
     });

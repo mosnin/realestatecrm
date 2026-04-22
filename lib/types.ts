@@ -293,6 +293,9 @@ export type Deal = {
   commissionRate: number | null;
   probability: number | null;
   milestones: DealMilestone[];
+  /** Realtor-authored "what's next" — shown prominently on the card and in the Today inbox. */
+  nextAction: string | null;
+  nextActionDueAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };

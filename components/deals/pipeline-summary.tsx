@@ -14,7 +14,7 @@ interface PipelineSummaryProps {
 }
 
 type StageWithDeals = DealStage & { deals: Deal[] };
-type StripDeal = Pick<Deal, 'id' | 'title' | 'status' | 'updatedAt' | 'closeDate' | 'followUpAt' | 'value'>;
+type StripDeal = Pick<Deal, 'id' | 'title' | 'status' | 'updatedAt' | 'closeDate' | 'followUpAt' | 'value' | 'nextAction' | 'nextActionDueAt'>;
 
 interface StripSpec {
   key: 'closing' | 'at-risk' | 'waiting';
@@ -76,6 +76,8 @@ export function PipelineSummary({ slug, pipelineId }: PipelineSummaryProps) {
         closeDate: d.closeDate,
         followUpAt: d.followUpAt,
         value: d.value,
+        nextAction: d.nextAction,
+        nextActionDueAt: d.nextActionDueAt,
       }));
 
     const active = allDeals.filter((d) => d.status === 'active');

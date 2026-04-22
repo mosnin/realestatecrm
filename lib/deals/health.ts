@@ -42,7 +42,9 @@ function daysBetween(a: Date, b: Date): number {
  *
  * Won / lost / on-hold deals always return 'on-track' — they aren't in flight.
  */
-export function dealHealth(deal: Pick<Deal, 'status' | 'updatedAt' | 'closeDate' | 'followUpAt'>): DealHealthMeta {
+export function dealHealth(
+  deal: Pick<Deal, 'status' | 'updatedAt' | 'closeDate' | 'followUpAt' | 'nextAction' | 'nextActionDueAt'>,
+): DealHealthMeta {
   if (deal.status !== 'active') return { state: 'on-track', reason: '' };
 
   const today = startOfToday();
@@ -64,6 +66,11 @@ export function dealHealth(deal: Pick<Deal, 'status' | 'updatedAt' | 'closeDate'
   const followUp = deal.followUpAt ? new Date(deal.followUpAt) : null;
   const followUpOverdue = !!(followUp && !isNaN(followUp.getTime()) && followUp.getTime() < today.getTime());
 
+  // Realtor-authored next action that's past its due date — a strong
+  // "this specific deal is being ignored" signal.
+  const nextDue = deal.nextActionDueAt ? new Date(deal.nextActionDueAt) : null;
+  const nextActionOverdue = !!(deal.nextAction && nextDue && !isNaN(nextDue.getTime()) && nextDue.getTime() < today.getTime());
+
   // Stuck first — most urgent
   if (stageDays != null && stageDays >= 30) {
     return { state: 'stuck', reason: `${stageDays} days in this stage` };
@@ -76,6 +83,9 @@ export function dealHealth(deal: Pick<Deal, 'status' | 'updatedAt' | 'closeDate'
   if (stageDays != null && stageDays >= 15) {
     return { state: 'at-risk', reason: `${stageDays} days in this stage` };
   }
+  if (nextActionOverdue) {
+    return { state: 'at-risk', reason: 'next action overdue' };
+  }
   if (followUpOverdue) {
     return { state: 'at-risk', reason: 'follow-up overdue' };
   }
@@ -87,15 +97,32 @@ export function dealHealth(deal: Pick<Deal, 'status' | 'updatedAt' | 'closeDate'
 }
 
 /**
- * Best-effort "next action" derived from the deal itself, used as a card
- * headline until Phase 3 adds a proper `nextAction` column. Returns null when
- * we can't infer anything useful — the card falls back to the title.
+ * Surface the deal's "what's next" for the card and Today inbox.
+ *
+ * Priority:
+ *   1. Explicit `nextAction` — realtor typed it, respect it.
+ *   2. Follow-up date — "follow up today / overdue / in 3 days".
+ *   3. Close date — "closing today / in 5 days".
+ *   4. null — card falls back to the deal title.
+ *
+ * The returned `dueAt` is used by the Today inbox to flag overdue items.
  */
-export function inferNextAction(deal: Pick<Deal, 'status' | 'followUpAt' | 'closeDate'>): { label: string; dueAt: Date | null } | null {
+export function inferNextAction(
+  deal: Pick<Deal, 'status' | 'followUpAt' | 'closeDate' | 'nextAction' | 'nextActionDueAt'>,
+): { label: string; dueAt: Date | null } | null {
   if (deal.status !== 'active') return null;
 
   const today = startOfToday();
 
+  // 1. Realtor-authored next action wins.
+  if (deal.nextAction && deal.nextAction.trim()) {
+    return {
+      label: deal.nextAction.trim(),
+      dueAt: deal.nextActionDueAt ? new Date(deal.nextActionDueAt) : null,
+    };
+  }
+
+  // 2. Follow-up fallback.
   const followUp = deal.followUpAt ? new Date(deal.followUpAt) : null;
   if (followUp && !isNaN(followUp.getTime())) {
     const days = daysBetween(new Date(followUp.getFullYear(), followUp.getMonth(), followUp.getDate()), today);
@@ -104,6 +131,7 @@ export function inferNextAction(deal: Pick<Deal, 'status' | 'followUpAt' | 'clos
     if (days <= 7) return { label: `Follow up in ${days} day${days === 1 ? '' : 's'}`, dueAt: followUp };
   }
 
+  // 3. Close-date fallback.
   const close = deal.closeDate ? new Date(deal.closeDate) : null;
   if (close && !isNaN(close.getTime())) {
     const days = daysBetween(new Date(close.getFullYear(), close.getMonth(), close.getDate()), today);
@@ -123,7 +151,7 @@ export function inferNextAction(deal: Pick<Deal, 'status' | 'followUpAt' | 'clos
  * an overdue follow-up is both "closing" and "waiting on me". We dedupe only
  * within each bucket; the card can live in more than one strip.
  */
-export function classifyForStrips<T extends Pick<Deal, 'status' | 'updatedAt' | 'closeDate' | 'followUpAt' | 'id'>>(deals: T[]): {
+export function classifyForStrips<T extends Pick<Deal, 'status' | 'updatedAt' | 'closeDate' | 'followUpAt' | 'id' | 'nextAction' | 'nextActionDueAt'>>(deals: T[]): {
   closingThisWeek: T[];
   atRisk: T[];
   waitingOnMe: T[];
