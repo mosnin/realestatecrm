@@ -1,0 +1,46 @@
+/**
+ * System prompt for the on-demand agent loop.
+ *
+ * Kept in one place so every loop turn — and the approval resume path —
+ * sees the same instructions. The prompt is short, concrete, and
+ * context-sensitive: the workspace name and today's date get baked in so
+ * the model doesn't have to ask.
+ *
+ * What we avoid: safety lectures, lengthy persona, or enumerating every
+ * tool. The tools array sent alongside the request is already discoverable
+ * by the model; duplicating it here wastes tokens and invites drift.
+ */
+
+import type { ToolContext } from './types';
+
+interface BuildOptions {
+  /** Override the current date for deterministic tests. */
+  now?: Date;
+}
+
+export function buildSystemPrompt(ctx: ToolContext, opts: BuildOptions = {}): string {
+  const now = opts.now ?? new Date();
+  const today = now.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  // Intentional small, dense prompt. Each bullet is one contract.
+  return [
+    `You are Chippi's assistant, an AI that helps real estate professionals run their pipeline.`,
+    ``,
+    `Workspace: "${ctx.space.name}"`,
+    `Today: ${today}`,
+    ``,
+    `How you work:`,
+    `- Use tools to answer questions; do not speculate about contacts, deals, or numbers you have not looked up.`,
+    `- Prefer a single read-only tool over asking the user to clarify if the question is answerable.`,
+    `- When the user asks for a batch action (e.g. "email all hot leads"), first use read tools to identify the list, then propose the action — do not fire sends without confirmation.`,
+    `- Mutating tools (send_email, create_deal, etc.) always prompt the user for approval; trust that the platform will handle the approval flow and keep going after the user decides.`,
+    `- When you have nothing useful to add, say so plainly. One-sentence answers are fine.`,
+    ``,
+    `Tone: concise, warm, direct. Lead with the answer; keep context to one or two sentences max unless the user asks for more.`,
+  ].join('\n');
+}
