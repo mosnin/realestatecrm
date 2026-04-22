@@ -15,6 +15,7 @@ import { DealStageSelector } from '@/components/deals/deal-stage-selector';
 import { DealContactsManager } from '@/components/deals/deal-contacts-manager';
 import { DealMilestones } from '@/components/deals/deal-milestones';
 import { DealChecklist } from '@/components/deals/deal-checklist';
+import { DealCommissionSplits } from '@/components/deals/deal-commission-splits';
 import { DealDocuments } from '@/components/deals/deal-documents';
 import { DealNextActionField } from '@/components/deals/deal-next-action-field';
 import { DealPropertyPicker } from '@/components/deals/deal-property-picker';
@@ -372,6 +373,11 @@ export default async function DealDetailPage({
                     placeholder="Add notes or description…"
                   />
                 </div>
+                <DealCommissionSplits
+                  dealId={id}
+                  dealValue={value}
+                  dealCommissionRate={commissionRate}
+                />
                 <AgentDealPanel dealId={id} />
               </div>
             )}
