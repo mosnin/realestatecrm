@@ -15,11 +15,13 @@ import { DealStageSelector } from '@/components/deals/deal-stage-selector';
 import { DealContactsManager } from '@/components/deals/deal-contacts-manager';
 import { DealMilestones } from '@/components/deals/deal-milestones';
 import { DealChecklist } from '@/components/deals/deal-checklist';
+import { DealDocuments } from '@/components/deals/deal-documents';
 import { DealNextActionField } from '@/components/deals/deal-next-action-field';
 import { DealPrioritySelector } from '@/components/deals/deal-priority-selector';
 import { DeleteDealButton } from '@/components/deals/deal-delete-button';
 import { AgentDealPanel } from '@/components/agent/agent-deal-panel';
 import type { DealChecklistItem } from '@/lib/deals/checklist';
+import type { DealDocument } from '@/lib/deals/documents';
 
 
 export default async function DealDetailPage({
@@ -31,7 +33,7 @@ export default async function DealDetailPage({
 }) {
   const { slug, id } = await params;
   const { tab } = await searchParams;
-  const activeTab = tab === 'activity' || tab === 'checklist' || tab === 'milestones' ? tab : 'overview';
+  const activeTab = tab === 'activity' || tab === 'checklist' || tab === 'documents' || tab === 'milestones' ? tab : 'overview';
 
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
@@ -41,6 +43,7 @@ export default async function DealDetailPage({
   let activities: DealActivity[];
   let allStages: DealStage[];
   let checklist: DealChecklistItem[];
+  let documents: DealDocument[];
 
   try {
     const { data: dealData, error: dealError } = await supabase
@@ -54,20 +57,23 @@ export default async function DealDetailPage({
     if (!dealData) notFound();
     dealRow = dealData as Record<string, unknown>;
 
-    const [stagesResult, dcResult, activityResult, checklistResult] = await Promise.all([
+    const [stagesResult, dcResult, activityResult, checklistResult, docsResult] = await Promise.all([
       supabase.from('DealStage').select('*').eq('spaceId', space.id).order('position'),
       supabase.from('DealContact').select('dealId, contactId, role, Contact(id, name, type, email, phone)').eq('dealId', id),
       supabase.from('DealActivity').select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(100),
       supabase.from('DealChecklistItem').select('*').eq('dealId', id).order('position', { ascending: true }),
+      supabase.from('DealDocument').select('*').eq('dealId', id).order('createdAt', { ascending: false }),
     ]);
 
     if (stagesResult.error) throw stagesResult.error;
     if (dcResult.error) throw dcResult.error;
     if (activityResult.error) throw activityResult.error;
     if (checklistResult.error) throw checklistResult.error;
+    if (docsResult.error) throw docsResult.error;
 
     allStages = (stagesResult.data ?? []) as DealStage[];
     checklist = (checklistResult.data ?? []) as DealChecklistItem[];
+    documents = (docsResult.data ?? []) as DealDocument[];
     dealContacts = ((dcResult.data ?? []) as Record<string, unknown>[]).map((row) => {
       const contact = row.Contact as { id: string; name: string; type: string; email: string | null; phone: string | null } | null;
       return {
@@ -287,6 +293,7 @@ export default async function DealDetailPage({
                 [
                   ['overview', 'Overview'],
                   ['checklist', 'Closing checklist'],
+                  ['documents', 'Documents'],
                   ['activity', 'Activity'],
                 ] as [string, string][]
               ).map(([key, label]) => (
@@ -360,6 +367,10 @@ export default async function DealDetailPage({
 
             {activeTab === 'checklist' && (
               <DealChecklist dealId={id} initial={checklist} />
+            )}
+
+            {activeTab === 'documents' && (
+              <DealDocuments dealId={id} initial={documents} />
             )}
 
             {/* Legacy milestones tab kept reachable via explicit ?tab=milestones
