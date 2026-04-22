@@ -72,6 +72,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  // Audit found: the CSV includes every agent's email, deal value, and
+  // amount. Letting realtor_member export the whole brokerage's ledger is
+  // a real data-leak (one agent could see another's earnings). Restrict to
+  // the people who already have legitimate financial access.
+  const role = ctx.membership.role;
+  if (role !== 'broker_owner' && role !== 'broker_admin') {
+    return NextResponse.json(
+      { error: 'Only the owner or admins can export commissions' },
+      { status: 403 },
+    );
+  }
+
   const { searchParams } = new URL(req.url);
   const month = searchParams.get('month');
   const formatParam = searchParams.get('format');

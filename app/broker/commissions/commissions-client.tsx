@@ -99,14 +99,18 @@ export function initials(name: string | null | undefined, email?: string | null)
     .join('');
 }
 
+// Month grouping is done in UTC to match the export endpoint, which filters
+// closedAt by UTC month boundaries. Mixing local-TZ and UTC grouping would
+// quietly drop deals that closed near midnight into the wrong bucket for
+// any broker outside UTC.
 function currentMonthKey(): string {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 function monthKeyOf(iso: string): string {
   const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 function pctToDecimal(v: string): number | null {

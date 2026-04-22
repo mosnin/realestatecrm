@@ -218,6 +218,37 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const effectiveReferralRate = referralRateVal ?? row.referralRate;
   const dealValue = row.dealValue;
 
+  // Audit found: individually-capped rates (0-100 each) still allow a broker
+  // to allocate >100% of dealValue. Cap the SUM at 100% so the ledger never
+  // shows a payout that exceeds the deal.
+  const rateSum =
+    (effectiveAgentRate ?? 0) +
+    (effectiveBrokerRate ?? 0) +
+    (effectiveReferralRate ?? 0);
+  if (rateSum > 100) {
+    return NextResponse.json(
+      {
+        error: `Rates sum to ${rateSum}% — agent + broker + referral cannot exceed 100% of the deal value.`,
+      },
+      { status: 400 },
+    );
+  }
+
+  // Referral pair invariant: a non-zero referralRate is meaningless without
+  // a referralUserId. Effective values (after merging the patch over the
+  // current row) are what matters.
+  const effectiveReferralUserId =
+    referralUserIdVal !== undefined ? referralUserIdVal : row.referralUserId;
+  if ((effectiveReferralRate ?? 0) > 0 && !effectiveReferralUserId) {
+    return NextResponse.json(
+      {
+        error:
+          'referralRate > 0 requires referralUserId — payouts cannot be recorded without a recipient.',
+      },
+      { status: 400 },
+    );
+  }
+
   const updates: Record<string, unknown> = {
     updatedAt: new Date().toISOString(),
   };
