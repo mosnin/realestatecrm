@@ -226,7 +226,28 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
         ))}
       </div>
 
-      {/* ── Risk dashboard — shown only when something needs attention ─ */}
+      {/* ── Risk dashboard ──────────────────────────────────────────── */}
+      {/* When there ARE active deals but nothing's flagged, we render a */}
+      {/* quiet "all healthy" strip instead of hiding the slot entirely. */}
+      {/* Audit finding: an empty slot made brokers wonder whether the   */}
+      {/* feature was broken. An empty pipeline (zero active deals)      */}
+      {/* still shows nothing — nothing to reassure about.               */}
+      {summary.atRiskCount === 0 && summary.stuckCount === 0 && summary.activeDeals > 0 && (
+        <Card className="border-emerald-500/20 bg-emerald-500/5">
+          <CardContent className="px-5 py-3 flex items-center gap-3">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center flex-shrink-0 text-emerald-700 dark:text-emerald-400">
+              <span role="img" aria-label="healthy">✓</span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">All pipelines healthy</p>
+              <p className="text-xs text-muted-foreground">
+                No deals stuck or at risk across {summary.activeDeals} active deal
+                {summary.activeDeals === 1 ? '' : 's'}.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {(summary.atRiskCount > 0 || summary.stuckCount > 0) && (
         <Card className="border-amber-500/30 bg-amber-50/50 dark:bg-amber-500/5">
           <CardContent className="px-5 py-4">
@@ -576,17 +597,25 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
 }
 
 /**
- * Small circular dot next to a deal title indicating its health state.
- * On-track renders nothing (visual noise at scale); at-risk is amber, stuck
- * is rose. `title` shows the classifier's reason on hover.
+ * Indicator next to a deal title for its health state.
+ *
+ * On-track renders nothing (visual noise at 50+ deals). At-risk and stuck
+ * use BOTH colour and shape so the signal survives red/green colourblind
+ * vision — at 2px, tint alone was indistinguishable (audit finding):
+ *   - at-risk → filled amber dot (3x3).
+ *   - stuck   → filled rose dot (3x3) with a visible ring so the outline
+ *               reads even in monochrome.
  */
 function HealthDot({ health, reason }: { health: PipelineDeal['health']; reason: string }) {
   if (health === 'on-track') return null;
-  const color = health === 'stuck' ? 'bg-rose-500' : 'bg-amber-500';
-  const label = health === 'stuck' ? 'Stuck' : 'At risk';
+  const isStuck = health === 'stuck';
+  const colorClass = isStuck
+    ? 'bg-rose-500 ring-2 ring-rose-300 dark:ring-rose-900'
+    : 'bg-amber-500';
+  const label = isStuck ? 'Stuck' : 'At risk';
   return (
     <span
-      className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${color}`}
+      className={`inline-block w-3 h-3 rounded-full flex-shrink-0 ${colorClass}`}
       title={reason ? `${label} — ${reason}` : label}
       aria-label={reason ? `${label}: ${reason}` : label}
     />

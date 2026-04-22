@@ -105,8 +105,8 @@ export default async function BrokerReviewDetailPage({ params }: PageProps) {
     resolvedNote: reviewRow.resolvedNote,
     requestingUser: {
       id: reviewRow.requestingUserId,
-      name: userRes.data?.name ?? null,
-      email: userRes.data?.email ?? null,
+      name: requestingUser?.name ?? null,
+      email: requestingUser?.email ?? null,
     },
     deal: {
       id: reviewRow.dealId,
@@ -115,8 +115,8 @@ export default async function BrokerReviewDetailPage({ params }: PageProps) {
       spaceSlug: space?.slug ?? null,
     },
     commentCount: comments.length,
-    resolvedByUser: resolvedByRes.data
-      ? { id: resolvedByRes.data.id, name: resolvedByRes.data.name ?? null }
+    resolvedByUser: resolvedByUser
+      ? { id: resolvedByUser.id, name: resolvedByUser.name ?? null }
       : null,
   };
 
