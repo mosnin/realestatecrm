@@ -19,6 +19,7 @@ import { getFormConfigs, getDefaultFormConfig } from '@/lib/form-builder';
 import { formConfigSchema, type FormQuestion } from '@/lib/form-config-schema';
 import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 import { logger } from '@/lib/logger';
+import { routeBrokerageLead } from '@/lib/brokerage-routing';
 
 /** Parse budget/rent range strings to a midpoint number for the DB. */
 function parseBudgetToNumber(val: unknown): number | null {
@@ -573,10 +574,25 @@ export async function POST(req: NextRequest) {
       logger.warn('[apply/brokerage] failed to fetch space settings', { spaceId: space.id }, err);
     }
 
-    // ── Create Contact in the broker's space ───────────────────────────────
+    // ── Lead routing: if auto-assignment is on and an eligible agent ─────
+    // exists, insert into their space; otherwise fall back to the broker
+    // owner's space (current behaviour). `routeBrokerageLead` never throws
+    // — null → owner-space fallback.
+    const routing = await routeBrokerageLead(brokerage.id);
+    const spaceIdForInsert = routing?.agentSpaceId ?? space.id;
+    if (routing) {
+      logger.info('[apply/brokerage] auto-assigned to agent', {
+        brokerageId: brokerage.id,
+        agentUserId: routing.agentUserId,
+        agentSpaceId: routing.agentSpaceId,
+        method: routing.method,
+      });
+    }
+
+    // ── Create Contact in the assigned agent's space (or owner fallback) ──
     const contactInsert: Record<string, unknown> = {
       id: crypto.randomUUID(),
-      spaceId: space.id,
+      spaceId: spaceIdForInsert,
       brokerageId: brokerage.id,
       name: contactName,
       email: contactEmail,
@@ -616,10 +632,14 @@ export async function POST(req: NextRequest) {
 
     logger.info('[apply/brokerage] submission persisted', {
       contactId: contact.id,
-      spaceId: space.id,
+      spaceId: spaceIdForInsert,
+      ownerSpaceId: space.id,
       brokerageId: brokerage.id,
       dynamicForm: !!formConfigSnapshot,
       leadType: contactLeadType,
+      routed: routing !== null,
+      routingMethod: routing?.method ?? null,
+      assignedUserId: routing?.agentUserId ?? null,
     });
 
     // ── Scoring + notification (awaited before response) ──────────────────
