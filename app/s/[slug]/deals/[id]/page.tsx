@@ -15,6 +15,7 @@ import { DealStageSelector } from '@/components/deals/deal-stage-selector';
 import { DealContactsManager } from '@/components/deals/deal-contacts-manager';
 import { DealMilestones } from '@/components/deals/deal-milestones';
 import { DealChecklist } from '@/components/deals/deal-checklist';
+import { DealCloseDateField } from '@/components/deals/deal-close-date-field';
 import { DealCommissionSplits } from '@/components/deals/deal-commission-splits';
 import { DealDocuments } from '@/components/deals/deal-documents';
 import { DealNextActionField } from '@/components/deals/deal-next-action-field';
@@ -256,23 +257,7 @@ export default async function DealDetailPage({
             {/* Close Date */}
             <div>
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Expected Close</p>
-              <DealInlineField
-                dealId={id}
-                field="closeDate"
-                value={closeDate ? closeDate.substring(0, 10) : null}
-                type="date"
-                label="Close Date"
-                displayValue={
-                  closeDate
-                    ? new Date(closeDate).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })
-                    : ''
-                }
-                placeholder="Not set"
-              />
+              <DealCloseDateField dealId={id} initial={closeDate} />
             </div>
 
             {/* Property link */}
