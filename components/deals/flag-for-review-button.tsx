@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Flag } from 'lucide-react';
 import { toast } from 'sonner';
@@ -80,7 +80,7 @@ export function FlagForReviewButton({
     }
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!canSubmit) return;
     setSubmitting(true);
@@ -168,7 +168,7 @@ export function FlagForReviewButton({
             <Textarea
               id="flag-reason"
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setReason(e.target.value)}
               placeholder="Briefly describe what you'd like your broker to look at…"
               rows={5}
               maxLength={MAX_REASON_LEN}

@@ -11,7 +11,8 @@ export type BrokerNotificationType =
   | 'member_removed'
   | 'deal_won'
   | 'deal_created'
-  | 'lead_hot';
+  | 'lead_hot'
+  | 'review_requested';
 
 export interface NotifyBrokerParams {
   brokerageId: string;

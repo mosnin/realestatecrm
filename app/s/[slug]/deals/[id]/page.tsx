@@ -22,6 +22,7 @@ import { DealNextActionField } from '@/components/deals/deal-next-action-field';
 import { DealPropertyPicker } from '@/components/deals/deal-property-picker';
 import { DealPrioritySelector } from '@/components/deals/deal-priority-selector';
 import { DeleteDealButton } from '@/components/deals/deal-delete-button';
+import { FlagForReviewButton } from '@/components/deals/flag-for-review-button';
 import { AgentDealPanel } from '@/components/agent/agent-deal-panel';
 import type { DealChecklistItem } from '@/lib/deals/checklist';
 import type { DealDocument } from '@/lib/deals/documents';
@@ -49,6 +50,7 @@ export default async function DealDetailPage({
   let checklist: DealChecklistItem[];
   let documents: DealDocument[];
   let linkedProperty: Property | null = null;
+  let hasOpenReview = false;
 
   try {
     const { data: dealData, error: dealError } = await supabase
@@ -92,6 +94,26 @@ export default async function DealDetailPage({
         .maybeSingle();
       linkedProperty = (propData as Property | null) ?? null;
     }
+    // Lookup whether this deal already has an open broker review request.
+    // Only meaningful when the space is in a brokerage; we still issue the
+    // query unconditionally (it's a single indexed lookup) so the UI below
+    // stays simple, and we swallow errors so an as-yet-unapplied migration
+    // on another branch doesn't break the page.
+    if (space.brokerageId) {
+      try {
+        const { data: openReview } = await supabase
+          .from('DealReviewRequest')
+          .select('id')
+          .eq('dealId', id)
+          .eq('status', 'open')
+          .maybeSingle();
+        hasOpenReview = !!openReview;
+      } catch (reviewErr) {
+        console.warn('[deal-detail] review-request lookup failed (ignored)', reviewErr);
+        hasOpenReview = false;
+      }
+    }
+
     dealContacts = ((dcResult.data ?? []) as Record<string, unknown>[]).map((row) => {
       const contact = row.Contact as { id: string; name: string; type: string; email: string | null; phone: string | null } | null;
       return {
@@ -162,10 +184,17 @@ export default async function DealDetailPage({
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
-        {/* Header bar with title + delete button */}
+        {/* Header bar with title + actions */}
         <div className="px-5 py-3.5 border-b border-border flex items-center justify-between gap-4">
           <h1 className="text-base font-semibold truncate">{title}</h1>
-          <DeleteDealButton dealId={id} slug={slug} dealTitle={title} />
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <FlagForReviewButton
+              dealId={id}
+              hasOpenReview={hasOpenReview}
+              visible={!!space.brokerageId}
+            />
+            <DeleteDealButton dealId={id} slug={slug} dealTitle={title} />
+          </div>
         </div>
 
         {/* Sidebar + main grid */}
