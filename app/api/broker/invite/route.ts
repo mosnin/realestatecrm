@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { sendBrokerageInvitation } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { audit } from '@/lib/audit';
+import { checkSeatCapacity } from '@/lib/brokerage-seats';
 
 /**
  * POST /api/broker/invite
@@ -101,6 +102,25 @@ export async function POST(req: Request) {
       console.error('[broker/invite] resend email failed for existing invite', err);
     }
     return NextResponse.json({ invitation: existing, duplicate: true }, { status: 200 });
+  }
+
+  // Seat-limit enforcement (BP3b): duplicates above returned early and don't
+  // consume a new seat, so we only gate genuinely new invitations.
+  const seatCheck = await checkSeatCapacity(brokerage.id, 1);
+  if (!seatCheck.ok) {
+    const { plan, seatLimit, used } = seatCheck.usage;
+    const needed = seatCheck.needed ?? 1;
+    return NextResponse.json(
+      {
+        error: `Seat limit reached — your ${plan} plan allows ${seatLimit} seats and ${used} are in use. Upgrade or remove a member to invite ${needed} more.`,
+        code: 'seat_limit',
+        plan,
+        used,
+        limit: seatLimit,
+        needed,
+      },
+      { status: 402 }
+    );
   }
 
   // Resolve inviter name for email
