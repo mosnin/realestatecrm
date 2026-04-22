@@ -433,11 +433,28 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   const deny = useCallback(
     async (requestId: string) => {
       if (isStreaming) return;
+      // Snapshot the prompt before the stream's `permission_resolved` event
+      // clears it — we use the snapshot to pre-populate a PermissionBlock
+      // on the continuation bubble so the denial is visible immediately,
+      // matching what the server persists for this turn.
+      const snapshot = pendingApproval;
       const contId = newId();
+      const initialBlocks: MessageBlock[] = snapshot
+        ? [
+            {
+              type: 'permission',
+              callId: snapshot.callId,
+              name: snapshot.name,
+              args: snapshot.args,
+              summary: snapshot.summary,
+              decision: 'denied',
+            },
+          ]
+        : [];
       const contMsg: UiMessage = {
         id: contId,
         role: 'assistant',
-        blocks: [],
+        blocks: initialBlocks,
         streaming: true,
       };
       streamingMsgIdRef.current = contId;
@@ -447,7 +464,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         decision: 'denied',
       });
     },
-    [isStreaming, consumeStream],
+    [isStreaming, pendingApproval, consumeStream],
   );
 
   const alwaysAllow = useCallback(
