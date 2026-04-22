@@ -100,16 +100,26 @@ export function DealInlineField({
     setSaving(true);
 
     try {
-      const res = await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: next }),
-      });
-      if (!res.ok) throw new Error('Failed to save');
+      let res: Response;
+      try {
+        res = await fetch(`/api/deals/${dealId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [field]: next }),
+        });
+      } catch {
+        setValue(previous);
+        toast.error('Network error — check your connection and try again.');
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({} as { error?: string; message?: string }));
+        const detail = body?.error || body?.message || `HTTP ${res.status}`;
+        setValue(previous);
+        toast.error(`Couldn't save: ${detail}`);
+        return;
+      }
       onSaved?.(next, previous);
-    } catch {
-      setValue(previous);
-      toast.error(`Failed to update ${label.toLowerCase()}`);
     } finally {
       setSaving(false);
       saveCalledRef.current = false;
