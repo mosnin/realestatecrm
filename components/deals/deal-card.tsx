@@ -80,8 +80,10 @@ export function DealCard({ deal, slug, onDelete, onStatusChange, nextStage, onAd
       <div
         className={cn(
           'group rounded-lg border border-border bg-card px-3.5 py-3 transition-all duration-150 hover:shadow-md hover:-translate-y-px cursor-pointer',
-          deal.status === 'won' && 'border-green-200 dark:border-green-800',
+          // Historical items recede — still scannable, visually quieter.
+          deal.status === 'won' && 'border-green-200 dark:border-green-800 opacity-80',
           deal.status === 'lost' && 'opacity-60',
+          deal.status === 'on_hold' && 'opacity-75',
         )}
         onClick={() => router.push(`/s/${slug}/deals/${deal.id}`)}
       >
