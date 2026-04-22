@@ -4,7 +4,8 @@
  */
 
 import type { ToolDefinition } from '../types';
+import { searchContactsTool } from './search-contacts';
 
 export const ALL_TOOLS: ToolDefinition[] = [
-  // Phase 1c populates this.
+  searchContactsTool as ToolDefinition,
 ];
