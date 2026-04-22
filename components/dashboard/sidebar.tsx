@@ -29,6 +29,7 @@ import {
   Settings,
   Key,
   Shuffle,
+  GitBranch,
   CreditCard,
   Plus,
   Check,
@@ -129,6 +130,7 @@ const brokerSettingsNavSections = [
     label: 'Lead Management',
     items: [
       { href: '/broker/settings/auto-assignment', label: 'Auto-Assignment', icon: Shuffle, exact: false },
+      { href: '/broker/settings/routing-rules', label: 'Routing rules', icon: GitBranch, exact: false },
     ],
   },
   {

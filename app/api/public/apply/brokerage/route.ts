@@ -577,8 +577,14 @@ export async function POST(req: NextRequest) {
     // ── Lead routing: if auto-assignment is on and an eligible agent ─────
     // exists, insert into their space; otherwise fall back to the broker
     // owner's space (current behaviour). `routeBrokerageLead` never throws
-    // — null → owner-space fallback.
-    const routing = await routeBrokerageLead(brokerage.id);
+    // — null → owner-space fallback. Pass the validated lead shape so the
+    // BP7d rules layer can match on leadType / budget / tags before
+    // falling back to round-robin/score.
+    const routing = await routeBrokerageLead(brokerage.id, {
+      leadType: contactLeadType,
+      budget: contactBudget,
+      tags: ['brokerage-lead', 'new-lead'],
+    });
     const spaceIdForInsert = routing?.agentSpaceId ?? space.id;
     if (routing) {
       logger.info('[apply/brokerage] auto-assigned to agent', {
@@ -586,6 +592,7 @@ export async function POST(req: NextRequest) {
         agentUserId: routing.agentUserId,
         agentSpaceId: routing.agentSpaceId,
         method: routing.method,
+        ruleId: routing.ruleId ?? null,
       });
     }
 
@@ -639,6 +646,7 @@ export async function POST(req: NextRequest) {
       leadType: contactLeadType,
       routed: routing !== null,
       routingMethod: routing?.method ?? null,
+      routingRuleId: routing?.ruleId ?? null,
       assignedUserId: routing?.agentUserId ?? null,
     });
 
