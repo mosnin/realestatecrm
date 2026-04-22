@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { z } from 'zod';
 import { defineTool, type ToolContext, type ToolDefinition } from '@/lib/ai-tools/types';
-import { validateSkill, type Skill } from '@/lib/ai-tools/skills/types';
+import { validateSkill, SKILL_FORBIDDEN_TOOLS, type Skill } from '@/lib/ai-tools/skills/types';
 
 // Registry mock — swap currentTools per test.
 let currentTools: ToolDefinition[] = [];
@@ -115,6 +115,23 @@ describe('validateSkill', () => {
       ),
     ).toThrow(/read-only/);
   });
+
+  it('rejects a skill that tries to allowlist delegate_to_subagent (no nested sub-agents)', () => {
+    // Even if delegate_to_subagent SHOWED UP in the tool pool (it shouldn't,
+    // it's added at the registry layer), SKILL_FORBIDDEN_TOOLS guards us.
+    expect(SKILL_FORBIDDEN_TOOLS.has('delegate_to_subagent')).toBe(true);
+    expect(() =>
+      validateSkill(
+        {
+          name: 'recursive',
+          description: '',
+          systemPrompt: '',
+          toolAllowlist: ['delegate_to_subagent'],
+        },
+        [],
+      ),
+    ).toThrow(/cannot delegate to other sub-agents/);
+  });
 });
 
 describe('runSubAgent', () => {
@@ -218,6 +235,37 @@ describe('runSubAgent', () => {
     });
     expect(out.reason).toBe('aborted');
     expect(out.summary).toBe('');
+  });
+
+  it('passes ctx.signal to the OpenAI call and surfaces AbortError as aborted', async () => {
+    // Regression for the Phase 7 audit finding: without signal propagation,
+    // an AbortController.abort() triggered mid-request would hang until the
+    // SDK's own timeout. Now the fetch-layer throws AbortError and we map
+    // it back to reason='aborted'.
+    const controller = new AbortController();
+    const openai = {
+      chat: {
+        completions: {
+          create: vi.fn(async (_req: unknown, opts?: { signal?: AbortSignal }) => {
+            // Assert the runtime did forward the orchestrator's signal.
+            expect(opts?.signal).toBe(controller.signal);
+            // Simulate an in-flight cancellation.
+            controller.abort();
+            const abortErr = Object.assign(new Error('Request was aborted.'), {
+              name: 'AbortError',
+            });
+            throw abortErr;
+          }),
+        },
+      },
+    } as unknown as import('openai').default;
+    const out = await runSubAgent({
+      skill: { name: 's', description: '', systemPrompt: '', toolAllowlist: [] },
+      task: 'cancel me',
+      ctx: makeCtx({ signal: controller.signal }),
+      openai,
+    });
+    expect(out.reason).toBe('aborted');
   });
 
   it('returns max_rounds + a best-effort summary when the tool budget is exhausted', async () => {

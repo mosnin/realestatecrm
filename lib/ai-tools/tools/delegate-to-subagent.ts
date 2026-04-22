@@ -96,9 +96,11 @@ export const delegateToSubagentTool = defineTool<typeof parameters, DelegateResu
     }
 
     // Both 'complete' and 'max_rounds' carry a usable summary. We surface
-    // max_rounds with a prefix so the orchestrator can decide whether to
-    // re-delegate with a narrower task.
-    const prefix = outcome.reason === 'max_rounds' ? '[Partial — tool budget exhausted] ' : '';
+    // max_rounds with a prefix AND a 'warning' display so the orchestrator
+    // can decide whether to re-delegate with a narrower task — and the UI
+    // tints the block amber instead of burying the caveat in text.
+    const partial = outcome.reason === 'max_rounds';
+    const prefix = partial ? '[Partial — tool budget exhausted] ' : '';
     return {
       summary: prefix + outcome.summary,
       data: {
@@ -106,7 +108,7 @@ export const delegateToSubagentTool = defineTool<typeof parameters, DelegateResu
         toolCalls: outcome.toolCalls,
         reason: outcome.reason,
       },
-      display: 'plain',
+      display: partial ? 'warning' : 'plain',
     };
   },
 });

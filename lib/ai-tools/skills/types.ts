@@ -53,9 +53,27 @@ export interface Skill {
  * unchanged on success so callers can chain `registerSkill(...)` into a
  * top-level module export.
  */
+/**
+ * Tool names a skill is NEVER allowed to grant a sub-agent, regardless
+ * of whether they're read-only. Listing `delegate_to_subagent` here is
+ * architecturally load-bearing: allowing a sub-agent to delegate would
+ * turn the bounded loop into a tree, blow past maxRounds, and defeat the
+ * context-rot boundary we built the pattern around.
+ *
+ * Exported so tests can assert the list without hard-coding it twice.
+ */
+export const SKILL_FORBIDDEN_TOOLS: ReadonlySet<string> = new Set([
+  'delegate_to_subagent',
+]);
+
 export function validateSkill(skill: Skill, allTools: ToolDefinition[]): Skill {
   const toolByName = new Map(allTools.map((t) => [t.name, t]));
   for (const toolName of skill.toolAllowlist) {
+    if (SKILL_FORBIDDEN_TOOLS.has(toolName)) {
+      throw new Error(
+        `Skill "${skill.name}" cannot include tool "${toolName}" — sub-agents cannot delegate to other sub-agents.`,
+      );
+    }
     const tool = toolByName.get(toolName);
     if (!tool) {
       throw new Error(

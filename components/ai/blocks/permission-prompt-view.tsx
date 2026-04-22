@@ -12,6 +12,56 @@ export interface PermissionPromptData {
   summary: string;
 }
 
+/**
+ * Human-readable args preview. The JSON dump works for tools where the
+ * realtor truly needs to see the shape (update_contact, create_deal), but
+ * for send_email / send_sms — the tools where the ACTUAL content matters
+ * most — JSON is noisy and the body field escapes newlines. Switch on the
+ * tool name and render labeled fields for those.
+ *
+ * Returns `null` when there's no tool-specific renderer, so the caller
+ * falls back to the generic JSON pre.
+ */
+function PrettyArgs({ prompt }: { prompt: PermissionPromptData }): React.ReactElement | null {
+  const a = prompt.args as Record<string, unknown>;
+  if (prompt.name === 'send_email') {
+    const to = typeof a.toEmail === 'string' ? a.toEmail : typeof a.contactId === 'string' ? `contact ${a.contactId}` : '—';
+    const subject = typeof a.subject === 'string' ? a.subject : '—';
+    const body = typeof a.body === 'string' ? a.body : '';
+    return (
+      <div className="mt-2.5 space-y-1.5 rounded-md border border-border bg-background/60 px-2.5 py-2 text-[12px]">
+        <div><span className="text-muted-foreground font-medium">To:</span> {to}</div>
+        <div><span className="text-muted-foreground font-medium">Subject:</span> {subject}</div>
+        <div>
+          <span className="text-muted-foreground font-medium">Body:</span>
+          <p className="mt-0.5 whitespace-pre-wrap text-foreground/90 leading-relaxed">
+            {body.length > 400 ? `${body.slice(0, 400)}…` : body}
+          </p>
+        </div>
+        {typeof a.replyTo === 'string' && a.replyTo && (
+          <div><span className="text-muted-foreground font-medium">Reply-To:</span> {a.replyTo}</div>
+        )}
+      </div>
+    );
+  }
+  if (prompt.name === 'send_sms') {
+    const to = typeof a.toPhone === 'string' ? a.toPhone : typeof a.contactId === 'string' ? `contact ${a.contactId}` : '—';
+    const body = typeof a.body === 'string' ? a.body : '';
+    return (
+      <div className="mt-2.5 space-y-1.5 rounded-md border border-border bg-background/60 px-2.5 py-2 text-[12px]">
+        <div><span className="text-muted-foreground font-medium">To:</span> {to}</div>
+        <div>
+          <span className="text-muted-foreground font-medium">Message:</span>
+          <p className="mt-0.5 whitespace-pre-wrap text-foreground/90 leading-relaxed">
+            {body.length > 320 ? `${body.slice(0, 320)}…` : body}
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
+
 interface PermissionPromptViewProps {
   prompt: PermissionPromptData;
   /** Async approve — may return/throw; component shows a spinner until it settles. */
@@ -128,9 +178,18 @@ export function PermissionPromptView({
               )}
             </div>
           ) : (
-            <pre className="mt-2.5 text-[11px] bg-background/60 border border-border rounded-md px-2.5 py-1.5 font-mono text-foreground/80 overflow-x-auto">
-              {JSON.stringify(prompt.args, null, 2)}
-            </pre>
+            (() => {
+              // Prefer tool-specific pretty rendering for high-content tools
+              // (send_email / send_sms); everything else still falls through
+              // to the raw JSON so the power-user signal isn't lost.
+              const pretty = PrettyArgs({ prompt });
+              if (pretty) return pretty;
+              return (
+                <pre className="mt-2.5 text-[11px] bg-background/60 border border-border rounded-md px-2.5 py-1.5 font-mono text-foreground/80 overflow-x-auto">
+                  {JSON.stringify(prompt.args, null, 2)}
+                </pre>
+              );
+            })()
           )}
 
           {/* Actions */}

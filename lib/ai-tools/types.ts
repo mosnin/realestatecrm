@@ -52,7 +52,19 @@ export interface ToolContext {
 export interface ToolResult<TData = unknown> {
   summary: string;
   data?: TData;
-  display?: 'contacts' | 'deals' | 'tours' | 'notes' | 'plain' | 'success' | 'error';
+  /**
+   * How the block renderer should tint this result.
+   *
+   * - `success`  → green: the mutation landed cleanly.
+   * - `error`    → red:   the handler failed (but turn is still alive).
+   * - `warning`  → amber: the tool finished but with an important caveat
+   *                       (e.g. a sub-agent hit its tool budget and only
+   *                       returned a partial summary — the orchestrator
+   *                       shouldn't silently act on it).
+   * - `contacts` / `deals` / `tours` / `notes` / `plain` — future-facing
+   *   hints for rich inline cards. Currently unstyled beyond neutral.
+   */
+  display?: 'contacts' | 'deals' | 'tours' | 'notes' | 'plain' | 'success' | 'error' | 'warning';
 }
 
 // ── Tool definition ────────────────────────────────────────────────────────

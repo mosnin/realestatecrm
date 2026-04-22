@@ -127,18 +127,31 @@ export async function runSubAgent(input: RunSubAgentInput): Promise<RunSubAgentO
 
     let completion: OpenAI.Chat.Completions.ChatCompletion;
     try {
-      completion = await openai.chat.completions.create({
-        model: AGENT_MODEL,
-        // Sub-agents don't stream — the orchestrator doesn't show their
-        // deltas anywhere. Blocking calls keep the control flow simple
-        // and still cheap: maxRounds caps total latency.
-        stream: false,
-        messages,
-        ...(toolsForOpenAI.length > 0
-          ? { tools: toolsForOpenAI, tool_choice: 'auto' as const }
-          : {}),
-      });
+      completion = await openai.chat.completions.create(
+        {
+          model: AGENT_MODEL,
+          // Sub-agents don't stream — the orchestrator doesn't show their
+          // deltas anywhere. Blocking calls keep the control flow simple
+          // and still cheap: maxRounds caps total latency.
+          stream: false,
+          messages,
+          ...(toolsForOpenAI.length > 0
+            ? { tools: toolsForOpenAI, tool_choice: 'auto' as const }
+            : {}),
+        },
+        // Pass the orchestrator's abort signal THROUGH to the HTTP call.
+        // Without this, `orchestrator.abort()` only interrupts between
+        // rounds — the in-flight OpenAI request runs to completion before
+        // the next ctx.signal.aborted check fires, so a user hitting Stop
+        // waits 30-60s for the current round to resolve.
+        { signal: ctx.signal },
+      );
     } catch (err) {
+      // An AbortError here just means the signal fired — surface it as
+      // the 'aborted' reason instead of a generic error.
+      if ((err as { name?: string }).name === 'AbortError') {
+        return { summary: '', toolCalls, reason: 'aborted' };
+      }
       const message = err instanceof Error ? err.message : String(err);
       logger.error('[skill] openai call failed', { skill: skill.name }, err);
       return { summary: '', toolCalls, reason: 'error', error: message };
@@ -207,11 +220,17 @@ export async function runSubAgent(input: RunSubAgentInput): Promise<RunSubAgentO
       'You have exhausted your tool budget. Reply with one short paragraph summarising what you learned and what remains uncertain.',
   });
   try {
-    const finalCompletion = await openai.chat.completions.create({
-      model: AGENT_MODEL,
-      stream: false,
-      messages,
-    });
+    const finalCompletion = await openai.chat.completions.create(
+      {
+        model: AGENT_MODEL,
+        stream: false,
+        messages,
+      },
+      // Same rationale as the round-level call above: propagate abort so
+      // a user hitting Stop doesn't wait on a fallback round we never
+      // needed.
+      { signal: ctx.signal },
+    );
     const summary = (finalCompletion.choices[0]?.message?.content ?? '').trim();
     logger.info('[skill.usage]', {
       skill: skill.name,
@@ -225,7 +244,11 @@ export async function runSubAgent(input: RunSubAgentInput): Promise<RunSubAgentO
       reason: 'max_rounds',
     };
   } catch (err) {
+    if ((err as { name?: string }).name === 'AbortError') {
+      return { summary: '', toolCalls, reason: 'aborted' };
+    }
     const message = err instanceof Error ? err.message : String(err);
+    logger.error('[skill] fallback summary failed', { skill: skill.name }, err);
     return {
       summary: 'Sub-agent hit its tool budget and failed to produce a summary.',
       toolCalls,

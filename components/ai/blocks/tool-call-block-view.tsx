@@ -100,13 +100,19 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
   // The handler's `display` hint tints the card so at-a-glance scanning
   // of the transcript tells a realtor which rows landed safely vs which
   // need a second look. We ONLY apply it to resolved blocks — in-flight
-  // rows stay neutral so the transition to green/red feels definitive.
+  // rows stay neutral so the transition feels definitive. The warning
+  // variant (amber) is for "completed but caveat" cases — e.g. a
+  // sub-agent whose tool budget ran out before it could finish research.
   const displayTint =
-    status === 'complete' && block.display === 'success'
-      ? 'border-emerald-500/25 bg-emerald-500/5'
-      : status === 'error' || block.display === 'error'
+    status === 'running'
+      ? 'border-border bg-muted/30'
+      : block.display === 'error' || status === 'error'
         ? 'border-rose-500/25 bg-rose-500/5'
-        : 'border-border bg-muted/30';
+        : block.display === 'warning'
+          ? 'border-amber-500/30 bg-amber-500/10'
+          : block.display === 'success' && status === 'complete'
+            ? 'border-emerald-500/25 bg-emerald-500/5'
+            : 'border-border bg-muted/30';
 
   return (
     <div

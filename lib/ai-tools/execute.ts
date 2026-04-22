@@ -24,6 +24,17 @@ export type ToolExecutionError =
   | { code: 'rate_limited'; message: string }
   | { code: 'aborted'; message: string };
 
+/** Render a window duration as "hour" / "minute" / "N minutes" — rate-limit
+ *  error messages read better with units than raw seconds or blindly-rounded
+ *  minutes ("1 min" when the real window is 60 minutes is worse than "hour"). */
+function formatWindow(windowSeconds: number): string {
+  if (windowSeconds === 3600) return 'hour';
+  if (windowSeconds === 60) return 'minute';
+  if (windowSeconds % 3600 === 0) return `${windowSeconds / 3600} hours`;
+  if (windowSeconds % 60 === 0) return `${windowSeconds / 60} minutes`;
+  return `${windowSeconds} seconds`;
+}
+
 export interface ToolExecution {
   ok: boolean;
   /** Tool name as the model sent it. Echoed for logging / UI correlation. */
@@ -117,7 +128,7 @@ export async function executeTool(
         args: parsed.data,
         error: {
           code: 'rate_limited',
-          message: `Rate limit reached for "${tool.name}" (${tool.rateLimit.max} per ${Math.round(tool.rateLimit.windowSeconds / 60)} min). Try again later.`,
+          message: `Rate limit reached for "${tool.name}" (${tool.rateLimit.max} per ${formatWindow(tool.rateLimit.windowSeconds)}). Try again later.`,
         },
       };
     }
