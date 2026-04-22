@@ -1,7 +1,7 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { CreateWorkspaceForm } from './create-workspace-form';
+import { OnboardingFlow } from '@/components/onboarding/onboarding-flow';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 
 export const metadata = { title: 'Create your workspace — Chippi' };
@@ -179,10 +179,15 @@ export default async function SetupPage() {
 
   const userImageUrl = clerkUser?.imageUrl ?? '';
 
+  // Mark that the user has passed the gate and reached the onboarding UI.
+  // The old form's "Back to sign-in" state and email prop aren't needed — the
+  // Clerk UserButton already lives in the global header on post-onboarding
+  // routes, and the email wasn't used for anything the user could see.
+  void email;
+
   return (
-    <CreateWorkspaceForm
+    <OnboardingFlow
       defaultName={resolvedUser?.name ?? ''}
-      userEmail={email}
       userImageUrl={userImageUrl}
     />
   );
