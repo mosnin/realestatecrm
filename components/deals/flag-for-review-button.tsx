@@ -51,18 +51,25 @@ export function FlagForReviewButton({
   if (!visible) return null;
 
   if (hasOpenReview) {
+    // Clickable — calls router.refresh() so the agent can pull the latest
+    // server state. Without this, the chip stays "Review pending" even
+    // after the broker resolves (server components re-render on navigation,
+    // but the agent has no in-app reason to navigate and no real-time
+    // subscription tells them to). Worst case: click does nothing visible
+    // because the review is still open.
     return (
-      <span
+      <button
+        type="button"
+        onClick={() => router.refresh()}
         className={cn(
           'inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/50',
-          'px-2.5 h-8 text-xs font-medium text-muted-foreground cursor-not-allowed select-none',
+          'px-2.5 h-8 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors',
         )}
-        aria-disabled="true"
-        title="A review request for this deal is already open"
+        title="Your broker is reviewing this deal. Click to check for updates."
       >
         <Flag size={13} className="text-muted-foreground" />
         Review pending
-      </span>
+      </button>
     );
   }
 
