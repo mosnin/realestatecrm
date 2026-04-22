@@ -448,6 +448,13 @@ export type Message = {
   conversationId: string | null;
   role: string;
   content: string;
+  /**
+   * Ordered list of rendered blocks (text + tool calls + permission
+   * prompts) for messages produced by the on-demand agent. Null for
+   * legacy plain-text messages — the client falls back to rendering
+   * `content` as a single text block. See lib/ai-tools/blocks.ts.
+   */
+  blocks: unknown[] | null;
   createdAt: Date;
 };
 
