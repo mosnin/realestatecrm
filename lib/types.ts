@@ -333,6 +333,20 @@ export type PropertyListingStatus =
   | 'off_market'
   | 'owned';
 
+export interface PropertyPacket {
+  id: string;
+  spaceId: string;
+  propertyId: string;
+  name: string;
+  token: string;
+  includeDocumentIds: string[];
+  expiresAt: string | null;
+  viewCount: number;
+  lastViewedAt: string | null;
+  createdAt: string;
+  revokedAt: string | null;
+}
+
 export interface Property {
   id: string;
   spaceId: string;

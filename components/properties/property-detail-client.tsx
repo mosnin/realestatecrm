@@ -4,12 +4,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Pencil, Trash2, ExternalLink, Building2, Briefcase, CalendarDays } from 'lucide-react';
+import { Pencil, Trash2, ExternalLink, Building2, Briefcase, CalendarDays, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Property } from '@/lib/types';
 import { formatCurrency } from '@/lib/formatting';
 import { formatPropertyAddress, formatPropertyFacts, PROPERTY_LISTING_STATUS_OPTIONS } from '@/lib/properties';
 import { PropertyForm } from './property-form';
+import { PropertyShareDialog } from './property-share-dialog';
 
 interface Props {
   slug: string;
@@ -22,7 +23,9 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
   const router = useRouter();
   const [property, setProperty] = useState(initial);
   const [editing, setEditing] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
   async function save(values: Partial<Property>) {
     setSubmitting(true);
@@ -134,14 +137,32 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
             >
               <Trash2 size={11} /> Delete
             </button>
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="inline-flex items-center gap-1 text-xs font-semibold rounded-md bg-foreground text-background px-2.5 py-1"
-            >
-              <Pencil size={11} /> Edit
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSharing(true)}
+                className="inline-flex items-center gap-1 text-xs font-semibold rounded-md border border-border bg-card hover:bg-muted px-2.5 py-1"
+              >
+                <Share2 size={11} /> Share
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="inline-flex items-center gap-1 text-xs font-semibold rounded-md bg-foreground text-background px-2.5 py-1"
+              >
+                <Pencil size={11} /> Edit
+              </button>
+            </div>
           </div>
+
+          {sharing && (
+            <PropertyShareDialog
+              propertyId={property.id}
+              linkedDealIds={linkedDeals.map((d) => d.id)}
+              origin={origin}
+              onClose={() => setSharing(false)}
+            />
+          )}
         </div>
       </div>
 
