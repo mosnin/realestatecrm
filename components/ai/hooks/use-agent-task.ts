@@ -104,6 +104,9 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   // semantics: a fresh tab / new session forgets what you trusted before.
   const STORAGE_PREFIX = 'agent-allow:';
   const allowedToolsRef = useRef<Set<string>>(new Set());
+  // Dedup guard for the auto-approve effect (declared up here so the
+  // conversation-change effect below can reset it when switching chats).
+  const autoApprovedRef = useRef<string | null>(null);
   useEffect(() => {
     allowedToolsRef.current = allowedTools;
   }, [allowedTools]);
@@ -112,7 +115,13 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   // is only the id — we deliberately don't rebind this effect when the
   // user adds a new tool (that's handled by `commitAllow` below writing
   // directly to storage).
+  //
+  // Also clears the transient approval + auto-approve tracking so
+  // switching conversations mid-prompt doesn't bleed a prompt or an
+  // already-fired requestId into the new chat.
   useEffect(() => {
+    setPendingApproval(null);
+    autoApprovedRef.current = null;
     if (typeof window === 'undefined') return;
     if (!initialConversationId) {
       setAllowedTools(new Set());
@@ -330,14 +339,20 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         }
         for (const event of parser.end()) applyEvent(event);
       } catch (err) {
-        if ((err as { name?: string }).name === 'AbortError') return;
-        setError(err instanceof Error ? err.message : 'Network error');
+        const aborted = (err as { name?: string }).name === 'AbortError';
+        if (!aborted) {
+          setError(err instanceof Error ? err.message : 'Network error');
+        }
+        // Either path: tidy the trailing assistant bubble so it doesn't
+        // hang around with a caret or phantom empty card.
         const targetId = streamingMsgIdRef.current;
         if (targetId) {
           setMessages((prev) =>
-            prev.filter(
-              (m) => !(m.id === targetId && m.role === 'assistant' && m.blocks.length === 0),
-            ),
+            prev
+              .filter(
+                (m) => !(m.id === targetId && m.role === 'assistant' && m.blocks.length === 0),
+              )
+              .map((m) => (m.id === targetId ? { ...m, streaming: false } : m)),
           );
         }
       } finally {
@@ -481,10 +496,10 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   // Auto-approve whenever we're paused on a tool the user has pre-trusted
   // for this chat. Runs after the initial turn's stream closes — that's the
   // moment `pendingApproval` flips to a value AND `isStreaming` goes false.
-  // The autoApprovedRef guard stops React 18's strict-mode double-invocation
-  // from firing two approve requests for the same requestId (setIsStreaming
-  // isn't visible yet on the synchronous second pass).
-  const autoApprovedRef = useRef<string | null>(null);
+  // The autoApprovedRef guard (declared above) stops React 18's strict-mode
+  // double-invocation from firing two approve requests for the same
+  // requestId (setIsStreaming isn't visible yet on the synchronous second
+  // pass) and also lets the conversation-change effect clear it.
   useEffect(() => {
     if (!pendingApproval) {
       autoApprovedRef.current = null;

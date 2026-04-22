@@ -65,7 +65,15 @@ export function TextBlockView({
   }
 
   return (
-    <div className={cn('text-sm text-foreground leading-relaxed whitespace-pre-wrap', className)}>
+    <div
+      // aria-live "polite" announces streaming deltas without interrupting;
+      // aria-atomic=false means screen readers read appended text only.
+      // Only the *streaming* block needs live semantics — static history
+      // should stay silent so reload doesn't re-read the whole transcript.
+      aria-live={streaming ? 'polite' : undefined}
+      aria-atomic={streaming ? false : undefined}
+      className={cn('text-sm text-foreground leading-relaxed whitespace-pre-wrap', className)}
+    >
       {lines.map((line, i) => (
         <Fragment key={i}>
           {renderInline(line)}

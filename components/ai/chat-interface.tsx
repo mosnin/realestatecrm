@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ConversationSidebar } from './conversation-sidebar';
 import { GradientAIChatInput, type MentionItem } from '@/components/ui/gradient-ai-chat-input';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Plus, Mic } from 'lucide-react';
+import { History, X, AlertCircle, Plus, Mic, Square } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { VoiceMode } from './voice-mode';
@@ -70,6 +70,7 @@ export function ChatInterface({
     approve,
     deny,
     alwaysAllow,
+    abort,
     clearError,
   } = useAgentTask({
     spaceSlug: slug,
@@ -444,6 +445,21 @@ export function ChatInterface({
           </ScrollArea>
         )}
       </div>
+
+      {/* Stop button — docks above the input while a turn is streaming. */}
+      {isStreaming && !atLimit && (
+        <div className="flex-shrink-0 w-full max-w-3xl mx-auto px-4 sm:px-6 flex justify-center pb-1">
+          <button
+            type="button"
+            onClick={abort}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background hover:bg-muted px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground shadow-sm transition-colors"
+            title="Stop generating"
+          >
+            <Square size={11} className="fill-current" />
+            Stop
+          </button>
+        </div>
+      )}
 
       {/* Input */}
       <div className="flex-shrink-0 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-2 pb-4">
