@@ -209,16 +209,33 @@ export async function POST(req: NextRequest) {
       try {
         const result = await runTurn({ openai, ctx, messages, pushEvent });
 
-        // Persist the assistant's blocks (even partial turns get saved —
-        // the transcript history reflects reality).
+        // Persist whatever blocks completed this turn (pause or complete).
+        // On pause, the pending call is NOT in blocks — it lives in
+        // pendingApproval and will be persisted when Phase 3 stashes it
+        // in Redis. The approval-continuation turn will save its own
+        // assistant message for the resumed portion.
         try {
-          await saveAssistantMessage({
-            spaceId: ctx.space.id,
-            conversationId,
-            blocks: result.blocks,
-          });
+          if (result.blocks.length > 0) {
+            await saveAssistantMessage({
+              spaceId: ctx.space.id,
+              conversationId,
+              blocks: result.blocks,
+            });
+          }
         } catch (err) {
           logger.error('[ai/task] save assistant message failed', { spaceSlug }, err);
+        }
+
+        if (result.reason === 'paused' && result.pendingApproval) {
+          // TODO Phase 3: persist `result.pendingApproval` to Redis keyed
+          // by `requestId` with a 1-hour TTL. Without that store, the
+          // approve endpoint has nowhere to read it from — the user will
+          // see the permission_required event but the resume path won't
+          // find state.
+          logger.warn(
+            '[ai/task] turn paused for approval, but persistence is Phase 3',
+            { requestId: result.pendingApproval.requestId, tool: result.pendingApproval.pending.name },
+          );
         }
 
         await pushEvent({ type: 'turn_complete', reason: result.reason });

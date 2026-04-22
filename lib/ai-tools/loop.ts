@@ -3,26 +3,27 @@
  *
  * One call to `runTurn` executes as many OpenAI round-trips as it takes for
  * the model to answer the user — each tool call needs a new round because
- * we feed the tool result back into the context. The loop:
+ * we feed the tool result back into the context.
  *
  *   1. Opens a streaming completion with the tools array from the registry.
  *   2. Streams text deltas directly into events + the current text block.
  *   3. Buffers any tool calls (OpenAI streams their JSON args in fragments).
  *   4. When OpenAI finishes a turn with `finish_reason === 'tool_calls'`:
- *      - For each buffered call, emit `tool_call_start`, run `executeTool`,
- *        emit `tool_call_result`, append the tool result message, and
- *        continue to the next round.
+ *      - For each buffered call:
+ *          - Read-only: emit tool_call_start, run executeTool,
+ *            emit tool_call_result, append tool message.
+ *          - Mutating: emit permission_required, return paused with the
+ *            messages-so-far plus the pending call — the caller stashes
+ *            this state (Redis, Phase 3) and resumes via continueTurn()
+ *            once the user approves.
  *   5. When `finish_reason === 'stop'`, return the accumulated blocks.
  *
  * The loop never owns the HTTP response — the route handler wires the
  * event pusher + handles SSE framing. That keeps `runTurn` unit-testable
  * with a fake pusher.
- *
- * Phase 3 will teach this loop to emit `permission_required` and pause for
- * mutating tools; today every registered tool is read-only, so we fast-path
- * straight into `executeTool`.
  */
 
+import crypto from 'crypto';
 import type OpenAI from 'openai';
 import { logger } from '@/lib/logger';
 import type { MessageBlock, TextBlock, ToolCallBlock } from './blocks';
@@ -39,6 +40,37 @@ type ChatMsg = OpenAI.Chat.Completions.ChatCompletionMessageParam;
  *  tool-loops where the model keeps asking without concluding. */
 const MAX_ROUNDS = 8;
 
+/** Parsed-args shape for a single tool call that the model issued. */
+export interface DeferredToolCall {
+  callId: string;
+  name: string;
+  args: Record<string, unknown>;
+}
+
+/**
+ * State handed back to the caller when the loop pauses for user approval.
+ * Phase 3 persists this to Redis keyed by `requestId`; the approval
+ * endpoint feeds it (plus possibly edited args) into `continueTurn()`.
+ */
+export interface PendingApprovalState {
+  requestId: string;
+  /** The call the user must approve before the loop can continue. */
+  pending: DeferredToolCall;
+  /**
+   * Other calls the model issued in the SAME batch that we haven't run
+   * yet. Order-preserving; the resumer should process them sequentially
+   * after the approved one. Empty in the common single-call case.
+   */
+  remainingCalls: DeferredToolCall[];
+  /**
+   * Messages array at pause point: system + history + user + assistant
+   * with tool_calls + any completed tool-result messages. Missing the
+   * tool-result for `pending` (and for `remainingCalls`) — the resumer
+   * appends those as they execute.
+   */
+  messages: ChatMsg[];
+}
+
 export interface RunTurnInput {
   openai: OpenAI;
   ctx: ToolContext;
@@ -53,11 +85,42 @@ export interface RunTurnOutput {
   blocks: MessageBlock[];
   /** What the caller should report in the `turn_complete` event. */
   reason: 'complete' | 'paused' | 'aborted';
+  /** Set when `reason === 'paused'`. Caller persists this + resumes later. */
+  pendingApproval?: PendingApprovalState;
+}
+
+/** One-liner describing what a mutating call would do. Used as the prompt's
+ *  human-readable summary in the permission card. */
+function summarisePendingCall(name: string, args: Record<string, unknown>): string {
+  // Per-tool heuristics keep the summary short. Unknown tools fall back
+  // to a generic "run {name}".
+  switch (name) {
+    case 'send_email': {
+      const to = typeof args.to === 'string' ? args.to : 'a contact';
+      const subject = typeof args.subject === 'string' && args.subject ? ` — "${args.subject}"` : '';
+      return `Send email to ${to}${subject}`;
+    }
+    case 'send_sms': {
+      const to = typeof args.to === 'string' ? args.to : 'a contact';
+      return `Send SMS to ${to}`;
+    }
+    case 'create_deal':
+      return typeof args.title === 'string' ? `Create deal "${args.title}"` : 'Create a new deal';
+    case 'update_contact':
+      return 'Update a contact';
+    case 'advance_deal_stage':
+      return 'Move a deal to a new stage';
+    case 'schedule_tour':
+      return 'Schedule a tour';
+    default:
+      return `Run ${name}`;
+  }
 }
 
 /**
  * Execute one full turn. Pushes events as side effects; returns the
- * assembled block list for persistence.
+ * assembled block list plus — when a mutating tool surfaces — pending-
+ * approval state for the caller to persist.
  */
 export async function runTurn(input: RunTurnInput): Promise<RunTurnOutput> {
   const { openai, ctx, pushEvent } = input;
@@ -78,16 +141,12 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnOutput> {
 
     // Per-round accumulators.
     let currentTextBlock: TextBlock | null = null;
-    /** Buffered fragments for each tool call, keyed by the `index` OpenAI uses. */
+    /** Buffered fragments for each tool call, keyed by OpenAI's `index`. */
     const toolCallBuffers = new Map<
       number,
       { id: string; name: string; argsJson: string }
     >();
     let finishReason: string | null = null;
-    /**
-     * The assistant message we have to push back into `messages` for the
-     * next round. Assembled incrementally as deltas arrive.
-     */
     let assistantContent = '';
 
     try {
@@ -108,8 +167,8 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnOutput> {
         }
 
         if (delta?.tool_calls) {
-          // Any new tool call ends the current text run; the model won't
-          // interleave text with tool calls within a single response.
+          // A tool-call start ends the current text run; OpenAI doesn't
+          // interleave text with tool calls within one response.
           currentTextBlock = null;
           for (const tc of delta.tool_calls) {
             const idx = tc.index ?? 0;
@@ -136,9 +195,9 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnOutput> {
       return { blocks, reason: 'aborted' };
     }
 
-    // Reconstruct the assistant message for this round so the NEXT round
-    // has the right history. For tool-calling rounds we include the tool
-    // calls; for plain-text rounds we just store the content.
+    // Push the assistant message reconstructed from this round into the
+    // messages array so the NEXT round has the right history. Tool-calling
+    // rounds include tool_calls; plain-text rounds just include content.
     if (toolCallBuffers.size > 0) {
       messages.push({
         role: 'assistant',
@@ -160,15 +219,19 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnOutput> {
       return { blocks, reason: 'complete' };
     }
 
-    // Tool-call round: execute each buffered call, append tool results,
-    // loop back for another round.
+    // Tool-call round: process each buffered call. Order matters — the
+    // model can request multiple tools in one response (parallel function
+    // calling); we execute them sequentially so the iteration order of
+    // toolCallBuffers mirrors the model's intent.
     if (toolCallBuffers.size > 0) {
-      for (const buf of toolCallBuffers.values()) {
+      const orderedBufs = Array.from(toolCallBuffers.entries())
+        .sort(([a], [b]) => a - b)
+        .map(([, buf]) => buf);
+
+      for (let i = 0; i < orderedBufs.length; i++) {
+        const buf = orderedBufs[i];
         if (!buf.id || !buf.name) continue; // skip malformed entries defensively
 
-        // Parse args. A parse failure falls through to executeTool which
-        // will produce a structured invalid_args error — better than
-        // fabricating one here, since the zod schema is the source of truth.
         let args: Record<string, unknown>;
         try {
           args = JSON.parse(buf.argsJson || '{}') as Record<string, unknown>;
@@ -178,36 +241,48 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnOutput> {
 
         const tool = getTool(buf.name);
 
-        // Phase 3 lands here for approval-gated tools. Today: refuse.
+        // ── Mutating tool path: pause the loop, return paused state ──────
         if (tool?.requiresApproval === true) {
-          const toolCallBlock: ToolCallBlock = {
-            type: 'tool_call',
-            callId: buf.id,
+          const requestId = crypto.randomUUID();
+          const callId = buf.id;
+          const pendingCall: DeferredToolCall = { callId, name: buf.name, args };
+          const remaining: DeferredToolCall[] = orderedBufs
+            .slice(i + 1)
+            .filter((b) => b.id && b.name)
+            .map((b) => {
+              let a: Record<string, unknown>;
+              try {
+                a = JSON.parse(b.argsJson || '{}') as Record<string, unknown>;
+              } catch {
+                a = {};
+              }
+              return { callId: b.id, name: b.name, args: a };
+            });
+
+          const summary = summarisePendingCall(buf.name, args);
+
+          await pushEvent({
+            type: 'permission_required',
+            requestId,
+            callId,
             name: buf.name,
             args,
-            status: 'denied',
-            result: {
-              ok: false,
-              summary: 'Approval-gated tools are not yet available.',
-              error: 'not_implemented',
+            summary,
+          });
+
+          return {
+            blocks,
+            reason: 'paused',
+            pendingApproval: {
+              requestId,
+              pending: pendingCall,
+              remainingCalls: remaining,
+              messages,
             },
           };
-          blocks.push(toolCallBlock);
-          await pushEvent({
-            type: 'tool_call_result',
-            callId: buf.id,
-            ok: false,
-            summary: toolCallBlock.result!.summary,
-            error: 'Approval-gated tools land in Phase 3.',
-          });
-          messages.push({
-            role: 'tool',
-            tool_call_id: buf.id,
-            content: 'ERROR: this tool requires user approval, which is not implemented yet.',
-          });
-          continue;
         }
 
+        // ── Read-only tool path: execute immediately ─────────────────────
         await pushEvent({
           type: 'tool_call_start',
           callId: buf.id,
@@ -215,8 +290,6 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnOutput> {
           args,
         });
 
-        // Pre-populate the block so it appears in the transcript immediately;
-        // we'll mutate it with the result below.
         const toolCallBlock: ToolCallBlock = {
           type: 'tool_call',
           callId: buf.id,
@@ -269,8 +342,7 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnOutput> {
       continue;
     }
 
-    // No tool calls + no 'stop' finish. Unusual (e.g. 'length' without text)
-    // — surface and return.
+    // No tool calls + no 'stop' finish. Unusual — surface and return.
     logger.warn('[tools.loop] unexpected end-of-stream', { finishReason, round });
     break;
   }

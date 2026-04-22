@@ -230,35 +230,112 @@ describe('runTurn — tool execution failures surface to the model', () => {
     expect(toolBlock).toMatchObject({ status: 'error' });
   });
 
-  it('refuses approval-gated tools (Phase 3 placeholder)', async () => {
+  it('pauses at approval-gated tools and emits permission_required', async () => {
+    const handler = vi.fn(async () => ({ summary: 'sent' }));
     currentTools = [
       defineTool({
         name: 'send_email',
         description: 'send an email',
-        parameters: z.object({}),
+        parameters: z.object({
+          to: z.string().optional(),
+          subject: z.string().optional(),
+        }),
         requiresApproval: true,
-        handler: async () => ({ summary: 'sent' }),
+        handler,
       }) as ToolDefinition,
     ];
 
     const openai = makeFakeOpenAI([
       makeStream([
-        { toolCalls: [{ index: 0, id: 'call_mut', name: 'send_email', args: '{}' }] },
+        {
+          toolCalls: [
+            { index: 0, id: 'call_mut', name: 'send_email', args: '{"to":"jane@x.com","subject":"Hi"}' },
+          ],
+        },
         { finishReason: 'tool_calls' },
       ]),
-      makeStream([{ content: 'OK.' }, { finishReason: 'stop' }]),
     ]);
 
     const { events, result } = await collectEvents(openai, [{ role: 'user', content: 'email Jane' }]);
 
-    // No tool_call_start — we short-circuited before executing.
-    expect(events.find((e) => e.type === 'tool_call_start')).toBeUndefined();
+    // Handler must NOT have run — approval comes before execution.
+    expect(handler).not.toHaveBeenCalled();
 
-    // One tool_call_result with ok=false, and a block in 'denied' state.
-    const failEvent = events.find((e) => e.type === 'tool_call_result');
-    expect(failEvent).toMatchObject({ ok: false });
-    const toolBlock = result.blocks.find((b) => 'type' in b && b.type === 'tool_call');
-    expect(toolBlock).toMatchObject({ status: 'denied' });
+    // No tool_call_start, no tool_call_result — those fire only on execution.
+    expect(events.find((e) => e.type === 'tool_call_start')).toBeUndefined();
+    expect(events.find((e) => e.type === 'tool_call_result')).toBeUndefined();
+
+    // permission_required IS emitted, with the pending-call details.
+    const perm = events.find((e) => e.type === 'permission_required');
+    expect(perm).toBeDefined();
+    expect(perm).toMatchObject({
+      callId: 'call_mut',
+      name: 'send_email',
+      args: { to: 'jane@x.com', subject: 'Hi' },
+    });
+    expect((perm as { summary?: string }).summary).toMatch(/jane@x\.com/);
+    expect(typeof (perm as { requestId?: string }).requestId).toBe('string');
+
+    // Return shape: paused + pendingApproval populated with the same call.
+    expect(result.reason).toBe('paused');
+    expect(result.pendingApproval).toBeDefined();
+    expect(result.pendingApproval?.pending).toMatchObject({
+      callId: 'call_mut',
+      name: 'send_email',
+    });
+    // No completed blocks for the pending call — only text blocks land in
+    // `blocks` during a pause; the pending call is captured in pendingApproval.
+    expect(result.blocks.filter((b) => 'type' in b && b.type === 'tool_call')).toHaveLength(0);
+  });
+
+  it('pauses only for the mutating call, running read-only ones first', async () => {
+    const searchHandler = vi.fn(async () => ({ summary: 'Found 2.' }));
+    const sendHandler = vi.fn(async () => ({ summary: 'sent' }));
+    currentTools = [
+      defineTool({
+        name: 'search_contacts',
+        description: 'read-only search',
+        parameters: z.object({ query: z.string() }),
+        requiresApproval: false,
+        handler: searchHandler,
+      }) as ToolDefinition,
+      defineTool({
+        name: 'send_email',
+        description: 'mutating send',
+        parameters: z.object({ to: z.string() }),
+        requiresApproval: true,
+        handler: sendHandler,
+      }) as ToolDefinition,
+    ];
+
+    const openai = makeFakeOpenAI([
+      // Parallel function calling: the model requests BOTH in one round.
+      makeStream([
+        { toolCalls: [{ index: 0, id: 'c_search', name: 'search_contacts', args: '{"query":"Jane"}' }] },
+        { toolCalls: [{ index: 1, id: 'c_send', name: 'send_email', args: '{"to":"jane@x.com"}' }] },
+        { finishReason: 'tool_calls' },
+      ]),
+    ]);
+
+    const { events, result } = await collectEvents(openai, [
+      { role: 'user', content: 'find jane and email her' },
+    ]);
+
+    // Read-only ran; mutating did not.
+    expect(searchHandler).toHaveBeenCalledTimes(1);
+    expect(sendHandler).not.toHaveBeenCalled();
+
+    // tool_call_start + tool_call_result for search; permission_required for send.
+    const types = events.map((e) => e.type);
+    expect(types).toContain('tool_call_start');
+    expect(types).toContain('tool_call_result');
+    expect(types).toContain('permission_required');
+    // Ordering: the read-only events come before the permission prompt.
+    expect(types.indexOf('tool_call_result')).toBeLessThan(types.indexOf('permission_required'));
+
+    expect(result.reason).toBe('paused');
+    expect(result.pendingApproval?.pending.callId).toBe('c_send');
+    expect(result.pendingApproval?.remainingCalls).toEqual([]);
   });
 });
 
