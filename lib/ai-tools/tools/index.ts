@@ -8,10 +8,14 @@ import { getContactTool } from './get-contact';
 import { pipelineSummaryTool } from './pipeline-summary';
 import { searchContactsTool } from './search-contacts';
 import { searchDealsTool } from './search-deals';
+import { sendEmailTool } from './send-email';
 
 export const ALL_TOOLS: ToolDefinition[] = [
+  // Read-only
   searchContactsTool as ToolDefinition,
   searchDealsTool as ToolDefinition,
   getContactTool as ToolDefinition,
   pipelineSummaryTool as ToolDefinition,
+  // Mutating — require approval
+  sendEmailTool as ToolDefinition,
 ];
