@@ -212,6 +212,41 @@ export function MembersClient({
           )}
         </div>
       )}
+
+      {(() => {
+        const target = members.find((m) => m.id === offboardTargetId) ?? null;
+        if (!target) return null;
+        const otherMembers = members
+          .filter((m) => m.id !== target.id)
+          .map((m) => ({
+            id: m.id,
+            name: m.userName,
+            email: m.userEmail ?? '',
+            userStatus: m.userOnboard ? 'active' : 'pending',
+          }));
+        return (
+          <OffboardMemberDialog
+            member={{
+              id: target.id,
+              userId: target.userId,
+              name: target.userName,
+              email: target.userEmail ?? '',
+              role: target.role,
+            }}
+            otherMembers={otherMembers}
+            open={offboardTargetId === target.id}
+            onOpenChange={(o) => {
+              if (!o) setOffboardTargetId(null);
+            }}
+            onDone={() => {
+              setOffboardTargetId(null);
+              // Fall back to a hard refresh — matches how RemoveMemberButton /
+              // ChangeRoleButton refresh the list after server mutations.
+              window.location.reload();
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
