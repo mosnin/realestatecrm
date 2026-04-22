@@ -92,11 +92,14 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   // Resolve the requesting User row (DB id, not clerk id).
+  // Include `name` in the select — notifyBroker wants it in the metadata so
+  // the broker's notification renders "Alice flagged ..." without a second
+  // lookup downstream.
   const { data: userRow, error: userErr } = await supabase
     .from('User')
-    .select('id')
+    .select('id, name')
     .eq('clerkId', clerkId)
-    .maybeSingle<{ id: string }>();
+    .maybeSingle<{ id: string; name: string | null }>();
   if (userErr || !userRow) {
     logger.error('[deals/review-request/POST] user lookup failed', { clerkId }, userErr);
     return NextResponse.json({ error: 'User not found' }, { status: 500 });
@@ -155,12 +158,16 @@ export async function POST(req: NextRequest, { params }: Params) {
   void notifyBroker({
     brokerageId: dealRow.Space.brokerageId,
     type: 'review_requested',
-    title: `Review requested on "${dealRow.title ?? 'Untitled deal'}"`,
+    title: `${userRow.name ?? 'An agent'} flagged "${dealRow.title ?? 'Untitled deal'}"`,
     body: reason.slice(0, 280),
+    // Include the requesting agent's name so downstream renderers (the
+    // in-app bell, any future email/Slack bridge) don't need a second
+    // User lookup to render "Alice flagged ...".
     metadata: {
       dealId,
       reviewRequestId: reviewId,
       requestingUserId: userRow.id,
+      requestingUserName: userRow.name ?? null,
     },
   });
 

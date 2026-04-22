@@ -74,27 +74,34 @@ async function shapeReview(row: ReviewRow): Promise<ShapedReview> {
   if (commentsRes.error) throw commentsRes.error;
 
   const deal = dealRes.data ?? null;
-  let space: SpaceLite | null = null;
-  if (deal) {
-    const spaceRes = await supabase
-      .from('Space')
-      .select('id, slug')
-      .eq('id', deal.spaceId)
-      .maybeSingle<SpaceLite>();
-    if (spaceRes.error) throw spaceRes.error;
-    space = spaceRes.data ?? null;
-  }
-
   const comments = (commentsRes.data ?? []) as CommentRow[];
   const authorIds = Array.from(new Set(comments.map((c) => c.authorUserId)));
-  let authorsById = new Map<string, { id: string; name: string | null }>();
-  if (authorIds.length) {
-    const authorsRes = await supabase.from('User').select('id, name').in('id', authorIds);
-    if (authorsRes.error) throw authorsRes.error;
-    authorsById = new Map(
-      ((authorsRes.data ?? []) as { id: string; name: string | null }[]).map((u) => [u.id, u]),
-    );
-  }
+
+  // Parallelise the second wave: Space (needs deal.spaceId) and comment
+  // authors (needs comments[]). These two queries depend on different
+  // earlier queries, so fire them concurrently instead of sequentially —
+  // saves one round-trip on the detail page's initial render.
+  const [spaceRes, authorsRes] = await Promise.all([
+    deal
+      ? supabase
+          .from('Space')
+          .select('id, slug')
+          .eq('id', deal.spaceId)
+          .maybeSingle<SpaceLite>()
+      : Promise.resolve({ data: null, error: null } as { data: SpaceLite | null; error: null }),
+    authorIds.length
+      ? supabase.from('User').select('id, name').in('id', authorIds)
+      : Promise.resolve({ data: [], error: null } as {
+          data: Array<{ id: string; name: string | null }>;
+          error: null;
+        }),
+  ]);
+  if (spaceRes.error) throw spaceRes.error;
+  if (authorsRes.error) throw authorsRes.error;
+  const space: SpaceLite | null = spaceRes.data ?? null;
+  const authorsById = new Map(
+    ((authorsRes.data ?? []) as { id: string; name: string | null }[]).map((u) => [u.id, u]),
+  );
 
   return {
     id: row.id,
