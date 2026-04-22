@@ -35,13 +35,31 @@ export async function GET(req: NextRequest) {
 
   if (search) {
     // Cap length to prevent expensive full-table-scan patterns
-    const limitedSearch = search.slice(0, 100);
-    // Escape PostgreSQL ILIKE special characters before wrapping in wildcards
-    const escaped = limitedSearch.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
-    // Strip PostgREST filter-breaking characters (commas, parens)
-    const sanitized = escaped.replace(/[,()]/g, '');
-    const pattern = `%${sanitized}%`;
-    query = query.or(`name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},preferences.ilike.${pattern}`);
+    const limitedSearch = search.slice(0, 100).trim().toLowerCase();
+    // Forgiving multi-token search:
+    //   - split on whitespace into tokens
+    //   - each non-empty token must match (AND across tokens, via chained .or())
+    //   - each token can match ANY of name/email/phone/preferences (OR within token)
+    // Example: "jane hot" matches a contact named "Jane" tagged "hot".
+    const tokens = limitedSearch
+      .split(/\s+/)
+      .filter((t) => t.length > 0)
+      // Cap the number of tokens to avoid pathological queries
+      .slice(0, 8);
+
+    for (const token of tokens) {
+      // Escape PostgreSQL ILIKE special characters before wrapping in wildcards
+      const escaped = token.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+      // Strip PostgREST filter-breaking characters (commas, parens)
+      const sanitized = escaped.replace(/[,()]/g, '');
+      if (!sanitized) continue;
+      const pattern = `%${sanitized}%`;
+      // Chained .or() calls are AND-combined by PostgREST, giving us
+      // "(field OR field OR ...) AND (field OR field OR ...)" across tokens.
+      query = query.or(
+        `name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},preferences.ilike.${pattern}`
+      );
+    }
   }
 
   if (type && type !== 'ALL') {
