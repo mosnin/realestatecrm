@@ -48,6 +48,7 @@ export default async function BrokerActivityPage() {
       .in('spaceId', spaceIds)
       .gte('createdAt', sinceIso)
       .order('createdAt', { ascending: false })
+      .order('id', { ascending: false })
       .limit(PAGE + 1);
     spaceScoped = (data ?? []) as AuditLogRow[];
   }
@@ -61,16 +62,24 @@ export default async function BrokerActivityPage() {
       .eq('metadata->>brokerageId', ctx.brokerage.id)
       .gte('createdAt', sinceIso)
       .order('createdAt', { ascending: false })
+      .order('id', { ascending: false })
       .limit(PAGE + 1);
     nullSpace = (data ?? []) as AuditLogRow[];
   }
 
-  const merged = [...spaceScoped, ...nullSpace].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
+  // Stable sort: createdAt desc, then id desc. Matches the route.
+  const merged = [...spaceScoped, ...nullSpace].sort((a, b) => {
+    const delta = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    if (delta !== 0) return delta;
+    return b.id < a.id ? -1 : b.id > a.id ? 1 : 0;
+  });
   const hasMore = merged.length > PAGE;
   const pageRows = merged.slice(0, PAGE);
-  const nextCursor = hasMore ? pageRows[pageRows.length - 1].createdAt : null;
+  const lastRow = pageRows[pageRows.length - 1];
+  // Compound cursor (createdAt|id) — fixes the millisecond-tie bug the
+  // audit flagged. Client treats this as an opaque string and echoes it
+  // back on the next fetch.
+  const nextCursor = hasMore && lastRow ? `${lastRow.createdAt}|${lastRow.id}` : null;
 
   // 3. Batch-load actor names for the rows we're about to render.
   const clerkIds = Array.from(

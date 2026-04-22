@@ -143,14 +143,24 @@ export async function GET(req: NextRequest) {
     limit = n;
   }
 
+  // Compound cursor: "<createdAt ISO>|<row id>". Encoding a single ISO
+  // timestamp alone was audit-flagged: PostgreSQL stores createdAt with
+  // microsecond precision but JS serialises milliseconds, so rows that
+  // share a millisecond boundary fell into (or out of) the cursor depending
+  // on which side of the .lt() landed. Tupling createdAt + id lets us
+  // evaluate "(createdAt, id) < (cursorTs, cursorId)" so ties are
+  // deterministic and no row is dropped or duplicated.
   const rawCursor = url.searchParams.get('cursor');
   let cursorIso: string | null = null;
+  let cursorId: string | null = null;
   if (rawCursor) {
-    const parsed = new Date(rawCursor);
-    if (Number.isNaN(parsed.getTime())) {
+    const [tsPart, idPart] = rawCursor.split('|');
+    const parsed = new Date(tsPart ?? '');
+    if (Number.isNaN(parsed.getTime()) || !idPart) {
       return NextResponse.json({ error: 'Invalid cursor' }, { status: 400 });
     }
     cursorIso = parsed.toISOString();
+    cursorId = idPart;
   }
 
   // ── Resolve brokerage spaces ──────────────────────────────────────────────
@@ -180,10 +190,14 @@ export async function GET(req: NextRequest) {
       .in('spaceId', spaceIds)
       .gte('createdAt', sinceIso)
       .order('createdAt', { ascending: false })
+      .order('id', { ascending: false })
       .limit(pageSize);
     if (actionFilter !== 'all') q = q.eq('action', actionFilter);
     if (actorClerkId) q = q.eq('clerkId', actorClerkId);
-    if (cursorIso) q = q.lt('createdAt', cursorIso);
+    if (cursorIso && cursorId) {
+      // Tuple comparison via PostgREST .or(): (createdAt, id) < (ts, id).
+      q = q.or(`createdAt.lt.${cursorIso},and(createdAt.eq.${cursorIso},id.lt.${cursorId})`);
+    }
     const { data, error } = await q;
     if (error) {
       console.error('[broker/activity] space query failed', error);
@@ -207,10 +221,14 @@ export async function GET(req: NextRequest) {
       .eq('metadata->>brokerageId', ctx.brokerage.id)
       .gte('createdAt', sinceIso)
       .order('createdAt', { ascending: false })
+      .order('id', { ascending: false })
       .limit(pageSize);
     if (actionFilter !== 'all') q = q.eq('action', actionFilter);
     if (actorClerkId) q = q.eq('clerkId', actorClerkId);
-    if (cursorIso) q = q.lt('createdAt', cursorIso);
+    if (cursorIso && cursorId) {
+      // Tuple comparison via PostgREST .or(): (createdAt, id) < (ts, id).
+      q = q.or(`createdAt.lt.${cursorIso},and(createdAt.eq.${cursorIso},id.lt.${cursorId})`);
+    }
     const { data, error } = await q;
     if (error) {
       // Non-fatal — we'd rather surface space rows than fail outright if the
@@ -222,13 +240,17 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Merge + sort + trim to page ───────────────────────────────────────────
-  const merged = [...spaceRowsResult, ...nullSpaceResult].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
+  // Stable sort: createdAt desc, then id desc. Matches the per-query order.
+  const merged = [...spaceRowsResult, ...nullSpaceResult].sort((a, b) => {
+    const delta = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    if (delta !== 0) return delta;
+    return b.id < a.id ? -1 : b.id > a.id ? 1 : 0;
+  });
 
   const hasMore = merged.length > limit;
   const pageRows = merged.slice(0, limit);
-  const nextCursor = hasMore ? pageRows[pageRows.length - 1].createdAt : null;
+  const lastRow = pageRows[pageRows.length - 1];
+  const nextCursor = hasMore && lastRow ? `${lastRow.createdAt}|${lastRow.id}` : null;
 
   // ── Join actor names ──────────────────────────────────────────────────────
   const clerkIds = Array.from(

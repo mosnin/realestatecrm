@@ -19,10 +19,13 @@ export default async function RealtorReviewDetailPage({ params }: PageProps) {
 
   const { data: dbUserRow } = await supabase
     .from('User')
-    .select('id')
+    .select('id, status')
     .eq('clerkId', clerkId)
     .maybeSingle();
   if (!dbUserRow) redirect('/setup');
+  // Same hard-stop as the list page. requireAuth handles this for API
+  // routes; server-only pages must check it themselves.
+  if ((dbUserRow as { status?: string }).status === 'offboarded') redirect('/offboarded');
   const userId = (dbUserRow as { id: string }).id;
 
   // 1. Load the review. 404 if it doesn't exist, belongs to a different user,

@@ -24,13 +24,17 @@ export default async function RealtorReviewsPage({ params }: PageProps) {
 
   // Resolve caller's DB user id. The outer /s/[slug]/layout already gates on
   // space ownership, but we still need the User.id to filter reviews.
+  // Audit-driven addition: pull status too and hard-stop offboarded users.
+  // requireAuth (used by API routes) enforces the same gate; server-only
+  // pages went through auth() directly and missed it.
   const { data: dbUser } = await supabase
     .from('User')
-    .select('id')
+    .select('id, status')
     .eq('clerkId', clerkId)
     .maybeSingle();
 
   if (!dbUser) redirect('/setup');
+  if ((dbUser as { status?: string }).status === 'offboarded') redirect('/offboarded');
   const userId = (dbUser as { id: string }).id;
 
   // Non-brokerage space: there are no reviews possible. Render an empty list

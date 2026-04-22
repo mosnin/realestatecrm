@@ -350,7 +350,10 @@ export function ActivityClient({ initialRows, initialCursor, actors, spaceMap, r
       ) : loadError ? (
         <LoadErrorState message={loadError} onRetry={retry} />
       ) : visibleRows.length === 0 ? (
-        <EmptyState hasSearch={search.trim().length > 0} />
+        <EmptyState
+          hasSearch={search.trim().length > 0}
+          windowLabel={winOptions.find((o) => o.key === win)?.label ?? 'this range'}
+        />
       ) : (
         <>
           <div className="space-y-1.5">
@@ -494,14 +497,17 @@ function LoadErrorState({ message, onRetry }: { message: string; onRetry: () => 
   );
 }
 
-function EmptyState({ hasSearch }: { hasSearch: boolean }) {
+function EmptyState({ hasSearch, windowLabel }: { hasSearch: boolean; windowLabel: string }) {
+  // Audit-driven copy: tell the broker they're searching a scoped window,
+  // not the whole history. Missing that context made "no matches" misread
+  // as "this actor has never done anything".
   return (
     <Card>
       <CardContent className="px-5 py-12 text-center">
         <p className="text-sm text-muted-foreground">
           {hasSearch
-            ? 'No activity matches that search. Try a different name or email.'
-            : 'Nothing logged in this window. Try widening the date range.'}
+            ? `No activity matches that search in "${windowLabel}". Try a different name or widen the date range.`
+            : `Nothing logged in "${windowLabel}". Try widening the date range.`}
         </p>
       </CardContent>
     </Card>

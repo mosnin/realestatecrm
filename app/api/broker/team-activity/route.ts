@@ -12,7 +12,7 @@ interface ActivityItem {
 }
 
 /**
- * GET /api/broker/activity
+ * GET /api/broker/team-activity
  * Returns the 10 most recent activities (new leads, deals, tours)
  * across all brokerage member workspaces, merged and time-sorted.
  */

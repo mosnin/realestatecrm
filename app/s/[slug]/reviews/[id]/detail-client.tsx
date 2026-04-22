@@ -103,7 +103,16 @@ export function DetailClient({ slug, review, comments: initialComments }: Props)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body }),
       });
-      if (!res.ok) throw new Error(`Failed to post comment (${res.status})`);
+      if (!res.ok) {
+        // Server now rejects posts to resolved reviews with 409 (audit
+        // follow-up). Surface the specific reason so the realtor knows
+        // to refresh rather than retry blindly.
+        if (res.status === 409) {
+          toast.error('This review was just resolved. Refresh to see your broker\'s decision.');
+          return;
+        }
+        throw new Error(`Failed to post comment (${res.status})`);
+      }
       const created = (await res.json()) as ReviewComment;
       setComments((prev) => [...prev, created]);
       setCommentBody('');
