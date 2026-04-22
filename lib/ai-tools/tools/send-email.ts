@@ -71,6 +71,13 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
     'Send an email to a contact. Always prompts the user before sending. Use for follow-ups, tour confirmations, and check-ins.',
   parameters,
   requiresApproval: true,
+  // 50 sends/hour/user caps accidental mass-blasts without throttling
+  // realistic follow-up sessions.
+  rateLimit: { max: 50, windowSeconds: 3600 },
+  summariseCall(args) {
+    const to = args.toEmail ?? (args.contactId ? `contact ${args.contactId.slice(0, 8)}` : 'a contact');
+    return `Email ${to} — "${args.subject}"`;
+  },
 
   async handler(args, ctx) {
     // Resolve the recipient. Three cases, in order of preference:

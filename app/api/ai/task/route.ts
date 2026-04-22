@@ -66,7 +66,8 @@ async function resolveConversation(
       .eq('id', conversationId)
       .maybeSingle();
     if (data && data.spaceId === spaceId) {
-      // Auto-title on first message, same rule as /api/ai/chat.
+      // Auto-title on first message: strip HTML + control chars, trim to
+      // 60 chars, default to "Task" if nothing survives.
       if (data.title === 'New conversation' || !data.title) {
         const autoTitle = sanitizeTitle(userMessage).slice(0, 60) || 'Task';
         await supabase

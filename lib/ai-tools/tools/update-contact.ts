@@ -65,6 +65,19 @@ export const updateContactTool = defineTool<typeof parameters, UpdateContactResu
     "Update a contact's editable fields (name, email, phone, address, notes, tags, type, budget, follow-up, etc.). Prompts for approval first.",
   parameters,
   requiresApproval: true,
+  rateLimit: { max: 100, windowSeconds: 3600 },
+  summariseCall(args) {
+    const { contactId: _c, ...rest } = args;
+    void _c;
+    const fields = Object.entries(rest)
+      .filter(([, v]) => v !== undefined)
+      .map(([k]) => k);
+    if (fields.length === 0) return `Update contact ${args.contactId.slice(0, 8)}`;
+    if (fields.length <= 3) {
+      return `Update contact ${args.contactId.slice(0, 8)}: ${fields.join(', ')}`;
+    }
+    return `Update contact ${args.contactId.slice(0, 8)}: ${fields.slice(0, 3).join(', ')} + ${fields.length - 3} more`;
+  },
 
   async handler(args, ctx) {
     const { contactId, ...rest } = args;

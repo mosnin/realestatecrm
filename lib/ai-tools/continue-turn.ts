@@ -31,7 +31,9 @@ import type { MessageBlock, PermissionBlock, ToolCallBlock } from './blocks';
 import { executeTool, executionToModelMessage } from './execute';
 import type { AgentEvent } from './events';
 import type { DeferredToolCall, PendingApprovalState, RunTurnOutput } from './loop';
-import { runTurn } from './loop';
+// Importing `summarisePendingCall` here keeps initial-pause and
+// continuation-re-pause wording identical.
+import { runTurn, summarisePendingCall } from './loop';
 import { getTool } from './registry';
 import type { ToolContext } from './types';
 
@@ -47,33 +49,6 @@ export interface ContinueTurnInput {
   pushEvent: (event: Omit<AgentEvent, 'seq' | 'ts'>) => Promise<void>;
 }
 
-/**
- * Shared one-liner with the loop's `summarisePendingCall`. Copied rather
- * than re-exported because the surface is intentionally private to the
- * loop modules and both call-sites want the same output without a circular
- * import.
- */
-function summarisePendingCall(name: string, args: Record<string, unknown>): string {
-  switch (name) {
-    case 'send_email': {
-      const to = typeof args.to === 'string' ? args.to : 'a contact';
-      const subject = typeof args.subject === 'string' && args.subject ? ` — "${args.subject}"` : '';
-      return `Send email to ${to}${subject}`;
-    }
-    case 'send_sms':
-      return `Send SMS to ${typeof args.to === 'string' ? args.to : 'a contact'}`;
-    case 'create_deal':
-      return typeof args.title === 'string' ? `Create deal "${args.title}"` : 'Create a new deal';
-    case 'update_contact':
-      return 'Update a contact';
-    case 'advance_deal_stage':
-      return 'Move a deal to a new stage';
-    case 'schedule_tour':
-      return 'Schedule a tour';
-    default:
-      return `Run ${name}`;
-  }
-}
 
 /** Append the tool-result + transcript bits for a denied call. */
 function recordDenied(

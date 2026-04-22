@@ -45,6 +45,10 @@ export const advanceDealStageTool = defineTool<typeof parameters, AdvanceDealSta
     "Move a deal to a different stage (column on the pipeline board). Prompts for approval first.",
   parameters,
   requiresApproval: true,
+  rateLimit: { max: 60, windowSeconds: 3600 },
+  summariseCall(args) {
+    return `Move deal ${args.dealId.slice(0, 8)} → stage ${args.stageId.slice(0, 8)}`;
+  },
 
   async handler(args, ctx) {
     // Deal must exist in this space.

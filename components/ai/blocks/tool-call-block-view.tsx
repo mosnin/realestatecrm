@@ -97,10 +97,22 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
 
   const hasDetails = !!block.result?.summary || Object.keys(block.args ?? {}).length > 0;
 
+  // The handler's `display` hint tints the card so at-a-glance scanning
+  // of the transcript tells a realtor which rows landed safely vs which
+  // need a second look. We ONLY apply it to resolved blocks — in-flight
+  // rows stay neutral so the transition to green/red feels definitive.
+  const displayTint =
+    status === 'complete' && block.display === 'success'
+      ? 'border-emerald-500/25 bg-emerald-500/5'
+      : status === 'error' || block.display === 'error'
+        ? 'border-rose-500/25 bg-rose-500/5'
+        : 'border-border bg-muted/30';
+
   return (
     <div
       className={cn(
-        'rounded-xl border border-border bg-muted/30 overflow-hidden',
+        'rounded-xl border overflow-hidden transition-colors',
+        displayTint,
         className,
       )}
     >

@@ -58,6 +58,14 @@ export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
     'Send an SMS to a contact (or free-form phone number). Always prompts for approval. Use for tour confirmations, quick check-ins.',
   parameters,
   requiresApproval: true,
+  // SMS is billed per-segment; 30/hour keeps bills sane without blocking
+  // realistic follow-up workflows.
+  rateLimit: { max: 30, windowSeconds: 3600 },
+  summariseCall(args) {
+    const to = args.toPhone ?? (args.contactId ? `contact ${args.contactId.slice(0, 8)}` : 'a contact');
+    const preview = args.body.length > 40 ? `${args.body.slice(0, 40)}…` : args.body;
+    return `SMS ${to} — "${preview}"`;
+  },
 
   async handler(args, ctx) {
     let resolvedPhone: string | null = null;

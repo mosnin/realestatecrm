@@ -4,7 +4,8 @@ import { Fragment } from 'react';
 import { cn } from '@/lib/utils';
 import type { TextBlock } from '@/lib/ai-tools/blocks';
 
-/** Render `**bold**` + `*italic*` inline. Matches the existing MessageBubble. */
+/** Render `**bold**` + `*italic*` inline — the lightest Markdown slice the
+ *  transcript needs, no third-party parser. */
 function renderInline(text: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
   const regex = /(\*\*(.+?)\*\*|\*(.+?)\*)/g;

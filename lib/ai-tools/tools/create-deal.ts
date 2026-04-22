@@ -59,6 +59,13 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
     'Create a new deal in a pipeline stage, optionally linking contacts. Prompts for approval first.',
   parameters,
   requiresApproval: true,
+  rateLimit: { max: 30, windowSeconds: 3600 },
+  summariseCall(args) {
+    const value =
+      typeof args.value === 'number' ? ` @ $${args.value.toLocaleString('en-US')}` : '';
+    const contacts = args.contactIds?.length ? ` with ${args.contactIds.length} contact(s)` : '';
+    return `Create deal "${args.title}"${value}${contacts}`;
+  },
 
   async handler(args, ctx) {
     // Stage must exist in this space.
@@ -78,25 +85,50 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
     // Validate every contactId belongs to this space. Mirror the PATCH
     // route's silent-filter behavior: drop unknown ids rather than 400.
     let validContactIds: string[] = [];
+    let buyerAmongContacts = false;
     if (args.contactIds && args.contactIds.length > 0) {
       const { data: validContacts, error: vcErr } = await supabase
         .from('Contact')
-        .select('id')
+        .select('id, leadType')
         .in('id', args.contactIds)
         .eq('spaceId', ctx.space.id)
         .is('brokerageId', null);
       if (vcErr) {
         return { summary: `Contact validation failed: ${vcErr.message}`, display: 'error' };
       }
-      const validSet = new Set((validContacts ?? []).map((c: { id: string }) => c.id));
+      const validRows = validContacts ?? [];
+      const validSet = new Set(validRows.map((c: { id: string }) => c.id));
       validContactIds = args.contactIds.filter((id) => validSet.has(id));
+      buyerAmongContacts = validRows.some(
+        (c: { leadType: string | null }) => c.leadType === 'buyer',
+      );
+    }
+
+    // Auto-route buyer deals to the buyer pipeline's first stage — mirrors
+    // POST /api/deals. A realtor who says "create a deal for Jane (a buyer)"
+    // in the seller pipeline should land the deal where buyer workflows
+    // actually live, not in a mismatched stage that will confuse the kanban.
+    let finalStageId = args.stageId;
+    let finalStage = stage;
+    if (buyerAmongContacts && stage.pipelineType !== 'buyer') {
+      const { data: buyerStages } = await supabase
+        .from('DealStage')
+        .select('id, name, pipelineType')
+        .eq('spaceId', ctx.space.id)
+        .eq('pipelineType', 'buyer')
+        .order('position', { ascending: true })
+        .limit(1);
+      if (buyerStages && buyerStages.length > 0) {
+        finalStageId = buyerStages[0].id;
+        finalStage = buyerStages[0] as typeof stage;
+      }
     }
 
     // Position = bottom of the stage's current column.
     const { data: lastDealRow } = await supabase
       .from('Deal')
       .select('position')
-      .eq('stageId', args.stageId)
+      .eq('stageId', finalStageId)
       .eq('spaceId', ctx.space.id)
       .order('position', { ascending: false })
       .limit(1)
@@ -115,7 +147,7 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
         address: args.address?.trim() || null,
         priority: args.priority ?? 'MEDIUM',
         closeDate: args.closeDate ? new Date(args.closeDate).toISOString() : null,
-        stageId: args.stageId,
+        stageId: finalStageId,
         position: nextPosition,
       })
       .select()
@@ -146,7 +178,7 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
 
     // Search reindex + new-deal notification — best-effort, matches the
     // HTTP route's fire-and-forget pattern.
-    syncDeal({ ...(dealRow as Deal), stage: stage as DealStage } as Deal & {
+    syncDeal({ ...(dealRow as Deal), stage: finalStage as DealStage } as Deal & {
       stage: { name: string };
     }).catch((err) => logger.warn('[tools.create_deal] vector sync failed', { dealId }, err));
 
@@ -162,15 +194,20 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
       logger.warn('[tools.create_deal] notification failed', { dealId }, err);
     }
 
+    const reroutedNote =
+      finalStageId !== args.stageId
+        ? ` (auto-routed to the buyer pipeline because a buyer contact is attached)`
+        : '';
+
     return {
-      summary: `Created deal "${args.title}" in stage "${stage.name}"${
+      summary: `Created deal "${args.title}" in stage "${finalStage.name}"${
         validContactIds.length ? ` with ${validContactIds.length} contact(s) linked` : ''
-      }.`,
+      }${reroutedNote}.`,
       data: {
         dealId,
         title: args.title,
-        stageId: args.stageId,
-        stageName: stage.name,
+        stageId: finalStageId,
+        stageName: finalStage.name,
         linkedContactIds: validContactIds,
       },
       display: 'success',

@@ -67,6 +67,15 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
     'Schedule a property tour. Uses a saved contact when provided, otherwise captures a walk-in guest. Always prompts for approval.',
   parameters,
   requiresApproval: true,
+  rateLimit: { max: 30, windowSeconds: 3600 },
+  summariseCall(args) {
+    // Dates render as UTC so the approval prompt is timezone-unambiguous;
+    // the tour still lands correctly because the DB stores the ISO value.
+    const when = new Date(args.startsAt).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+    const who = args.contactId ? `contact ${args.contactId.slice(0, 8)}` : args.guestName ?? 'guest';
+    const where = args.propertyAddress ? ` at ${args.propertyAddress}` : '';
+    return `Schedule tour for ${who}${where} — ${when}`;
+  },
 
   async handler(args, ctx) {
     // Resolve guest from Contact when provided.

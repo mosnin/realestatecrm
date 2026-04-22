@@ -59,6 +59,13 @@ export const addChecklistItemTool = defineTool<typeof parameters, AddChecklistIt
     "Add a single task to a deal's closing checklist (earnest money, inspection, appraisal, etc.). Prompts for approval first.",
   parameters,
   requiresApproval: true,
+  rateLimit: { max: 60, windowSeconds: 3600 },
+  summariseCall(args) {
+    const due = args.dueAt
+      ? ` (due ${new Date(args.dueAt).toISOString().slice(0, 10)})`
+      : '';
+    return `Add checklist item "${args.label}" to deal ${args.dealId.slice(0, 8)}${due}`;
+  },
 
   async handler(args, ctx) {
     // Deal must exist in this space — we don't take the FK's word for it

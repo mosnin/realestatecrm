@@ -90,32 +90,25 @@ export interface RunTurnOutput {
 }
 
 /** One-liner describing what a mutating call would do. Used as the prompt's
- *  human-readable summary in the permission card. */
+ *  human-readable summary in the permission card. Delegates to each tool's
+ *  `summariseCall` when defined so prompts speak the tool's domain language;
+ *  a buggy summariser falls through to a safe generic line rather than
+ *  tearing down the approval flow. */
 function summarisePendingCall(name: string, args: Record<string, unknown>): string {
-  // Per-tool heuristics keep the summary short. Unknown tools fall back
-  // to a generic "run {name}".
-  switch (name) {
-    case 'send_email': {
-      const to = typeof args.to === 'string' ? args.to : 'a contact';
-      const subject = typeof args.subject === 'string' && args.subject ? ` — "${args.subject}"` : '';
-      return `Send email to ${to}${subject}`;
+  const tool = getTool(name);
+  if (tool?.summariseCall) {
+    try {
+      return (tool.summariseCall as (a: unknown) => string)(args);
+    } catch (err) {
+      logger.warn('[loop] summariseCall threw', { tool: name }, err);
     }
-    case 'send_sms': {
-      const to = typeof args.to === 'string' ? args.to : 'a contact';
-      return `Send SMS to ${to}`;
-    }
-    case 'create_deal':
-      return typeof args.title === 'string' ? `Create deal "${args.title}"` : 'Create a new deal';
-    case 'update_contact':
-      return 'Update a contact';
-    case 'advance_deal_stage':
-      return 'Move a deal to a new stage';
-    case 'schedule_tour':
-      return 'Schedule a tour';
-    default:
-      return `Run ${name}`;
   }
+  return `Run ${name}`;
 }
+
+// `continue-turn.ts` re-exports this so the approve path uses the same
+// summaries as the initial pause.
+export { summarisePendingCall };
 
 /**
  * Execute one full turn. Pushes events as side effects; returns the

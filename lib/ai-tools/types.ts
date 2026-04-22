@@ -85,6 +85,21 @@ export interface ToolDefinition<
   requiresApproval: boolean | 'maybe';
   /** Optional finer-grained approval resolver for the 'maybe' case. */
   shouldApprove?: (args: TArgs, ctx: ToolContext) => boolean;
+  /**
+   * One-line "what will happen if you approve?" summary. Rendered in the
+   * PermissionPromptView. Per-tool override so each tool can speak in
+   * domain-specific terms ("Email jane@x — subject: Tour Friday") instead
+   * of a generic fallback ("Run send_email"). Called with the validated
+   * args — it's safe to read any schema field here.
+   */
+  summariseCall?: (args: TArgs) => string;
+  /**
+   * Per-user rate limit for this tool. Checked by executeTool BEFORE the
+   * handler runs. Enforces a tighter blast-radius cap than the
+   * per-conversation limit on the /api/ai/task route — that route bounds
+   * turns/hour, this bounds specific tool firings.
+   */
+  rateLimit?: { max: number; windowSeconds: number };
   /** The actual work. Must respect ctx.signal for cancellation. */
   handler: ToolHandler<TArgs, TData>;
 }
@@ -102,6 +117,8 @@ export function defineTool<TSchema extends z.ZodType, TData = unknown>(def: {
   parameters: TSchema;
   requiresApproval: boolean | 'maybe';
   shouldApprove?: (args: z.infer<TSchema>, ctx: ToolContext) => boolean;
+  summariseCall?: (args: z.infer<TSchema>) => string;
+  rateLimit?: { max: number; windowSeconds: number };
   handler: (args: z.infer<TSchema>, ctx: ToolContext) => Promise<ToolResult<TData>>;
 }): ToolDefinition<z.infer<TSchema>, TData> {
   return def as ToolDefinition<z.infer<TSchema>, TData>;

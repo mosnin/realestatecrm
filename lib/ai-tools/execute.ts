@@ -13,6 +13,7 @@
 
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { getTool } from './registry';
 import type { ToolContext, ToolDefinition, ToolResult } from './types';
 
@@ -20,6 +21,7 @@ export type ToolExecutionError =
   | { code: 'unknown_tool'; message: string }
   | { code: 'invalid_args'; message: string; issues?: z.ZodIssue[] }
   | { code: 'handler_error'; message: string }
+  | { code: 'rate_limited'; message: string }
   | { code: 'aborted'; message: string };
 
 export interface ToolExecution {
@@ -90,8 +92,43 @@ export async function executeTool(
     };
   }
 
-  // 4. Run the handler inside a try/catch so an unexpected throw becomes
+  // 4. Per-tool rate limit. Bounds the blast radius of a single user's
+  //    session even after the global /api/ai/task hourly cap has allowed
+  //    the turn through — e.g., a model that tries to send 40 emails in
+  //    one turn hits this before any of them go out. We scope the key by
+  //    userId + tool.name so rate limits are per-tool, not shared across
+  //    them.
+  if (tool.rateLimit) {
+    const { allowed } = await checkRateLimit(
+      `ai:tool:${tool.name}:${ctx.userId}`,
+      tool.rateLimit.max,
+      tool.rateLimit.windowSeconds,
+    );
+    if (!allowed) {
+      logger.warn('[tools.execute] rate limit hit', {
+        tool: tool.name,
+        userId: ctx.userId,
+        max: tool.rateLimit.max,
+        windowSeconds: tool.rateLimit.windowSeconds,
+      });
+      return {
+        ok: false,
+        name,
+        args: parsed.data,
+        error: {
+          code: 'rate_limited',
+          message: `Rate limit reached for "${tool.name}" (${tool.rateLimit.max} per ${Math.round(tool.rateLimit.windowSeconds / 60)} min). Try again later.`,
+        },
+      };
+    }
+  }
+
+  // 5. Run the handler inside a try/catch so an unexpected throw becomes
   //    a structured error rather than bubbling out of the loop.
+  //    We emit one structured log line per execution (success or failure)
+  //    so downstream aggregators can chart p95 duration + error rate per
+  //    tool without any per-tool instrumentation.
+  const startedAt = Date.now();
   try {
     const result = await (tool as ToolDefinition).handler(parsed.data, ctx);
 
@@ -99,6 +136,14 @@ export async function executeTool(
     // result after cancellation; if the signal fired during execution,
     // surface that explicitly so the loop doesn't try to continue.
     if (ctx.signal.aborted) {
+      logger.info('[tools.usage]', {
+        tool: tool.name,
+        userId: ctx.userId,
+        spaceId: ctx.space.id,
+        ok: false,
+        errorCode: 'aborted',
+        durationMs: Date.now() - startedAt,
+      });
       return {
         ok: false,
         name,
@@ -107,10 +152,26 @@ export async function executeTool(
       };
     }
 
+    logger.info('[tools.usage]', {
+      tool: tool.name,
+      userId: ctx.userId,
+      spaceId: ctx.space.id,
+      ok: true,
+      display: result.display,
+      durationMs: Date.now() - startedAt,
+    });
     return { ok: true, name, args: parsed.data, result };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error('[tools.execute] handler threw', { name }, err);
+    logger.info('[tools.usage]', {
+      tool: tool.name,
+      userId: ctx.userId,
+      spaceId: ctx.space.id,
+      ok: false,
+      errorCode: 'handler_error',
+      durationMs: Date.now() - startedAt,
+    });
     return {
       ok: false,
       name,
