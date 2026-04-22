@@ -267,6 +267,13 @@ export async function PATCH(
         ...(milestonesVal !== undefined && { milestones: milestonesVal }),
         ...(nextActionVal !== undefined && { nextAction: nextActionVal }),
         ...(nextActionDueAtVal !== undefined && { nextActionDueAt: nextActionDueAtVal }),
+        // propertyId: null unlinks; otherwise validated as string referencing a
+        // Property in this space. We don't load the row here — the FK will
+        // reject a mismatched id; validating at edit time adds a round-trip
+        // without additional safety.
+        ...(body.propertyId !== undefined && {
+          propertyId: body.propertyId ? String(body.propertyId).slice(0, 64) : null,
+        }),
         // Won/lost post-mortem fields — captured from the kanban dialog.
         // When the deal transitions back to active we clear them so stale
         // reasons don't confuse a later close.

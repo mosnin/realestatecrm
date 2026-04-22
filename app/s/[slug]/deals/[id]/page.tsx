@@ -17,11 +17,13 @@ import { DealMilestones } from '@/components/deals/deal-milestones';
 import { DealChecklist } from '@/components/deals/deal-checklist';
 import { DealDocuments } from '@/components/deals/deal-documents';
 import { DealNextActionField } from '@/components/deals/deal-next-action-field';
+import { DealPropertyPicker } from '@/components/deals/deal-property-picker';
 import { DealPrioritySelector } from '@/components/deals/deal-priority-selector';
 import { DeleteDealButton } from '@/components/deals/deal-delete-button';
 import { AgentDealPanel } from '@/components/agent/agent-deal-panel';
 import type { DealChecklistItem } from '@/lib/deals/checklist';
 import type { DealDocument } from '@/lib/deals/documents';
+import type { Property } from '@/lib/types';
 
 
 export default async function DealDetailPage({
@@ -44,6 +46,7 @@ export default async function DealDetailPage({
   let allStages: DealStage[];
   let checklist: DealChecklistItem[];
   let documents: DealDocument[];
+  let linkedProperty: Property | null = null;
 
   try {
     const { data: dealData, error: dealError } = await supabase
@@ -74,6 +77,19 @@ export default async function DealDetailPage({
     allStages = (stagesResult.data ?? []) as DealStage[];
     checklist = (checklistResult.data ?? []) as DealChecklistItem[];
     documents = (docsResult.data ?? []) as DealDocument[];
+
+    // Load the linked Property, if any. Kept as a small separate fetch so we
+    // don't join here — Property rows can be referenced from multiple deals.
+    const linkedPropertyId = (dealRow.propertyId as string | null | undefined) ?? null;
+    if (linkedPropertyId) {
+      const { data: propData } = await supabase
+        .from('Property')
+        .select('*')
+        .eq('id', linkedPropertyId)
+        .eq('spaceId', space.id)
+        .maybeSingle();
+      linkedProperty = (propData as Property | null) ?? null;
+    }
     dealContacts = ((dcResult.data ?? []) as Record<string, unknown>[]).map((row) => {
       const contact = row.Contact as { id: string; name: string; type: string; email: string | null; phone: string | null } | null;
       return {
@@ -257,6 +273,9 @@ export default async function DealDetailPage({
                 placeholder="Not set"
               />
             </div>
+
+            {/* Property link */}
+            <DealPropertyPicker dealId={id} slug={slug} initial={linkedProperty} />
 
             {/* Contacts */}
             <div>

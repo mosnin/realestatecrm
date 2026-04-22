@@ -303,6 +303,8 @@ export type Deal = {
   /** Captured when a deal is marked won or lost so we can learn from it later. */
   wonLostReason: string | null;
   wonLostNote: string | null;
+  /** Nullable FK to Property. Deals without a linked property still work. */
+  propertyId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -314,6 +316,46 @@ export type DealStageKind =
   | 'under_contract'
   | 'closing'
   | 'closed';
+
+export type PropertyType =
+  | 'single_family'
+  | 'condo'
+  | 'townhouse'
+  | 'multi_family'
+  | 'land'
+  | 'commercial'
+  | 'other';
+
+export type PropertyListingStatus =
+  | 'active'
+  | 'pending'
+  | 'sold'
+  | 'off_market'
+  | 'owned';
+
+export interface Property {
+  id: string;
+  spaceId: string;
+  address: string;
+  unitNumber: string | null;
+  city: string | null;
+  stateRegion: string | null;
+  postalCode: string | null;
+  mlsNumber: string | null;
+  propertyType: PropertyType | null;
+  beds: number | null;
+  baths: number | null;
+  squareFeet: number | null;
+  lotSizeSqft: number | null;
+  yearBuilt: number | null;
+  listPrice: number | null;
+  listingStatus: PropertyListingStatus;
+  listingUrl: string | null;
+  photos: string[];
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export type DealActivity = {
   id: string;
