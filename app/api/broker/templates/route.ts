@@ -1,262 +1,168 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { z } from 'zod';
 import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
-import { getSpaceByOwnerId } from '@/lib/space';
-import { z } from 'zod';
+import { audit } from '@/lib/audit';
+import { logger } from '@/lib/logger';
 
-const TEMPLATE_NOTE_TITLE = '[BROKER_TEMPLATES]';
+// ── Shared types / schema ─────────────────────────────────────────────────────
+//
+// These shapes mirror the `BrokerageTemplate` table introduced in Phase BP6a.
+// Columns live in the DB as-is (versioned rows, not JSON blobs) so the row
+// type is just the table row.
 
-const templateSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(1).max(100),
-  category: z.enum(['follow-up', 'intro', 'closing', 'tour-invite']),
-  body: z.string().min(1).max(5000),
-});
+type TemplateCategory = 'follow-up' | 'intro' | 'closing' | 'tour-invite';
+type TemplateChannel = 'sms' | 'email' | 'note';
 
-type Template = {
+type BrokerageTemplateRow = {
   id: string;
+  brokerageId: string;
   name: string;
-  category: string;
+  category: TemplateCategory;
+  channel: TemplateChannel;
+  subject: string | null;
   body: string;
-  createdBy: string;
+  version: number;
+  publishedAt: string | null;
+  publishedCount: number;
+  createdByUserId: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
+const TEMPLATE_COLUMNS =
+  'id, brokerageId, name, category, channel, subject, body, version, publishedAt, publishedCount, createdByUserId, createdAt, updatedAt';
+
+const createSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  category: z.enum(['follow-up', 'intro', 'closing', 'tour-invite']),
+  channel: z.enum(['sms', 'email', 'note']),
+  subject: z
+    .union([z.string().max(200), z.null()])
+    .optional(),
+  body: z.string().min(1).max(5000),
+});
+
+// ── GET — any broker member may read their brokerage's templates ──────────────
+
 /**
- * Helper: find or create the special Note that stores templates as JSON in content.
+ * GET /api/broker/templates
+ *
+ * Returns the brokerage's template library ordered by updatedAt DESC.
+ * All broker-scoped members (owner, admin, realtor) can read — viewing the
+ * library is a prerequisite for agents to pull published copies.
  */
-async function getOrCreateTemplateNote(spaceId: string) {
-  const { data: existing } = await supabase
-    .from('Note')
-    .select('id, content')
-    .eq('spaceId', spaceId)
-    .eq('title', TEMPLATE_NOTE_TITLE)
-    .maybeSingle();
+export async function GET(): Promise<NextResponse> {
+  const ctx = await getBrokerMemberContext();
+  if (!ctx) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
-  if (existing) return existing;
+  const { data, error } = await supabase
+    .from('BrokerageTemplate')
+    .select(TEMPLATE_COLUMNS)
+    .eq('brokerageId', ctx.brokerage.id)
+    .order('updatedAt', { ascending: false });
 
-  const { data: created, error } = await supabase
-    .from('Note')
+  if (error) {
+    logger.error(
+      '[broker/templates/GET] list failed',
+      { brokerageId: ctx.brokerage.id },
+      error,
+    );
+    return NextResponse.json({ error: 'Failed to load templates' }, { status: 500 });
+  }
+
+  return NextResponse.json((data ?? []) as BrokerageTemplateRow[]);
+}
+
+// ── POST — create a new template (broker_owner / broker_admin only) ───────────
+
+/**
+ * POST /api/broker/templates
+ *
+ * Body: { name, category, channel, subject?, body }
+ * Restricted to broker_owner / broker_admin. Realtor members may read the
+ * library but cannot author it.
+ */
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  const { userId: clerkId } = await auth();
+
+  const ctx = await getBrokerMemberContext();
+  if (!ctx) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  if (ctx.membership.role !== 'broker_owner' && ctx.membership.role !== 'broker_admin') {
+    return NextResponse.json(
+      { error: 'Only the owner or admins can create templates' },
+      { status: 403 },
+    );
+  }
+
+  let rawBody: unknown;
+  try {
+    rawBody = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const parsed = createSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Invalid data', issues: parsed.error.issues },
+      { status: 400 },
+    );
+  }
+
+  // Normalise: non-email channels never carry a subject; for email we store
+  // the provided subject (or null if absent/empty). Keeps data tidy and stops
+  // stray subject text from leaking onto SMS/note renders.
+  const { name, category, channel, body } = parsed.data;
+  const subject =
+    channel === 'email'
+      ? (parsed.data.subject ?? null) || null
+      : null;
+
+  const { data: inserted, error: insertErr } = await supabase
+    .from('BrokerageTemplate')
     .insert({
-      spaceId,
-      title: TEMPLATE_NOTE_TITLE,
-      content: '[]',
-      sortOrder: -1,
+      brokerageId: ctx.brokerage.id,
+      name,
+      category,
+      channel,
+      subject,
+      body,
+      version: 1,
+      publishedAt: null,
+      publishedCount: 0,
+      createdByUserId: ctx.dbUserId,
     })
-    .select('id, content')
-    .single();
+    .select(TEMPLATE_COLUMNS)
+    .single<BrokerageTemplateRow>();
 
-  if (error) throw error;
-  return created;
-}
-
-function parseTemplates(content: string): Template[] {
-  try {
-    return JSON.parse(content || '[]');
-  } catch {
-    return [];
-  }
-}
-
-/**
- * GET /api/broker/templates — list all templates
- */
-export async function GET() {
-  const ctx = await getBrokerMemberContext();
-  if (!ctx) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (insertErr || !inserted) {
+    logger.error(
+      '[broker/templates/POST] insert failed',
+      { brokerageId: ctx.brokerage.id },
+      insertErr,
+    );
+    return NextResponse.json({ error: 'Failed to create template' }, { status: 500 });
   }
 
-  try {
-    const space = await getSpaceByOwnerId(ctx.brokerage.ownerId);
-    if (!space) {
-      return NextResponse.json({ error: 'Broker space not found' }, { status: 500 });
-    }
+  void audit({
+    actorClerkId: clerkId ?? null,
+    action: 'CREATE',
+    resource: 'BrokerageTemplate',
+    resourceId: inserted.id,
+    req,
+    metadata: {
+      brokerageId: ctx.brokerage.id,
+      name: inserted.name,
+      category: inserted.category,
+      channel: inserted.channel,
+    },
+  });
 
-    const note = await getOrCreateTemplateNote(space.id);
-    const templates = parseTemplates(note.content);
-
-    return NextResponse.json(templates);
-  } catch (error) {
-    console.error('[templates] GET error', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
-  }
-}
-
-/**
- * POST /api/broker/templates — create a new template
- */
-export async function POST(req: NextRequest) {
-  const ctx = await getBrokerMemberContext();
-  if (!ctx) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const parsed = templateSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid data', issues: parsed.error.issues }, { status: 400 });
-  }
-
-  try {
-    const space = await getSpaceByOwnerId(ctx.brokerage.ownerId);
-    if (!space) {
-      return NextResponse.json({ error: 'Broker space not found' }, { status: 500 });
-    }
-
-    const note = await getOrCreateTemplateNote(space.id);
-    const templates = parseTemplates(note.content);
-    const now = new Date().toISOString();
-
-    const newTemplate: Template = {
-      id: crypto.randomUUID(),
-      name: parsed.data.name,
-      category: parsed.data.category,
-      body: parsed.data.body,
-      createdBy: ctx.dbUserId,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    templates.unshift(newTemplate);
-
-    const { error: updateError } = await supabase
-      .from('Note')
-      .update({ content: JSON.stringify(templates), updatedAt: now })
-      .eq('id', note.id);
-
-    if (updateError) throw updateError;
-
-    return NextResponse.json(newTemplate, { status: 201 });
-  } catch (error) {
-    console.error('[templates] POST error', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
-  }
-}
-
-/**
- * Check if the current user is the template creator or a broker owner/admin.
- */
-function canModifyTemplate(ctx: { dbUserId: string; membership: { role: string } }, template: Template): boolean {
-  if (template.createdBy === ctx.dbUserId) return true;
-  if (ctx.membership.role === 'broker_owner' || ctx.membership.role === 'broker_admin') return true;
-  return false;
-}
-
-/**
- * PATCH /api/broker/templates — update a template
- */
-export async function PATCH(req: NextRequest) {
-  const ctx = await getBrokerMemberContext();
-  if (!ctx) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const parsed = templateSchema.extend({ id: z.string().uuid() }).safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid data', issues: parsed.error.issues }, { status: 400 });
-  }
-
-  try {
-    const space = await getSpaceByOwnerId(ctx.brokerage.ownerId);
-    if (!space) {
-      return NextResponse.json({ error: 'Broker space not found' }, { status: 500 });
-    }
-
-    const note = await getOrCreateTemplateNote(space.id);
-    const templates = parseTemplates(note.content);
-    const idx = templates.findIndex((t) => t.id === parsed.data.id);
-
-    if (idx === -1) {
-      return NextResponse.json({ error: 'Template not found' }, { status: 404 });
-    }
-
-    if (!canModifyTemplate(ctx, templates[idx])) {
-      return NextResponse.json({ error: 'Forbidden: you can only edit your own templates' }, { status: 403 });
-    }
-
-    const now = new Date().toISOString();
-    templates[idx] = {
-      ...templates[idx],
-      name: parsed.data.name,
-      category: parsed.data.category,
-      body: parsed.data.body,
-      updatedAt: now,
-    };
-
-    const { error: updateError } = await supabase
-      .from('Note')
-      .update({ content: JSON.stringify(templates), updatedAt: now })
-      .eq('id', note.id);
-
-    if (updateError) throw updateError;
-
-    return NextResponse.json(templates[idx]);
-  } catch (error) {
-    console.error('[templates] PATCH error', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
-  }
-}
-
-/**
- * DELETE /api/broker/templates — delete a template by id (query param)
- */
-export async function DELETE(req: NextRequest) {
-  const ctx = await getBrokerMemberContext();
-  if (!ctx) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  const templateId = req.nextUrl.searchParams.get('id');
-  if (!templateId) {
-    return NextResponse.json({ error: 'id query param required' }, { status: 400 });
-  }
-
-  try {
-    const space = await getSpaceByOwnerId(ctx.brokerage.ownerId);
-    if (!space) {
-      return NextResponse.json({ error: 'Broker space not found' }, { status: 500 });
-    }
-
-    const note = await getOrCreateTemplateNote(space.id);
-    const templates = parseTemplates(note.content);
-    const target = templates.find((t) => t.id === templateId);
-
-    if (!target) {
-      return NextResponse.json({ error: 'Template not found' }, { status: 404 });
-    }
-
-    if (!canModifyTemplate(ctx, target)) {
-      return NextResponse.json({ error: 'Forbidden: you can only delete your own templates' }, { status: 403 });
-    }
-
-    const filtered = templates.filter((t) => t.id !== templateId);
-
-    const now = new Date().toISOString();
-    const { error: updateError } = await supabase
-      .from('Note')
-      .update({ content: JSON.stringify(filtered), updatedAt: now })
-      .eq('id', note.id);
-
-    if (updateError) throw updateError;
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('[templates] DELETE error', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
-  }
+  return NextResponse.json(inserted, { status: 201 });
 }
