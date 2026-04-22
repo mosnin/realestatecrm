@@ -142,6 +142,7 @@ export async function executeTool(
         spaceId: ctx.space.id,
         ok: false,
         errorCode: 'aborted',
+        display: undefined,
         durationMs: Date.now() - startedAt,
       });
       return {
@@ -157,6 +158,7 @@ export async function executeTool(
       userId: ctx.userId,
       spaceId: ctx.space.id,
       ok: true,
+      errorCode: undefined,
       display: result.display,
       durationMs: Date.now() - startedAt,
     });
@@ -170,6 +172,7 @@ export async function executeTool(
       spaceId: ctx.space.id,
       ok: false,
       errorCode: 'handler_error',
+      display: undefined,
       durationMs: Date.now() - startedAt,
     });
     return {
