@@ -138,6 +138,7 @@ async function getEligibleAgents(brokerageId: string): Promise<EligibleAgent[]> 
         .eq('brokerageId', brokerageId),
     ]);
 
+    let userRows: Array<{ id: string; status?: string | null }> = [];
     if (usersResult.error) {
       // If the status column doesn't exist yet, retry without it — we
       // simply treat everyone as active.
@@ -151,13 +152,15 @@ async function getEligibleAgents(brokerageId: string): Promise<EligibleAgent[]> 
           logger.warn('[brokerage-routing] failed to fetch users (fallback)', { brokerageId }, retryErr);
           return [];
         }
-        usersResult.data = (usersNoStatus ?? []).map(
-          (u: unknown) => ({ ...(u as Record<string, unknown>), status: null }),
+        userRows = (usersNoStatus ?? []).map(
+          (u: unknown) => ({ ...(u as { id: string }), status: null }),
         );
       } else {
         logger.warn('[brokerage-routing] failed to fetch users', { brokerageId }, usersResult.error);
         return [];
       }
+    } else {
+      userRows = (usersResult.data ?? []) as Array<{ id: string; status?: string | null }>;
     }
 
     if (spacesResult.error) {
@@ -166,8 +169,7 @@ async function getEligibleAgents(brokerageId: string): Promise<EligibleAgent[]> 
     }
 
     const activeUserIds = new Set<string>();
-    for (const u of usersResult.data ?? []) {
-      const row = u as { id: string; status?: string | null };
+    for (const row of userRows) {
       if (row.status !== 'offboarded') activeUserIds.add(row.id);
     }
 
