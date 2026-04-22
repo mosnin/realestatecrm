@@ -69,19 +69,33 @@ export async function savePendingApproval(record: StoredPendingApproval): Promis
  *   replay the pending turn.
  * - If it's absent (expired or already consumed), the caller returns 410.
  *
- * Upstash's REST client doesn't expose a server-side atomic pop, so we do
- * get-then-delete. A racing second request could see the record between our
- * get and delete — acceptable for a single-user flow where the UI disables
- * the button on first click, but worth noting if we ever allow multi-device
- * approval.
+ * Uses Upstash's atomic `getdel` command (single round-trip, no race window
+ * between get and delete). Falls back to get+del if the Redis proxy is a
+ * no-op (env vars not set in dev) — the proxy's get returns null, so we
+ * never reach the delete.
  */
 export async function consumePendingApproval(
   requestId: string,
 ): Promise<StoredPendingApproval | null> {
   try {
-    const raw = (await redis.get(keyFor(requestId))) as StoredPendingApproval | null;
+    const key = keyFor(requestId);
+    // @upstash/redis ^1.20 exposes `getdel`; we runtime-guard it so a
+    // downgrade to an older version still returns something sensible.
+    const rAny = redis as unknown as {
+      getdel?: (k: string) => Promise<unknown>;
+      get: (k: string) => Promise<unknown>;
+      del: (k: string) => Promise<unknown>;
+    };
+    if (typeof rAny.getdel === 'function') {
+      const raw = (await rAny.getdel(key)) as StoredPendingApproval | null;
+      return raw ?? null;
+    }
+    // Fallback for older clients. Single-user approval UI makes the race
+    // window benign; a shout in the logs warns us if we end up here.
+    logger.warn('[agent-task.pending] atomic getdel unavailable — using get+del fallback');
+    const raw = (await redis.get(key)) as StoredPendingApproval | null;
     if (!raw) return null;
-    await redis.del(keyFor(requestId));
+    await redis.del(key);
     return raw;
   } catch (err) {
     logger.error('[agent-task.pending] consume failed', { requestId }, err);

@@ -28,6 +28,20 @@ vi.mock('@/lib/redis', () => ({
       const existed = store.delete(key);
       return existed ? 1 : 0;
     },
+    // Mirror Upstash's atomic getdel. The production code prefers this
+    // over get+del; the fallback path still works if we stub it out to
+    // undefined in a per-test override.
+    getdel: async (key: string) => {
+      calls.push({ fn: 'getdel', args: [key] });
+      const entry = store.get(key);
+      if (!entry) return null;
+      if (entry.expiresAt != null && entry.expiresAt < Date.now()) {
+        store.delete(key);
+        return null;
+      }
+      store.delete(key);
+      return entry.value;
+    },
   },
 }));
 

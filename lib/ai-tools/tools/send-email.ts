@@ -125,16 +125,18 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
       };
     }
 
-    // Workspace's display name (on envelope) and default reply-to.
+    // Workspace's display name for the envelope. The fallback chain is
+    // strict about what exists: SpaceSetting.businessName (canonical, set
+    // on onboarding) → the Space's display name. We intentionally do NOT
+    // include User.name here because that's the owner's personal name,
+    // which they may not want on every outbound email.
     const { data: settings } = await supabase
       .from('SpaceSetting')
-      .select('businessName, realtorName')
+      .select('businessName')
       .eq('spaceId', ctx.space.id)
       .maybeSingle();
     const fromName =
-      (settings?.businessName as string | undefined) ||
-      (settings?.realtorName as string | undefined) ||
-      ctx.space.name;
+      (settings?.businessName as string | undefined) || ctx.space.name;
 
     try {
       await sendEmailFromCRM({
@@ -157,19 +159,30 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
     }
 
     // Best-effort log of the send as a ContactActivity for the audit trail.
-    // Non-fatal — the email went out regardless.
+    // Non-fatal — the email went out regardless. PostgREST returns
+    // { data, error } rather than throwing on DB errors, so we check the
+    // error field explicitly; the surrounding try/catch covers any
+    // transport-level exception.
     if (resolvedContactId) {
-      await supabase
-        .from('ContactActivity')
-        .insert({
+      try {
+        const { error: auditErr } = await supabase.from('ContactActivity').insert({
           id: crypto.randomUUID(),
           spaceId: ctx.space.id,
           contactId: resolvedContactId,
           type: 'email',
           content: `AI-assisted: ${args.subject}`,
           metadata: { via: 'on_demand_agent' },
-        })
-        .catch(() => undefined);
+        });
+        if (auditErr) {
+          logger.warn(
+            '[tools.send_email] audit insert failed',
+            { contactId: resolvedContactId },
+            auditErr,
+          );
+        }
+      } catch (err) {
+        logger.warn('[tools.send_email] audit insert threw', { contactId: resolvedContactId }, err);
+      }
     }
 
     return {
