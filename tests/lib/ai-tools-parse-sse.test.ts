@@ -110,4 +110,37 @@ describe('SSEParser', () => {
     // Nothing left — already consumed in feed.
     expect(flushed).toHaveLength(0);
   });
+
+  it('round-trips a permission_required event carrying otherPendingCalls', () => {
+    // Regression: cascade-denied siblings arrive with the initial
+    // permission_required event; the client depends on decodeEvent
+    // preserving the optional otherPendingCalls field intact.
+    const parser = new SSEParser();
+    const chunk = frame({
+      type: 'permission_required',
+      requestId: 'req_1',
+      callId: 'c_1',
+      name: 'send_email',
+      args: { toEmail: 'a@b.com', subject: 'S', body: 'B' },
+      summary: 'Email a@b.com — "S"',
+      otherPendingCalls: [
+        {
+          callId: 'c_2',
+          name: 'send_email',
+          args: { toEmail: 'x@y.com', subject: 'S2', body: 'B2' },
+          summary: 'Email x@y.com — "S2"',
+        },
+      ],
+      seq: 0,
+      ts: 't',
+    });
+    const events = Array.from(parser.feed(chunk));
+    expect(events).toHaveLength(1);
+    const ev = events[0];
+    expect(ev.type).toBe('permission_required');
+    // Narrow via `type` so TS knows otherPendingCalls exists.
+    if (ev.type !== 'permission_required') throw new Error('wrong event');
+    expect(ev.otherPendingCalls).toHaveLength(1);
+    expect(ev.otherPendingCalls?.[0].callId).toBe('c_2');
+  });
 });

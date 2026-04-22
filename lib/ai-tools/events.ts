@@ -74,6 +74,21 @@ export interface PermissionRequiredEvent extends BaseEvent {
   summary: string;
   /** How the UI should render the approval preview. */
   display?: ToolResult['display'];
+  /**
+   * Other mutating calls the model emitted in the SAME parallel batch. The
+   * orchestrator only prompts for one at a time, but the user's decision
+   * cascades: a single deny skips every subsequent mutation in the batch
+   * without nagging. The client uses this list to render PermissionBlocks
+   * for the cascaded denials live, instead of only after a page reload —
+   * server-side persistence has always recorded them, but the transcript
+   * would lag the DB until refresh without this.
+   */
+  otherPendingCalls?: Array<{
+    callId: string;
+    name: string;
+    args: Record<string, unknown>;
+    summary: string;
+  }>;
 }
 
 /**

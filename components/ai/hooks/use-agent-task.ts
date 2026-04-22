@@ -253,6 +253,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           name: event.name,
           args: event.args,
           summary: event.summary,
+          otherPendingCalls: event.otherPendingCalls,
         });
         return;
       }
@@ -449,23 +450,37 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     async (requestId: string) => {
       if (isStreaming) return;
       // Snapshot the prompt before the stream's `permission_resolved` event
-      // clears it — we use the snapshot to pre-populate a PermissionBlock
+      // clears it — we use the snapshot to pre-populate PermissionBlocks
       // on the continuation bubble so the denial is visible immediately,
       // matching what the server persists for this turn.
+      //
+      // The snapshot includes otherPendingCalls (forwarded from the
+      // server's permission_required event): a deny cascades to every
+      // mutating call in the batch, so we show a block per cascaded call
+      // too — not only the one the user clicked on.
       const snapshot = pendingApproval;
       const contId = newId();
-      const initialBlocks: MessageBlock[] = snapshot
-        ? [
-            {
-              type: 'permission',
-              callId: snapshot.callId,
-              name: snapshot.name,
-              args: snapshot.args,
-              summary: snapshot.summary,
-              decision: 'denied',
-            },
-          ]
-        : [];
+      const initialBlocks: MessageBlock[] = [];
+      if (snapshot) {
+        initialBlocks.push({
+          type: 'permission',
+          callId: snapshot.callId,
+          name: snapshot.name,
+          args: snapshot.args,
+          summary: snapshot.summary,
+          decision: 'denied',
+        });
+        for (const other of snapshot.otherPendingCalls ?? []) {
+          initialBlocks.push({
+            type: 'permission',
+            callId: other.callId,
+            name: other.name,
+            args: other.args,
+            summary: other.summary,
+            decision: 'denied',
+          });
+        }
+      }
       const contMsg: UiMessage = {
         id: contId,
         role: 'assistant',

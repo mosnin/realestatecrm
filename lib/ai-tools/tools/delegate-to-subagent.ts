@@ -51,8 +51,15 @@ export const delegateToSubagentTool = defineTool<typeof parameters, DelegateResu
   description: `Delegate a read-only research task to a specialised sub-agent. The sub-agent has its own fresh context and returns one short paragraph — use this BEFORE pulling lots of data into the main conversation so you keep room to think. Available skills:\n${skillSummaries}`,
   parameters,
   requiresApproval: false,
-  // Light rate limit — delegations are OpenAI calls, not cheap. 20/hour per
-  // user is plenty for realistic use and bounds runaway loops.
+  // Rate-limit interaction worth understanding: this limit (20 delegations
+  // per hour) ONLY bounds how often the orchestrator can spawn a sub-agent.
+  // Each sub-agent then calls tools independently, and THOSE tools have
+  // their own per-user per-tool rate limits (e.g. search_contacts is
+  // uncapped, get_contact is uncapped). So a realtor who delegates 20
+  // times with 3 tool calls each drives 60 search_contacts hits against
+  // the global user budget, not against this 20/hr cap. That's
+  // intentional — we don't want a cheap delegation to burn the
+  // orchestrator's direct-call budget — but worth noting when tuning.
   rateLimit: { max: 20, windowSeconds: 3600 },
   summariseCall(args) {
     return `Delegate to ${args.skill}: "${args.task.slice(0, 60)}${args.task.length > 60 ? '…' : ''}"`;

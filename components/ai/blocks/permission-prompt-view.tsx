@@ -10,6 +10,18 @@ export interface PermissionPromptData {
   name: string;
   args: Record<string, unknown>;
   summary: string;
+  /**
+   * Other mutating calls the model queued in the same batch. The prompt
+   * itself only shows the current call — but the hook keeps this list so
+   * a deny can immediately render cascade blocks for every skipped call,
+   * matching what the server persists.
+   */
+  otherPendingCalls?: Array<{
+    callId: string;
+    name: string;
+    args: Record<string, unknown>;
+    summary: string;
+  }>;
 }
 
 /**

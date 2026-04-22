@@ -120,6 +120,21 @@ export async function continueTurn(input: ContinueTurnInput): Promise<RunTurnOut
       // Re-pause for this one. The endpoint saves the new state and the
       // UI prompts again.
       const requestId = crypto.randomUUID();
+      // Remaining calls after this one: the ones we haven't started yet.
+      const furtherRemaining = pendingState.remainingCalls.slice(
+        pendingState.remainingCalls.indexOf(rem) + 1,
+      );
+      // Cascade-deny preview for the client — same rationale as the initial
+      // pause in loop.ts: if the user denies, the transcript should reflect
+      // every skipped call immediately, not only after a refresh.
+      const otherPendingCalls = furtherRemaining
+        .filter((c) => getTool(c.name)?.requiresApproval !== false)
+        .map((c) => ({
+          callId: c.callId,
+          name: c.name,
+          args: c.args,
+          summary: summarisePendingCall(c.name, c.args),
+        }));
       await pushEvent({
         type: 'permission_required',
         requestId,
@@ -127,11 +142,8 @@ export async function continueTurn(input: ContinueTurnInput): Promise<RunTurnOut
         name: rem.name,
         args: rem.args,
         summary: summarisePendingCall(rem.name, rem.args),
+        ...(otherPendingCalls.length > 0 ? { otherPendingCalls } : {}),
       });
-      // Remaining calls after this one: the ones we haven't started yet.
-      const furtherRemaining = pendingState.remainingCalls.slice(
-        pendingState.remainingCalls.indexOf(rem) + 1,
-      );
       return {
         blocks,
         reason: 'paused',

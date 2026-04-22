@@ -254,6 +254,23 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnOutput> {
 
           const summary = summarisePendingCall(buf.name, args);
 
+          // Include any OTHER mutating calls in the batch so the client
+          // can surface cascade-denied blocks live (not just after
+          // refresh). Read-only remaining calls run without prompting
+          // during the approval resume, so they don't need to be
+          // enumerated here — only approval-gated ones.
+          const otherPendingCalls = remaining
+            .filter((c) => {
+              const t = getTool(c.name);
+              return t?.requiresApproval !== false;
+            })
+            .map((c) => ({
+              callId: c.callId,
+              name: c.name,
+              args: c.args,
+              summary: summarisePendingCall(c.name, c.args),
+            }));
+
           await pushEvent({
             type: 'permission_required',
             requestId,
@@ -261,6 +278,7 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnOutput> {
             name: buf.name,
             args,
             summary,
+            ...(otherPendingCalls.length > 0 ? { otherPendingCalls } : {}),
           });
 
           return {
