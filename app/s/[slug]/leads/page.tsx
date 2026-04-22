@@ -7,6 +7,7 @@ import { Phone, Flame, Thermometer, Snowflake, HelpCircle, ArrowRight } from 'lu
 import Link from 'next/link';
 import type { Contact } from '@/lib/types';
 import { LeadsView } from '@/components/leads/leads-view';
+import { PeopleTabs } from '@/components/people/people-tabs';
 
 export default async function LeadsPage({
   params,
@@ -88,22 +89,14 @@ export default async function LeadsPage({
   return (
     <div className="space-y-4 max-w-[1320px]">
       {/* Page header */}
-      <div className="rounded-xl border border-border bg-card px-4 py-3 sm:px-5 sm:py-4">
-        <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Leads</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Applications submitted via your intake link
-          </p>
-        </div>
-        {unreadLeads.length > 0 && (
-          <div className="flex items-center gap-1.5 text-sm text-orange-700 dark:text-orange-400 font-medium bg-orange-50 dark:bg-orange-500/10 rounded-md px-3 py-1 flex-shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-brand" />
-            {unreadLeads.length} new
-          </div>
-        )}
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">People</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          New applications that haven&apos;t been reviewed yet.
+        </p>
       </div>
-      </div>
+
+      <PeopleTabs slug={slug} newCount={unreadLeads.length} />
 
       {/* Tier summary bar */}
       {leads.length > 0 && (

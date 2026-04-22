@@ -29,6 +29,14 @@ export type PipelineDeal = {
   agentName: string;
   agentUserId: string;
   createdAt: string;
+  /**
+   * Health classification from lib/deals/health.ts. Non-active deals
+   * always land as 'on-track' — the classifier treats closed deals as
+   * out-of-scope for risk tracking.
+   */
+  health: 'on-track' | 'at-risk' | 'stuck';
+  /** Short human reason, e.g. "18 days in this stage". Empty for on-track. */
+  healthReason: string;
 };
 
 export type StageInfo = {
@@ -47,6 +55,10 @@ export type PipelineSummary = {
   activeDeals: number;
   dealsWonThisMonth: number;
   dealsLostThisMonth: number;
+  atRiskCount: number;
+  stuckCount: number;
+  /** Per-agent rollup, sorted most-stuck first. Empty when no risks. */
+  agentRisk: Array<{ agentName: string; atRisk: number; stuck: number }>;
 };
 
 type Props = {
@@ -214,6 +226,79 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
         ))}
       </div>
 
+      {/* ── Risk dashboard ──────────────────────────────────────────── */}
+      {/* When there ARE active deals but nothing's flagged, we render a */}
+      {/* quiet "all healthy" strip instead of hiding the slot entirely. */}
+      {/* Audit finding: an empty slot made brokers wonder whether the   */}
+      {/* feature was broken. An empty pipeline (zero active deals)      */}
+      {/* still shows nothing — nothing to reassure about.               */}
+      {summary.atRiskCount === 0 && summary.stuckCount === 0 && summary.activeDeals > 0 && (
+        <Card className="border-emerald-500/20 bg-emerald-500/5">
+          <CardContent className="px-5 py-3 flex items-center gap-3">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center flex-shrink-0 text-emerald-700 dark:text-emerald-400">
+              <span role="img" aria-label="healthy">✓</span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">All pipelines healthy</p>
+              <p className="text-xs text-muted-foreground">
+                No deals stuck or at risk across {summary.activeDeals} active deal
+                {summary.activeDeals === 1 ? '' : 's'}.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {(summary.atRiskCount > 0 || summary.stuckCount > 0) && (
+        <Card className="border-amber-500/30 bg-amber-50/50 dark:bg-amber-500/5">
+          <CardContent className="px-5 py-4">
+            <div className="flex items-start gap-4 flex-wrap">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+                  <span className="text-base" role="img" aria-label="attention">⚠</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">Deals needing attention</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    <span className="font-medium text-rose-700 dark:text-rose-400">{summary.stuckCount}</span> stuck ·{' '}
+                    <span className="font-medium text-amber-700 dark:text-amber-400">{summary.atRiskCount}</span> at-risk
+                  </p>
+                </div>
+              </div>
+              {summary.agentRisk.length > 0 && (
+                <div className="flex flex-wrap gap-2 ml-auto max-w-full">
+                  {summary.agentRisk.slice(0, 4).map((row) => (
+                    <span
+                      key={row.agentName}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium"
+                      title={`${row.agentName}: ${row.stuck} stuck, ${row.atRisk} at-risk`}
+                    >
+                      <span className="truncate max-w-[120px]">{row.agentName}</span>
+                      {row.stuck > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-rose-700 dark:text-rose-400 font-semibold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          {row.stuck}
+                        </span>
+                      )}
+                      {row.atRisk > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-amber-700 dark:text-amber-400 font-semibold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          {row.atRisk}
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                  {summary.agentRisk.length > 4 && (
+                    <span className="inline-flex items-center text-[11px] text-muted-foreground px-2">
+                      +{summary.agentRisk.length - 4} more
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Filters ────────────────────────────────────────────── */}
       <Card>
         <CardContent className="px-5 py-3">
@@ -367,7 +452,12 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
                             <tbody>
                               {agent.deals.map((deal) => (
                                 <tr key={deal.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                                  <td className="px-4 py-2 font-medium truncate max-w-[200px]">{deal.title}</td>
+                                  <td className="px-4 py-2 font-medium max-w-[200px]">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <HealthDot health={deal.health} reason={deal.healthReason} />
+                                      <span className="truncate">{deal.title}</span>
+                                    </div>
+                                  </td>
                                   <td className="px-4 py-2">
                                     <div className="flex items-center gap-1.5">
                                       <span
@@ -456,7 +546,12 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
                 <tbody>
                   {sortedDeals.map((deal) => (
                     <tr key={deal.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-2.5 font-medium truncate max-w-[200px]">{deal.title}</td>
+                      <td className="px-4 py-2.5 font-medium max-w-[200px]">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <HealthDot health={deal.health} reason={deal.healthReason} />
+                          <span className="truncate">{deal.title}</span>
+                        </div>
+                      </td>
                       <td className="px-4 py-2.5 text-muted-foreground">{deal.agentName}</td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-1.5">
@@ -498,5 +593,31 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/**
+ * Indicator next to a deal title for its health state.
+ *
+ * On-track renders nothing (visual noise at 50+ deals). At-risk and stuck
+ * use BOTH colour and shape so the signal survives red/green colourblind
+ * vision — at 2px, tint alone was indistinguishable (audit finding):
+ *   - at-risk → filled amber dot (3x3).
+ *   - stuck   → filled rose dot (3x3) with a visible ring so the outline
+ *               reads even in monochrome.
+ */
+function HealthDot({ health, reason }: { health: PipelineDeal['health']; reason: string }) {
+  if (health === 'on-track') return null;
+  const isStuck = health === 'stuck';
+  const colorClass = isStuck
+    ? 'bg-rose-500 ring-2 ring-rose-300 dark:ring-rose-900'
+    : 'bg-amber-500';
+  const label = isStuck ? 'Stuck' : 'At risk';
+  return (
+    <span
+      className={`inline-block w-3 h-3 rounded-full flex-shrink-0 ${colorClass}`}
+      title={reason ? `${label} — ${reason}` : label}
+      aria-label={reason ? `${label}: ${reason}` : label}
+    />
   );
 }

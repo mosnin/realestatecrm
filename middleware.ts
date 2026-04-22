@@ -56,6 +56,8 @@ const isFullyPublicRoute = createRouteMatcher([
   '/apply/b/(.*)',
   '/book/(.*)',
   '/status/(.*)',
+  '/packet/(.*)',            // tokenised listing-packet share pages (Phase 11)
+  '/api/packet/(.*)',        // token-scoped signed-URL endpoint for packet docs
   '/api/public/(.*)',
   '/api/webhooks/(.*)',
   '/api/mcp',

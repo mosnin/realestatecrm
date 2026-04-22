@@ -2,6 +2,7 @@ import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
+import { dealHealth } from '@/lib/deals/health';
 import type { Metadata } from 'next';
 import {
   PipelineClient,
@@ -40,11 +41,13 @@ export default async function BrokerPipelinePage() {
     realtors.push({ userId: m.userId, name });
   }
 
-  // Fetch all deals across realtor spaces
+  // Fetch all deals across realtor spaces. The health classifier needs
+  // followUpAt / nextAction / nextActionDueAt alongside the card fields,
+  // so we pull those here and reuse the same rows for both.
   const { data: dealsRaw } = spaceIds.length > 0
     ? await supabase
         .from('Deal')
-        .select('id, spaceId, title, description, value, address, priority, closeDate, stageId, status, createdAt, updatedAt')
+        .select('id, spaceId, title, description, value, address, priority, closeDate, stageId, status, createdAt, updatedAt, followUpAt, nextAction, nextActionDueAt')
         .in('spaceId', spaceIds)
         .limit(5000)
     : { data: [] };
@@ -88,6 +91,9 @@ export default async function BrokerPipelinePage() {
     status: string;
     createdAt: string;
     updatedAt: string;
+    followUpAt: string | null;
+    nextAction: string | null;
+    nextActionDueAt: string | null;
   };
 
   const now = new Date();
@@ -97,12 +103,28 @@ export default async function BrokerPipelinePage() {
   let activeDeals = 0;
   let dealsWonThisMonth = 0;
   let dealsLostThisMonth = 0;
+  let atRiskCount = 0;
+  let stuckCount = 0;
+  // Per-agent risk rollup so the dashboard can surface "Alice has 3 stuck
+  // deals" at a glance without the broker pivoting through every card.
+  const riskByAgent = new Map<string, { agentName: string; atRisk: number; stuck: number }>();
 
   const deals: PipelineDeal[] = [];
 
   for (const d of (dealsRaw ?? []) as DealRow[]) {
     const realtor = spaceToRealtor.get(d.spaceId);
     const stage = stageMap.get(d.stageId);
+
+    // Classify deal health — dealHealth() already returns 'on-track' for
+    // non-active deals, so we always call it and let it decide.
+    const health = dealHealth({
+      status: d.status as 'active' | 'won' | 'lost' | 'on_hold',
+      updatedAt: d.updatedAt,
+      closeDate: d.closeDate,
+      followUpAt: d.followUpAt,
+      nextAction: d.nextAction,
+      nextActionDueAt: d.nextActionDueAt,
+    });
 
     const deal: PipelineDeal = {
       id: d.id,
@@ -116,6 +138,8 @@ export default async function BrokerPipelinePage() {
       agentName: realtor?.name ?? 'Unknown',
       agentUserId: realtor?.userId ?? '',
       createdAt: d.createdAt,
+      health: health.state,
+      healthReason: health.reason,
     };
 
     deals.push(deal);
@@ -124,6 +148,20 @@ export default async function BrokerPipelinePage() {
     if (d.status === 'active' || d.status === 'on_hold') {
       totalPipelineValue += d.value ?? 0;
       activeDeals += 1;
+    }
+
+    if (health.state === 'at-risk' || health.state === 'stuck') {
+      if (health.state === 'at-risk') atRiskCount += 1;
+      else stuckCount += 1;
+      const key = realtor?.userId ?? 'unknown';
+      const row = riskByAgent.get(key) ?? {
+        agentName: realtor?.name ?? 'Unknown',
+        atRisk: 0,
+        stuck: 0,
+      };
+      if (health.state === 'at-risk') row.atRisk += 1;
+      else row.stuck += 1;
+      riskByAgent.set(key, row);
     }
 
     const updatedAt = new Date(d.updatedAt);
@@ -140,6 +178,12 @@ export default async function BrokerPipelinePage() {
     activeDeals,
     dealsWonThisMonth,
     dealsLostThisMonth,
+    atRiskCount,
+    stuckCount,
+    // Sort descending by stuck then at-risk so the worst agent lands first.
+    agentRisk: Array.from(riskByAgent.values()).sort(
+      (a, b) => b.stuck - a.stuck || b.atRisk - a.atRisk,
+    ),
   };
 
   return (

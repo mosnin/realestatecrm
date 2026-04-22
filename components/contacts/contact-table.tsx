@@ -32,9 +32,20 @@ import {
   GitCompare,
   CalendarDays,
   ArrowUpDown,
+  MoreHorizontal,
+  Users,
+  Inbox,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ApplicationCompare } from './application-compare';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { downloadCSV } from '@/lib/csv';
 import type { SavedView } from '@/lib/types';
@@ -433,8 +444,8 @@ export function ContactTable({ slug }: ContactTableProps) {
       </div>
 
       {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-2.5">
-        <div className="relative flex-1">
+      <div className="flex flex-row gap-2.5">
+        <div className="relative flex-1 min-w-0">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search clients..."
@@ -443,7 +454,74 @@ export function ContactTable({ slug }: ContactTableProps) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-2 flex-wrap">
+
+        {/* Mobile overflow menu — Sort / Filter / Save view / Import / Export */}
+        <div className="sm:hidden flex-shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="h-9 px-2.5" title="More options">
+                <MoreHorizontal size={15} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Sort</div>
+              {([
+                { value: 'newest', label: 'Newest first' },
+                { value: 'oldest', label: 'Oldest first' },
+                { value: 'name-az', label: 'Name A-Z' },
+                { value: 'name-za', label: 'Name Z-A' },
+              ] as const).map((opt) => (
+                <DropdownMenuItem
+                  key={opt.value}
+                  onSelect={() => setSortBy(opt.value)}
+                  className={cn(sortBy === opt.value && 'font-semibold')}
+                >
+                  <ArrowUpDown size={12} />
+                  {opt.label}
+                </DropdownMenuItem>
+              ))}
+              {(view === 'list' || search) && (
+                <>
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Stage</div>
+                  {([
+                    { value: 'ALL', label: 'All stages' },
+                    { value: 'QUALIFICATION', label: 'Qualifying' },
+                    { value: 'TOUR', label: 'Tour' },
+                    { value: 'APPLICATION', label: 'Applied' },
+                  ] as const).map((opt) => (
+                    <DropdownMenuItem
+                      key={opt.value}
+                      onSelect={() => setTypeFilter(opt.value)}
+                      className={cn(typeFilter === opt.value && 'font-semibold')}
+                    >
+                      {opt.label}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setShowSaveInput(true)}>
+                <Bookmark size={12} />
+                Save view
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setImportOpen(true)}>
+                <Upload size={12} />
+                Import
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => handleExportAll()}
+                disabled={contacts.length === 0}
+              >
+                <Download size={12} />
+                Export
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Desktop controls — unchanged layout at sm+ */}
+        <div className="hidden sm:flex gap-2 flex-wrap">
           {/* Sort dropdown */}
           <div className="relative">
             <select
@@ -530,81 +608,138 @@ export function ContactTable({ slug }: ContactTableProps) {
             <Download size={12} />
             Export
           </Button>
-
-          {/* View toggle */}
-          <div className="flex rounded-md border border-border overflow-hidden bg-card">
-            <button
-              type="button"
-              onClick={() => setView('list')}
-              className={cn(
-                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
-                view === 'list'
-                  ? 'bg-secondary text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-              )}
-            >
-              <List size={15} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('card')}
-              className={cn(
-                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
-                view === 'card'
-                  ? 'bg-secondary text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-              )}
-            >
-              <LayoutGrid size={15} />
-            </button>
-          </div>
-
-          <LiquidMetalButton
-            label="Add client"
-            onClick={() => setAddOpen(true)}
-          />
         </div>
+
+        {/* View toggle — visible at all breakpoints */}
+        <div className="flex rounded-md border border-border overflow-hidden bg-card flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setView('list')}
+            className={cn(
+              'px-2.5 py-1.5 flex items-center justify-center transition-colors',
+              view === 'list'
+                ? 'bg-secondary text-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+            )}
+          >
+            <List size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('card')}
+            className={cn(
+              'px-2.5 py-1.5 flex items-center justify-center transition-colors',
+              view === 'card'
+                ? 'bg-secondary text-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+            )}
+          >
+            <LayoutGrid size={15} />
+          </button>
+        </div>
+
+        <LiquidMetalButton
+          label="Add client"
+          onClick={() => setAddOpen(true)}
+        />
       </div>
 
-      {/* Loading skeleton */}
+      {/* Loading skeleton — matches final full-width row layout */}
       {loading && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="rounded-lg border border-border bg-card px-5 py-4 animate-pulse">
-              <div className="flex gap-3">
-                <div className="w-9 h-9 rounded-full bg-muted flex-shrink-0" />
-                <div className="flex-1 space-y-2 pt-1">
-                  <div className="h-3.5 bg-muted rounded w-3/4" />
-                  <div className="h-3 bg-muted rounded w-1/2" />
-                </div>
-              </div>
+        <div className="rounded-lg border border-border overflow-hidden bg-card divide-y divide-border">
+          {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3 h-[56px]">
+              <Skeleton className="h-4 w-4 rounded-sm flex-shrink-0" />
+              <Skeleton className="h-7 w-7 rounded-full flex-shrink-0" />
+              <Skeleton className="h-3.5 w-32 sm:w-40 flex-shrink-0" />
+              <Skeleton className="h-5 w-16 rounded-full hidden sm:block flex-shrink-0" />
+              <Skeleton className="h-3 flex-1 max-w-[220px] hidden sm:block" />
+              <Skeleton className="h-3 w-16 hidden md:block flex-shrink-0" />
+              <Skeleton className="h-3 w-28 hidden lg:block flex-shrink-0" />
+              <Skeleton className="ml-auto h-3 w-12 hidden xl:block flex-shrink-0" />
             </div>
           ))}
         </div>
       )}
 
-      {/* Empty state */}
-      {!loading && visibleContacts.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-border bg-card py-16 text-center px-6">
-          <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-            <Search size={20} className="text-muted-foreground" />
+      {/* Empty state — context-aware */}
+      {!loading && visibleContacts.length === 0 && (() => {
+        const hasStageFilter = typeFilter !== 'ALL';
+        const hasLeadTypeFilter = leadTypeFilter !== 'all';
+        const hasTagFilter = !!tagFilter;
+        const hasAnyFilter = hasStageFilter || hasLeadTypeFilter || hasTagFilter;
+        const isSearchOrFilterCase = !!search || hasTagFilter;
+        // When no search and no tag filter, `contacts` holds the API result filtered
+        // only by stage (server-side). If a server-side filter OR lead-type filter
+        // produced an empty view while contacts exist otherwise, treat it as a
+        // "this view" case. If everything is unset and contacts is empty, the
+        // workspace is fresh.
+        const isFreshWorkspace = !search && !hasAnyFilter && contacts.length === 0;
+        const clearAllFilters = () => {
+          setTypeFilter('ALL');
+          setLeadTypeFilter('all');
+          setTagFilter('');
+        };
+
+        if (isFreshWorkspace) {
+          return (
+            <div className="rounded-2xl border border-dashed border-border bg-card py-16 text-center px-6">
+              <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                <Users size={20} className="text-muted-foreground" />
+              </div>
+              <p className="font-semibold text-foreground mb-1">No contacts yet</p>
+              <p className="text-sm text-muted-foreground">
+                Add one or import a list to get started.
+              </p>
+              <div className="mt-4 flex gap-2 justify-center">
+                <Button onClick={() => setAddOpen(true)} className="gap-2" size="sm">
+                  <Plus size={14} /> Add contact
+                </Button>
+                <Button onClick={() => setImportOpen(true)} className="gap-2" size="sm" variant="outline">
+                  <Upload size={14} /> Import
+                </Button>
+              </div>
+            </div>
+          );
+        }
+
+        if (isSearchOrFilterCase) {
+          return (
+            <div className="rounded-2xl border border-dashed border-border bg-card py-16 text-center px-6">
+              <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                <Search size={20} className="text-muted-foreground" />
+              </div>
+              <p className="font-semibold text-foreground mb-1">No matches for that search</p>
+              <p className="text-sm text-muted-foreground">
+                Try a shorter query or clear filters.
+              </p>
+              {hasAnyFilter && (
+                <Button onClick={clearAllFilters} className="mt-4 gap-2" size="sm" variant="outline">
+                  <X size={14} /> Clear filters
+                </Button>
+              )}
+            </div>
+          );
+        }
+
+        // Filters cleared of search/tag but stage or lead-type filter hides everything.
+        return (
+          <div className="rounded-2xl border border-dashed border-border bg-card py-16 text-center px-6">
+            <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+              <Inbox size={20} className="text-muted-foreground" />
+            </div>
+            <p className="font-semibold text-foreground mb-1">This view has no matches right now</p>
+            <p className="text-sm text-muted-foreground">
+              Adjust the current filters to see more contacts.
+            </p>
+            {hasAnyFilter && (
+              <Button onClick={clearAllFilters} className="mt-4 gap-2" size="sm" variant="outline">
+                <X size={14} /> Clear filters
+              </Button>
+            )}
           </div>
-          <p className="font-semibold text-foreground mb-1">No clients found</p>
-          <p className="text-sm text-muted-foreground">
-            {tagFilter ? `No clients tagged "${tagFilter}".` : search ? `No clients match "${search}".` : 'Add your first client to get started.'}
-          </p>
-          {tagFilter && (
-            <Button onClick={() => setTagFilter('')} className="mt-4 gap-2" size="sm" variant="outline">
-              <X size={14} /> Clear filter
-            </Button>
-          )}
-          {!search && !tagFilter && (
-            <Button onClick={() => setAddOpen(true)} className="mt-4 gap-2" size="sm">
-              <Plus size={14} /> Add client
-            </Button>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Card view — stage-grouped ── */}
       {!loading && visibleContacts.length > 0 && view === 'card' && (

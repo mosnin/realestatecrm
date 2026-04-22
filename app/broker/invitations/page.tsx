@@ -6,6 +6,7 @@ import { InviteForm } from '@/components/broker/invite-form';
 import { InviteCodeCard } from '@/components/broker/invite-code-card';
 import { RevokeInviteButton } from '@/components/broker/revoke-invite-button';
 import { BulkInviteForm } from '@/components/broker/bulk-invite-form';
+import { getSeatUsage } from '@/lib/brokerage-seats';
 
 const statusBadge = (status: string) => {
   switch (status) {
@@ -22,11 +23,17 @@ export default async function BrokerInvitationsPage() {
   const ctx = await getBrokerContext();
   if (!ctx) redirect('/');
 
-  const { data: invitations } = await supabase
-    .from('Invitation')
-    .select('*')
-    .eq('brokerageId', ctx.brokerage.id)
-    .order('createdAt', { ascending: false });
+  // Pull seat usage alongside invitations so the forms can render capacity
+  // inline (and disable submit when at cap) instead of only reacting to the
+  // 402 server response. Parallel for speed.
+  const [{ data: invitations }, seatUsage] = await Promise.all([
+    supabase
+      .from('Invitation')
+      .select('*')
+      .eq('brokerageId', ctx.brokerage.id)
+      .order('createdAt', { ascending: false }),
+    getSeatUsage(ctx.brokerage.id),
+  ]);
 
   const invs = (invitations ?? []) as Array<{
     id: string;
@@ -58,11 +65,14 @@ const roleBadge = (role: string) =>
       <Card>
         <CardContent className="px-5 py-4 space-y-3">
           <p className="text-sm font-medium">Send an email invitation</p>
-          <InviteForm isOwner={ctx.membership.role === 'broker_owner'} />
+          <InviteForm
+            isOwner={ctx.membership.role === 'broker_owner'}
+            seatUsage={seatUsage}
+          />
         </CardContent>
       </Card>
 
-      <BulkInviteForm />
+      <BulkInviteForm seatUsage={seatUsage} />
 
       <div>
         <p className="text-sm font-semibold mb-3">Sent invitations</p>

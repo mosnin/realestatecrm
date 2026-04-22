@@ -56,6 +56,19 @@ export async function GET(req: NextRequest) {
     dealContactRows = data || [];
   }
 
+  // Fetch checklist items for these deals — used for the per-card progress chip.
+  // We only select the minimal fields needed for the summary (completedAt, dueAt,
+  // label) so the payload doesn't balloon with long custom labels.
+  let checklistRows: Array<{ dealId: string; completedAt: string | null; dueAt: string | null; label: string }> = [];
+  if (dealIds.length > 0) {
+    const { data, error: clError } = await supabase
+      .from('DealChecklistItem')
+      .select('dealId, completedAt, dueAt, label')
+      .in('dealId', dealIds);
+    if (clError) throw clError;
+    checklistRows = (data as typeof checklistRows) || [];
+  }
+
   // Group dealContacts by dealId
   const dcByDeal = new Map<string, any[]>();
   for (const dc of dealContactRows) {
@@ -68,6 +81,14 @@ export async function GET(req: NextRequest) {
     dcByDeal.set(dc.dealId, arr);
   }
 
+  // Group checklist items by dealId
+  const checklistByDeal = new Map<string, typeof checklistRows>();
+  for (const item of checklistRows) {
+    const arr = checklistByDeal.get(item.dealId) || [];
+    arr.push(item);
+    checklistByDeal.set(item.dealId, arr);
+  }
+
   // Group deals by stageId
   const dealsByStage = new Map<string, any[]>();
   for (const deal of dealRows) {
@@ -75,6 +96,7 @@ export async function GET(req: NextRequest) {
     arr.push({
       ...deal,
       dealContacts: dcByDeal.get(deal.id) || [],
+      checklist: checklistByDeal.get(deal.id) || [],
     });
     dealsByStage.set(deal.stageId, arr);
   }
@@ -88,8 +110,26 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(stages);
 }
 
+const VALID_STAGE_KINDS = ['lead', 'qualified', 'active', 'under_contract', 'closing', 'closed'] as const;
+
+/**
+ * Best-effort guess of a stage's semantic kind from its name. Used when a
+ * stage is created without an explicit `kind`. The check happens once at
+ * creation; the realtor can override it later via PATCH.
+ */
+function inferStageKind(name: string): (typeof VALID_STAGE_KINDS)[number] | null {
+  const n = name.toLowerCase();
+  if (/\b(closed|won|complete|done|funded)\b/.test(n)) return 'closed';
+  if (/\b(closing|escrow|clear.*close)\b/.test(n)) return 'closing';
+  if (/\b(under.?contract|pending|accepted|inspection|appraisal)\b/.test(n)) return 'under_contract';
+  if (/\b(qualified|pre.?approval|showing|touring|active)\b/.test(n)) return 'active';
+  if (/\b(qualif)\b/.test(n)) return 'qualified';
+  if (/\b(lead|new|prospect|inquiry|intake)\b/.test(n)) return 'lead';
+  return null;
+}
+
 export async function POST(req: NextRequest) {
-  const { slug, name, color, pipelineType, pipelineId } = await req.json();
+  const { slug, name, color, pipelineType, pipelineId, kind } = await req.json();
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
@@ -133,6 +173,11 @@ export async function POST(req: NextRequest) {
   const lastPosition = lastStageRows && lastStageRows.length > 0 ? lastStageRows[0].position : -1;
 
   const id = crypto.randomUUID();
+  // Explicit kind wins; otherwise try to infer from the stage name so we
+  // give the system a useful default without forcing a picker in the UI.
+  const safeKind = typeof kind === 'string' && (VALID_STAGE_KINDS as readonly string[]).includes(kind)
+    ? kind
+    : inferStageKind(name.trim());
   const insertData: Record<string, unknown> = {
     id,
     spaceId: space.id,
@@ -142,6 +187,7 @@ export async function POST(req: NextRequest) {
   };
   if (safePipelineId) insertData.pipelineId = safePipelineId;
   if (safePipelineType) insertData.pipelineType = safePipelineType;
+  if (safeKind) insertData.kind = safeKind;
 
   const { data: stage, error: insertError } = await supabase
     .from('DealStage')

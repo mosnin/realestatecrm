@@ -9,6 +9,7 @@ import {
   DragOverlay,
   DragStartEvent,
   PointerSensor,
+  useDndContext,
   useSensor,
   useSensors,
   closestCorners,
@@ -82,6 +83,8 @@ interface SortableKanbanColumnProps {
   onDeleteStage: (stage: DealStage) => void;
   onDealCreated: () => void;
   onStatusChange: (deal: DealWithRelations, status: 'won' | 'lost' | 'on_hold' | 'active') => void;
+  nextStage?: DealStage | null;
+  onAdvanceStage?: (deal: DealWithRelations, nextStageId: string) => void;
 }
 
 function SortableKanbanColumn({
@@ -93,6 +96,8 @@ function SortableKanbanColumn({
   onDeleteStage,
   onDealCreated,
   onStatusChange,
+  nextStage,
+  onAdvanceStage,
 }: SortableKanbanColumnProps) {
   const {
     attributes,
@@ -103,6 +108,19 @@ function SortableKanbanColumn({
     isDragging,
   } = useSortable({ id: `stage:${stage.id}` });
 
+  // Observe the global DnD state so we can highlight this column as a drop
+  // target when a deal card is hovering over it. We explicitly ignore the
+  // stage-column reorder drag (ids that start with `stage:`) — the highlight
+  // is only meaningful for card drops.
+  const { active, over } = useDndContext();
+  const activeId = active?.id?.toString() ?? null;
+  const overId = over?.id?.toString() ?? null;
+  const isDealDrag = !!activeId && !activeId.startsWith('stage:');
+  const overMatchesStage =
+    !!overId &&
+    (overId === stage.id || deals.some((d) => d.id === overId));
+  const isDropTarget = isDealDrag && overMatchesStage;
+
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -110,7 +128,15 @@ function SortableKanbanColumn({
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'rounded-xl transition-[box-shadow,background-color] duration-150',
+        isDropTarget &&
+          'ring-2 ring-inset ring-primary/70 bg-primary/5',
+      )}
+    >
       <KanbanColumn
         stage={stage}
         deals={deals}
@@ -120,6 +146,8 @@ function SortableKanbanColumn({
         onDeleteStage={onDeleteStage}
         onDealCreated={onDealCreated}
         onStatusChange={onStatusChange}
+        nextStage={nextStage}
+        onAdvanceStage={onAdvanceStage}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
     </div>
@@ -136,6 +164,28 @@ function formatCurrency(n: number | null) {
   if (n == null) return null;
   return _formatCurrency(n);
 }
+
+/**
+ * Pulls a human-readable error message from a failed API response.
+ * Routes in this app return `{ error: string }` on non-2xx. Falls back to
+ * the HTTP status text, then a generic label, if the body is empty/malformed.
+ */
+async function parseApiError(res: Response): Promise<string> {
+  try {
+    const data = await res.clone().json();
+    if (data && typeof data.error === 'string' && data.error.trim()) {
+      return data.error.trim();
+    }
+    if (data && typeof data.message === 'string' && data.message.trim()) {
+      return data.message.trim();
+    }
+  } catch {
+    // fall through to status-based message
+  }
+  return res.statusText || `Request failed (${res.status})`;
+}
+
+const NETWORK_ERROR_MSG = 'Network error — check your connection';
 
 interface KanbanBoardProps {
   slug: string;
@@ -283,7 +333,8 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         body: JSON.stringify({ slug, name, color: newStageColor, pipelineId }),
       });
       if (!res.ok) {
-        toast.error('Failed to create stage');
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't create stage: ${detail}`);
         return;
       }
       setAddingStage(false);
@@ -291,7 +342,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
       setNewStageColor('#6b7280');
       fetchData();
     } catch {
-      toast.error('Failed to create stage');
+      toast.error(`Couldn't create stage: ${NETWORK_ERROR_MSG}`);
     } finally {
       setAddingStageSubmitting(false);
     }
@@ -510,12 +561,13 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
           body: JSON.stringify({ stageIds }),
         });
         if (!res.ok) {
-          toast.error('Failed to save stage order');
+          const detail = await parseApiError(res);
+          toast.error(`Couldn't save stage order: ${detail}`);
           // Revert to the original order on failure
           setStages(previousStages);
         }
       } catch {
-        toast.error('Failed to save stage order');
+        toast.error(`Couldn't save stage order: ${NETWORK_ERROR_MSG}`);
         setStages(previousStages);
       } finally {
         // Flush any realtime refetch that was queued during the drag
@@ -536,6 +588,12 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
     );
     if (!targetStage) return;
 
+    // Capture the dragged deal's title up-front so the success toast can
+    // reference it even if `fetchData()` replaces the reference mid-flight.
+    const draggedDeal = targetStage.deals.find((d) => d.id === active.id)
+      ?? stages.flatMap((s) => s.deals).find((d) => d.id === active.id);
+    const dealTitle = draggedDeal?.title ?? 'Deal';
+
     const targetIndex = targetStage.deals.findIndex((d) => d.id === over.id);
     // When dropped onto the column droppable (not onto a deal), targetIndex is -1.
     // In that case place at end. After handleDragOver the dragged deal is already in
@@ -550,12 +608,13 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         body: JSON.stringify({ dealId: active.id, newStageId: targetStage.id, newPosition }),
       });
       if (res.ok) {
-        toast.success(`Deal moved to ${targetStage.name}`);
+        toast.success(`Moved "${dealTitle}" → ${targetStage.name}`);
       } else {
-        toast.error('Failed to move deal');
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't move deal: ${detail}`);
       }
     } catch {
-      toast.error('Failed to move deal');
+      toast.error(`Couldn't move deal: ${NETWORK_ERROR_MSG}`);
     } finally {
       fetchData();
       // Clear any queued realtime refetch since we just refetched
@@ -575,10 +634,11 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
       if (res.ok) {
         toast.success('Deal deleted');
       } else {
-        toast.error('Failed to delete deal');
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't delete deal: ${detail}`);
       }
     } catch {
-      toast.error('Failed to delete deal');
+      toast.error(`Couldn't delete deal: ${NETWORK_ERROR_MSG}`);
     }
     fetchData();
   }
@@ -615,10 +675,14 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
           submitting: false,
         });
       } else {
-        toast.error('Failed to delete stage');
+        const detail =
+          (typeof body?.error === 'string' && body.error.trim())
+            ? body.error.trim()
+            : res.statusText || `Request failed (${res.status})`;
+        toast.error(`Couldn't delete stage: ${detail}`);
       }
     } catch {
-      toast.error('Failed to delete stage');
+      toast.error(`Couldn't delete stage: ${NETWORK_ERROR_MSG}`);
     }
   }
 
@@ -634,7 +698,8 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         { method: 'DELETE' },
       );
       if (!res.ok) {
-        toast.error('Failed to delete stage');
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't delete stage: ${detail}`);
         setStageDelete((prev) => (prev ? { ...prev, submitting: false } : prev));
         return;
       }
@@ -644,7 +709,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
       setStageDelete(null);
       fetchData();
     } catch {
-      toast.error('Failed to delete stage');
+      toast.error(`Couldn't delete stage: ${NETWORK_ERROR_MSG}`);
       setStageDelete((prev) => (prev ? { ...prev, submitting: false } : prev));
     }
   }
@@ -686,7 +751,8 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        toast.error('Failed to update status');
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't update status: ${detail}`);
         // Roll back optimistic update
         fetchData();
       } else {
@@ -700,7 +766,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         fetchData();
       }
     } catch {
-      toast.error('Failed to update status');
+      toast.error(`Couldn't update status: ${NETWORK_ERROR_MSG}`);
       fetchData();
     } finally {
       setStatusChangePending(false);
@@ -716,6 +782,49 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
 
   function openAddDeal(stageId: string) {
     router.push(`/s/${slug}/deals/new?stageId=${stageId}`);
+  }
+
+  /**
+   * Advance a deal to the next stage. Uses the same reorder endpoint the drag
+   * handler uses so the server-side position rebalancing stays consistent.
+   * Optimistically moves the card, toasts on success/failure.
+   */
+  async function handleAdvanceStage(deal: DealWithRelations, nextStageId: string) {
+    const nextStage = stages.find((s) => s.id === nextStageId);
+    if (!nextStage) return;
+
+    // Optimistic move — pop from current stage, append to next stage.
+    setStages((prev) =>
+      prev.map((s) => {
+        if (s.id === deal.stageId) {
+          return { ...s, deals: s.deals.filter((d) => d.id !== deal.id) };
+        }
+        if (s.id === nextStageId) {
+          return { ...s, deals: [...s.deals, { ...deal, stageId: nextStageId, stage: nextStage }] };
+        }
+        return s;
+      }),
+    );
+
+    try {
+      const newPosition = nextStage.deals.length;
+      const res = await fetch('/api/deals/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealId: deal.id, newStageId: nextStageId, newPosition }),
+      });
+      if (res.ok) {
+        toast.success(`Advanced to ${nextStage.name}`);
+      } else {
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't advance deal: ${detail}`);
+      }
+    } catch {
+      toast.error(`Couldn't advance deal: ${NETWORK_ERROR_MSG}`);
+    } finally {
+      fetchData();
+      pendingRefetchRef.current = false;
+    }
   }
 
   // CSV export
@@ -761,12 +870,16 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
           contactIds: deal.dealContacts.map((dc) => dc.contactId),
         }),
       });
-      if (!res.ok) { toast.error('Failed to duplicate deal'); return; }
+      if (!res.ok) {
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't duplicate deal: ${detail}`);
+        return;
+      }
       const newDeal = await res.json();
       toast.success('Deal duplicated');
       router.push(`/s/${slug}/deals/${newDeal.id}`);
     } catch {
-      toast.error('Failed to duplicate deal');
+      toast.error(`Couldn't duplicate deal: ${NETWORK_ERROR_MSG}`);
     }
   }
 
@@ -796,12 +909,43 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
     if (!confirmed) return;
     setBulkPending(true);
     try {
-      await Promise.allSettled(ids.map((id) => fetch(`/api/deals/${id}`, { method: 'DELETE' })));
-      toast.success(`Deleted ${ids.length} deal${ids.length === 1 ? '' : 's'}`);
-      setSelectedDealIds(new Set());
+      const results = await Promise.allSettled(
+        ids.map((id) => fetch(`/api/deals/${id}`, { method: 'DELETE' })),
+      );
+
+      // Count network-level rejections separately from API-level failures so
+      // we can surface a useful detail in the error toast.
+      let networkFailures = 0;
+      const apiErrors: string[] = [];
+      for (const r of results) {
+        if (r.status === 'rejected') {
+          networkFailures += 1;
+          continue;
+        }
+        if (!r.value.ok) {
+          apiErrors.push(await parseApiError(r.value));
+        }
+      }
+
+      const failed = networkFailures + apiErrors.length;
+      if (failed === 0) {
+        toast.success(`Deleted ${ids.length} deal${ids.length === 1 ? '' : 's'}`);
+        setSelectedDealIds(new Set());
+      } else if (failed === ids.length) {
+        const detail = networkFailures === ids.length
+          ? NETWORK_ERROR_MSG
+          : apiErrors[0] ?? 'Unknown error';
+        toast.error(`Couldn't delete deals: ${detail}`);
+      } else {
+        const succeeded = ids.length - failed;
+        const detail = apiErrors[0] ?? NETWORK_ERROR_MSG;
+        toast.error(
+          `Deleted ${succeeded} of ${ids.length}; ${failed} failed: ${detail}`,
+        );
+      }
       fetchData();
     } catch {
-      toast.error('Failed to delete some deals');
+      toast.error(`Couldn't delete deals: ${NETWORK_ERROR_MSG}`);
     } finally {
       setBulkPending(false);
     }
@@ -812,7 +956,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
     const ids = Array.from(selectedDealIds);
     setBulkPending(true);
     try {
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         ids.map((id) =>
           fetch(`/api/deals/${id}`, {
             method: 'PATCH',
@@ -821,14 +965,43 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
           }),
         ),
       );
+
+      // Distinguish network-level rejections from API-level failures so the
+      // error toast can point the realtor at an actionable cause.
+      let networkFailures = 0;
+      const apiErrors: string[] = [];
+      for (const r of results) {
+        if (r.status === 'rejected') {
+          networkFailures += 1;
+          continue;
+        }
+        if (!r.value.ok) {
+          apiErrors.push(await parseApiError(r.value));
+        }
+      }
+
       const stageName = stages.find((s) => s.id === bulkStageTarget)?.name ?? '';
-      toast.success(`Moved ${ids.length} deal${ids.length === 1 ? '' : 's'} to ${stageName}`);
-      setBulkStagePicker(false);
-      setBulkStageTarget('');
-      setSelectedDealIds(new Set());
+      const failed = networkFailures + apiErrors.length;
+      if (failed === 0) {
+        toast.success(`Moved ${ids.length} deal${ids.length === 1 ? '' : 's'} to ${stageName}`);
+        setBulkStagePicker(false);
+        setBulkStageTarget('');
+        setSelectedDealIds(new Set());
+      } else if (failed === ids.length) {
+        const detail = networkFailures === ids.length
+          ? NETWORK_ERROR_MSG
+          : apiErrors[0] ?? 'Unknown error';
+        toast.error(`Couldn't move deals: ${detail}`);
+      } else {
+        const succeeded = ids.length - failed;
+        const detail = apiErrors[0] ?? NETWORK_ERROR_MSG;
+        toast.error(
+          `Moved ${succeeded} of ${ids.length} to ${stageName}; ${failed} failed: ${detail}`,
+        );
+      }
       fetchData();
     } catch {
-      toast.error('Failed to move some deals');
+      toast.error(`Couldn't move deals: ${NETWORK_ERROR_MSG}`);
     } finally {
       setBulkPending(false);
     }
@@ -1280,7 +1453,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
               strategy={horizontalListSortingStrategy}
             >
               <div className="flex gap-4 min-w-max items-start">
-                {filteredStages.map((stage) => (
+                {filteredStages.map((stage, idx) => (
                   <SortableKanbanColumn
                     key={stage.id}
                     stage={stage}
@@ -1291,6 +1464,8 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                     onDeleteStage={handleDeleteStage}
                     onDealCreated={fetchData}
                     onStatusChange={handleCardStatusChange}
+                    nextStage={filteredStages[idx + 1] ?? null}
+                    onAdvanceStage={handleAdvanceStage}
                   />
                 ))}
 

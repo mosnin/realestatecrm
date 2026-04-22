@@ -368,23 +368,23 @@ export default function IntakeCustomizePage() {
         </div>
       </div>
 
-      {/* Builder / Preview / Optimize / Test Scoring sub-tabs */}
+      {/* Builder / Preview / What-makes-a-good-lead / Try-it-out / Improve sub-tabs */}
       <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
         <TabsList>
           <TabsTrigger value="builder">
-            <Pencil size={14} className="mr-1.5" /> Builder
+            <Pencil size={14} className="mr-1.5" /> Questions
           </TabsTrigger>
           <TabsTrigger value="preview">
             <Eye size={14} className="mr-1.5" /> Preview
           </TabsTrigger>
-          <TabsTrigger value="optimize" title="Get AI-powered suggestions to improve your form based on real applicant data">
-            <Lightbulb size={14} className="mr-1.5" /> Suggestions
+          <TabsTrigger value="scoring" title="Tell the assistant what makes a good lead for you — which answers matter and how much.">
+            <Sparkles size={14} className="mr-1.5" /> What makes a good lead
           </TabsTrigger>
-          <TabsTrigger value="scoring" title="View and fine-tune the AI-generated scoring weights for each question">
-            <Sparkles size={14} className="mr-1.5" /> Scoring
+          <TabsTrigger value="test-scoring" title="See how a sample applicant would rank given your answers.">
+            <Gauge size={14} className="mr-1.5" /> Try it with a sample
           </TabsTrigger>
-          <TabsTrigger value="test-scoring" title="Try filling out your form as a test applicant to see what lead score they would get">
-            <Gauge size={14} className="mr-1.5" /> Score Simulator
+          <TabsTrigger value="optimize" title="Suggestions for how to ask better questions based on real applicants.">
+            <Lightbulb size={14} className="mr-1.5" /> Improve
           </TabsTrigger>
         </TabsList>
 

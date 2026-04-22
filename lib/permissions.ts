@@ -65,10 +65,18 @@ export async function getBrokerContext(): Promise<BrokerContext | null> {
 
   const { data: user } = await supabase
     .from('User')
-    .select('id')
+    .select('id, status')
     .eq('clerkId', session.userId)
     .maybeSingle();
   if (!user) return null;
+  // Same offboarding gate as requireAuth(). Broker routes use this helper
+  // (or getBrokerMemberContext below) without going through requireAuth,
+  // so the gate has to live here too — otherwise an offboarded user's
+  // broker-scoped sessions would keep working until their membership row
+  // eventually fell out of the DB. Resilient to a missing `status` column
+  // pre-BP1a migration: maybeSingle() returns { status: undefined } which
+  // is not === 'offboarded'.
+  if ((user as { status?: string }).status === 'offboarded') return null;
 
   // Fetch all broker-level memberships. A user may own one brokerage and
   // manage another — prefer broker_owner so they always land on their own brokerage.
@@ -116,10 +124,12 @@ export async function getBrokerMemberContext(): Promise<BrokerContext | null> {
 
   const { data: user } = await supabase
     .from('User')
-    .select('id')
+    .select('id, status')
     .eq('clerkId', session.userId)
     .maybeSingle();
   if (!user) return null;
+  // Offboarding gate — see getBrokerContext above for rationale.
+  if ((user as { status?: string }).status === 'offboarded') return null;
 
   const { data: memberships } = await supabase
     .from('BrokerageMembership')

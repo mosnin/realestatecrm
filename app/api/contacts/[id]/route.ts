@@ -125,6 +125,18 @@ export async function PATCH(
     if (body.followUpAt !== undefined) updates.followUpAt = body.followUpAt;
     if (body.lastContactedAt !== undefined) updates.lastContactedAt = body.lastContactedAt;
     if (body.sourceLabel !== undefined) updates.sourceLabel = body.sourceLabel ? String(body.sourceLabel).slice(0, 200) : null;
+    if (body.referralSource !== undefined) {
+      updates.referralSource = body.referralSource ? String(body.referralSource).trim().slice(0, 200) : null;
+    }
+    if (body.snoozedUntil !== undefined) {
+      if (body.snoozedUntil === null || body.snoozedUntil === '') {
+        updates.snoozedUntil = null;
+      } else {
+        const d = new Date(body.snoozedUntil);
+        if (isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid snoozedUntil' }, { status: 400 });
+        updates.snoozedUntil = d.toISOString();
+      }
+    }
 
     if (body.budget !== undefined) {
       const budgetVal = body.budget != null && body.budget !== '' ? parseFloat(body.budget) : null;

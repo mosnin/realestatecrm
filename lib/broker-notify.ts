@@ -4,13 +4,15 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 
 export type BrokerNotificationType =
   | 'member_joined'
   | 'member_removed'
   | 'deal_won'
   | 'deal_created'
-  | 'lead_hot';
+  | 'lead_hot'
+  | 'review_requested';
 
 export interface NotifyBrokerParams {
   brokerageId: string;
@@ -34,6 +36,6 @@ export async function notifyBroker(params: NotifyBrokerParams): Promise<void> {
       read: false,
     });
   } catch (err) {
-    console.error('[broker-notify] failed to create notification', { err, type, brokerageId });
+    logger.error('[broker-notify] failed to create notification', { type, brokerageId }, err);
   }
 }

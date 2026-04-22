@@ -27,6 +27,12 @@ interface DealInlineFieldProps {
   min?: number;
   max?: number;
   step?: number;
+  /**
+   * Fires after a successful PATCH with the new and previous values. Lets the
+   * caller run a side-effect (e.g. offer to shift the checklist when closeDate
+   * moves) without duplicating the inline-edit UI.
+   */
+  onSaved?: (next: string | number | null, previous: string | number | null) => void;
 }
 
 export function DealInlineField({
@@ -42,6 +48,7 @@ export function DealInlineField({
   min,
   max,
   step,
+  onSaved,
 }: DealInlineFieldProps) {
   const [value, setValue] = useState<string | number | null>(initialValue);
   const [editing, setEditing] = useState(false);
@@ -93,20 +100,31 @@ export function DealInlineField({
     setSaving(true);
 
     try {
-      const res = await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: next }),
-      });
-      if (!res.ok) throw new Error('Failed to save');
-    } catch {
-      setValue(previous);
-      toast.error(`Failed to update ${label.toLowerCase()}`);
+      let res: Response;
+      try {
+        res = await fetch(`/api/deals/${dealId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [field]: next }),
+        });
+      } catch {
+        setValue(previous);
+        toast.error('Network error — check your connection and try again.');
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({} as { error?: string; message?: string }));
+        const detail = body?.error || body?.message || `HTTP ${res.status}`;
+        setValue(previous);
+        toast.error(`Couldn't save: ${detail}`);
+        return;
+      }
+      onSaved?.(next, previous);
     } finally {
       setSaving(false);
       saveCalledRef.current = false;
     }
-  }, [draft, value, type, dealId, field, label]);
+  }, [draft, value, type, dealId, field, label, onSaved]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && type !== 'textarea') {

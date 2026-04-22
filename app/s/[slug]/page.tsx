@@ -17,6 +17,8 @@ import {
   BarChart3,
   UserPlus,
   ArrowRight,
+  Sparkles,
+  Inbox,
 } from 'lucide-react';
 import type { Metadata } from 'next';
 import { buildIntakeUrl } from '@/lib/intake';
@@ -25,6 +27,7 @@ import { timeAgo, formatCurrency } from '@/lib/formatting';
 import { FollowUpWidget, type FollowUpContact } from '@/components/dashboard/follow-up-widget';
 import { OnboardingChecklist } from '@/components/dashboard/onboarding-checklist';
 import { AgentInsightsWidget } from '@/components/agent/agent-insights-widget';
+import { logger } from '@/lib/logger';
 
 export async function generateMetadata({
   params,
@@ -68,14 +71,17 @@ export default async function DashboardPage({
   let contactCount = 0, dealCount = 0, newLeadCount = 0, totalLeads = 0, followUpDue = 0;
   let upcomingTourCount = 0;
   let buyerLeadCount = 0, rentalLeadCount = 0;
+  let pendingDraftCount = 0;
   let deals: { value: number | null; stageId: string }[] = [];
   let stages: { id: string; name: string; color: string; position: number; spaceId: string }[] = [];
   let recentLeads: { id: string; name: string; phone: string | null; budget: number | null; preferences: string | null; createdAt: Date; tags: string[]; leadScore: number | null; scoreLabel: string | null; scoringStatus: string | null }[] = [];
   let followUpContacts: FollowUpContact[] = [];
   let upcomingTours: { id: string; guestName: string; startsAt: string; endsAt: string; propertyAddress: string | null; status: string }[] = [];
+  let overdueNextActions: { id: string; title: string; nextAction: string; nextActionDueAt: string }[] = [];
+  let overdueChecklistItems: { id: string; label: string; dueAt: string; dealId: string; dealTitle: string }[] = [];
 
   try {
-    [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads, followUpDue, followUpContacts, upcomingTourCount, upcomingTours, buyerLeadCount, rentalLeadCount] =
+    [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads, followUpDue, followUpContacts, upcomingTourCount, upcomingTours, buyerLeadCount, rentalLeadCount, pendingDraftCount, overdueNextActions, overdueChecklistItems] =
       await Promise.all([
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).is('brokerageId', null).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
         supabase.from('Deal').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
@@ -90,9 +96,46 @@ export default async function DashboardPage({
         supabase.from('Tour').select('id, guestName, startsAt, endsAt, propertyAddress, status').eq('spaceId', space.id).gte('startsAt', new Date().toISOString()).in('status', ['scheduled', 'confirmed']).order('startsAt', { ascending: true }).limit(4).then(r => (r.data ?? []) as any[]),
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).is('brokerageId', null).eq('leadType', 'buyer').contains('tags', ['application-link']).then(r => r.count ?? 0),
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).is('brokerageId', null).eq('leadType', 'rental').contains('tags', ['application-link']).then(r => r.count ?? 0),
+        supabase.from('AgentDraft').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).eq('status', 'pending').then(r => r.count ?? 0),
+        // Deals with a realtor-authored next action that's overdue — surface in
+        // the Today inbox. Scoped to active deals only.
+        supabase
+          .from('Deal')
+          .select('id, title, nextAction, nextActionDueAt')
+          .eq('spaceId', space.id)
+          .eq('status', 'active')
+          .not('nextAction', 'is', null)
+          .not('nextActionDueAt', 'is', null)
+          .lte('nextActionDueAt', new Date().toISOString())
+          .order('nextActionDueAt', { ascending: true })
+          .limit(5)
+          .then(r => (r.data ?? []) as { id: string; title: string; nextAction: string; nextActionDueAt: string }[]),
+        // Overdue closing-checklist items. Join Deal so we can link to the
+        // right page. Filter client-side to only keep items whose deal is
+        // still active (Supabase REST doesn't support join-side filters
+        // without an RPC).
+        supabase
+          .from('DealChecklistItem')
+          .select('id, label, dueAt, dealId, Deal(title, status)')
+          .eq('spaceId', space.id)
+          .is('completedAt', null)
+          .not('dueAt', 'is', null)
+          .lte('dueAt', new Date().toISOString())
+          .order('dueAt', { ascending: true })
+          .limit(10)
+          .then((r) => ((r.data ?? []) as any[])
+            .filter((row) => row.Deal?.status === 'active')
+            .slice(0, 5)
+            .map((row) => ({
+              id: row.id as string,
+              label: row.label as string,
+              dueAt: row.dueAt as string,
+              dealId: row.dealId as string,
+              dealTitle: (row.Deal?.title as string) ?? 'Deal',
+            }))),
       ]);
   } catch (err) {
-    console.error('[space-home] DB queries failed', { slug, error: err });
+    logger.error('[space-home] DB queries failed', { slug }, err);
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <div className="text-center space-y-4 p-8">
@@ -124,51 +167,134 @@ export default async function DashboardPage({
   const intakeUrl = buildIntakeUrl(space.slug);
   const bookingUrl = intakeUrl.replace('/apply/', '/book/');
 
-  // Today's tours for Important Actions
+  // ── Today inbox: one unified stream of things that need attention ─────────
+  // Ordered by urgency: overdue → tours today → new leads → drafts awaiting review.
   const todayTours = upcomingTours.filter(t =>
     new Date(t.startsAt).toDateString() === new Date().toDateString()
   );
 
-  // Build Important Actions list
-  const importantActions: Array<{
+  type TodayItem = {
+    key: string;
     icon: React.ComponentType<{ size?: number; className?: string }>;
     iconBg: string;
     iconColor: string;
     title: string;
     sub: string;
     href: string;
-  }> = [];
+    cta: string;
+    urgent?: boolean;
+  };
+
+  const todayItems: TodayItem[] = [];
 
   if (followUpDue > 0) {
-    importantActions.push({
+    todayItems.push({
+      key: 'follow-ups',
       icon: Clock,
       iconBg: 'bg-red-50 dark:bg-red-500/10',
       iconColor: 'text-red-600 dark:text-red-400',
-      title: `${followUpDue} follow-up${followUpDue === 1 ? '' : 's'} due`,
-      sub: 'Overdue — needs attention',
+      title: `${followUpDue} follow-up${followUpDue === 1 ? '' : 's'} overdue`,
+      sub: 'These people were expecting to hear from you today.',
       href: `/s/${slug}/follow-ups`,
+      cta: 'Open',
+      urgent: true,
+    });
+  }
+  // Overdue next actions on deals — one row per deal up to 3, the rest rolled
+  // into a "deals" link.
+  const visibleNextActions = overdueNextActions.slice(0, 3);
+  for (const d of visibleNextActions) {
+    todayItems.push({
+      key: `next-${d.id}`,
+      icon: ArrowRight,
+      iconBg: 'bg-red-50 dark:bg-red-500/10',
+      iconColor: 'text-red-600 dark:text-red-400',
+      title: d.nextAction,
+      sub: `${d.title} · overdue`,
+      href: `/s/${slug}/deals/${d.id}`,
+      cta: 'Open',
+      urgent: true,
+    });
+  }
+  if (overdueNextActions.length > visibleNextActions.length) {
+    const rest = overdueNextActions.length - visibleNextActions.length;
+    todayItems.push({
+      key: 'next-actions-more',
+      icon: ArrowRight,
+      iconBg: 'bg-red-50 dark:bg-red-500/10',
+      iconColor: 'text-red-600 dark:text-red-400',
+      title: `${rest} more overdue deal ${rest === 1 ? 'action' : 'actions'}`,
+      sub: 'Open the deals board to triage.',
+      href: `/s/${slug}/deals`,
+      cta: 'Open',
+      urgent: true,
+    });
+  }
+  // Overdue closing-checklist items — each is a hard contractual deadline,
+  // so they appear prominently in red alongside other urgent rows.
+  for (const item of overdueChecklistItems.slice(0, 3)) {
+    const due = new Date(item.dueAt);
+    const days = Math.max(0, Math.round((Date.now() - due.getTime()) / 86_400_000));
+    todayItems.push({
+      key: `checklist-${item.id}`,
+      icon: Clock,
+      iconBg: 'bg-red-50 dark:bg-red-500/10',
+      iconColor: 'text-red-600 dark:text-red-400',
+      title: item.label,
+      sub: `${item.dealTitle} · ${days === 0 ? 'due today' : `${days} day${days === 1 ? '' : 's'} past`}`,
+      href: `/s/${slug}/deals/${item.dealId}?tab=checklist`,
+      cta: 'Open',
+      urgent: true,
+    });
+  }
+  if (overdueChecklistItems.length > 3) {
+    todayItems.push({
+      key: 'checklist-more',
+      icon: Clock,
+      iconBg: 'bg-red-50 dark:bg-red-500/10',
+      iconColor: 'text-red-600 dark:text-red-400',
+      title: `${overdueChecklistItems.length - 3} more overdue deadline${overdueChecklistItems.length - 3 === 1 ? '' : 's'}`,
+      sub: 'Open the deals board to triage.',
+      href: `/s/${slug}/deals`,
+      cta: 'Open',
+      urgent: true,
+    });
+  }
+  for (const t of todayTours.slice(0, 3)) {
+    const d = new Date(t.startsAt);
+    todayItems.push({
+      key: `tour-${t.id}`,
+      icon: CalendarDays,
+      iconBg: 'bg-indigo-50 dark:bg-indigo-500/10',
+      iconColor: 'text-indigo-600 dark:text-indigo-400',
+      title: `Tour with ${t.guestName} today`,
+      sub: `${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}${t.propertyAddress ? ` · ${t.propertyAddress}` : ''}`,
+      href: `/s/${slug}/tours`,
+      cta: 'View',
     });
   }
   if (newLeadCount > 0) {
-    importantActions.push({
+    todayItems.push({
+      key: 'new-leads',
       icon: PhoneIncoming,
       iconBg: 'bg-brand-subtle dark:bg-brand/10',
       iconColor: 'text-brand',
-      title: `${newLeadCount} new lead${newLeadCount === 1 ? '' : 's'}`,
-      sub: 'Unread · review now',
+      title: `${newLeadCount} new ${newLeadCount === 1 ? 'lead' : 'leads'} to review`,
+      sub: 'Fresh applications came in through your intake link.',
       href: `/s/${slug}/leads`,
+      cta: 'Review',
     });
   }
-  if (todayTours.length > 0) {
-    const t = todayTours[0];
-    const d = new Date(t.startsAt);
-    importantActions.push({
-      icon: CalendarDays,
-      iconBg: 'bg-muted',
-      iconColor: 'text-muted-foreground',
-      title: `Tour with ${t.guestName}`,
-      sub: `Today at ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`,
-      href: `/s/${slug}/tours`,
+  if (pendingDraftCount > 0) {
+    todayItems.push({
+      key: 'drafts',
+      icon: Sparkles,
+      iconBg: 'bg-violet-50 dark:bg-violet-500/10',
+      iconColor: 'text-violet-600 dark:text-violet-400',
+      title: `${pendingDraftCount} AI ${pendingDraftCount === 1 ? 'draft' : 'drafts'} waiting for you`,
+      sub: 'Review, edit, and send in one tap.',
+      href: `/s/${slug}/agent`,
+      cta: 'Review drafts',
     });
   }
 
@@ -183,55 +309,66 @@ export default async function DashboardPage({
     <div className="space-y-5 max-w-[1320px]">
 
       {/* ── 1. Hero ───────────────────────────────────────────────────── */}
-      <div className="relative rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
-        <div className="absolute inset-y-0 left-0 w-[3px] bg-brand/50 rounded-l-xl" />
-        <div className="flex items-center justify-between px-7 py-5">
-          <div>
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/60 mb-1.5">
-              {formatToday()}
-            </p>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              {getGreeting()}, {firstName}! 👋
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">Here&apos;s a look at your workspace</p>
-          </div>
-          <Link
-            href={`/s/${slug}/settings/profile`}
-            className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium bg-foreground text-background px-3.5 py-2 rounded-lg hover:bg-foreground/90 transition-colors flex-shrink-0"
-          >
-            Profile <ChevronRight size={12} />
-          </Link>
+      <div className="flex items-end justify-between gap-4 px-1">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/60 mb-1.5">
+            {formatToday()}
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            {getGreeting()}, {firstName}.
+          </h1>
         </div>
       </div>
 
-      {/* ── 2. Important Actions ──────────────────────────────────────── */}
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-2.5 px-0.5">
-          {importantActions.length > 0 ? `Important Actions (${importantActions.length})` : 'Status'}
-        </p>
-        {importantActions.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {importantActions.map((action) => (
-              <Link
-                key={action.title}
-                href={action.href}
-                className="group flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3.5 hover:bg-muted/30 transition-colors"
-              >
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${action.iconBg}`}>
-                  <action.icon size={16} className={action.iconColor} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground">{action.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{action.sub}</p>
-                </div>
-                <ChevronRight size={15} className="text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors flex-shrink-0" />
-              </Link>
-            ))}
+      {/* ── 2. Today inbox ────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Inbox size={14} className="text-muted-foreground" />
+            <h2 className="text-sm font-semibold">Today</h2>
+            {todayItems.length > 0 && (
+              <span className="text-[11px] text-muted-foreground">
+                {todayItems.length} {todayItems.length === 1 ? 'thing' : 'things'} to do
+              </span>
+            )}
+          </div>
+        </div>
+
+        {todayItems.length === 0 ? (
+          <div className="flex items-center gap-3 px-5 py-5">
+            <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center flex-shrink-0 text-emerald-600 dark:text-emerald-400 text-sm">✓</div>
+            <div>
+              <p className="text-sm font-medium">You&apos;re caught up.</p>
+              <p className="text-xs text-muted-foreground mt-0.5">No follow-ups, tours, or new leads needing attention right now.</p>
+            </div>
           </div>
         ) : (
-          <div className="flex items-center gap-3 bg-card border border-border rounded-xl px-5 py-3.5">
-            <div className="w-7 h-7 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center flex-shrink-0 text-emerald-600 dark:text-emerald-400 text-sm">✓</div>
-            <p className="text-sm text-muted-foreground">You&apos;re all caught up — no urgent actions right now.</p>
+          <div className="divide-y divide-border">
+            {todayItems.map((item) => (
+              <Link
+                key={item.key}
+                href={item.href}
+                className="group flex items-center gap-3 px-5 py-3.5 hover:bg-muted/30 transition-colors"
+              >
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${item.iconBg}`}>
+                  <item.icon size={16} className={item.iconColor} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-foreground truncate">{item.title}</p>
+                    {item.urgent && (
+                      <span className="inline-flex text-[10px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 leading-none flex-shrink-0">
+                        Overdue
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.sub}</p>
+                </div>
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0">
+                  {item.cta} <ArrowRight size={12} />
+                </span>
+              </Link>
+            ))}
           </div>
         )}
       </div>

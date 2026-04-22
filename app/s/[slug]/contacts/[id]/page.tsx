@@ -24,6 +24,7 @@ import {
 import type { Contact, ApplicationData, LeadScoreDetails, IntakeFormConfig } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
 import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-field';
+import { ContactLifecycleFields } from '@/components/contacts/contact-lifecycle-fields';
 import { FollowUpSuggestions } from '@/components/contacts/follow-up-suggestions';
 import { StageProgression } from '@/components/contacts/stage-progression';
 import { RescoreButton } from '@/components/contacts/rescore-button';
@@ -168,6 +169,12 @@ export default async function ClientDetailPage({
               />
             </div>
 
+            <ContactLifecycleFields
+              contactId={contact.id}
+              initialReferralSource={contact.referralSource ?? null}
+              initialSnoozedUntil={contact.snoozedUntil ? String(contact.snoozedUntil) : null}
+            />
+
             <div className="space-y-2 rounded-lg border border-border p-3">
               <p className="text-sm font-semibold">Pipeline stage</p>
               <div className="max-w-full overflow-x-auto pb-1">
@@ -186,16 +193,20 @@ export default async function ClientDetailPage({
               <Link href={tabHref('deals')} className={`${activeTab === 'deals' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Deals</Link>
             </div>
 
-      {/* Smart follow-up suggestions */}
+      {/* Next-best-action: AI suggestions + drafts surface at the top of Overview
+          so the realtor can approve/send without navigating to Intelligence. */}
       {activeTab === 'overview' && (
-      <FollowUpSuggestions
-        contactId={contact.id}
-        scoreLabel={contact.scoreLabel}
-        contactType={contact.type}
-        hasTours={contact.tours.length > 0}
-        hasDeals={contact.dealContacts.length > 0}
-        hasFollowUp={!!contact.followUpAt}
-      />
+        <>
+          <AgentContactPanel contactId={contact.id} slug={slug} />
+          <FollowUpSuggestions
+            contactId={contact.id}
+            scoreLabel={contact.scoreLabel}
+            contactType={contact.type}
+            hasTours={contact.tours.length > 0}
+            hasDeals={contact.dealContacts.length > 0}
+            hasFollowUp={!!contact.followUpAt}
+          />
+        </>
       )}
 
       {/* ── AI Lead Score Card ── */}

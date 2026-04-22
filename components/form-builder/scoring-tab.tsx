@@ -332,9 +332,9 @@ export function ScoringTab({
       const data = await res.json();
       onScoringModelChange(data.scoringModel);
       setHasUnsavedChanges(false);
-      toast.success('Scoring model generated and saved');
+      toast.success('Draft saved — tune it below if you want.');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to generate scoring model');
+      toast.error(err instanceof Error ? err.message : 'Could not draft one right now. Try again.');
     } finally {
       setGenerating(false);
     }
@@ -348,7 +348,7 @@ export function ScoringTab({
     try {
       await onSave(scoringModel);
       setHasUnsavedChanges(false);
-      toast.success('Scoring model saved');
+      toast.success('Saved.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save');
     } finally {
@@ -528,17 +528,17 @@ export function ScoringTab({
       <div className="space-y-6">
         <div className="rounded-xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center">
           <Sparkles size={32} className="mx-auto text-primary/60 mb-3" />
-          <h3 className="text-sm font-semibold mb-1.5">Generate Scoring Model</h3>
+          <h3 className="text-sm font-semibold mb-1.5">Teach the assistant what you look for</h3>
           <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed mb-4">
-            AI will analyze your form questions and create an optimal scoring model
-            that automatically weights each question based on its importance for
-            {leadType === 'rental' ? ' rental' : ' buyer'} lead qualification.
+            We&apos;ll read your questions and draft a starting point — which
+            answers count as a strong {leadType === 'rental' ? 'rental' : 'buyer'} lead
+            vs. a weak one. You can tune it afterwards.
           </p>
           <Button onClick={handleGenerate} disabled={generating}>
             {generating ? (
-              <><Loader2 size={14} className="mr-1.5 animate-spin" /> Generating...</>
+              <><Loader2 size={14} className="mr-1.5 animate-spin" /> Thinking…</>
             ) : (
-              <><Sparkles size={14} className="mr-1.5" /> Generate Scoring Model</>
+              <><Sparkles size={14} className="mr-1.5" /> Draft it for me</>
             )}
           </Button>
         </div>

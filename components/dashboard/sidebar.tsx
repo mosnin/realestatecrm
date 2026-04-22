@@ -29,6 +29,7 @@ import {
   Settings,
   Key,
   Shuffle,
+  GitBranch,
   CreditCard,
   Plus,
   Check,
@@ -129,6 +130,7 @@ const brokerSettingsNavSections = [
     label: 'Lead Management',
     items: [
       { href: '/broker/settings/auto-assignment', label: 'Auto-Assignment', icon: Shuffle, exact: false },
+      { href: '/broker/settings/routing-rules', label: 'Routing rules', icon: GitBranch, exact: false },
     ],
   },
   {
@@ -484,7 +486,7 @@ function WorkspaceSwitcher({
               <Briefcase size={14} className="text-foreground flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{spaceName}</p>
-                <p className="text-[10px] text-muted-foreground">Realtor Dashboard</p>
+                <p className="text-[10px] text-muted-foreground">My workspace</p>
               </div>
               {!isOnBrokerPage && (
                 <Check size={14} className="text-foreground flex-shrink-0" />
@@ -764,7 +766,7 @@ export function Sidebar({
 
         <WorkspaceSwitcher
           currentName={brokerageName ?? 'Brokerage'}
-          currentSubtitle="Brokerage Dashboard"
+          currentSubtitle="Brokerage view"
           currentIcon={Building2}
           slug={slug}
           spaceName={spaceName}
@@ -834,7 +836,7 @@ export function Sidebar({
       {/* Workspace switcher */}
       <WorkspaceSwitcher
         currentName={spaceName}
-        currentSubtitle="Realtor Dashboard"
+        currentSubtitle="My workspace"
         currentIcon={Briefcase}
         slug={slug}
         spaceName={spaceName}

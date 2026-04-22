@@ -18,6 +18,8 @@ import { z } from 'zod';
 import { getFormConfigs, getDefaultFormConfig } from '@/lib/form-builder';
 import { formConfigSchema, type FormQuestion } from '@/lib/form-config-schema';
 import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
+import { logger } from '@/lib/logger';
+import { routeBrokerageLead } from '@/lib/brokerage-routing';
 
 /** Parse budget/rent range strings to a midpoint number for the DB. */
 function parseBudgetToNumber(val: unknown): number | null {
@@ -108,7 +110,7 @@ async function fetchBrokerageFormConfig(
     const spaceConfig = leadType === 'buyer' ? dual.buyer : dual.rental;
     if (spaceConfig) return spaceConfig;
   } catch (err) {
-    console.warn('[apply/brokerage] form config fetch failed', { brokerageId, spaceId, leadType, err });
+    logger.warn('[apply/brokerage] form config fetch failed', { brokerageId, spaceId, leadType }, err);
   }
 
   return null;
@@ -281,7 +283,7 @@ export async function POST(req: NextRequest) {
   try {
     requestBody = await req.json();
   } catch (error) {
-    console.warn('[apply/brokerage] invalid JSON body', { error });
+    logger.warn('[apply/brokerage] invalid JSON body', undefined, error);
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
@@ -309,7 +311,7 @@ export async function POST(req: NextRequest) {
     if (!brokerage || brokerage.status !== 'active') {
       // Return a generic error for both invalid and not-found brokerages
       // to prevent ID enumeration attacks
-      console.warn('[apply/brokerage] invalid or inactive brokerage', { brokerageId: rawBrokerageId });
+      logger.warn('[apply/brokerage] invalid or inactive brokerage', { brokerageId: rawBrokerageId });
       return NextResponse.json({ error: 'Unable to process application. Please check the link and try again.' }, { status: 422 });
     }
 
@@ -337,7 +339,7 @@ export async function POST(req: NextRequest) {
       const fallbackSpace = ownerSpaces?.[0] ?? null;
       if ((ownerSpaces ?? []).length === 1 && fallbackSpace) {
         space = fallbackSpace;
-        console.warn('[apply/brokerage] using legacy owner-only space fallback', {
+        logger.warn('[apply/brokerage] using legacy owner-only space fallback', {
           brokerageId: brokerage.id,
           ownerId: brokerage.ownerId,
           spaceId: fallbackSpace.id,
@@ -346,7 +348,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!space) {
-      console.error('[apply/brokerage] broker owner has no space', {
+      logger.error('[apply/brokerage] broker owner has no space', {
         brokerageId: brokerage.id,
         ownerId: brokerage.ownerId,
       });
@@ -361,12 +363,11 @@ export async function POST(req: NextRequest) {
         formConfig = formConfigSchema.parse(formConfig);
       }
     } catch (err) {
-      console.warn('[apply/brokerage] form config invalid or fetch failed, falling back to legacy', {
+      logger.warn('[apply/brokerage] form config invalid or fetch failed, falling back to legacy', {
         brokerageId: brokerage.id,
         spaceId: space.id,
         leadType: resolvedLeadType,
-        err,
-      });
+      }, err);
       formConfig = null;
     }
 
@@ -386,12 +387,11 @@ export async function POST(req: NextRequest) {
           scoringModel = (scoringSettings as Record<string, unknown>)[scoringColumn] as ScoringModel | null;
         }
       } catch (err) {
-        console.warn('[apply/brokerage] scoring model fetch failed (non-fatal, will use legacy scoring)', {
+        logger.warn('[apply/brokerage] scoring model fetch failed (non-fatal, will use legacy scoring)', {
           spaceId: space.id,
           brokerageId: brokerage.id,
           leadType: resolvedLeadType,
-          err,
-        });
+        }, err);
       }
     }
 
@@ -410,7 +410,7 @@ export async function POST(req: NextRequest) {
 
     if (formConfig) {
       // ── Dynamic form config path ──────────────────────────────────────
-      console.log('[apply/brokerage] using dynamic form config', {
+      logger.debug('[apply/brokerage] using dynamic form config', {
         brokerageId: brokerage.id,
         spaceId: space.id,
         leadType: resolvedLeadType,
@@ -423,7 +423,7 @@ export async function POST(req: NextRequest) {
 
       const parsed = dynamicSchema.safeParse(requestBody);
       if (!parsed.success) {
-        console.warn('[apply/brokerage] dynamic validation failed', { issues: parsed.error.issues });
+        logger.warn('[apply/brokerage] dynamic validation failed', { issues: parsed.error.issues });
         return NextResponse.json({ error: 'Invalid submission data', issues: parsed.error.issues }, { status: 400 });
       }
 
@@ -452,7 +452,7 @@ export async function POST(req: NextRequest) {
       // ── Legacy path (backwards compatible) ────────────────────────────
       const parsed = brokerageApplicationSchema.safeParse(requestBody);
       if (!parsed.success) {
-        console.warn('[apply/brokerage] validation failed', { issues: parsed.error.issues });
+        logger.warn('[apply/brokerage] validation failed', { issues: parsed.error.issues });
         return NextResponse.json({ error: 'Invalid submission data' }, { status: 400 });
       }
 
@@ -502,10 +502,9 @@ export async function POST(req: NextRequest) {
       const lockResult = await redis.set(idempotencyKey, '1', { nx: true, ex: 120 });
       idempotencyLockAcquired = lockResult === 'OK';
     } catch (error) {
-      console.warn('[apply/brokerage] idempotency lock unavailable; using DB fallback', {
-        error,
+      logger.warn('[apply/brokerage] idempotency lock unavailable; using DB fallback', {
         spaceId: space.id,
-      });
+      }, error);
     }
 
     // ── Duplicate detection (5-minute window) ──────────────────────────────
@@ -551,7 +550,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!idempotencyLockAcquired) {
-      console.info('[apply/brokerage] proceeding without distributed lock', {
+      logger.info('[apply/brokerage] proceeding without distributed lock', {
         spaceId: space.id,
         brokerageId: brokerage.id,
         fingerprint,
@@ -572,13 +571,35 @@ export async function POST(req: NextRequest) {
       spaceBusinessName = spaceSetting?.businessName ?? null;
       intakeConfirmationEmail = spaceSetting?.intakeConfirmationEmail ?? null;
     } catch (err) {
-      console.warn('[apply/brokerage] failed to fetch space settings', { spaceId: space.id, err });
+      logger.warn('[apply/brokerage] failed to fetch space settings', { spaceId: space.id }, err);
     }
 
-    // ── Create Contact in the broker's space ───────────────────────────────
+    // ── Lead routing: if auto-assignment is on and an eligible agent ─────
+    // exists, insert into their space; otherwise fall back to the broker
+    // owner's space (current behaviour). `routeBrokerageLead` never throws
+    // — null → owner-space fallback. Pass the validated lead shape so the
+    // BP7d rules layer can match on leadType / budget / tags before
+    // falling back to round-robin/score.
+    const routing = await routeBrokerageLead(brokerage.id, {
+      leadType: contactLeadType,
+      budget: contactBudget,
+      tags: ['brokerage-lead', 'new-lead'],
+    });
+    const spaceIdForInsert = routing?.agentSpaceId ?? space.id;
+    if (routing) {
+      logger.info('[apply/brokerage] auto-assigned to agent', {
+        brokerageId: brokerage.id,
+        agentUserId: routing.agentUserId,
+        agentSpaceId: routing.agentSpaceId,
+        method: routing.method,
+        ruleId: routing.ruleId ?? null,
+      });
+    }
+
+    // ── Create Contact in the assigned agent's space (or owner fallback) ──
     const contactInsert: Record<string, unknown> = {
       id: crypto.randomUUID(),
-      spaceId: space.id,
+      spaceId: spaceIdForInsert,
       brokerageId: brokerage.id,
       name: contactName,
       email: contactEmail,
@@ -616,12 +637,17 @@ export async function POST(req: NextRequest) {
     if (insertError) throw insertError;
     const contact = contacts![0] as Contact;
 
-    console.info('[apply/brokerage] submission persisted', {
+    logger.info('[apply/brokerage] submission persisted', {
       contactId: contact.id,
-      spaceId: space.id,
+      spaceId: spaceIdForInsert,
+      ownerSpaceId: space.id,
       brokerageId: brokerage.id,
       dynamicForm: !!formConfigSnapshot,
       leadType: contactLeadType,
+      routed: routing !== null,
+      routingMethod: routing?.method ?? null,
+      routingRuleId: routing?.ruleId ?? null,
+      assignedUserId: routing?.agentUserId ?? null,
     });
 
     // ── Scoring + notification (awaited before response) ──────────────────
@@ -664,19 +690,18 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', contact.id);
       if (scoreUpdateError) {
-        console.error('[apply/brokerage] scoring update failed', {
+        logger.error('[apply/brokerage] scoring update failed', {
           contactId: contact.id,
-          scoreUpdateError,
-        });
+        }, scoreUpdateError);
       } else {
-        console.info('[apply/brokerage] scoring persisted', {
+        logger.info('[apply/brokerage] scoring persisted', {
           contactId: contact.id,
           scoringStatus: scoring.scoringStatus,
           scoreLabel: scoring.scoreLabel,
         });
       }
     } catch (error) {
-      console.error('[apply/brokerage] scoring failed', { contactId: contact.id, error });
+      logger.error('[apply/brokerage] scoring failed', { contactId: contact.id }, error);
       try {
         await supabase
           .from('Contact')
@@ -689,10 +714,9 @@ export async function POST(req: NextRequest) {
           })
           .eq('id', contact.id);
       } catch (fallbackErr) {
-        console.error('[apply/brokerage] fallback scoring state failed', {
+        logger.error('[apply/brokerage] fallback scoring state failed', {
           contactId: contact.id,
-          fallbackErr,
-        });
+        }, fallbackErr);
       }
     }
 
@@ -711,7 +735,7 @@ export async function POST(req: NextRequest) {
         source: 'brokerage-intake',
       },
     }).catch((err) => {
-      console.error('[apply/brokerage] brokerage notification failed', { contactId: contact.id, err });
+      logger.error('[apply/brokerage] brokerage notification failed', { contactId: contact.id }, err);
     });
 
     const applicantConfirmation = contactEmail
@@ -724,12 +748,12 @@ export async function POST(req: NextRequest) {
           leadType: contactLeadType,
           customMessage: intakeConfirmationEmail,
         }).catch((confirmErr) => {
-          console.error('[apply/brokerage] applicant confirmation email failed', { contactId: contact.id, confirmErr });
+          logger.error('[apply/brokerage] applicant confirmation email failed', { contactId: contact.id }, confirmErr);
         })
       : Promise.resolve();
 
     await Promise.all([brokerNotification, applicantConfirmation]);
-    console.log('[apply/brokerage] notifications dispatched');
+    logger.debug('[apply/brokerage] notifications dispatched', { contactId: contact.id });
 
     return NextResponse.json(
       {
@@ -740,10 +764,9 @@ export async function POST(req: NextRequest) {
       { status: 201 },
     );
   } catch (error) {
-    console.error('[apply/brokerage] unhandled submission failure', {
+    logger.error('[apply/brokerage] unhandled submission failure', {
       brokerageId: rawBrokerageId,
-      error,
-    });
+    }, error);
     return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 });
   }
 }

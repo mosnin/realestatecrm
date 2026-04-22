@@ -26,7 +26,7 @@ export function TeamActivityFeed() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/broker/activity', { signal: controller.signal })
+    fetch('/api/broker/team-activity', { signal: controller.signal })
       .then((r) => r.json())
       .then((d) => setActivities(d.activities ?? []))
       .catch((err) => { if (err.name !== 'AbortError') setActivities([]); })

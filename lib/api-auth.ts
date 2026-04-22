@@ -13,10 +13,45 @@ import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import type { Space } from '@/lib/types';
 
-/** Returns { userId } or a 401 NextResponse. */
+/**
+ * Returns { userId } or a 401/403 NextResponse.
+ *
+ * Brokerage offboarding status gate: after Clerk auth succeeds we look up the
+ * User row and reject with 403 if `status === 'offboarded'`. Offboarding is a
+ * hard-stop initiated by a broker_owner/broker_admin when an agent leaves the
+ * brokerage; their book of business has been reassigned and they must lose API
+ * access immediately, even though their Clerk session may still be valid. This
+ * is the single choke-point for API auth, so enforcing it here blocks every
+ * protected route uniformly. Resilience: if the User row is missing (user is
+ * mid-onboarding) or the `status` column isn't present yet (the migration
+ * adding it lands separately), we fall through as if active — this keeps the
+ * check safe to deploy ahead of the migration.
+ */
 export async function requireAuth(): Promise<{ userId: string } | NextResponse> {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Offboarding hard-stop — see JSDoc above. Wrapped in try/catch so that a
+  // missing `status` column (pre-migration) or transient DB issue does not
+  // brick auth; we only block on a definitive 'offboarded' signal.
+  try {
+    const { data: userRow } = await supabase
+      .from('User')
+      .select('id, status')
+      .eq('clerkId', userId)
+      .maybeSingle();
+
+    if (userRow && (userRow as { status?: string }).status === 'offboarded') {
+      return NextResponse.json(
+        { error: 'Your access has been revoked by your brokerage.', code: 'offboarded' },
+        { status: 403 },
+      );
+    }
+  } catch {
+    // Swallow: treat as active. The migration adding `status` may not have
+    // run yet, and we never want this lookup to break authenticated traffic.
+  }
+
   return { userId };
 }
 

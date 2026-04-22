@@ -113,7 +113,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold truncate">{pathname.startsWith('/broker') ? (brokerageName ?? 'Brokerage') : spaceName}</p>
-                        <p className="text-[10px] text-muted-foreground">{pathname.startsWith('/broker') ? 'Brokerage Dashboard' : 'Realtor Dashboard'}</p>
+                        <p className="text-[10px] text-muted-foreground">{pathname.startsWith('/broker') ? 'Brokerage view' : 'My workspace'}</p>
                       </div>
                       <ChevronDown size={14} className={cn('text-muted-foreground transition-transform', mobileSwitcherOpen && 'rotate-180')} />
                     </button>
@@ -132,7 +132,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{spaceName}</p>
-                            <p className="text-[10px] text-muted-foreground">Realtor Dashboard</p>
+                            <p className="text-[10px] text-muted-foreground">My workspace</p>
                           </div>
                           {!pathname.startsWith('/broker') && <Check size={14} className="text-foreground flex-shrink-0" />}
                         </Link>
@@ -166,7 +166,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate">{spaceName}</p>
-                      <p className="text-[10px] text-muted-foreground">Realtor Dashboard</p>
+                      <p className="text-[10px] text-muted-foreground">My workspace</p>
                     </div>
                   </div>
                 )}
