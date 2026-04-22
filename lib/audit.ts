@@ -29,7 +29,11 @@ export type AuditAction =
   | 'ACCESS'
   | 'LOGIN'
   | 'LOGOUT'
-  | 'ADMIN_ACTION';
+  | 'ADMIN_ACTION'
+  // Brokerage-specific lifecycle actions — kept in the union so callers
+  // don't have to cast. OFFBOARD covers the agent-offboarding transfer
+  // (Phase BP1); future brokerage phases can add more verbs here.
+  | 'OFFBOARD';
 
 export interface AuditParams {
   /** Clerk userId of the person performing the action */

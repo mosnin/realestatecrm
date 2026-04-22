@@ -2,9 +2,11 @@
 
 import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { CheckCircle2, AlertCircle, Search, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Search, X, UserMinus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { RemoveMemberButton } from '@/components/broker/remove-member-button';
 import { ChangeRoleButton } from '@/components/broker/change-role-button';
+import { OffboardMemberDialog } from '@/components/broker/offboard-member-dialog';
 
 interface Member {
   id: string;
@@ -44,6 +46,7 @@ export function MembersClient({
 }) {
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<RoleTab>('all');
+  const [offboardTargetId, setOffboardTargetId] = useState<string | null>(null);
 
   const adminCount = members.filter((m) => m.role === 'broker_admin' || m.role === 'broker_owner').length;
   const memberCount = members.filter((m) => m.role === 'realtor_member').length;
@@ -184,6 +187,15 @@ export function MembersClient({
                           currentRole={m.role}
                           memberName={m.userName ?? m.userEmail ?? 'this member'}
                         />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground flex-shrink-0"
+                          onClick={() => setOffboardTargetId(m.id)}
+                          title={`Offboard ${m.userName ?? m.userEmail ?? 'this member'}`}
+                        >
+                          <UserMinus size={13} />
+                        </Button>
                         <RemoveMemberButton
                           membershipId={m.id}
                           memberName={m.userName ?? m.userEmail ?? 'this member'}
