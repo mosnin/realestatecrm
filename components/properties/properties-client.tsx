@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Plus, Search, Home as HomeIcon, Loader2, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Property, PropertyListingStatus } from '@/lib/types';
 import { formatCurrency } from '@/lib/formatting';
 import { formatPropertyAddress, formatPropertyFacts, PROPERTY_LISTING_STATUS_OPTIONS } from '@/lib/properties';
+import { useRowNavigation } from '@/lib/hooks/use-row-navigation';
 import { PropertyForm } from './property-form';
 
 const STATUS_CLASS: Record<PropertyListingStatus, string> = {
@@ -24,6 +26,7 @@ interface Props {
 }
 
 export function PropertiesClient({ slug, initial }: Props) {
+  const router = useRouter();
   const [items, setItems] = useState<Property[]>(initial);
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState<PropertyListingStatus | 'all'>('all');
@@ -39,6 +42,12 @@ export function PropertiesClient({ slug, initial }: Props) {
       return hay.includes(query);
     });
   }, [items, q, statusFilter]);
+
+  // Keyboard row navigation: J/K + ↑/↓ + Enter to open the focused card.
+  const filteredIds = useMemo(() => filtered.map((p) => p.id), [filtered]);
+  const { focusedId, containerRef } = useRowNavigation(filteredIds, (id) => {
+    router.push(`/s/${slug}/properties/${id}`);
+  });
 
   async function onCreate(values: Partial<Property>) {
     setSubmitting(true);
@@ -76,6 +85,13 @@ export function PropertiesClient({ slug, initial }: Props) {
             className="w-full pl-8 pr-3 py-1.5 text-sm rounded-md border border-border bg-card"
           />
         </div>
+        <span className="hidden lg:inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+          <kbd className="font-mono bg-muted rounded px-1 py-0.5">J</kbd>
+          <kbd className="font-mono bg-muted rounded px-1 py-0.5">K</kbd>
+          to navigate,
+          <kbd className="font-mono bg-muted rounded px-1 py-0.5">↵</kbd>
+          to open
+        </span>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as PropertyListingStatus | 'all')}
@@ -133,14 +149,24 @@ export function PropertiesClient({ slug, initial }: Props) {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div
+          ref={containerRef}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+        >
           {filtered.map((p) => {
             const cover = p.photos[0];
+            const isFocused = focusedId === p.id;
             return (
               <Link
                 key={p.id}
                 href={`/s/${slug}/properties/${p.id}`}
-                className="group rounded-xl border border-border bg-card overflow-hidden hover:border-foreground transition-colors"
+                data-row-id={p.id}
+                className={cn(
+                  'group rounded-xl border bg-card overflow-hidden transition-colors',
+                  isFocused
+                    ? 'border-foreground ring-2 ring-foreground/20'
+                    : 'border-border hover:border-foreground',
+                )}
               >
                 <div className="aspect-[16/10] bg-muted overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
