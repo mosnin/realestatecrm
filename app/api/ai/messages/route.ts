@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabase
       .from('Message')
-      .select('id, role, content, createdAt')
+      .select('id, role, content, blocks, createdAt')
       .eq('conversationId', conversationId)
       .order('createdAt', { ascending: true })
       .limit(MESSAGE_LIMIT);

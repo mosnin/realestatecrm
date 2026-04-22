@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { ChatInterface } from '@/components/ai/chat-interface';
 import { AssistantTabs } from '@/components/assistant/assistant-tabs';
 import type { Conversation } from '@/lib/types';
+import type { MessageBlock } from '@/lib/ai-tools/blocks';
 
 export default async function AIPage({
   params
@@ -29,7 +30,7 @@ export default async function AIPage({
 
   // Load conversations for this space
   let conversations: Conversation[] = [];
-  let initialMessages: { role: 'user' | 'assistant'; content: string }[] = [];
+  let initialMessages: { role: 'user' | 'assistant'; content: string; blocks?: MessageBlock[] | null }[] = [];
   let initialConversationId: string | null = null;
 
   try {
@@ -48,13 +49,14 @@ export default async function AIPage({
       initialConversationId = latestConv.id;
       const { data: msgData } = await supabase
         .from('Message')
-        .select('role, content')
+        .select('role, content, blocks')
         .eq('conversationId', latestConv.id)
         .order('createdAt', { ascending: true })
         .limit(50);
-      initialMessages = ((msgData ?? []) as { role: string; content: string }[]).map((m) => ({
+      initialMessages = ((msgData ?? []) as { role: string; content: string; blocks: MessageBlock[] | null }[]).map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
+        blocks: m.blocks,
       }));
     }
   } catch {

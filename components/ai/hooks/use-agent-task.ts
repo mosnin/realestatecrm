@@ -1,0 +1,407 @@
+'use client';
+
+/**
+ * `useAgentTask` — the client-side driver for the on-demand agent.
+ *
+ * Owns the transcript state (a list of messages, each a block sequence),
+ * streams events from /api/ai/task and /api/ai/task/approve, and exposes
+ * send / approve / deny / abort as stable callbacks. Surrounding UI (the
+ * conversation sidebar, @-mention search, voice mode, ...) stays in the
+ * ChatInterface; this hook's only job is to run the loop.
+ *
+ * Stream → state mapping:
+ *   - `text_delta`          → append to the trailing text block.
+ *   - `tool_call_start`     → push a tool_call block with status=running.
+ *   - `tool_call_result`    → update the matching block with result + status.
+ *   - `permission_required` → surface the approval card via `pendingApproval`.
+ *   - `permission_resolved` → clear `pendingApproval`.
+ *   - `turn_complete`       → mark the trailing assistant message as saved.
+ *   - `error`               → surface via `error`, end the stream.
+ *
+ * When the user approves or denies, a SEPARATE fetch hits the approve
+ * endpoint; its events append to a fresh assistant message bubble (matching
+ * the server, which persists the continuation as its own Message row).
+ */
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { AgentEvent } from '@/lib/ai-tools/events';
+import type { MessageBlock, ToolCallBlock } from '@/lib/ai-tools/blocks';
+import { SSEParser } from '@/lib/ai-tools/client/parse-sse';
+import type { PermissionPromptData } from '@/components/ai/blocks/permission-prompt-view';
+
+export interface UiMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  blocks: MessageBlock[];
+  /** True while the assistant is actively streaming into this message. */
+  streaming?: boolean;
+}
+
+export interface UseAgentTaskOptions {
+  spaceSlug: string;
+  /** Current conversation, or null to have the hook create one on first send. */
+  conversationId: string | null;
+  /**
+   * Called when the hook creates a new conversation (first message of a
+   * fresh chat). Parent uses this to update the sidebar + keep future
+   * sends scoped to the same conversation.
+   */
+  onConversationCreated?: (conversationId: string) => void;
+}
+
+export interface UseAgentTaskResult {
+  messages: UiMessage[];
+  setMessages: React.Dispatch<React.SetStateAction<UiMessage[]>>;
+  isStreaming: boolean;
+  pendingApproval: PermissionPromptData | null;
+  liveCallIds: Set<string>;
+  error: string | null;
+  send: (text: string) => Promise<void>;
+  approve: (requestId: string, editedArgs?: Record<string, unknown>) => Promise<void>;
+  deny: (requestId: string) => Promise<void>;
+  /** Tear down an in-flight stream. Safe to call when nothing is running. */
+  abort: () => void;
+  clearError: () => void;
+}
+
+/** Short random id for UI-local message keys. */
+function newId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return Math.random().toString(36).slice(2);
+}
+
+export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
+  const { spaceSlug, conversationId: initialConversationId, onConversationCreated } = options;
+
+  const [messages, setMessages] = useState<UiMessage[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState<PermissionPromptData | null>(null);
+  const [liveCallIds, setLiveCallIds] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+
+  // Refs shadow the reactive state for places where we need the latest value
+  // synchronously without re-closing over it every render. We only sync
+  // the ref from props when the prop actually changes — otherwise the
+  // `ensureConversationId` path would see its own write overwritten on the
+  // very next render while the parent is still holding the old value.
+  const conversationIdRef = useRef(initialConversationId);
+  useEffect(() => {
+    conversationIdRef.current = initialConversationId;
+  }, [initialConversationId]);
+
+  const abortRef = useRef<AbortController | null>(null);
+  const streamingMsgIdRef = useRef<string | null>(null);
+
+  const clearError = useCallback(() => setError(null), []);
+
+  const abort = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
+
+  /**
+   * Apply one AgentEvent to the transcript state. The targeted assistant
+   * message is the one whose id matches `streamingMsgIdRef.current` — that
+   * ref is set when we start a new assistant turn and cleared on close.
+   */
+  const applyEvent = useCallback((event: AgentEvent) => {
+    switch (event.type) {
+      case 'text_delta': {
+        if (!event.delta) return;
+        const targetId = streamingMsgIdRef.current;
+        if (!targetId) return;
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== targetId) return m;
+            const last = m.blocks[m.blocks.length - 1];
+            if (last?.type === 'text') {
+              const updated = [...m.blocks];
+              updated[updated.length - 1] = { ...last, content: last.content + event.delta };
+              return { ...m, blocks: updated };
+            }
+            return { ...m, blocks: [...m.blocks, { type: 'text', content: event.delta }] };
+          }),
+        );
+        return;
+      }
+
+      case 'tool_call_start': {
+        const targetId = streamingMsgIdRef.current;
+        if (!targetId) return;
+        setLiveCallIds((s) => {
+          const next = new Set(s);
+          next.add(event.callId);
+          return next;
+        });
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== targetId) return m;
+            const block: ToolCallBlock = {
+              type: 'tool_call',
+              callId: event.callId,
+              name: event.name,
+              args: event.args,
+              status: 'complete', // placeholder; overridden by `live` prop during streaming
+              display: event.display,
+            };
+            return { ...m, blocks: [...m.blocks, block] };
+          }),
+        );
+        return;
+      }
+
+      case 'tool_call_result': {
+        setLiveCallIds((s) => {
+          if (!s.has(event.callId)) return s;
+          const next = new Set(s);
+          next.delete(event.callId);
+          return next;
+        });
+        setMessages((prev) =>
+          prev.map((m) => ({
+            ...m,
+            blocks: m.blocks.map((b) => {
+              if (b.type !== 'tool_call' || b.callId !== event.callId) return b;
+              return {
+                ...b,
+                status: event.ok ? 'complete' : 'error',
+                result: {
+                  ok: event.ok,
+                  summary: event.summary,
+                  data: event.data,
+                  error: event.error,
+                },
+              };
+            }),
+          })),
+        );
+        return;
+      }
+
+      case 'permission_required': {
+        setPendingApproval({
+          requestId: event.requestId,
+          callId: event.callId,
+          name: event.name,
+          args: event.args,
+          summary: event.summary,
+        });
+        return;
+      }
+
+      case 'permission_resolved': {
+        // Clear the prompt only if it still matches this requestId — a later
+        // event for a different pending call shouldn't nuke a fresh prompt.
+        setPendingApproval((prev) => (prev && prev.requestId === event.requestId ? null : prev));
+        return;
+      }
+
+      case 'turn_complete': {
+        const targetId = streamingMsgIdRef.current;
+        if (targetId) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === targetId ? { ...m, streaming: false } : m)),
+          );
+        }
+        return;
+      }
+
+      case 'error': {
+        setError(event.message);
+        return;
+      }
+    }
+  }, []);
+
+  /**
+   * Shared stream consumer. Opens a POST to `url` with `body`, applies every
+   * event, and returns when the stream ends. The caller is responsible for
+   * pushing the initial user message + starting the assistant turn.
+   */
+  const consumeStream = useCallback(
+    async (url: string, body: unknown) => {
+      abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setIsStreaming(true);
+      setError(null);
+
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          let message = `Request failed (${res.status})`;
+          try {
+            const parsed = (await res.json()) as { error?: string };
+            if (parsed?.error) message = parsed.error;
+          } catch {
+            /* non-JSON body */
+          }
+          setError(message);
+          // Drop the empty trailing assistant bubble we optimistically
+          // appended — leaving it around would show a phantom empty card
+          // under the error banner.
+          const targetId = streamingMsgIdRef.current;
+          if (targetId) {
+            setMessages((prev) =>
+              prev.filter(
+                (m) => !(m.id === targetId && m.role === 'assistant' && m.blocks.length === 0),
+              ),
+            );
+          }
+          return;
+        }
+
+        if (!res.body) {
+          setError('Empty response from server');
+          return;
+        }
+
+        const parser = new SSEParser();
+        const reader = res.body.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          for (const event of parser.feed(value)) applyEvent(event);
+        }
+        for (const event of parser.end()) applyEvent(event);
+      } catch (err) {
+        if ((err as { name?: string }).name === 'AbortError') return;
+        setError(err instanceof Error ? err.message : 'Network error');
+        const targetId = streamingMsgIdRef.current;
+        if (targetId) {
+          setMessages((prev) =>
+            prev.filter(
+              (m) => !(m.id === targetId && m.role === 'assistant' && m.blocks.length === 0),
+            ),
+          );
+        }
+      } finally {
+        abortRef.current = null;
+        streamingMsgIdRef.current = null;
+        setIsStreaming(false);
+        setLiveCallIds(new Set());
+      }
+    },
+    [abort, applyEvent],
+  );
+
+  /**
+   * Ensure we have a conversationId before opening a stream. The task route
+   * will create one for us if we don't pass one, but we have no way to read
+   * the new id back from the SSE stream — so we create it client-side first.
+   */
+  const ensureConversationId = useCallback(async (): Promise<string> => {
+    if (conversationIdRef.current) return conversationIdRef.current;
+    const res = await fetch('/api/ai/conversations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: spaceSlug }),
+    });
+    if (!res.ok) throw new Error('Could not start conversation');
+    const conv = (await res.json()) as { id: string };
+    conversationIdRef.current = conv.id;
+    onConversationCreated?.(conv.id);
+    return conv.id;
+  }, [spaceSlug, onConversationCreated]);
+
+  const send = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || isStreaming) return;
+
+      let convId: string;
+      try {
+        convId = await ensureConversationId();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not start conversation');
+        return;
+      }
+
+      const userMsg: UiMessage = {
+        id: newId(),
+        role: 'user',
+        blocks: [{ type: 'text', content: trimmed }],
+      };
+      const assistantMsgId = newId();
+      const assistantMsg: UiMessage = {
+        id: assistantMsgId,
+        role: 'assistant',
+        blocks: [],
+        streaming: true,
+      };
+      streamingMsgIdRef.current = assistantMsgId;
+      setMessages((prev) => [...prev, userMsg, assistantMsg]);
+      setPendingApproval(null);
+
+      await consumeStream('/api/ai/task', {
+        spaceSlug,
+        conversationId: convId,
+        message: trimmed,
+      });
+    },
+    [isStreaming, spaceSlug, ensureConversationId, consumeStream],
+  );
+
+  const approve = useCallback(
+    async (requestId: string, editedArgs?: Record<string, unknown>) => {
+      if (isStreaming) return;
+      // Start a new assistant bubble for the continuation. Matches the
+      // server's persistence model (it saves a second Message row).
+      const contId = newId();
+      const contMsg: UiMessage = {
+        id: contId,
+        role: 'assistant',
+        blocks: [],
+        streaming: true,
+      };
+      streamingMsgIdRef.current = contId;
+      setMessages((prev) => [...prev, contMsg]);
+
+      await consumeStream(`/api/ai/task/approve/${encodeURIComponent(requestId)}`, {
+        decision: 'approved',
+        ...(editedArgs ? { editedArgs } : {}),
+      });
+    },
+    [isStreaming, consumeStream],
+  );
+
+  const deny = useCallback(
+    async (requestId: string) => {
+      if (isStreaming) return;
+      const contId = newId();
+      const contMsg: UiMessage = {
+        id: contId,
+        role: 'assistant',
+        blocks: [],
+        streaming: true,
+      };
+      streamingMsgIdRef.current = contId;
+      setMessages((prev) => [...prev, contMsg]);
+
+      await consumeStream(`/api/ai/task/approve/${encodeURIComponent(requestId)}`, {
+        decision: 'denied',
+      });
+    },
+    [isStreaming, consumeStream],
+  );
+
+  return {
+    messages,
+    setMessages,
+    isStreaming,
+    pendingApproval,
+    liveCallIds,
+    error,
+    send,
+    approve,
+    deny,
+    abort,
+    clearError,
+  };
+}
