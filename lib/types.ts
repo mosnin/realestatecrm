@@ -176,6 +176,10 @@ export type Contact = {
   consentPrivacyPolicyUrl: string | null;
   formConfigSnapshot: IntakeFormConfig | null;
   formLeadType: 'rental' | 'buyer' | null;
+  /** Who sent this lead — free-form. Used for referral-fee tracking later. */
+  referralSource: string | null;
+  /** Hide this contact from the main People view until this date. */
+  snoozedUntil: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };

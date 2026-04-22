@@ -24,6 +24,7 @@ import {
 import type { Contact, ApplicationData, LeadScoreDetails, IntakeFormConfig } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
 import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-field';
+import { ContactLifecycleFields } from '@/components/contacts/contact-lifecycle-fields';
 import { FollowUpSuggestions } from '@/components/contacts/follow-up-suggestions';
 import { StageProgression } from '@/components/contacts/stage-progression';
 import { RescoreButton } from '@/components/contacts/rescore-button';
@@ -167,6 +168,12 @@ export default async function ClientDetailPage({
                 lastContactedAt={contact.lastContactedAt ? String(contact.lastContactedAt) : null}
               />
             </div>
+
+            <ContactLifecycleFields
+              contactId={contact.id}
+              initialReferralSource={contact.referralSource ?? null}
+              initialSnoozedUntil={contact.snoozedUntil ? String(contact.snoozedUntil) : null}
+            />
 
             <div className="space-y-2 rounded-lg border border-border p-3">
               <p className="text-sm font-semibold">Pipeline stage</p>

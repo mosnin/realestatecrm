@@ -15,12 +15,23 @@ export async function GET(req: NextRequest) {
 
   const search = req.nextUrl.searchParams.get('search') ?? '';
   const type = req.nextUrl.searchParams.get('type');
+  // Snooze hygiene: by default hide currently-snoozed contacts from the main
+  // People view. Callers that need them (e.g. a "Snoozed" tab, or the
+  // command palette fuzzy search) can pass ?includeSnoozed=1.
+  const includeSnoozed = req.nextUrl.searchParams.get('includeSnoozed') === '1';
+  const onlySnoozed = req.nextUrl.searchParams.get('onlySnoozed') === '1';
 
   let query = supabase
     .from('Contact')
     .select('*')
     .eq('spaceId', space.id)
     .is('brokerageId', null); // Exclude brokerage leads — those show on /broker/leads
+
+  if (!includeSnoozed && !onlySnoozed) {
+    query = query.or(`snoozedUntil.is.null,snoozedUntil.lte.${new Date().toISOString()}`);
+  } else if (onlySnoozed) {
+    query = query.gt('snoozedUntil', new Date().toISOString());
+  }
 
   if (search) {
     // Cap length to prevent expensive full-table-scan patterns
