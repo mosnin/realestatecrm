@@ -38,12 +38,19 @@ interface Props {
   deals: DealFollowUp[];
 }
 
-const SNOOZE_OPTIONS = [
-  { label: 'Later today', hours: 3 },
+export const SNOOZE_OPTIONS = [
+  { label: 'Later today', hours: 6 },
   { label: 'Tomorrow', hours: 24 },
-  { label: 'In 2 days', hours: 48 },
+  { label: 'In 3 days', hours: 72 },
   { label: 'Next week', hours: 168 },
 ] as const;
+
+/** Compute the ISO timestamp for a snooze option. Matches the inline math used
+ * in the follow-ups list (`new Date(Date.now() + hours*3600*1000)`) so quick
+ * buttons in other views produce identical values. */
+export function snoozeDateFromHours(hours: number): string {
+  return new Date(Date.now() + hours * 3600 * 1000).toISOString();
+}
 
 function getScoreBadge(scoreLabel: string | null) {
   if (!scoreLabel) return null;
