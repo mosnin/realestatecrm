@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, X, Pencil, ShieldCheck, Loader2 } from 'lucide-react';
+import { Check, X, Pencil, ShieldCheck, Loader2, Infinity as InfinityIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface PermissionPromptData {
@@ -17,6 +17,13 @@ interface PermissionPromptViewProps {
   /** Async approve — may return/throw; component shows a spinner until it settles. */
   onApprove: (requestId: string, editedArgs?: Record<string, unknown>) => Promise<void>;
   onDeny: (requestId: string) => Promise<void>;
+  /**
+   * Phase 4c — "Always allow <tool> for this chat". When provided, we render
+   * a third button that trusts the tool for the remainder of this conversation
+   * and then fires approve for the current call. Omit if auto-approval isn't
+   * supported in the host context (e.g. an external embed).
+   */
+  onAlwaysAllow?: (requestId: string, editedArgs?: Record<string, unknown>) => Promise<void>;
   /** Disable when another approval is already processing (single-active rule). */
   busy?: boolean;
 }
@@ -27,28 +34,38 @@ interface PermissionPromptViewProps {
  * editor so the user can tweak the JSON args before approving — the Phase 3d
  * edit-args path is already supported server-side.
  */
-export function PermissionPromptView({ prompt, onApprove, onDeny, busy }: PermissionPromptViewProps) {
+export function PermissionPromptView({
+  prompt,
+  onApprove,
+  onDeny,
+  onAlwaysAllow,
+  busy,
+}: PermissionPromptViewProps) {
   const [editing, setEditing] = useState(false);
   const [argsText, setArgsText] = useState(() => JSON.stringify(prompt.args, null, 2));
   const [parseError, setParseError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState<null | 'approve' | 'deny'>(null);
+  const [submitting, setSubmitting] = useState<null | 'approve' | 'deny' | 'always'>(null);
+
+  /** Shared pre-parse for the approve paths — keeps the JSON editor DRY. */
+  function resolveEditedArgs(): { ok: true; edited?: Record<string, unknown> } | { ok: false } {
+    if (!editing) return { ok: true };
+    try {
+      return { ok: true, edited: JSON.parse(argsText) as Record<string, unknown> };
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : 'Invalid JSON. Fix before approving.');
+      return { ok: false };
+    }
+  }
 
   async function doApprove() {
     setSubmitting('approve');
     try {
-      let edited: Record<string, unknown> | undefined = undefined;
-      if (editing) {
-        try {
-          edited = JSON.parse(argsText) as Record<string, unknown>;
-        } catch (err) {
-          setParseError(
-            err instanceof Error ? err.message : 'Invalid JSON. Fix before approving.',
-          );
-          setSubmitting(null);
-          return;
-        }
+      const parsed = resolveEditedArgs();
+      if (!parsed.ok) {
+        setSubmitting(null);
+        return;
       }
-      await onApprove(prompt.requestId, edited);
+      await onApprove(prompt.requestId, parsed.edited);
     } finally {
       setSubmitting(null);
     }
@@ -58,6 +75,21 @@ export function PermissionPromptView({ prompt, onApprove, onDeny, busy }: Permis
     setSubmitting('deny');
     try {
       await onDeny(prompt.requestId);
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
+  async function doAlwaysAllow() {
+    if (!onAlwaysAllow) return;
+    setSubmitting('always');
+    try {
+      const parsed = resolveEditedArgs();
+      if (!parsed.ok) {
+        setSubmitting(null);
+        return;
+      }
+      await onAlwaysAllow(prompt.requestId, parsed.edited);
     } finally {
       setSubmitting(null);
     }
@@ -102,7 +134,7 @@ export function PermissionPromptView({ prompt, onApprove, onDeny, busy }: Permis
           )}
 
           {/* Actions */}
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={doApprove}
@@ -119,6 +151,22 @@ export function PermissionPromptView({ prompt, onApprove, onDeny, busy }: Permis
               )}
               {editing ? 'Approve edited' : 'Approve'}
             </button>
+            {onAlwaysAllow && (
+              <button
+                type="button"
+                onClick={doAlwaysAllow}
+                disabled={disabled}
+                title={`Auto-approve ${prompt.name} for the rest of this chat`}
+                className="inline-flex items-center gap-1 rounded-md border border-foreground/20 bg-background hover:bg-muted px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {submitting === 'always' ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <InfinityIcon size={12} />
+                )}
+                Always allow
+              </button>
+            )}
             <button
               type="button"
               onClick={doDeny}

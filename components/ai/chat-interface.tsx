@@ -69,6 +69,7 @@ export function ChatInterface({
     send,
     approve,
     deny,
+    alwaysAllow,
     clearError,
   } = useAgentTask({
     spaceSlug: slug,
@@ -402,6 +403,7 @@ export function ChatInterface({
                             prompt: pendingApproval,
                             onApprove: approve,
                             onDeny: deny,
+                            onAlwaysAllow: alwaysAllow,
                             busy: isStreaming,
                           }
                         : undefined

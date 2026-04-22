@@ -59,6 +59,14 @@ export interface UseAgentTaskResult {
   send: (text: string) => Promise<void>;
   approve: (requestId: string, editedArgs?: Record<string, unknown>) => Promise<void>;
   deny: (requestId: string) => Promise<void>;
+  /**
+   * Phase 4c — approve this call AND auto-approve any future call to the
+   * same tool in this conversation. Scoped to sessionStorage so a refresh
+   * preserves the decision but a new browser session resets it.
+   */
+  alwaysAllow: (requestId: string, editedArgs?: Record<string, unknown>) => Promise<void>;
+  /** Set of tool names currently auto-approved for this conversation. */
+  allowedTools: Set<string>;
   /** Tear down an in-flight stream. Safe to call when nothing is running. */
   abort: () => void;
   clearError: () => void;
@@ -78,6 +86,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   const [pendingApproval, setPendingApproval] = useState<PermissionPromptData | null>(null);
   const [liveCallIds, setLiveCallIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [allowedTools, setAllowedTools] = useState<Set<string>>(new Set());
 
   // Refs shadow the reactive state for places where we need the latest value
   // synchronously without re-closing over it every render. We only sync
@@ -88,6 +97,56 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   useEffect(() => {
     conversationIdRef.current = initialConversationId;
   }, [initialConversationId]);
+
+  // ── Phase 4c: always-allow for this chat ──────────────────────────────────
+  // Auto-approvals are keyed by conversationId so switching chats resets the
+  // list. sessionStorage (not localStorage) matches the "for this chat"
+  // semantics: a fresh tab / new session forgets what you trusted before.
+  const STORAGE_PREFIX = 'agent-allow:';
+  const allowedToolsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    allowedToolsRef.current = allowedTools;
+  }, [allowedTools]);
+
+  // Load the saved allow-list when the conversation changes. The dependency
+  // is only the id — we deliberately don't rebind this effect when the
+  // user adds a new tool (that's handled by `commitAllow` below writing
+  // directly to storage).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!initialConversationId) {
+      setAllowedTools(new Set());
+      return;
+    }
+    try {
+      const raw = window.sessionStorage.getItem(STORAGE_PREFIX + initialConversationId);
+      if (raw) {
+        const parsed = JSON.parse(raw) as string[];
+        if (Array.isArray(parsed)) {
+          setAllowedTools(new Set(parsed.filter((x) => typeof x === 'string')));
+          return;
+        }
+      }
+    } catch {
+      /* corrupt JSON / access denied — fall through to empty */
+    }
+    setAllowedTools(new Set());
+  }, [initialConversationId]);
+
+  function commitAllow(toolName: string) {
+    const next = new Set(allowedToolsRef.current);
+    next.add(toolName);
+    allowedToolsRef.current = next;
+    setAllowedTools(next);
+    const cid = conversationIdRef.current;
+    if (cid && typeof window !== 'undefined') {
+      try {
+        window.sessionStorage.setItem(STORAGE_PREFIX + cid, JSON.stringify(Array.from(next)));
+      } catch {
+        /* quota / private mode — in-memory allow-list still works */
+      }
+    }
+  }
 
   const abortRef = useRef<AbortController | null>(null);
   const streamingMsgIdRef = useRef<string | null>(null);
@@ -391,6 +450,36 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     [isStreaming, consumeStream],
   );
 
+  const alwaysAllow = useCallback(
+    async (requestId: string, editedArgs?: Record<string, unknown>) => {
+      // Capture the tool name from the CURRENT pending prompt at click time —
+      // by the time approve() returns the prompt will have been cleared.
+      const toolName = pendingApproval?.name;
+      if (toolName) commitAllow(toolName);
+      await approve(requestId, editedArgs);
+    },
+    [pendingApproval, approve],
+  );
+
+  // Auto-approve whenever we're paused on a tool the user has pre-trusted
+  // for this chat. Runs after the initial turn's stream closes — that's the
+  // moment `pendingApproval` flips to a value AND `isStreaming` goes false.
+  // The autoApprovedRef guard stops React 18's strict-mode double-invocation
+  // from firing two approve requests for the same requestId (setIsStreaming
+  // isn't visible yet on the synchronous second pass).
+  const autoApprovedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pendingApproval) {
+      autoApprovedRef.current = null;
+      return;
+    }
+    if (isStreaming) return;
+    if (!allowedTools.has(pendingApproval.name)) return;
+    if (autoApprovedRef.current === pendingApproval.requestId) return;
+    autoApprovedRef.current = pendingApproval.requestId;
+    void approve(pendingApproval.requestId);
+  }, [pendingApproval, isStreaming, allowedTools, approve]);
+
   return {
     messages,
     setMessages,
@@ -401,6 +490,8 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     send,
     approve,
     deny,
+    alwaysAllow,
+    allowedTools,
     abort,
     clearError,
   };

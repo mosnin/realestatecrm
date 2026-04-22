@@ -32,6 +32,7 @@ interface TranscriptProps {
     prompt: PermissionPromptData;
     onApprove: (requestId: string, editedArgs?: Record<string, unknown>) => Promise<void>;
     onDeny: (requestId: string) => Promise<void>;
+    onAlwaysAllow?: (requestId: string, editedArgs?: Record<string, unknown>) => Promise<void>;
     busy?: boolean;
   };
   className?: string;
@@ -93,6 +94,7 @@ export function Transcript({
           prompt={pendingApproval.prompt}
           onApprove={pendingApproval.onApprove}
           onDeny={pendingApproval.onDeny}
+          onAlwaysAllow={pendingApproval.onAlwaysAllow}
           busy={pendingApproval.busy}
         />
       )}
