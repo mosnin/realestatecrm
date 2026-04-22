@@ -28,6 +28,7 @@ import { createSeqCounter, encodeEvent } from '@/lib/ai-tools/events';
 import { runTurn } from '@/lib/ai-tools/loop';
 import { getOpenAIClient, MissingOpenAIKeyError } from '@/lib/ai-tools/openai-client';
 import { saveAssistantMessage, saveUserMessage } from '@/lib/ai-tools/persistence';
+import { savePendingApproval } from '@/lib/ai-tools/pending-approvals';
 import { resolveToolContext } from '@/lib/ai-tools/context';
 import { buildSystemPrompt } from '@/lib/ai-tools/system-prompt';
 import type { ToolContext } from '@/lib/ai-tools/types';
@@ -227,15 +228,17 @@ export async function POST(req: NextRequest) {
         }
 
         if (result.reason === 'paused' && result.pendingApproval) {
-          // TODO Phase 3: persist `result.pendingApproval` to Redis keyed
-          // by `requestId` with a 1-hour TTL. Without that store, the
-          // approve endpoint has nowhere to read it from — the user will
-          // see the permission_required event but the resume path won't
-          // find state.
-          logger.warn(
-            '[ai/task] turn paused for approval, but persistence is Phase 3',
-            { requestId: result.pendingApproval.requestId, tool: result.pendingApproval.pending.name },
-          );
+          // Stash the paused turn so the approve endpoint can resume it.
+          // Failure here is logged + swallowed; the user already saw the
+          // permission_required event, and the approve endpoint will
+          // return 410 gracefully if the state isn't there.
+          await savePendingApproval({
+            state: result.pendingApproval,
+            userId: ctx.userId,
+            spaceSlug,
+            conversationId,
+            createdAt: new Date().toISOString(),
+          });
         }
 
         await pushEvent({ type: 'turn_complete', reason: result.reason });
