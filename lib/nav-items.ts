@@ -26,6 +26,7 @@ import {
   Shield,
   Flame,
   Bot,
+  Flag,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -98,6 +99,11 @@ export const realtorNavItems: NavItem[] = [
     href: '/notes',
     label: 'Notes',
     icon: FileText,
+  },
+  {
+    href: '/reviews',
+    label: 'My reviews',
+    icon: Flag,
   },
   {
     href: '/analytics',
