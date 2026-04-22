@@ -267,6 +267,12 @@ export async function PATCH(
         ...(milestonesVal !== undefined && { milestones: milestonesVal }),
         ...(nextActionVal !== undefined && { nextAction: nextActionVal }),
         ...(nextActionDueAtVal !== undefined && { nextActionDueAt: nextActionDueAtVal }),
+        // Won/lost post-mortem fields — captured from the kanban dialog.
+        // When the deal transitions back to active we clear them so stale
+        // reasons don't confuse a later close.
+        ...(body.wonLostReason !== undefined && { wonLostReason: body.wonLostReason ? String(body.wonLostReason).slice(0, 120) : null }),
+        ...(body.wonLostNote !== undefined && { wonLostNote: body.wonLostNote ? String(body.wonLostNote).slice(0, 2000) : null }),
+        ...(body.status === 'active' && { wonLostReason: null, wonLostNote: null }),
         updatedAt: new Date().toISOString(),
       })
       .eq('id', id)

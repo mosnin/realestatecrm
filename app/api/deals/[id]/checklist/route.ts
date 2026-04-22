@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
-import { BUYER_RESIDENTIAL_TEMPLATE, materializeTemplate, type ChecklistKind } from '@/lib/deals/checklist';
+import { TEMPLATES, materializeTemplate, type ChecklistKind, type TemplateId } from '@/lib/deals/checklist';
 
 const VALID_KINDS: ChecklistKind[] = [
   'earnest_money',
@@ -77,7 +77,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  if (body.seed === 'buyer_residential') {
+  if (typeof body.seed === 'string' && body.seed in TEMPLATES) {
+    const templateId = body.seed as TemplateId;
     // Refuse if items already exist — template seed is additive-by-intent.
     const { count } = await supabase
       .from('DealChecklistItem')
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Checklist already has items' }, { status: 409 });
     }
 
-    const materialised = materializeTemplate(BUYER_RESIDENTIAL_TEMPLATE, deal.closeDate);
+    const materialised = materializeTemplate(TEMPLATES[templateId].items, deal.closeDate);
     const rows = materialised.map((m) => ({
       id: crypto.randomUUID(),
       dealId: id,

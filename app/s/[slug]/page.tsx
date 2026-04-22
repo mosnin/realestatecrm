@@ -78,9 +78,10 @@ export default async function DashboardPage({
   let followUpContacts: FollowUpContact[] = [];
   let upcomingTours: { id: string; guestName: string; startsAt: string; endsAt: string; propertyAddress: string | null; status: string }[] = [];
   let overdueNextActions: { id: string; title: string; nextAction: string; nextActionDueAt: string }[] = [];
+  let overdueChecklistItems: { id: string; label: string; dueAt: string; dealId: string; dealTitle: string }[] = [];
 
   try {
-    [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads, followUpDue, followUpContacts, upcomingTourCount, upcomingTours, buyerLeadCount, rentalLeadCount, pendingDraftCount, overdueNextActions] =
+    [contactCount, dealCount, deals, stages, recentLeads, newLeadCount, totalLeads, followUpDue, followUpContacts, upcomingTourCount, upcomingTours, buyerLeadCount, rentalLeadCount, pendingDraftCount, overdueNextActions, overdueChecklistItems] =
       await Promise.all([
         supabase.from('Contact').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).is('brokerageId', null).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
         supabase.from('Deal').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).then(r => { if (r.error) throw r.error; return r.count ?? 0; }),
@@ -109,6 +110,29 @@ export default async function DashboardPage({
           .order('nextActionDueAt', { ascending: true })
           .limit(5)
           .then(r => (r.data ?? []) as { id: string; title: string; nextAction: string; nextActionDueAt: string }[]),
+        // Overdue closing-checklist items. Join Deal so we can link to the
+        // right page. Filter client-side to only keep items whose deal is
+        // still active (Supabase REST doesn't support join-side filters
+        // without an RPC).
+        supabase
+          .from('DealChecklistItem')
+          .select('id, label, dueAt, dealId, Deal(title, status)')
+          .eq('spaceId', space.id)
+          .is('completedAt', null)
+          .not('dueAt', 'is', null)
+          .lte('dueAt', new Date().toISOString())
+          .order('dueAt', { ascending: true })
+          .limit(10)
+          .then((r) => ((r.data ?? []) as any[])
+            .filter((row) => row.Deal?.status === 'active')
+            .slice(0, 5)
+            .map((row) => ({
+              id: row.id as string,
+              label: row.label as string,
+              dueAt: row.dueAt as string,
+              dealId: row.dealId as string,
+              dealTitle: (row.Deal?.title as string) ?? 'Deal',
+            }))),
       ]);
   } catch (err) {
     logger.error('[space-home] DB queries failed', { slug }, err);
@@ -200,6 +224,36 @@ export default async function DashboardPage({
       iconBg: 'bg-red-50 dark:bg-red-500/10',
       iconColor: 'text-red-600 dark:text-red-400',
       title: `${rest} more overdue deal ${rest === 1 ? 'action' : 'actions'}`,
+      sub: 'Open the deals board to triage.',
+      href: `/s/${slug}/deals`,
+      cta: 'Open',
+      urgent: true,
+    });
+  }
+  // Overdue closing-checklist items — each is a hard contractual deadline,
+  // so they appear prominently in red alongside other urgent rows.
+  for (const item of overdueChecklistItems.slice(0, 3)) {
+    const due = new Date(item.dueAt);
+    const days = Math.max(0, Math.round((Date.now() - due.getTime()) / 86_400_000));
+    todayItems.push({
+      key: `checklist-${item.id}`,
+      icon: Clock,
+      iconBg: 'bg-red-50 dark:bg-red-500/10',
+      iconColor: 'text-red-600 dark:text-red-400',
+      title: item.label,
+      sub: `${item.dealTitle} · ${days === 0 ? 'due today' : `${days} day${days === 1 ? '' : 's'} past`}`,
+      href: `/s/${slug}/deals/${item.dealId}?tab=checklist`,
+      cta: 'Open',
+      urgent: true,
+    });
+  }
+  if (overdueChecklistItems.length > 3) {
+    todayItems.push({
+      key: 'checklist-more',
+      icon: Clock,
+      iconBg: 'bg-red-50 dark:bg-red-500/10',
+      iconColor: 'text-red-600 dark:text-red-400',
+      title: `${overdueChecklistItems.length - 3} more overdue deadline${overdueChecklistItems.length - 3 === 1 ? '' : 's'}`,
       sub: 'Open the deals board to triage.',
       href: `/s/${slug}/deals`,
       cta: 'Open',

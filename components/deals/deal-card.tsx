@@ -153,23 +153,35 @@ export function DealCard({ deal, slug, onDelete, onStatusChange, nextStage, onAd
               </p>
             )}
 
-            {/* Closing checklist chip — compact progress + next item. */}
-            {checklistSummary && (
-              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-muted-foreground">
-                <CheckCircle2 size={11} className={cn(
-                  checklistSummary.anyOverdue ? 'text-red-500' : 'text-muted-foreground',
-                )} />
-                <span className="font-medium">
-                  {checklistSummary.complete}/{checklistSummary.total}
-                </span>
-                {checklistSummary.nextLabel && !checklistSummary.anyOverdue && (
-                  <span className="truncate">· next: {checklistSummary.nextLabel}</span>
-                )}
-                {checklistSummary.anyOverdue && (
-                  <span className="text-red-700 dark:text-red-400 font-medium truncate">· overdue</span>
-                )}
-              </div>
-            )}
+            {/* Closing-checklist chip — shows progress + the soonest deadline.
+                Answers "where is this deal in real life?" in eight words. */}
+            {checklistSummary && (() => {
+              const due = checklistSummary.nextDueAt;
+              const today = new Date(); today.setHours(0, 0, 0, 0);
+              let dueLabel: string | null = null;
+              if (due) {
+                const days = Math.round((due.getTime() - today.getTime()) / 86_400_000);
+                if (days < 0) dueLabel = `${Math.abs(days)}d overdue`;
+                else if (days === 0) dueLabel = 'today';
+                else if (days <= 14) dueLabel = `in ${days}d`;
+                else dueLabel = due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+              }
+              return (
+                <div className={cn(
+                  'flex items-center gap-1.5 mt-1.5 text-[11px]',
+                  checklistSummary.anyOverdue ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground',
+                )}>
+                  <CheckCircle2 size={11} />
+                  <span className="font-medium">{checklistSummary.complete}/{checklistSummary.total}</span>
+                  {checklistSummary.nextLabel && (
+                    <span className="truncate">
+                      · {checklistSummary.nextLabel}
+                      {dueLabel ? ` ${dueLabel}` : ''}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
 
             {deal.dealContacts.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">

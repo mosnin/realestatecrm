@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { CheckCircle2, Circle, Trash2, Plus, Sparkles, Calendar, Loader2, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { DealChecklistItem, ChecklistKind } from '@/lib/deals/checklist';
+import type { DealChecklistItem, ChecklistKind, TemplateId } from '@/lib/deals/checklist';
+import { TEMPLATES } from '@/lib/deals/checklist';
 
 const KIND_ICON: Record<ChecklistKind, string> = {
   earnest_money: '💰',
@@ -50,13 +51,13 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
     return () => { cancelled = true; };
   }, [dealId, initial.length]);
 
-  async function seedTemplate() {
+  async function seedTemplate(templateId: TemplateId) {
     setSeeding(true);
     try {
       const res = await fetch(`/api/deals/${dealId}/checklist`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seed: 'buyer_residential' }),
+        body: JSON.stringify({ seed: templateId }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -65,7 +66,7 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
       }
       const data: DealChecklistItem[] = await res.json();
       setItems(data);
-      toast.success('Closing checklist added — edit any dates that don’t match your contract.');
+      toast.success('Checklist added — edit any dates that don’t match your contract.');
     } catch {
       toast.error('Could not seed checklist');
     } finally {
@@ -144,23 +145,36 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
     return <div className="text-sm text-muted-foreground py-4">Loading…</div>;
   }
 
-  // Empty state — offer to seed the canonical residential flow.
+  // Empty state — offer template choices for the canonical flows.
   if (items.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border bg-muted/10 px-5 py-8 text-center">
-        <p className="text-sm font-semibold mb-1">No checklist yet</p>
-        <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-4">
-          A closing checklist tracks the deadlines that actually close a deal — earnest money, inspection, appraisal, loan commitment, walkthrough, close.
-        </p>
-        <button
-          type="button"
-          onClick={seedTemplate}
-          disabled={seeding}
-          className="inline-flex items-center gap-1.5 rounded-md bg-foreground text-background hover:bg-foreground/90 text-sm font-semibold px-3 py-2 transition-colors disabled:opacity-50"
-        >
-          {seeding ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-          {seeding ? 'Adding…' : 'Add buyer residential checklist'}
-        </button>
+      <div className="rounded-lg border border-dashed border-border bg-muted/10 px-5 py-6 text-center space-y-4">
+        <div>
+          <p className="text-sm font-semibold mb-1">Start from a template</p>
+          <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+            Pick the flow that fits this deal — dates anchor to the expected close and can be edited afterwards.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
+          {(Object.keys(TEMPLATES) as TemplateId[]).map((id) => {
+            const t = TEMPLATES[id];
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => seedTemplate(id)}
+                disabled={seeding}
+                className="flex-1 rounded-md border border-border bg-card hover:border-foreground hover:bg-muted/40 text-left px-3 py-2.5 transition-colors disabled:opacity-50"
+              >
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  {seeding ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                  <span className="text-sm font-semibold">{t.label}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">{t.description}</p>
+              </button>
+            );
+          })}
+        </div>
       </div>
     );
   }

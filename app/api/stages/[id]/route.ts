@@ -46,9 +46,23 @@ export async function PATCH(
   const safeColor = typeof body.color === 'string' && HEX_COLOR.test(body.color)
     ? body.color
     : existing.color; // keep existing color if invalid value supplied
+
+  // Optional stage kind. null explicitly clears; an invalid value is rejected.
+  const VALID_KINDS = ['lead', 'qualified', 'active', 'under_contract', 'closing', 'closed'] as const;
+  let kindUpdate: string | null | undefined = undefined;
+  if (body.kind !== undefined) {
+    if (body.kind === null) kindUpdate = null;
+    else if (typeof body.kind === 'string' && (VALID_KINDS as readonly string[]).includes(body.kind)) kindUpdate = body.kind;
+    else return NextResponse.json({ error: 'Invalid kind' }, { status: 400 });
+  }
+
   const { data: stage, error: updateError } = await supabase
     .from('DealStage')
-    .update({ name: body.name !== undefined ? body.name.trim() : existing.name, color: safeColor })
+    .update({
+      name: body.name !== undefined ? body.name.trim() : existing.name,
+      color: safeColor,
+      ...(kindUpdate !== undefined && { kind: kindUpdate }),
+    })
     .eq('id', id)
     .eq('spaceId', space.id)
     .select()

@@ -296,9 +296,20 @@ export type Deal = {
   /** Realtor-authored "what's next" — shown prominently on the card and in the Today inbox. */
   nextAction: string | null;
   nextActionDueAt: Date | null;
+  /** Captured when a deal is marked won or lost so we can learn from it later. */
+  wonLostReason: string | null;
+  wonLostNote: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type DealStageKind =
+  | 'lead'
+  | 'qualified'
+  | 'active'
+  | 'under_contract'
+  | 'closing'
+  | 'closed';
 
 export type DealActivity = {
   id: string;
@@ -330,6 +341,8 @@ export type DealStage = {
   position: number;
   pipelineType: string | null;
   pipelineId: string | null;
+  /** Typed view of the stage. Null for custom user stages. */
+  kind: DealStageKind | null;
 };
 
 export type DealContactRole =

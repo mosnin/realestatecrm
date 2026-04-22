@@ -62,6 +62,36 @@ export const BUYER_RESIDENTIAL_TEMPLATE: TemplateItem[] = [
   { kind: 'closing',           label: 'Closing',                        offsetFromCloseDays: 0,   fallbackDaysFromToday: null },
 ];
 
+/**
+ * Rental flow. Shorter + landlord-centric. `closing` here means move-in /
+ * lease start. Custom items cover application processing, screening, lease
+ * signing — things that don't fit the buyer kinds cleanly.
+ */
+export const RENTAL_TEMPLATE: TemplateItem[] = [
+  { kind: 'custom',            label: 'Application submitted',          offsetFromCloseDays: -14, fallbackDaysFromToday: 1 },
+  { kind: 'custom',            label: 'Screening + background complete', offsetFromCloseDays: -10, fallbackDaysFromToday: 3 },
+  { kind: 'custom',            label: 'Lease drafted',                  offsetFromCloseDays: -7,  fallbackDaysFromToday: 5 },
+  { kind: 'custom',            label: 'Lease signed',                   offsetFromCloseDays: -3,  fallbackDaysFromToday: 7 },
+  { kind: 'earnest_money',     label: 'Security deposit + first month received', offsetFromCloseDays: -2, fallbackDaysFromToday: 8 },
+  { kind: 'final_walkthrough', label: 'Move-in inspection',             offsetFromCloseDays: -1,  fallbackDaysFromToday: null },
+  { kind: 'closing',           label: 'Move-in / keys handed over',     offsetFromCloseDays: 0,   fallbackDaysFromToday: null },
+];
+
+export type TemplateId = 'buyer_residential' | 'rental_residential';
+
+export const TEMPLATES: Record<TemplateId, { label: string; description: string; items: TemplateItem[] }> = {
+  buyer_residential: {
+    label: 'Buyer · residential',
+    description: 'Earnest money → inspection → appraisal → loan → walkthrough → close.',
+    items: BUYER_RESIDENTIAL_TEMPLATE,
+  },
+  rental_residential: {
+    label: 'Rental',
+    description: 'Application → screening → lease → deposit → move-in.',
+    items: RENTAL_TEMPLATE,
+  },
+};
+
 function midnight(d: Date): Date {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
