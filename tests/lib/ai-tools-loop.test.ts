@@ -339,6 +339,87 @@ describe('runTurn — tool execution failures surface to the model', () => {
   });
 });
 
+describe('runTurn — parallel tool calls in one round', () => {
+  it('runs both read-only calls in order, then continues to a final text round', async () => {
+    // Two independent read-only tools; each called once in the same batch.
+    const searchContactsHandler = vi.fn(async (args: { query: string }) => ({
+      summary: `Found contacts for "${args.query}".`,
+    }));
+    const searchDealsHandler = vi.fn(async (args: { query: string }) => ({
+      summary: `Found deals for "${args.query}".`,
+    }));
+    currentTools = [
+      defineTool({
+        name: 'search_contacts',
+        description: 'search contacts',
+        parameters: z.object({ query: z.string() }),
+        requiresApproval: false,
+        handler: searchContactsHandler,
+      }) as ToolDefinition,
+      defineTool({
+        name: 'search_deals',
+        description: 'search deals',
+        parameters: z.object({ query: z.string() }),
+        requiresApproval: false,
+        handler: searchDealsHandler,
+      }) as ToolDefinition,
+    ];
+
+    // Round 1: the model issues two calls in one response. Args stream in
+    // fragments for BOTH, interleaved, to exercise the index-keyed buffer.
+    // Round 2: after both tool results arrive, the model wraps up.
+    const openai = makeFakeOpenAI([
+      makeStream([
+        { toolCalls: [{ index: 0, id: 'c_contacts', name: 'search_contacts' }] },
+        { toolCalls: [{ index: 1, id: 'c_deals', name: 'search_deals' }] },
+        { toolCalls: [{ index: 0, args: '{"qu' }] },
+        { toolCalls: [{ index: 1, args: '{"que' }] },
+        { toolCalls: [{ index: 0, args: 'ery":"Jane"}' }] },
+        { toolCalls: [{ index: 1, args: 'ry":"Main"}' }] },
+        { finishReason: 'tool_calls' },
+      ]),
+      makeStream([
+        { content: 'Both searches done.' },
+        { finishReason: 'stop' },
+      ]),
+    ]);
+
+    const { events, result } = await collectEvents(openai, [
+      { role: 'user', content: 'find jane and deals on main street' },
+    ]);
+
+    // Both handlers called exactly once with the correctly-assembled args.
+    expect(searchContactsHandler).toHaveBeenCalledTimes(1);
+    expect(searchContactsHandler.mock.calls[0][0]).toEqual({ query: 'Jane' });
+    expect(searchDealsHandler).toHaveBeenCalledTimes(1);
+    expect(searchDealsHandler.mock.calls[0][0]).toEqual({ query: 'Main' });
+
+    // Events: two tool_call_start + two tool_call_result in order (by index),
+    // then the final text_delta round.
+    const starts = events.filter((e) => e.type === 'tool_call_start');
+    expect(starts).toHaveLength(2);
+    expect(starts[0]).toMatchObject({ callId: 'c_contacts', name: 'search_contacts' });
+    expect(starts[1]).toMatchObject({ callId: 'c_deals', name: 'search_deals' });
+
+    const results = events.filter((e) => e.type === 'tool_call_result');
+    expect(results).toHaveLength(2);
+    // Each result paired to its callId.
+    expect(results[0]).toMatchObject({ callId: 'c_contacts', ok: true });
+    expect(results[1]).toMatchObject({ callId: 'c_deals', ok: true });
+
+    // Final text after both tool rounds.
+    const finalText = events.filter((e) => e.type === 'text_delta');
+    expect(finalText.at(-1)).toMatchObject({ delta: 'Both searches done.' });
+
+    // Blocks: [tool_call (contacts), tool_call (deals), text].
+    expect(result.blocks).toHaveLength(3);
+    expect(result.blocks[0]).toMatchObject({ type: 'tool_call', name: 'search_contacts', status: 'complete' });
+    expect(result.blocks[1]).toMatchObject({ type: 'tool_call', name: 'search_deals', status: 'complete' });
+    expect(result.blocks[2]).toMatchObject({ type: 'text', content: 'Both searches done.' });
+    expect(result.reason).toBe('complete');
+  });
+});
+
 describe('runTurn — abort propagation', () => {
   it('returns aborted when the signal fires before the stream starts', async () => {
     const controller = new AbortController();
