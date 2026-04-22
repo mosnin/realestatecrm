@@ -21,6 +21,7 @@ type BrokerageTemplateRow = {
   body: string;
   version: number;
   publishedAt: string | null;
+  publishedVersion: number | null;
   publishedCount: number;
   createdByUserId: string | null;
   createdAt: string;
@@ -28,7 +29,7 @@ type BrokerageTemplateRow = {
 };
 
 const TEMPLATE_COLUMNS =
-  'id, brokerageId, name, category, channel, subject, body, version, publishedAt, publishedCount, createdByUserId, createdAt, updatedAt';
+  'id, brokerageId, name, category, channel, subject, body, version, publishedAt, publishedVersion, publishedCount, createdByUserId, createdAt, updatedAt';
 
 // Every field optional — PATCH is a partial update. subject is explicitly
 // nullable so callers can clear a previously-set subject by sending null.
@@ -105,9 +106,12 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
     return NextResponse.json({ error: 'Template not found' }, { status: 404 });
   }
 
-  // Build the update payload only with fields the caller actually supplied.
-  // Any of {name, category, channel, subject, body} being present means the
-  // agent-facing content is changing, so bump the version.
+  // Build the update payload only with fields the caller actually supplied
+  // AND whose value differs from the row's current value. Version bumps on
+  // any real content change; a no-op PATCH (empty body OR all fields equal
+  // to current) is rejected rather than silently succeeding — audit caught
+  // that "empty body" was returning 200 + an updatedAt bump, and that
+  // "field = current value" was still bumping the version.
   const patch: Partial<BrokerageTemplateRow> & { updatedAt: string } = {
     updatedAt: new Date().toISOString(),
   };
@@ -116,12 +120,17 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
   type ContentField = (typeof contentFields)[number];
   let contentChanged = false;
   for (const key of contentFields) {
+    if (!(key in parsed.data)) continue;
     const value = (parsed.data as Record<ContentField, unknown>)[key];
-    if (key in parsed.data && value !== undefined) {
-      // subject can be null; everything else is a defined value on this branch.
-      (patch as Record<string, unknown>)[key] = value ?? null;
-      contentChanged = true;
-    }
+    if (value === undefined) continue;
+    // Normalise falsy subject values to null so the comparison is apples-
+    // to-apples against the DB (which stores NULL, not '').
+    const nextValue = value ?? null;
+    const currentValue =
+      (existing as unknown as Record<string, unknown>)[key] ?? null;
+    if (nextValue === currentValue) continue; // no-op field
+    (patch as Record<string, unknown>)[key] = nextValue;
+    contentChanged = true;
   }
 
   // If the channel is changing to non-email, clear subject unless the caller
@@ -130,14 +139,24 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
   if (
     parsed.data.channel !== undefined &&
     parsed.data.channel !== 'email' &&
-    !('subject' in parsed.data)
+    !('subject' in parsed.data) &&
+    existing.subject !== null
   ) {
     (patch as Record<string, unknown>).subject = null;
+    contentChanged = true;
   }
 
-  if (contentChanged) {
-    patch.version = existing.version + 1;
+  if (!contentChanged) {
+    return NextResponse.json(
+      {
+        error:
+          'No change — the patch body is empty or every field matches the current value.',
+      },
+      { status: 400 },
+    );
   }
+
+  patch.version = existing.version + 1;
 
   const { data: updated, error: updateErr } = await supabase
     .from('BrokerageTemplate')

@@ -25,6 +25,7 @@ type BrokerageTemplateRow = {
   body: string;
   version: number;
   publishedAt: string | null;
+  publishedVersion: number | null;
   publishedCount: number;
   createdByUserId: string | null;
   createdAt: string;
@@ -32,7 +33,7 @@ type BrokerageTemplateRow = {
 };
 
 const TEMPLATE_COLUMNS =
-  'id, brokerageId, name, category, channel, subject, body, version, publishedAt, publishedCount, createdByUserId, createdAt, updatedAt';
+  'id, brokerageId, name, category, channel, subject, body, version, publishedAt, publishedVersion, publishedCount, createdByUserId, createdAt, updatedAt';
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(100),

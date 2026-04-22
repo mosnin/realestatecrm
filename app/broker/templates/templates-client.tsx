@@ -59,6 +59,7 @@ type BrokerageTemplate = {
   body: string;
   version: number;
   publishedAt: string | null;
+  publishedVersion: number | null;
   publishedCount: number;
   createdByUserId: string | null;
   createdAt: string;
@@ -140,19 +141,15 @@ function previewBody(body: string): string {
 
 type PublishStatus = 'up-to-date' | 'edited' | 'never';
 
-// DECISION: we don't get the "published version number" back from the API;
-// the spec suggests inferring staleness from updatedAt > publishedAt. We treat
-// a template as "up-to-date" only when it has been published AND updatedAt is
-// within 1 second of publishedAt (publish bumps updatedAt on the server).
-// If the user subsequently edits content, updatedAt outruns publishedAt and we
-// flip to "edited".
+// The earlier version of this function compared updatedAt against publishedAt
+// with a 1-second slack; audit found that (a) a PATCH within 1s of a publish
+// read as green, and (b) even modest client/server clock skew broke the
+// heuristic. We now compare the published version against the current
+// version directly — the BP6 audit follow-up migration adds
+// publishedVersion to the row, set by the publish route at stamp time.
 function publishStatus(t: BrokerageTemplate): PublishStatus {
-  if (!t.publishedAt) return 'never';
-  const updated = new Date(t.updatedAt).getTime();
-  const published = new Date(t.publishedAt).getTime();
-  if (Number.isNaN(updated) || Number.isNaN(published)) return 'never';
-  // 1s slack to absorb the server's own updatedAt touch during publish.
-  return updated - published > 1000 ? 'edited' : 'up-to-date';
+  if (!t.publishedAt || t.publishedVersion == null) return 'never';
+  return t.version > t.publishedVersion ? 'edited' : 'up-to-date';
 }
 
 function statusMeta(status: PublishStatus): { dot: string; label: string } {
@@ -199,14 +196,22 @@ export default function TemplatesClient() {
   const [deleteTarget, setDeleteTarget] = useState<BrokerageTemplate | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Separate "initial load failed" from the templates list itself so the UI
+  // can offer a retry button instead of leaving the broker staring at an
+  // empty page after a transient network error (audit finding).
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const loadTemplates = useCallback(async () => {
+    setLoadError(null);
     try {
       const res = await fetch('/api/broker/templates', { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to load templates');
       const data = (await res.json()) as BrokerageTemplate[];
       setTemplates(data);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to load templates');
+      const msg = err instanceof Error ? err.message : 'Failed to load templates';
+      toast.error(msg);
+      setLoadError(msg);
     } finally {
       setLoading(false);
     }
@@ -437,6 +442,8 @@ export default function TemplatesClient() {
 
       {loading ? (
         <LoadingSkeleton />
+      ) : loadError ? (
+        <LoadErrorState message={loadError} onRetry={() => { setLoading(true); void loadTemplates(); }} />
       ) : templates.length === 0 ? (
         <EmptyState onCreate={openCreate} />
       ) : (
@@ -788,7 +795,10 @@ function PublishConfirmDialog({ target, busy, onCancel, onConfirm }: PublishConf
           <Button variant="outline" onClick={onCancel} disabled={busy}>
             Cancel
           </Button>
-          <Button onClick={onConfirm} disabled={busy}>
+          {/* autoFocus so keyboard users can confirm from the dropdown
+              without grabbing the mouse — the DropdownMenu grabs focus on
+              open, and without this the tab order drops back to <body>. */}
+          <Button onClick={onConfirm} disabled={busy} autoFocus>
             {busy ? 'Publishing…' : 'Publish'}
           </Button>
         </DialogFooter>
@@ -825,7 +835,7 @@ function DeleteConfirmDialog({ target, busy, onCancel, onConfirm }: DeleteConfir
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={onCancel} disabled={busy}>
+          <Button variant="outline" onClick={onCancel} disabled={busy} autoFocus>
             Cancel
           </Button>
           <Button variant="destructive" onClick={onConfirm} disabled={busy}>
@@ -867,6 +877,20 @@ function LoadingSkeleton() {
         </div>
       ))}
     </div>
+  );
+}
+
+function LoadErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <Card>
+      <CardContent className="px-5 py-12 text-center space-y-3">
+        <p className="text-sm font-medium text-foreground">Couldn&apos;t load templates</p>
+        <p className="text-xs text-muted-foreground max-w-xs mx-auto">{message}</p>
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          Try again
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

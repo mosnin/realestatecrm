@@ -20,6 +20,7 @@ type BrokerageTemplateRow = {
   body: string;
   version: number;
   publishedAt: string | null;
+  publishedVersion: number | null;
   publishedCount: number;
   createdByUserId: string | null;
   createdAt: string;
@@ -36,7 +37,7 @@ type MessageTemplateRow = {
 };
 
 const TEMPLATE_COLUMNS =
-  'id, brokerageId, name, category, channel, subject, body, version, publishedAt, publishedCount, createdByUserId, createdAt, updatedAt';
+  'id, brokerageId, name, category, channel, subject, body, version, publishedAt, publishedVersion, publishedCount, createdByUserId, createdAt, updatedAt';
 
 /**
  * POST /api/broker/templates/[id]/publish
@@ -127,15 +128,18 @@ export async function POST(req: NextRequest, { params }: Params): Promise<NextRe
   let skipped = 0;
 
   if (agentUserIds.length > 0) {
-    // 3. Resolve each agent's Space via Space.ownerId. An agent could, in
-    //    theory, have more than one Space (historical multi-workspace) or
-    //    none (rare — a member who hasn't completed onboarding). We push
-    //    to ALL of their spaces so the template shows up wherever they
-    //    work; 0-space members are counted as skipped and logged.
+    // 3. Resolve each agent's Space via Space.ownerId, SCOPED to this
+    //    brokerage. A realtor can be a member of this brokerage AND also
+    //    own a Space in another brokerage (dual-membership); without the
+    //    brokerageId filter, publishing a template from Brokerage A would
+    //    fan out into Spaces in Brokerage B — a cross-tenant data leak.
+    //    0-space members (or members whose only Space is elsewhere) are
+    //    counted as skipped and logged.
     const { data: spaces, error: spaceErr } = await supabase
       .from('Space')
       .select('id, ownerId')
       .in('ownerId', agentUserIds)
+      .eq('brokerageId', ctx.brokerage.id)
       .returns<SpaceRow[]>();
 
     if (spaceErr) {
@@ -297,6 +301,11 @@ export async function POST(req: NextRequest, { params }: Params): Promise<NextRe
     .from('BrokerageTemplate')
     .update({
       publishedAt,
+      // Audit follow-up: pin the exact version that was just pushed so the
+      // UI can tell "up-to-date" (version === publishedVersion) from
+      // "edited since last publish" (version > publishedVersion) without
+      // relying on a fragile timestamp-slack heuristic.
+      publishedVersion: tmpl.version,
       publishedCount: pushed,
       updatedAt: publishedAt,
     })
