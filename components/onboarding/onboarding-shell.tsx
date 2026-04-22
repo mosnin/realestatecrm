@@ -18,53 +18,33 @@ interface OnboardingShellProps {
 }
 
 /**
- * The shared onboarding surface:
- *   - Deep neutral canvas
- *   - Warm orange radial gradient bleeding up from the bottom, with a gentle
- *     hint of amber from the top corners for vertical symmetry
- *   - Centered brand mark + step content
- *   - Progress dots pinned to the bottom — the active one stretches into a pill
+ * The shared onboarding surface.
  *
- * The shell owns transitions so each step just returns static JSX.
+ * Background follows the "radial at 50% 10%" pattern: a light canvas with an
+ * orange edge glow fading from a near-white core at the top centre. Light
+ * theme, so text uses neutral-900 and the primary button is dark.
  */
 export function OnboardingShell({ stepIndex, totalSteps, stepKey, children, onBack }: OnboardingShellProps) {
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-neutral-950 text-white">
-      {/* Gradient backdrop */}
-      <div className="pointer-events-none absolute inset-0 z-0">
-        {/* Main plume from the bottom */}
-        <div
-          className="absolute left-1/2 -bottom-[55%] h-[120vh] w-[160vw] -translate-x-1/2 rounded-full blur-3xl"
-          style={{
-            background:
-              'radial-gradient(circle at 50% 50%, rgba(255, 140, 60, 0.95) 0%, rgba(255, 94, 44, 0.75) 25%, rgba(224, 65, 25, 0.35) 45%, rgba(120, 30, 10, 0) 70%)',
-          }}
-        />
-        {/* Subtle top-corner warmth for visual balance */}
-        <div
-          className="absolute -top-[25%] -left-[15%] h-[60vh] w-[60vw] rounded-full blur-3xl opacity-55"
-          style={{
-            background:
-              'radial-gradient(circle at 50% 50%, rgba(255, 170, 90, 0.65) 0%, rgba(240, 110, 45, 0.25) 40%, rgba(200, 60, 30, 0) 70%)',
-          }}
-        />
-        <div
-          className="absolute -top-[25%] -right-[15%] h-[60vh] w-[60vw] rounded-full blur-3xl opacity-55"
-          style={{
-            background:
-              'radial-gradient(circle at 50% 50%, rgba(255, 170, 90, 0.65) 0%, rgba(240, 110, 45, 0.25) 40%, rgba(200, 60, 30, 0) 70%)',
-          }}
-        />
-        {/* Grain / darkening overlay so text stays legible */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(10,10,10,0.65)_70%)]" />
-      </div>
+    <div className="relative min-h-screen w-full overflow-hidden bg-white text-neutral-900">
+      {/* Orange glow backdrop — single radial, white core at 50% 10% fading to
+          orange at the edges. This is the "125% 125%" formula scaled to the
+          viewport so the glow reaches every corner regardless of aspect. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0"
+        style={{
+          background:
+            'radial-gradient(125% 125% at 50% 10%, #ffffff 40%, #f97316 100%)',
+        }}
+      />
 
       {/* Back button — top-left */}
       {onBack && (
         <button
           type="button"
           onClick={onBack}
-          className="absolute left-5 top-5 z-20 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/70 backdrop-blur-sm transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
+          className="absolute left-5 top-5 z-20 inline-flex items-center gap-1.5 rounded-full border border-neutral-900/10 bg-white/60 px-3 py-1.5 text-xs font-medium text-neutral-700 backdrop-blur-sm transition-colors hover:border-neutral-900/30 hover:bg-white/80 hover:text-neutral-900"
         >
           ← Back
         </button>
@@ -99,8 +79,12 @@ export function OnboardingShell({ stepIndex, totalSteps, stepKey, children, onBa
                 key={i}
                 aria-hidden
                 className={cn(
-                  'h-1.5 rounded-full',
-                  active ? 'bg-white' : complete ? 'bg-white/60' : 'bg-white/25',
+                  'inline-block h-1.5 rounded-full',
+                  active
+                    ? 'bg-neutral-900'
+                    : complete
+                      ? 'bg-neutral-900/55'
+                      : 'bg-neutral-900/20',
                 )}
                 animate={{ width: active ? 28 : 6 }}
                 transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}

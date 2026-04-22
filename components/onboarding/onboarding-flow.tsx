@@ -3,19 +3,38 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Briefcase, Building2, Clock, GraduationCap, HandCoins, Home, MapPinned, MessageCircle, Share2, Sparkles, TrendingDown, Users2, Wallet } from 'lucide-react';
+import {
+  Briefcase,
+  Building2,
+  Clock,
+  GraduationCap,
+  HandCoins,
+  Home,
+  MessageCircle,
+  Share2,
+  TrendingDown,
+  Users2,
+  Wallet,
+} from 'lucide-react';
 import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
 import { OnboardingShell } from './onboarding-shell';
-import { PhotoStep, SlugStep, TextStep, TextareaStep, TilesStep, type TileOption } from './onboarding-steps';
+import {
+  MultiFieldStep,
+  PhotoStep,
+  SlugStep,
+  TextStep,
+  TilesStep,
+  type TileOption,
+} from './onboarding-steps';
 
 // ── Role ───────────────────────────────────────────────────────────────────
 
 type Role = 'realtor' | 'broker' | 'broker_only';
 
 const ROLE_OPTIONS: TileOption<Role>[] = [
-  { value: 'realtor',     label: 'Realtor',            description: 'Solo agent with a pipeline.', icon: Home },
-  { value: 'broker',      label: 'Broker + realtor',   description: 'Run a team and sell.',        icon: Briefcase },
-  { value: 'broker_only', label: 'Broker only',        description: 'Team lead — no personal pipeline.', icon: Building2 },
+  { value: 'realtor',     label: 'Realtor',           description: 'Solo agent with a pipeline.',      icon: Home },
+  { value: 'broker',      label: 'Broker + realtor',  description: 'Run a team and sell.',             icon: Briefcase },
+  { value: 'broker_only', label: 'Broker only',       description: 'Team lead — no personal pipeline.', icon: Building2 },
 ];
 
 // ── Shared option sets ─────────────────────────────────────────────────────
@@ -30,7 +49,7 @@ const TIMEZONES: TileOption<string>[] = [
 ];
 
 const PAIN_POINTS: TileOption<string>[] = [
-  { value: 'lead-followup',  label: 'Lead follow-up', description: 'New leads slip through.', icon: MessageCircle },
+  { value: 'lead-followup',  label: 'Lead follow-up', description: 'New leads slip through.',   icon: MessageCircle },
   { value: 'scheduling',     label: 'Scheduling',     description: 'Tour bookings + conflicts.', icon: Clock },
   { value: 'pipeline',       label: 'Pipeline',       description: 'Hard to see what\'s moving.', icon: TrendingDown },
   { value: 'paperwork',      label: 'Paperwork',      description: 'Docs, disclosures, offers.', icon: GraduationCap },
@@ -101,22 +120,20 @@ interface FormValues {
 
 /**
  * Step ids for the full catalog. Each role path picks a subset in order. A
- * union rather than an enum so typos surface at compile time.
+ * string union rather than enum so typos surface at compile time.
  */
 type StepId =
   | 'role'
   | 'name'
   | 'business-name'
   | 'slug'
-  | 'phone'
-  | 'bio'
+  | 'about-you'          // grouped: phone + bio
   | 'logo'
   | 'timezone'
   | 'pain'
   | 'hear'
   | 'brokerage-name'
-  | 'brokerage-address'
-  | 'brokerage-phone'
+  | 'brokerage-contact'  // grouped: office address + phone
   | 'brokerage-logo'
   | 'brokerage-agent-count'
   | 'brokerage-type'
@@ -124,23 +141,25 @@ type StepId =
   | 'brokerage-commission';
 
 /**
- * Compute the step sequence from the chosen role. `role` is always first;
- * the rest flow naturally from there. Steps that don't apply to a role are
- * simply absent from the list — no conditional rendering inside the step
- * machine.
+ * Compute the step sequence from the chosen role. `role` is always first.
+ * Grouped steps (about-you, brokerage-contact) replace previously-separate
+ * phone/bio and address/phone steps so the total count stays short:
+ *
+ *   realtor       → 10 steps
+ *   broker + realtor → 17 steps
+ *   broker_only   → 12 steps
  */
 function stepsFor(role: Role | null): StepId[] {
   if (!role) return ['role'];
 
   const base: StepId[] = ['role', 'name'];
   if (role === 'realtor' || role === 'broker') {
-    base.push('business-name', 'slug', 'phone', 'bio', 'logo');
+    base.push('business-name', 'slug', 'about-you', 'logo');
   }
   if (role === 'broker' || role === 'broker_only') {
     base.push(
       'brokerage-name',
-      'brokerage-address',
-      'brokerage-phone',
+      'brokerage-contact',
       'brokerage-logo',
       'brokerage-agent-count',
       'brokerage-type',
@@ -156,10 +175,16 @@ function stepsFor(role: Role | null): StepId[] {
 
 interface OnboardingFlowProps {
   defaultName: string;
+  /**
+   * The signed-in user's Clerk avatar. Intentionally not used to prefill the
+   * business-logo step — a realtor's profile photo should not double as their
+   * company logo. Accepted here so callers can pass it for a future
+   * avatar-specific step.
+   */
   userImageUrl?: string;
 }
 
-export function OnboardingFlow({ defaultName, userImageUrl }: OnboardingFlowProps) {
+export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: OnboardingFlowProps) {
   const router = useRouter();
   const confettiRef = useRef<ConfettiRef>(null);
   const [values, setValues] = useState<FormValues>({
@@ -169,7 +194,7 @@ export function OnboardingFlow({ defaultName, userImageUrl }: OnboardingFlowProp
     slug: '',
     realtorPhone: '',
     realtorBio: '',
-    logoUrl: userImageUrl || null,
+    logoUrl: null,
     timezone: '',
     painPoint: '',
     hearAbout: '',
@@ -198,7 +223,6 @@ export function OnboardingFlow({ defaultName, userImageUrl }: OnboardingFlowProp
   const stepId = steps[stepIndex];
   const totalSteps = steps.length;
 
-  // Last step — once completed, we submit + redirect rather than advance.
   const isLastStep = stepIndex === steps.length - 1;
 
   const goBack = useCallback(() => {
@@ -210,7 +234,6 @@ export function OnboardingFlow({ defaultName, userImageUrl }: OnboardingFlowProp
       setStepIndex((i) => i + 1);
       return;
     }
-    // Last step → finalize.
     await finalize();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLastStep]);
@@ -224,7 +247,12 @@ export function OnboardingFlow({ defaultName, userImageUrl }: OnboardingFlowProp
       });
       if (!res.ok) return { available: false, error: 'Could not check availability' };
       const data = await res.json();
-      return { available: !!data.available, error: data.error };
+      // Server returns { available, reason }. Map 'invalid' to a readable
+      // message; otherwise fall back to the SlugStep default.
+      if (data.reason === 'invalid') {
+        return { available: false, error: 'Use 3+ lowercase letters, numbers, or dashes.' };
+      }
+      return { available: !!data.available };
     } catch {
       return { available: false, error: 'Network error' };
     }
@@ -236,6 +264,9 @@ export function OnboardingFlow({ defaultName, userImageUrl }: OnboardingFlowProp
     try {
       if (role === 'broker_only') {
         // Broker-only: skip workspace creation.
+        // User-level fields (timezone, hearAbout, painPoint, etc.) aren't
+        // persisted in this path — save_profile doesn't accept them and
+        // there's no create_space call. Pre-existing API limitation.
         const profileRes = await fetch('/api/onboarding', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -244,9 +275,6 @@ export function OnboardingFlow({ defaultName, userImageUrl }: OnboardingFlowProp
             name: values.name.trim(),
             phone: '',
             businessName: values.brokerageName.trim(),
-            timezone: values.timezone || undefined,
-            hearAbout: values.hearAbout || undefined,
-            painPoint: values.painPoint || undefined,
           }),
         });
         if (!profileRes.ok) throw await errorFrom(profileRes);
@@ -271,23 +299,23 @@ export function OnboardingFlow({ defaultName, userImageUrl }: OnboardingFlowProp
         return;
       }
 
-      // Realtor or broker-with-workspace.
+      // Realtor or broker-with-workspace. Personal phone is collected on the
+      // about-you step for both roles, so persist it in both cases.
       const profileRes = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'save_profile',
           name: values.name.trim(),
-          phone: role === 'realtor' ? values.realtorPhone.trim() : '',
+          phone: values.realtorPhone.trim(),
           businessName: values.businessName.trim(),
-          bio: role === 'realtor' ? values.realtorBio.trim() || undefined : undefined,
-          timezone: values.timezone || undefined,
-          hearAbout: values.hearAbout || undefined,
-          painPoint: values.painPoint || undefined,
         }),
       });
       if (!profileRes.ok) throw await errorFrom(profileRes);
 
+      // create_space persists space-level config AND User-level fields via its
+      // userUpdates block — so we send timezone, bio, referralSource, and
+      // biggestPainPoint here (save_profile silently drops them).
       const spaceRes = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -298,6 +326,11 @@ export function OnboardingFlow({ defaultName, userImageUrl }: OnboardingFlowProp
           intakePageIntro: 'Share a few details so I can review your rental fit faster.',
           businessName: values.businessName.trim(),
           logoUrl: values.logoUrl ?? undefined,
+          bio: values.realtorBio.trim() || undefined,
+          phone: values.realtorPhone.trim() || undefined,
+          timezone: values.timezone || undefined,
+          referralSource: values.hearAbout || undefined,
+          biggestPainPoint: values.painPoint || undefined,
         }),
       });
       const spaceData = await spaceRes.json().catch(() => ({}));
@@ -305,7 +338,6 @@ export function OnboardingFlow({ defaultName, userImageUrl }: OnboardingFlowProp
         if (spaceRes.status === 409) {
           toast.error('That slug was just taken. Please pick a different one.');
           setSubmitting(false);
-          // Jump back to the slug step so the user can fix it.
           const slugIndex = steps.indexOf('slug');
           if (slugIndex >= 0) setStepIndex(slugIndex);
           return;
@@ -415,44 +447,45 @@ export function OnboardingFlow({ defaultName, userImageUrl }: OnboardingFlowProp
         />
       )}
 
-      {stepId === 'phone' && (
-        <TextStep
-          title="How can clients reach you?"
-          subtitle="Optional — we'll never share this publicly."
-          label="Phone number"
-          placeholder="(415) 555-0123"
-          type="tel"
-          value={values.realtorPhone}
-          onChange={(v) => set('realtorPhone', v)}
+      {stepId === 'about-you' && (
+        <MultiFieldStep
+          title="A little about you"
+          subtitle="Both optional — shown on your intake page and emails."
+          fields={[
+            {
+              key: 'phone',
+              label: 'Phone number',
+              placeholder: '(415) 555-0123',
+              type: 'tel',
+              value: values.realtorPhone,
+              onChange: (v) => set('realtorPhone', v),
+              maxLength: 40,
+            },
+            {
+              key: 'bio',
+              label: 'Short bio',
+              placeholder: '15 years helping families find their next home.',
+              value: values.realtorBio,
+              onChange: (v) => set('realtorBio', v),
+              maxLength: 500,
+              multiline: true,
+              rows: 3,
+            },
+          ]}
           onNext={goNext}
           onSkip={goNext}
-          required={false}
-          maxLength={40}
-        />
-      )}
-
-      {stepId === 'bio' && (
-        <TextareaStep
-          title="Tell clients a bit about yourself"
-          subtitle="Shown on your intake page. Keep it short."
-          label="Bio"
-          placeholder="15 years helping families land their next home in the Bay Area."
-          value={values.realtorBio}
-          onChange={(v) => set('realtorBio', v)}
-          onNext={goNext}
-          onSkip={goNext}
-          maxLength={500}
         />
       )}
 
       {stepId === 'logo' && (
         <PhotoStep
-          title="Add a photo or logo"
-          subtitle="Shown next to your name. You can update this later."
+          title="Add your business logo"
+          subtitle="Shown on your intake form and email templates."
           value={values.logoUrl}
           onChange={(url) => set('logoUrl', url)}
           onNext={goNext}
           onSkip={goNext}
+          uploadKind="logo"
         />
       )}
 
@@ -469,33 +502,31 @@ export function OnboardingFlow({ defaultName, userImageUrl }: OnboardingFlowProp
         />
       )}
 
-      {stepId === 'brokerage-address' && (
-        <TextStep
-          title="Where's your office?"
-          subtitle="Optional."
-          label="Office address"
-          placeholder="500 Main St, Oakland, CA"
-          value={values.officeAddress}
-          onChange={(v) => set('officeAddress', v)}
+      {stepId === 'brokerage-contact' && (
+        <MultiFieldStep
+          title="Where should leads find you?"
+          subtitle="Optional — office address and a main phone line."
+          fields={[
+            {
+              key: 'officeAddress',
+              label: 'Office address',
+              placeholder: '500 Main St, Oakland, CA',
+              value: values.officeAddress,
+              onChange: (v) => set('officeAddress', v),
+              maxLength: 200,
+            },
+            {
+              key: 'officePhone',
+              label: 'Office phone',
+              placeholder: '(415) 555-0199',
+              type: 'tel',
+              value: values.officePhone,
+              onChange: (v) => set('officePhone', v),
+              maxLength: 40,
+            },
+          ]}
           onNext={goNext}
           onSkip={goNext}
-          required={false}
-          maxLength={200}
-        />
-      )}
-
-      {stepId === 'brokerage-phone' && (
-        <TextStep
-          title="Office phone?"
-          label="Office phone"
-          placeholder="(415) 555-0199"
-          type="tel"
-          value={values.officePhone}
-          onChange={(v) => set('officePhone', v)}
-          onNext={goNext}
-          onSkip={goNext}
-          required={false}
-          maxLength={40}
         />
       )}
 
@@ -507,6 +538,7 @@ export function OnboardingFlow({ defaultName, userImageUrl }: OnboardingFlowProp
           onChange={(url) => set('brokerLogoUrl', url ?? '')}
           onNext={goNext}
           onSkip={goNext}
+          uploadKind="broker_logo"
         />
       )}
 

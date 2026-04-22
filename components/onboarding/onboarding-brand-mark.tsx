@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * Small stylised brand mark for the onboarding hero. Uses an inline SVG with
- * an orange gradient so it feels on-brand without shipping a separate asset.
- * The shape is deliberately abstract (a rounded "C"-ish glyph) so it reads
- * as a brand element, not a literal icon from the icon set.
+ * Small stylised brand mark for the onboarding hero. Renders as an inline
+ * SVG with an orange gradient fill so it feels on-brand without shipping a
+ * separate asset. Shape is a simple rounded-diamond glyph — reads well on a
+ * light background.
  */
 export function OnboardingBrandMark({ size = 56 }: { size?: number }) {
   return (
@@ -19,27 +19,21 @@ export function OnboardingBrandMark({ size = 56 }: { size?: number }) {
       <defs>
         <linearGradient id="chippi-brand-grad" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor="#FFB056" />
-          <stop offset="50%" stopColor="#FF7A3A" />
-          <stop offset="100%" stopColor="#E64A1A" />
+          <stop offset="50%" stopColor="#F97316" />
+          <stop offset="100%" stopColor="#C2410C" />
         </linearGradient>
-        <filter id="chippi-brand-blur" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="0.6" />
-        </filter>
       </defs>
-      {/* Soft outer glow */}
-      <circle cx="28" cy="28" r="22" fill="url(#chippi-brand-grad)" opacity="0.15" filter="url(#chippi-brand-blur)" />
-      {/* Main mark — a rounded "chip" / house glyph */}
+      {/* Soft drop shadow — gives the mark a little depth on white */}
+      <ellipse cx="28" cy="50" rx="12" ry="2" fill="#C2410C" opacity="0.18" />
+      {/* Main rounded-diamond mark */}
       <path
-        d="M28 8 L44 18 V38 L28 48 L12 38 V18 Z"
+        d="M28 6 L46 18 V38 L28 50 L10 38 V18 Z"
         fill="url(#chippi-brand-grad)"
-        stroke="url(#chippi-brand-grad)"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
       />
-      {/* Inner accent — subtle window to give depth */}
+      {/* Inner highlight — slight specular so it doesn't look flat */}
       <path
-        d="M28 18 L38 24 V36 L28 42 L18 36 V24 Z"
-        fill="rgba(255, 255, 255, 0.18)"
+        d="M28 16 L38 22 V34 L28 40 L18 34 V22 Z"
+        fill="rgba(255, 255, 255, 0.22)"
       />
     </svg>
   );

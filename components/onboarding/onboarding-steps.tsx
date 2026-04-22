@@ -36,17 +36,17 @@ export function StepScaffold({
 }: StepScaffoldProps) {
   return (
     <div className="flex flex-col items-center text-center">
-      <h1 className="text-[28px] font-semibold leading-tight tracking-tight text-white sm:text-4xl">
+      <h1 className="text-[28px] font-semibold leading-tight tracking-tight text-neutral-900 sm:text-4xl">
         {title}
       </h1>
       {subtitle && (
-        <p className="mt-2 max-w-xl text-sm text-white/60 sm:text-base">{subtitle}</p>
+        <p className="mt-2 max-w-xl text-sm text-neutral-600 sm:text-base">{subtitle}</p>
       )}
 
       <div className="mt-8 w-full">{children}</div>
 
       {error && (
-        <p className="mt-4 text-sm text-rose-300" role="alert">
+        <p className="mt-4 text-sm text-rose-600" role="alert">
           {error}
         </p>
       )}
@@ -57,7 +57,7 @@ export function StepScaffold({
             <button
               type="button"
               onClick={onSkip}
-              className="text-sm font-medium text-white/60 transition-colors hover:text-white"
+              className="text-sm font-medium text-neutral-500 transition-colors hover:text-neutral-900"
             >
               Skip
             </button>
@@ -68,8 +68,8 @@ export function StepScaffold({
               onClick={onPrimary}
               disabled={primaryDisabled || primaryBusy}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-neutral-900 transition-all',
-                'hover:-translate-y-px hover:shadow-[0_10px_30px_rgba(255,120,50,0.35)]',
+                'inline-flex items-center gap-1.5 rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white transition-all',
+                'hover:-translate-y-px hover:shadow-[0_12px_30px_rgba(234,88,12,0.28)]',
                 'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none',
               )}
             >
@@ -83,6 +83,13 @@ export function StepScaffold({
     </div>
   );
 }
+
+// ── Shared input styling ────────────────────────────────────────────────────
+// Extracted so Text / Textarea / Multi-field step share the same look.
+const INPUT_CLASS =
+  'w-full rounded-xl border border-neutral-300 bg-white/80 px-4 py-3 text-base text-neutral-900 placeholder:text-neutral-400 outline-none backdrop-blur-sm transition-colors focus:border-neutral-900 focus:bg-white';
+const LABEL_CLASS =
+  'mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500';
 
 // ── Text step ──────────────────────────────────────────────────────────────
 
@@ -140,11 +147,7 @@ export function TextStep({
       error={error}
     >
       <div className="mx-auto max-w-md text-left">
-        {label && (
-          <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">
-            {label}
-          </label>
-        )}
+        {label && <label className={LABEL_CLASS}>{label}</label>}
         <input
           ref={inputRef}
           type={type}
@@ -158,9 +161,9 @@ export function TextStep({
           }}
           placeholder={placeholder}
           maxLength={maxLength}
-          className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-base text-white placeholder:text-white/30 outline-none backdrop-blur transition-colors focus:border-white/30 focus:bg-white/[0.07]"
+          className={INPUT_CLASS}
         />
-        {helper && <p className="mt-2 text-xs text-white/50">{helper}</p>}
+        {helper && <p className="mt-2 text-xs text-neutral-500">{helper}</p>}
       </div>
     </StepScaffold>
   );
@@ -204,11 +207,7 @@ export function TextareaStep({
       error={error}
     >
       <div className="mx-auto max-w-lg text-left">
-        {label && (
-          <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">
-            {label}
-          </label>
-        )}
+        {label && <label className={LABEL_CLASS}>{label}</label>}
         <textarea
           ref={ref}
           value={value}
@@ -216,8 +215,115 @@ export function TextareaStep({
           placeholder={placeholder}
           maxLength={maxLength}
           rows={rows}
-          className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-base text-white placeholder:text-white/30 outline-none backdrop-blur transition-colors focus:border-white/30 focus:bg-white/[0.07]"
+          className={cn(INPUT_CLASS, 'resize-none')}
         />
+      </div>
+    </StepScaffold>
+  );
+}
+
+// ── Multi-field step ───────────────────────────────────────────────────────
+
+export interface MultiFieldInput {
+  key: string;
+  label: string;
+  placeholder?: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: 'text' | 'tel' | 'url' | 'email';
+  maxLength?: number;
+  multiline?: boolean;
+  rows?: number;
+}
+
+interface MultiFieldStepProps {
+  title: string;
+  subtitle?: string;
+  fields: MultiFieldInput[];
+  onNext: () => void;
+  onSkip?: () => void;
+  /** Require at least one non-empty field to advance. */
+  requireAny?: boolean;
+  /** Require every listed field. */
+  requireAll?: boolean;
+  busy?: boolean;
+  error?: string | null;
+}
+
+/**
+ * Groups two or three related fields onto one step (e.g. phone + bio, or
+ * office address + office phone). Keeps each field labelled so the screen
+ * still answers one clear question overall.
+ */
+export function MultiFieldStep({
+  title,
+  subtitle,
+  fields,
+  onNext,
+  onSkip,
+  requireAny,
+  requireAll,
+  busy,
+  error,
+}: MultiFieldStepProps) {
+  // Focus the first input/textarea inside the container on mount. Querying the
+  // DOM avoids juggling multiple refs across a union of element types.
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = containerRef.current?.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+      'input, textarea',
+    );
+    el?.focus();
+  }, []);
+
+  const disabled =
+    (requireAll && fields.some((f) => !f.value.trim())) ||
+    (requireAny && !fields.some((f) => f.value.trim())) ||
+    false;
+
+  return (
+    <StepScaffold
+      title={title}
+      subtitle={subtitle}
+      onPrimary={onNext}
+      primaryDisabled={disabled}
+      primaryBusy={busy}
+      onSkip={onSkip}
+      error={error}
+    >
+      <div ref={containerRef} className="mx-auto max-w-lg space-y-4 text-left">
+        {fields.map((f, i) => (
+          <div key={f.key}>
+            <label className={LABEL_CLASS}>{f.label}</label>
+            {f.multiline ? (
+              <textarea
+                value={f.value}
+                onChange={(e) => f.onChange(e.target.value)}
+                placeholder={f.placeholder}
+                maxLength={f.maxLength ?? 500}
+                rows={f.rows ?? 3}
+                className={cn(INPUT_CLASS, 'resize-none')}
+              />
+            ) : (
+              <input
+                type={f.type ?? 'text'}
+                value={f.value}
+                onChange={(e) => f.onChange(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter advances only from the last non-multiline field so a
+                  // mid-form Enter doesn't accidentally submit.
+                  if (e.key === 'Enter' && i === fields.length - 1 && !disabled) {
+                    e.preventDefault();
+                    onNext();
+                  }
+                }}
+                placeholder={f.placeholder}
+                maxLength={f.maxLength ?? 120}
+                className={INPUT_CLASS}
+              />
+            )}
+          </div>
+        ))}
       </div>
     </StepScaffold>
   );
@@ -231,10 +337,8 @@ interface SlugStepProps {
   value: string;
   onChange: (v: string) => void;
   onNext: () => void;
-  /** Called with the raw value; returns { available, error? }. */
   onCheck: (v: string) => Promise<{ available: boolean; error?: string }>;
   busy?: boolean;
-  /** Prefix shown next to the input, e.g. "chippi.app/" */
   urlPrefix?: string;
 }
 
@@ -291,11 +395,9 @@ export function SlugStep({
       error={error && available === false ? error : null}
     >
       <div className="mx-auto max-w-md text-left">
-        <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">
-          Your intake link
-        </label>
-        <div className="flex items-stretch overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] focus-within:border-white/30 focus-within:bg-white/[0.07] transition-colors">
-          <span className="inline-flex items-center border-r border-white/10 bg-white/[0.03] px-3 text-sm text-white/50">
+        <label className={LABEL_CLASS}>Your intake link</label>
+        <div className="flex items-stretch overflow-hidden rounded-xl border border-neutral-300 bg-white/80 backdrop-blur-sm transition-colors focus-within:border-neutral-900 focus-within:bg-white">
+          <span className="inline-flex items-center border-r border-neutral-300 bg-neutral-50 px-3 text-sm text-neutral-500">
             {urlPrefix}
           </span>
           <input
@@ -314,17 +416,17 @@ export function SlugStep({
             }}
             placeholder="your-name"
             maxLength={48}
-            className="flex-1 bg-transparent px-3 py-3 text-base text-white placeholder:text-white/30 outline-none"
+            className="flex-1 bg-transparent px-3 py-3 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
           />
           <span className="inline-flex w-9 items-center justify-center text-sm">
             {checking ? (
-              <Loader2 size={14} className="animate-spin text-white/50" />
+              <Loader2 size={14} className="animate-spin text-neutral-400" />
             ) : available === true ? (
-              <Check size={14} className="text-emerald-400" />
+              <Check size={14} className="text-emerald-600" />
             ) : null}
           </span>
         </div>
-        <p className="mt-2 text-xs text-white/50">
+        <p className="mt-2 text-xs text-neutral-500">
           Lowercase letters, numbers, and dashes only. This is where leads will land.
         </p>
       </div>
@@ -347,9 +449,7 @@ interface TilesStepProps<T extends string> {
   options: TileOption<T>[];
   value: T | null;
   onSelect: (v: T) => void;
-  /** Columns at md+. Defaults to 4. Use 2 for longer labels. */
   columns?: 2 | 3 | 4;
-  /** When set, selecting a tile advances the step automatically. */
   advanceOnSelect?: boolean;
   onNext?: () => void;
   onSkip?: () => void;
@@ -368,7 +468,12 @@ export function TilesStep<T extends string>({
   onSkip,
   busy,
 }: TilesStepProps<T>) {
-  const gridCols = columns === 2 ? 'sm:grid-cols-2' : columns === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-4';
+  const gridCols =
+    columns === 2
+      ? 'sm:grid-cols-2'
+      : columns === 3
+        ? 'sm:grid-cols-3'
+        : 'sm:grid-cols-2 lg:grid-cols-4';
   return (
     <StepScaffold
       title={title}
@@ -389,7 +494,6 @@ export function TilesStep<T extends string>({
               onClick={() => {
                 onSelect(opt.value);
                 if (advanceOnSelect && onNext) {
-                  // Short delay so the visual selection registers before the exit animation.
                   setTimeout(() => onNext(), 140);
                 }
               }}
@@ -397,21 +501,24 @@ export function TilesStep<T extends string>({
               whileTap={{ scale: 0.98 }}
               transition={{ duration: 0.15 }}
               className={cn(
-                'group relative flex flex-col items-center justify-center gap-2 rounded-2xl border px-4 py-6 text-center transition-colors backdrop-blur',
+                'group relative flex flex-col items-center justify-center gap-2 rounded-2xl border bg-white/70 px-4 py-6 text-center backdrop-blur-sm transition-colors',
                 selected
-                  ? 'border-white/60 bg-white/15 text-white'
-                  : 'border-white/10 bg-white/[0.04] text-white/80 hover:border-white/30 hover:bg-white/[0.08] hover:text-white',
+                  ? 'border-neutral-900 bg-white shadow-[0_8px_24px_rgba(234,88,12,0.18)]'
+                  : 'border-neutral-300 hover:border-neutral-500 hover:bg-white',
               )}
             >
               {Icon && (
                 <Icon
                   size={22}
-                  className={cn('transition-colors', selected ? 'text-white' : 'text-white/70 group-hover:text-white')}
+                  className={cn(
+                    'transition-colors',
+                    selected ? 'text-neutral-900' : 'text-neutral-600 group-hover:text-neutral-900',
+                  )}
                 />
               )}
-              <span className="text-sm font-semibold">{opt.label}</span>
+              <span className="text-sm font-semibold text-neutral-900">{opt.label}</span>
               {opt.description && (
-                <span className="text-[11px] text-white/50">{opt.description}</span>
+                <span className="text-[11px] text-neutral-500">{opt.description}</span>
               )}
             </motion.button>
           );
@@ -430,10 +537,9 @@ interface PhotoStepProps {
   onChange: (url: string | null) => void;
   onNext: () => void;
   onSkip: () => void;
-  /** Upload endpoint that returns { url }. */
   uploadUrl?: string;
-  /** Form field name for the upload type. */
-  uploadKind?: string;
+  /** Must match one of the server's accepted types: 'logo' | 'photo' | 'broker_logo' */
+  uploadKind?: 'logo' | 'photo' | 'broker_logo';
   busy?: boolean;
 }
 
@@ -490,17 +596,17 @@ export function PhotoStep({
           className={cn(
             'relative flex h-32 w-32 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed transition-colors',
             value
-              ? 'border-white/30 bg-white/5'
-              : 'border-white/20 bg-white/[0.04] hover:border-white/40 hover:bg-white/[0.06]',
+              ? 'border-neutral-900/40 bg-white'
+              : 'border-neutral-300 bg-white/60 hover:border-neutral-500 hover:bg-white',
           )}
         >
           {value ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={value} alt="" className="h-full w-full object-cover" />
           ) : uploading ? (
-            <Loader2 size={22} className="animate-spin text-white/60" />
+            <Loader2 size={22} className="animate-spin text-neutral-500" />
           ) : (
-            <div className="flex flex-col items-center gap-1 text-white/60">
+            <div className="flex flex-col items-center gap-1 text-neutral-500">
               <span className="text-xs font-medium">Click to upload</span>
               <span className="text-[10px]">PNG · JPG · WebP</span>
             </div>
@@ -509,7 +615,7 @@ export function PhotoStep({
         <input
           ref={fileRef}
           type="file"
-          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+          accept="image/png,image/jpeg,image/webp"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -521,7 +627,7 @@ export function PhotoStep({
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="text-xs text-white/60 hover:text-white"
+            className="text-xs text-neutral-500 hover:text-neutral-900"
           >
             Remove
           </button>
