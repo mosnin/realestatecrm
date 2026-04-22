@@ -121,12 +121,29 @@ function extractInvoiceSubscriptionId(invoice: Stripe.Invoice): string | undefin
  * Returns true if a brokerage was updated (and thus Space path should be skipped),
  * false if the brokerage row no longer exists (idempotency: orphaned subscription).
  */
-async function updateBrokerageFromSubscription(
+/**
+ * Guard against metadata poisoning. A subscription's `metadata.brokerageId`
+ * is untrusted — whoever created the sub could point it at any brokerage.
+ * Before we write to a Brokerage row based on a webhook, confirm the
+ * subscription's Stripe customer matches the brokerage's stored customer
+ * (or that the brokerage has no customer yet, which is the legitimate
+ * first-subscribe case).
+ *
+ * Returns one of:
+ *   'ok'       — safe to write (either customers match, or brokerage has none)
+ *   'missing'  — brokerage row doesn't exist (orphaned subscription)
+ *   'mismatch' — customer IDs don't match; treat as handled but DO NOT write
+ *
+ * Every handler that writes to Brokerage based on subscription.metadata
+ * MUST call this first. Duplicating the logic inline is how the
+ * customer.subscription.deleted and invoice.payment_failed paths shipped
+ * without the check; centralising it closes that door.
+ */
+async function verifyBrokerageOwnsSubscription(
   brokerageId: string,
   subscription: Stripe.Subscription,
-  opts: { customerId?: string | null; includePlanFromMetadata?: boolean } = {},
-): Promise<boolean> {
-  // Verify the brokerage exists and (if it has a customer) that it matches.
+  customerOverride?: string | null,
+): Promise<{ status: 'ok' | 'missing' | 'mismatch'; existing: { id: string; stripeCustomerId: string | null } | null }> {
   const { data: existing } = await supabase
     .from('Brokerage')
     .select('id, stripeCustomerId')
@@ -134,15 +151,15 @@ async function updateBrokerageFromSubscription(
     .maybeSingle();
 
   if (!existing) {
-    logger.warn(
-      '[stripe-webhook] subscription metadata.brokerageId points to missing brokerage — ignoring',
-      { brokerageId, subscriptionId: subscription.id },
-    );
-    return false;
+    logger.warn('[stripe-webhook] subscription references missing brokerage — ignoring', {
+      brokerageId,
+      subscriptionId: subscription.id,
+    });
+    return { status: 'missing', existing: null };
   }
 
   const webhookCustomer =
-    opts.customerId ??
+    customerOverride ??
     (typeof subscription.customer === 'string'
       ? subscription.customer
       : subscription.customer?.id ?? null);
@@ -158,10 +175,38 @@ async function updateBrokerageFromSubscription(
         brokerageId,
         brokerageCustomer: existing.stripeCustomerId,
         webhookCustomer,
+        subscriptionId: subscription.id,
       },
     );
-    return true; // treat as handled — do NOT fall through to Space
+    return { status: 'mismatch', existing: { id: existing.id, stripeCustomerId: existing.stripeCustomerId } };
   }
+
+  return {
+    status: 'ok',
+    existing: { id: existing.id, stripeCustomerId: existing.stripeCustomerId ?? null },
+  };
+}
+
+async function updateBrokerageFromSubscription(
+  brokerageId: string,
+  subscription: Stripe.Subscription,
+  opts: { customerId?: string | null; includePlanFromMetadata?: boolean } = {},
+): Promise<boolean> {
+  const guard = await verifyBrokerageOwnsSubscription(
+    brokerageId,
+    subscription,
+    opts.customerId,
+  );
+  if (guard.status === 'missing') return false;
+  if (guard.status === 'mismatch') return true; // treat as handled — do NOT fall through to Space
+  // Guard returned 'ok'; existing is populated.
+  const existing = guard.existing!;
+
+  const webhookCustomer =
+    opts.customerId ??
+    (typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id ?? null);
 
   const updateData: Record<string, unknown> = {
     stripeSubscriptionId: subscription.id,
@@ -354,20 +399,13 @@ export async function POST(req: NextRequest) {
 
         // Brokerage path: mark canceled but preserve subscription id + seatLimit
         // so the owner has audit context and can resubscribe without losing config.
+        // The ownership guard is critical here — without it, an attacker who
+        // can set metadata.brokerageId on their OWN subscription could cancel
+        // a victim brokerage simply by deleting their sub. (Audit-driven fix.)
         const brokerageId = subscription.metadata?.brokerageId;
         if (brokerageId) {
-          const { data: existing } = await supabase
-            .from('Brokerage')
-            .select('id')
-            .eq('id', brokerageId)
-            .maybeSingle();
-          if (!existing) {
-            logger.warn(
-              '[stripe-webhook] subscription.deleted for missing brokerage — ignoring',
-              { brokerageId, subscriptionId: subscription.id },
-            );
-            break;
-          }
+          const guard = await verifyBrokerageOwnsSubscription(brokerageId, subscription);
+          if (guard.status !== 'ok') break; // missing or customer mismatch — swallow
           const { error } = await supabase
             .from('Brokerage')
             .update({
@@ -454,18 +492,9 @@ export async function POST(req: NextRequest) {
         const failedSub = await stripe.subscriptions.retrieve(subId);
         const brokerageId = failedSub.metadata?.brokerageId;
         if (brokerageId) {
-          const { data: existing } = await supabase
-            .from('Brokerage')
-            .select('id')
-            .eq('id', brokerageId)
-            .maybeSingle();
-          if (!existing) {
-            logger.warn(
-              '[stripe-webhook] payment_failed for missing brokerage — ignoring',
-              { brokerageId, subscriptionId: subId },
-            );
-            break;
-          }
+          // Same metadata-poisoning guard as subscription.deleted.
+          const guard = await verifyBrokerageOwnsSubscription(brokerageId, failedSub);
+          if (guard.status !== 'ok') break;
           const { error } = await supabase
             .from('Brokerage')
             .update({ stripeSubscriptionStatus: 'past_due' })

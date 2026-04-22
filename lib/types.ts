@@ -35,6 +35,17 @@ export type Brokerage = {
   brokerageBuyerFormConfig: IntakeFormConfig | null;
   brokerageRentalScoringModel: import('@/lib/scoring/scoring-model-types').ScoringModel | null;
   brokerageBuyerScoringModel: import('@/lib/scoring/scoring-model-types').ScoringModel | null;
+  /**
+   * Plan tier — controls seatLimit (BP3). 'starter' → 5, 'team' → 15,
+   * 'enterprise' → unlimited (seatLimit = null).
+   */
+  plan: 'starter' | 'team' | 'enterprise';
+  /** Max members + pending invites. Null = unlimited (enterprise). */
+  seatLimit: number | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripeSubscriptionStatus: 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'inactive';
+  stripePeriodEnd: Date | null;
   createdAt: Date;
 };
 

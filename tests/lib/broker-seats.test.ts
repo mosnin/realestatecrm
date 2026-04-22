@@ -145,17 +145,18 @@ describe('checkSeatCapacity', () => {
     expect(r.ok).toBe(true);
   });
 
-  it('fails open on infra error — blocking legitimate invites is worse', async () => {
-    // Make the Brokerage select error so loadPlan hits its fallback, but
-    // tip BrokerageMembership into erroring too to simulate full infra
-    // flap. The helper should still allow the invite through.
+  it('fails CLOSED on infra count error — silent overages are worse than a transient 402', async () => {
+    // Audit of BP3 flipped this trade-off. If either count sub-query
+    // can't reach the DB, we refuse the invite rather than risk the
+    // brokerage silently exceeding its billed seat count.
     mockByTable = {
-      Brokerage: { error: { message: 'db flap' }, single: null },
+      Brokerage: { single: { plan: 'starter', seatLimit: 5 } },
       BrokerageMembership: { error: { message: 'db flap' }, count: null },
       Invitation: { count: 0 },
     };
     const r = await checkSeatCapacity('b1', 1);
-    expect(r.ok).toBe(true);
+    expect(r.ok).toBe(false);
+    expect(r.needed).toBe(1);
   });
 
   it('clamps non-positive additional to 0 (never rejects on a zero-invite probe)', async () => {

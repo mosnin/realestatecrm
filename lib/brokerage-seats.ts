@@ -151,10 +151,15 @@ export async function getSeatUsage(brokerageId: string): Promise<SeatUsage> {
  *  - Otherwise → not ok; `needed` echoes back `additional` so the UI can tell
  *    the user how many invites it was trying to send.
  *
- * Fail-open: if either count sub-query errored (returned null), we treat this
- * as infrastructure flap and allow the operation through. Blocking legitimate
- * invites on a transient Supabase error is a worse failure mode than letting
- * one past the cap.
+ * Fail-closed on infra errors: if either count sub-query returned null
+ * (Supabase flap), we REFUSE the invite rather than silently leak past the
+ * seat cap. An earlier revision failed open under the reasoning that
+ * blocking legitimate invites was worse; an audit flipped that trade-off:
+ * a transient 402 during an infra incident is recoverable in seconds, a
+ * silent overage against a billing cap is detected weeks later when the
+ * customer reconciles their seat bill. The plan load itself still fails
+ * closed to starter/5 (safe floor) so a missing `plan` column
+ * (pre-migration) doesn't unlock the brokerage.
  */
 export async function checkSeatCapacity(
   brokerageId: string,
@@ -166,8 +171,9 @@ export async function checkSeatCapacity(
     countPendingInvites(brokerageId),
   ]);
 
-  // Infra error on either count → fail open.
+  // Infra error on either count → fail closed.
   if (membersResult === null || pendingResult === null) {
+    const requested = Math.max(0, Math.floor(additional));
     const usage: SeatUsage = {
       plan,
       seatLimit,
@@ -175,7 +181,7 @@ export async function checkSeatCapacity(
       pendingInvites: pendingResult ?? 0,
       used: (membersResult ?? 0) + (pendingResult ?? 0),
     };
-    return { ok: true, usage };
+    return { ok: false, usage, needed: requested };
   }
 
   const usage: SeatUsage = {

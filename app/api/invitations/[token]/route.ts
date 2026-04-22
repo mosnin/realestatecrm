@@ -161,6 +161,18 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Failed to join brokerage' }, { status: 500 });
   }
 
+  // If this user had been offboarded previously (BP1 set User.status =
+  // 'offboarded' and requireAuth gates on that), joining a new brokerage
+  // revives them. Without this flip, the agent would create the membership
+  // row, then bounce at every API call because the auth gate still 403s.
+  // Best-effort — a failure here is not fatal (the membership exists, a
+  // future admin action can re-activate).
+  await supabase
+    .from('User')
+    .update({ status: 'active' })
+    .eq('id', user.id)
+    .eq('status', 'offboarded');
+
   // Link the user's Space to this brokerage (best-effort)
   const { data: space } = await supabase
     .from('Space')
