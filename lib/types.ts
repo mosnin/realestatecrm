@@ -332,9 +332,24 @@ export type DealStage = {
   pipelineId: string | null;
 };
 
+export type DealContactRole =
+  | 'buyer'
+  | 'seller'
+  | 'buyer_agent'
+  | 'listing_agent'
+  | 'co_agent'
+  | 'lender'
+  | 'title'
+  | 'escrow'
+  | 'inspector'
+  | 'appraiser'
+  | 'attorney'
+  | 'other';
+
 export type DealContact = {
   dealId: string;
   contactId: string;
+  role: DealContactRole | null;
 };
 
 export type ContactActivity = {

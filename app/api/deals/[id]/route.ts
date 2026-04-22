@@ -34,7 +34,7 @@ export async function GET(
 
   const [stageResult, dcResult, activityResult] = await Promise.all([
     supabase.from('DealStage').select('*').eq('id', deal.stageId).maybeSingle(),
-    supabase.from('DealContact').select('dealId, contactId, Contact(id, name, type)').eq('dealId', id),
+    supabase.from('DealContact').select('dealId, contactId, role, Contact(id, name, type)').eq('dealId', id),
     supabase.from('DealActivity').select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(50),
   ]);
 
@@ -44,6 +44,7 @@ export async function GET(
   const dealContacts = (dcResult.data ?? []).map((row: any) => ({
     dealId: row.dealId,
     contactId: row.contactId,
+    role: row.role ?? null,
     contact: row.Contact ? { id: row.Contact.id, name: row.Contact.name, type: row.Contact.type } : null,
   }));
 

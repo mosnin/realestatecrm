@@ -37,7 +37,7 @@ export default async function DealDetailPage({
   if (!space) notFound();
 
   let dealRow: Record<string, unknown>;
-  let dealContacts: { dealId: string; contactId: string; contact: { id: string; name: string; email: string | null; phone: string | null } | null }[];
+  let dealContacts: { dealId: string; contactId: string; role: string | null; contact: { id: string; name: string; email: string | null; phone: string | null } | null }[];
   let activities: DealActivity[];
   let allStages: DealStage[];
   let checklist: DealChecklistItem[];
@@ -56,7 +56,7 @@ export default async function DealDetailPage({
 
     const [stagesResult, dcResult, activityResult, checklistResult] = await Promise.all([
       supabase.from('DealStage').select('*').eq('spaceId', space.id).order('position'),
-      supabase.from('DealContact').select('dealId, contactId, Contact(id, name, type, email, phone)').eq('dealId', id),
+      supabase.from('DealContact').select('dealId, contactId, role, Contact(id, name, type, email, phone)').eq('dealId', id),
       supabase.from('DealActivity').select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(100),
       supabase.from('DealChecklistItem').select('*').eq('dealId', id).order('position', { ascending: true }),
     ]);
@@ -73,6 +73,7 @@ export default async function DealDetailPage({
       return {
         dealId: row.dealId as string,
         contactId: row.contactId as string,
+        role: (row.role as string | null) ?? null,
         contact: contact
           ? { id: contact.id, name: contact.name, email: contact.email ?? null, phone: contact.phone ?? null }
           : null,
@@ -116,7 +117,7 @@ export default async function DealDetailPage({
 
   const linkedContacts = dealContacts
     .filter((dc) => dc.contact !== null)
-    .map((dc) => dc.contact!);
+    .map((dc) => ({ ...dc.contact!, role: dc.role as import('@/lib/types').DealContactRole | null }));
 
   return (
     <div className="space-y-0">

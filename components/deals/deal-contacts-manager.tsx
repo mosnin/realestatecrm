@@ -7,12 +7,15 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { DEAL_CONTACT_ROLES } from '@/lib/deals/roles';
+import type { DealContactRole } from '@/lib/types';
 
 interface LinkedContact {
   id: string;
   name: string;
   email: string | null;
   phone: string | null;
+  role: DealContactRole | null;
 }
 
 interface ContactSearchResult {
@@ -97,10 +100,35 @@ export function DealContactsManager({ dealId, slug, initialContacts }: DealConta
       name: result.name,
       email: result.email,
       phone: null,
+      role: null,
     };
     const updated = [...contacts, newContact];
     setContacts(updated);
     patchContacts(updated, previous);
+  }
+
+  /**
+   * Update a contact's role. Uses the dedicated role endpoint so it doesn't
+   * race with list-level patches.
+   */
+  async function handleRoleChange(contactId: string, role: DealContactRole | null) {
+    const previous = contacts;
+    setContacts((list) => list.map((c) => c.id === contactId ? { ...c, role } : c));
+
+    try {
+      const res = await fetch(`/api/deals/${dealId}/contacts/${contactId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      });
+      if (!res.ok) {
+        setContacts(previous);
+        toast.error('Could not save role');
+      }
+    } catch {
+      setContacts(previous);
+      toast.error('Could not save role');
+    }
   }
 
   function handleRemove(contactId: string) {
@@ -138,6 +166,22 @@ export function DealContactsManager({ dealId, slug, initialContacts }: DealConta
                   </p>
                 )}
               </Link>
+
+              {/* Role selector — compact dropdown. Empty string = no role. */}
+              <select
+                value={contact.role ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  handleRoleChange(contact.id, v === '' ? null : (v as DealContactRole));
+                }}
+                className="flex-shrink-0 text-xs border border-border rounded px-1.5 py-1 bg-transparent max-w-[120px]"
+                aria-label={`Role for ${contact.name}`}
+              >
+                <option value="">Role…</option>
+                {DEAL_CONTACT_ROLES.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
 
               {/* Remove button */}
               <button
