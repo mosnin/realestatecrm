@@ -207,13 +207,31 @@ Configured in `next.config.ts`:
 
 Implementation in `lib/rate-limit.ts` using Upstash Redis sliding-window counters. **Fails open** (allows request) if Redis is unavailable.
 
+### Endpoint rate limits
+
 | Endpoint | Limit | Key |
 |----------|-------|-----|
 | `POST /api/public/apply` | 10/hr per IP | `apply:rl:{ip}` |
-| `POST /api/ai/chat` | 60/hr per user | User-based |
+| `POST /api/ai/task` | 30 tasks/hr per user | `ai:task:{userId}` |
+| `POST /api/ai/task/approve/[requestId]` | 60/hr per user | `ai:task-approve:{userId}` |
 | `POST /api/contacts/import` | 5/hr per user | User-based |
 | `POST /api/broker/invite` | 20/hr per user | User-based |
 | `POST /api/broker/join` | 10/hr per user | User-based |
+
+### Per-tool rate limits (AI agent mutations)
+
+Every mutating tool ships its own `rateLimit: { max, windowSeconds }` in `lib/ai-tools/tools/*.ts` and is enforced inside the tool handler via `checkRateLimit`. Read-only tools (`search_contacts`, `search_deals`, `get_contact`, `pipeline_summary`) have no per-tool limit and are gated only by the per-turn cap above.
+
+| Tool | Max | Window | File |
+|------|-----|--------|------|
+| `send_email` | 50 | 3600 s (1 hr) | `lib/ai-tools/tools/send-email.ts` |
+| `send_sms` | 30 | 3600 s (1 hr) | `lib/ai-tools/tools/send-sms.ts` |
+| `update_contact` | 100 | 3600 s (1 hr) | `lib/ai-tools/tools/update-contact.ts` |
+| `advance_deal_stage` | 60 | 3600 s (1 hr) | `lib/ai-tools/tools/advance-deal-stage.ts` |
+| `create_deal` | 30 | 3600 s (1 hr) | `lib/ai-tools/tools/create-deal.ts` |
+| `schedule_tour` | 30 | 3600 s (1 hr) | `lib/ai-tools/tools/schedule-tour.ts` |
+| `add_checklist_item` | 60 | 3600 s (1 hr) | `lib/ai-tools/tools/add-checklist-item.ts` |
+| `delegate_to_subagent` | 20 | 3600 s (1 hr) | `lib/ai-tools/tools/delegate-to-subagent.ts` |
 
 ---
 
@@ -291,26 +309,41 @@ Implementation in `lib/rate-limit.ts` using Upstash Redis sliding-window counter
 
 ## 13. Audit logging
 
-The `AuditLog` table provides append-only event tracking:
+Every mutation in the app — including every AI-agent tool call that writes data — should go through the `audit()` helper in `lib/audit.ts`. It writes to the append-only `AuditLog` table via the service-role client and **swallows its own errors** so audit persistence can never block a user-facing operation.
 
 ```typescript
+import { audit } from '@/lib/audit';
+
 await audit({
-  actorId: dbUserId,
-  clerkId: clerkUserId,
-  ipAddress: req.headers.get('x-forwarded-for'),
-  action: 'CREATE',
-  resource: 'Contact',
-  resourceId: contact.id,
-  spaceId: space.id,
-  metadata: { name: contact.name },
+  actorClerkId: userId,           // Clerk userId of the caller (nullable)
+  action: 'CREATE',               // see AuditAction union below
+  resource: 'Contact',            // table/entity name
+  resourceId: contact.id,         // optional primary key
+  spaceId: space.id,              // optional workspace scope
+  req,                            // optional — IP is auto-extracted via getClientIp
+  metadata: { name: contact.name } // free-form JSON (before/after snapshots, tags, etc.)
 });
 ```
 
+### `AuditAction` union (source of truth: `lib/audit.ts`)
+
+`'CREATE' | 'UPDATE' | 'DELETE' | 'ACCESS' | 'LOGIN' | 'LOGOUT' | 'ADMIN_ACTION' | 'OFFBOARD'`
+
+Add new verbs to the union rather than casting at call sites. `OFFBOARD` covers the agent-offboarding transfer flow (Phase BP1).
+
+### Broker surfacing
+
+Audit rows are surfaced to brokers at **`/broker/activity`** (`app/broker/activity/page.tsx`). The page is brokerage-scoped via two queries merged server-side:
+- rows whose `spaceId` is in the brokerage's `Space.id` set (`Space.brokerageId = ctx.brokerage.id`), and
+- rows with `spaceId IS NULL` where `metadata->>brokerageId = ctx.brokerage.id` (for brokerage-level events that don't live inside a single space).
+
+Results are trimmed to the most recent 100 rows inside a 90-day window with a compound `createdAt|id` cursor for pagination.
+
 **Rules**:
-- AuditLog is append-only — never update or delete rows
-- Log all mutations (create, update, delete) on sensitive resources
+- `AuditLog` is append-only — never update or delete rows
+- Log all mutations (create, update, delete) on sensitive resources and every mutating AI tool call
 - Include before/after state in `metadata` for updates
-- Include IP address for compliance
+- IP address is captured automatically when you pass `req`
 
 ---
 

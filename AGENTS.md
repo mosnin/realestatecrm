@@ -10,7 +10,7 @@ All AI agents must read and follow this file before making any changes.
 
 Chippi is a self-serve SaaS for U.S. realtors focused on faster lead handling through intake, qualification, follow-up, and lightweight CRM workflows. The product emphasizes speed, clarity, and a polished brand experience for solo realtors handling renter and leasing leads.
 
-**Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind 4, Prisma 7 (PostgreSQL), Clerk (auth), OpenAI (scoring + embeddings + assistant), Zilliz/Milvus (vector search), Upstash Redis (legacy metadata), Vercel (deployment target).
+**Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind 4, Supabase (PostgreSQL, accessed via `@supabase/supabase-js` with the service-role key; schema lives in `supabase/schema.sql`), Clerk (auth), OpenAI (scoring + embeddings + assistant), Supabase pgvector (vector search via the `DocumentEmbedding` table and `match_documents` RPC — see `lib/zilliz.ts` for the pgvector wrapper), Upstash Redis (legacy metadata + rate limiting + pending-approval state), Resend (email), Telnyx (SMS), Stripe (billing), Vercel (deployment target). Prisma is **not** in use — there is no `prisma/schema.prisma`, no `prisma.config.ts`, and `@prisma/client` is not imported anywhere in the codebase.
 
 ---
 
@@ -82,10 +82,12 @@ Do **not** modify these unless the task explicitly requires it:
 | 6 | CRM state logic | `app/api/contacts/*`, `app/api/deals/*`, `app/api/stages/*` |
 | 7 | Auth | `middleware.ts`, `app/(auth)/*`, Clerk configuration |
 | 8 | Billing | `SpaceSetting.billingSettings`, any future Stripe routes |
-| 9 | Database schema and migrations | `prisma/schema.prisma`, `prisma/migrations/*` |
+| 9 | Database schema and migrations | `supabase/schema.sql`, `supabase/migrations/*` |
 | 10 | Deployment configuration | `next.config.ts`, `package.json` scripts, `scripts/*` |
 | 11 | Core routing and middleware | `middleware.ts`, route matchers, redirect logic |
-| 12 | Environment variable handling | `lib/utils.ts` (protocol/domain), `lib/db.ts`, `lib/redis.ts` |
+| 12 | Environment variable handling | `lib/utils.ts` (protocol/domain), `lib/supabase.ts`, `lib/redis.ts` |
+| 13 | AI tool registry | `lib/ai-tools/tools/index.ts` (source-of-truth list of every agent-callable tool), `lib/ai-tools/registry.ts`, individual `lib/ai-tools/tools/*.ts` files (each ships its own `requiresApproval` + `rateLimit` contract) |
+| 14 | Broker permission helpers | `lib/permissions.ts` (`requireBroker`, `getBrokerContext`, `getBrokerMemberContext`, role predicates) and `lib/api-auth.ts` (`requireAuth`, `requireSpaceOwner`, `requireContactAccess`). Never bypass these with raw `auth()` or ad-hoc role checks. |
 
 ---
 
