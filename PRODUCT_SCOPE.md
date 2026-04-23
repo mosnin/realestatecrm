@@ -45,14 +45,16 @@ Help realtors qualify renter and leasing leads faster, with less chaos, more con
 | Feature | Status | Key files |
 |---|---|---|
 | Auth (Clerk sign-up/sign-in) | Implemented | `middleware.ts`, `app/(auth)/*` |
-| Onboarding wizard (7 steps to activation) | Implemented | `app/onboarding/*`, `app/api/onboarding/route.ts` |
+| Onboarding wizard (setup to activation) | Implemented | `app/setup/page.tsx`, `app/api/onboarding/route.ts` |
 | Intake link setup and public form | Implemented | `app/apply/[slug]/*`, `app/api/public/apply/route.ts` |
 | Structured application ingestion into CRM | Implemented | `app/api/public/apply/route.ts` → Contact creation |
-| Lead scoring with explainable summary | Implemented | `lib/lead-scoring.ts` (OpenAI gpt-4o-mini) |
+| Lead scoring with explainable summary | Implemented | `lib/lead-scoring.ts` + `lib/scoring/*` (deterministic core + optional AI enhancement) |
 | CRM: Leads list (intake-sourced) | Implemented | `app/s/[slug]/leads/page.tsx` |
 | CRM: Contacts CRUD with lifecycle types | Implemented | `app/s/[slug]/contacts/*`, `app/api/contacts/*` |
 | CRM: Deals kanban board | Implemented | `app/s/[slug]/deals/*`, `app/api/deals/*` |
 | AI assistant (chat with RAG context) | Implemented | `app/s/[slug]/ai/*`, `lib/ai.ts` |
+| Background agent (drafts/activity/settings) | Implemented | `agent/*`, `app/api/agent/*`, `app/s/[slug]/agent/page.tsx` |
+| Stripe billing flow (brokerage subscriptions) | Implemented | `app/api/billing/*`, `app/api/webhooks/stripe/route.ts` |
 | Workspace settings | Implemented | `app/s/[slug]/settings/*`, `app/api/spaces/route.ts` |
 | Landing page | Implemented | `app/page.tsx` |
 | Legal pages (terms, privacy, cookies) | Implemented | `app/legal/*` |
@@ -65,7 +67,6 @@ Help realtors qualify renter and leasing leads faster, with less chaos, more con
 - Enterprise features (team accounts, roles, permissions)
 - Advanced automation systems not already present
 - Marketing campaign tools
-- Email sending or SMS integration
 - Property listing management
 - MLS integration
 - Transaction management

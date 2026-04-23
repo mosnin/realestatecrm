@@ -121,6 +121,24 @@ export interface ErrorEvent extends BaseEvent {
   code?: 'rate_limited' | 'quota' | 'internal' | 'auth';
 }
 
+/**
+ * Event payload shape callers pass to `makeEventPusher` before the helper
+ * stamps `seq` + `ts`.
+ *
+ * NOTE: Keep this as an explicit union of variants so discriminated keys
+ * (e.g. `reason` on `turn_complete`, `message` on `error`) remain available
+ * at call-sites. A plain `Omit<AgentEvent, 'seq' | 'ts'>` can lose
+ * discrimination in some TS configurations.
+ */
+export type AgentEventPayload =
+  | Omit<TextDeltaEvent, 'seq' | 'ts'>
+  | Omit<ToolCallStartEvent, 'seq' | 'ts'>
+  | Omit<ToolCallResultEvent, 'seq' | 'ts'>
+  | Omit<PermissionRequiredEvent, 'seq' | 'ts'>
+  | Omit<PermissionResolvedEvent, 'seq' | 'ts'>
+  | Omit<TurnCompleteEvent, 'seq' | 'ts'>
+  | Omit<ErrorEvent, 'seq' | 'ts'>;
+
 // ── Wire format ────────────────────────────────────────────────────────────
 
 /**
@@ -180,7 +198,7 @@ export function createSeqCounter(): () => number {
  */
 export function makeEventPusher(
   writer: WritableStreamDefaultWriter<Uint8Array>,
-): (event: Omit<AgentEvent, 'seq' | 'ts'>) => Promise<void> {
+): (event: AgentEventPayload) => Promise<void> {
   const nextSeq = createSeqCounter();
   return async (event) => {
     const full = {

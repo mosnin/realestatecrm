@@ -175,7 +175,7 @@ export default function FeaturesPage() {
         {/* Feature grid overview */}
         <section className="px-6 py-16 border-t border-border">
           <div className="max-w-5xl mx-auto">
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-8 text-center">What's included</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-8 text-center">What&apos;s included</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {allFeatures.map((f) => (
                 <div

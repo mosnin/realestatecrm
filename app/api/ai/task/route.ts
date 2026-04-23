@@ -23,7 +23,7 @@ import type OpenAI from 'openai';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
-import type { AgentEvent } from '@/lib/ai-tools/events';
+import type { AgentEvent, AgentEventPayload } from '@/lib/ai-tools/events';
 import { createSeqCounter, encodeEvent } from '@/lib/ai-tools/events';
 import { runTurn } from '@/lib/ai-tools/loop';
 import { getOpenAIClient, MissingOpenAIKeyError } from '@/lib/ai-tools/openai-client';
@@ -199,7 +199,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       const nextSeq = createSeqCounter();
 
-      const pushEvent = async (event: Omit<AgentEvent, 'seq' | 'ts'>) => {
+      const pushEvent = async (event: AgentEventPayload) => {
         const full = { ...event, seq: nextSeq(), ts: new Date().toISOString() } as AgentEvent;
         try {
           controller.enqueue(encodeEvent(full));

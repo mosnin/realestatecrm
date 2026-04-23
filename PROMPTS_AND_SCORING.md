@@ -1,212 +1,94 @@
 # PROMPTS_AND_SCORING.md
 
-Protected AI behavior documentation for prompts, scoring, and model configuration.
+Protected AI behavior reference for scoring, assistant prompts, and model/runtime boundaries.
 
-**These systems are protected.** Do not edit without explicit instruction. See change control rules in section 6.
+**Protected systems:** scoring engine behavior, AI enhancement prompt contract, assistant tool-loop system prompting, and provider/runtime configuration.
 
 ---
 
-## 1. Do prompts and scoring systems exist?
-
-Yes. All are implemented and active.
+## 1. Active AI systems
 
 | System | Status | Location |
 |---|---|---|
-| Lead scoring prompt + schema | **Implemented** | `lib/lead-scoring.ts` |
-| AI assistant system prompt | **Implemented** | `lib/ai.ts` |
-| Embedding pipeline | **Implemented** | `lib/embeddings.ts` |
-| Vector retrieval (RAG) | **Implemented** | `lib/zilliz.ts`, `lib/vectorize.ts` |
+| Deterministic lead scoring engine | Implemented | `lib/scoring/engine.ts`, `lib/lead-scoring.ts` |
+| AI enhancement layer for scoring narratives | Implemented | `lib/scoring/enhance.ts` |
+| In-app assistant tool-loop prompts | Implemented | `lib/ai-tools/system-prompt.ts`, `app/api/ai/task/*` |
+| In-app RAG assistant context composer | Implemented | `lib/ai.ts` |
+| Embedding pipeline | Implemented | `lib/embeddings.ts`, `lib/vectorize.ts` |
+| Background agent prompt/runtime stack | Implemented | `agent/agents/*`, `agent/orchestrator.py` |
 
 ---
 
-## 2. Code locations
+## 2. Lead scoring contract (current)
 
-### Lead scoring
+### 2.1 Source-of-truth behavior
 
-| Component | File | Line reference |
-|---|---|---|
-| Main function | `lib/lead-scoring.ts` → `scoreLeadApplication()` | Entry point for scoring |
-| Prompt builder | `lib/lead-scoring.ts` → `toPrompt()` | Constructs scoring prompt from lead fields |
-| Schema validation | `lib/lead-scoring.ts` → `scoreSchema` (zod) | Validates model output |
-| OpenAI structured output | `lib/lead-scoring.ts` → `response_format.json_schema` | Enforces output shape |
-| Caller | `app/api/public/apply/route.ts` | Called after Contact creation |
+- Numeric scoring comes from deterministic scoring logic.
+- AI is optional and only enriches qualitative fields (summary/tags/recommendation/state).
+- Failure in AI enhancement must not block deterministic scored output.
 
-### AI assistant
+### 2.2 Public scoring result shape
 
-| Component | File | Line reference |
-|---|---|---|
-| Main function | `lib/ai.ts` → `chatWithRAG()` | Entry point for assistant |
-| System prompt | `lib/ai.ts` → inline `systemPrompt` construction | Dynamic with space name + RAG context |
-| Provider routing | `lib/ai.ts` → OpenAI only | Provider selection logic |
-| API endpoint | `app/api/ai/chat/route.ts` | Authenticated streaming endpoint |
-| Message persistence | `app/api/ai/chat/route.ts` | Saves user + assistant messages to `Message` table |
+`LeadScoringResult` from `lib/lead-scoring.ts`:
 
-### Embeddings and vectors
+- `scoringStatus`: `scored` | `failed` | `pending`
+- `leadScore`: `number | null`
+- `scoreLabel`: `hot | warm | cold | unscored`
+- `scoreSummary`: `string | null`
+- `scoreDetails`: structured details object when scoring succeeds
 
-| Component | File |
-|---|---|
-| Text embedding | `lib/embeddings.ts` → `embedText()` |
-| Vector CRUD | `lib/zilliz.ts` → `ensureCollection()`, `upsertVector()`, `searchVectors()`, `deleteVector()` |
-| Entity sync | `lib/vectorize.ts` → `syncContact()`, `syncDeal()` |
-| Sync trigger | `app/api/vectorize/sync/route.ts` |
+### 2.3 Failure behavior
+
+- Deterministic engine failure returns failed/unscored fallback.
+- AI enhancement failure returns deterministic fallback narrative fields while preserving scored status when engine succeeds.
+- Contact persistence is independent from scoring success/failure.
 
 ---
 
-## 3. Scoring contract (implemented)
+## 3. In-app assistant contract (current)
 
-### Input shape
+### 3.1 Primary API surface
 
-The `scoreLeadApplication` function accepts:
+- `POST /api/ai/task` — interactive SSE turn execution with tool-calling and approval pause/resume.
+- `POST /api/ai/task/approve/[requestId]` — continuation endpoint for permission-gated tool calls.
+- `GET /api/ai/messages` and `GET/POST /api/ai/conversations` — transcript persistence APIs.
 
-```typescript
-{
-  contactId: string;    // Internal ID (for logging)
-  name: string;         // Required
-  email: string | null;
-  phone: string;        // Required
-  budget: number | null;
-  timeline: string | null;
-  preferredAreas: string | null;
-  notes: string | null;
-}
-```
+### 3.2 Prompt/runtime sources
 
-### Prompt structure
+- System prompt assembly: `lib/ai-tools/system-prompt.ts`
+- Tool loop orchestration: `lib/ai-tools/loop.ts`
+- Approval continuation: `lib/ai-tools/continue-turn.ts`
+- Event protocol: `lib/ai-tools/events.ts`
 
-The scoring prompt is constructed by `toPrompt()`:
+### 3.3 Safety behavior
 
-- **Role**: "You are scoring a U.S. renter leasing lead for follow-up priority."
-- **Output instruction**: "Return strict JSON only."
-- **Score range**: 0-100 (higher = higher follow-up priority)
-- **Label rules**: hot (75-100), warm (45-74), cold (0-44), unscored only if insufficient data
-- **Summary constraint**: "explainable and practical in under 300 chars"
-- **System message**: "You are a lead qualification assistant. Return only valid JSON matching the schema."
-
-### Model configuration
-
-| Parameter | Value |
-|---|---|
-| Model | `gpt-4o-mini` |
-| Temperature | `0` |
-| Response format | `json_schema` (strict mode) |
-
-### Output shape (`LeadScoringResult`)
-
-```typescript
-{
-  scoringStatus: 'scored' | 'failed' | 'pending';
-  leadScore: number | null;      // 0-100
-  scoreLabel: string;            // 'hot' | 'warm' | 'cold' | 'unscored'
-  scoreSummary: string | null;   // Max 300 chars, explainable
-}
-```
-
-### Zod validation schema
-
-```typescript
-z.object({
-  leadScore: z.number().min(0).max(100),
-  scoreLabel: z.enum(['hot', 'warm', 'cold', 'unscored']),
-  scoreSummary: z.string().min(1).max(300)
-})
-```
+- Mutating tool calls can be paused for approval.
+- Pending approvals are stored and resumed explicitly.
+- Workspace ownership and auth checks gate task execution and transcript access.
 
 ---
 
-## 4. Parsing and persistence flow
+## 4. Background agent model/runtime boundary
 
-```
-1. POST /api/public/apply receives submission
-2. Contact created with scoringStatus: 'pending', scoreLabel: 'unscored'
-3. scoreLeadApplication() called with lead fields
-4. OpenAI gpt-4o-mini called with structured JSON output format
-5. Response parsed as JSON
-6. Parsed JSON validated against Zod schema
-7. If valid: Contact updated with scored result
-8. If invalid (any step): Contact updated with fallback state
-9. API returns 201 with scoring result
-```
+- Runtime entrypoints: `agent/modal_app.py` (heartbeat, run-now webhook)
+- Orchestration: `agent/orchestrator.py`
+- Agent composition and handoffs: `agent/agents/*`
+- Security/budget controls: `agent/security/*`
 
-### Failure points and their handling
-
-| Failure | Handling |
-|---|---|
-| `OPENAI_API_KEY` missing | `getOpenAIClient()` throws → caught → fallback state |
-| Empty model response | Returns fallback state |
-| Invalid JSON in response | `JSON.parse` fails → returns fallback state |
-| Schema validation failure | `scoreSchema.safeParse` fails → returns fallback state |
-| Provider API error | Catch block → returns fallback state |
-| Scoring persistence failure | Separate catch block attempts fallback persistence |
+This system is separate from the in-app assistant tool loop and should be documented/changed independently.
 
 ---
 
-## 5. Fallback behavior expectations
+## 5. Change-control rules (strict)
 
-### Scoring fallback
+Explicit instruction is required to change any of the following:
 
-On any scoring failure, the result must be:
+1. Deterministic scoring logic and weighting behavior
+2. AI enhancement output contract or fallback semantics
+3. Assistant system prompt/tool-loop behavior
+4. Provider/runtime choices (OpenAI SDKs, model bindings, Modal runtime hooks)
+5. Approval/pending-approval semantics for mutating assistant actions
+6. Embedding model/dimensions and vector retrieval assumptions
 
-```typescript
-{
-  scoringStatus: 'failed',
-  leadScore: null,
-  scoreLabel: 'unscored',
-  scoreSummary: 'Scoring unavailable right now. Lead saved successfully.'
-}
-```
+For authorized changes, validate both success and failure paths and confirm persistence-isolation guarantees (especially intake/contact creation).
 
-**Critical rule**: Scoring failures must **never** block lead persistence. The Contact is always saved regardless of scoring outcome.
-
-### Assistant error handling
-
-| Scenario | Behavior |
-|---|---|
-| `OPENAI_API_KEY` not configured | Returns text: "No AI API key configured. Add OPENAI_API_KEY in your Vercel environment variables." |
-| OpenAI available | Uses OpenAI gpt-4.1-mini |
-| OpenAI fails (4xx/5xx) | Returns descriptive error text |
-| Zilliz/embeddings not configured | RAG context silently skipped; assistant still responds |
-
-### Assistant model configuration
-
-| Provider | Model | Temperature | Max tokens |
-|---|---|---|---|
-| OpenAI | `gpt-4.1-mini` | `0.2` | `2000` |
-
----
-
-## 6. Change control rules (strict)
-
-### What requires explicit instruction to change
-
-1. Prompt text (scoring or assistant system prompts)
-2. Model names or provider selection logic
-3. Temperature, max tokens, or response format settings
-4. Scoring label thresholds (hot/warm/cold ranges)
-5. Schema contracts (input shape, output shape, Zod validation)
-6. Fallback behavior and fallback text
-7. Persistence fields and status semantics
-8. Provider routing logic (OpenAI only)
-9. Embedding model or vector dimensions
-
-### Process for authorized changes
-
-If a task explicitly requires changes to prompts or scoring:
-
-1. **Call out** all impacted workflows in the task report
-2. **Document** backward compatibility risk (will existing scored contacts still make sense?)
-3. **Test** success path, failure path, and fallback path
-4. **Verify** that scoring failures still do not block lead persistence
-5. **Log** the change in `CHANGELOG_AI.md` with full detail
-
----
-
-## 7. Mandatory protection note
-
-AI prompts, scoring logic, model configuration, and provider routing are **protected core systems**.
-
-Any change requires:
-- Explicit task instruction
-- Validation evidence covering success, failure, and fallback paths
-- Entry in CHANGELOG_AI.md
-
-No agent may modify these systems as part of a broader task, cleanup, or refactor. Changes must be isolated and intentional.

@@ -122,14 +122,14 @@ export default async function AcceptInvitationPage({ params }: Params) {
                 )}
                 <div>
                   <p className="text-sm text-foreground leading-relaxed">
-                    You've been invited to join{' '}
+                    You&apos;ve been invited to join{' '}
                     <span className="font-semibold">{inv.brokerageName}</span> as a{' '}
                     <span className="font-semibold">{roleLabel(inv.roleToAssign)}</span>.
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">
                     {inv.roleToAssign === 'broker_admin'
-                      ? 'You\'ll get access to the brokerage dashboard to help manage the team. No subscription required.'
-                      : 'You\'ll keep your own workspace, leads, and pipeline — this just adds you to the brokerage network.'}
+                      ? 'You’ll get access to the brokerage dashboard to help manage the team. No subscription required.'
+                      : 'You’ll keep your own workspace, leads, and pipeline — this just adds you to the brokerage network.'}
                   </p>
                 </div>
                 <AcceptButton token={token} />

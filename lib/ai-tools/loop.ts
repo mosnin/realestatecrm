@@ -28,7 +28,7 @@ import type OpenAI from 'openai';
 import { logger } from '@/lib/logger';
 import type { MessageBlock, TextBlock, ToolCallBlock } from './blocks';
 import { executeTool, executionToModelMessage } from './execute';
-import type { AgentEvent } from './events';
+import type { AgentEventPayload } from './events';
 import { AGENT_MODEL } from './openai-client';
 import { allToolsForOpenAI } from './openai-format';
 import { getTool, listTools } from './registry';
@@ -77,7 +77,7 @@ export interface RunTurnInput {
   /** System prompt + message history + the new user message, already built. */
   messages: ChatMsg[];
   /** Called for every AgentEvent the loop emits. Callee owns the wire. */
-  pushEvent: (event: Omit<AgentEvent, 'seq' | 'ts'>) => Promise<void>;
+  pushEvent: (event: AgentEventPayload) => Promise<void>;
 }
 
 export interface RunTurnOutput {

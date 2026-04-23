@@ -10,7 +10,7 @@ All AI agents must read and follow this file before making any changes.
 
 Chippi is a self-serve SaaS for U.S. realtors focused on faster lead handling through intake, qualification, follow-up, and lightweight CRM workflows. The product emphasizes speed, clarity, and a polished brand experience for solo realtors handling renter and leasing leads.
 
-**Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind 4, Prisma 7 (PostgreSQL), Clerk (auth), OpenAI (scoring + embeddings + assistant), Zilliz/Milvus (vector search), Upstash Redis (legacy metadata), Vercel (deployment target).
+**Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind 4, Supabase PostgreSQL, Clerk (auth), OpenAI (assistant + embeddings + scoring enhancement), OpenAI Agents SDK (background runtime), Modal (agent runtime), Upstash Redis (legacy metadata + agent queues), Vercel (deployment target).
 
 ---
 
@@ -74,7 +74,7 @@ Do **not** modify these unless the task explicitly requires it:
 
 | # | Protected system | Key files |
 |---|---|---|
-| 1 | Onboarding logic | `app/onboarding/*`, `app/api/onboarding/route.ts` |
+| 1 | Onboarding logic | `app/setup/page.tsx`, `app/api/onboarding/route.ts` |
 | 2 | Application flow logic | `app/apply/*`, `app/api/public/apply/route.ts` |
 | 3 | AI prompts | `lib/ai.ts` (system prompt, provider routing) |
 | 4 | Scoring logic | `lib/lead-scoring.ts` (prompt, schema, thresholds, fallback) |
@@ -82,7 +82,7 @@ Do **not** modify these unless the task explicitly requires it:
 | 6 | CRM state logic | `app/api/contacts/*`, `app/api/deals/*`, `app/api/stages/*` |
 | 7 | Auth | `middleware.ts`, `app/(auth)/*`, Clerk configuration |
 | 8 | Billing | `SpaceSetting.billingSettings`, any future Stripe routes |
-| 9 | Database schema and migrations | `prisma/schema.prisma`, `prisma/migrations/*` |
+| 9 | Database schema and migrations | `supabase/schema.sql`, `supabase/migrations/*` |
 | 10 | Deployment configuration | `next.config.ts`, `package.json` scripts, `scripts/*` |
 | 11 | Core routing and middleware | `middleware.ts`, route matchers, redirect logic |
 | 12 | Environment variable handling | `lib/utils.ts` (protocol/domain), `lib/db.ts`, `lib/redis.ts` |

@@ -176,11 +176,12 @@ All protected routes use one of these auth helpers from `lib/api-auth.ts`:
 
 ## AI endpoints
 
-### `POST /api/ai/chat`
-- **Auth**: `requireAuth()`
-- **Body**: `{ slug, message, conversationId? }`
-- **Response**: Streaming text (SSE/ReadableStream)
-- **Side effects**: Persists user + assistant messages to `Message` table, RAG context lookup
+### `POST /api/ai/task`
+- **Auth**: Authenticated user + workspace ownership check (`spaceSlug`)
+- **Body**: `{ spaceSlug, message, conversationId? }`
+- **Response**: Streaming SSE events (text deltas, tool-call events, permission-required events, turn_complete)
+- **Rate limit**: `30/hour` per user (`ai:task:{userId}`)
+- **Side effects**: Persists user message, executes tool loop, persists assistant message blocks, may create pending approval state
 
 ### `GET /api/ai/conversations?slug=X`
 - **Auth**: `requireSpaceOwner(slug)`
@@ -190,9 +191,16 @@ All protected routes use one of these auth helpers from `lib/api-auth.ts`:
 - **Auth**: `requireAuth()` + verify conversation belongs to user's space
 - **Response**: `200` — `Conversation` with messages
 
-### `GET /api/ai/messages?slug=X&conversationId=Y`
-- **Auth**: `requireSpaceOwner(slug)`
+### `GET /api/ai/messages?conversationId=Y`
+- **Auth**: `auth()` + conversation ownership verification
 - **Response**: `200` — `Message[]` ordered by createdAt asc
+
+### `POST /api/ai/task/approve/[requestId]`
+- **Auth**: Authenticated user; requestId must belong to same user/workspace
+- **Body**: `{ decision: 'approved' | 'denied', editedArgs? }`
+- **Response**: Streaming SSE continuation events for resumed turn
+- **Rate limit**: `60/hour` per user (`ai:task-approve:{userId}`)
+- **Side effects**: Consumes pending approval state, continues tool loop, persists assistant continuation blocks
 
 ---
 

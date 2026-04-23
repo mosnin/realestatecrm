@@ -35,8 +35,8 @@ This document defines clear boundaries between each major workflow in Chippi. AI
                               ▼
                        ┌─────────────┐
                        │   BILLING   │
-                       │ (not yet    │
-                       │ implemented)│
+                       │ Stripe      │
+                       │ lifecycle   │
                        └─────────────┘
 ```
 
@@ -57,11 +57,11 @@ This document defines clear boundaries between each major workflow in Chippi. AI
 
 | Pattern | Protection |
 |---|---|
-| `/dashboard(.*)` | Protected — requires auth |
 | `/s/(.*)` | Protected — requires auth |
-| `/onboarding(.*)` | Protected — requires auth |
-| `/`, `/sign-in`, `/sign-up`, `/admin` | Public |
-| `/apply/*` | Public (not in middleware matcher — prospect-facing) |
+| `/setup(.*)` | Protected — requires auth |
+| `/admin(.*)` / `/broker(.*)` / `/authorize` | Protected — requires auth |
+| `/`, `/sign-in`, `/sign-up`, `/login/*` | Public |
+| `/apply/*`, `/book/*`, `/api/public/*` | Public fast-path (prospect-facing) |
 | `/legal/*` | Public |
 
 ---
@@ -73,7 +73,7 @@ This document defines clear boundaries between each major workflow in Chippi. AI
 | **Purpose** | Activate user and workspace; generate intake link |
 | **Trigger** | Authenticated user enters onboarding flow |
 | **Source of truth** | `User.onboardingCurrentStep`, `User.onboardingCompletedAt`, `Space` creation |
-| **Key files** | `app/onboarding/*`, `app/api/onboarding/route.ts` |
+| **Key files** | `app/setup/page.tsx`, `app/api/onboarding/route.ts` |
 | **Key records** | `User` (onboarding fields), `Space`, `SpaceSetting`, default `DealStage` rows |
 | **Can change** | Onboarding progress/completion, workspace setup data, user profile fields |
 | **Must never change** | Application submission records, Contact scoring outputs, CRM pipeline state |
@@ -105,7 +105,7 @@ This document defines clear boundaries between each major workflow in Chippi. AI
 | **Purpose** | Capture structured prospect applications via public intake form |
 | **Trigger** | Public form submission at `/apply/[slug]` |
 | **Source of truth** | `Contact` record created under the target `Space` |
-| **Key files** | `app/apply/[slug]/*`, `app/api/public/apply/route.ts` |
+| **Key files** | `app/apply/[slug]/*`, `app/apply/b/[brokerageId]/page.tsx`, `app/api/public/apply/route.ts` |
 | **Key records** | `Contact` (with tags `['application-link', 'new-lead']`, type `QUALIFICATION`) |
 | **Can change** | Contact creation, intake metadata, scoring status fields on Contact |
 | **Must never change** | `User.onboardingCompletedAt`, `Space` configuration, `DealStage` definitions |
@@ -139,7 +139,7 @@ This document defines clear boundaries between each major workflow in Chippi. AI
 2. Scoring failure must not prevent Contact persistence
 3. Scoring must not create or modify Deals, DealStages, or Messages
 4. Scoring logic must not be modified as a side effect of other changes
-5. Score thresholds (hot 75-100, warm 45-74, cold 0-44) are part of the prompt contract
+5. Deterministic scoring engine remains source-of-truth; AI enhancement is optional and must not determine numeric score
 
 ---
 
@@ -150,7 +150,7 @@ This document defines clear boundaries between each major workflow in Chippi. AI
 | **Purpose** | Triage and follow-up operations for the authenticated realtor |
 | **Trigger** | Authenticated workspace usage at `/s/[slug]/*` |
 | **Source of truth** | `Contact`, `Deal`, `DealStage`, `DealContact`, `Message` records |
-| **Key files** | `app/s/[slug]/*`, `app/api/contacts/*`, `app/api/deals/*`, `app/api/stages/*`, `app/api/ai/chat/*` |
+| **Key files** | `app/s/[slug]/*`, `app/api/contacts/*`, `app/api/deals/*`, `app/api/stages/*`, `app/api/ai/task/*`, `app/api/ai/messages/route.ts` |
 | **Can change** | CRM records, pipeline ordering, deal stage assignments, contact lifecycle type, messages |
 | **Must never change** | Scoring prompt/contract, onboarding state, public intake form behavior, model configuration |
 
@@ -170,17 +170,17 @@ This document defines clear boundaries between each major workflow in Chippi. AI
 
 | Attribute | Detail |
 |---|---|
-| **Purpose** | Billing preferences and settings (current visible scope) |
-| **Trigger** | Settings page updates |
-| **Source of truth** | `SpaceSetting.billingSettings` (string field) |
-| **Key files** | `app/s/[slug]/settings/*`, `app/api/spaces/route.ts` |
-| **Can change** | Billing settings field value |
+| **Purpose** | Subscription lifecycle and plan access management |
+| **Trigger** | Billing checkout/portal actions and Stripe webhook events |
+| **Source of truth** | Stripe customer/subscription IDs and status fields on workspace/brokerage records |
+| **Key files** | `app/api/billing/*`, `app/api/webhooks/stripe/route.ts`, `app/s/[slug]/billing/page.tsx` |
+| **Can change** | Subscription status fields, billing period metadata, checkout/portal redirect state |
 | **Must never change** | Auth state, onboarding state, scoring logic, CRM core records, contact data |
-| **Status** | Stripe workflow **not confirmed** in current codebase. Field and UI exist but no payment processing. |
+| **Status** | Stripe billing routes and webhook handling are implemented; continue hardening/reconciliation. |
 
 ### Billing implementation notes
 
-- When billing is implemented, it must not gate existing CRM functionality without explicit product decision
+- Billing must not gate existing CRM functionality without explicit product decision
 - Billing state must not be coupled to onboarding completion
 - Billing failures must not affect lead ingestion or scoring
 

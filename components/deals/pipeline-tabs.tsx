@@ -443,7 +443,7 @@ export function PipelineTabs({
         <Dialog open onOpenChange={(open) => { if (!open && !deleteState.submitting) setDeleteState(null); }}>
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
-              <DialogTitle>Delete "{deleteState.pipeline.name}"?</DialogTitle>
+              <DialogTitle>Delete &quot;{deleteState.pipeline.name}&quot;?</DialogTitle>
               <DialogDescription>
                 This board has {deleteState.dealCount} deal{deleteState.dealCount === 1 ? '' : 's'} across{' '}
                 {deleteState.stageCount} stage{deleteState.stageCount === 1 ? '' : 's'}. Choose a board to move them to before deleting.

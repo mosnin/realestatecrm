@@ -1,8 +1,8 @@
 # TESTING.md
 
-Manual validation playbook for Chippi.
+Validation playbook for Chippi.
 
-No automated test framework is currently configured in this repository. All validation is manual. This playbook defines what to check after changes.
+This repository supports both automated and manual validation. Run automated checks first, then execute manual workflow checks for the surfaces your change touches.
 
 ---
 
@@ -12,15 +12,14 @@ No automated test framework is currently configured in this repository. All vali
 |---|---|
 | Node.js | 18+ |
 | Package manager | pnpm (v10.12 configured in `package.json`) |
-| Database | PostgreSQL with `DATABASE_URL` configured |
+| Database | Supabase/PostgreSQL credentials configured |
 | Clerk | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` configured |
-| Schema | Migrations applied: `pnpm exec prisma migrate deploy` |
+| Schema | `supabase/schema.sql` applied (or equivalent migrations applied) |
 
 ### Basic run flow
 
 ```bash
 pnpm install
-pnpm exec prisma migrate deploy
 pnpm dev
 ```
 
@@ -30,13 +29,27 @@ Dev server runs at `http://localhost:3000` with Turbopack.
 
 | Service | Required for | Env vars |
 |---|---|---|
-| OpenAI | Lead scoring, embeddings, AI assistant | `OPENAI_API_KEY` |
+| OpenAI | AI assistant, embeddings, AI-enhanced scoring summaries | `OPENAI_API_KEY` |
 | Zilliz/Milvus | Vector search (RAG context) | `ZILLIZ_URI`, `ZILLIZ_TOKEN` |
-| Upstash Redis | Legacy admin/slug path | `KV_REST_API_URL`, `KV_REST_API_TOKEN` |
+| Upstash Redis | Agent triggers, live streams, budget counters, legacy metadata paths | `KV_REST_API_URL`, `KV_REST_API_TOKEN` |
+| Modal runtime | Background agent heartbeat + run-now webhook | `AGENT_INTERNAL_SECRET`, `MODAL_WEBHOOK_URL` |
 
 ---
 
-## 2. Smoke test checklist
+## 2. Automated checks (run first)
+
+Run these before manual QA whenever possible:
+
+- [ ] `pnpm test` (Vitest suite: `tests/**/*.test.ts`)
+- [ ] `pnpm test:contract` (Node contract tests: `scripts/*.test.mjs`)
+- [ ] `pnpm typecheck`
+- [ ] `pnpm lint`
+
+If one fails due environment/setup constraints, record the exact failure and continue with relevant manual checks.
+
+---
+
+## 3. Smoke test checklist
 
 Run these after any change to confirm nothing is fundamentally broken:
 
@@ -50,7 +63,7 @@ Run these after any change to confirm nothing is fundamentally broken:
 
 ---
 
-## 3. Core workflow tests
+## 4. Core workflow tests
 
 ### A. Onboarding
 
@@ -79,12 +92,11 @@ Run these after any change to confirm nothing is fundamentally broken:
 
 ### C. Lead scoring
 
-- [ ] Successful submission with valid `OPENAI_API_KEY` produces scored result (score, label, summary)
-- [ ] Score label matches threshold rules: hot (75-100), warm (45-74), cold (0-44)
-- [ ] Missing `OPENAI_API_KEY` results in `scoringStatus: 'failed'`, `scoreLabel: 'unscored'`
-- [ ] Invalid API key results in fallback unscored state
+- [ ] Successful submission produces scored result (score, label, summary/details)
+- [ ] Missing/invalid `OPENAI_API_KEY` still preserves lead creation and deterministic scoring output
+- [ ] AI enhancement failures fall back to deterministic summary/tags/next-action values
 - [ ] Scoring failure does **not** prevent Contact creation — lead is always saved
-- [ ] Fallback summary text: "Scoring unavailable right now. Lead saved successfully."
+- [ ] True scoring engine failures return unscored fallback state and still preserve contact creation
 
 ### D. CRM rendering and actions
 
@@ -127,13 +139,23 @@ Run these after any change to confirm nothing is fundamentally broken:
 
 ### H. Billing checks
 
-- [ ] Current status: Stripe flow not confirmed in code
+- [ ] Stripe checkout flow endpoints load (`/api/billing/checkout`, `/api/billing/portal`, `/api/billing/cancel`)
 - [ ] Billing settings field in Settings does not break on save
-- [ ] No billing-related errors on page load
+- [ ] Stripe webhook route is configured and accepting signed events in target environment
+
+### I. Background agent checks
+
+- [ ] Agent page (`/s/[slug]/agent`) loads Drafts, Activity, and Settings tabs
+- [ ] Agent settings save correctly (`enabled`, `autonomyLevel`, `enabledAgents`, `dailyTokenBudget`)
+- [ ] `Run now` triggers immediate Modal path when `MODAL_WEBHOOK_URL` is configured
+- [ ] `Run now` falls back to queued trigger flow when Modal webhook is unavailable
+- [ ] Agent live stream (`/api/agent/stream`) emits events for recent run IDs
+- [ ] Draft review flow works end-to-end (pending → approved/sent or dismissed)
+- [ ] Agent activity/usage/insights endpoints return workspace-scoped data
 
 ---
 
-## 4. Regression checklist
+## 5. Regression checklist
 
 Run these after any change to verify workflow boundaries are intact:
 
@@ -148,7 +170,7 @@ Run these after any change to verify workflow boundaries are intact:
 
 ---
 
-## 5. Workflow boundary validation (required after cross-system changes)
+## 6. Workflow boundary validation (required after cross-system changes)
 
 Explicitly verify that onboarding and application are separate states:
 
