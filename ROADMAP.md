@@ -4,9 +4,9 @@ Prioritized work ahead for Chippi. Use this to avoid fixing things about to be r
 
 ---
 
-## Current phase: V1 Stabilization + Tour System
+## Current phase: V1 Stabilization + Agent Runtime Hardening
 
-The product is past initial build. Focus is on hardening existing systems, completing the tour booking feature, and preparing for billing.
+The product is past initial build. Focus is on hardening existing systems, background agent reliability, tour/brokerage polish, and billing operations.
 
 ---
 
@@ -14,6 +14,7 @@ The product is past initial build. Focus is on hardening existing systems, compl
 
 | Item | Status | Key files | Notes |
 |------|--------|-----------|-------|
+| Background agent runtime | Building | `agent/*`, `app/api/agent/*`, `components/agent/*` | Modal heartbeat + run-now webhook, draft inbox, activity feed, token budgets, streaming updates |
 | Tour booking system | Building | `app/api/tours/*`, `app/s/[slug]/tours/*`, `supabase/migrations/` | Multi-property scheduling, waitlist, feedback, Google Calendar sync |
 | Broker/brokerage system | Building | `app/broker/*`, `lib/permissions.ts`, `app/api/broker/*` | Self-serve brokerage creation, invite flow, broker dashboard |
 | Audit logging | Building | `lib/audit.ts`, `AuditLog` table | SOC 2 prep, append-only event log |
@@ -27,8 +28,8 @@ The product is past initial build. Focus is on hardening existing systems, compl
 
 | Item | Priority | Dependencies | Notes |
 |------|----------|--------------|-------|
-| Stripe billing integration | High | Billing field exists in SpaceSetting; no Stripe package yet | $97/mo, 7-day trial. Must not gate existing CRM features without product decision |
-| Automated test suite | High | None | Currently all manual validation. Need at minimum: contract tests, API route tests |
+| Billing operations hardening | High | Existing Stripe routes and webhooks | Improve failure handling, reconciliation, and subscription lifecycle visibility |
+| Integration/E2E test coverage | High | Existing Vitest + contract tests | Add route-level and end-to-end coverage for onboarding, billing, and agent workflows |
 | Contact import (CSV/bulk) | Medium | Rate limiting exists (5/hr import tier) | Bulk contact creation with dedup |
 | Email notifications expansion | Medium | Resend already integrated | Currently only lead notification; expand to tour confirmations, deal updates |
 | Google Calendar OAuth flow | Medium | `GoogleCalendarToken` table exists | Token storage ready, need OAuth consent + sync logic |
@@ -47,7 +48,6 @@ These are mentioned in product context but have no code or active plan:
 - Transaction management
 - Document signing
 - Marketing campaign tools
-- SMS integration
 - Team workspaces (multi-user per space)
 - Advanced automation / workflow builder
 - Mobile app

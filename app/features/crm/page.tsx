@@ -127,7 +127,7 @@ export default function CRMPage() {
         {/* Profile sections */}
         <section className="px-6 py-20 border-t border-border">
           <div className="max-w-5xl mx-auto">
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-3">What's on every profile</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-3">What&apos;s on every profile</p>
             <h2 className="text-3xl font-semibold tracking-tight mb-10">
               One view for everything you need to act.
             </h2>

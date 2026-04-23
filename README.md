@@ -11,11 +11,11 @@ Chippi is a SaaS platform that helps realtors capture, qualify, and manage renta
 ### Key features
 
 - **Public intake forms** — Custom-branded application pages for prospects to submit rental applications
-- **AI lead scoring** — Automatic lead qualification using GPT-4o-mini with score, tier (hot/warm/cold), and actionable summaries
+- **AI lead scoring** — Deterministic scoring engine with optional AI-enhanced summaries and recommendations
 - **CRM pipeline** — Kanban-style deal management with customizable stages, drag-and-drop, and contact linking
 - **Tour scheduling** — Public booking page, calendar integration, automated confirmations/reminders
 - **Brokerage management** — Multi-user team dashboards, invite system, performance tracking across realtors
-- **AI assistant** — Context-aware chat with RAG-enriched vector search across contacts and deals
+- **AI assistant + agent system** — Interactive in-app assistant plus a background agent runtime for automated monitoring, drafting, and follow-up orchestration
 - **Notifications** — Email (Resend) and SMS (Telnyx) notifications for leads, tours, deals, and follow-ups
 - **Analytics** — Weekly trends, conversion funnels, and team performance metrics
 
@@ -36,8 +36,9 @@ Chippi is a SaaS platform that helps realtors capture, qualify, and manage renta
 | UI | React 19, Tailwind CSS 4, shadcn/ui components |
 | Auth | Clerk |
 | Database | PostgreSQL via Supabase |
-| AI | OpenAI (scoring + embeddings + assistant) |
+| AI | OpenAI (in-app assistant + agent workflows) + OpenAI Agents SDK (background agent runtime) |
 | Vector search | Supabase pgvector |
+| Agent runtime | Modal (Python service in `agent/`) |
 | Email | Resend |
 | SMS | Telnyx |
 | Cache | Upstash Redis |
@@ -69,6 +70,11 @@ lib/                    # Core business logic
   ai.ts                 # AI assistant with provider fallback
   supabase.ts           # Supabase client
   permissions.ts        # Auth helpers and broker context
+agent/                  # Background AI agent service (Modal + OpenAI Agents SDK)
+  agents/               # Coordinator + specialist agents
+  tools/                # Agent tool implementations (contacts, deals, drafts, activities, memory)
+  orchestrator.py       # Multi-space run orchestration and budgeting
+  modal_app.py          # Modal heartbeat + webhook entrypoints
 supabase/
   schema.sql            # Database schema and migrations
 docs/framework/         # Design system documentation (tokens, components, archetypes)
@@ -96,11 +102,12 @@ cp .env.example .env.local
 Required variables:
 - `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` — Supabase connection
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY` — Clerk auth
-- `OPENAI_API_KEY` — Lead scoring and embeddings
+- `OPENAI_API_KEY` — AI assistant, embeddings, and AI-enhanced scoring summaries
 
 Optional:
 - `RESEND_API_KEY` + `RESEND_FROM_EMAIL` — Email notifications
 - `TELNYX_API_KEY` + `TELNYX_FROM_NUMBER` — SMS notifications
+- `AGENT_INTERNAL_SECRET` + `MODAL_WEBHOOK_URL` — Background agent webhook/auth wiring
 See [ENVIRONMENT.md](./ENVIRONMENT.md) for the full reference.
 
 ### Install and run
@@ -130,10 +137,12 @@ pnpm start
 1. **Realtor signs up** via Clerk and completes onboarding (or skips to set up later)
 2. **Workspace created** with a custom slug and public intake link
 3. **Prospects submit** rental applications through the public intake form
-4. **Leads are scored** automatically by AI and saved as contacts
+4. **Leads are scored** via deterministic scoring + optional AI enhancement and saved as contacts
 5. **Realtor manages** leads, contacts, deals, and tours from the workspace dashboard
-6. **Notifications sent** via email and/or SMS based on workspace preferences
-7. **Brokers** can invite realtors, track team performance, and manage the brokerage
+6. **In-app assistant** supports conversational CRM help and tool-driven task execution
+7. **Background agent (optional)** runs on heartbeat or manual trigger, monitors workspace signals, and drafts/suggests follow-ups based on configured autonomy
+8. **Notifications and delivery** send via email and/or SMS based on workspace preferences and approval settings
+9. **Brokers** can invite realtors, track team performance, and manage the brokerage
 
 ---
 

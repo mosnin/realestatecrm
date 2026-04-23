@@ -53,10 +53,8 @@ export function SignupChart({ data }: SignupChartProps) {
               fontSize: '12px',
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
             }}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            formatter={(value: any) => [`${value} signups`, ''] as any}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            labelFormatter={(label: any) => label as any}
+            formatter={(value: unknown) => [`${String(value ?? '')} signups`, '']}
+            labelFormatter={(label: unknown) => String(label ?? '')}
           />
           <Area
             type="monotone"

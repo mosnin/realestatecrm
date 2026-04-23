@@ -2,7 +2,7 @@
 
 Database naming conventions, query patterns, and migration safety rules for Chippi.
 
-Prevents issues like the `subdomain` vs `slug` column mismatch that broke the app after the Prisma migration.
+Prevents schema drift issues like the historical `subdomain` vs `slug` mismatch.
 
 ---
 
@@ -177,7 +177,7 @@ const { data: spaceId } = await supabase.rpc('create_space_with_defaults', { ...
 ### Before writing a migration
 
 1. Check `supabase/schema.sql` — it's the source of truth for fresh installs
-2. Check existing migrations in `supabase/migrations/` — 14 files, chronologically ordered
+2. Check existing migrations in `supabase/migrations/` (chronologically ordered)
 3. Verify column names against this doc and the schema
 
 ### Migration rules

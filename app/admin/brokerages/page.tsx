@@ -19,7 +19,7 @@ export default async function AdminBrokeragesPage() {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <div className="text-center space-y-2 p-8">
-          <p className="text-sm text-muted-foreground">Couldn't load brokerages.</p>
+          <p className="text-sm text-muted-foreground">Couldn&apos;t load brokerages.</p>
           <a href="/admin/brokerages" className="text-xs text-primary hover:underline">Retry</a>
         </div>
       </div>

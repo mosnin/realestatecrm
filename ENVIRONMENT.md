@@ -6,7 +6,7 @@ Configuration and external service reference for Chippi. Based on actual reposit
 
 ## 1. Environment variables
 
-All variables found or inferable from code usage:
+Primary variables used by the Next.js app and background agent:
 
 | Variable | Used by | What it powers | Criticality | Failure symptom if missing |
 |---|---|---|---|---|
@@ -14,15 +14,22 @@ All variables found or inferable from code usage:
 | `SUPABASE_SERVICE_ROLE_KEY` | `lib/supabase.ts` | Server-side Supabase service role (bypasses RLS) | **Critical** | All DB operations fail |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk SDK (client-side) | Auth UI components (sign-in, sign-up) | **Critical** | Auth pages fail to render; sign-in/sign-up broken |
 | `CLERK_SECRET_KEY` | Clerk SDK (server-side) | Server-side auth verification, middleware | **Critical** | All protected routes fail; API auth returns errors |
-| `OPENAI_API_KEY` | `lib/lead-scoring.ts`, `lib/embeddings.ts`, `lib/ai.ts` | Lead scoring, text embeddings, AI assistant | **High** | Scoring fails (fallback to unscored); embeddings and vector sync fail; assistant returns error message |
-| `KV_REST_API_URL` | `lib/redis.ts` | Upstash Redis endpoint | **Medium** | Legacy admin path and slug metadata fail |
-| `KV_REST_API_TOKEN` | `lib/redis.ts` | Upstash Redis authentication | **Medium** | Same as `KV_REST_API_URL` |
+| `OPENAI_API_KEY` | `lib/lead-scoring.ts`, `lib/embeddings.ts`, `lib/ai.ts`, `agent/config.py` | In-app AI assistant, embeddings, AI-enhanced scoring summaries, background agent reasoning | **High** | Assistant/agent/scoring enhancements fail; deterministic scoring fallback still works |
+| `KV_REST_API_URL` | `lib/redis.ts`, `app/api/agent/*`, `agent/orchestrator.py` | Upstash Redis endpoint for legacy metadata + agent triggers/streams/budgets | **Medium** | Agent triggers/live stream/budget tracking degrade; legacy metadata paths fail |
+| `KV_REST_API_TOKEN` | `lib/redis.ts`, `app/api/agent/*`, `agent/orchestrator.py` | Upstash Redis authentication | **Medium** | Same as `KV_REST_API_URL` |
+| `AGENT_INTERNAL_SECRET` | `app/api/agent/events/route.ts`, `app/api/agent/run-now/route.ts`, `agent/config.py` | Shared auth secret between Next.js and Modal background agent | **High (agent)** | Agent webhook/events auth fails (`401`/`503`), run-now cannot securely invoke Modal |
+| `MODAL_WEBHOOK_URL` | `app/api/agent/run-now/route.ts` | Direct on-demand background-agent invocation (UI "Run now") | **Optional (agent)** | Run-now falls back to queued Redis trigger flow |
+| `DATABASE_URL` | `agent/config.py` | Direct Postgres access for background agent bulk reads | **Optional (agent)** | Agent can still run via Supabase REST paths, but bulk query path may be unavailable |
+| `MCP_JWT_SECRET` | `app/api/mcp/route.ts` | JWT validation for MCP OAuth bearer tokens | **Medium (MCP)** | OAuth-style MCP auth fails; raw API-key MCP auth still works |
 | `NEXT_PUBLIC_ROOT_DOMAIN` | `lib/utils.ts` | Public URL/domain construction for intake links | **Medium** | Falls back to `workflowrouting.com` (prod) or `localhost:3000` (dev); intake link URLs may be wrong if not set correctly |
 | `NEXT_PUBLIC_APP_URL` | `lib/email.ts` | Base URL for links in notification emails (e.g. `https://app.yourdomain.com`) | **Medium** | Email links fall back to `https://app.yourdomain.com` placeholder |
 | `RESEND_API_KEY` | `lib/email.ts`, `lib/tour-emails.ts` | Resend API key for sending all transactional emails (leads, tours, invitations) | **Medium** | Email notifications silently skipped; leads still saved normally |
 | `RESEND_FROM_EMAIL` | `lib/email.ts`, `lib/tour-emails.ts` | Sender address for notification emails (must be verified in Resend) | **Medium** | Falls back to `notifications@updates.yourdomain.com`; must be set to a verified domain |
 | `TELNYX_API_KEY` | `lib/sms.ts` | Telnyx API key for SMS notifications | **Medium** | SMS notifications silently skipped |
 | `TELNYX_FROM_NUMBER` | `lib/sms.ts` | Telnyx phone number to send SMS from (E.164 format) | **Medium** | SMS notifications silently skipped |
+| `STRIPE_SECRET_KEY` | `app/api/billing/*`, `app/api/webhooks/stripe/route.ts` | Stripe API access for subscriptions and checkout | **High (billing)** | Billing API flows fail |
+| `STRIPE_WEBHOOK_SECRET` | `app/api/webhooks/stripe/route.ts` | Signature verification for Stripe webhooks | **High (billing)** | Webhook events rejected |
+| `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_TEAM` / `STRIPE_PRICE_ENTERPRISE` | `app/api/billing/*` | Plan price IDs for brokerage billing checkout | **High (billing)** | Checkout session creation fails for missing tier |
 | `NODE_ENV` | `lib/utils.ts` | Protocol selection (http vs https) | **Auto-set** | Set automatically by Next.js; do not override manually |
 
 ### Clerk-specific variables
@@ -46,11 +53,14 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 |---|---|---|
 | **Clerk** | Authentication, session management, route protection | `middleware.ts`, `app/(auth)/*`, all API routes using `auth()` |
 | **Supabase** | Source-of-truth for all app data (users, spaces, contacts, deals, stages, messages, embeddings) | `lib/supabase.ts`, `supabase/schema.sql` |
-| **OpenAI** | Lead scoring (gpt-4o-mini), text embeddings (text-embedding-3-small), AI assistant primary provider | `lib/lead-scoring.ts`, `lib/embeddings.ts`, `lib/ai.ts` |
+| **OpenAI (JS SDK)** | In-app assistant, embeddings, AI-enhanced scoring summaries | `lib/ai.ts`, `lib/embeddings.ts`, `lib/scoring/enhance.ts` |
+| **OpenAI Agents SDK (Python)** | Background multi-agent orchestration and specialist handoffs | `agent/pyproject.toml`, `agent/orchestrator.py`, `agent/agents/*` |
+| **Modal** | Hosted runtime for scheduled heartbeat + run-now webhook for background agent | `agent/modal_app.py`, `app/api/agent/run-now/route.ts` |
 | **Supabase pgvector** | Vector storage and similarity search for RAG-enriched AI assistant context, scoped per workspace | `lib/zilliz.ts`, `lib/vectorize.ts`, `supabase/schema.sql` (`DocumentEmbedding` table + `match_documents` RPC) |
 | **Resend** | Transactional email — sends lead notifications, tour confirmations/reminders/follow-ups, brokerage invitations, follow-up digests, and CRM emails | `lib/email.ts`, `lib/tour-emails.ts`, `app/api/public/apply/route.ts` |
 | **Telnyx** | SMS notifications — sends text messages to workspace owners for new leads, tour bookings, and deals (opt-in per workspace via settings) | `lib/sms.ts`, `lib/notify.ts` |
-| **Upstash Redis** | Legacy slug metadata storage, admin dashboard data | `lib/redis.ts`, `lib/slugs.ts`, `app/actions.ts` |
+| **Upstash Redis** | Legacy metadata + background-agent trigger queues, SSE stream buffers, daily budget counters | `lib/redis.ts`, `app/api/agent/*`, `agent/orchestrator.py` |
+| **MCP SDK** | Workspace-scoped MCP server for external tool access to CRM data | `app/api/mcp/route.ts`, `app/api/mcp/oauth/*`, `app/api/mcp-keys/*` |
 | **Vercel** | Deployment target, analytics, speed insights | `@vercel/analytics`, `@vercel/speed-insights` packages |
 
 ---
@@ -70,7 +80,7 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 
 | Variable | Why |
 |---|---|
-| `OPENAI_API_KEY` | Lead scoring, embeddings, and AI assistant all require it. Vector sync requires embeddings. |
+| `OPENAI_API_KEY` | AI assistant and embeddings require it. Lead scoring uses deterministic core logic and uses OpenAI only for optional enhancement text. |
 
 ### Nice to have / optional
 
@@ -81,6 +91,9 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 | `NEXT_PUBLIC_APP_URL` | For correct contact links in notification emails. |
 | `RESEND_API_KEY` + `RESEND_FROM_EMAIL` | Required for lead notification emails. Notifications are silently skipped if unset. |
 | `TELNYX_API_KEY` + `TELNYX_FROM_NUMBER` | Required for SMS notifications. SMS silently skipped if unset. Users must enable SMS in workspace settings. |
+| `AGENT_INTERNAL_SECRET` | Required to securely connect Next.js ↔ Modal agent endpoints (`/api/agent/events`, run-now webhook auth). |
+| `MODAL_WEBHOOK_URL` | Enables immediate background-agent runs from the UI; otherwise run-now uses queued trigger fallback. |
+| `DATABASE_URL` | Recommended for agent bulk reads; optional for the rest of the app. |
 
 ---
 
@@ -105,13 +118,15 @@ All `.env*` files are gitignored. Create a `.env.local` file locally with the re
 |---|---|---|---|
 | Clerk | Yes | `@clerk/nextjs@^7.0.1` | Core auth, fully integrated |
 | Supabase | Yes | `@supabase/supabase-js@^2.99.1` | Core database, fully integrated |
-| OpenAI | Yes | `openai@^6.26.0` | Scoring + embeddings + assistant, fully integrated |
+| OpenAI (JS) | Yes | `openai@^6.26.0` | In-app assistant, embeddings, and AI-enhanced scoring, fully integrated |
+| OpenAI Agents SDK (Python) | Yes (agent service) | `openai-agents>=0.0.15` | Background multi-agent runtime, fully integrated |
+| Modal | Yes (agent service) | `modal>=0.73.0` | Scheduled heartbeat + webhook runtime for background agent |
 | Supabase pgvector | Yes (via Supabase) | Built into `@supabase/supabase-js` | Vector search for AI RAG context, optional |
 | Upstash Redis | Yes | `@upstash/redis@^1.34.9` | Legacy metadata path |
 | Vercel | Yes (packages) | `@vercel/analytics@^1.5.0`, `@vercel/speed-insights@^1.2.0` | Deployment target |
-| Resend | Yes | `resend@^4.8.0` | All transactional emails (leads, tours, invitations, digests), fully integrated |
-| Telnyx | Yes | `telnyx@^2.x` | SMS notifications for leads, tours, and deals, fully integrated |
-| Stripe | **Not confirmed** | Not in dependencies | Billing field exists in DB schema but no Stripe integration |
+| Resend | Yes | `resend@^4.6.0` | All transactional emails (leads, tours, invitations, digests), fully integrated |
+| Telnyx | Yes | `telnyx@^6.26.0` | SMS notifications for leads, tours, and deals, fully integrated |
+| Stripe | Yes | `stripe@^20.4.1` | Brokerage billing routes + webhook processing implemented |
 
 ---
 

@@ -37,6 +37,40 @@ Use this to record meaningful decisions and avoid re-litigating context. When a 
 
 ## Log
 
+## [CONFIRMED] Deterministic scoring engine with optional AI enhancement
+
+- **Status**: [CONFIRMED] — implemented in `lib/lead-scoring.ts`, `lib/scoring/engine.ts`, and `lib/scoring/enhance.ts`
+- **Decision**: Compute lead scores deterministically, then optionally use AI for qualitative summary/recommendation enrichment.
+- **Context**: Scoring needed to stay reliable even when model providers are unavailable or degraded. Deterministic scoring provides stable outputs; AI enhancement improves readability when available.
+- **Options considered**:
+  1. Full LLM scoring for score + rationale
+  2. Deterministic score only (no AI text)
+  3. Deterministic score + optional AI enhancement (chosen)
+- **Chosen option**: 3 — deterministic core with optional enhancement.
+- **Expected impact**: More predictable scoring behavior, fewer hard failures, better operational resilience.
+- **Risks**: Enhancement quality still depends on model output; docs/tests must avoid assuming AI is always available.
+- **Follow-up review date**: [TBD]
+
+---
+
+## [CONFIRMED] Dual AI surfaces: in-app assistant + background agent runtime
+
+- **Status**: [CONFIRMED] — implemented in `app/api/ai/task/*` + `lib/ai-tools/*` and `agent/*` + `app/api/agent/*`
+- **Decision**: Keep two complementary AI surfaces:
+  1) interactive in-app assistant for user-in-the-loop tasks, and
+  2) background agent runtime for proactive monitoring/drafting workflows.
+- **Context**: Realtors need both real-time assistant help and asynchronous workflow automation.
+- **Options considered**:
+  1. Chat-only assistant
+  2. Background automation only
+  3. Dual-surface architecture (chosen)
+- **Chosen option**: 3 — maintain both surfaces with clear boundaries.
+- **Expected impact**: Better coverage of immediate and asynchronous use cases without overloading one interface.
+- **Risks**: Documentation drift if boundaries between surfaces are not kept explicit.
+- **Follow-up review date**: [TBD]
+
+---
+
 ## [CONFIRMED] Protect launch wedge over generic CRM expansion
 
 - **Status**: [CONFIRMED] — product context and codebase both support this
@@ -68,18 +102,18 @@ Use this to record meaningful decisions and avoid re-litigating context. When a 
 
 ---
 
-## [CONFIRMED] OpenAI for scoring, embeddings, and assistant
+## [CONFIRMED] OpenAI platform for assistant, embeddings, and agent orchestration
 
-- **Status**: [CONFIRMED] — implemented in `lib/lead-scoring.ts` and `lib/ai.ts`
-- **Decision**: Use OpenAI exclusively — gpt-4o-mini for lead scoring (structured JSON output) and gpt-4.1-mini for the AI assistant.
-- **Context**: Scoring requires structured JSON output with strict schema validation. Consolidating on a single provider reduces complexity and surface area.
+- **Status**: [CONFIRMED] — implemented across `lib/ai.ts`, `lib/embeddings.ts`, and `agent/*`
+- **Decision**: Standardize on OpenAI ecosystem components for in-app assistant, embeddings, and background-agent reasoning/orchestration.
+- **Context**: Consolidating provider surface area simplifies operations and model/runtime management across both JS and Python systems.
 - **Options considered**:
-  1. OpenAI only for everything (chosen)
-  2. Anthropic only for everything
-  3. OpenAI for scoring + embeddings, dual-provider for assistant
-- **Chosen option**: 1 — OpenAI handles all AI workloads.
-- **Expected impact**: Reliable scoring via structured output. Simpler provider management.
-- **Risks**: Single provider dependency; mitigated by OpenAI's reliability.
+  1. OpenAI ecosystem only (chosen)
+  2. Multi-provider split by subsystem
+  3. Non-OpenAI default with fallback adapters
+- **Chosen option**: 1 — OpenAI ecosystem for current AI workloads.
+- **Expected impact**: Operational simplicity and fewer provider-integration failure points.
+- **Risks**: Single-provider concentration risk.
 - **Follow-up review date**: [TBD]
 
 ---
@@ -99,16 +133,16 @@ Use this to record meaningful decisions and avoid re-litigating context. When a 
 
 ---
 
-## [PLACEHOLDER] Billing implementation approach
+## [CONFIRMED] Stripe-backed brokerage billing path
 
-- **Status**: [PLACEHOLDER] — billing field exists but no implementation confirmed
-- **Decision**: Billing approach not yet decided.
-- **Context**: `SpaceSetting.billingSettings` exists as a string field. Settings UI has a billing input. No Stripe package or payment routes are in the codebase. Intended pricing is $97/month with 7-day free trial (per product context, not confirmed in code).
+- **Status**: [CONFIRMED] — Stripe package, billing routes, and webhook handler are present in code
+- **Decision**: Use Stripe-backed checkout/portal/webhook flow for brokerage subscription lifecycle.
+- **Context**: Billing requires a standard subscription lifecycle with reliable webhook-driven status updates.
 - **Options considered**:
-  1. Stripe Checkout / Billing portal
+  1. Stripe checkout + billing portal + webhooks (chosen)
   2. Alternative payment processor
-  3. Manual billing initially
-- **Chosen option**: Not yet decided
-- **Expected impact**: Unknown until implemented
-- **Risks**: Billing touches auth, access control, and workspace lifecycle. Must be carefully bounded.
-- **Follow-up review date**: [TBD — when billing implementation begins]
+  3. Manual billing only
+- **Chosen option**: 1 — Stripe-backed subscription flow.
+- **Expected impact**: More standard billing lifecycle management and recoverable state transitions.
+- **Risks**: Billing still touches access control/workspace lifecycle and needs continued hardening.
+- **Follow-up review date**: [TBD]

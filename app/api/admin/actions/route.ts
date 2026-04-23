@@ -432,14 +432,17 @@ export async function POST(req: NextRequest) {
       if (!lastInvoice) {
         return NextResponse.json({ error: 'No paid invoice found for this customer.' }, { status: 404 });
       }
-      if (!lastInvoice.payment_intent) {
+      const paymentIntentRaw = (lastInvoice as unknown as { payment_intent?: string | { id: string } | null }).payment_intent;
+      const paymentIntentId = typeof paymentIntentRaw === 'string' ? paymentIntentRaw : paymentIntentRaw?.id;
+
+      if (!paymentIntentId) {
         return NextResponse.json({ error: 'Latest invoice has no associated payment intent.' }, { status: 400 });
       }
 
       const refund = await stripe.refunds.create({
-        payment_intent: lastInvoice.payment_intent as string,
+        payment_intent: paymentIntentId,
       });
-      logAdminAction({ actor: admin.userId, action: 'issue_refund', target: targetUserId, details: { invoiceId: lastInvoice.id, paymentIntent: lastInvoice.payment_intent, refundId: refund.id, amount: refund.amount } });
+      logAdminAction({ actor: admin.userId, action: 'issue_refund', target: targetUserId, details: { invoiceId: lastInvoice.id, paymentIntent: paymentIntentId, refundId: refund.id, amount: refund.amount } });
       return NextResponse.json({ success: true, refundId: refund.id, amount: refund.amount });
     }
 

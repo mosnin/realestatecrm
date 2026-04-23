@@ -23,7 +23,7 @@ export default async function AdminInvitationsPage() {
   if (error) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-sm text-muted-foreground">Couldn't load invitations.</p>
+        <p className="text-sm text-muted-foreground">Couldn&apos;t load invitations.</p>
       </div>
     );
   }

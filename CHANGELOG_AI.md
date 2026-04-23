@@ -53,6 +53,26 @@ Copy this template for each new entry:
 
 ## Log
 
+## [2026-04-23] Continue docs normalization for runtime boundaries
+
+- **Task**: Continue iterative documentation normalization across legacy docs.
+- **Summary**: Updated architecture, prompts/scoring, API/security contracts, workflow/scope boundaries, and agent operating docs to match the current implemented stack (deterministic scoring core, in-app task assistant, background agent runtime, Stripe billing).
+- **Files touched**:
+  - `ARCHITECTURE.md` — Rewritten to match current code paths and subsystem boundaries.
+  - `PROMPTS_AND_SCORING.md` — Rewritten for deterministic scoring + optional AI enhancement and current assistant/runtime endpoints.
+  - `API_CONTRACTS.md` — Updated AI endpoint contracts to `/api/ai/task` + approval flow.
+  - `SECURITY.md` — Updated AI task rate-limit entries.
+  - `WORKFLOW_BOUNDARIES.md` — Corrected route protection/onboarding/scoring/billing boundary notes.
+  - `PRODUCT_SCOPE.md` — Updated current-scope implementation map and removed stale out-of-scope SMS/email note.
+  - `AGENTS.md` — Updated stack summary and protected-file references.
+  - `DB_CONVENTIONS.md` — Removed stale Prisma migration phrasing.
+- **Reason**: Multiple docs still referenced pre-agentic and pre-Stripe assumptions, causing source-of-truth drift.
+- **Risks**: Documentation interpretation risk if implementation changes again without follow-up updates.
+- **Manual tests**:
+  - Verified referenced endpoint/file paths exist — pass.
+  - Verified key rate-limit and AI endpoint docs align with current route files — pass.
+- **Rollback notes**: Revert the docs-only commits from 2026-04-23 if needed.
+
 ### [PLACEHOLDER] Example entry — replace with real entries
 
 ## [2026-03-10] Create documentation stack
