@@ -54,7 +54,6 @@ function containsRef(obj: unknown): boolean {
   return false;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function toolToOpenAIFormat(tool: ToolDefinition<any, any>): OpenAIToolFormat {
   const parameters = toJSONSchema(tool.parameters);
 
@@ -86,7 +85,6 @@ export function toolToOpenAIFormat(tool: ToolDefinition<any, any>): OpenAIToolFo
 }
 
 /** Bulk-convert the registry for the per-turn OpenAI request payload. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function allToolsForOpenAI(tools: ToolDefinition<any, any>[]): OpenAIToolFormat[] {
   return tools.map(toolToOpenAIFormat);
 }
