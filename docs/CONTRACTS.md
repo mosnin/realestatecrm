@@ -26,7 +26,7 @@ These are the canonical contracts that govern onboarding, identity, and public i
 
 | Rule | Detail |
 |------|--------|
-| Single identity field | `Space.slug` (mapped to DB column `subdomain` via Prisma `@map`) |
+| Single identity field | `Space.slug` — DB column is literally named `slug` (see `supabase/schema.sql`). Historical note: slug used to map via Prisma `@map("subdomain")` before the Supabase/raw-SQL migration; today the field is named `slug` directly on `Space` and no Prisma mapping exists. |
 | URL format | Path-based only: `/apply/{slug}` |
 | URL builder | `buildIntakeUrl(slug)` in `lib/intake.ts` |
 | Normalization | `normalizeSlug(raw)` — lowercase, strip non-alphanumeric except hyphens |

@@ -15,7 +15,7 @@ Yes. All are implemented and active.
 | Lead scoring prompt + schema | **Implemented** | `lib/lead-scoring.ts` |
 | AI assistant system prompt | **Implemented** | `lib/ai.ts` |
 | Embedding pipeline | **Implemented** | `lib/embeddings.ts` |
-| Vector retrieval (RAG) | **Implemented** | `lib/zilliz.ts`, `lib/vectorize.ts` |
+| Vector retrieval (RAG) | **Implemented** | `lib/zilliz.ts` (Supabase pgvector wrapper — name retained from the historical Zilliz/Milvus integration), `lib/vectorize.ts` |
 
 ---
 
@@ -38,8 +38,8 @@ Yes. All are implemented and active.
 | Main function | `lib/ai.ts` → `chatWithRAG()` | Entry point for assistant |
 | System prompt | `lib/ai.ts` → inline `systemPrompt` construction | Dynamic with space name + RAG context |
 | Provider routing | `lib/ai.ts` → OpenAI only | Provider selection logic |
-| API endpoint | `app/api/ai/chat/route.ts` | Authenticated streaming endpoint |
-| Message persistence | `app/api/ai/chat/route.ts` | Saves user + assistant messages to `Message` table |
+| API endpoint | `app/api/ai/task/route.ts` + `app/api/ai/task/approve/[requestId]/route.ts` | Authenticated task-based assistant endpoint (historical: previously `app/api/ai/chat/route.ts` — that route has been removed). See `docs/AI_AGENT_SPEC.md` for the full protocol. |
+| Message persistence | `app/api/ai/task/route.ts` | Saves user + assistant messages to `Message` table |
 
 ### Embeddings and vectors
 

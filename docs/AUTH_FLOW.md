@@ -33,9 +33,11 @@ Sign In (Clerk)  ──→  /dashboard  ──→  /s/{slug}
 
 ## What broke and how it was fixed
 
-### Problem: "Something went wrong" on the dashboard
+### Historical: the Prisma `@map("subdomain")` bug (resolved)
 
-**Root cause:** The app was migrated from Prisma to raw SQL (`@neondatabase/serverless`). The Prisma schema had this mapping on the Space model:
+> This section is preserved as incident lore. The bug described below is no longer possible: Prisma has been removed from the stack entirely, there is no `@map` in the codebase (grep `@map` across `lib/` and `supabase/` returns no hits), and the Space table's column is literally named `slug` in `supabase/schema.sql`.
+
+**Root cause (historical):** The app was migrated from Prisma to raw SQL (`@neondatabase/serverless`). The Prisma schema had this mapping on the Space model:
 
 ```prisma
 slug String @unique @map("subdomain")
@@ -45,7 +47,7 @@ This told Prisma: "the field is called `slug` in code, but the actual database c
 
 **But the actual database column was named `slug`, not `subdomain`.** The `@map("subdomain")` was a leftover from an old naming convention that never matched the real DB schema. Prisma abstracted this away, so it was never a problem until the migration to raw SQL exposed the mismatch.
 
-**The fix:** Replaced every occurrence of `"subdomain"` with `"slug"` in SQL queries across 12 files:
+**The fix (historical):** Replaced every occurrence of `"subdomain"` with `"slug"` in SQL queries across 12 files:
 
 | File | What changed |
 |------|-------------|
@@ -65,7 +67,7 @@ This told Prisma: "the field is called `slug` in code, but the actual database c
 ### How to prevent this in the future
 
 1. **Never reference `"subdomain"` in SQL.** The column is `"slug"`. Period.
-2. **The Prisma schema is no longer authoritative.** It sits in `node_modules/.prisma/client/schema.prisma` and is not actively used. The real schema is whatever's in the Neon database.
+2. **Prisma is gone.** Historical: the Prisma schema once lived in `node_modules/.prisma/client/schema.prisma` and was the source of the `@map` trap above. Today Prisma is not part of the stack at all — the real (and only) schema is `supabase/schema.sql`.
 3. **If you add a new SQL query referencing the Space table,** use `"slug"` for the workspace identifier column.
 
 ### Other fix: error visibility
