@@ -27,6 +27,7 @@ import {
   Flame,
   Bot,
   Flag,
+  Inbox,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -73,6 +74,12 @@ export const realtorNavItems: NavItem[] = [
     label: 'Today',
     icon: Home,
     exact: true,
+  },
+  {
+    href: '/agent',
+    label: 'Inbox',
+    icon: Inbox,
+    badgeKey: 'pendingDrafts',
   },
   {
     href: '/contacts',

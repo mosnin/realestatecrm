@@ -43,6 +43,7 @@ interface SidebarProps {
   slug: string;
   spaceName: string;
   unreadLeadCount: number;
+  pendingDraftCount?: number;
   overdueFollowUpCount?: number;
   isBroker?: boolean;
   isBrokerOnly?: boolean;
@@ -599,12 +600,14 @@ function RealtorNav({
   searchParamsString,
   unreadLeadCount,
   overdueFollowUpCount,
+  pendingDraftCount,
 }: {
   base: string;
   pathname: string;
   searchParamsString: string;
   unreadLeadCount: number;
   overdueFollowUpCount: number;
+  pendingDraftCount: number;
 }) {
   // Determine which section should be initially expanded based on current route
   const initialExpanded = useMemo(() => {
@@ -645,6 +648,12 @@ function RealtorNav({
               {unreadLeadCount > 99 ? '99+' : unreadLeadCount}
             </span>
           );
+        } else if (item.badgeKey === 'pendingDrafts' && pendingDraftCount > 0) {
+          badge = (
+            <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums flex-shrink-0 bg-primary text-primary-foreground">
+              {pendingDraftCount > 99 ? '99+' : pendingDraftCount}
+            </span>
+          );
         }
 
         return (
@@ -672,6 +681,7 @@ export function Sidebar({
   slug,
   spaceName,
   unreadLeadCount,
+  pendingDraftCount = 0,
   overdueFollowUpCount = 0,
   isBroker = false,
   isBrokerOnly = false,
@@ -851,6 +861,7 @@ export function Sidebar({
         searchParamsString={searchParamsString}
         unreadLeadCount={unreadLeadCount}
         overdueFollowUpCount={overdueFollowUpCount}
+        pendingDraftCount={pendingDraftCount}
       />
 
       {/* User footer */}

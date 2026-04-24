@@ -176,8 +176,9 @@ export default async function DashboardLayout({
 
   let unreadLeadCount = 0;
   let overdueFollowUpCount = 0;
+  let pendingDraftCount = 0;
   try {
-    const [leadResult, followUpResult] = await Promise.all([
+    const [leadResult, followUpResult, draftResult] = await Promise.all([
       supabase
         .from('Contact')
         .select('*', { count: 'exact', head: true })
@@ -191,13 +192,20 @@ export default async function DashboardLayout({
         .is('brokerageId', null)
         .not('followUpAt', 'is', null)
         .lte('followUpAt', new Date().toISOString()),
+      supabase
+        .from('AgentDraft')
+        .select('id', { count: 'exact', head: true })
+        .eq('spaceId', space.id)
+        .eq('status', 'pending'),
     ]);
     if (leadResult.error) throw leadResult.error;
     unreadLeadCount = leadResult.count ?? 0;
     overdueFollowUpCount = followUpResult.count ?? 0;
+    pendingDraftCount = draftResult.count ?? 0;
   } catch {
     unreadLeadCount = 0;
     overdueFollowUpCount = 0;
+    pendingDraftCount = 0;
   }
 
   // Check broker context and brokerage memberships for sidebar
@@ -228,7 +236,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
-      <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} overdueFollowUpCount={overdueFollowUpCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} />
+      <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} pendingDraftCount={pendingDraftCount ?? 0} overdueFollowUpCount={overdueFollowUpCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <PlatformBanner />
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />

@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   CheckCircle, XCircle, MessageSquare, Mail, StickyNote,
-  Bot, Loader2, RefreshCw, Pencil, Copy, Check, ChevronDown,
-  ChevronUp, AlertTriangle, Send, TriangleAlert,
+  Bot, Loader2, RefreshCw, Pencil, Copy, Check,
+  AlertTriangle, Send, TriangleAlert,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -91,7 +91,6 @@ function DraftCard({
   const [editedContent, setEditedContent] = useState(draft.content);
   const [actioning, setActioning] = useState<'approved' | 'dismissed' | null>(null);
   const [copied, setCopied] = useState(false);
-  const [reasoningOpen, setReasoningOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const cfg = CHANNEL_CONFIG[draft.channel];
@@ -189,14 +188,11 @@ function DraftCard({
                 rows={Math.max(3, Math.ceil(editedContent.length / 60))}
                 className="w-full resize-none rounded-lg border bg-background px-3 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring"
               />
-              <div className="flex items-center justify-between">
+              <div className="flex items-center">
                 <span className={cn('text-[11px]', overLimit ? 'text-destructive font-medium' : nearLimit ? 'text-amber-500' : 'text-muted-foreground')}>
                   {editedContent.length}{cfg.charLimit ? `/${cfg.charLimit}` : ''} chars
                   {overLimit && ' — too long for SMS'}
                 </span>
-                <button onClick={cancelEdit} className="text-[11px] text-muted-foreground hover:text-foreground">
-                  Cancel
-                </button>
               </div>
             </div>
           ) : (
@@ -235,27 +231,17 @@ function DraftCard({
             </p>
           )}
 
-          {/* Reasoning — collapsible */}
+          {/* Reasoning — always visible blockquote bar */}
           {draft.reasoning && (
-            <div>
-              <button
-                onClick={() => setReasoningOpen((o) => !o)}
-                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {reasoningOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                Why did the agent suggest this?
-              </button>
-              {reasoningOpen && (
-                <p className="mt-1.5 text-xs text-muted-foreground border-l-2 border-muted pl-2.5 leading-relaxed">
-                  {draft.reasoning}
-                </p>
-              )}
-            </div>
+            <p className="text-xs text-muted-foreground border-l-2 border-muted pl-2.5 leading-relaxed">
+              {draft.reasoning}
+            </p>
           )}
         </div>
 
         {/* Action bar */}
         <div className="flex items-center gap-2 px-4 pb-4">
+          {/* Primary action */}
           <Button
             size="sm"
             className="gap-1.5 h-8"
@@ -267,9 +253,10 @@ function DraftCard({
             ) : (
               <CheckCircle size={13} />
             )}
-            {isEdited ? 'Approve edited' : 'Approve'}
+            {editing ? 'Save & Approve' : 'Approve & Send'}
           </Button>
 
+          {/* Secondary action — Edit (hidden while editing) */}
           {!editing && (
             <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={startEdit}>
               <Pencil size={12} />
@@ -277,20 +264,32 @@ function DraftCard({
             </Button>
           )}
 
-          <Button
-            size="sm"
-            variant="ghost"
-            className="gap-1.5 h-8 text-muted-foreground hover:text-destructive ml-auto"
-            onClick={handleDismiss}
-            disabled={actioning !== null}
-          >
-            {actioning === 'dismissed' ? (
-              <Loader2 size={13} className="animate-spin" />
-            ) : (
-              <XCircle size={13} />
-            )}
-            Dismiss
-          </Button>
+          {/* Least-prominent action — Cancel (editing) or Dismiss */}
+          {editing ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1.5 h-8 text-muted-foreground hover:text-foreground ml-auto"
+              onClick={cancelEdit}
+            >
+              Cancel
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1.5 h-8 text-muted-foreground hover:text-destructive ml-auto"
+              onClick={handleDismiss}
+              disabled={actioning !== null}
+            >
+              {actioning === 'dismissed' ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <XCircle size={13} />
+              )}
+              Dismiss
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -321,8 +320,8 @@ function DeliveryBanner({
       result.method === 'note'
         ? contactName ? `Note logged for ${contactName}` : 'Note logged'
         : contactName
-        ? `Sent to ${contactName} via ${methodLabel}`
-        : `Sent via ${methodLabel}`;
+        ? `Sent ✓ — ${contactName} via ${methodLabel}`
+        : `Sent ✓ via ${methodLabel}`;
 
     return (
       <div className="flex items-center gap-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-400">
@@ -340,7 +339,7 @@ function DeliveryBanner({
       <div className="flex items-start gap-2.5 rounded-lg bg-muted/50 border border-border px-3 py-2.5 text-sm text-muted-foreground">
         <Copy size={14} className="flex-shrink-0 mt-0.5" />
         <span>
-          Draft approved and copied to clipboard.{' '}
+          Queued to clipboard.{' '}
           <span className="text-foreground/70">
             Add <code className="text-[11px] bg-muted px-1 rounded">{methodLabel === 'email' ? 'RESEND_API_KEY + FROM_EMAIL' : 'TELNYX_API_KEY + TELNYX_FROM_NUMBER'}</code> to enable auto-send.
           </span>
@@ -459,19 +458,15 @@ export function AgentDraftInbox({ slug }: Props) {
   if (drafts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
-        <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
-          <Bot size={24} className="text-muted-foreground" />
+        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+          <Bot size={40} className="text-muted-foreground" />
         </div>
         <div>
-          <p className="font-semibold text-foreground">Inbox is clear</p>
+          <p className="font-semibold text-foreground">Your agent is watching</p>
           <p className="text-sm text-muted-foreground mt-1 max-w-xs">
-            The agent will suggest follow-up messages here when it spots leads or deals that need attention.
+            When your agent drafts an outreach or flags an action, it shows up here for your review.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={load} className="gap-1.5 mt-1">
-          <RefreshCw size={13} />
-          Check again
-        </Button>
       </div>
     );
   }
