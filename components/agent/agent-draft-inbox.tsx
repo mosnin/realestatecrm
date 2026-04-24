@@ -91,7 +91,10 @@ function DraftCard({
   const [editedContent, setEditedContent] = useState(draft.content);
   const [actioning, setActioning] = useState<'approved' | 'dismissed' | null>(null);
   const [copied, setCopied] = useState(false);
+  const [dismissError, setDismissError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const cfg = CHANNEL_CONFIG[draft.channel];
   const Icon = cfg.icon;
@@ -121,8 +124,11 @@ function DraftCard({
 
   async function handleDismiss() {
     setActioning('dismissed');
+    setDismissError(null);
     await onAction(draft.id, 'dismissed');
+    if (!mountedRef.current) return; // success — parent filtered card out and unmounted us
     setActioning(null);
+    setDismissError('Could not dismiss — please try again.');
   }
 
   async function copyContent() {
@@ -204,7 +210,7 @@ function DraftCard({
                 )}
               </div>
               {/* Hover actions on content bubble */}
-              <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/content:opacity-100 transition-opacity">
+              <div className="absolute top-2 right-2 flex items-center gap-1 opacity-50 group-hover/content:opacity-100 focus-within:opacity-100 transition-opacity">
                 <button
                   onClick={copyContent}
                   className="w-6 h-6 rounded flex items-center justify-center bg-background border text-muted-foreground hover:text-foreground transition-colors"
@@ -243,8 +249,7 @@ function DraftCard({
         <div className="flex items-center gap-2 px-4 pb-4">
           {/* Primary action */}
           <Button
-            size="sm"
-            className="gap-1.5 h-8"
+            className="gap-1.5 h-11"
             onClick={handleApprove}
             disabled={actioning !== null || (overLimit && draft.channel === 'sms')}
           >
@@ -258,7 +263,7 @@ function DraftCard({
 
           {/* Secondary action — Edit (hidden while editing) */}
           {!editing && (
-            <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={startEdit}>
+            <Button size="sm" variant="outline" className="gap-1.5 h-9" onClick={startEdit}>
               <Pencil size={12} />
               Edit
             </Button>
@@ -269,7 +274,7 @@ function DraftCard({
             <Button
               size="sm"
               variant="ghost"
-              className="gap-1.5 h-8 text-muted-foreground hover:text-foreground ml-auto"
+              className="gap-1.5 h-9 text-muted-foreground hover:text-foreground ml-auto"
               onClick={cancelEdit}
             >
               Cancel
@@ -278,7 +283,7 @@ function DraftCard({
             <Button
               size="sm"
               variant="ghost"
-              className="gap-1.5 h-8 text-muted-foreground hover:text-destructive ml-auto"
+              className="gap-1.5 h-9 text-muted-foreground hover:text-destructive ml-auto"
               onClick={handleDismiss}
               disabled={actioning !== null}
             >
@@ -291,6 +296,12 @@ function DraftCard({
             </Button>
           )}
         </div>
+        {dismissError && (
+          <p className="flex items-center gap-1.5 px-4 pb-3 text-xs text-destructive">
+            <AlertTriangle size={11} />
+            {dismissError}
+          </p>
+        )}
       </CardContent>
     </Card>
   );

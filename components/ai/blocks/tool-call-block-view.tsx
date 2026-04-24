@@ -146,8 +146,9 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
         disabled={!hasDetails}
         onClick={() => hasDetails && setExpanded((v) => !v)}
         className={cn(
-          'relative flex items-center gap-2 pl-3 pr-2.5 py-1.5 rounded-lg border text-left',
-          'transition-colors bg-muted/20 border-border',
+          'relative flex items-center gap-2 pl-3 pr-2.5 py-1.5 rounded-lg border text-left min-h-[36px]',
+          'transition-colors',
+          displayTint,
           hasDetails && 'hover:bg-muted/40 cursor-pointer',
           !hasDetails && 'cursor-default',
         )}
@@ -202,7 +203,7 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
         <div className="mt-1 ml-3 pl-3 border-l-2 border-border space-y-2.5 py-2">
           {argsEntries.length > 0 && (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                 Arguments
               </p>
               <pre className="text-[11px] bg-muted/30 border border-border rounded-md px-2 py-1.5 overflow-x-auto font-mono text-foreground/80">
@@ -212,7 +213,7 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
           )}
           {block.result?.summary && (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                 Result
               </p>
               <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
@@ -222,7 +223,7 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
           )}
           {block.result?.error && block.result.ok === false && (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-1">
                 Error
               </p>
               <p className="text-xs text-rose-700 dark:text-rose-300">{block.result.error}</p>

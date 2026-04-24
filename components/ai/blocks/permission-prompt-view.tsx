@@ -166,7 +166,7 @@ export function PermissionPromptView({
           <ShieldCheck size={15} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">
             Approve before running
           </p>
           <p className="text-sm font-semibold text-foreground">{prompt.summary}</p>
@@ -228,7 +228,7 @@ export function PermissionPromptView({
               onClick={doApprove}
               disabled={disabled}
               className={cn(
-                'inline-flex items-center gap-1 rounded-md bg-foreground text-background px-3 py-1.5 text-xs font-semibold transition-all',
+                'inline-flex items-center gap-1 rounded-md bg-foreground text-background px-3 py-2.5 min-h-[44px] text-xs font-semibold transition-all',
                 'disabled:cursor-not-allowed disabled:opacity-50',
               )}
             >
@@ -245,7 +245,7 @@ export function PermissionPromptView({
                 onClick={doAlwaysAllow}
                 disabled={disabled}
                 title={`Auto-approve ${prompt.name} for the rest of this chat`}
-                className="inline-flex items-center gap-1 rounded-md border border-foreground/20 bg-background hover:bg-muted px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-md border border-foreground/20 bg-background hover:bg-muted px-3 py-2.5 min-h-[44px] text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting === 'always' ? (
                   <Loader2 size={12} className="animate-spin" />
@@ -259,7 +259,7 @@ export function PermissionPromptView({
               type="button"
               onClick={doDeny}
               disabled={disabled}
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background hover:bg-muted px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-md border border-rose-400/50 bg-background text-rose-700 dark:text-rose-400 hover:bg-rose-500/10 px-3 py-2.5 min-h-[44px] text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting === 'deny' ? (
                 <Loader2 size={12} className="animate-spin" />
