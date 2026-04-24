@@ -32,7 +32,12 @@ export default async function DashboardLayout({
   // Gate: user must exist in our DB. On DB error, render error UI
   // (NOT .catch(() => null) which caused redirect loops, NOT throw which
   // shows the generic "Application error" page).
-  let dbUser;
+  let dbUser: {
+    id: string;
+    onboard: boolean;
+    isPlatformAdmin: boolean;
+    space: { id: string } | null;
+  } | null | undefined;
   try {
     const { data: row, error } = await supabase
       .from('User')

@@ -307,8 +307,8 @@ export function FormAnalyticsClient({
                     fontSize: '12px',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                   }}
-                  formatter={(value: number) => [`${value} submissions`, '']}
-                  labelFormatter={(label: string) => label}
+                  formatter={(value: unknown) => [`${value} submissions`, ''] as [string, string]}
+                  labelFormatter={(label: unknown) => String(label)}
                 />
                 <Area
                   type="monotone"

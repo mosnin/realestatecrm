@@ -131,7 +131,7 @@ export default clerkMiddleware(async (auth, request) => {
             .from('User')
             .select('platformRole')
             .eq('clerkId', session.userId)
-            .maybeSingle();
+            .maybeSingle<{ platformRole: string | null }>();
           if (dbUser?.platformRole === 'banned') {
             const bannedUrl = new URL('/login/realtor', request.url);
             bannedUrl.searchParams.set('reason', 'suspended');

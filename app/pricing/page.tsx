@@ -29,7 +29,13 @@ const planFeatures = [
   { icon: Sparkles, label: 'Full follow-up workflow', description: 'Notes, calls, emails & follow-up scheduling' },
 ];
 
-const comparison = [
+type ComparisonCellValue = boolean | 'partial';
+const comparison: Array<{
+  feature: string;
+  chippi: ComparisonCellValue;
+  spreadsheet: ComparisonCellValue;
+  crm: ComparisonCellValue;
+}> = [
   { feature: 'Structured intake form', chippi: true, spreadsheet: false, crm: 'partial' },
   { feature: 'AI lead scoring', chippi: true, spreadsheet: false, crm: false },
   { feature: 'Priority tiers with context', chippi: true, spreadsheet: false, crm: false },

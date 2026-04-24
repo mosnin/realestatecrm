@@ -157,9 +157,10 @@ export function PipelineSummary({ slug, pipelineId }: PipelineSummaryProps) {
       </div>
 
       <div className={cn('grid gap-3 md:grid-cols-3', loading && 'opacity-60')}>
-        {strips.map((strip) => (
-          <AttentionStrip key={strip.key} slug={slug} {...strip} />
-        ))}
+        {strips.map((strip) => {
+          const { key, ...rest } = strip;
+          return <AttentionStrip key={key} slug={slug} {...rest} />;
+        })}
       </div>
     </div>
   );

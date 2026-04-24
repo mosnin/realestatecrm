@@ -58,8 +58,8 @@ export const getContactTool = defineTool<typeof parameters, { contact: ContactDe
       .eq('id', args.contactId)
       .eq('spaceId', ctx.space.id)
       .is('brokerageId', null)
-      .maybeSingle()
-      .abortSignal(ctx.signal);
+      .abortSignal(ctx.signal)
+      .maybeSingle();
 
     if (error) {
       return {
@@ -92,7 +92,7 @@ export const getContactTool = defineTool<typeof parameters, { contact: ContactDe
     ]);
 
     const deals =
-      ((dealJoin.data ?? []) as Array<{ Deal: { id: string; title: string; status: string; value: number | null } | null }>)
+      ((dealJoin.data ?? []) as unknown as Array<{ Deal: { id: string; title: string; status: string; value: number | null } | null }>)
         .map((r) => r.Deal)
         .filter((d): d is NonNullable<typeof d> => Boolean(d));
 

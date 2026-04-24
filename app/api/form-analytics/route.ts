@@ -22,7 +22,7 @@ const eventSchema = z.object({
   stepIndex: z.number().int().min(0).max(100).optional(),
   stepTitle: z.string().max(500).optional(),
   durationMs: z.number().int().min(0).max(3_600_000).optional(), // max 1 hour
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 const batchSchema = z.object({

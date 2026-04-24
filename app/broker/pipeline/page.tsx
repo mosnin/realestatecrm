@@ -119,11 +119,11 @@ export default async function BrokerPipelinePage() {
     // non-active deals, so we always call it and let it decide.
     const health = dealHealth({
       status: d.status as 'active' | 'won' | 'lost' | 'on_hold',
-      updatedAt: d.updatedAt,
-      closeDate: d.closeDate,
-      followUpAt: d.followUpAt,
+      updatedAt: new Date(d.updatedAt),
+      closeDate: d.closeDate ? new Date(d.closeDate) : null,
+      followUpAt: d.followUpAt ? new Date(d.followUpAt) : null,
       nextAction: d.nextAction,
-      nextActionDueAt: d.nextActionDueAt,
+      nextActionDueAt: d.nextActionDueAt ? new Date(d.nextActionDueAt) : null,
     });
 
     const deal: PipelineDeal = {

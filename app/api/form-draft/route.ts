@@ -10,7 +10,7 @@ import { sendDraftResumeEmail } from '@/lib/email';
 const createDraftSchema = z.object({
   spaceId: z.string().min(1),
   email: z.string().trim().email().max(255),
-  answers: z.record(z.unknown()),
+  answers: z.record(z.string(), z.unknown()),
   currentStep: z.number().int().min(0).default(0),
   formConfigVersion: z.number().int().optional(),
   completed: z.boolean().optional(),
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const parsed = createDraftSchema.safeParse(body);
   if (!parsed.success) {
     // Only return minimal error info to prevent schema leakage
-    const safeIssues = parsed.error.issues.map((i: { path: (string | number)[]; message: string }) => ({
+    const safeIssues = parsed.error.issues.map((i) => ({
       path: i.path,
       message: i.message,
     }));

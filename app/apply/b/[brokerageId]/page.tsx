@@ -125,6 +125,8 @@ export default async function BrokerageApplyPage({
     intakeFaviconUrl: string | null;
     bio: string | null;
     socialLinks: Record<string, string> | null;
+    privacyPolicyUrl: string | null;
+    consentCheckboxLabel: string | null;
   } | null;
 
   // Use brokerage name for title, fall back to space settings
