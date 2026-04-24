@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import {
   Brain,
   MessageSquare,
@@ -10,10 +11,9 @@ import {
   XCircle,
   Copy,
   Check,
-  ChevronDown,
-  ChevronUp,
   RefreshCw,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -94,7 +94,6 @@ function DraftCard({
 }) {
   const [editing, setEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(draft.content);
-  const [showReasoning, setShowReasoning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState<'approve' | 'dismiss' | null>(null);
 
@@ -156,18 +155,9 @@ function DraftCard({
         )}
 
         {draft.reasoning && (
-          <button
-            onClick={() => setShowReasoning(v => !v)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {showReasoning ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-            Why this message?
-          </button>
-        )}
-        {showReasoning && draft.reasoning && (
-          <p className="text-xs text-muted-foreground bg-muted/30 rounded p-2 leading-relaxed">
+          <blockquote className="border-l-2 border-muted-foreground/20 pl-2 text-xs text-muted-foreground leading-relaxed">
             {draft.reasoning}
-          </p>
+          </blockquote>
         )}
       </div>
 
@@ -183,7 +173,7 @@ function DraftCard({
             <button
               onClick={handleDismiss}
               disabled={!!loading}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs border border-border hover:bg-muted/60 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] rounded-md text-xs border border-border hover:bg-muted/60 transition-colors disabled:opacity-50"
             >
               {loading === 'dismiss' ? <Loader2 size={11} className="animate-spin" /> : <XCircle size={11} />}
               Dismiss
@@ -191,7 +181,7 @@ function DraftCard({
             <button
               onClick={handleApprove}
               disabled={!!loading || overLimit}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-md text-xs bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               {loading === 'approve'
                 ? <Loader2 size={11} className="animate-spin" />
@@ -207,7 +197,7 @@ function DraftCard({
   );
 }
 
-export function AgentContactPanel({ contactId, slug }: { contactId: string; slug: string }) {
+export function AgentContactPanel({ contactId, slug, contactName }: { contactId: string; slug: string; contactName?: string }) {
   const [data, setData] = useState<AgentContactData | null>(null);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
@@ -302,6 +292,13 @@ export function AgentContactPanel({ contactId, slug }: { contactId: string; slug
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href={`/s/${slug}/ai?q=${encodeURIComponent(`Tell me about ${contactName ?? 'this contact'} and suggest what I should do next`)}`}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted/60 transition-colors"
+          >
+            <Sparkles size={11} />
+            Ask assistant
+          </Link>
           <button
             onClick={() => void load()}
             className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/60 transition-colors"

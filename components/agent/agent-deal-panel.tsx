@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Brain, Activity, Zap, CheckCircle2, XCircle, RefreshCw, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { Brain, Activity, Zap, CheckCircle2, XCircle, RefreshCw, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AgentMemory {
@@ -52,7 +53,7 @@ function ImportanceDot({ importance }: { importance: number }) {
   return <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 shrink-0 mt-1.5" />;
 }
 
-export function AgentDealPanel({ dealId }: { dealId: string }) {
+export function AgentDealPanel({ dealId, slug, dealTitle }: { dealId: string; slug: string; dealTitle?: string }) {
   const [data, setData] = useState<AgentDealData | null>(null);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
@@ -115,6 +116,13 @@ export function AgentDealPanel({ dealId }: { dealId: string }) {
           <span className="text-sm font-semibold">Agent Intelligence</span>
         </div>
         <div className="flex items-center gap-1.5">
+          <Link
+            href={`/s/${slug}/ai?q=${encodeURIComponent(`Tell me about my deal "${dealTitle ?? 'this deal'}" and suggest next steps`)}`}
+            className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted/60 transition-colors"
+          >
+            <Sparkles size={10} />
+            Ask assistant
+          </Link>
           <button
             onClick={() => void load()}
             className="p-1 text-muted-foreground hover:text-foreground rounded hover:bg-muted/60 transition-colors"

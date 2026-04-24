@@ -197,7 +197,7 @@ export default async function ClientDetailPage({
           so the realtor can approve/send without navigating to Intelligence. */}
       {activeTab === 'overview' && (
         <>
-          <AgentContactPanel contactId={contact.id} slug={slug} />
+          <AgentContactPanel contactId={contact.id} slug={slug} contactName={contact.name} />
           <FollowUpSuggestions
             contactId={contact.id}
             scoreLabel={contact.scoreLabel}
@@ -377,7 +377,7 @@ export default async function ClientDetailPage({
 
       {/* ── Agent Intelligence Panel ── */}
       {activeTab === 'intelligence' && (
-        <AgentContactPanel contactId={contact.id} slug={slug} />
+        <AgentContactPanel contactId={contact.id} slug={slug} contactName={contact.name} />
       )}
 
       {/* ── Application Details (rich structured data) ── */}

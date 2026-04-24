@@ -392,7 +392,7 @@ export default async function DealDetailPage({
                   dealValue={value}
                   dealCommissionRate={commissionRate}
                 />
-                <AgentDealPanel dealId={id} />
+                <AgentDealPanel dealId={id} slug={slug} dealTitle={title} />
               </div>
             )}
 
