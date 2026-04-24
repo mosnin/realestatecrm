@@ -26,7 +26,7 @@ import { CopyLinkButton } from './copy-link-button';
 import { timeAgo, formatCurrency } from '@/lib/formatting';
 import { FollowUpWidget, type FollowUpContact } from '@/components/dashboard/follow-up-widget';
 import { OnboardingChecklist } from '@/components/dashboard/onboarding-checklist';
-import { AgentInsightsWidget } from '@/components/agent/agent-insights-widget';
+import { AgentMissionControl } from '@/components/agent/agent-mission-control';
 import { logger } from '@/lib/logger';
 
 export async function generateMetadata({
@@ -373,7 +373,10 @@ export default async function DashboardPage({
         )}
       </div>
 
-      {/* ── 3. Recent Applications ────────────────────────────────────── */}
+      {/* ── 3. Agent Mission Control ─────────────────────────────────── */}
+      <AgentMissionControl slug={slug} />
+
+      {/* ── 4. Recent Applications ────────────────────────────────────── */}
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <h2 className="text-sm font-semibold">Recent Applications</h2>
@@ -459,12 +462,12 @@ export default async function DashboardPage({
         )}
       </div>
 
-      {/* ── 4. Follow-up Queue (conditional) ─────────────────────────── */}
+      {/* ── 5. Follow-up Queue (conditional) ─────────────────────────── */}
       {followUpContacts.length > 0 && (
         <FollowUpWidget slug={slug} contacts={followUpContacts} />
       )}
 
-      {/* ── 5. Pipeline ───────────────────────────────────────────────── */}
+      {/* ── 6. Pipeline ───────────────────────────────────────────────── */}
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <h2 className="text-sm font-semibold">Pipeline</h2>
@@ -546,7 +549,7 @@ export default async function DashboardPage({
         )}
       </div>
 
-      {/* ── 6. Lead Overview + Upcoming Tours ────────────────────────── */}
+      {/* ── 7. Lead Overview + Upcoming Tours ────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Lead metrics */}
         <div className="lg:col-span-3 rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
@@ -624,9 +627,6 @@ export default async function DashboardPage({
           )}
         </div>
       </div>
-
-      {/* ── 7. Agent Insights ────────────────────────────────────────── */}
-      <AgentInsightsWidget slug={slug} />
 
       {/* ── 8. Utilities ──────────────────────────────────────────────── */}
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
