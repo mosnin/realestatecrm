@@ -354,3 +354,166 @@ This is the `DealRoutingRule` + rule layer already described in BP7.
 CRUD routes under `/api/broker/routing-rules` +
 `/api/broker/routing-rules/[id]`; UI under
 `app/broker/settings/routing-rules`.
+
+---
+
+## 5. Route inventory
+
+One line per route. Method + path + auth + purpose. Enumerated from
+`find app/api/broker app/api/brokerages app/api/space/[slug]/reviews
+app/api/public/apply/brokerage -name route.ts`.
+
+### `/api/broker/*` — broker control surface
+
+| Method / path | Auth | Purpose |
+|---|---|---|
+| GET `/api/broker/activity` | `requireBroker` | AuditLog viewer (Linear Step 2); supports `action` / `actorClerkId` / `since` / `cursor` filters |
+| GET `/api/broker/team-activity` | `requireBroker` | Legacy aggregator (new leads/deals/tours feed); preserved for the team-activity-feed widget |
+| GET / POST `/api/broker/announcements`, PATCH / DELETE `/[id]` | `requireBroker` | Broker-wide announcement board |
+| POST `/api/broker/assign-lead` | `requireBroker` + `canManageLeads` | Manual lead-to-agent assignment |
+| POST `/api/broker/unassign-lead` | same | Return a lead to the brokerage pool |
+| GET / POST `/api/broker/chat` | `requireBroker` | Team chat thread |
+| POST `/api/broker/chat-command` | `requireBroker` | Slash-command dispatch |
+| POST `/api/broker/chat-notify` | `requireBroker` | Team-chat notification fan-out |
+| PATCH `/api/broker/commissions/ledger/[id]` | `broker_owner / broker_admin` | Adjust a ledger row; enforces rate-sum ≤ 100 + referral invariant (BP2) |
+| GET `/api/broker/commissions/export?month=YYYY-MM` | `broker_owner / broker_admin` | Month CSV export, UTC bucketed |
+| POST `/api/broker/create` | signed-in | Mint a new Brokerage; promotes caller to `broker_owner` |
+| GET `/api/broker/export` | `requireBroker` | CSV of team-wide metrics |
+| GET / POST / PATCH `/api/broker/form-config` | `broker_owner / broker_admin` | Brokerage intake form schema |
+| DELETE `/api/broker/invitations/[id]` | `broker_owner / broker_admin` | Revoke a pending invite |
+| POST `/api/broker/invite` | `broker_owner / broker_admin` | Single-email invite; 402 `{ code: 'seat_limit' }` on cap (BP3) |
+| POST `/api/broker/invite/bulk` | same | Bulk invite list; same 402 semantics |
+| POST `/api/broker/join` | signed-in | Accept an invite by token |
+| GET / POST `/api/broker/join-code` | `broker_owner` | Rotate the public join code |
+| POST `/api/broker/lead-note` | `requireBroker` | Attach a note to an assigned lead |
+| GET `/api/broker/leads` | `requireBroker` | Brokerage lead queue |
+| DELETE `/api/broker/members/[id]` | `broker_owner / broker_admin` | Remove membership (soft — no data transfer) |
+| POST `/api/broker/members/[id]/offboard` | `broker_owner` | **Atomic transfer + offboard** (BP1); `{ dryRun: true }` returns counts |
+| GET `/api/broker/notifications` | `requireBroker` | `BrokerNotification` inbox |
+| GET `/api/broker/realtors` | `requireBroker` | Roster + status |
+| GET `/api/broker/reviews?status=...` | `requireBroker` (member+) | Review queue (BP5) |
+| GET `/api/broker/reviews/[id]` | GET any member | Review detail |
+| PATCH `/api/broker/reviews/[id]` | `broker_owner / broker_admin` | Resolve (approve / close) |
+| POST `/api/broker/reviews/[id]/comments` | **dual-auth** — broker member OR `review.requestingUserId` | Comment; 409 when review is resolved |
+| GET / POST `/api/broker/routing-rules` | GET member; POST owner/admin | Lead-routing rules (BP7 layer 1) |
+| PATCH / DELETE `/api/broker/routing-rules/[id]` | owner/admin | Edit / delete a rule |
+| GET `/api/broker/settings` | `requireBroker` member | Brokerage settings read |
+| PATCH `/api/broker/settings` | owner/admin | Update plan / rates / auto-assign |
+| GET `/api/broker/stats` | `requireBroker` | Team-wide KPI roll-up |
+| GET / POST `/api/broker/templates` | GET member; POST owner/admin | BrokerageTemplate CRUD (BP6) |
+| PATCH / DELETE `/api/broker/templates/[id]` | owner/admin | Edit / delete + auto-bump `version` |
+| POST `/api/broker/templates/[id]/publish` | owner/admin | Fan-out to realtor_members; skips `sourceVersion IS NULL` rows |
+| GET `/api/broker/trends` | `requireBroker` | Time-series metrics for the dashboard |
+
+### `/api/brokerages/*` — less-gated brokerage entry points
+
+| Method / path | Auth | Purpose |
+|---|---|---|
+| POST `/api/brokerages/leads` | `requireBroker` + `canManageLeads` | Manual broker-add lead; calls `routeBrokerageLead` before insert |
+
+### `/api/space/[slug]/reviews/*` — realtor-side reviews (Linear Step 1)
+
+| Method / path | Auth | Purpose |
+|---|---|---|
+| GET `/api/space/[slug]/reviews?status=...` | `requireSpaceOwner` + local `User.status` re-check | Realtor's own flagged reviews |
+| GET `/api/space/[slug]/reviews/[id]` | same + `requestingUserId` match | Single review + comment thread |
+
+Comments POST reuses the shared `/api/broker/reviews/[id]/comments`
+endpoint via the dual-auth rule — no duplicate route.
+
+### `/api/public/apply/brokerage` — public lead intake
+
+| Method / path | Auth | Purpose |
+|---|---|---|
+| POST `/api/public/apply/brokerage` | **public** — captcha + per-IP rate limit | Inbound lead; calls `routeBrokerageLead` with `leadType / budget / tags` so rules evaluate before insert |
+
+### Billing + webhooks
+
+| Method / path | Auth | Purpose |
+|---|---|---|
+| POST `/api/billing/checkout` | signed-in; `scope: 'brokerage'` branch requires `broker_owner` | Create Stripe checkout session for the brokerage plan |
+| POST `/api/webhooks/stripe` | Stripe signature | Subscription lifecycle → `Brokerage`; **every write passes `verifyBrokerageOwnsSubscription`** (metadata-poisoning guard) |
+
+---
+
+## 6. Audit logging
+
+All sensitive writes go through `lib/audit.ts`. The `AuditAction` union
+at lib/audit.ts:25-36 is the source of truth for what's loggable:
+`CREATE | UPDATE | DELETE | ACCESS | LOGIN | LOGOUT | ADMIN_ACTION |
+OFFBOARD`. Extending it for a new write category is a one-line change
+plus the call-site usage; **don't silently cast `as AuditAction`** —
+the BP1 audit flagged exactly that pattern.
+
+**Call-site convention.** Fire-and-forget via `void audit({ ... })`
+**after** the DB write succeeds. Arguments:
+
+- `actorClerkId` — `null` for system events (cron, webhooks with no
+  user context); the Clerk id otherwise.
+- `action` — one of the union values.
+- `resource` — table name (e.g. `'BrokerageMembership'`).
+- `resourceId` — primary key of the affected row.
+- `spaceId` — the workspace scope; **`undefined` for brokerage-wide
+  writes** (invites, member removals, template publishes). The
+  `AuditLog.spaceId` column is nullable for exactly this reason.
+- `metadata` — freeform `jsonb`. **Must include `brokerageId`** for
+  brokerage-wide writes so the `/broker/activity` viewer's null-space
+  scoping can find the row (see §4 Step 2).
+- `req` — pass the `NextRequest` for IP extraction.
+
+**Metadata hygiene.** Treat `metadata` as user-visible. The
+`/broker/activity` UI expands the full JSON on row-click (see
+`activity-client.tsx`). Do NOT log tokens, password-reset values, raw
+email bodies, Stripe secrets, or anything else a broker reading the
+log shouldn't see. A grep-based CI guard would catch most leaks; it
+doesn't exist yet (§7).
+
+**Visibility.** `/broker/activity` (Linear Step 2) scopes by
+`spaceId ∈ brokerage.spaces` UNION `spaceId IS NULL AND
+metadata->>brokerageId = caller's brokerageId`. Cursor is compound
+`<createdAt>|<id>` to be tie-safe on millisecond collisions.
+
+---
+
+## 7. Known gaps
+
+Tracked trade-offs and scope-deferred items. All deliberate; called
+out in the commits that shipped the surrounding feature.
+
+- **Priority-reorder race on DealRoutingRule.** Two admins clicking
+  the up/down arrows simultaneously can produce duplicate
+  priorities. The engine tie-breaks on `createdAt ASC` so routing
+  stays deterministic, but the UI shows matching numbers until a
+  page refresh. Proper fix: a batched reorder endpoint that
+  renumbers in a transaction.
+- **`destinationPoolTag` accepted but ignored.** The schema + API
+  accept a tag for pool narrowing, but the engine does nothing with
+  it pending a `BrokerageMembership.tags` column. The UI has a
+  placeholder explainer so brokers aren't surprised.
+- **Broker notifications on routing assignment skipped.** Intentional
+  — the broker already knows leads arrive; a per-lead
+  `BrokerNotification` would be noise. If product asks, add a
+  `'lead_assigned'` `BrokerNotificationType` and fire it from the
+  two routing callers.
+- **No audit row for SMS deliveries.** `lib/sms.ts` is
+  fire-and-forget (silently no-ops when Telnyx env is missing). The
+  `send_sms` tool logs a `ContactActivity` for the CRM-side feed,
+  but no `audit()` call — so brokerage compliance reports miss SMS
+  activity. Adding one is a two-line change.
+- **No lint / CI guard on `AuditLog.metadata`.** A writer that
+  accidentally logs a sensitive field leaks into
+  `/broker/activity`. A typed `AuditMetadata` discriminated union
+  keyed by `AuditAction` would close this at compile time; a
+  grep-based pre-commit is the cheaper MVP.
+- **`User.status = 'offboarded'` is global.** Offboarding from the
+  LAST brokerage locks the user out of Chippi entirely
+  (intentional). Per-brokerage "soft suspension" isn't modelled —
+  use `BrokerageMembership` row removal for that case.
+- **No per-agent availability / DND.** The routing engine doesn't
+  check whether an agent is on vacation; a real implementation
+  would need a `User.availability` column and engine
+  short-circuit.
+- **Priority integer instead of fractional ranks.** `DealRoutingRule.priority`
+  is an `integer`, so inserting between rules 100 and 101 requires
+  renumbering. A fractional rank would avoid the rebalance; not
+  worth the complexity at current brokerage scale.
