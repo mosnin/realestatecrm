@@ -29,7 +29,7 @@ import crypto from 'crypto';
 import type OpenAI from 'openai';
 import type { MessageBlock, PermissionBlock, ToolCallBlock } from './blocks';
 import { executeTool, executionToModelMessage } from './execute';
-import type { AgentEvent } from './events';
+import type { PushableEvent } from './events';
 import type { DeferredToolCall, PendingApprovalState, RunTurnOutput } from './loop';
 // Importing `summarisePendingCall` here keeps initial-pause and
 // continuation-re-pause wording identical.
@@ -46,7 +46,7 @@ export interface ContinueTurnInput {
   decision: 'approved' | 'denied';
   /** Optional override of the pending call's args — Phase 3d edit flow. */
   editedArgs?: Record<string, unknown>;
-  pushEvent: (event: Omit<AgentEvent, 'seq' | 'ts'>) => Promise<void>;
+  pushEvent: (event: PushableEvent) => Promise<void>;
 }
 
 
@@ -178,7 +178,7 @@ async function runCall(
   ctx: ToolContext,
   messages: ChatMsg[],
   blocks: MessageBlock[],
-  pushEvent: (event: Omit<AgentEvent, 'seq' | 'ts'>) => Promise<void>,
+  pushEvent: (event: PushableEvent) => Promise<void>,
   forceApprovedExecution: boolean,
 ): Promise<{ status: 'done' | 'aborted' }> {
   void forceApprovedExecution; // tracked for clarity; executeTool doesn't need it
@@ -245,7 +245,7 @@ async function finishWithRunTurn(
   ctx: ToolContext,
   messages: ChatMsg[],
   blocks: MessageBlock[],
-  pushEvent: (event: Omit<AgentEvent, 'seq' | 'ts'>) => Promise<void>,
+  pushEvent: (event: PushableEvent) => Promise<void>,
 ): Promise<RunTurnOutput> {
   const downstream = await runTurn({ openai, ctx, messages, pushEvent });
   return {

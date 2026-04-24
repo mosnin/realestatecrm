@@ -178,9 +178,19 @@ export function createSeqCounter(): () => number {
  *   const push = makeEventPusher(writer);
  *   push({ type: 'text_delta', delta: 'Hello' });
  */
+type DistributiveOmit<T, K extends keyof never> = T extends unknown ? Omit<T, K> : never;
+
+/**
+ * The event shape callers pass to `pushEvent` — an AgentEvent minus the
+ * framing fields (`seq`, `ts`) which the pusher stamps on. Distributive
+ * over the AgentEvent union so type-narrowing on `type` preserves the
+ * variant-specific fields (`delta`, `reason`, `message`, etc.).
+ */
+export type PushableEvent = DistributiveOmit<AgentEvent, 'seq' | 'ts'>;
+
 export function makeEventPusher(
   writer: WritableStreamDefaultWriter<Uint8Array>,
-): (event: Omit<AgentEvent, 'seq' | 'ts'>) => Promise<void> {
+): (event: PushableEvent) => Promise<void> {
   const nextSeq = createSeqCounter();
   return async (event) => {
     const full = {

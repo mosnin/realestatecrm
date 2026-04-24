@@ -342,7 +342,7 @@ export async function PATCH(
       stage: stageRow || null
     } as Deal & { stage: DealStage | null };
 
-    syncDeal(deal).catch(console.error);
+    syncDeal({ ...deal, stage: deal.stage ?? undefined }).catch(console.error);
     void audit({ actorClerkId: userId, action: 'UPDATE', resource: 'Deal', resourceId: id, spaceId: space.id, req });
 
     return NextResponse.json(deal);

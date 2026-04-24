@@ -20,7 +20,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { continueTurn } from '@/lib/ai-tools/continue-turn';
-import type { AgentEvent } from '@/lib/ai-tools/events';
+import type { AgentEvent, PushableEvent } from '@/lib/ai-tools/events';
 import { createSeqCounter, encodeEvent } from '@/lib/ai-tools/events';
 import { getOpenAIClient, MissingOpenAIKeyError } from '@/lib/ai-tools/openai-client';
 import { consumePendingApproval, savePendingApproval } from '@/lib/ai-tools/pending-approvals';
@@ -112,7 +112,7 @@ export async function POST(
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const nextSeq = createSeqCounter();
-      const pushEvent = async (event: Omit<AgentEvent, 'seq' | 'ts'>) => {
+      const pushEvent = async (event: PushableEvent) => {
         const full = { ...event, seq: nextSeq(), ts: new Date().toISOString() } as AgentEvent;
         try {
           controller.enqueue(encodeEvent(full));

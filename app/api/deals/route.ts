@@ -245,7 +245,7 @@ export async function POST(req: NextRequest) {
     stage: stageRow || null
   } as Deal & { stage: DealStage | null };
 
-  syncDeal(deal).catch(console.error);
+  syncDeal({ ...deal, stage: deal.stage ?? undefined }).catch(console.error);
 
   // Email + SMS notification for new deal
   try {
