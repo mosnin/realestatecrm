@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 
 type PaletteAction =
   | { kind: 'route'; id: string; label: string; icon: typeof Home; href: string; group: string }
+  | { kind: 'ask'; id: string; label: string; query: string; group: string }
   | { kind: 'search-contact'; id: string; label: string; sublabel: string; href: string; group: string }
   | { kind: 'search-deal'; id: string; label: string; sublabel: string; href: string; group: string };
 
@@ -154,10 +155,22 @@ export function CommandPalette({ slug }: Props) {
 
   // Filter static actions against the query
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const matches = (s: string) => s.toLowerCase().includes(q);
-    const filteredStatic = q === '' ? staticActions : staticActions.filter((a) => matches(a.label));
-    return [...filteredStatic, ...remote];
+    const q = query.trim();
+    const ql = q.toLowerCase();
+    const matches = (s: string) => s.toLowerCase().includes(ql);
+    const filteredStatic = ql === '' ? staticActions : staticActions.filter((a) => matches(a.label));
+
+    // Dynamic "Ask assistant" entry whenever there's a substantive query —
+    // placed first so cmd+k doubles as a quick way to fire a prompt.
+    const askItems: PaletteAction[] = q.length >= 2 ? [{
+      kind: 'ask',
+      id: 'ask-assistant',
+      group: 'Ask',
+      label: `Ask assistant: "${q}"`,
+      query: q,
+    }] : [];
+
+    return [...askItems, ...filteredStatic, ...remote];
   }, [staticActions, remote, query]);
 
   // Reset active index when results change
@@ -165,8 +178,12 @@ export function CommandPalette({ slug }: Props) {
 
   const run = useCallback((action: PaletteAction) => {
     setOpen(false);
-    router.push(action.href);
-  }, [router]);
+    if (action.kind === 'ask') {
+      router.push(`${base}/ai?q=${encodeURIComponent(action.query)}`);
+    } else {
+      router.push(action.href);
+    }
+  }, [router, base]);
 
   function onInputKey(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown') {
@@ -211,7 +228,7 @@ export function CommandPalette({ slug }: Props) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKey}
-            placeholder="Jump to, search contacts or deals, create…"
+            placeholder="Jump to, search, or ask your assistant…"
             className="flex-1 bg-transparent outline-none text-sm py-3"
           />
           <kbd className="hidden sm:inline-block text-[10px] font-mono bg-muted text-muted-foreground rounded px-1.5 py-0.5">Esc</kbd>
@@ -225,14 +242,16 @@ export function CommandPalette({ slug }: Props) {
           ) : (
             grouped.map((g) => (
               <div key={g.group}>
-                <p className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <p className="px-4 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {g.group}
                 </p>
                 {g.items.map((action) => {
                   running += 1;
                   const idx = running;
                   const active = idx === activeIndex;
-                  const Icon = action.kind === 'route' ? action.icon : (action.kind === 'search-deal' ? Briefcase : Users);
+                  const Icon = action.kind === 'route' ? action.icon :
+                               action.kind === 'ask' ? Sparkles :
+                               action.kind === 'search-deal' ? Briefcase : Users;
                   return (
                     <button
                       key={action.id}

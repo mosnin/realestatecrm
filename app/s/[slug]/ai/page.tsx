@@ -8,11 +8,15 @@ import type { Conversation } from '@/lib/types';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 
 export default async function AIPage({
-  params
+  params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ q?: string }>;
 }) {
   const { slug } = await params;
+  const { q } = await searchParams;
+  const initialInput = typeof q === 'string' && q.trim() ? q.trim() : undefined;
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
 
@@ -80,6 +84,7 @@ export default async function AIPage({
           initialMessages={initialMessages}
           initialConversations={conversations}
           initialConversationId={initialConversationId}
+          initialInput={initialInput}
         />
       </div>
     </div>

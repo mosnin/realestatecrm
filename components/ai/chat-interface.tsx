@@ -30,6 +30,8 @@ interface ChatInterfaceProps {
   initialMessages: LegacyMessage[];
   initialConversations: Conversation[];
   initialConversationId: string | null;
+  /** Pre-send this message on mount (used when arriving from the command palette). */
+  initialInput?: string;
 }
 
 const MESSAGE_LIMIT = 50;
@@ -50,6 +52,7 @@ export function ChatInterface({
   initialMessages,
   initialConversations,
   initialConversationId,
+  initialInput,
 }: ChatInterfaceProps) {
   const { user } = useUser();
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
@@ -244,6 +247,16 @@ export function ChatInterface({
     },
     [send, activeConversationId],
   );
+
+  // Auto-send when arriving from the command palette via ?q= — fires once,
+  // only when the conversation is fresh (no prior messages loaded).
+  const autoSentRef = useRef(false);
+  useEffect(() => {
+    if (initialInput && initialMessages.length === 0 && !autoSentRef.current) {
+      autoSentRef.current = true;
+      void handleSend(initialInput, []);
+    }
+  }, [initialInput, initialMessages.length, handleSend]);
 
   const atLimit = messages.length >= MESSAGE_LIMIT;
   const userAvatarUrl = user?.imageUrl ?? null;

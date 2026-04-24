@@ -10,7 +10,6 @@ import { supabase } from '@/lib/supabase';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 import { getBrokerContext } from '@/lib/permissions';
 import { LiveNotifications } from '@/components/dashboard/live-notifications';
-import { FloatingChatWidget } from '@/components/ui/floating-chat-widget-shadcnui';
 import { PlatformBanner } from '@/components/platform-banner';
 import { CommandPalette } from '@/components/command-palette/command-palette';
 
@@ -247,7 +246,6 @@ export default async function DashboardLayout({
           <DashboardFooter />
           </div>
         </main>
-        <FloatingChatWidget slug={slug} />
       </div>
       <MobileNav slug={slug} isBroker={isBroker} />
       {/* ⌘K palette — listens globally, renders a modal when open. */}
