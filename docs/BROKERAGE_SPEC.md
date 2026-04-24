@@ -187,3 +187,170 @@ Single immutable audit table (supabase/schema.sql:284-294). Columns: `id`,
 Linear Step 2 scoping rule), `createdAt`. The `AuditAction` union in
 lib/audit.ts:25-36 currently enumerates `CREATE | UPDATE | DELETE |
 ACCESS | LOGIN | LOGOUT | ADMIN_ACTION | OFFBOARD`.
+
+## 4. Feature map
+
+Each phase below links to the canonical source. Descriptions name the
+key invariant the code protects — that's what you'll break if you
+refactor without reading.
+
+### BP1 — Agent offboarding
+The `offboard_brokerage_member(p_leaving_user_id, p_destination_user_id,
+p_brokerage_id, p_dry_run)` RPC in
+`supabase/migrations/20260506000000_brokerage_offboarding.sql` moves
+every brokerage-scoped row owned by the leaving member to the
+destination member's Space in a single SECURITY DEFINER transaction —
+`Contact` (filtered by `brokerageId` + source `spaceId`), the matching
+`ContactActivity`, the `Deal` rows linked to those contacts via
+`DealContact`, their `DealActivity` + `DealChecklistItem`, and `Tour`
+rows scoped to the moved contacts. The hardening migration
+`20260508000000_offboarding_hardening.sql` revoked `authenticated`'s
+EXECUTE grant (service_role only now), added a destination-`status =
+'active'` check inside the function, and — most importantly — made the
+`User.status = 'offboarded'` flip conditional: it only fires when this
+was the LAST `BrokerageMembership` row. Dual-brokerage realtors leaving
+one firm keep their account active (20260508 lines 156-176); only
+`offboardedAt` / `offboardedToUserId` are recorded. API:
+`POST /api/broker/members/[id]/offboard`. UI:
+`components/broker/offboard-member-dialog.tsx`.
+
+### BP2 — Commission ledger
+Persistent ledger driven by `sync_commission_ledger()` triggers on
+`Deal` (AFTER INSERT and AFTER UPDATE OF status, both gated by
+`NEW.status = 'won'` — see `20260507000000_commission_ledger.sql`
+lines 181-192). Rates are snapshotted at close time —
+`defaultAgentRate` / `defaultBrokerRate` from the Brokerage row at that
+moment — so future rate edits never mutate historical ledger amounts
+(migration header, "Snapshot semantics"). `UNIQUE (dealId)` +
+`ON CONFLICT DO NOTHING` makes status bounces (won→active→won)
+idempotent — re-entering `won` is a no-op after the first transition.
+`PATCH /api/broker/commissions/ledger/[id]` validates the rate-sum cap
+and rejects a non-zero `referralRate` with a null `referralUserId`
+(schema-wise these are unconstrained; enforcement lives at the API).
+`GET /api/broker/commissions/export` returns CSV, gated to
+`broker_owner` / `broker_admin`. UI:
+`app/broker/commissions/commissions-client.tsx`. The month picker
+operates in UTC to line up with the export's UTC day boundary.
+
+### BP3 — Seat-based billing
+Plan tiers `starter | team | enterprise` (schema CHECK, migration
+`20260509000000_brokerage_billing.sql` lines 23-24). `lib/brokerage-seats.ts`
+computes `used = members + pending-non-expired invites`
+(`countPendingInvites` at line 105 filters `status = 'pending'` AND
+`expiresAt > now()`). Critical invariant: `checkSeatCapacity`
+FAIL-CLOSES on infra error — if either count sub-query returns null,
+the function refuses the invite rather than silently leaking past the
+cap (lines 174-185). The `loadPlan` fallback is ALSO fail-closed — a
+pre-migration / missing column defaults to `starter / 5`, never
+unlimited (lines 37-38, 49-82). Invite endpoints return HTTP 402
+`{ code: 'seat_limit' }` when capacity is exhausted. Stripe integration
+routes the `scope=brokerage` checkout branch to the Brokerage row, and
+every webhook handler that writes back goes through
+`verifyBrokerageOwnsSubscription` to prevent metadata-poisoning (an
+attacker setting `metadata.brokerageId` to a victim org on their own
+sub). UI: `components/broker/seat-usage-pill.tsx` +
+`/broker/settings/auto-assignment`.
+
+### BP4 — Deal-at-risk dashboard
+Reuses `lib/deals/health.ts` at brokerage scope — no new tables, no new
+migration. `app/broker/pipeline/page.tsx` computes `atRiskCount +
+stuckCount` and a per-agent rollup. `HealthDot` uses colour AND shape
+so the dashboard reads in monochrome. The "All pipelines healthy"
+reassurance card only renders when both counts are zero AND there are
+active deals — an empty brokerage should NOT falsely claim health.
+
+### BP5 — Deal review requests
+`DealReviewRequest` + `DealReviewComment` from migration
+`20260510000000_deal_review_requests.sql`. Partial unique index
+`CREATE UNIQUE INDEX ... idx_dealreview_open_per_deal ON
+"DealReviewRequest"("dealId") WHERE status = 'open'` (migration lines
+92-93) enforces one open review per deal — the API layer must turn the
+resulting 23505 into a 409 Conflict. Status CHECK enum:
+`open | approved | closed` (migration lines 26-27). The comments route
+`POST /api/broker/reviews/[id]/comments` is the DUAL-AUTH endpoint
+documented in §2 — broker member OR the requesting agent
+(`review.requestingUserId === dbUser.id`). Resolution via
+`PATCH /api/broker/reviews/[id]` sets `resolvedAt` +
+`resolvedByUserId` + `status` and is gated to `broker_owner` /
+`broker_admin`. Agent-side surface at `/s/[slug]/reviews` is the
+Linear Step 1 deliverable.
+
+### BP6 — Playbook template versioning
+`BrokerageTemplate` (migration
+`20260511000000_brokerage_templates.sql`) replaces the legacy
+`title = '[BROKER_TEMPLATES]'` magic-Note JSON blob; the legacy Note
+rows are left in place as a rollback window per the migration header.
+The same migration adds `sourceTemplateId` + `sourceVersion` to
+`MessageTemplate` (lines 49-53). Publish semantics: on re-publish, the
+route detects "agent locally edited" via `sourceVersion IS NULL` and
+SKIPS such rows (that's the explicit contract from the migration
+comment at lines 46-48). Migration
+`20260512000000_template_published_version.sql` adds
+`publishedVersion` so the UI compares `version === publishedVersion`
+for up-to-date vs amber (replacing the old 1-second-slack
+`updatedAt` vs `publishedAt` heuristic described in that migration's
+header). Publish fan-out scopes its Space lookup to
+`brokerageId = caller.brokerageId` — the same cross-tenant guard
+spirit as the BP3 metadata-poisoning fix.
+
+### BP7 — Lead routing
+Two layers in `lib/brokerage-routing.ts`. Rules layer:
+`loadEnabledRules` (line 154) loads `DealRoutingRule` rows
+`WHERE brokerageId = ? AND enabled = true ORDER BY priority ASC,
+createdAt ASC`; `ruleMatches` (line 186) AND-combines criteria
+case-insensitively and REJECTS a budget-bounded rule against a
+null-budget lead (lines 192-200) — null-budget leads fall through to
+the next rule. Destination is XOR-enforced via CHECK
+`deal_routing_rule_destination_xor`:
+`("destinationUserId" IS NOT NULL AND "destinationPoolMethod" IS NULL)
+OR ("destinationUserId" IS NULL AND "destinationPoolMethod" IS NOT NULL)`
+(migration `20260514000000_deal_routing_rules.sql` lines 72-76). Pool
+method with a `destinationPoolTag` is accepted by the schema and API
+but IGNORED by the v1 engine — `resolveRuleDestination` only logs and
+continues (lib/brokerage-routing.ts lines 446-452), because
+`BrokerageMembership` has no tags column yet (migration header lines
+58-63). Don't let the UI promise tag-narrowing. Fallback layer:
+`round_robin` honours `Brokerage.lastAssignedUserId` cursor
+(`pickNextAfterCursor` line 313 wraps index 0 when the cursor is null
+or stale); `score_based` picks the agent with the fewest active
+pipeline Contacts (`type IN ('QUALIFICATION','TOUR','APPLICATION')`
+and not currently snoozed — lines 358-385), ties broken by the same
+cursor. Callers: `/api/brokerages/leads`, `/api/public/apply/brokerage`,
+and the CRUD routes under `/api/broker/routing-rules[+/[id]]`. UI:
+`app/broker/settings/routing-rules/rules-client.tsx`. Hardening
+migration `20260515000000_routing_rules_hardening.sql` enabled RLS
+with no policies AND flipped `destinationUserId` FK from
+`ON DELETE SET NULL` to `ON DELETE CASCADE` — under SET NULL a user
+hard-delete would null out `destinationUserId`, trip the XOR CHECK,
+and roll back the entire DELETE (header lines 13-22).
+
+### Linear Step 1 — Realtor-side reviews
+Agent-facing surface at `app/s/[slug]/reviews/*.tsx` (list + detail +
+composer). GETs at `/api/space/[slug]/reviews` and
+`/api/space/[slug]/reviews/[id]`. These pages re-check the
+offboarding gate LOCALLY because server components use `auth()`
+directly, not `requireAuth` — the same follow-up documented in §2's
+offboarding hard-stop note (commit 4e3fc5e). Comment posting reuses
+the broker route `POST /api/broker/reviews/[id]/comments` via the
+dual-auth path — there is no duplicate comment endpoint on the space
+side.
+
+### Linear Step 2 — Brokerage activity log
+`app/broker/activity` surfaces `AuditLog` rows scoped to the
+brokerage. The scope is the UNION of two predicates:
+`(AuditLog.spaceId IN brokerage.spaceIds)` OR
+`(AuditLog.spaceId IS NULL AND metadata->>'brokerageId' =
+caller.brokerageId)` — the null-spaceId branch is why the data-model
+section documents `metadata.brokerageId` as REQUIRED for
+brokerage-wide events. Pagination cursor is a compound
+`<createdAt>|<id>` tuple — a bare ISO cursor missed rows on
+millisecond ties until the hardening commit tupled it. The older
+aggregator at `/api/broker/activity` (new leads / deals / tours
+feed) was preserved under `/api/broker/team-activity`; its sole
+consumer `components/broker/team-activity-feed.tsx` was repointed.
+
+### Linear Step 3 — Lead routing rules v2
+This is the `DealRoutingRule` + rule layer already described in BP7.
+CRUD routes under `/api/broker/routing-rules` +
+`/api/broker/routing-rules/[id]`; UI under
+`app/broker/settings/routing-rules`.
