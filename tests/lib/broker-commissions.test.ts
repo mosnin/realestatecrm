@@ -50,11 +50,13 @@ function queueRows(
 type RpcResult = { data: unknown; error: { message: string } | null };
 const rpcQueue: RpcResult[] = [];
 
-const rpcMock = vi.fn(async (_name: string, _args: Record<string, unknown>) => {
-  const next = rpcQueue.shift();
-  if (!next) return { data: null, error: null };
-  return next;
-});
+const { rpcMock } = vi.hoisted(() => ({
+  rpcMock: vi.fn(async (_name: string, _args: Record<string, unknown>) => {
+    const next = rpcQueue.shift();
+    if (!next) return { data: null, error: null };
+    return next;
+  }),
+}));
 
 vi.mock('@/lib/supabase', () => {
   function makeChain(table: string): Record<string, unknown> {
@@ -122,7 +124,7 @@ vi.mock('@/lib/permissions', () => ({
 }));
 
 // ── audit + clerk + logger ─────────────────────────────────────────────────
-const auditMock = vi.fn(async () => undefined);
+const { auditMock } = vi.hoisted(() => ({ auditMock: vi.fn(async () => undefined) }));
 vi.mock('@/lib/audit', () => ({ audit: auditMock }));
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -480,7 +482,8 @@ describe('GET /api/broker/commissions/export', () => {
         brokerageId: 'brk_1',
         dealId: 'deal_1',
         dealValue: 500000,
-        dealTitle: '123 Main St, Apt 4B',
+        deal: { id: 'deal_1', title: '123 Main St, Apt 4B' },
+        agent: null,
         agentRate: 2.5,
         brokerRate: 0.5,
         referralRate: 0,
@@ -489,14 +492,15 @@ describe('GET /api/broker/commissions/export', () => {
         referralAmount: 0,
         status: 'paid',
         payoutAt: '2026-05-15T00:00:00.000Z',
-        createdAt: '2026-05-01T00:00:00.000Z',
+        closedAt: '2026-05-01T00:00:00.000Z',
       },
       {
         id: 'led_2',
         brokerageId: 'brk_1',
         dealId: 'deal_2',
         dealValue: 300000,
-        dealTitle: 'Plain Title',
+        deal: { id: 'deal_2', title: 'Plain Title' },
+        agent: null,
         agentRate: 2.0,
         brokerRate: 0.5,
         referralRate: 0,
@@ -505,7 +509,7 @@ describe('GET /api/broker/commissions/export', () => {
         referralAmount: 0,
         status: 'pending',
         payoutAt: null,
-        createdAt: '2026-05-02T00:00:00.000Z',
+        closedAt: null,
       },
     ]);
 

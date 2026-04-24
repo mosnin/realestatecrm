@@ -48,8 +48,10 @@ vi.mock('@/lib/supabase', () => {
   return { supabase: { from: vi.fn((table: string) => makeChain(table)) } };
 });
 
-const syncContactMock = vi.fn(async () => undefined);
-const syncDealMock = vi.fn(async () => undefined);
+const { syncContactMock, syncDealMock } = vi.hoisted(() => ({
+  syncContactMock: vi.fn(async () => undefined),
+  syncDealMock: vi.fn(async () => undefined),
+}));
 vi.mock('@/lib/vectorize', () => ({
   syncContact: syncContactMock,
   syncDeal: syncDealMock,
@@ -57,10 +59,10 @@ vi.mock('@/lib/vectorize', () => ({
   deleteDealVector: vi.fn(),
 }));
 
-const sendSMSMock = vi.fn(async () => true);
+const { sendSMSMock } = vi.hoisted(() => ({ sendSMSMock: vi.fn(async () => true) }));
 vi.mock('@/lib/sms', () => ({ sendSMS: sendSMSMock }));
 
-const notifyNewDealMock = vi.fn(async () => undefined);
+const { notifyNewDealMock } = vi.hoisted(() => ({ notifyNewDealMock: vi.fn(async () => undefined) }));
 vi.mock('@/lib/notify', () => ({ notifyNewDeal: notifyNewDealMock }));
 
 import { updateContactTool } from '@/lib/ai-tools/tools/update-contact';

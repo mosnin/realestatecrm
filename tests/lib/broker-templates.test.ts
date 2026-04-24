@@ -120,6 +120,7 @@ vi.mock('@/lib/supabase', () => {
           insertThen.then(r, e),
       };
     });
+    chain.returns = vi.fn(pass);
     chain.maybeSingle = vi.fn(() => singleThen);
     chain.single = vi.fn(() => singleThen);
     chain.then = (r: (v: unknown) => unknown, e?: (e: unknown) => unknown) =>
@@ -474,27 +475,36 @@ describe('POST /api/broker/templates/[id]/publish', () => {
       ],
     };
 
-    // MessageTemplate look-up: agent c's copy has been locally edited
-    // (sourceVersion IS NULL). The route selects agents whose copies have
-    // `sourceVersion IS NOT NULL`, so only a and b should be returned.
-    //
-    // The simplest portable mock is to return those two rows directly as the
-    // MessageTemplate `rows` payload — the route's `.is('sourceVersion', null)
-    // .not(...)` filter is a no-op in the mock, so we seed the *filtered*
-    // result shape.
+    // Space rows — each agent has one space in brokerage b_1.
+    mockByTable.Space = {
+      rows: [
+        { id: 'space_a', ownerId: 'u_a', brokerageId: 'b_1' },
+        { id: 'space_b', ownerId: 'u_b', brokerageId: 'b_1' },
+        { id: 'space_c', ownerId: 'u_c', brokerageId: 'b_1' },
+      ],
+    };
+
+    // MessageTemplate look-up keyed by spaceId. Agent c's copy has
+    // sourceVersion=null (locally edited) — it should be skipped.
     mockByTable.MessageTemplate = {
       rows: [
         {
           id: 'mt_a',
-          userId: 'u_a',
+          spaceId: 'space_a',
           sourceTemplateId: 't_1',
           sourceVersion: 2,
         },
         {
           id: 'mt_b',
-          userId: 'u_b',
+          spaceId: 'space_b',
           sourceTemplateId: 't_1',
           sourceVersion: 2,
+        },
+        {
+          id: 'mt_c',
+          spaceId: 'space_c',
+          sourceTemplateId: 't_1',
+          sourceVersion: null,
         },
       ],
     };
@@ -529,6 +539,10 @@ describe('POST /api/broker/templates/[id]/publish', () => {
       rows: [
         { id: 'm_fresh', userId: 'u_fresh', brokerageId: 'b_1', role: 'realtor_member' },
       ],
+    };
+    // Agent's space.
+    mockByTable.Space = {
+      rows: [{ id: 'space_fresh', ownerId: 'u_fresh', brokerageId: 'b_1' }],
     };
     // No MessageTemplate exists for this agent yet — rows: [] is the default
     // but we spell it out for clarity.

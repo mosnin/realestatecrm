@@ -34,7 +34,7 @@ vi.mock('@/lib/supabase', () => {
   return { supabase: { from: vi.fn((table: string) => makeChain(table)) } };
 });
 
-const sendEmailFromCRMMock = vi.fn(async () => undefined);
+const { sendEmailFromCRMMock } = vi.hoisted(() => ({ sendEmailFromCRMMock: vi.fn(async () => undefined) }));
 vi.mock('@/lib/email', () => ({ sendEmailFromCRM: sendEmailFromCRMMock }));
 
 import { sendEmailTool } from '@/lib/ai-tools/tools/send-email';

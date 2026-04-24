@@ -103,7 +103,7 @@ function summarisePendingCall(name: string, args: Record<string, unknown>): stri
       logger.warn('[loop] summariseCall threw', { tool: name }, err);
     }
   }
-  return `Run ${name}`;
+  return `Run ${name}: ${JSON.stringify(args)}`;
 }
 
 // `continue-turn.ts` re-exports this so the approve path uses the same

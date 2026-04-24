@@ -35,11 +35,13 @@ function queueRpc(data: unknown, error: { message: string } | null = null): void
   rpcQueue.push({ data, error });
 }
 
-const rpcMock = vi.fn(async (_name: string, _args: Record<string, unknown>) => {
-  const next = rpcQueue.shift();
-  if (!next) return { data: null, error: null };
-  return next;
-});
+const { rpcMock } = vi.hoisted(() => ({
+  rpcMock: vi.fn(async (_name: string, _args: Record<string, unknown>) => {
+    const next = rpcQueue.shift();
+    if (!next) return { data: null, error: null };
+    return next;
+  }),
+}));
 
 vi.mock('@/lib/supabase', () => {
   function makeChain(table: string): Record<string, unknown> {
@@ -91,7 +93,7 @@ vi.mock('@/lib/permissions', () => ({
 }));
 
 // ── audit + clerk + logger ─────────────────────────────────────────────────
-const auditMock = vi.fn(async () => undefined);
+const { auditMock } = vi.hoisted(() => ({ auditMock: vi.fn(async () => undefined) }));
 vi.mock('@/lib/audit', () => ({ audit: auditMock }));
 
 vi.mock('@clerk/nextjs/server', () => ({

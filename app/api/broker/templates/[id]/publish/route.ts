@@ -222,6 +222,7 @@ export async function POST(req: NextRequest, { params }: Params): Promise<NextRe
             .from('MessageTemplate')
             .insert({
               spaceId: space.id,
+              userId: space.ownerId,
               name: tmpl.name,
               channel: tmpl.channel,
               subject: tmpl.channel === 'email' ? tmpl.subject : null,

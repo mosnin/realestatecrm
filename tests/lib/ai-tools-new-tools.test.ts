@@ -31,7 +31,7 @@ vi.mock('@/lib/supabase', () => {
       or: vi.fn(() => chain),
       ilike: vi.fn(() => chain),
       maybeSingle: vi.fn(() => singleThenable),
-      abortSignal: vi.fn(() => terminalThenable),
+      abortSignal: vi.fn(() => chain),
       then: (
         resolve: (v: { data: unknown; error: unknown }) => unknown,
         reject?: (e: unknown) => unknown,

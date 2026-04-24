@@ -39,6 +39,21 @@ function toJSONSchema(schema: z.ZodType): Record<string, unknown> {
   return zAny.toJSONSchema(schema, { target: 'openai' });
 }
 
+/** Recursively checks whether a JSON-schema object contains any $ref key. */
+function containsRef(obj: unknown): boolean {
+  if (obj === null || typeof obj !== 'object') return false;
+  const record = obj as Record<string, unknown>;
+  if ('$ref' in record) return true;
+  for (const value of Object.values(record)) {
+    if (Array.isArray(value)) {
+      if (value.some(containsRef)) return true;
+    } else if (containsRef(value)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function toolToOpenAIFormat(tool: ToolDefinition<any, any>): OpenAIToolFormat {
   const parameters = toJSONSchema(tool.parameters);
@@ -51,9 +66,12 @@ export function toolToOpenAIFormat(tool: ToolDefinition<any, any>): OpenAIToolFo
   // Likewise `definitions` pointing at intra-schema $refs — the tools we
   // expose are flat objects, so any $defs reference is signal of a
   // recursive schema we don't want to send to a model anyway.
-  if ('definitions' in parameters || '$defs' in parameters) {
+  // Also scan the whole schema for any $ref occurrences (zod v4 with
+  // target:'openai' emits inline $ref:"#" for recursive z.lazy schemas
+  // instead of $defs, so we need both checks).
+  if ('definitions' in parameters || '$defs' in parameters || containsRef(parameters)) {
     throw new Error(
-      `Tool "${tool.name}" parameters contain recursive or referenced schemas, which aren't supported for model tool-calling. Flatten the shape.`,
+      'Tool schema contains recursive or $ref types which are not supported by the OpenAI function calling API',
     );
   }
 
