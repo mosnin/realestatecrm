@@ -165,6 +165,12 @@ function makeBrokerage(overrides: Partial<Brokerage> = {}): Brokerage {
     brokerageBuyerFormConfig: null,
     brokerageRentalScoringModel: null,
     brokerageBuyerScoringModel: null,
+    plan: 'starter',
+    seatLimit: 5,
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    stripeSubscriptionStatus: 'inactive',
+    stripePeriodEnd: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     ...overrides,
   };
@@ -373,7 +379,7 @@ describe('PATCH /api/broker/commissions/ledger/[id]', () => {
 
       // Audit fired with action UPDATE.
       expect(auditMock).toHaveBeenCalledTimes(1);
-      const auditArgs = auditMock.mock.calls[0][0] as {
+      const auditArgs = (auditMock.mock.calls as unknown[][])[0][0] as {
         action: string;
         resource: string;
         resourceId: string;

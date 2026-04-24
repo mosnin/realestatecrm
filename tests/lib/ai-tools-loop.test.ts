@@ -161,7 +161,7 @@ describe('runTurn — single tool call round-trip', () => {
 
     // Handler was called with the parsed, zod-validated args.
     expect(handler).toHaveBeenCalledTimes(1);
-    expect(handler.mock.calls[0][0]).toEqual({ query: 'hot' });
+    expect((handler.mock.calls as unknown[][])[0][0]).toEqual({ query: 'hot' });
 
     // Event sequence: tool_call_start, tool_call_result, text_delta.
     const types = events.map((e) => e.type);
@@ -390,9 +390,9 @@ describe('runTurn — parallel tool calls in one round', () => {
 
     // Both handlers called exactly once with the correctly-assembled args.
     expect(searchContactsHandler).toHaveBeenCalledTimes(1);
-    expect(searchContactsHandler.mock.calls[0][0]).toEqual({ query: 'Jane' });
+    expect((searchContactsHandler.mock.calls as unknown[][])[0][0]).toEqual({ query: 'Jane' });
     expect(searchDealsHandler).toHaveBeenCalledTimes(1);
-    expect(searchDealsHandler.mock.calls[0][0]).toEqual({ query: 'Main' });
+    expect((searchDealsHandler.mock.calls as unknown[][])[0][0]).toEqual({ query: 'Main' });
 
     // Events: two tool_call_start + two tool_call_result in order (by index),
     // then the final text_delta round.

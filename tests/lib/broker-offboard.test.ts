@@ -127,6 +127,12 @@ function makeBrokerage(overrides: Partial<Brokerage> = {}): Brokerage {
     brokerageBuyerFormConfig: null,
     brokerageRentalScoringModel: null,
     brokerageBuyerScoringModel: null,
+    plan: 'starter',
+    seatLimit: 5,
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    stripeSubscriptionStatus: 'inactive',
+    stripePeriodEnd: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     ...overrides,
   };
@@ -363,8 +369,8 @@ describe('POST /api/broker/members/[id]/offboard', () => {
 
       // Verify the rpc call shape.
       expect(rpcMock).toHaveBeenCalledTimes(1);
-      expect(rpcMock.mock.calls[0][0]).toBe('offboard_brokerage_member');
-      expect(rpcMock.mock.calls[0][1]).toMatchObject({
+      expect((rpcMock.mock.calls as unknown[][])[0][0]).toBe('offboard_brokerage_member');
+      expect((rpcMock.mock.calls as unknown[][])[0][1]).toMatchObject({
         p_leaving_user_id: 'u_leaving',
         p_destination_user_id: 'u_dest',
         p_brokerage_id: 'brk_1',
@@ -394,7 +400,7 @@ describe('POST /api/broker/members/[id]/offboard', () => {
       // Audit is fire-and-forget; it's called synchronously before the
       // response resolves.
       expect(auditMock).toHaveBeenCalledTimes(1);
-      const auditArgs = auditMock.mock.calls[0][0] as {
+      const auditArgs = (auditMock.mock.calls as unknown[][])[0][0] as {
         action: string;
         resource: string;
         resourceId: string;

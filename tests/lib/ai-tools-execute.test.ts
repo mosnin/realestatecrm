@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { z } from 'zod';
-import { defineTool, type ToolContext } from '@/lib/ai-tools/types';
+import { defineTool, type ToolContext, type ToolDefinition } from '@/lib/ai-tools/types';
 
 // ── Mock the registry so we control exactly what `getTool` returns ────────
 // Keeping this in a variable so individual tests can swap the tool under
 // test without rewriting the mock.
-let currentTool: ReturnType<typeof defineTool> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let currentTool: ToolDefinition<any, any> | null = null;
 
 vi.mock('@/lib/ai-tools/registry', () => ({
   getTool: (name: string) => (currentTool && (currentTool as { name: string }).name === name ? currentTool : undefined),

@@ -228,7 +228,7 @@ describe('POST /api/deals/[id]/review-request', () => {
     const res = await invoke('d_1', { reason: 'please review' });
     expect(res.status).toBe(201);
     expect(notifyBrokerMock).toHaveBeenCalledTimes(1);
-    expect(notifyBrokerMock.mock.calls[0][0]).toMatchObject({ type: 'review_requested' });
+    expect((notifyBrokerMock.mock.calls as unknown[][])[0][0]).toMatchObject({ type: 'review_requested' });
   });
 });
 

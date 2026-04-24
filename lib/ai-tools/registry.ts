@@ -16,13 +16,17 @@ import type { ToolDefinition } from './types';
 // latent cycle: delegate → skills/registry → tools (for skill-allowlist
 // validation). Adding it here means validateSkill still sees a clean
 // domain-only pool and can't accidentally permit sub-agent recursion.
-const COMBINED: ToolDefinition[] = [
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const COMBINED: ToolDefinition<any, any>[] = [
   ...ALL_TOOLS,
-  delegateToSubagentTool as ToolDefinition,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  delegateToSubagentTool as ToolDefinition<any, any>,
 ];
 
-const REGISTRY: Map<string, ToolDefinition> = new Map(
-  COMBINED.map((t) => [t.name, t as ToolDefinition]),
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const REGISTRY: Map<string, ToolDefinition<any, any>> = new Map(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  COMBINED.map((t) => [t.name, t as ToolDefinition<any, any>]),
 );
 
 // Guardrail: duplicate names would silently lose a tool on Map insertion.
@@ -37,12 +41,14 @@ if (REGISTRY.size !== COMBINED.length) {
 }
 
 /** Look up a tool by name. Returns `undefined` for unknown names. */
-export function getTool(name: string): ToolDefinition | undefined {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getTool(name: string): ToolDefinition<any, any> | undefined {
   return REGISTRY.get(name);
 }
 
 /** Full list of tools. Used to build the OpenAI `tools` array on each turn. */
-export function listTools(): ToolDefinition[] {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function listTools(): ToolDefinition<any, any>[] {
   return Array.from(REGISTRY.values());
 }
 

@@ -265,7 +265,7 @@ describe('sendSmsTool', () => {
       makeCtx(),
     );
     expect(sendSMSMock).toHaveBeenCalledTimes(1);
-    expect(sendSMSMock.mock.calls[0][0]).toMatchObject({ to: '+14155550123' });
+    expect((sendSMSMock.mock.calls as unknown[][])[0][0]).toMatchObject({ to: '+14155550123' });
     expect(result.display).toBe('success');
     expect((result.data as { contactId: string | null }).contactId).toBe('c_1');
   });

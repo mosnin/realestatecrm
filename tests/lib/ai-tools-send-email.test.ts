@@ -108,7 +108,7 @@ describe('sendEmailTool handler — contactId path', () => {
     );
 
     expect(sendEmailFromCRMMock).toHaveBeenCalledTimes(1);
-    expect(sendEmailFromCRMMock.mock.calls[0][0]).toMatchObject({
+    expect((sendEmailFromCRMMock.mock.calls as unknown[][])[0][0]).toMatchObject({
       toEmail: 'jane@example.com',
       fromName: 'Jane Realty',
       subject: 'Tour Friday',

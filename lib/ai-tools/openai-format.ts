@@ -39,7 +39,8 @@ function toJSONSchema(schema: z.ZodType): Record<string, unknown> {
   return zAny.toJSONSchema(schema, { target: 'openai' });
 }
 
-export function toolToOpenAIFormat(tool: ToolDefinition): OpenAIToolFormat {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function toolToOpenAIFormat(tool: ToolDefinition<any, any>): OpenAIToolFormat {
   const parameters = toJSONSchema(tool.parameters);
 
   // OpenAI's function-calling API chokes on `$schema`; zod sometimes emits
@@ -67,6 +68,7 @@ export function toolToOpenAIFormat(tool: ToolDefinition): OpenAIToolFormat {
 }
 
 /** Bulk-convert the registry for the per-turn OpenAI request payload. */
-export function allToolsForOpenAI(tools: ToolDefinition[]): OpenAIToolFormat[] {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function allToolsForOpenAI(tools: ToolDefinition<any, any>[]): OpenAIToolFormat[] {
   return tools.map(toolToOpenAIFormat);
 }
