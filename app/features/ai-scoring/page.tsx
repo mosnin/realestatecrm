@@ -187,7 +187,7 @@ export default function AIScoringPage() {
                   Multi-signal scoring — not just a number.
                 </h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  Chippi evaluates every meaningful qualification signal in the intake submission. The result isn't just a score — it's a summary you can read and act on immediately.
+                  Chippi evaluates every meaningful qualification signal in the intake submission. The result isn&apos;t just a score — it&apos;s a summary you can read and act on immediately.
                 </p>
                 <div className="mt-6 rounded-xl border border-border bg-card p-5">
                   <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Example summary</p>
