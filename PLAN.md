@@ -1,5 +1,13 @@
 # Multi-Account Role & Organization System — Implementation Plan
 
+> [!IMPORTANT]
+> **This plan is historical.** The brokerage feature described below was
+> implemented in full (phases BP1–BP7 + linear steps 1–3). For the
+> **current** data model, APIs, routing engine, and known gaps, see
+> [`docs/BROKERAGE_SPEC.md`](docs/BROKERAGE_SPEC.md). This file is kept
+> as a record of the original plan — any discrepancy between PLAN.md
+> and BROKERAGE_SPEC.md, BROKERAGE_SPEC.md wins.
+
 ## Summary
 
 Add three account levels to Chippi:
