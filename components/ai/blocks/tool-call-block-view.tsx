@@ -114,56 +114,98 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
             ? 'border-emerald-500/25 bg-emerald-500/5'
             : 'border-border bg-muted/30';
 
+  // Derive a brief args hint shown inline (first key=value pair, truncated).
+  const argsEntries = Object.entries(block.args ?? {});
+  const argsHint =
+    argsEntries.length > 0
+      ? argsEntries
+          .slice(0, 2)
+          .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+          .join(', ')
+          .slice(0, 60) + (argsEntries.length > 2 ? ' …' : '')
+      : null;
+
+  // Colored left-edge bar mirrors the displayTint semantic so the row is
+  // scannable without reading the status badge.
+  const accentBar =
+    status === 'running'
+      ? 'bg-muted-foreground/30'
+      : block.display === 'error' || status === 'error'
+        ? 'bg-rose-500/60'
+        : block.display === 'warning'
+          ? 'bg-amber-500/60'
+          : block.display === 'success' && status === 'complete'
+            ? 'bg-emerald-500/60'
+            : 'bg-muted-foreground/20';
+
   return (
-    <div
-      className={cn(
-        'rounded-xl border overflow-hidden transition-colors',
-        displayTint,
-        className,
-      )}
-    >
-      {/* Header — always visible */}
+    <div className={cn('group relative flex flex-col', className)}>
+      {/* Compact step row */}
       <button
         type="button"
         disabled={!hasDetails}
         onClick={() => hasDetails && setExpanded((v) => !v)}
         className={cn(
-          'w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors',
-          hasDetails && 'hover:bg-muted/50 cursor-pointer',
+          'relative flex items-center gap-2 pl-3 pr-2.5 py-1.5 rounded-lg border text-left',
+          'transition-colors bg-muted/20 border-border',
+          hasDetails && 'hover:bg-muted/40 cursor-pointer',
           !hasDetails && 'cursor-default',
         )}
       >
-        <div className="w-7 h-7 rounded-md bg-background flex items-center justify-center flex-shrink-0 text-muted-foreground">
-          <Icon size={14} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground truncate">{friendlyName(block.name)}</p>
-          {block.result?.summary && (
-            <p className="text-xs text-muted-foreground truncate mt-0.5">
-              {block.result.summary.split('\n')[0]}
-            </p>
+        {/* Left accent bar */}
+        <span
+          aria-hidden
+          className={cn('absolute left-0 inset-y-0 w-[3px] rounded-l-lg flex-shrink-0', accentBar)}
+        />
+
+        {/* Tool icon */}
+        <span className={cn('flex-shrink-0', tint)}>
+          <Icon size={13} />
+        </span>
+
+        {/* Tool name */}
+        <span className="text-[12px] font-medium text-foreground flex-shrink-0">
+          {friendlyName(block.name)}
+        </span>
+
+        {/* Args hint — shown only when not expanded and args exist */}
+        {argsHint && !expanded && (
+          <span className="text-[11px] text-muted-foreground/70 truncate flex-1 min-w-0 font-mono">
+            {argsHint}
+          </span>
+        )}
+
+        {/* Spacer when no args hint */}
+        {(!argsHint || expanded) && <span className="flex-1" />}
+
+        {/* Status badge */}
+        <span
+          className={cn(
+            'inline-flex items-center gap-1 text-[11px] font-medium flex-shrink-0 ml-1',
+            tint,
           )}
-        </div>
-        <span className={cn('inline-flex items-center gap-1 text-[11px] font-medium flex-shrink-0', tint)}>
+        >
           {iconEl}
           {label}
         </span>
+
+        {/* Expand chevron */}
         {hasDetails && (
-          <span className="text-muted-foreground/60 flex-shrink-0">
-            {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          <span className="text-muted-foreground/50 flex-shrink-0 ml-0.5">
+            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           </span>
         )}
       </button>
 
-      {/* Collapsible details */}
+      {/* Collapsible details — rendered below the row, slightly indented */}
       {expanded && hasDetails && (
-        <div className="border-t border-border px-3 py-2.5 space-y-3 bg-background/40">
-          {Object.keys(block.args ?? {}).length > 0 && (
+        <div className="mt-1 ml-3 pl-3 border-l-2 border-border space-y-2.5 py-2">
+          {argsEntries.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                 Arguments
               </p>
-              <pre className="text-[11px] bg-background/70 border border-border rounded-md px-2 py-1.5 overflow-x-auto font-mono text-foreground/80">
+              <pre className="text-[11px] bg-muted/30 border border-border rounded-md px-2 py-1.5 overflow-x-auto font-mono text-foreground/80">
                 {JSON.stringify(block.args, null, 2)}
               </pre>
             </div>

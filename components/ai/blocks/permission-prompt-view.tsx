@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, X, Pencil, ShieldCheck, Loader2, Infinity as InfinityIcon } from 'lucide-react';
+import { Check, X, Pencil, ShieldCheck, Loader2, Infinity as InfinityIcon, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface PermissionPromptData {
@@ -202,6 +202,23 @@ export function PermissionPromptView({
                 </pre>
               );
             })()
+          )}
+
+          {/* Also queued */}
+          {(prompt.otherPendingCalls?.length ?? 0) > 0 && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                Also queued in this run ({prompt.otherPendingCalls!.length}):
+              </p>
+              <div className="space-y-1">
+                {prompt.otherPendingCalls!.map((call) => (
+                  <div key={call.callId} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Clock size={10} className="flex-shrink-0" />
+                    <span>{call.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Actions */}

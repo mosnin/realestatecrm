@@ -247,6 +247,12 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       }
 
       case 'permission_required': {
+        // If the user isn't actively viewing this tab, don't interrupt them with
+        // an inline prompt — the server has already staged this as a draft in the
+        // inbox. The pending approval state will time out naturally.
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+          return; // let it fall to inbox
+        }
         setPendingApproval({
           requestId: event.requestId,
           callId: event.callId,
