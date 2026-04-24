@@ -97,8 +97,11 @@ supabase/schema.sql:31-45: `name`, `ownerId` with `ON DELETE RESTRICT`,
 - `defaultAgentRate`, `defaultBrokerRate` (commission defaults snapshotted
   onto ledger rows at close time)
 
-(Added across migrations 20260507–20260513; see the feature-map chunk for
-which phase added which column.) <!-- TODO: verify exact migration filenames for plan/seat/stripe/assignment/rate columns -->
+Added across migrations `20260507000000_commission_ledger.sql` (rate
+defaults), `20260509000000_brokerage_billing.sql`
+(plan/seatLimit/stripe*), and `20260513000000_brokerage_routing.sql`
+(autoAssign/method/cursor). See the feature-map chunk for which phase
+added which column.
 
 ### BrokerageMembership
 User ↔ Brokerage join with a `role` enum (schema.sql:239-247). Unique on
@@ -127,35 +130,54 @@ reportable) from an agent's personal contacts. FK is
 
 ### CommissionLedger
 One row per `won` Deal. Sync trigger on Deal (migration
-`supabase/migrations/20260507000000`). Rates snapshotted at close —
-`defaultAgentRate`/`defaultBrokerRate` from the Brokerage at the moment of
-close. Rate-sum cap (0..1) and referral invariant (non-zero rate ⇒ userId)
-enforced at the API layer, not the schema. <!-- TODO: verify exact filename of 20260507000000 commission ledger migration -->
+`supabase/migrations/20260507000000_commission_ledger.sql`). Rates are
+snapshotted at close — `defaultAgentRate` / `defaultBrokerRate` from the
+Brokerage at the moment of close. Status CHECK enum:
+`pending | paid | void` (migration line 71). `UNIQUE (dealId)` +
+`ON CONFLICT DO NOTHING` makes the won-trigger idempotent across
+status bounces. Rate-sum cap (≤ 100%) and referral invariant
+(non-zero `referralRate` ⇒ non-null `referralUserId`) are enforced at
+the API layer, not the schema.
 
 ### DealReviewRequest + DealReviewComment
 Broker sign-off queue on a specific deal. Migration
 `supabase/migrations/20260510000000_deal_review_requests.sql`. Partial
-unique index on `(dealId) WHERE status = 'open'` enforces one active
-review at a time. Status enum: `open | approved | closed`. Comments
-reference `DealReviewRequest.id`. <!-- TODO: verify DealReviewRequest status enum and partial index exist as described in the migration -->
+unique index `idx_dealreview_open_per_deal ON "DealReviewRequest"("dealId")
+WHERE status = 'open'` (migration lines 92-93) enforces one active
+review per deal — API callers must translate a 23505 unique-violation
+into a 409. Status CHECK enum: `open | approved | closed` (migration
+lines 26-27). `DealReviewComment` references `DealReviewRequest.id`
+via `reviewRequestId` with `ON DELETE CASCADE`.
 
 ### BrokerageTemplate + MessageTemplate.sourceTemplateId / sourceVersion
 Versioned playbook library. Migration
-`supabase/migrations/20260511000000` replaces a legacy "magic Note" JSON
-hack. MessageTemplate (per-agent) gains two columns tracking WHICH
-brokerage template produced the copy AND at WHICH version — the publish
-flow uses this to detect agent-edited copies (skip) and drift-from-source
-(amber dot in the UI). <!-- TODO: verify exact migration filename and column names sourceTemplateId / sourceVersion -->
+`supabase/migrations/20260511000000_brokerage_templates.sql` replaces a
+legacy "magic Note" JSON hack (a Note row with
+`title = '[BROKER_TEMPLATES]'` in the broker_owner's personal Space).
+That migration also adds two provenance columns to MessageTemplate
+(per-agent copies): `sourceTemplateId` (FK to `BrokerageTemplate`,
+`ON DELETE SET NULL`) and `sourceVersion` (integer, nullable). The
+publish flow uses `sourceVersion IS NULL` as the signal that the agent
+edited the copy locally and skips those rows on re-publish. Migration
+`20260512000000_template_published_version.sql` adds `publishedVersion`
+on BrokerageTemplate so the UI can compare `version === publishedVersion`
+directly (replaces a flaky `updatedAt` vs `publishedAt` 1-second-slack
+heuristic).
 
 ### DealRoutingRule
 Optional rules-first routing layer. Migration
-`supabase/migrations/20260514000000` + hardening in
-`supabase/migrations/20260515000000`. Criteria fields (`leadType`,
-`minBudget`, `maxBudget`, `matchTag`) are all nullable and AND-combined.
-Destination is XOR-enforced via CHECK constraint: either a specific
-`destinationUserId` OR a `destinationPoolMethod` + optional
-`destinationPoolTag`. FK to User is `ON DELETE CASCADE` post-hardening (a
-rule whose target user no longer exists is meaningless). <!-- TODO: verify exact migration filenames and CHECK constraint wording -->
+`supabase/migrations/20260514000000_deal_routing_rules.sql` + hardening
+in `supabase/migrations/20260515000000_routing_rules_hardening.sql`.
+Criteria fields (`leadType`, `minBudget`, `maxBudget`, `matchTag`) are
+all nullable and AND-combined. Destination is XOR-enforced via CHECK
+`deal_routing_rule_destination_xor`:
+`("destinationUserId" IS NOT NULL AND "destinationPoolMethod" IS NULL) OR ("destinationUserId" IS NULL AND "destinationPoolMethod" IS NOT NULL)`
+(migration lines 72-76). A second CHECK
+`deal_routing_rule_budget_range` requires `maxBudget >= minBudget` when
+both are set. Hardening flipped `destinationUserId` FK from
+`ON DELETE SET NULL` to `ON DELETE CASCADE` because the SET NULL +
+XOR combination would make a user hard-delete roll back on the CHECK
+(20260515 header).
 
 ### AuditLog
 Single immutable audit table (supabase/schema.sql:284-294). Columns: `id`,
