@@ -16,8 +16,9 @@ from agents import Agent
 from config import settings
 from tools.activities import log_activity_run, set_contact_follow_up
 from tools.contacts import get_contact, get_contact_activity
-from tools.drafts import check_recent_drafts, create_draft_message
+from tools.drafts import check_recent_drafts
 from tools.memory_tools import recall_facts, store_observation
+from tools.outreach import send_or_draft
 
 TOUR_FOLLOWUP_INSTRUCTIONS = """
 You are the Tour Follow-Up Agent. Your sole job is to follow up with a contact
@@ -33,12 +34,12 @@ The coordinator will give you a contactId in the brief. Use it.
    (look for activity entries mentioning "tour", the property address, etc.).
 4. Call check_recent_drafts(contact_id, hours=24). If a tour follow-up draft
    already exists from the last 24 hours, skip drafting and log why, then stop.
-5. Draft a follow-up message. Choose channel based on availability:
+5. Draft a follow-up message via send_or_draft. Choose channel:
    - SMS if phone is available (faster, more personal for same-day follow-up)
    - Email if no phone, or if the tour notes suggest a detailed response is needed
 6. Call set_contact_follow_up to schedule a reminder 2 days from today
-   (ISO date, e.g. "2026-04-23") so the realtor knows to check in again.
-7. Call store_observation to note: "Tour follow-up draft created on [date]"
+   (ISO date, e.g. "2026-04-26") so the realtor knows to check in again.
+7. Call store_observation to note: "Tour follow-up sent/drafted on [date]"
    with importance=0.7 (high — this is a critical pipeline moment).
 8. Call log_activity_run at the end with a summary.
 
@@ -50,11 +51,16 @@ The coordinator will give you a contactId in the brief. Use it.
   Body: 3-4 sentences. Reference the specific property if activity notes mention
   an address. Ask one open-ended question. Offer a next step (call, showing, etc.)
 
+## send_or_draft behaviour
+You call send_or_draft exactly like you would call create_draft_message — the
+platform automatically decides whether to send immediately or queue for approval
+based on the space's autonomy setting. You don't need to check it.
+
 ## Rules
 - NEVER fabricate property details or prices.
 - If the contact has no phone AND no email, log an observation and stop.
 - If no tour activity is found, still follow up — the coordinator saw the trigger.
-- Limit to 1 draft per run for this contact. Do not create multiple drafts.
+- Limit to 1 outreach per run for this contact. Do not create multiple messages.
 - Always personalise using recall_facts — a generic message is a wasted opportunity.
 """.strip()
 
@@ -70,7 +76,7 @@ def make_tour_followup_agent() -> Agent:
             recall_facts,
             store_observation,
             check_recent_drafts,
-            create_draft_message,
+            send_or_draft,
             set_contact_follow_up,
             log_activity_run,
         ],

@@ -6,13 +6,14 @@ a real signal to act on.
 
 Handoff flow:
   CoordinatorAgent
-    → survey_workspace()            ← lightweight DB snapshot
-    → handoff tour_followup         ← if tour_completed trigger (time-critical)
-    → handoff lead_nurture          ← if stale leads or new_lead trigger
-    → handoff deal_sentinel         ← if stalled/at-risk deals
-    → handoff long_term_nurture     ← if cold-lead pool is meaningful
-    → handoff lead_scorer           ← if application trigger or mass score decay
-    → CoordinatorRunReport          ← structured summary stored as space memory
+    → survey_workspace()             ← lightweight DB snapshot
+    → handoff offer_agent            ← if application_submitted trigger (highest priority)
+    → handoff tour_followup          ← if tour_completed trigger (time-critical)
+    → handoff lead_nurture           ← if stale leads or new_lead trigger
+    → handoff deal_sentinel          ← if stalled/at-risk deals
+    → handoff long_term_nurture      ← if cold-lead pool is meaningful
+    → handoff lead_scorer            ← if application trigger or mass score decay
+    → CoordinatorRunReport           ← structured summary stored as space memory
 
 Guardrails:
   Input  — pending_drafts_guardrail: blocks run if ≥10 unreviewed drafts
@@ -49,10 +50,15 @@ a focused brief. You do not perform CRM actions yourself.
 
 ## Routing rules
 
+Activate offer_agent FIRST when:
+- An "application_submitted" trigger is active.
+- Pass the contactId from the trigger in your brief.
+- This is the highest-priority event — a submitted application needs a same-hour response.
+
 Activate tour_followup_agent when:
 - A "tour_completed" trigger is active.
-- Pass the contactId from the trigger in your brief (e.g. "contactId: abc-123").
-- This runs FIRST — tour follow-up is the most time-sensitive action.
+- Pass the contactId from the trigger.
+- Runs second — post-tour follow-up is the most time-sensitive recurring action.
 
 Activate lead_nurture_agent when:
 - stale_leads > 0  (contacts inactive 7+ days with no follow-up scheduled)
@@ -67,18 +73,17 @@ Activate long_term_nurture_agent when:
 - cold_leads_30d > 3  (meaningful pool of leads inactive 30+ days)
 
 Activate lead_scorer_agent when:
-- An "application_submitted" trigger is active
-- OR cold_leads_30d > 8  (many contacts likely have stale scores from engagement decay)
-- Note: tour_completed rescoring is handled by tour_followup_agent via store_observation;
-  lead_scorer only needs to run if application_submitted or broad decay is detected.
+- cold_leads_30d > 8  (many contacts likely have stale scores from engagement decay)
+- Note: application_submitted rescoring is handled by offer_agent via store_fact;
+  lead_scorer only needs to run for broad engagement decay signals.
 
 ## Rules
 - ONLY hand off to agents that appear in the enabled_agents list from the survey result.
 - Maintain this order when multiple agents are needed:
-  tour_followup → lead_nurture → deal_sentinel → long_term_nurture → lead_scorer
-  tour_followup runs first because it is time-critical (same-day post-tour outreach).
+  offer_agent → tour_followup → lead_nurture → deal_sentinel → long_term_nurture → lead_scorer
+  offer_agent and tour_followup run first because they are time-critical.
 - Your handoff brief must be specific. Include contactIds for event-driven agents.
-  Example: "tour_completed trigger received. contactId: abc-123. Follow up immediately."
+  Example: "application_submitted trigger received. contactId: abc-123. Process immediately."
 - Do not activate an agent simply because it is enabled — only when a concrete
   signal exists (non-zero count or matching trigger).
 
@@ -87,7 +92,7 @@ After all work is done, produce a CoordinatorRunReport with these fields:
 - workspace_name: the workspace name from your brief
 - run_date: today's date as YYYY-MM-DD
 - agents_activated: list of specialist names you handed off to (empty list if none)
-- total_drafts_created: your best estimate of total drafts created across all specialists
+- total_drafts_created: your best estimate of total drafts/sends across all specialists
   (read from their final messages; use 0 if unknown)
 - total_follow_ups_set: your best estimate of total follow-ups scheduled
   (read from their final messages; use 0 if unknown)
@@ -112,7 +117,7 @@ async def survey_workspace(ctx: RunContextWrapper[AgentContext]) -> dict[str, An
     today = now.date().isoformat()
     fourteen_days_out = (now + timedelta(days=14)).date().isoformat()
 
-    stale_res, cold_res, stalled_res, closing_res = await asyncio.gather(
+    stale_res, cold_res, stalled_res, closing_res, application_res = await asyncio.gather(
         # Contacts inactive 7+ days with no follow-up scheduled
         db.table("Contact")
         .select("id", count="exact")
@@ -144,6 +149,14 @@ async def survey_workspace(ctx: RunContextWrapper[AgentContext]) -> dict[str, An
         .lte("closeDate", fourteen_days_out)
         .gte("closeDate", today)
         .execute(),
+
+        # Contacts who recently submitted an application (type=APPLICATION, updated in last 24h)
+        db.table("Contact")
+        .select("id", count="exact")
+        .eq("spaceId", space_id)
+        .eq("type", "APPLICATION")
+        .gte("updatedAt", (now - timedelta(hours=24)).isoformat())
+        .execute(),
     )
 
     snapshot = {
@@ -151,6 +164,7 @@ async def survey_workspace(ctx: RunContextWrapper[AgentContext]) -> dict[str, An
         "cold_leads_30d": cold_res.count or 0,
         "stalled_deals": stalled_res.count or 0,
         "deals_closing_soon": closing_res.count or 0,
+        "recent_applications": application_res.count or 0,
         "enabled_agents": ctx.context.enabled_agents,
     }
 
@@ -162,7 +176,8 @@ async def survey_workspace(ctx: RunContextWrapper[AgentContext]) -> dict[str, An
             f"{snapshot['stale_leads']} stale leads, "
             f"{snapshot['cold_leads_30d']} cold 30d+, "
             f"{snapshot['stalled_deals']} stalled deals, "
-            f"{snapshot['deals_closing_soon']} closing soon"
+            f"{snapshot['deals_closing_soon']} closing soon, "
+            f"{snapshot['recent_applications']} recent application(s)"
         ),
         agent_type="coordinator",
     )
@@ -192,9 +207,15 @@ def make_coordinator_agent(enabled_agents: list[str]) -> Agent:
     from agents.lead_nurture import make_lead_nurture_agent
     from agents.lead_scorer import make_lead_scorer_agent
     from agents.long_term_nurture import make_long_term_nurture_agent
+    from agents.offer_agent import make_offer_agent
     from agents.tour_followup import make_tour_followup_agent
 
     _registry: dict[str, tuple[Callable, str, str]] = {
+        "offer_agent": (
+            make_offer_agent,
+            "Offer Agent",
+            "contacts who just submitted a rental or buyer application and need an immediate acknowledgement",
+        ),
         "tour_followup": (
             make_tour_followup_agent,
             "Tour Follow-Up Agent",
@@ -222,8 +243,8 @@ def make_coordinator_agent(enabled_agents: list[str]) -> Agent:
         ),
     }
 
-    # tour_followup runs first — same-day post-tour outreach is time-critical
-    _order = ["tour_followup", "lead_nurture", "deal_sentinel", "long_term_nurture", "lead_scorer"]
+    # offer_agent and tour_followup run first — time-critical event-driven responses
+    _order = ["offer_agent", "tour_followup", "lead_nurture", "deal_sentinel", "long_term_nurture", "lead_scorer"]
     ordered = [name for name in _order if name in enabled_agents]
 
     handoffs_list = []

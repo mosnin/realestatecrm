@@ -18,8 +18,9 @@ from agents import Agent
 from config import settings
 from tools.activities import log_activity_run, log_agent_observation, set_contact_follow_up
 from tools.contacts import get_contact, get_contact_activity
-from tools.drafts import check_recent_drafts, create_draft_message
+from tools.drafts import check_recent_drafts
 from tools.memory_tools import recall_facts, store_fact, store_observation
+from tools.outreach import send_or_draft
 
 LONG_TERM_NURTURE_INSTRUCTIONS = """
 You are the Long-Term Nurture Agent. You specialise in re-engaging leads that
@@ -58,17 +59,21 @@ Calculate days since last contact from lastContactedAt field.
   Email: A full re-qualification email. Acknowledge the time, mention the market has
   shifted, ask if their needs have changed.
 
+## send_or_draft behaviour
+Call send_or_draft exactly like create_draft_message. The platform decides whether
+to send immediately or queue for approval. You never check the autonomy setting.
+
 ## Rules
-- ALWAYS call check_recent_drafts(contact_id, hours=336) (14 days) before creating a draft.
-  Skip if ANY recent draft exists — do not spam.
-- Maximum 8 drafts per run. Focus on longest-inactive first.
+- ALWAYS call check_recent_drafts(contact_id, hours=336) (14 days) before outreach.
+  Skip if ANY recent draft or send exists — do not spam.
+- Maximum 8 outreach actions per run. Focus on longest-inactive first.
 - Never reference specific prices, rates, or statistics you weren't told.
 - SMS messages must be under 160 characters.
 - Store what you learn as observations using store_observation.
 - Call log_activity_run at the end with a summary.
 
-## After drafting
-Call store_observation to note: "Long-term nurture draft created on [date]"
+## After outreach
+Call store_observation to note: "Long-term nurture message sent/drafted on [date]"
 with importance 0.3 so future runs know this contact was recently touched.
 """.strip()
 
@@ -88,7 +93,7 @@ def make_long_term_nurture_agent() -> Agent:
             store_fact,
             store_observation,
             check_recent_drafts,
-            create_draft_message,
+            send_or_draft,
             set_contact_follow_up,
             log_agent_observation,
             log_activity_run,
