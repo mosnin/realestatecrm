@@ -17,6 +17,7 @@ interface AgentSettings {
   dailyTokenBudget: number;
   heartbeatIntervalMinutes: number;
   enabledAgents: string[];
+  perAgentAutonomy: Record<string, 'autonomous' | 'draft_required' | 'suggest_only'>;
 }
 
 interface AgentUsage {
@@ -93,6 +94,18 @@ const AGENT_OPTIONS = [
     iconClass: 'text-rose-500',
   },
 ] as const;
+
+const AUTONOMY_ICONS = {
+  suggest_only: Eye,
+  draft_required: Shield,
+  autonomous: Zap,
+} as const;
+
+const AUTONOMY_LABELS = {
+  suggest_only: 'Suggest only',
+  draft_required: 'Draft + approval',
+  autonomous: 'Autonomous',
+} as const;
 
 const BUDGET_PRESETS = [
   { label: '10k', value: 10_000, desc: '~40 runs/day' },
@@ -183,6 +196,18 @@ export function AgentSettingsPanel({ slug }: Props) {
       : [...current, agent];
     setSettings({ ...settings, enabledAgents: next });
     void saveField({ enabledAgents: next }, `agent_${agent}`);
+  }
+
+  function setAgentAutonomy(agent: string, level: 'autonomous' | 'draft_required' | 'suggest_only' | null) {
+    if (!settings) return;
+    const next = { ...(settings.perAgentAutonomy ?? {}) };
+    if (level === null) {
+      delete next[agent];
+    } else {
+      next[agent] = level;
+    }
+    setSettings({ ...settings, perAgentAutonomy: next });
+    void saveField({ perAgentAutonomy: next }, `autonomy_${agent}`);
   }
 
   async function triggerRun() {
@@ -358,25 +383,85 @@ export function AgentSettingsPanel({ slug }: Props) {
 
       {/* Active agents */}
       <div className="space-y-3">
-        <Label className="text-sm font-semibold">Active agents</Label>
+        <div>
+          <Label className="text-sm font-semibold">Active agents</Label>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Each agent inherits the workspace autonomy level above. Override per-agent when enabled.
+          </p>
+        </div>
         <div className="space-y-2">
           {AGENT_OPTIONS.map((opt) => {
             const Icon = opt.icon;
-            const enabled = (settings.enabledAgents ?? []).includes(opt.value);
+            const isEnabled = (settings.enabledAgents ?? []).includes(opt.value);
+            const override = (settings.perAgentAutonomy ?? {})[opt.value] as
+              'autonomous' | 'draft_required' | 'suggest_only' | undefined;
+            const effective = override ?? settings.autonomyLevel;
+
             return (
-              <div key={opt.value} className="flex items-center gap-4 p-4 rounded-xl border bg-card">
-                <div className={cn('w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center flex-shrink-0', opt.iconClass)}>
-                  <Icon size={15} />
+              <div key={opt.value} className="rounded-xl border bg-card space-y-0">
+                {/* Top row */}
+                <div className="flex items-center gap-4 p-4">
+                  <div className={cn('w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center flex-shrink-0', opt.iconClass)}>
+                    <Icon size={15} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{opt.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{opt.description}</p>
+                  </div>
+                  <Switch
+                    checked={isEnabled}
+                    onCheckedChange={() => toggleAgent(opt.value)}
+                    disabled={saving}
+                  />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{opt.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{opt.description}</p>
-                </div>
-                <Switch
-                  checked={enabled}
-                  onCheckedChange={() => toggleAgent(opt.value)}
-                  disabled={saving}
-                />
+
+                {/* Per-agent autonomy row — only when enabled */}
+                {isEnabled && (
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border">
+                    <span className="text-xs text-muted-foreground flex-shrink-0">Autonomy</span>
+                    <div className="flex items-center rounded-lg border border-border overflow-hidden ml-auto">
+                      {(['suggest_only', 'draft_required', 'autonomous'] as const).map((level) => {
+                        const LevelIcon = AUTONOMY_ICONS[level];
+                        const isSelected = effective === level;
+                        const isWorkspaceDefault = settings.autonomyLevel === level && !override;
+                        return (
+                          <button
+                            key={level}
+                            title={AUTONOMY_LABELS[level] + (isWorkspaceDefault ? ' (workspace default)' : '')}
+                            onClick={() => setAgentAutonomy(opt.value, level === override ? null : level)}
+                            className={cn(
+                              'flex items-center gap-1 px-2.5 py-1.5 text-xs transition-colors border-r border-border last:border-r-0',
+                              isSelected && override
+                                ? 'bg-primary text-primary-foreground'
+                                : isSelected
+                                ? 'bg-muted text-foreground'
+                                : 'hover:bg-muted/40 text-muted-foreground',
+                            )}
+                          >
+                            <LevelIcon size={11} />
+                            {isWorkspaceDefault && !override && (
+                              <span className="w-1 h-1 rounded-full bg-primary inline-block flex-shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {override && (
+                      <button
+                        onClick={() => setAgentAutonomy(opt.value, null)}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                        title="Reset to workspace default"
+                      >
+                        Reset
+                      </button>
+                    )}
+                    {savedField === `autonomy_${opt.value}` && (
+                      <span className="text-xs text-emerald-600 flex items-center gap-1 flex-shrink-0">
+                        <CheckCircle2 size={11} /> Saved
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

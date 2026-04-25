@@ -27,6 +27,7 @@ export async function GET(_req: NextRequest) {
       dailyTokenBudget: 50000,
       heartbeatIntervalMinutes: 15,
       enabledAgents: ['lead_nurture'],
+      perAgentAutonomy: {},
     });
   }
 
@@ -70,6 +71,15 @@ export async function PATCH(req: NextRequest) {
   if (Array.isArray(body.enabledAgents)) {
     const agents = body.enabledAgents.filter((a: unknown) => validAgents.includes(a as string));
     patch.enabledAgents = agents;
+  }
+  if (body.perAgentAutonomy !== undefined && typeof body.perAgentAutonomy === 'object' && !Array.isArray(body.perAgentAutonomy)) {
+    const validated: Record<string, string> = {};
+    for (const [agent, level] of Object.entries(body.perAgentAutonomy as Record<string, unknown>)) {
+      if (validAgents.includes(agent) && validAutonomy.includes(level as string)) {
+        validated[agent] = level as string;
+      }
+    }
+    patch.perAgentAutonomy = validated;
   }
 
   // Upsert — creates the row on first save
