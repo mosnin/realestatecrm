@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Brain, Activity, Zap, CheckCircle2, XCircle, RefreshCw, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { timeAgo } from '@/lib/formatting';
+import { ImportanceDot } from './importance-dot';
 
 interface AgentMemory {
   id: string;
@@ -35,23 +37,6 @@ const AGENT_LABELS: Record<string, string> = {
   lead_scorer: 'Lead Scorer',
 };
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
-function ImportanceDot({ importance }: { importance: number }) {
-  if (importance >= 0.7)
-    return <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 mt-1.5" />;
-  if (importance >= 0.4)
-    return <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 mt-1.5" />;
-  return <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 shrink-0 mt-1.5" />;
-}
 
 export function AgentDealPanel({ dealId, slug, dealTitle }: { dealId: string; slug: string; dealTitle?: string }) {
   const [data, setData] = useState<AgentDealData | null>(null);
@@ -118,14 +103,14 @@ export function AgentDealPanel({ dealId, slug, dealTitle }: { dealId: string; sl
         <div className="flex items-center gap-1.5">
           <Link
             href={`/s/${slug}/ai?q=${encodeURIComponent(`Tell me about my deal "${dealTitle ?? 'this deal'}" and suggest next steps`)}`}
-            className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted/60 transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] text-xs font-medium rounded-md border border-border hover:bg-muted/60 transition-colors"
           >
-            <Sparkles size={10} />
+            <Sparkles size={11} />
             Ask assistant
           </Link>
           <button
             onClick={() => void load()}
-            className="p-1 text-muted-foreground hover:text-foreground rounded hover:bg-muted/60 transition-colors"
+            className="p-1.5 min-h-[36px] text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/60 transition-colors"
             title="Refresh"
           >
             <RefreshCw size={12} />
@@ -133,9 +118,9 @@ export function AgentDealPanel({ dealId, slug, dealTitle }: { dealId: string; sl
           <button
             onClick={() => void handleRequestAnalysis()}
             disabled={triggering}
-            className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] text-xs font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50"
           >
-            {triggering ? <Loader2 size={10} className="animate-spin" /> : <Zap size={10} />}
+            {triggering ? <Loader2 size={11} className="animate-spin" /> : <Zap size={11} />}
             {triggered ? 'Queued!' : 'Analyse'}
           </button>
         </div>

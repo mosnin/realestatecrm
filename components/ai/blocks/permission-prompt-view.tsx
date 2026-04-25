@@ -104,7 +104,9 @@ export function PermissionPromptView({
   busy,
 }: PermissionPromptViewProps) {
   const [editing, setEditing] = useState(false);
-  const [argsText, setArgsText] = useState(() => JSON.stringify(prompt.args, null, 2));
+  const [argsText, setArgsText] = useState(() => {
+    try { return JSON.stringify(prompt.args, null, 2); } catch { return '{}'; }
+  });
   const [parseError, setParseError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<null | 'approve' | 'deny' | 'always'>(null);
 

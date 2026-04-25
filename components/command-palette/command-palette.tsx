@@ -231,7 +231,7 @@ export function CommandPalette({ slug }: Props) {
             placeholder="Jump to, search, or ask your assistant…"
             className="flex-1 bg-transparent outline-none text-sm py-3"
           />
-          <kbd className="hidden sm:inline-block text-[10px] font-mono bg-muted text-muted-foreground rounded px-1.5 py-0.5">Esc</kbd>
+          <kbd className="hidden sm:inline-block text-[11px] font-mono bg-muted text-muted-foreground rounded px-1.5 py-0.5">Esc</kbd>
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto py-1">
@@ -279,7 +279,7 @@ export function CommandPalette({ slug }: Props) {
           )}
         </div>
 
-        <div className="px-4 py-2 border-t border-border flex items-center justify-between text-[10px] text-muted-foreground">
+        <div className="px-4 py-2 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground">
           <div className="flex items-center gap-3">
             <span><kbd className="font-mono bg-muted rounded px-1">↑</kbd> <kbd className="font-mono bg-muted rounded px-1">↓</kbd> navigate</span>
             <span><kbd className="font-mono bg-muted rounded px-1">↵</kbd> select</span>

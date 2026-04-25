@@ -248,15 +248,20 @@ export function ChatInterface({
     [send, activeConversationId],
   );
 
-  // Auto-send when arriving from the command palette via ?q= — fires once,
-  // only when the conversation is fresh (no prior messages loaded).
+  // Auto-send when arriving from the command palette via ?q= — fires once on
+  // mount only. handleSendRef lets us read the latest handleSend without
+  // adding it to the deps array (which would re-trigger on every send).
   const autoSentRef = useRef(false);
+  const handleSendRef = useRef(handleSend);
+  useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
   useEffect(() => {
     if (initialInput && initialMessages.length === 0 && !autoSentRef.current) {
       autoSentRef.current = true;
-      void handleSend(initialInput, []);
+      void handleSendRef.current(initialInput, []);
     }
-  }, [initialInput, initialMessages.length, handleSend]);
+    // Intentionally empty deps — this must fire exactly once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const atLimit = messages.length >= MESSAGE_LIMIT;
   const userAvatarUrl = user?.imageUrl ?? null;

@@ -1,24 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Bot, CheckCircle2, Clock, AlertCircle, Lightbulb,
   ArrowRight, ChevronRight, User, Briefcase,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
+import { timeAgo } from '@/lib/formatting';
 
 const ACTION_LABELS: Record<string, string> = {
   create_draft_message: 'Drafted message',
@@ -150,15 +139,18 @@ export function AgentMissionControl({ slug }: { slug: string }) {
   if (loading) return <MissionControlSkeleton />;
 
   // Group consecutive entries by runId (API returns DESC order so first = newest)
-  const runs: RunGroup[] = [];
-  for (const entry of entries) {
-    const last = runs[runs.length - 1];
-    if (last && last.runId === entry.runId) {
-      last.entries.push(entry);
-    } else {
-      runs.push({ runId: entry.runId, agentType: entry.agentType, entries: [entry], startedAt: entry.createdAt });
+  const runs = useMemo<RunGroup[]>(() => {
+    const result: RunGroup[] = [];
+    for (const entry of entries) {
+      const last = result[result.length - 1];
+      if (last && last.runId === entry.runId) {
+        last.entries.push(entry);
+      } else {
+        result.push({ runId: entry.runId, agentType: entry.agentType, entries: [entry], startedAt: entry.createdAt });
+      }
     }
-  }
+    return result;
+  }, [entries]);
 
   const latestRun = runs[0] ?? null;
   const lastRanAt = entries[0]?.createdAt ?? null;

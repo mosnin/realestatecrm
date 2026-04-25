@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { timeAgo } from '@/lib/formatting';
 
 interface AgentSettings {
   spaceId: string;
@@ -113,16 +114,6 @@ const BUDGET_PRESETS = [
   { label: '50k', value: 50_000, desc: '~200 runs/day' },
   { label: '100k', value: 100_000, desc: '~400 runs/day' },
 ] as const;
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 function timeUntil(dateStr: string): string {
   const diff = new Date(dateStr).getTime() - Date.now();
@@ -260,7 +251,7 @@ export function AgentSettingsPanel({ slug }: Props) {
               <div className="flex items-center gap-2">
                 <p className="font-semibold text-sm">Background Agent</p>
                 <span className={cn(
-                  'text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                  'text-[11px] font-semibold px-1.5 py-0.5 rounded-full',
                   settings.enabled
                     ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
                     : 'bg-muted text-muted-foreground',
@@ -281,7 +272,7 @@ export function AgentSettingsPanel({ slug }: Props) {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 gap-1.5 text-xs"
+                className="h-9 gap-1.5 text-xs"
                 onClick={() => void triggerRun()}
                 disabled={triggeringRun || !settings.enabled}
               >
@@ -289,7 +280,7 @@ export function AgentSettingsPanel({ slug }: Props) {
                 Run now
               </Button>
               {runResult && (
-                <p className="text-[10px] text-muted-foreground">{runResult}</p>
+                <p className="text-[11px] text-muted-foreground">{runResult}</p>
               )}
             </div>
             <Switch
@@ -364,7 +355,7 @@ export function AgentSettingsPanel({ slug }: Props) {
                         : <Circle size={14} className="text-muted-foreground/40 flex-shrink-0" />}
                       <span className="text-sm font-medium">{opt.label}</span>
                       {'recommended' in opt && opt.recommended && (
-                        <span className="text-[10px] bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded-full">
+                        <span className="text-[11px] bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded-full">
                           Recommended
                         </span>
                       )}
@@ -430,7 +421,7 @@ export function AgentSettingsPanel({ slug }: Props) {
                             title={AUTONOMY_LABELS[level] + (isWorkspaceDefault ? ' (workspace default)' : '')}
                             onClick={() => setAgentAutonomy(opt.value, level === override ? null : level)}
                             className={cn(
-                              'flex items-center gap-1 px-2.5 py-1.5 text-xs transition-colors border-r border-border last:border-r-0',
+                              'flex items-center gap-1 px-2.5 py-2 min-h-[36px] text-xs transition-colors border-r border-border last:border-r-0',
                               isSelected && override
                                 ? 'bg-primary text-primary-foreground'
                                 : isSelected
@@ -492,7 +483,7 @@ export function AgentSettingsPanel({ slug }: Props) {
               )}
             >
               <span className="font-bold">{preset.label}</span>
-              <span className="text-[10px] text-muted-foreground mt-0.5">{preset.desc}</span>
+              <span className="text-[11px] text-muted-foreground mt-0.5">{preset.desc}</span>
             </button>
           ))}
         </div>

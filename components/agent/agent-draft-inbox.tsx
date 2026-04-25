@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { timeAgo } from '@/lib/formatting';
 
 interface DeliveryResult {
   sent: boolean;
@@ -44,16 +45,6 @@ interface Props {
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 const CHANNEL_CONFIG = {
   sms: {
@@ -206,7 +197,7 @@ function DraftCard({
               <div className="bg-muted/50 rounded-lg px-3 py-2.5 text-sm whitespace-pre-wrap leading-relaxed pr-16">
                 {editedContent}
                 {isEdited && (
-                  <span className="ml-1.5 text-[10px] text-primary font-medium">(edited)</span>
+                  <span className="ml-1.5 text-[11px] text-primary font-medium">(edited)</span>
                 )}
               </div>
               {/* Hover actions on content bubble */}
@@ -419,6 +410,9 @@ export function AgentDraftInbox({ slug }: Props) {
     status: 'approved' | 'dismissed',
     content?: string,
   ): Promise<DeliveryResult | null> {
+    // Capture before the async gap — state may update while fetch is in-flight
+    const contactName = drafts.find((d) => d.id === draftId)?.Contact?.name ?? null;
+
     const body: Record<string, unknown> = { status };
     if (content !== undefined) body.content = content;
 
@@ -434,7 +428,6 @@ export function AgentDraftInbox({ slug }: Props) {
     setDrafts((prev) => prev.filter((d) => d.id !== draftId));
 
     if (status === 'approved' && data.deliveryResult) {
-      const contactName = drafts.find((d) => d.id === draftId)?.Contact?.name ?? null;
       showFeedback(contactName, data.deliveryResult as DeliveryResult);
       return data.deliveryResult as DeliveryResult;
     }

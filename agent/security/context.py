@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from schemas import AgentSettings, AutonommyLevel
+from schemas import AgentSettings, AutonomyLevel
 
 
 @dataclass
@@ -18,7 +18,7 @@ class AgentContext:
 
     space_id: str
     space_name: str
-    autonomy_level: AutonommyLevel
+    autonomy_level: AutonomyLevel
     daily_token_budget: int
     enabled_agents: list[str]
     run_id: str

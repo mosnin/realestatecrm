@@ -19,7 +19,7 @@ LeadType = Literal["rental", "buyer"]
 DealStatus = Literal["active", "won", "lost", "on_hold"]
 Priority = Literal["LOW", "MEDIUM", "HIGH"]
 ContactType = Literal["QUALIFICATION", "TOUR", "APPLICATION"]
-AutonommyLevel = Literal["autonomous", "draft_required", "suggest_only"]
+AutonomyLevel = Literal["autonomous", "draft_required", "suggest_only"]
 DraftChannel = Literal["sms", "email", "note"]
 DraftStatus = Literal["pending", "approved", "dismissed", "sent"]
 AgentType = Literal["lead_nurture", "deal_sentinel", "long_term_nurture", "lead_scorer", "tour_followup", "offer_agent", "coordinator"]
@@ -99,7 +99,7 @@ class AgentSettings(BaseModel):
     id: str
     space_id: str = Field(alias="spaceId")
     enabled: bool = False
-    autonomy_level: AutonommyLevel = Field("suggest_only", alias="autonomyLevel")
+    autonomy_level: AutonomyLevel = Field("suggest_only", alias="autonomyLevel")
     daily_token_budget: int = Field(50_000, alias="dailyTokenBudget")
     heartbeat_interval_minutes: int = Field(15, alias="heartbeatIntervalMinutes")
     enabled_agents: list[str] = Field(default_factory=lambda: ["lead_nurture"], alias="enabledAgents")

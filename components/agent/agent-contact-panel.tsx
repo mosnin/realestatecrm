@@ -16,6 +16,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { timeAgo } from '@/lib/formatting';
+import { ImportanceDot } from './importance-dot';
 
 interface AgentMemory {
   id: string;
@@ -65,23 +67,6 @@ const AGENT_LABELS: Record<string, string> = {
   lead_scorer: 'Lead Scorer',
 };
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
-function ImportanceDot({ importance }: { importance: number }) {
-  if (importance >= 0.7)
-    return <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 mt-1.5" />;
-  if (importance >= 0.4)
-    return <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 mt-1.5" />;
-  return <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 shrink-0 mt-1.5" />;
-}
 
 function DraftCard({
   draft,
