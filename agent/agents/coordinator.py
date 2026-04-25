@@ -33,6 +33,7 @@ from db import supabase
 from schemas import CoordinatorRunReport
 from security.context import AgentContext
 from security.guardrails import pending_drafts_guardrail, run_integrity_guardrail
+from tools.goals import list_active_goals
 from tools.streaming import publish_event
 
 COORDINATOR_INSTRUCTIONS = """
@@ -295,7 +296,7 @@ def make_coordinator_agent(enabled_agents: list[str]) -> Agent:
         name="Chippi Coordinator",
         model=settings.orchestrator_model,
         instructions=COORDINATOR_INSTRUCTIONS,
-        tools=[survey_workspace],
+        tools=[survey_workspace, list_active_goals],
         handoffs=handoffs_list,
         output_type=CoordinatorRunReport,
         input_guardrails=[pending_drafts_guardrail],

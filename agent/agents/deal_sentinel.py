@@ -15,6 +15,9 @@ from agents import Agent
 from config import settings
 from tools.activities import log_activity_run, log_agent_observation, set_deal_follow_up
 from tools.deals import get_deal, get_deals_closing_soon, get_stalled_deals, list_deals
+from tools.goals import list_active_goals, update_goal_status
+from tools.outcome import record_outcome
+from tools.questions import ask_realtor
 from tools.write import update_deal_notes, update_deal_probability
 
 DEAL_SENTINEL_INSTRUCTIONS = """
@@ -55,6 +58,12 @@ Example: "Stalled 28 days with no activity. Close date in 9 days. Probability lo
 - Limit to 15 deals per run.
 
 Always call log_activity_run at the end with outcome='completed' and a summary.
+
+## New capabilities
+- Use list_active_goals to find active deal-related goals before updating deal status.
+- Use update_goal_status to mark deal goals complete when milestones are hit.
+- Use ask_realtor if you are uncertain about a deal decision (e.g. whether to mark it at-risk).
+- Use record_outcome to close the loop on outreach outcomes you observe.
 """.strip()
 
 
@@ -73,5 +82,9 @@ def make_deal_sentinel_agent() -> Agent:
             update_deal_notes,
             log_agent_observation,
             log_activity_run,
+            list_active_goals,
+            update_goal_status,
+            ask_realtor,
+            record_outcome,
         ],
     )

@@ -19,8 +19,11 @@ from config import settings
 from tools.activities import log_activity_run, log_agent_observation, set_contact_follow_up
 from tools.contacts import get_contact, get_contact_activity
 from tools.drafts import check_recent_drafts
+from tools.goals import create_goal, list_active_goals, update_goal_status
 from tools.memory_tools import recall_facts, store_fact, store_observation
 from tools.outreach import send_or_draft
+from tools.outcome import record_outcome
+from tools.questions import ask_realtor
 
 LONG_TERM_NURTURE_INSTRUCTIONS = """
 You are the Long-Term Nurture Agent. You specialise in re-engaging leads that
@@ -75,6 +78,13 @@ to send immediately or queue for approval. You never check the autonomy setting.
 ## After outreach
 Call store_observation to note: "Long-term nurture message sent/drafted on [date]"
 with importance 0.3 so future runs know this contact was recently touched.
+
+## New capabilities
+- Use list_active_goals to check if any goals exist for a contact before deciding on outreach.
+- Use create_goal to start a multi-step objective (e.g. 'tour_booking') for a promising lead.
+- Use update_goal_status to mark a goal complete when its objective is achieved.
+- Use ask_realtor if you are uncertain about a major decision (e.g. whether to move a lead to a different stage).
+- Use record_outcome to record whether a previous outreach resulted in a response or meeting.
 """.strip()
 
 
@@ -97,5 +107,10 @@ def make_long_term_nurture_agent() -> Agent:
             set_contact_follow_up,
             log_agent_observation,
             log_activity_run,
+            list_active_goals,
+            create_goal,
+            update_goal_status,
+            ask_realtor,
+            record_outcome,
         ],
     )

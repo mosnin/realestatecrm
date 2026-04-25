@@ -19,6 +19,8 @@ from tools.contacts import get_contact, get_contact_activity
 from tools.drafts import check_recent_drafts
 from tools.memory_tools import recall_facts, store_observation
 from tools.outreach import send_or_draft
+from tools.outcome import record_outcome
+from tools.questions import ask_realtor
 
 TOUR_FOLLOWUP_INSTRUCTIONS = """
 You are the Tour Follow-Up Agent. Your sole job is to follow up with a contact
@@ -79,5 +81,7 @@ def make_tour_followup_agent() -> Agent:
             send_or_draft,
             set_contact_follow_up,
             log_activity_run,
+            ask_realtor,
+            record_outcome,
         ],
     )
