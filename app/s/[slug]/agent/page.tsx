@@ -103,10 +103,10 @@ export default async function AgentPage({ params, searchParams }: Props) {
       <Suspense>
         {activeTab === 'inbox' && (
           <div className="space-y-5">
-            <AgentQuestionsPanel slug={slug} />
-            <AgentGoalsPanel slug={slug} />
+            <AgentQuestionsPanel />
+            <AgentGoalsPanel />
             <AgentDraftInbox slug={slug} />
-            <AgentPortfolioInsights slug={slug} />
+            <AgentPortfolioInsights />
           </div>
         )}
         {activeTab === 'activity' && <AgentActivityPage slug={slug} />}
