@@ -1,12 +1,13 @@
 /**
  * POST /api/agent/inbound
  *
- * Internal webhook called by SMS/email provider when a contact replies.
- * Secured with AGENT_INTERNAL_SECRET header (not Clerk — provider webhooks
- * can't use Clerk auth).
+ * Webhook called by SMS/email providers when a contact replies.
+ * Records the inbound message as a ContactActivity and optionally
+ * marks the source AgentDraft as having received a response.
  *
- * Body: { contactId, spaceId, channel, content, externalId? }
+ * Secured with AGENT_INTERNAL_SECRET (not user auth — this is a webhook).
  */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
@@ -18,97 +19,89 @@ export async function POST(req: NextRequest) {
   }
 
   const auth = req.headers.get('authorization');
-  if (auth !== `Bearer ${AGENT_INTERNAL_SECRET}`) {
+  if (!auth || auth !== `Bearer ${AGENT_INTERNAL_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: { contactId?: string; spaceId?: string; channel?: string; content?: string; externalId?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const { contactId, spaceId, channel, content, externalId } = body;
+  const body = await req.json();
+  const { contactId, spaceId, channel, content, draftId } = body as {
+    contactId: string;
+    spaceId: string;
+    channel: 'sms' | 'email';
+    content: string;
+    draftId?: string;
+  };
 
   if (!contactId || !spaceId || !channel || !content) {
-    return NextResponse.json({ error: 'contactId, spaceId, channel, and content are required' }, { status: 400 });
+    return NextResponse.json({ error: 'Missing required fields: contactId, spaceId, channel, content' }, { status: 400 });
   }
 
   const validChannels = ['sms', 'email'];
   if (!validChannels.includes(channel)) {
-    return NextResponse.json({ error: `channel must be one of ${validChannels.join(', ')}` }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid channel' }, { status: 400 });
   }
 
-  // Validate contact exists in the given space
-  const { data: contact, error: contactError } = await supabase
+  // Validate contact belongs to the stated space
+  const { data: contact } = await supabase
     .from('Contact')
     .select('id, name, leadScore')
     .eq('id', contactId)
     .eq('spaceId', spaceId)
     .maybeSingle();
 
-  if (contactError || !contact) {
+  if (!contact) {
     return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
-  }
-
-  // Simple intent detection
-  const lower = content.toLowerCase();
-  let intent: 'positive' | 'question' | 'objection' | 'other' = 'other';
-  if (['yes', 'interested', 'love', 'perfect', 'when', 'how much', 'available', 'schedule', 'book', 'tour'].some(w => lower.includes(w))) {
-    intent = 'positive';
-  } else if (lower.includes('?') || ['what', 'why', 'how', 'where', 'tell me'].some(w => lower.includes(w))) {
-    intent = 'question';
-  } else if (['no', 'not interested', 'stop', 'unsubscribe', 'remove'].some(w => lower.includes(w))) {
-    intent = 'objection';
   }
 
   const now = new Date().toISOString();
 
-  // Log inbound message as ContactActivity
-  const activityId = crypto.randomUUID();
+  // Record as ContactActivity
   await supabase.from('ContactActivity').insert({
-    id: activityId,
+    id: crypto.randomUUID(),
     contactId,
     spaceId,
-    type: 'message',
+    type: 'inbound_message',
     content: `[Inbound ${channel.toUpperCase()}] ${content.slice(0, 500)}`,
-    metadata: { source: 'inbound', channel, intent, externalId: externalId ?? null },
+    metadata: {
+      source: 'inbound',
+      channel,
+      draftId: draftId ?? null,
+    },
   });
 
   // Update lastContactedAt
-  const contactUpdate: Record<string, unknown> = { lastContactedAt: now, updatedAt: now };
+  await supabase
+    .from('Contact')
+    .update({ lastContactedAt: now, updatedAt: now })
+    .eq('id', contactId)
+    .eq('spaceId', spaceId);
 
-  // Boost lead score for positive engagement
-  let scoreBoost = 0;
-  if (intent === 'positive' || intent === 'question') {
-    const currentScore = contact.leadScore ?? 50;
-    const newScore = Math.min(100, currentScore + 5);
-    scoreBoost = newScore - currentScore;
-    if (scoreBoost > 0) contactUpdate.leadScore = newScore;
+  // Mark draft as responded
+  if (draftId) {
+    await supabase
+      .from('AgentDraft')
+      .update({ outcome: 'responded', outcomeDetectedAt: now })
+      .eq('id', draftId)
+      .eq('spaceId', spaceId);
   }
 
-  await supabase.from('Contact').update(contactUpdate).eq('id', contactId).eq('spaceId', spaceId);
-
-  // Push trigger to Redis (best-effort)
+  // Push inbound_message trigger to Redis for next agent run
   const kvUrl = process.env.KV_REST_API_URL;
   const kvToken = process.env.KV_REST_API_TOKEN;
   if (kvUrl && kvToken) {
     const trigger = JSON.stringify({
-      event: 'inbound_message_received',
+      event: 'inbound_message',
       contactId,
-      channel,
-      intent,
       spaceId,
+      channel,
       queuedAt: now,
     });
-    const key = `agent:triggers:${spaceId}`;
-    fetch(`${kvUrl}/rpush/${encodeURIComponent(key)}`, {
+    await fetch(`${kvUrl}/rpush/${encodeURIComponent(`agent:triggers:${spaceId}`)}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${kvToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify([trigger]),
-    }).catch(() => {});
+    }).catch(() => { /* non-critical */ });
   }
 
-  return NextResponse.json({ recorded: true, intent, scoreBoost, contactId });
+  return NextResponse.json({ recorded: true, contactId, channel });
 }
