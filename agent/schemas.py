@@ -103,6 +103,8 @@ class AgentSettings(BaseModel):
     daily_token_budget: int = Field(50_000, alias="dailyTokenBudget")
     heartbeat_interval_minutes: int = Field(15, alias="heartbeatIntervalMinutes")
     enabled_agents: list[str] = Field(default_factory=lambda: ["lead_nurture"], alias="enabledAgents")
+    # Per-agent overrides — keys are agent_type strings; missing key → inherits autonomy_level
+    per_agent_autonomy: dict[str, AutonomyLevel] = Field(default_factory=dict, alias="perAgentAutonomy")
 
     model_config = {"populate_by_name": True}
 

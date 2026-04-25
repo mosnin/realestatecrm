@@ -186,8 +186,11 @@ async def survey_workspace(ctx: RunContextWrapper[AgentContext]) -> dict[str, An
 
 
 def _make_on_handoff(display_name: str, agent_key: str) -> Callable:
-    """Return an async on_handoff callback that publishes an SSE delegation event."""
+    """Return an async on_handoff callback that tracks the active specialist and
+    publishes an SSE delegation event. Setting current_agent_type before the
+    specialist runs ensures effective_autonomy_for() reads the right override."""
     async def _callback(ctx: RunContextWrapper[AgentContext]) -> None:
+        ctx.context.current_agent_type = agent_key
         await publish_event(
             ctx.context,
             "info",

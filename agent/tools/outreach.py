@@ -49,7 +49,7 @@ async def send_or_draft(
     Returns: { "action": "sent" | "drafted" | "suggested", ... }
     """
     space_id = ctx.context.space_id
-    autonomy = ctx.context.autonomy_level
+    autonomy = ctx.context.effective_autonomy_for(ctx.context.current_agent_type)
     db = await supabase()
 
     valid_channels = {"sms", "email", "note"}
