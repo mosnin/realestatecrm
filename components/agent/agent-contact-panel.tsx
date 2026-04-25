@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { ImportanceDot } from './importance-dot';
+import { ChippiAssessmentCard } from '@/components/agent/chippi-assessment-card';
 
 interface AgentMemory {
   id: string;
@@ -248,15 +249,18 @@ export function AgentContactPanel({ contactId, slug, contactName }: { contactId:
 
   if (loading) {
     return (
-      <div className="rounded-lg border border-border bg-card p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Brain size={14} className="text-primary animate-pulse" />
-          <span className="text-sm font-semibold">Agent Intelligence</span>
-        </div>
-        <div className="space-y-2">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-4 bg-muted rounded animate-pulse" style={{ width: `${60 + i * 10}%` }} />
-          ))}
+      <div className="space-y-3">
+        <ChippiAssessmentCard entityType="contact" entityId={contactId} entityName={contactName ?? 'this contact'} slug={slug} />
+        <div className="rounded-lg border border-border bg-card p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Brain size={14} className="text-primary animate-pulse" />
+            <span className="text-sm font-semibold">Agent Intelligence</span>
+          </div>
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-4 bg-muted rounded animate-pulse" style={{ width: `${60 + i * 10}%` }} />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -265,6 +269,8 @@ export function AgentContactPanel({ contactId, slug, contactName }: { contactId:
   const hasContent = allDrafts.length > 0 || memories.length > 0 || activity.length > 0;
 
   return (
+    <div className="space-y-3">
+      <ChippiAssessmentCard entityType="contact" entityId={contactId} entityName={contactName ?? 'this contact'} slug={slug} />
     <div className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -414,6 +420,7 @@ export function AgentContactPanel({ contactId, slug, contactName }: { contactId:
           </div>
         </>
       )}
+    </div>
     </div>
   );
 }
