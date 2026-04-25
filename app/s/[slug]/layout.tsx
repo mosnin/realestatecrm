@@ -12,6 +12,7 @@ import { getBrokerContext } from '@/lib/permissions';
 import { LiveNotifications } from '@/components/dashboard/live-notifications';
 import { PlatformBanner } from '@/components/platform-banner';
 import { CommandPalette } from '@/components/command-palette/command-palette';
+import { AgentStatusBar } from '@/components/agent/agent-status-bar';
 
 
 export default async function DashboardLayout({
@@ -239,6 +240,7 @@ export default async function DashboardLayout({
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <PlatformBanner />
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
+        <AgentStatusBar slug={slug} />
         <main className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
           <div className="w-full max-w-[1500px] mx-auto">
           <LiveNotifications spaceId={space.id} slug={slug} />
