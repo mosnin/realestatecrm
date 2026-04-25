@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
+import { ChippiAvatar } from './chippi-avatar';
 
 const ACTION_LABELS: Record<string, string> = {
   create_draft_message: 'Drafted message',
@@ -40,7 +41,7 @@ function formatAgent(t: string): string {
 const OUTCOME_CFG = {
   completed: { icon: CheckCircle2, cls: 'text-emerald-600 dark:text-emerald-400' },
   queued_for_approval: { icon: Clock, cls: 'text-amber-500 dark:text-amber-400' },
-  suggested: { icon: Lightbulb, cls: 'text-blue-500 dark:text-blue-400' },
+  suggested: { icon: Lightbulb, cls: 'text-amber-400 dark:text-amber-300' },
   failed: { icon: AlertCircle, cls: 'text-rose-600 dark:text-rose-400' },
 } as const;
 
@@ -173,9 +174,9 @@ export function AgentMissionControl({ slug }: { slug: string }) {
     <div className="rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
 
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+      <div className="flex flex-wrap items-center justify-between gap-y-1 px-5 py-3.5 border-b border-border">
         <div className="flex items-center gap-2 min-w-0">
-          <Bot size={14} className={enabled ? 'text-primary flex-shrink-0' : 'text-muted-foreground flex-shrink-0'} />
+          <ChippiAvatar size="xs" className={enabled ? undefined : 'opacity-40'} pulse={!!enabled} />
           <h2 className="text-sm font-semibold flex-shrink-0">Agent</h2>
           <span className={cn(
             'inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full flex-shrink-0',
@@ -225,10 +226,10 @@ export function AgentMissionControl({ slug }: { slug: string }) {
       {pendingDrafts > 0 && (
         <Link
           href={`/s/${slug}/agent`}
-          className="flex items-center justify-between gap-3 px-5 py-3 bg-primary/5 border-b border-border hover:bg-primary/10 transition-colors"
+          className="flex items-center justify-between gap-3 px-5 py-3 bg-orange-500/5 border-b border-border hover:bg-orange-500/10 transition-colors"
         >
           <div className="flex items-center gap-2.5">
-            <span className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold shrink-0">
+            <span className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
               {pendingDrafts > 9 ? '9+' : pendingDrafts}
             </span>
             <div>
@@ -246,7 +247,7 @@ export function AgentMissionControl({ slug }: { slug: string }) {
       {latestRun && (
         <>
           {/* Run header bar */}
-          <div className="flex items-center gap-2 px-5 py-2.5 bg-muted/20 border-b border-border/60">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-5 py-2.5 bg-muted/20 border-b border-border/60">
             <span className="text-xs font-semibold text-foreground flex-shrink-0">{formatAgent(latestRun.agentType)}</span>
             <span className="text-[11px] text-muted-foreground">·</span>
             <span className="text-[11px] text-muted-foreground flex-shrink-0">
@@ -282,7 +283,7 @@ export function AgentMissionControl({ slug }: { slug: string }) {
                   {entry.Contact && (
                     <Link
                       href={`/s/${slug}/contacts/${entry.Contact.id}`}
-                      className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline underline-offset-2 flex-shrink-0"
+                      className="inline-flex items-center gap-0.5 text-xs text-orange-500 dark:text-orange-400 hover:underline underline-offset-2 flex-shrink-0"
                     >
                       <User size={10} />
                       <span className="max-w-[120px] truncate">{entry.Contact.name}</span>
@@ -291,7 +292,7 @@ export function AgentMissionControl({ slug }: { slug: string }) {
                   {!entry.Contact && entry.Deal && (
                     <Link
                       href={`/s/${slug}/deals`}
-                      className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline underline-offset-2 flex-shrink-0"
+                      className="inline-flex items-center gap-0.5 text-xs text-orange-500 dark:text-orange-400 hover:underline underline-offset-2 flex-shrink-0"
                     >
                       <Briefcase size={10} />
                       <span className="max-w-[120px] truncate">{entry.Deal.title}</span>

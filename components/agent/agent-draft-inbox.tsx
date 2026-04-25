@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
+import { ChippiBadge } from './chippi-avatar';
 
 interface DeliveryResult {
   sent: boolean;
@@ -133,12 +134,13 @@ function DraftCard({
     <Card className="overflow-hidden">
       <CardContent className="p-0">
         {/* Header row */}
-        <div className="flex items-center gap-2.5 px-4 pt-4 pb-3 border-b border-border/60">
+        <div className="flex items-center gap-2.5 px-4 pt-4 pb-3 border-b border-border/60 border-l-2 border-l-orange-400">
           {/* Channel pill */}
           <span className={cn('inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full', cfg.pill)}>
             <Icon size={10} />
             {cfg.label}
           </span>
+          <ChippiBadge />
 
           {/* Contact link */}
           {draft.Contact ? (
@@ -250,10 +252,10 @@ function DraftCard({
         </div>
 
         {/* Action bar */}
-        <div className="flex items-center gap-2 px-4 pb-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 px-4 pb-4">
           {/* Primary action */}
           <Button
-            className="gap-1.5 h-11"
+            className="gap-1.5 h-11 w-full sm:w-auto"
             onClick={handleApprove}
             disabled={actioning !== null || (overLimit && draft.channel === 'sms')}
           >
@@ -267,7 +269,7 @@ function DraftCard({
 
           {/* Secondary action — Edit (hidden while editing) */}
           {!editing && (
-            <Button size="sm" variant="outline" className="gap-1.5 h-9" onClick={startEdit}>
+            <Button size="sm" variant="outline" className="gap-1.5 h-9 w-full sm:w-auto" onClick={startEdit}>
               <Pencil size={12} />
               Edit
             </Button>
@@ -278,7 +280,7 @@ function DraftCard({
             <Button
               size="sm"
               variant="ghost"
-              className="gap-1.5 h-9 text-muted-foreground hover:text-foreground ml-auto"
+              className="gap-1.5 h-9 text-muted-foreground hover:text-foreground w-full sm:w-auto sm:ml-auto"
               onClick={cancelEdit}
             >
               Cancel
@@ -287,7 +289,7 @@ function DraftCard({
             <Button
               size="sm"
               variant="ghost"
-              className="gap-1.5 h-9 text-muted-foreground hover:text-destructive ml-auto"
+              className="gap-1.5 h-9 text-muted-foreground hover:text-destructive w-full sm:w-auto sm:ml-auto"
               onClick={handleDismiss}
               disabled={actioning !== null}
             >
@@ -493,7 +495,7 @@ export function AgentDraftInbox({ slug }: Props) {
       {/* Toolbar */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">{drafts.length}</span>{' '}
+          <span className="font-semibold text-orange-500 dark:text-orange-400">{drafts.length}</span>{' '}
           pending draft{drafts.length !== 1 ? 's' : ''} awaiting review
         </p>
         <div className="flex items-center gap-2">
