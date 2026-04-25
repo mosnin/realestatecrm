@@ -1,117 +1,161 @@
-import { Suspense } from 'react';
-import { notFound, redirect } from 'next/navigation';
-import { auth } from '@clerk/nextjs/server';
-import { Bot, ArrowRight } from 'lucide-react';
-import Link from 'next/link';
-import { getSpaceForUser } from '@/lib/space';
-import { supabase } from '@/lib/supabase';
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Bot, Play, Settings, FileText, HelpCircle, Target, Activity, Loader2 } from 'lucide-react';
+import { useParams } from 'next/navigation';
 import { AgentDraftInbox } from '@/components/agent/agent-draft-inbox';
-import { AgentActivityPage } from '@/components/agent/agent-activity-page';
-import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { AgentQuestionsPanel } from '@/components/agent/agent-questions-panel';
 import { AgentGoalsPanel } from '@/components/agent/agent-goals-panel';
+import { ChippiTerminal } from '@/components/agent/chippi-terminal';
+import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { AgentPortfolioInsights } from '@/components/agent/agent-portfolio-insights';
+import { cn } from '@/lib/utils';
 
-interface Props {
-  params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tab?: string }>;
-}
+export default function AgentPage() {
+  const params = useParams();
+  const slug = params.slug as string;
+  const [view, setView] = useState<'workspace' | 'settings'>('workspace');
+  const [running, setRunning] = useState(false);
+  const [counts, setCounts] = useState({ drafts: 0, questions: 0, goals: 0 });
 
-type TabKey = 'inbox' | 'activity' | 'settings';
+  useEffect(() => {
+    async function loadCounts() {
+      const [draftsRes, questionsRes, goalsRes] = await Promise.all([
+        fetch('/api/agent/drafts?status=pending&limit=50'),
+        fetch('/api/agent/questions?status=pending&limit=50'),
+        fetch('/api/agent/goals?status=active&limit=50'),
+      ]);
+      const [draftsData, questionsData, goalsData] = await Promise.all([
+        draftsRes.ok ? draftsRes.json() : [],
+        questionsRes.ok ? questionsRes.json() : [],
+        goalsRes.ok ? goalsRes.json() : [],
+      ]);
+      setCounts({
+        drafts: Array.isArray(draftsData) ? draftsData.length : 0,
+        questions: Array.isArray(questionsData) ? questionsData.length : 0,
+        goals: Array.isArray(goalsData) ? goalsData.length : 0,
+      });
+    }
+    void loadCounts();
+  }, []);
 
-export default async function AgentPage({ params, searchParams }: Props) {
-  const { slug } = await params;
-  const { tab } = await searchParams;
-  const activeTab: TabKey = tab === 'activity' || tab === 'settings' ? tab : 'inbox';
-
-  const { userId } = await auth();
-  if (!userId) redirect('/login/realtor');
-
-  const space = await getSpaceForUser(userId);
-  if (!space) notFound();
-
-  const [draftsResult, settingsResult] = await Promise.all([
-    supabase
-      .from('AgentDraft')
-      .select('id', { count: 'exact', head: true })
-      .eq('spaceId', space.id)
-      .eq('status', 'pending'),
-    supabase
-      .from('AgentSettings')
-      .select('enabled')
-      .eq('spaceId', space.id)
-      .maybeSingle(),
-  ]);
-
-  const pendingCount = draftsResult.count ?? 0;
-  const agentEnabled = settingsResult.data?.enabled ?? false;
-
-  const tabs: { key: TabKey; label: string; badge?: number }[] = [
-    { key: 'inbox', label: 'Inbox', badge: pendingCount > 0 ? pendingCount : undefined },
-    { key: 'activity', label: 'Activity' },
-    { key: 'settings', label: 'Settings' },
-  ];
+  async function handleRunNow() {
+    setRunning(true);
+    try {
+      await fetch('/api/agent/run-now', { method: 'POST' });
+    } finally {
+      setRunning(false);
+    }
+  }
 
   return (
-    <div className="space-y-5 max-w-[900px]">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Agent Inbox</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Actions your agent staged for your review. Approve to send, edit before approving, or dismiss.
-        </p>
-      </div>
-
-      <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
-        {tabs.map(({ key, label, badge }) => (
-          <Link
-            key={key}
-            href={`/s/${slug}/agent${key !== 'inbox' ? `?tab=${key}` : ''}`}
-            className={
-              activeTab === key
-                ? 'inline-flex items-center gap-1.5 bg-background shadow-sm rounded-md px-3 py-1.5 text-sm font-medium text-foreground'
-                : 'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors'
-            }
-          >
-            {label}
-            {badge !== undefined && (
-              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold leading-none">
-                {badge}
-              </span>
-            )}
-          </Link>
-        ))}
-      </div>
-
-      {!agentEnabled && activeTab !== 'settings' && (
-        <div className="flex items-start gap-4 rounded-xl border border-border bg-card px-4 py-3.5">
-          <Bot size={18} className="text-muted-foreground mt-0.5 flex-shrink-0" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground">Agent automation is off</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Enable it in Settings to have your agent watch leads and draft outreach on your behalf.
-            </p>
+    <div className="min-h-[calc(100vh-8rem)]">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center shadow-md shadow-orange-500/25">
+            <Bot size={17} className="text-white" />
           </div>
-          <Link
-            href={`/s/${slug}/agent?tab=settings`}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-foreground hover:underline flex-shrink-0 mt-0.5"
-          >
-            Enable <ArrowRight size={12} />
-          </Link>
+          <div>
+            <h1 className="text-base font-bold leading-tight">Chippi Workspace</h1>
+            <p className="text-xs text-muted-foreground">Your AI agent · autonomous outreach platform</p>
+          </div>
         </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => setView(view === 'settings' ? 'workspace' : 'settings')}
+            className={cn(
+              'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-colors',
+              view === 'settings'
+                ? 'bg-orange-500 text-white'
+                : 'border border-border text-muted-foreground hover:text-foreground hover:bg-muted/40',
+            )}
+          >
+            <Settings size={12} />
+            Settings
+          </button>
+          <button
+            onClick={() => void handleRunNow()}
+            disabled={running}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-orange-500 text-white text-xs font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50"
+          >
+            {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+            Run Now
+          </button>
+        </div>
+      </div>
+
+      {/* Settings view */}
+      {view === 'settings' && (
+        <AgentSettingsPanel slug={slug} />
       )}
 
-      <Suspense>
-        {activeTab === 'inbox' && (
-          <div className="space-y-5">
-            <AgentQuestionsPanel />
-            <AgentGoalsPanel />
-            <AgentDraftInbox slug={slug} />
+      {/* Workspace view — two columns */}
+      {view === 'workspace' && (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6">
+            {/* LEFT: Inbox */}
+            <div className="space-y-6">
+              {/* Drafts section */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText size={14} className="text-orange-500" />
+                  <h2 className="text-sm font-semibold">Awaiting Review</h2>
+                  {counts.drafts > 0 && (
+                    <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-500 text-white min-w-[18px] text-center">
+                      {counts.drafts}
+                    </span>
+                  )}
+                </div>
+                <AgentDraftInbox slug={slug} />
+              </div>
+
+              {/* Questions section */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <HelpCircle size={14} className="text-amber-500" />
+                  <h2 className="text-sm font-semibold">Questions</h2>
+                  {counts.questions > 0 && (
+                    <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500 text-white min-w-[18px] text-center">
+                      {counts.questions}
+                    </span>
+                  )}
+                </div>
+                <AgentQuestionsPanel />
+              </div>
+
+              {/* Goals section */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Target size={14} className="text-orange-500/70" />
+                  <h2 className="text-sm font-semibold">Active Goals</h2>
+                  {counts.goals > 0 && (
+                    <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground min-w-[18px] text-center">
+                      {counts.goals}
+                    </span>
+                  )}
+                </div>
+                <AgentGoalsPanel />
+              </div>
+            </div>
+
+            {/* RIGHT: Terminal */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Activity size={14} className="text-orange-500" />
+                <h2 className="text-sm font-semibold">Live Terminal</h2>
+                <span className="text-[11px] text-muted-foreground">Real-time agent output</span>
+              </div>
+              <ChippiTerminal className="h-full" />
+            </div>
+          </div>
+
+          {/* Portfolio Insights below the grid */}
+          <div className="mt-8">
             <AgentPortfolioInsights />
           </div>
-        )}
-        {activeTab === 'activity' && <AgentActivityPage slug={slug} />}
-        {activeTab === 'settings' && <AgentSettingsPanel slug={slug} />}
-      </Suspense>
+        </>
+      )}
     </div>
   );
 }
