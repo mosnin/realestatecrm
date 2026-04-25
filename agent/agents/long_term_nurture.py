@@ -24,6 +24,8 @@ from tools.memory_tools import recall_facts, store_fact, store_observation
 from tools.outreach import send_or_draft
 from tools.outcome import record_outcome
 from tools.questions import ask_realtor
+from tools.brief import update_contact_brief
+from tools.priority import mark_contact_warm
 
 LONG_TERM_NURTURE_INSTRUCTIONS = """
 You are the Long-Term Nurture Agent. You specialise in re-engaging leads that
@@ -85,6 +87,9 @@ with importance 0.3 so future runs know this contact was recently touched.
 - Use update_goal_status to mark a goal complete when its objective is achieved.
 - Use ask_realtor if you are uncertain about a major decision (e.g. whether to move a lead to a different stage).
 - Use record_outcome to record whether a previous outreach resulted in a response or meeting.
+- When re-engaging a cold contact, call update_contact_brief with your assessment
+  of their situation and what re-engagement approach you're taking.
+- If a cold contact shows any signal of renewed interest, call mark_contact_warm.
 """.strip()
 
 
@@ -112,5 +117,7 @@ def make_long_term_nurture_agent() -> Agent:
             update_goal_status,
             ask_realtor,
             record_outcome,
+            update_contact_brief,
+            mark_contact_warm,
         ],
     )

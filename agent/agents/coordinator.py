@@ -34,6 +34,7 @@ from schemas import CoordinatorRunReport
 from security.context import AgentContext
 from security.guardrails import pending_drafts_guardrail, run_integrity_guardrail
 from tools.goals import list_active_goals
+from tools.priority import generate_priority_list
 from tools.streaming import publish_event
 
 COORDINATOR_INSTRUCTIONS = """
@@ -93,6 +94,11 @@ for deal_close goals) so they can advance the goals and call update_goal_status.
   Example: "application_submitted trigger received. contactId: abc-123. Process immediately."
 - Do not activate an agent simply because it is enabled — only when a concrete
   signal exists (non-zero count or matching trigger).
+
+## Priority list
+After all specialist handoffs are complete (or if nothing_to_do is True),
+call generate_priority_list(top_n=5) to update the realtor's daily focus list.
+This should be the LAST tool call before producing your CoordinatorRunReport.
 
 ## Final output
 After all work is done, produce a CoordinatorRunReport with these fields:
@@ -296,7 +302,7 @@ def make_coordinator_agent(enabled_agents: list[str]) -> Agent:
         name="Chippi Coordinator",
         model=settings.orchestrator_model,
         instructions=COORDINATOR_INSTRUCTIONS,
-        tools=[survey_workspace, list_active_goals],
+        tools=[survey_workspace, list_active_goals, generate_priority_list],
         handoffs=handoffs_list,
         output_type=CoordinatorRunReport,
         input_guardrails=[pending_drafts_guardrail],

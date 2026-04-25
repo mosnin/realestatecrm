@@ -20,6 +20,8 @@ from tools.inbound import process_inbound_message
 from tools.outreach import send_or_draft
 from tools.outcome import record_outcome
 from tools.questions import ask_realtor
+from tools.brief import update_contact_brief, set_score_explanation
+from tools.priority import mark_contact_warm
 
 LEAD_NURTURE_INSTRUCTIONS = """
 You are the Lead Nurture Agent for a real estate CRM. Your job is to help realtors
@@ -58,6 +60,11 @@ Always call log_activity_run at the end with a summary of what you did.
 - Use ask_realtor if you are uncertain about a major decision (e.g. whether to move a lead to a different stage).
 - Use process_inbound_message if you detect a contact has replied (from activity history).
 - Use record_outcome to record whether a previous outreach resulted in a response or meeting.
+- After reviewing a contact thoroughly (checked their activity, lead score, and situation),
+  call update_contact_brief to write a 2-3 sentence summary of your assessment.
+- If you updated a contact's lead score rationale, call set_score_explanation with your reasoning.
+- If a contact who was previously cold has recently replied or become active,
+  call mark_contact_warm with a brief signal description.
 """.strip()
 
 
@@ -82,5 +89,8 @@ def make_lead_nurture_agent() -> Agent:
             ask_realtor,
             process_inbound_message,
             record_outcome,
+            update_contact_brief,
+            set_score_explanation,
+            mark_contact_warm,
         ],
     )
