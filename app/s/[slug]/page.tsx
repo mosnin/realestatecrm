@@ -27,6 +27,7 @@ import { timeAgo, formatCurrency } from '@/lib/formatting';
 import { FollowUpWidget, type FollowUpContact } from '@/components/dashboard/follow-up-widget';
 import { OnboardingChecklist } from '@/components/dashboard/onboarding-checklist';
 import { AgentMissionControl } from '@/components/agent/agent-mission-control';
+import { ChippiBriefing } from '@/components/agent/chippi-briefing';
 import { logger } from '@/lib/logger';
 
 export async function generateMetadata({
@@ -307,6 +308,11 @@ export default async function DashboardPage({
 
   return (
     <div className="space-y-5 max-w-[1320px]">
+
+      {/* ── 0. Chippi's Briefing ──────────────────────────────────────── */}
+      <div className="mb-6">
+        <ChippiBriefing slug={slug} />
+      </div>
 
       {/* ── 1. Hero ───────────────────────────────────────────────────── */}
       <div className="flex items-end justify-between gap-4 px-1">

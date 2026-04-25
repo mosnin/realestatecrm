@@ -12,6 +12,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ContactForm } from './contact-form';
+import { LeadScoreBar } from '@/components/agent/lead-score-bar';
+import { ContactAgentContext } from '@/components/agent/contact-agent-context';
 import {
   Plus,
   Search,
@@ -35,6 +37,7 @@ import {
   MoreHorizontal,
   Users,
   Inbox,
+  Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ApplicationCompare } from './application-compare';
@@ -70,6 +73,7 @@ type Client = {
   tags: string[];
   followUpAt: string | null;
   leadType: 'rental' | 'buyer';
+  leadScore: number | null;
 };
 
 const STAGES = CONTACT_STAGES;
@@ -89,7 +93,7 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'rental' | 'buyer'>('all');
   const [tagFilter, setTagFilter] = useState('');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name-az' | 'name-za'>('newest');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name-az' | 'name-za' | 'agent-priority'>('agent-priority');
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editContact, setEditContact] = useState<Client | null>(null);
@@ -326,7 +330,9 @@ export function ContactTable({ slug }: ContactTableProps) {
     let list = contacts
       .filter((c) => leadTypeFilter === 'all' || c.leadType === leadTypeFilter)
       .filter((c) => !tagFilter || c.tags.includes(tagFilter));
-    if (sortBy === 'oldest') {
+    if (sortBy === 'agent-priority') {
+      list = [...list].sort((a, b) => (b.leadScore ?? -1) - (a.leadScore ?? -1));
+    } else if (sortBy === 'oldest') {
       list = [...list].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     } else if (sortBy === 'newest') {
       list = [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -466,6 +472,7 @@ export function ContactTable({ slug }: ContactTableProps) {
             <DropdownMenuContent align="end" className="w-56">
               <div className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Sort</div>
               {([
+                { value: 'agent-priority', label: '⚡ Agent priority' },
                 { value: 'newest', label: 'Newest first' },
                 { value: 'oldest', label: 'Oldest first' },
                 { value: 'name-az', label: 'Name A-Z' },
@@ -522,6 +529,21 @@ export function ContactTable({ slug }: ContactTableProps) {
 
         {/* Desktop controls — unchanged layout at sm+ */}
         <div className="hidden sm:flex gap-2 flex-wrap">
+          {/* Agent priority pill */}
+          <button
+            type="button"
+            onClick={() => setSortBy('agent-priority')}
+            className={cn(
+              'inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 py-1.5 h-9 border transition-colors flex-shrink-0',
+              sortBy === 'agent-priority'
+                ? 'bg-orange-500 text-white border-orange-500 hover:bg-orange-600'
+                : 'bg-card text-orange-600 border-orange-200 dark:border-orange-900/60 hover:bg-orange-50 dark:hover:bg-orange-950/30',
+            )}
+          >
+            <Zap size={11} />
+            Agent
+          </button>
+
           {/* Sort dropdown */}
           <div className="relative">
             <select
@@ -529,6 +551,7 @@ export function ContactTable({ slug }: ContactTableProps) {
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
               className="appearance-none rounded-md border border-border bg-card pl-7 pr-8 py-2 text-xs font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring h-9"
             >
+              <option value="agent-priority">Agent priority</option>
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
               <option value="name-az">Name A-Z</option>
@@ -833,9 +856,13 @@ export function ContactTable({ slug }: ContactTableProps) {
                           <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
                             {getInitials(contact.name)}
                           </div>
-                          <Link href={`/s/${slug}/contacts/${contact.id}`} className="font-medium hover:text-foreground transition-colors">
-                            {contact.name}
-                          </Link>
+                          <div className="min-w-0">
+                            <Link href={`/s/${slug}/contacts/${contact.id}`} className="font-medium hover:text-foreground transition-colors block">
+                              {contact.name}
+                            </Link>
+                            <LeadScoreBar score={contact.leadScore ?? null} />
+                            <ContactAgentContext contactId={contact.id} />
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3">
