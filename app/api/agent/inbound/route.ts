@@ -23,7 +23,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await req.json();
+  let body: { contactId: string; spaceId: string; channel: 'sms' | 'email'; content: string; draftId?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
   const { contactId, spaceId, channel, content, draftId } = body as {
     contactId: string;
     spaceId: string;
@@ -56,11 +61,11 @@ export async function POST(req: NextRequest) {
   const now = new Date().toISOString();
 
   // Record as ContactActivity
-  await supabase.from('ContactActivity').insert({
+  const { error: activityError } = await supabase.from('ContactActivity').insert({
     id: crypto.randomUUID(),
     contactId,
     spaceId,
-    type: 'inbound_message',
+    type: 'note',
     content: `[Inbound ${channel.toUpperCase()}] ${content.slice(0, 500)}`,
     metadata: {
       source: 'inbound',
@@ -68,6 +73,10 @@ export async function POST(req: NextRequest) {
       draftId: draftId ?? null,
     },
   });
+  if (activityError) {
+    console.error('[agent/inbound] ContactActivity insert failed', activityError);
+    return NextResponse.json({ error: 'Failed to record message' }, { status: 500 });
+  }
 
   // Update lastContactedAt
   await supabase

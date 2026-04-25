@@ -39,10 +39,13 @@ async def analyze_portfolio(
         .eq("status", "active")
     )
 
-    contacts_res, deals_res = await asyncio.gather(
-        contacts_query.execute(),
-        deals_query.execute(),
-    )
+    try:
+        contacts_res, deals_res = await asyncio.gather(
+            contacts_query.execute(),
+            deals_query.execute(),
+        )
+    except Exception as exc:
+        return {"error": f"Portfolio analysis failed: {exc}"}
 
     contacts: list[dict[str, Any]] = contacts_res.data or []
     deals: list[dict[str, Any]] = deals_res.data or []

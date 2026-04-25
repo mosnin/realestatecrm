@@ -121,6 +121,9 @@ class AgentDraft(BaseModel):
     reasoning: str | None = None
     priority: int = 0
     status: DraftStatus = "pending"
+    confidence: int | None = None
+    outcome: str | None = None
+    outcome_detected_at: datetime | None = Field(None, alias="outcomeDetectedAt")
     created_at: datetime = Field(alias="createdAt")
 
     model_config = {"populate_by_name": True}

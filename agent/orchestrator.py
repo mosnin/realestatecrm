@@ -255,7 +255,7 @@ def _build_coordinator_prompt(
 
     trigger_section = ""
     if triggers:
-        _valid = {"new_lead", "tour_completed", "deal_stage_changed", "application_submitted"}
+        _valid = {"new_lead", "tour_completed", "deal_stage_changed", "application_submitted", "inbound_message", "goal_completed"}
         lines = []
         for t in triggers:
             event = t.get("event", "")

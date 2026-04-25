@@ -63,7 +63,7 @@ async def ask_realtor(
         "agentType": ctx.context.current_agent_type,
         "question": question,
         "status": "pending",
-        "priority": priority,
+        "priority": max(0, min(100, priority)),
         "createdAt": now,
     }
     if context is not None:

@@ -17,6 +17,7 @@ from agents import RunContextWrapper, function_tool
 
 from db import supabase
 from security.context import AgentContext
+from tools.streaming import publish_event
 
 
 @function_tool
@@ -37,6 +38,9 @@ async def process_inbound_message(
     """
     space_id = ctx.context.space_id
     db = await supabase()
+
+    if channel not in {"sms", "email"}:
+        return {"error": f"Invalid channel '{channel}'. Must be 'sms' or 'email'"}
 
     # Validate contact belongs to this space
     check = await (
@@ -117,6 +121,14 @@ async def process_inbound_message(
             .execute()
         )
         score_boosted = True
+
+    await publish_event(
+        ctx.context,
+        "action",
+        f"Inbound {channel.upper()} from {contact.get('name', contact_id)}: {intent.replace('_', ' ')}",
+        agent_type=ctx.context.current_agent_type,
+        metadata={"contactId": contact_id, "intent": intent, "sentiment": sentiment},
+    )
 
     return {
         "recorded": True,

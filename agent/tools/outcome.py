@@ -7,7 +7,8 @@ Lead scores are adjusted based on outcomes so agents learn what works.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from agents import RunContextWrapper, function_tool
@@ -65,9 +66,6 @@ async def record_outcome(
 
     # Update the draft outcome
     draft_update: dict[str, Any] = {"outcome": outcome, "outcomeDetectedAt": now}
-    if notes:
-        # Store notes in a metadata-like pattern via ContactActivity
-        pass
     await (
         db.table("AgentDraft")
         .update(draft_update)
@@ -109,7 +107,6 @@ async def record_outcome(
 
             # Log outcome as ContactActivity if notes or meaningful outcome
             if notes or outcome in ("responded", "meeting_booked"):
-                import uuid
                 log_content = f"[Outcome] {outcome.replace('_', ' ').title()}"
                 if notes:
                     log_content += f": {notes[:200]}"
@@ -117,7 +114,7 @@ async def record_outcome(
                     "id": str(uuid.uuid4()),
                     "contactId": contact_id,
                     "spaceId": space_id,
-                    "type": "outcome",
+                    "type": "note",
                     "content": log_content,
                     "metadata": {
                         "source": "agent",
@@ -156,7 +153,6 @@ async def get_outcome_summary(
     space_id = ctx.context.space_id
     db = await supabase()
 
-    from datetime import timedelta
     since = (datetime.now(timezone.utc) - timedelta(days=max(1, min(90, days)))).isoformat()
 
     result = await (

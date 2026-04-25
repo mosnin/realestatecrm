@@ -394,15 +394,15 @@ export function AgentSettingsPanel({ slug }: Props) {
           value={settings.confidenceThreshold ?? 0}
           onChange={(e) => {
             if (!settings) return;
-            const v = parseInt(e.target.value);
-            setSettings({ ...settings, confidenceThreshold: v });
+            const v = parseInt(e.target.value, 10);
+            if (!Number.isNaN(v)) setSettings({ ...settings, confidenceThreshold: v });
           }}
           onMouseUp={(e) => {
-            const v = parseInt((e.target as HTMLInputElement).value);
-            void saveField({ confidenceThreshold: v }, 'confidenceThreshold');
+            const v = parseInt((e.target as HTMLInputElement).value, 10);
+            if (!Number.isNaN(v)) void saveField({ confidenceThreshold: v }, 'confidenceThreshold');
           }}
           onTouchEnd={(e) => {
-            const v = parseInt((e.target as HTMLInputElement).value);
+            const v = parseInt((e.target as HTMLInputElement).value, 10);
             void saveField({ confidenceThreshold: v }, 'confidenceThreshold');
           }}
           className="w-full accent-primary"

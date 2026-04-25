@@ -126,7 +126,7 @@ async def update_goal_status(
     # Verify goal belongs to this space
     check = await (
         db.table("AgentGoal")
-        .select("id,description,status")
+        .select("id,description,status,metadata")
         .eq("id", goal_id)
         .eq("spaceId", space_id)
         .execute()
