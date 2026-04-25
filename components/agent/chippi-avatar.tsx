@@ -23,7 +23,7 @@ export function ChippiAvatar({ size = 'sm', className, pulse = false }: ChippiAv
     )}>
       <Bot size={s.icon} className="text-white" />
       {pulse && (
-        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400 border-2 border-background" />
+        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-orange-500 border-2 border-background" />
       )}
     </div>
   );

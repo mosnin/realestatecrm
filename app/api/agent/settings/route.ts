@@ -83,10 +83,18 @@ export async function PATCH(req: NextRequest) {
     patch.perAgentAutonomy = validated;
   }
   if (body.confidenceThreshold !== undefined) {
-    const threshold = parseInt(String(body.confidenceThreshold));
-    if (!isNaN(threshold) && threshold >= 0 && threshold <= 100) {
-      patch.confidenceThreshold = threshold;
+    const threshold = parseInt(String(body.confidenceThreshold), 10);
+    if (isNaN(threshold) || threshold < 0 || threshold > 100) {
+      return NextResponse.json({ error: 'confidenceThreshold must be 0–100' }, { status: 400 });
     }
+    patch.confidenceThreshold = threshold;
+  }
+  if (body.heartbeatIntervalMinutes !== undefined) {
+    const interval = parseInt(String(body.heartbeatIntervalMinutes), 10);
+    if (isNaN(interval) || interval < 1 || interval > 1440) {
+      return NextResponse.json({ error: 'heartbeatIntervalMinutes must be 1–1440' }, { status: 400 });
+    }
+    patch.heartbeatIntervalMinutes = interval;
   }
 
   // Upsert — creates the row on first save

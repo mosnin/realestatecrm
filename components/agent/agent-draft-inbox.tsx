@@ -58,7 +58,7 @@ const CHANNEL_CONFIG = {
   email: {
     label: 'Email',
     icon: Mail,
-    pill: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
+    pill: 'bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400',
     charLimit: null,
   },
   note: {
@@ -118,10 +118,14 @@ function DraftCard({
   async function handleDismiss() {
     setActioning('dismissed');
     setDismissError(null);
-    await onAction(draft.id, 'dismissed');
-    if (!mountedRef.current) return; // success — parent filtered card out and unmounted us
-    setActioning(null);
-    setDismissError('Could not dismiss — please try again.');
+    try {
+      await onAction(draft.id, 'dismissed');
+    } catch {
+      if (mountedRef.current) {
+        setActioning(null);
+        setDismissError('Could not dismiss — please try again.');
+      }
+    }
   }
 
   async function copyContent() {
@@ -134,7 +138,7 @@ function DraftCard({
     <Card className="overflow-hidden">
       <CardContent className="p-0">
         {/* Header row */}
-        <div className="flex items-center gap-2.5 px-4 pt-4 pb-3 border-b border-border/60 border-l-2 border-l-orange-400">
+        <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1 px-4 pt-4 pb-3 border-b border-border/60 border-l-2 border-l-orange-500">
           {/* Channel pill */}
           <span className={cn('inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full', cfg.pill)}>
             <Icon size={10} />
@@ -170,9 +174,9 @@ function DraftCard({
             {draft.confidence !== null && draft.confidence !== undefined && (
               <span className={cn(
                 "text-[11px] px-1.5 py-0.5 rounded-full font-medium",
-                draft.confidence >= 70
+                draft.confidence >= 80
                   ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
-                  : draft.confidence >= 40
+                  : draft.confidence >= 50
                   ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400"
                   : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400"
               )}>
@@ -212,7 +216,7 @@ function DraftCard({
               <div className="bg-muted/50 rounded-lg px-3 py-2.5 text-sm whitespace-pre-wrap leading-relaxed pr-16">
                 {editedContent}
                 {isEdited && (
-                  <span className="ml-1.5 text-[11px] text-primary font-medium">(edited)</span>
+                  <span className="ml-1.5 text-[11px] text-orange-600 dark:text-orange-400 font-medium">(edited)</span>
                 )}
               </div>
               {/* Hover actions on content bubble */}
@@ -451,17 +455,20 @@ export function AgentDraftInbox({ slug }: Props) {
 
   async function approveAll() {
     setApprovingAll(true);
-    await Promise.all(
-      drafts.map((d) =>
-        fetch(`/api/agent/drafts/${d.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'approved' }),
-        }),
-      ),
-    );
-    setDrafts([]);
-    setApprovingAll(false);
+    try {
+      await Promise.all(
+        drafts.map((d) =>
+          fetch(`/api/agent/drafts/${d.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'approved' }),
+          }),
+        ),
+      );
+      setDrafts([]);
+    } finally {
+      setApprovingAll(false);
+    }
   }
 
   if (loading) {

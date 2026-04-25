@@ -7,6 +7,7 @@ const VALID_GOAL_TYPES = [
   'follow_up_sequence',
   'tour_booking',
   'offer_progress',
+  'deal_close',
   'reengagement',
   'custom',
 ] as const;
@@ -60,6 +61,18 @@ export async function POST(req: NextRequest) {
 
   if (!description || typeof description !== 'string' || description.trim().length === 0) {
     return NextResponse.json({ error: 'description is required' }, { status: 400 });
+  }
+
+  // Validate foreign keys belong to this space
+  if (contactId) {
+    const { data: c } = await supabase.from('Contact').select('id')
+      .eq('id', contactId).eq('spaceId', space.id).maybeSingle();
+    if (!c) return NextResponse.json({ error: 'Contact not found' }, { status: 400 });
+  }
+  if (dealId) {
+    const { data: d } = await supabase.from('Deal').select('id')
+      .eq('id', dealId).eq('spaceId', space.id).maybeSingle();
+    if (!d) return NextResponse.json({ error: 'Deal not found' }, { status: 400 });
   }
 
   const now = new Date().toISOString();

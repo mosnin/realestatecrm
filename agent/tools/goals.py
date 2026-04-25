@@ -18,7 +18,7 @@ from security.context import AgentContext
 from tools.streaming import publish_event
 
 
-VALID_GOAL_TYPES = {"follow_up_sequence", "tour_booking", "offer_progress", "deal_close", "custom"}
+VALID_GOAL_TYPES = {"follow_up_sequence", "tour_booking", "offer_progress", "deal_close", "reengagement", "custom"}
 VALID_STATUSES = {"active", "completed", "cancelled", "paused"}
 
 

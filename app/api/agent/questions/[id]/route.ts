@@ -26,14 +26,14 @@ export async function PATCH(
   }
 
   // Verify the question belongs to this space
-  const { data: existing, error: fetchError } = await supabase
+  const { data: existing } = await supabase
     .from('AgentQuestion')
     .select('id, status')
     .eq('id', id)
     .eq('spaceId', space.id)
-    .single();
+    .maybeSingle();
 
-  if (fetchError || !existing) {
+  if (!existing) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 

@@ -61,7 +61,7 @@ async def process_inbound_message(
         "id": str(uuid.uuid4()),
         "contactId": contact_id,
         "spaceId": space_id,
-        "type": "inbound_message",
+        "type": "note",
         "content": f"[Inbound {channel.upper()}] {content[:500]}",
         "metadata": {
             "source": "inbound",
@@ -88,6 +88,7 @@ async def process_inbound_message(
             .update({
                 "outcome": "responded",
                 "outcomeDetectedAt": now,
+                "updatedAt": now,
             })
             .eq("id", draft_id)
             .eq("spaceId", space_id)

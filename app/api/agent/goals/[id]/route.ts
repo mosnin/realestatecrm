@@ -27,14 +27,14 @@ export async function PATCH(
   }
 
   // Verify the goal belongs to this space
-  const { data: existing, error: fetchError } = await supabase
+  const { data: existing } = await supabase
     .from('AgentGoal')
     .select('id, status')
     .eq('id', id)
     .eq('spaceId', space.id)
-    .single();
+    .maybeSingle();
 
-  if (fetchError || !existing) {
+  if (!existing) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
@@ -78,15 +78,18 @@ export async function DELETE(
   const { id } = await params;
 
   // Verify the goal belongs to this space
-  const { data: existing, error: fetchError } = await supabase
+  const { data: existing } = await supabase
     .from('AgentGoal')
-    .select('id')
+    .select('id, status')
     .eq('id', id)
     .eq('spaceId', space.id)
-    .single();
+    .maybeSingle();
 
-  if (fetchError || !existing) {
+  if (!existing) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+  if (existing.status === 'cancelled') {
+    return NextResponse.json({ cancelled: true });
   }
 
   const { error } = await supabase

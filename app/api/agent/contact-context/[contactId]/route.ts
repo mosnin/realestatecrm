@@ -20,6 +20,15 @@ export async function GET(
 
   const { contactId } = await params;
 
+  // Validate contact belongs to this space
+  const { data: contact } = await supabase
+    .from('Contact')
+    .select('id')
+    .eq('id', contactId)
+    .eq('spaceId', space.id)
+    .maybeSingle();
+  if (!contact) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
   const [goalRes, activityRes] = await Promise.all([
     supabase
       .from('AgentGoal')
@@ -36,7 +45,7 @@ export async function GET(
       .select('content, createdAt')
       .eq('spaceId', space.id)
       .eq('contactId', contactId)
-      .like('content', '[Agent]%')
+      .or('content.like.[Agent]%,content.like.[Outcome]%')
       .order('createdAt', { ascending: false })
       .limit(1)
       .maybeSingle(),

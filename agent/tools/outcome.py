@@ -65,7 +65,7 @@ async def record_outcome(
     now = datetime.now(timezone.utc).isoformat()
 
     # Update the draft outcome
-    draft_update: dict[str, Any] = {"outcome": outcome, "outcomeDetectedAt": now}
+    draft_update: dict[str, Any] = {"outcome": outcome, "outcomeDetectedAt": now, "updatedAt": now}
     await (
         db.table("AgentDraft")
         .update(draft_update)
@@ -159,7 +159,7 @@ async def get_outcome_summary(
         db.table("AgentDraft")
         .select("outcome")
         .eq("spaceId", space_id)
-        .not_.is_("outcome", None)
+        .not_.is_("outcome", "null")
         .gte("outcomeDetectedAt", since)
         .execute()
     )

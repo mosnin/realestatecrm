@@ -55,7 +55,7 @@ const AUTONOMY_OPTIONS = [
     label: 'Autonomous',
     description: 'Schedules follow-ups and takes low-risk actions automatically.',
     icon: Zap,
-    iconClass: 'text-blue-500',
+    iconClass: 'text-orange-500',
   },
 ] as const;
 
@@ -65,21 +65,21 @@ const AGENT_OPTIONS = [
     label: 'Lead Nurture',
     description: 'Drafts personalised follow-ups for leads not contacted in 7+ days.',
     icon: UserCheck,
-    iconClass: 'text-emerald-500',
+    iconClass: 'text-orange-500',
   },
   {
     value: 'deal_sentinel',
     label: 'Deal Sentinel',
     description: 'Flags stalled deals and warns on approaching close dates.',
     icon: Briefcase,
-    iconClass: 'text-violet-500',
+    iconClass: 'text-orange-600',
   },
   {
     value: 'long_term_nurture',
     label: 'Long-Term Nurture',
     description: 'Re-engages cold leads at 30, 60, 90, and 180+ day intervals.',
     icon: Clock,
-    iconClass: 'text-sky-500',
+    iconClass: 'text-orange-400',
   },
   {
     value: 'lead_scorer',
@@ -93,7 +93,7 @@ const AGENT_OPTIONS = [
     label: 'Tour Follow-Up',
     description: 'Instantly drafts a personal follow-up when a contact completes a tour.',
     icon: CalendarCheck,
-    iconClass: 'text-rose-500',
+    iconClass: 'text-orange-500',
   },
 ] as const;
 
@@ -243,7 +243,7 @@ export function AgentSettingsPanel({ slug }: Props) {
             <div className={cn(
               'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0',
               settings.enabled
-                ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400'
+                ? 'bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400'
                 : 'bg-muted text-muted-foreground',
             )}>
               <Bot size={18} />
@@ -254,7 +254,7 @@ export function AgentSettingsPanel({ slug }: Props) {
                 <span className={cn(
                   'text-[11px] font-semibold px-1.5 py-0.5 rounded-full',
                   settings.enabled
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
+                    ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400'
                     : 'bg-muted text-muted-foreground',
                 )}>
                   {settings.enabled ? 'ACTIVE' : 'DISABLED'}
@@ -312,7 +312,7 @@ export function AgentSettingsPanel({ slug }: Props) {
               <div
                 className={cn(
                   'h-full rounded-full transition-all',
-                  usage.pct >= 90 ? 'bg-destructive' : usage.pct >= 70 ? 'bg-amber-400' : 'bg-primary',
+                  usage.pct >= 90 ? 'bg-destructive' : usage.pct >= 70 ? 'bg-amber-400' : 'bg-orange-500',
                 )}
                 style={{ width: `${usage.pct}%` }}
               />
@@ -342,7 +342,7 @@ export function AgentSettingsPanel({ slug }: Props) {
                 }}
                 className={cn(
                   'w-full text-left p-4 rounded-xl border transition-all',
-                  selected ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border bg-card hover:bg-muted/40',
+                  selected ? 'border-orange-500 bg-orange-500/5 ring-1 ring-orange-500/20' : 'border-border bg-card hover:bg-muted/40',
                 )}
               >
                 <div className="flex items-start gap-3">
@@ -352,11 +352,11 @@ export function AgentSettingsPanel({ slug }: Props) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       {selected
-                        ? <CheckCircle2 size={14} className="text-primary flex-shrink-0" />
+                        ? <CheckCircle2 size={14} className="text-orange-500 flex-shrink-0" />
                         : <Circle size={14} className="text-muted-foreground/40 flex-shrink-0" />}
                       <span className="text-sm font-medium">{opt.label}</span>
                       {'recommended' in opt && opt.recommended && (
-                        <span className="text-[11px] bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded-full">
+                        <span className="text-[11px] bg-orange-500/10 text-orange-600 dark:text-orange-400 font-semibold px-1.5 py-0.5 rounded-full">
                           Recommended
                         </span>
                       )}
@@ -405,7 +405,7 @@ export function AgentSettingsPanel({ slug }: Props) {
             const v = parseInt((e.target as HTMLInputElement).value, 10);
             void saveField({ confidenceThreshold: v }, 'confidenceThreshold');
           }}
-          className="w-full accent-primary"
+          className="w-full accent-orange-500"
           disabled={saving}
         />
         {savedField === 'confidenceThreshold' && (
@@ -466,7 +466,7 @@ export function AgentSettingsPanel({ slug }: Props) {
                             className={cn(
                               'flex items-center gap-1 px-2.5 py-2 min-h-[36px] text-xs transition-colors border-r border-border last:border-r-0',
                               isSelected && override
-                                ? 'bg-primary text-primary-foreground'
+                                ? 'bg-orange-500 text-white'
                                 : isSelected
                                 ? 'bg-muted text-foreground'
                                 : 'hover:bg-muted/40 text-muted-foreground',
@@ -474,7 +474,7 @@ export function AgentSettingsPanel({ slug }: Props) {
                           >
                             <LevelIcon size={11} />
                             {isWorkspaceDefault && !override && (
-                              <span className="w-1 h-1 rounded-full bg-primary inline-block flex-shrink-0" />
+                              <span className="w-1 h-1 rounded-full bg-orange-500 inline-block flex-shrink-0" />
                             )}
                           </button>
                         );
@@ -521,7 +521,7 @@ export function AgentSettingsPanel({ slug }: Props) {
               className={cn(
                 'flex flex-col items-center px-4 py-2.5 rounded-xl border text-sm transition-all',
                 settings.dailyTokenBudget === preset.value
-                  ? 'border-primary bg-primary/5 text-primary font-semibold ring-1 ring-primary/20'
+                  ? 'border-orange-500 bg-orange-500/5 text-orange-600 dark:text-orange-400 font-semibold ring-1 ring-orange-500/20'
                   : 'border-border bg-card text-foreground hover:bg-muted/40',
               )}
             >

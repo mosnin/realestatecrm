@@ -40,6 +40,9 @@ export async function POST(req: NextRequest) {
   if (!contactId || !spaceId || !channel || !content) {
     return NextResponse.json({ error: 'Missing required fields: contactId, spaceId, channel, content' }, { status: 400 });
   }
+  if (typeof content !== 'string' || content.length > 5000) {
+    return NextResponse.json({ error: 'content must be 5000 characters or fewer' }, { status: 400 });
+  }
 
   const validChannels = ['sms', 'email'];
   if (!validChannels.includes(channel)) {

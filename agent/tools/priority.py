@@ -7,6 +7,7 @@ triggering another agent run.
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -93,11 +94,11 @@ async def generate_priority_list(
             try:
                 lca = datetime.fromisoformat(last_contacted.replace("Z", "+00:00"))
                 hours_ago = (now - lca).total_seconds() / 3600
-                if 0 < hours_ago <= 48:
+                if 0 < hours_ago <= 24:
+                    score -= 10  # just contacted by us
+                elif hours_ago <= 48:
                     score += 15
                     reasons.append("replied recently")
-                elif hours_ago <= 24:
-                    score -= 10  # just contacted by us
             except ValueError:
                 pass
 
@@ -157,7 +158,7 @@ async def generate_priority_list(
         entity_type="space",
         entity_id=space_id,
         memory_type="observation",
-        content=f"PRIORITY_LIST:{__import__('json').dumps(result)}",
+        content=f"PRIORITY_LIST:{json.dumps(result)}",
         importance=0.9,
     )
 

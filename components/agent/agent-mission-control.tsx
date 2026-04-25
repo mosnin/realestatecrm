@@ -181,10 +181,10 @@ export function AgentMissionControl({ slug }: { slug: string }) {
           <span className={cn(
             'inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full flex-shrink-0',
             enabled
-              ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+              ? 'bg-orange-50 dark:bg-orange-950/20 text-orange-700 dark:text-orange-400'
               : 'bg-muted text-muted-foreground',
           )}>
-            <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', enabled ? 'bg-emerald-500' : 'bg-muted-foreground/40')} />
+            <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', enabled ? 'bg-orange-500' : 'bg-muted-foreground/40')} />
             {enabled ? 'Active' : 'Off'}
           </span>
           {lastRanAt && (
@@ -361,7 +361,7 @@ export function AgentMissionControl({ slug }: { slug: string }) {
                       <span className={cn(
                         'mt-1 inline-flex text-[11px] font-medium rounded px-1.5 py-0.5',
                         insight.entityType === 'contact'
-                          ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400'
+                          ? 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-400'
                           : insight.entityType === 'deal'
                             ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400'
                             : 'bg-muted text-muted-foreground',

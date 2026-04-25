@@ -766,7 +766,7 @@ export function ContactTable({ slug }: ContactTableProps) {
 
       {/* ── Card view — stage-grouped ── */}
       {!loading && visibleContacts.length > 0 && view === 'card' && (
-        <div className="grid gap-5 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
           {STAGES.map((stage) => {
             const stageContacts = visibleContacts.filter((c) => c.type === stage.key);
             if (stageContacts.length === 0 && !search && !tagFilter) return (
@@ -928,7 +928,7 @@ export function ContactTable({ slug }: ContactTableProps) {
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-lg border border-border bg-card shadow-lg px-4 py-3">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center flex-wrap gap-2 rounded-lg border border-border bg-card shadow-lg px-3 sm:px-4 py-2 sm:py-3 max-w-[calc(100vw-2rem)]">
           <CheckSquare size={14} className="text-foreground" />
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="h-4 w-px bg-border mx-1" />
@@ -943,7 +943,7 @@ export function ContactTable({ slug }: ContactTableProps) {
             </SelectContent>
           </Select>
           {selectedIds.size >= 2 && (
-            <Button size="sm" variant="outline" onClick={() => setShowCompare(true)} className="h-8 gap-1.5 text-xs">
+            <Button size="sm" variant="outline" onClick={() => setShowCompare(true)} className="h-8 gap-1.5 text-xs hidden sm:inline-flex">
               <GitCompare size={12} />
               Compare
             </Button>

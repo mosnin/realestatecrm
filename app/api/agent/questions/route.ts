@@ -55,6 +55,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Validate contactId belongs to this space if provided
+  if (contactId) {
+    const { data: c } = await supabase.from('Contact').select('id')
+      .eq('id', contactId).eq('spaceId', space.id).maybeSingle();
+    if (!c) return NextResponse.json({ error: 'Contact not found' }, { status: 400 });
+  }
+
   const { data, error } = await supabase
     .from('AgentQuestion')
     .insert({

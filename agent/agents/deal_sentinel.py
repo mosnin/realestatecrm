@@ -15,7 +15,7 @@ from agents import Agent
 from config import settings
 from tools.activities import log_activity_run, log_agent_observation, set_deal_follow_up
 from tools.deals import get_deal, get_deals_closing_soon, get_stalled_deals, list_deals
-from tools.goals import list_active_goals, update_goal_status
+from tools.goals import create_goal, list_active_goals, update_goal_status
 from tools.outcome import record_outcome
 from tools.questions import ask_realtor
 from tools.write import update_deal_notes, update_deal_probability
@@ -82,6 +82,7 @@ def make_deal_sentinel_agent() -> Agent:
             update_deal_notes,
             log_agent_observation,
             log_activity_run,
+            create_goal,
             list_active_goals,
             update_goal_status,
             ask_realtor,

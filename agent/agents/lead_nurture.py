@@ -18,7 +18,7 @@ from tools.drafts import check_recent_drafts
 from tools.goals import create_goal, list_active_goals, update_goal_status
 from tools.inbound import process_inbound_message
 from tools.outreach import send_or_draft
-from tools.outcome import record_outcome
+from tools.outcome import get_outcome_summary, record_outcome
 from tools.questions import ask_realtor
 from tools.brief import update_contact_brief, set_score_explanation
 from tools.priority import mark_contact_warm
@@ -89,6 +89,7 @@ def make_lead_nurture_agent() -> Agent:
             ask_realtor,
             process_inbound_message,
             record_outcome,
+            get_outcome_summary,
             update_contact_brief,
             set_score_explanation,
             mark_contact_warm,
