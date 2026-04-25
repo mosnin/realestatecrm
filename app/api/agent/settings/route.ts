@@ -28,6 +28,7 @@ export async function GET(_req: NextRequest) {
       heartbeatIntervalMinutes: 15,
       enabledAgents: ['lead_nurture'],
       perAgentAutonomy: {},
+      confidenceThreshold: 0,
     });
   }
 
@@ -80,6 +81,12 @@ export async function PATCH(req: NextRequest) {
       }
     }
     patch.perAgentAutonomy = validated;
+  }
+  if (body.confidenceThreshold !== undefined) {
+    const threshold = parseInt(String(body.confidenceThreshold));
+    if (!isNaN(threshold) && threshold >= 0 && threshold <= 100) {
+      patch.confidenceThreshold = threshold;
+    }
   }
 
   // Upsert — creates the row on first save
