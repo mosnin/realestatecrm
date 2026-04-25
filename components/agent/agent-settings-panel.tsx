@@ -19,6 +19,7 @@ interface AgentSettings {
   heartbeatIntervalMinutes: number;
   enabledAgents: string[];
   perAgentAutonomy: Record<string, 'autonomous' | 'draft_required' | 'suggest_only'>;
+  confidenceThreshold: number;
 }
 
 interface AgentUsage {
@@ -369,6 +370,48 @@ export function AgentSettingsPanel({ slug }: Props) {
         </div>
         {savedField === 'autonomyLevel' && (
           <p className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 size={11} /> Saved</p>
+        )}
+      </div>
+
+      {/* Confidence threshold */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Confidence threshold</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Drafts actions below this confidence score even in autonomous mode (0 = disabled)
+            </p>
+          </div>
+          <span className="text-sm font-mono text-muted-foreground w-10 text-right">
+            {settings.confidenceThreshold ?? 0}
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={settings.confidenceThreshold ?? 0}
+          onChange={(e) => {
+            if (!settings) return;
+            const v = parseInt(e.target.value);
+            setSettings({ ...settings, confidenceThreshold: v });
+          }}
+          onMouseUp={(e) => {
+            const v = parseInt((e.target as HTMLInputElement).value);
+            void saveField({ confidenceThreshold: v }, 'confidenceThreshold');
+          }}
+          onTouchEnd={(e) => {
+            const v = parseInt((e.target as HTMLInputElement).value);
+            void saveField({ confidenceThreshold: v }, 'confidenceThreshold');
+          }}
+          className="w-full accent-primary"
+          disabled={saving}
+        />
+        {savedField === 'confidenceThreshold' && (
+          <span className="text-xs text-emerald-600 flex items-center gap-1">
+            <CheckCircle2 size={11} /> Saved
+          </span>
         )}
       </div>
 

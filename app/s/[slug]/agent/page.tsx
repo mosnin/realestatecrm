@@ -8,6 +8,9 @@ import { supabase } from '@/lib/supabase';
 import { AgentDraftInbox } from '@/components/agent/agent-draft-inbox';
 import { AgentActivityPage } from '@/components/agent/agent-activity-page';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
+import { AgentQuestionsPanel } from '@/components/agent/agent-questions-panel';
+import { AgentGoalsPanel } from '@/components/agent/agent-goals-panel';
+import { AgentPortfolioInsights } from '@/components/agent/agent-portfolio-insights';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -98,7 +101,14 @@ export default async function AgentPage({ params, searchParams }: Props) {
       )}
 
       <Suspense>
-        {activeTab === 'inbox' && <AgentDraftInbox slug={slug} />}
+        {activeTab === 'inbox' && (
+          <div className="space-y-5">
+            <AgentQuestionsPanel slug={slug} />
+            <AgentGoalsPanel slug={slug} />
+            <AgentDraftInbox slug={slug} />
+            <AgentPortfolioInsights slug={slug} />
+          </div>
+        )}
         {activeTab === 'activity' && <AgentActivityPage slug={slug} />}
         {activeTab === 'settings' && <AgentSettingsPanel slug={slug} />}
       </Suspense>

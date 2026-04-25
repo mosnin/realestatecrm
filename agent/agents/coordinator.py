@@ -117,7 +117,7 @@ async def survey_workspace(ctx: RunContextWrapper[AgentContext]) -> dict[str, An
     today = now.date().isoformat()
     fourteen_days_out = (now + timedelta(days=14)).date().isoformat()
 
-    stale_res, cold_res, stalled_res, closing_res, application_res = await asyncio.gather(
+    stale_res, cold_res, stalled_res, closing_res, application_res, goals_res, questions_res = await asyncio.gather(
         # Contacts inactive 7+ days with no follow-up scheduled
         db.table("Contact")
         .select("id", count="exact")
@@ -156,6 +156,20 @@ async def survey_workspace(ctx: RunContextWrapper[AgentContext]) -> dict[str, An
         .eq("spaceId", space_id)
         .eq("type", "APPLICATION")
         .gte("updatedAt", (now - timedelta(hours=24)).isoformat())
+        .execute(),
+
+        # Active agent goals
+        db.table("AgentGoal")
+        .select("id", count="exact")
+        .eq("spaceId", space_id)
+        .eq("status", "active")
+        .execute(),
+
+        # Pending inbound questions awaiting realtor response
+        db.table("AgentQuestion")
+        .select("id", count="exact")
+        .eq("spaceId", space_id)
+        .eq("status", "pending")
         .execute(),
     )
 

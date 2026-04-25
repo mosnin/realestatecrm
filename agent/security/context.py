@@ -28,6 +28,7 @@ class AgentContext:
     tokens_used: int = field(default=0, compare=False)
     # Set by on_handoff callback so tools know which specialist is running
     current_agent_type: str = field(default="coordinator", compare=False)
+    confidence_threshold: int = field(default=0, compare=False)
 
     @classmethod
     def from_settings(cls, settings: AgentSettings, run_id: str, space_name: str) -> "AgentContext":
@@ -39,6 +40,7 @@ class AgentContext:
             daily_token_budget=settings.daily_token_budget,
             enabled_agents=settings.enabled_agents,
             run_id=run_id,
+            confidence_threshold=settings.confidence_threshold,
         )
 
     def effective_autonomy_for(self, agent_type: str) -> AutonomyLevel:

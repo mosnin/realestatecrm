@@ -36,6 +36,7 @@ async def send_or_draft(
     subject: str | None = None,
     deal_id: str | None = None,
     priority: int = 0,
+    confidence: int = -1,
 ) -> dict[str, Any]:
     """Send or draft a message for a contact. Behaviour is controlled by the space's
     autonomy_level setting — you never need to check it yourself.
@@ -50,6 +51,13 @@ async def send_or_draft(
     """
     space_id = ctx.context.space_id
     autonomy = ctx.context.effective_autonomy_for(ctx.context.current_agent_type)
+
+    # Confidence gate: if threshold is set and confidence is below it, force to draft
+    confidence_threshold = ctx.context.confidence_threshold
+    if autonomy == "autonomous" and confidence >= 0 and confidence_threshold > 0:
+        if confidence < confidence_threshold:
+            autonomy = "draft_required"
+
     db = await supabase()
 
     valid_channels = {"sms", "email", "note"}
@@ -166,6 +174,7 @@ async def send_or_draft(
         "content": content,
         "reasoning": reasoning,
         "priority": priority,
+        "confidence": confidence if confidence >= 0 else None,
         "status": "pending",
         "expiresAt": expires_at,
     }
