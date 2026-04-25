@@ -105,6 +105,7 @@ class AgentSettings(BaseModel):
     enabled_agents: list[str] = Field(default_factory=lambda: ["lead_nurture"], alias="enabledAgents")
     # Per-agent overrides — keys are agent_type strings; missing key → inherits autonomy_level
     per_agent_autonomy: dict[str, AutonomyLevel] = Field(default_factory=dict, alias="perAgentAutonomy")
+    confidence_threshold: int = Field(0, alias="confidenceThreshold")
 
     model_config = {"populate_by_name": True}
 
@@ -137,6 +138,41 @@ class AgentActivityLogEntry(BaseModel):
     related_deal_id: str | None = Field(None, alias="relatedDealId")
     reversible: bool = True
     metadata: dict[str, Any] | None = None
+    created_at: datetime = Field(alias="createdAt")
+
+    model_config = {"populate_by_name": True}
+
+
+class AgentGoal(BaseModel):
+    id: str
+    space_id: str = Field(alias="spaceId")
+    contact_id: str | None = Field(None, alias="contactId")
+    deal_id: str | None = Field(None, alias="dealId")
+    goal_type: str = Field(alias="goalType")
+    description: str
+    instructions: str | None = None
+    status: str = "active"
+    priority: int = 0
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    completed_at: datetime | None = Field(None, alias="completedAt")
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")
+
+    model_config = {"populate_by_name": True}
+
+
+class AgentQuestion(BaseModel):
+    id: str
+    space_id: str = Field(alias="spaceId")
+    run_id: str = Field(alias="runId")
+    agent_type: str = Field(alias="agentType")
+    question: str
+    context: str | None = None
+    status: str = "pending"
+    answer: str | None = None
+    answered_at: datetime | None = Field(None, alias="answeredAt")
+    priority: int = 0
+    contact_id: str | None = Field(None, alias="contactId")
     created_at: datetime = Field(alias="createdAt")
 
     model_config = {"populate_by_name": True}
