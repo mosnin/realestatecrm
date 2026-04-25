@@ -36,7 +36,7 @@ export async function PATCH(
   // Verify the draft belongs to this space and is still pending
   const { data: existing, error: fetchError } = await supabase
     .from('AgentDraft')
-    .select('id, status, contactId, dealId, channel, subject, content')
+    .select('id, status, contactId, dealId, channel, subject, content, outcome')
     .eq('id', id)
     .eq('spaceId', space.id)
     .single();
@@ -63,9 +63,17 @@ export async function PATCH(
 
   // ── Dismissed: simple status update ──────────────────────────────────────
   if (newStatus === 'dismissed') {
+    const dismissPatch: Record<string, unknown> = {
+      status: 'dismissed',
+      updatedAt: new Date().toISOString(),
+    };
+    if (!existing.outcome) {
+      dismissPatch.outcome = 'no_response';
+      dismissPatch.outcomeDetectedAt = new Date().toISOString();
+    }
     const { data: updated, error: updateError } = await supabase
       .from('AgentDraft')
-      .update({ status: 'dismissed', updatedAt: new Date().toISOString() })
+      .update(dismissPatch)
       .eq('id', id)
       .eq('spaceId', space.id)
       .select()
