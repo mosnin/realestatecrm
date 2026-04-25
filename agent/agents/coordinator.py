@@ -179,6 +179,8 @@ async def survey_workspace(ctx: RunContextWrapper[AgentContext]) -> dict[str, An
         "stalled_deals": stalled_res.count or 0,
         "deals_closing_soon": closing_res.count or 0,
         "recent_applications": application_res.count or 0,
+        "active_goals": goals_res.count or 0,
+        "pending_questions": questions_res.count or 0,
         "enabled_agents": ctx.context.enabled_agents,
     }
 
@@ -191,7 +193,9 @@ async def survey_workspace(ctx: RunContextWrapper[AgentContext]) -> dict[str, An
             f"{snapshot['cold_leads_30d']} cold 30d+, "
             f"{snapshot['stalled_deals']} stalled deals, "
             f"{snapshot['deals_closing_soon']} closing soon, "
-            f"{snapshot['recent_applications']} recent application(s)"
+            f"{snapshot['recent_applications']} recent application(s), "
+            f"{snapshot['active_goals']} active goal(s), "
+            f"{snapshot['pending_questions']} pending question(s)"
         ),
         agent_type="coordinator",
     )
