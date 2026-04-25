@@ -34,6 +34,7 @@ interface AgentDraft {
   content: string;
   reasoning: string | null;
   priority: number;
+  confidence: number | null;
   status: 'pending' | 'approved' | 'dismissed' | 'sent';
   createdAt: string;
   expiresAt: string | null;
@@ -164,6 +165,18 @@ function DraftCard({
           )}
 
           <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+            {draft.confidence !== null && draft.confidence !== undefined && (
+              <span className={cn(
+                "text-[11px] px-1.5 py-0.5 rounded-full font-medium",
+                draft.confidence >= 70
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
+                  : draft.confidence >= 40
+                  ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400"
+                  : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400"
+              )}>
+                {draft.confidence}% confident
+              </span>
+            )}
             <span className="text-[11px] text-muted-foreground">{timeAgo(draft.createdAt)}</span>
           </div>
         </div>

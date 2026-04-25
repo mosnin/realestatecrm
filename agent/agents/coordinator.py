@@ -77,6 +77,12 @@ Activate lead_scorer_agent when:
 - Note: application_submitted rescoring is handled by offer_agent via store_fact;
   lead_scorer only needs to run for broad engagement decay signals.
 
+Activate lead_nurture_agent when pending_questions > 0 to process recent inbound replies.
+
+Check active_goals > 0 at the start of each run: pass the goal count to whichever
+specialist is relevant (e.g. lead_nurture for follow_up_sequence goals, deal_sentinel
+for deal_close goals) so they can advance the goals and call update_goal_status.
+
 ## Rules
 - ONLY hand off to agents that appear in the enabled_agents list from the survey result.
 - Maintain this order when multiple agents are needed:
