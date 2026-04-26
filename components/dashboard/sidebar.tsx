@@ -33,6 +33,7 @@ import {
   CreditCard,
   Plus,
   Check,
+  PanelLeft,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -297,26 +298,26 @@ function CollapsibleNavItem({
         href={href}
         onClick={handleClick}
         className={cn(
-          'group relative flex items-center gap-2.5 min-h-[44px] h-11 px-2.5 rounded-md text-sm transition-colors',
+          'group relative flex items-center gap-3 min-h-[44px] h-12 px-3 rounded-xl text-[15px] transition-colors',
           isParentActive
             ? 'bg-accent text-foreground font-medium'
-            : 'text-muted-foreground font-normal hover:bg-accent hover:text-foreground',
+            : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground',
         )}
       >
         {item.isAI ? (
           <img
             src="/chip-avatar.png"
             alt="Chip"
-            className="w-[18px] h-[18px] rounded-full flex-shrink-0"
+            className="w-[20px] h-[20px] rounded-full flex-shrink-0"
           />
         ) : (
           <Icon
-            size={18}
+            size={20}
             className={cn(
               'flex-shrink-0 transition-colors',
               isParentActive
                 ? 'text-foreground'
-                : 'text-muted-foreground group-hover:text-foreground',
+                : 'text-foreground/70 group-hover:text-foreground',
             )}
           />
         )}
@@ -371,7 +372,7 @@ function CollapsibleNavItem({
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-2.5 pt-4 pb-1.5 text-[11px] font-medium text-muted-foreground select-none">
+    <p className="px-2.5 pt-5 pb-2 text-[11px] font-medium text-muted-foreground select-none">
       {children}
     </p>
   );
@@ -398,19 +399,19 @@ function FlatNavItem({
     <Link
       href={href}
       className={cn(
-        'group relative flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sm transition-colors',
+        'group relative flex items-center gap-3 h-11 px-3 rounded-xl text-[15px] transition-colors',
         isActive
           ? 'bg-accent text-foreground font-medium'
-          : 'text-muted-foreground font-normal hover:bg-accent hover:text-foreground',
+          : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground',
       )}
     >
       <Icon
-        size={16}
+        size={18}
         className={cn(
           'flex-shrink-0 transition-colors',
           isActive
             ? 'text-foreground'
-            : 'text-muted-foreground group-hover:text-foreground',
+            : 'text-foreground/70 group-hover:text-foreground',
         )}
       />
       <span className="flex-1 truncate">{label}</span>
@@ -658,7 +659,7 @@ function RealtorNav({
   );
 
   return (
-    <nav className="flex-1 px-3 py-2 overflow-y-auto space-y-1">
+    <nav className="flex-1 px-3 py-2 overflow-y-auto space-y-3">
       {/* AI section */}
       <div>
         <SectionLabel>AI</SectionLabel>
@@ -852,12 +853,19 @@ export function Sidebar({
   return (
     <aside className="relative hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0 overflow-hidden">
       {/* Subtle gradient tint at the top — matches reference design */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-violet-100/60 to-transparent dark:from-violet-900/10" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-pink-100/50 via-purple-50/20 to-transparent dark:from-purple-900/10 dark:via-transparent" />
 
       <div className="relative z-10 flex flex-col h-full">
-        {/* Logo */}
-        <div className="px-5 pt-5 pb-4">
+        {/* Logo row with panel toggle */}
+        <div className="flex items-center justify-between px-4 pt-5 pb-4">
           <BrandLogo className="h-7" alt="Chippi" />
+          <button
+            type="button"
+            aria-label="Toggle sidebar"
+            className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-accent transition-colors"
+          >
+            <PanelLeft size={16} />
+          </button>
         </div>
 
         {/* Workspace switcher */}
