@@ -18,7 +18,9 @@ import {
   BarChart2,
   Inbox,
 } from 'lucide-react';
+import Link from 'next/link';
 import { EmptyState } from '@/components/ui/empty-state';
+import { DateRangePresets } from '@/components/ui/date-range-presets';
 import {
   AreaChart,
   Area,
@@ -59,6 +61,7 @@ export function FormAnalyticsClient({
   perSource: SourceRow[];
 }) {
   const [filter, setFilter] = useState('');
+  const [days, setDays] = useState(30);
 
   const filteredBrokerages = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -143,13 +146,21 @@ export function FormAnalyticsClient({
     },
   ];
 
-  const trendFormatted = trend.map((d) => ({
+  // Client-side trend filtering: slice to last N days from the full 30-day dataset
+  const filteredTrend = useMemo(() => {
+    if (days >= trend.length) return trend;
+    return trend.slice(trend.length - days);
+  }, [trend, days]);
+
+  const trendFormatted = filteredTrend.map((d) => ({
     ...d,
     label: new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
     }),
   }));
+
+  const trendTotal = filteredTrend.reduce((sum, d) => sum + d.count, 0);
 
   return (
     <div className="space-y-8">
@@ -160,17 +171,20 @@ export function FormAnalyticsClient({
             Conversion metrics across intake forms.
           </p>
         </div>
-        <div className="relative w-full sm:w-[280px]">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-          />
-          <Input
-            placeholder="Filter brokerages or spaces…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="pl-9"
-          />
+        <div className="flex items-center gap-3 flex-wrap">
+          <DateRangePresets value={days} onChange={setDays} />
+          <div className="relative w-full sm:w-[280px]">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              placeholder="Filter brokerages or spaces…"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="pl-9"
+            />
+          </div>
         </div>
       </div>
 
@@ -273,7 +287,7 @@ export function FormAnalyticsClient({
             <div>
               <p className="text-sm font-semibold">Submission trend</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Last 30 days · {stats.submissions30d} total
+                Last {days} days · {trendTotal} total
               </p>
             </div>
           </div>
@@ -342,7 +356,11 @@ export function FormAnalyticsClient({
             <Card className="rounded-xl border bg-card">
               <div className="divide-y divide-border">
                 {filteredBrokerages.map((b) => (
-                  <div key={b.brokerageId} className="flex items-center gap-3 px-4 py-3">
+                  <Link
+                    key={b.brokerageId}
+                    href={`/admin/brokerages/${b.brokerageId}`}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors"
+                  >
                     <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                       <Building2 size={14} className="text-violet-500" />
                     </div>
@@ -352,7 +370,7 @@ export function FormAnalyticsClient({
                       </p>
                     </div>
                     <span className="text-sm font-semibold tabular-nums">{b.count}</span>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </Card>
@@ -365,13 +383,19 @@ export function FormAnalyticsClient({
           </h2>
           {filteredSpaces.length === 0 ? (
             <Card className="rounded-xl border bg-card">
-              <EmptyState icon={LayoutGrid} title="No space submissions yet." size="sm" />
+              <CardContent className="p-6 text-center">
+                <p className="text-sm text-muted-foreground">No space submissions yet.</p>
+              </CardContent>
             </Card>
           ) : (
             <Card className="rounded-xl border bg-card">
               <div className="divide-y divide-border">
                 {filteredSpaces.map((s) => (
-                  <div key={s.spaceId} className="flex items-center gap-3 px-4 py-3">
+                  <Link
+                    key={s.spaceId}
+                    href={`/admin/spaces`}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors"
+                  >
                     <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                       <LayoutGrid size={14} className="text-cyan-500" />
                     </div>
@@ -384,7 +408,7 @@ export function FormAnalyticsClient({
                       )}
                     </div>
                     <span className="text-sm font-semibold tabular-nums">{s.count}</span>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </Card>

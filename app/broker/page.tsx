@@ -232,14 +232,17 @@ export default async function BrokerOverviewPage() {
           { label: 'Won deals', value: wonDeals.length, sub: formatCompact(totalWonValue), icon: CheckCircle2, color: wonDeals.length > 0 ? 'text-emerald-600 dark:text-emerald-400' : '', bg: 'bg-emerald-500/10', href: '/broker/realtors' },
           { label: 'Invitations', value: pendingInvitations.length, sub: pendingInvitations.length > 0 ? 'pending' : 'none', icon: Mail, color: pendingInvitations.length > 0 ? 'text-primary' : '', bg: 'bg-primary/10', href: '/broker/invitations' },
         ].map(({ label, value, sub, icon: Icon, color, bg, href }) => (
-          <Link key={label} href={href}>
+          <Link key={label} href={href} aria-label={`${label}: ${value} — ${sub}`}>
             <Card className="transition-all hover:shadow-md hover:border-primary/20 group">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color ? bg : 'bg-muted'}`}>
+                  <div
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center ${color ? bg : 'bg-muted'}`}
+                    aria-hidden="true"
+                  >
                     <Icon size={16} className={color || 'text-muted-foreground'} />
                   </div>
-                  <ArrowRight size={12} className="text-muted-foreground/0 group-hover:text-muted-foreground/60 transition-colors" />
+                  <ArrowRight size={12} className="text-muted-foreground/0 group-hover:text-muted-foreground/60 transition-colors" aria-hidden="true" />
                 </div>
                 <p className={`text-2xl font-bold tabular-nums leading-tight ${color || 'text-foreground'}`}>
                   {value}
