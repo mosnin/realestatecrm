@@ -55,8 +55,8 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
             >
               <div
                 className={cn(
-                  'w-9 h-6 rounded-md flex items-center justify-center transition-colors',
-                  isActive ? 'bg-primary/10' : ''
+                  'w-10 h-7 rounded-lg flex items-center justify-center transition-colors',
+                  isActive ? 'bg-primary/15' : ''
                 )}
               >
                 <item.icon size={18} />
@@ -87,8 +87,8 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
           >
             <div
               className={cn(
-                'w-9 h-6 rounded-md flex items-center justify-center transition-colors',
-                isActive ? 'bg-primary/10' : ''
+                'w-10 h-7 rounded-lg flex items-center justify-center transition-colors',
+                isActive ? 'bg-primary/15' : ''
               )}
             >
               <item.icon size={18} />
@@ -107,8 +107,8 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
       >
         <div
           className={cn(
-            'w-9 h-6 rounded-md flex items-center justify-center transition-colors',
-            pathname.startsWith(`${base}/intake`) ? 'bg-primary/10' : ''
+            'w-10 h-7 rounded-lg flex items-center justify-center transition-colors',
+            pathname.startsWith(`${base}/intake`) ? 'bg-primary/15' : ''
           )}
         >
           <ClipboardList size={18} />

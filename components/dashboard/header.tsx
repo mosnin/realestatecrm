@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronRight, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronRight, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check, Inbox, Sparkles, Home, CalendarDays, Calendar, Flag, BarChart2 } from 'lucide-react';
 import { GlobalSearch } from './global-search';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
@@ -95,7 +95,9 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
           <SheetTrigger className="md:hidden">
             <MenuToggleIcon open={open} className="size-5 text-muted-foreground" duration={400} />
           </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border flex flex-col overflow-hidden">
+          <SheetContent side="left" className="w-64 p-0 border-sidebar-border flex flex-col overflow-hidden relative bg-sidebar">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-pink-100/50 via-purple-50/20 to-transparent dark:from-purple-900/10 dark:via-transparent z-0" />
+            <div className="relative z-10 flex flex-col h-full overflow-y-auto">
             <SheetHeader className="px-4 py-5 border-b border-sidebar-border">
               <SheetTitle className="flex items-center gap-2.5 text-sidebar-foreground">
                 <BrandLogo className="h-5" alt="Chippi" />
@@ -176,32 +178,78 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
             <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-2 space-y-0.5">
               {!isBrokerOnly && !showBrokerMobileNavOnly && (
                 <>
-                  <p className="px-3 pb-1.5 text-[10px] font-medium text-muted-foreground">
-                    Workspace
-                  </p>
-                  {primaryNavItems.map((item) => {
+                  {/* AI section */}
+                  <p className="px-3 pb-2 pt-1 text-[11px] font-medium text-muted-foreground select-none">AI</p>
+                  {[
+                    { href: `${base}/agent`, label: 'Inbox', icon: Inbox, exact: false },
+                    { href: `${base}/ai`, label: 'Assistant', icon: Sparkles, exact: false },
+                  ].map((item) => {
+                    const isActive = pathname.startsWith(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                          'group flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] transition-colors',
+                          isActive
+                            ? 'bg-accent text-foreground font-medium'
+                            : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground'
+                        )}
+                      >
+                        <item.icon size={20} className="flex-shrink-0" />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+
+                  {/* Workspace section */}
+                  <p className="px-3 pb-2 pt-5 text-[11px] font-medium text-muted-foreground select-none">Workspace</p>
+                  {[
+                    { href: '', label: 'Today', icon: Home, exact: true },
+                    { href: '/contacts', label: 'People', icon: Users, exact: false },
+                    { href: '/deals', label: 'Deals', icon: Briefcase, exact: false },
+                    { href: '/tours', label: 'Tours', icon: CalendarDays, exact: false },
+                    { href: '/calendar', label: 'Calendar', icon: Calendar, exact: false },
+                    { href: '/notes', label: 'Notes', icon: FileText, exact: false },
+                    { href: '/reviews', label: 'My reviews', icon: Flag, exact: false },
+                    { href: '/analytics', label: 'Analytics', icon: BarChart2, exact: false },
+                  ].map((item) => {
                     const href = `${base}${item.href}`;
-                    const isActive =
-                      item.href === ''
-                        ? pathname === base
-                        : pathname.startsWith(`${base}${item.href}`);
+                    const isActive = item.exact ? pathname === base : pathname.startsWith(href);
                     return (
                       <Link
                         key={item.href}
                         href={href}
                         onClick={() => setOpen(false)}
                         className={cn(
-                          'group flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
+                          'group flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] transition-colors',
                           isActive
                             ? 'bg-accent text-foreground font-medium'
-                            : 'text-muted-foreground font-normal hover:bg-accent hover:text-foreground'
+                            : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground'
                         )}
                       >
-                        <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
+                        <item.icon size={20} className="flex-shrink-0" />
                         {item.label}
                       </Link>
                     );
                   })}
+
+                  {/* Settings section */}
+                  <p className="px-3 pb-2 pt-5 text-[11px] font-medium text-muted-foreground select-none">Settings</p>
+                  <Link
+                    href={`${base}/settings`}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      'group flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] transition-colors',
+                      pathname.startsWith(`${base}/settings`) || pathname.startsWith(`${base}/billing`) || pathname.startsWith(`${base}/intake`)
+                        ? 'bg-accent text-foreground font-medium'
+                        : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground'
+                    )}
+                  >
+                    <Settings size={20} className="flex-shrink-0" />
+                    Settings
+                  </Link>
                 </>
               )}
               {isBroker && showBrokerMobileNavOnly && (
@@ -339,6 +387,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
               <div className="flex items-center gap-2 px-3 pt-3">
                 <BrandLogo className="h-4" alt="Chippi" />
               </div>
+            </div>
             </div>
           </SheetContent>
         </Sheet>
