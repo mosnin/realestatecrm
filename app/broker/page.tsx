@@ -28,6 +28,7 @@ import { TrendsChart } from '@/components/broker/trends-chart';
 import { BrokerOnboardingChecklist } from '@/components/broker/onboarding-checklist';
 import { TeamActivityFeed } from '@/components/broker/team-activity-feed';
 import { MemberDashboard } from './member-dashboard';
+import { IntakeLinkCopyButton } from '@/components/broker/intake-link-copy-button';
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -201,6 +202,9 @@ export default async function BrokerOverviewPage() {
           <code className="flex-1 sm:flex-none text-xs font-mono bg-card border rounded-lg px-3 py-2 truncate max-w-[280px]">
             {`${process.env.NEXT_PUBLIC_ROOT_DOMAIN ? `https://${process.env.NEXT_PUBLIC_ROOT_DOMAIN}` : 'https://my.usechippi.com'}/apply/b/${brokerage.id}`}
           </code>
+          <IntakeLinkCopyButton
+            url={`${process.env.NEXT_PUBLIC_ROOT_DOMAIN ? `https://${process.env.NEXT_PUBLIC_ROOT_DOMAIN}` : 'https://my.usechippi.com'}/apply/b/${brokerage.id}`}
+          />
           <Link
             href={`/apply/b/${brokerage.id}`}
             target="_blank"
