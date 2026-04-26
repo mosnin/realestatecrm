@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { Search, Users, Briefcase, Calendar, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LEAD_SCORE_COLORS } from '@/lib/constants/colors';
 
 interface ContactResult {
   id: string;
@@ -32,12 +33,6 @@ interface TourResult {
   startsAt: string;
   status: string;
 }
-
-const SCORE_COLORS: Record<string, string> = {
-  hot: 'text-red-600 dark:text-red-400',
-  warm: 'text-amber-600 dark:text-amber-400',
-  cold: 'text-slate-500 dark:text-slate-400',
-};
 
 interface Props {
   slug: string;
@@ -208,7 +203,7 @@ export function GlobalSearch({ slug }: Props) {
                       <p className="text-xs text-muted-foreground truncate">{c.email ?? c.phone ?? c.type}</p>
                     </div>
                     {c.scoreLabel && c.scoreLabel !== 'unscored' && (
-                      <span className={cn('text-xs font-semibold', SCORE_COLORS[c.scoreLabel] ?? 'text-muted-foreground')}>
+                      <span className={cn('text-xs font-semibold', (LEAD_SCORE_COLORS[c.scoreLabel as keyof typeof LEAD_SCORE_COLORS]?.text) ?? 'text-muted-foreground')}>
                         {c.scoreLabel}
                       </span>
                     )}

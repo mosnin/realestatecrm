@@ -61,22 +61,22 @@ export default async function AdminBrokeragesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground">
                     Brokerage
                   </th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground hidden sm:table-cell">
                     Owner
                   </th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground hidden md:table-cell">
                     Members
                   </th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground">
                     Status
                   </th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground hidden lg:table-cell">
                     Created
                   </th>
-                  <th className="text-right px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="text-right px-4 py-3 text-[11px] font-semibold text-muted-foreground">
                     &nbsp;
                   </th>
                 </tr>

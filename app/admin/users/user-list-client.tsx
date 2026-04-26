@@ -16,6 +16,7 @@ import {
 import { Search, Users, X, ShieldBan, ShieldCheck, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
+import { SUBSCRIPTION_STATUS_COLORS } from '@/lib/constants/colors';
 
 type UserRow = {
   id: string;
@@ -37,19 +38,6 @@ const FILTERS = [
   { value: 'suspended', label: 'Suspended' },
 ] as const;
 
-const SUB_STATUS_STYLES: Record<string, string> = {
-  active:
-    'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
-  trialing:
-    'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15',
-  past_due:
-    'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
-  canceled:
-    'text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-slate-500/15',
-  unpaid: 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15',
-  inactive:
-    'text-slate-500 bg-slate-50 dark:text-slate-500 dark:bg-slate-500/10',
-};
 
 function SuspendButton({
   userId,
@@ -288,22 +276,22 @@ export function UserListClient({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground">
                     User
                   </th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground">
                     Status
                   </th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground hidden sm:table-cell">
                     Workspace
                   </th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground hidden md:table-cell">
                     Plan
                   </th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground hidden lg:table-cell">
                     Joined
                   </th>
-                  <th className="text-right px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="text-right px-4 py-3 text-[11px] font-semibold text-muted-foreground">
                     Actions
                   </th>
                 </tr>
@@ -379,7 +367,7 @@ export function UserListClient({
                           <span
                             className={cn(
                               'text-[10px] font-semibold rounded-full px-2 py-0.5',
-                              SUB_STATUS_STYLES[subStatus] ?? SUB_STATUS_STYLES.inactive,
+                              SUBSCRIPTION_STATUS_COLORS[subStatus] ?? SUBSCRIPTION_STATUS_COLORS.inactive,
                             )}
                           >
                             {subStatus}
