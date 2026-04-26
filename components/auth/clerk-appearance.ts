@@ -12,7 +12,7 @@ export function clerkAuthAppearance(isDark: boolean) {
       colorPrimary: primary,
       colorNeutral: foreground,
       borderRadius: '0.75rem',
-      fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
       fontSize: '0.875rem',
     },
     layout: {

@@ -1,17 +1,8 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import { GeistSans } from 'geist/font/sans';
-import { Open_Sans } from 'next/font/google';
-
-const openSans = Open_Sans({
-  subsets: ['latin'],
-  variable: '--font-open-sans',
-  display: 'swap',
-});
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { ThemeProvider } from '@/components/theme-provider';
-import { Providers as HeroUIProviders } from '@/components/heroui-provider';
 import { AmplitudeProvider } from '@/components/amplitude-provider';
 import { Toaster } from 'sonner';
 import './globals.css';
@@ -57,13 +48,11 @@ export default async function RootLayout({
           }}
         />
       </head>
-      <body className={`${GeistSans.variable} ${openSans.variable} antialiased bg-background text-foreground`}>
+      <body className="antialiased bg-background text-foreground">
         <ThemeProvider>
-          <HeroUIProviders>
-            <AmplitudeProvider>
-              {body}
-            </AmplitudeProvider>
-          </HeroUIProviders>
+          <AmplitudeProvider>
+            {body}
+          </AmplitudeProvider>
         </ThemeProvider>
         <Toaster richColors position="top-right" />
         <SpeedInsights />
