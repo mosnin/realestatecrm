@@ -22,9 +22,19 @@ export const metadata: Metadata = {
     title: 'Chippi — AI-Powered CRM for Real Estate Agents',
     description: 'Score leads with AI, automate follow-ups, and manage your pipeline. Join agents closing deals faster.',
   },
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0c0c0d' },
+  ],
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default' as const,
+    title: 'Chippi',
+  },
   icons: {
     icon: '/chip-avatar.png',
     apple: '/chip-avatar.png',
+    shortcut: '/chip-avatar.png',
   },
 };
 

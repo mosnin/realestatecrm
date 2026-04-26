@@ -162,8 +162,8 @@ export function PublicPageShell({
 
       {/* ── Floating pill footer ─────────────────────────────────────────── */}
       <div className="fixed bottom-0 inset-x-0 z-50 px-3 pb-3 sm:px-4 sm:pb-4 pointer-events-none">
-        <footer className="max-w-2xl mx-auto rounded-full bg-card/95 backdrop-blur-md border border-border shadow-sm px-4 py-2 pointer-events-auto">
-          <div className="flex items-center justify-between gap-2 text-[10px] sm:text-[11px] text-muted-foreground/60">
+        <footer className="max-w-2xl mx-auto rounded-2xl sm:rounded-full bg-card/95 backdrop-blur-md border border-border shadow-sm px-4 py-2 pointer-events-auto">
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[10px] sm:text-[11px] text-muted-foreground/60">
             {/* Left: legal links */}
             <div className="flex items-center gap-2 sm:gap-3">
               <a href="/legal/terms" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Terms</a>
@@ -173,8 +173,8 @@ export function PublicPageShell({
               )}
             </div>
 
-            {/* Center: trust line (desktop only) */}
-            <span className="hidden md:inline text-center truncate max-w-xs">{trustLine}</span>
+            {/* Center: trust line — visible on all screens, wraps below on mobile */}
+            <span className="w-full sm:w-auto text-center order-last sm:order-none">{trustLine}</span>
 
             {/* Right: custom footer links or business name */}
             <div className="flex items-center gap-2 sm:gap-3">

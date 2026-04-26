@@ -12,9 +12,11 @@ import {
   Loader2,
   Check,
   Building2,
+  Inbox,
 } from 'lucide-react';
 import Link from 'next/link';
 import type { SpaceFailureRow, FailedLeadRow } from './page';
+import { EmptyState } from '@/components/ui/empty-state';
 
 type Stats = {
   totalContacts: number;
@@ -202,9 +204,11 @@ export function ScoringHealthClient({
         </h2>
         {perSpace.length === 0 ? (
           <Card className="rounded-xl border bg-card">
-            <CardContent className="p-6 text-center">
-              <p className="text-sm text-muted-foreground">No failed scoring on any space.</p>
-            </CardContent>
+            <EmptyState
+              icon={Inbox}
+              title="No failed scoring on any space."
+              size="sm"
+            />
           </Card>
         ) : (
           <Card className="rounded-xl border bg-card">
@@ -247,9 +251,11 @@ export function ScoringHealthClient({
         </div>
         {visibleFailed.length === 0 ? (
           <Card className="rounded-xl border bg-card">
-            <CardContent className="p-6 text-center">
-              <p className="text-sm text-muted-foreground">No failed leads in view.</p>
-            </CardContent>
+            <EmptyState
+              icon={Inbox}
+              title="No failed leads in view."
+              size="sm"
+            />
           </Card>
         ) : (
           <Card className="rounded-xl border bg-card">

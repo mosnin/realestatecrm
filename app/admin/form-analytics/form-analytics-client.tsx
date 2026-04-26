@@ -15,7 +15,10 @@ import {
   Building2,
   LayoutGrid,
   Search,
+  BarChart2,
+  Inbox,
 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   AreaChart,
   Area,
@@ -199,7 +202,7 @@ export function FormAnalyticsClient({
               Score distribution
             </h2>
             {totalScored === 0 ? (
-              <p className="text-sm text-muted-foreground">No scored leads yet.</p>
+              <EmptyState icon={BarChart2} title="No scored leads yet." size="sm" />
             ) : (
               <div className="space-y-4">
                 {distItems.map(({ label, value, icon: Icon, bar, text }) => {
@@ -236,7 +239,7 @@ export function FormAnalyticsClient({
               Submissions by source
             </h2>
             {perSource.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No submissions tagged yet.</p>
+              <EmptyState icon={Inbox} title="No submissions tagged yet." size="sm" />
             ) : (
               <div className="space-y-3">
                 {perSource.map(({ source, count }) => {
@@ -333,9 +336,7 @@ export function FormAnalyticsClient({
           </h2>
           {filteredBrokerages.length === 0 ? (
             <Card className="rounded-xl border bg-card">
-              <CardContent className="p-6 text-center">
-                <p className="text-sm text-muted-foreground">No brokerage submissions yet.</p>
-              </CardContent>
+              <EmptyState icon={Building2} title="No brokerage submissions yet." size="sm" />
             </Card>
           ) : (
             <Card className="rounded-xl border bg-card">
@@ -364,9 +365,7 @@ export function FormAnalyticsClient({
           </h2>
           {filteredSpaces.length === 0 ? (
             <Card className="rounded-xl border bg-card">
-              <CardContent className="p-6 text-center">
-                <p className="text-sm text-muted-foreground">No space submissions yet.</p>
-              </CardContent>
+              <EmptyState icon={LayoutGrid} title="No space submissions yet." size="sm" />
             </Card>
           ) : (
             <Card className="rounded-xl border bg-card">
