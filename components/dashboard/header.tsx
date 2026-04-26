@@ -23,6 +23,7 @@ import { GlobalSearch } from './global-search';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { BrokerHelpGuide } from '@/components/broker/help-guide';
+import { getBreadcrumbLabel } from '@/lib/breadcrumb-routes';
 
 const brokerMobileNavItems = [
   { href: '/broker', label: 'Team Overview', icon: LayoutDashboard, exact: true },
@@ -353,11 +354,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
               <span className="text-muted-foreground">{brokerageName}</span>
               <span className="text-muted-foreground/40">/</span>
               <span className="font-medium text-foreground">
-                {pathname === '/broker' ? 'Overview' :
-                 pathname.startsWith('/broker/realtors') ? 'Realtors' :
-                 pathname.startsWith('/broker/members') ? 'Members' :
-                 pathname.startsWith('/broker/invitations') ? 'Invitations' :
-                 pathname.startsWith('/broker/settings') ? 'Settings' : 'Team'}
+                {getBreadcrumbLabel(pathname)}
               </span>
               {/* Quick switch to workspace */}
               {!isBrokerOnly && slug && (
@@ -374,20 +371,10 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
           ) : (
             <>
               <span className="text-muted-foreground">{title}</span>
-              {(() => {
-                const allItems = [...primaryNavItems, ...secondaryNavItems];
-                const match = allItems
-                  .filter((item) => item.href !== '')
-                  .find((item) => pathname.startsWith(`${base}${item.href}`));
-                return match ? (
-                  <>
-                    <span className="text-muted-foreground/40">/</span>
-                    <span className="font-medium text-foreground">{match.label}</span>
-                  </>
-                ) : (
-                  <><span className="text-muted-foreground/40">/</span><span className="font-medium text-foreground">Overview</span></>
-                );
-              })()}
+              <span className="text-muted-foreground/40">/</span>
+              <span className="font-medium text-foreground">
+                {getBreadcrumbLabel(pathname, base)}
+              </span>
               {/* Quick switch to brokerage */}
               {isBroker && brokerageName && (
                 <Link
