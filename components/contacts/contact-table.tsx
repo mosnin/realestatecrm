@@ -928,7 +928,7 @@ export function ContactTable({ slug }: ContactTableProps) {
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center flex-wrap gap-2 rounded-lg border border-border bg-card shadow-lg px-3 sm:px-4 py-2 sm:py-3 max-w-[calc(100vw-2rem)]">
+        <div className="sticky bottom-4 mx-auto w-fit z-30 flex items-center flex-wrap gap-2 rounded-lg border border-border bg-card shadow-lg px-3 sm:px-4 py-2 sm:py-3 max-w-[calc(100vw-2rem)]">
           <CheckSquare size={14} className="text-foreground" />
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="h-4 w-px bg-border mx-1" />

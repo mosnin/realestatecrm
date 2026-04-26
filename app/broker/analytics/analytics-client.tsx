@@ -37,6 +37,11 @@ interface Props {
   agents: AgentFunnelData[];
 }
 
+// ── Conversion threshold constants ───────────────────────────────────────────
+
+const CONVERSION_THRESHOLD_GOOD = 20; // % above this = green
+const CONVERSION_THRESHOLD_OK = 10;   // % above this = amber, below = muted
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatCompact(n: number): string {
@@ -417,9 +422,9 @@ export function AnalyticsClient({ agents }: Props) {
                     <td className="px-3 py-3 text-right tabular-nums text-xs hidden md:table-cell">{a.appToDeal}%</td>
                     <td className="px-4 py-3 text-right">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold tabular-nums ${
-                        a.overallConversion >= 20
+                        a.overallConversion >= CONVERSION_THRESHOLD_GOOD
                           ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
-                          : a.overallConversion >= 10
+                          : a.overallConversion >= CONVERSION_THRESHOLD_OK
                           ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
                           : 'bg-muted text-muted-foreground'
                       }`}>

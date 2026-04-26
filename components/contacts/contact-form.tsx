@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -209,8 +210,9 @@ export function ContactForm({
             </Field>
           </FieldGroup>
 
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save client'}
+          <Button type="submit" disabled={isSubmitting} className="w-full gap-2">
+            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isSubmitting ? 'Saving...' : 'Save Contact'}
           </Button>
         </form>
       </DialogContent>
