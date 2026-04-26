@@ -568,6 +568,7 @@ export function ApplicationForm({
           <Input
             id="name"
             type="text"
+            autoComplete="name"
             placeholder="Alex Johnson"
             value={get('name')}
             onChange={(e) => set('name', e.target.value)}
@@ -582,6 +583,7 @@ export function ApplicationForm({
           <Input
             id="email"
             type="email"
+            autoComplete="email"
             placeholder="alex@email.com"
             value={get('email')}
             onChange={(e) => set('email', e.target.value)}
@@ -596,6 +598,7 @@ export function ApplicationForm({
           <Input
             id="phone"
             type="tel"
+            autoComplete="tel"
             placeholder="(555) 123-4567"
             value={get('phone')}
             onChange={(e) => set('phone', e.target.value)}
@@ -1128,6 +1131,7 @@ export function ApplicationForm({
               <Input
                 id="occupants"
                 type="number"
+                inputMode="numeric"
                 min={1}
                 placeholder="e.g., 2"
                 value={get('occupants')}

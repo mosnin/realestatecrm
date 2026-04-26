@@ -26,6 +26,7 @@ function SelectionCard({
       onClick={onClick}
       className={cn(
         'w-full text-left px-4 py-3.5 rounded-xl border transition-all text-sm',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         selected
           ? 'border-2 shadow-sm font-medium'
           : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
@@ -59,6 +60,7 @@ function MultiSelectChip({
       onClick={onClick}
       className={cn(
         'flex items-center gap-2.5 px-3.5 py-3 rounded-xl border transition-all text-sm text-left',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         checked
           ? 'border-2 shadow-sm font-medium'
           : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
@@ -220,6 +222,7 @@ export function QuestionRenderer({
           <Input
             id={inputId}
             type="number"
+            inputMode="numeric"
             placeholder={question.placeholder}
             value={strValue}
             onChange={(e) => onChange(e.target.value)}
@@ -371,7 +374,7 @@ export function QuestionRenderer({
 // ── Validation helper ────────────────────────────────────────────────────────
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^[\d\s()+\-]{7,}$/;
+const PHONE_REGEX = /^[\d\s()+\-.]{7,}$/;
 
 /**
  * Validate a single question's answer.
