@@ -209,11 +209,14 @@ export function RealtorsClient({ realtors }: { realtors: RealtorRow[] }) {
         </div>
 
         {/* Row 2: Sort pills — scrollable on mobile */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 -mb-0.5">
-          <span className="text-xs text-muted-foreground font-medium mr-0.5 flex-shrink-0">Sort:</span>
-          {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-            <SortButton key={k} col={k} current={sortKey} dir={sortDir} onSort={handleSort} />
-          ))}
+        <div className="relative">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 -mb-0.5">
+            <span className="text-xs text-muted-foreground font-medium mr-0.5 flex-shrink-0">Sort:</span>
+            {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+              <SortButton key={k} col={k} current={sortKey} dir={sortDir} onSort={handleSort} />
+            ))}
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
         </div>
       </div>
 
