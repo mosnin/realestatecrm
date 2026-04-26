@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
@@ -591,7 +591,7 @@ function UserFooter({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Shopify-style realtor nav — accordion (one section expanded at a time)
+// Realtor nav — 3 sections: AI at top, Workspace in middle, Settings at bottom
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function RealtorNav({
@@ -609,66 +609,79 @@ function RealtorNav({
   overdueFollowUpCount: number;
   pendingDraftCount: number;
 }) {
-  // Determine which section should be initially expanded based on current route
-  const initialExpanded = useMemo(() => {
-    for (const item of realtorNavItems) {
-      if (item.children && doesItemOwnPath(item, pathname, base)) {
-        return item.href;
-      }
-    }
-    return null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only compute on mount
+  const settingsItem = realtorNavItems.find((item) => item.href === '/settings')!;
+  const isOnSettings = doesItemOwnPath(settingsItem, pathname, base);
+  const [settingsExpanded, setSettingsExpanded] = useState(isOnSettings);
 
-  const [expandedKey, setExpandedKey] = useState<string | null>(initialExpanded);
-
-  // Auto-expand when navigating to a child route
   useEffect(() => {
-    for (const item of realtorNavItems) {
-      if (item.children && doesItemOwnPath(item, pathname, base)) {
-        setExpandedKey(item.href);
-        return;
-      }
-    }
-  }, [pathname, base]);
+    if (isOnSettings) setSettingsExpanded(true);
+  }, [isOnSettings]);
 
-  const handleToggle = useCallback((key: string) => {
-    setExpandedKey((prev) => (prev === key ? null : key));
-  }, []);
+  // AI-related items always sit at the top
+  const aiItems = realtorNavItems.filter(
+    (item) => item.isAI || item.href === '/agent',
+  );
+  // Everything else except settings
+  const mainItems = realtorNavItems.filter(
+    (item) => !item.isAI && item.href !== '/agent' && item.href !== '/settings',
+  );
+
+  const getBadge = (item: NavItem): React.ReactNode => {
+    if (item.badgeKey === 'leads' && unreadLeadCount > 0) {
+      return (
+        <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-medium tabular-nums flex-shrink-0 bg-secondary text-muted-foreground">
+          {unreadLeadCount > 99 ? '99+' : unreadLeadCount}
+        </span>
+      );
+    }
+    if (item.badgeKey === 'pendingDrafts' && pendingDraftCount > 0) {
+      return (
+        <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums flex-shrink-0 bg-primary text-primary-foreground">
+          {pendingDraftCount > 99 ? '99+' : pendingDraftCount}
+        </span>
+      );
+    }
+    return undefined;
+  };
+
+  const renderItem = (item: NavItem) => (
+    <CollapsibleNavItem
+      key={item.href}
+      item={item}
+      base={base}
+      pathname={pathname}
+      searchParams={searchParamsString}
+      isExpanded={false}
+      onToggle={() => {}}
+      badge={getBadge(item)}
+    />
+  );
 
   return (
-    <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-      {realtorNavItems.map((item) => {
-        let badge: React.ReactNode = undefined;
-        const isParentActive = doesItemOwnPath(item, pathname, base);
+    <nav className="flex-1 px-3 py-2 overflow-y-auto space-y-1">
+      {/* AI section */}
+      <div>
+        <SectionLabel>AI</SectionLabel>
+        <div className="space-y-0.5">{aiItems.map(renderItem)}</div>
+      </div>
 
-        if (item.badgeKey === 'leads' && unreadLeadCount > 0) {
-          badge = (
-            <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-medium tabular-nums flex-shrink-0 bg-secondary text-muted-foreground">
-              {unreadLeadCount > 99 ? '99+' : unreadLeadCount}
-            </span>
-          );
-        } else if (item.badgeKey === 'pendingDrafts' && pendingDraftCount > 0) {
-          badge = (
-            <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums flex-shrink-0 bg-primary text-primary-foreground">
-              {pendingDraftCount > 99 ? '99+' : pendingDraftCount}
-            </span>
-          );
-        }
+      {/* Main workspace section */}
+      <div>
+        <SectionLabel>Workspace</SectionLabel>
+        <div className="space-y-0.5">{mainItems.map(renderItem)}</div>
+      </div>
 
-        return (
-          <CollapsibleNavItem
-            key={item.href}
-            item={item}
-            base={base}
-            pathname={pathname}
-            searchParams={searchParamsString}
-            isExpanded={expandedKey === item.href}
-            onToggle={() => handleToggle(item.href)}
-            badge={badge}
-          />
-        );
-      })}
+      {/* Settings — collapsible, pinned at bottom of scroll area */}
+      <div className="pt-1">
+        <CollapsibleNavItem
+          item={settingsItem}
+          base={base}
+          pathname={pathname}
+          searchParams={searchParamsString}
+          isExpanded={settingsExpanded}
+          onToggle={() => setSettingsExpanded((p) => !p)}
+        />
+      </div>
     </nav>
   );
 }
@@ -835,42 +848,47 @@ export function Sidebar({
     );
   }
 
-  // ── Realtor workspace sidebar (Shopify-style) ────────────────────────────
+  // ── Realtor workspace sidebar ────────────────────────────────────────────
   return (
-    <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0">
-      {/* Logo */}
-      <div className="px-5 pt-5 pb-4">
-        <BrandLogo className="h-7" alt="Chippi" />
+    <aside className="relative hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0 overflow-hidden">
+      {/* Subtle gradient tint at the top — matches reference design */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-violet-100/60 to-transparent dark:from-violet-900/10" />
+
+      <div className="relative z-10 flex flex-col h-full">
+        {/* Logo */}
+        <div className="px-5 pt-5 pb-4">
+          <BrandLogo className="h-7" alt="Chippi" />
+        </div>
+
+        {/* Workspace switcher */}
+        <WorkspaceSwitcher
+          currentName={spaceName}
+          currentSubtitle="My workspace"
+          currentIcon={Briefcase}
+          slug={slug}
+          spaceName={spaceName}
+          brokerageMemberships={brokerageMemberships}
+          isOnBrokerPage={isOnBrokerPage}
+        />
+
+        {/* 3-section nav: AI → Workspace → Settings */}
+        <RealtorNav
+          base={base}
+          pathname={pathname}
+          searchParamsString={searchParamsString}
+          unreadLeadCount={unreadLeadCount}
+          overdueFollowUpCount={overdueFollowUpCount}
+          pendingDraftCount={pendingDraftCount}
+        />
+
+        {/* User footer */}
+        <div className="mx-4 border-t border-border" />
+        <UserFooter
+          href={`${base}/settings/profile`}
+          displayName={displayName}
+          imageUrl={user?.imageUrl}
+        />
       </div>
-
-      {/* Workspace switcher */}
-      <WorkspaceSwitcher
-        currentName={spaceName}
-        currentSubtitle="My workspace"
-        currentIcon={Briefcase}
-        slug={slug}
-        spaceName={spaceName}
-        brokerageMemberships={brokerageMemberships}
-        isOnBrokerPage={isOnBrokerPage}
-      />
-
-      {/* Shopify-style nav — all items with inline collapsible children */}
-      <RealtorNav
-        base={base}
-        pathname={pathname}
-        searchParamsString={searchParamsString}
-        unreadLeadCount={unreadLeadCount}
-        overdueFollowUpCount={overdueFollowUpCount}
-        pendingDraftCount={pendingDraftCount}
-      />
-
-      {/* User footer */}
-      <div className="mx-4 border-t border-border" />
-      <UserFooter
-        href={`${base}/settings/profile`}
-        displayName={displayName}
-        imageUrl={user?.imageUrl}
-      />
     </aside>
   );
 }
