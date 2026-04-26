@@ -64,7 +64,7 @@ export default async function RootLayout({
             {body}
           </AmplitudeProvider>
         </ThemeProvider>
-        <Toaster richColors position="top-right" />
+        <Toaster richColors position="top-right" toastOptions={{ duration: 3500 }} />
         <SpeedInsights />
       </body>
     </html>

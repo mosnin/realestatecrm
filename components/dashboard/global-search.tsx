@@ -302,7 +302,7 @@ export function GlobalSearch({ slug }: Props) {
       >
         <Search size={12} />
         <span className="hidden sm:inline">Search</span>
-        <kbd className="hidden md:inline-flex items-center gap-0.5 rounded border border-border bg-background px-1 py-0.5 font-mono text-[10px]">
+        <kbd className="hidden sm:inline-flex items-center gap-1 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
           ⌘K
         </kbd>
       </button>
