@@ -17,7 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
-import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
+import { secondaryNavItems } from '@/lib/nav-items';
 import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronRight, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check, Inbox, Sparkles, Home, CalendarDays, Calendar, Flag, BarChart2 } from 'lucide-react';
 import { GlobalSearch } from './global-search';
 import { NotificationCenter } from './notification-center';
