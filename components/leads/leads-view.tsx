@@ -47,6 +47,7 @@ import { timeAgo, formatMoney, getInitials, formatFollowUpDate, toDateInputValue
 import { LEAD_TIERS, type TierKey } from '@/lib/constants';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { TableRowSkeleton, CardSkeleton } from '@/components/ui/skeleton';
 
 const TIERS = LEAD_TIERS;
 
@@ -142,6 +143,7 @@ interface LeadsViewProps {
   leads: Contact[];
   slug: string;
   newLeadIds: Set<string>;
+  loading?: boolean;
 }
 
 type SortKey = 'newest' | 'oldest' | 'score' | 'score-low' | 'name-az' | 'name-za' | 'followup';
@@ -171,7 +173,7 @@ function isValidView(v: string | null): v is ViewMode {
   return v != null && ['card', 'list'].includes(v);
 }
 
-export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewProps) {
+export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = false }: LeadsViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -623,8 +625,25 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
         </div>
       </div>
 
+      {/* ── Loading skeletons ── */}
+      {loading && (
+        <div className="space-y-0 rounded-lg border border-border overflow-hidden">
+          {view === 'card' ? (
+            <div className="space-y-3 p-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <CardSkeleton key={i} />
+              ))}
+            </div>
+          ) : (
+            Array.from({ length: 5 }).map((_, i) => (
+              <TableRowSkeleton key={i} cols={4} />
+            ))
+          )}
+        </div>
+      )}
+
       {/* ── Empty state ── */}
-      {filtered.length === 0 && (
+      {!loading && filtered.length === 0 && (
         <div className="rounded-lg border border-dashed border-border bg-card py-12 text-center px-6">
           <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center mx-auto mb-4">
             <Search size={20} className="text-muted-foreground" />
@@ -655,7 +674,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
       )}
 
       {/* ── Card view ── */}
-      {view === 'card' && filtered.length > 0 && (
+      {!loading && view === 'card' && filtered.length > 0 && (
         <div className="space-y-3">
           {filtered.map((lead) => {
             const isNew = newLeadIds.has(lead.id);
@@ -927,7 +946,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
       )}
 
       {/* ── List view ── */}
-      {view === 'list' && filtered.length > 0 && (
+      {!loading && view === 'list' && filtered.length > 0 && (
         <div className="rounded-lg border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
