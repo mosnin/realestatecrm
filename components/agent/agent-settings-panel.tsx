@@ -10,6 +10,17 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface AgentSettings {
   spaceId: string;
@@ -133,6 +144,7 @@ export function AgentSettingsPanel({ slug }: Props) {
   const [savedField, setSavedField] = useState<string | null>(null);
   const [triggeringRun, setTriggeringRun] = useState(false);
   const [runResult, setRunResult] = useState<string | null>(null);
+  const [showDisableConfirm, setShowDisableConfirm] = useState(false);
 
   const load = useCallback(async () => {
     const [settingsRes, usageRes, draftsRes, activityRes] = await Promise.all([
@@ -162,6 +174,7 @@ export function AgentSettingsPanel({ slug }: Props) {
 
   async function saveField(patch: Partial<AgentSettings>, fieldKey: string) {
     if (!settings) return;
+    const previous = settings;
     setSaving(true);
     const merged = { ...settings, ...patch };
     try {
@@ -174,7 +187,13 @@ export function AgentSettingsPanel({ slug }: Props) {
         setSettings(await res.json());
         setSavedField(fieldKey);
         setTimeout(() => setSavedField(null), 2000);
+      } else {
+        setSettings(previous);
+        toast.error('Failed to save setting — please try again');
       }
+    } catch {
+      setSettings(previous);
+      toast.error('Could not reach server');
     } finally {
       setSaving(false);
     }
@@ -286,9 +305,15 @@ export function AgentSettingsPanel({ slug }: Props) {
             </div>
             <Switch
               checked={settings.enabled}
-              onCheckedChange={(v) => {
-                setSettings({ ...settings, enabled: v });
-                void saveField({ enabled: v }, 'enabled');
+              onCheckedChange={(checked) => {
+                if (!checked) {
+                  // Turning OFF — require confirmation
+                  setShowDisableConfirm(true);
+                } else {
+                  // Turning ON — save immediately
+                  setSettings({ ...settings, enabled: true });
+                  void saveField({ enabled: true }, 'enabled');
+                }
               }}
             />
           </div>
@@ -324,21 +349,38 @@ export function AgentSettingsPanel({ slug }: Props) {
       {/* Autonomy level */}
       <div className="space-y-3">
         <div>
-          <Label className="text-sm font-semibold">How much should the agent do on its own?</Label>
+          <Label id="autonomy-label" className="text-sm font-semibold">How much should the agent do on its own?</Label>
           <p className="text-xs text-muted-foreground mt-0.5">
             We recommend starting with &quot;Draft + approval&quot; — you stay in control.
           </p>
         </div>
-        <div className="space-y-2">
+        <div role="radiogroup" aria-labelledby="autonomy-label" className="space-y-2">
           {AUTONOMY_OPTIONS.map((opt) => {
             const Icon = opt.icon;
             const selected = settings.autonomyLevel === opt.value;
             return (
               <button
                 key={opt.value}
+                role="radio"
+                aria-checked={selected}
                 onClick={() => {
                   setSettings({ ...settings, autonomyLevel: opt.value });
                   void saveField({ autonomyLevel: opt.value }, 'autonomyLevel');
+                }}
+                onKeyDown={(e) => {
+                  const opts = AUTONOMY_OPTIONS.map(o => o.value);
+                  const idx = opts.indexOf(settings.autonomyLevel);
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const next = opts[(idx + 1) % opts.length];
+                    setSettings({ ...settings, autonomyLevel: next as typeof settings.autonomyLevel });
+                    void saveField({ autonomyLevel: next as typeof settings.autonomyLevel }, 'autonomyLevel');
+                  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const prev = opts[(idx - 1 + opts.length) % opts.length];
+                    setSettings({ ...settings, autonomyLevel: prev as typeof settings.autonomyLevel });
+                    void saveField({ autonomyLevel: prev as typeof settings.autonomyLevel }, 'autonomyLevel');
+                  }
                 }}
                 className={cn(
                   'w-full text-left p-4 rounded-xl border transition-all',
@@ -462,6 +504,7 @@ export function AgentSettingsPanel({ slug }: Props) {
                           <button
                             key={level}
                             title={AUTONOMY_LABELS[level] + (isWorkspaceDefault ? ' (workspace default)' : '')}
+                            aria-label={`Set to ${AUTONOMY_LABELS[level] ?? level}`}
                             onClick={() => setAgentAutonomy(opt.value, level === override ? null : level)}
                             className={cn(
                               'flex items-center gap-1 px-2.5 py-2 min-h-[36px] text-xs transition-colors border-r border-border last:border-r-0',
@@ -534,6 +577,29 @@ export function AgentSettingsPanel({ slug }: Props) {
           <p className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 size={11} /> Saved</p>
         )}
       </div>
+
+      <AlertDialog open={showDisableConfirm} onOpenChange={setShowDisableConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable agent?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Chippi will stop all autonomous actions. You can re-enable at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep enabled</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setSettings({ ...settings, enabled: false });
+                void saveField({ enabled: false }, 'enabled');
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Yes, disable
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

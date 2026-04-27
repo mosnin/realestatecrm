@@ -28,7 +28,7 @@ interface ChippiTerminalProps {
   compact?: boolean;        // compact mode for sidebar use
 }
 
-function EventRow({ event }: { event: StreamEvent; index: number }) {
+function EventRow({ event }: { event: StreamEvent }) {
   const icons: Record<StreamEvent['type'], React.ReactNode> = {
     info: <Info size={12} className="text-muted-foreground flex-shrink-0 mt-0.5" />,
     action: <CheckCircle2 size={12} className="text-orange-500 flex-shrink-0 mt-0.5" />,
@@ -176,7 +176,7 @@ export function ChippiTerminal({ runId, className, maxEvents = 30, compact = fal
   void (null as unknown as TerminalRun);
 
   return (
-    <div className={cn('rounded-xl border border-border bg-card overflow-hidden', className)}>
+    <div className={cn('relative rounded-xl border border-border bg-card overflow-hidden', className)}>
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border/60 bg-muted/20">
         <div className={cn(
@@ -213,6 +213,9 @@ export function ChippiTerminal({ runId, className, maxEvents = 30, compact = fal
 
       {/* Terminal body */}
       <div
+        role="log"
+        aria-live="polite"
+        aria-label="Agent event log"
         ref={containerRef}
         onScroll={handleScroll}
         className={cn(
@@ -234,7 +237,7 @@ export function ChippiTerminal({ runId, className, maxEvents = 30, compact = fal
           </div>
         )}
         {events.length > 0 && events.map((event, i) => (
-          <EventRow key={`${event.ts}-${i}`} event={event} index={i} />
+          <EventRow key={`${event.ts}-${i}`} event={event} />
         ))}
         {isRunning && (
           <div className="flex items-center gap-1.5 pt-1 font-mono text-[12px] text-orange-500">
@@ -243,6 +246,17 @@ export function ChippiTerminal({ runId, className, maxEvents = 30, compact = fal
         )}
         <div ref={bottomRef} />
       </div>
+      {userScrolled && (
+        <button
+          onClick={() => {
+            setUserScrolled(false);
+            containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: 'smooth' });
+          }}
+          className="absolute bottom-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full bg-orange-500/90 text-white text-[10px] font-medium shadow-md hover:bg-orange-600 transition-colors"
+        >
+          ↓ Live
+        </button>
+      )}
     </div>
   );
 }
