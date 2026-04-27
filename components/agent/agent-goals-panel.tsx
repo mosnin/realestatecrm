@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Target, Plus, CheckCircle2, X, ChevronRight } from 'lucide-react';
+import { Target, Plus, CheckCircle2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface AgentGoal {
   id: string;
@@ -65,28 +66,43 @@ function GoalCard({
 
   async function handleAction(status: 'completed' | 'cancelled') {
     setActioning(status);
-    await onAction(goal.id, status);
-    setActioning(null);
+    try {
+      await onAction(goal.id, status);
+    } finally {
+      setActioning(null); // Always clear so buttons re-enable
+    }
   }
 
   return (
     <div className="rounded-xl border bg-card p-4 space-y-2.5">
-      {/* Header: type badge + priority dot */}
+      {/* Header: type badge + priority badge */}
       <div className="flex items-center gap-2">
         <span className={cn('inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full', cfg.pill)}>
           {cfg.label}
         </span>
         {goal.priority > 0 && (
           <span
-            className="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0"
-            title={`Priority ${goal.priority}`}
-          />
+            className={cn(
+              'text-[10px] font-medium px-1.5 py-0.5 rounded-full',
+              goal.priority >= 8
+                ? 'bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400'
+                : goal.priority >= 5
+                ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400'
+                : 'bg-muted text-muted-foreground',
+            )}
+          >
+            P{goal.priority}
+          </span>
         )}
-        <ChevronRight size={12} className="text-muted-foreground/40 ml-auto flex-shrink-0" />
       </div>
 
       {/* Description */}
       <p className="text-sm text-foreground leading-snug">{goal.description}</p>
+      {goal.instructions && (
+        <p className="text-[12px] text-muted-foreground/80 italic mt-1 line-clamp-2">
+          {goal.instructions}
+        </p>
+      )}
 
       {/* Contact */}
       {goal.Contact && (
@@ -252,13 +268,27 @@ export function AgentGoalsPanel() {
   }, []);
 
   async function handleAction(id: string, status: 'completed' | 'cancelled') {
-    const res = await fetch(`/api/agent/goals/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    if (res.ok) {
-      setGoals((prev) => prev.filter((g) => g.id !== id));
+    try {
+      const res = await fetch(`/api/agent/goals/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        setGoals((prev) => prev.filter((g) => g.id !== id));
+        if (status === 'completed') {
+          toast.success('Goal completed! 🎉');
+        }
+      } else {
+        toast.error('Could not update goal — please try again');
+        throw new Error('update failed'); // Re-throw so GoalCard re-enables buttons
+      }
+    } catch (err) {
+      // Only show network error toast if we didn't already show a server-error toast
+      if (!(err instanceof Error && err.message === 'update failed')) {
+        toast.error('Could not reach server');
+      }
+      throw err; // Re-throw so GoalCard's finally block still runs
     }
   }
 

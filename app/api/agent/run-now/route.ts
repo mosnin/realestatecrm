@@ -27,6 +27,37 @@ export async function POST() {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+  // Rate limit: max 5 runs per space per minute
+  const kvUrl = process.env.KV_REST_API_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN;
+  if (kvUrl && kvToken) {
+    const rateLimitKey = `agent:runnow-rate:${space.id}:${Math.floor(Date.now() / 60_000)}`;
+    try {
+      const incrRes = await fetch(`${kvUrl}/incr/${encodeURIComponent(rateLimitKey)}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${kvToken}` },
+      });
+      if (incrRes.ok) {
+        const { result: count } = await incrRes.json() as { result: number };
+        if (count === 1) {
+          // Set expiry of 90 seconds on first increment
+          await fetch(`${kvUrl}/expire/${encodeURIComponent(rateLimitKey)}/90`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${kvToken}` },
+          });
+        }
+        if (count > 5) {
+          return NextResponse.json(
+            { triggered: false, reason: 'Rate limit exceeded — try again in a minute' },
+            { status: 429 }
+          );
+        }
+      }
+    } catch {
+      // If Redis is unavailable, allow the run (fail open)
+    }
+  }
+
   // Path 1: Modal web endpoint configured — trigger immediately
   if (MODAL_WEBHOOK_URL && AGENT_INTERNAL_SECRET) {
     try {
@@ -48,9 +79,6 @@ export async function POST() {
   }
 
   // Path 2: Fallback — push a trigger to Redis so it runs at next heartbeat
-  const kvUrl = process.env.KV_REST_API_URL;
-  const kvToken = process.env.KV_REST_API_TOKEN;
-
   if (kvUrl && kvToken) {
     const trigger = JSON.stringify({
       event: 'new_lead',  // generic trigger — prompts all agents to run

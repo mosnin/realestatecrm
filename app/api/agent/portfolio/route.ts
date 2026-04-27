@@ -37,12 +37,14 @@ export async function GET() {
     supabase
       .from('Contact')
       .select('leadScore, leadType, lastContactedAt, followUpAt, type')
-      .eq('spaceId', space.id),
+      .eq('spaceId', space.id)
+      .limit(2000),
     supabase
       .from('Deal')
       .select('value, probability, closeDate')
       .eq('spaceId', space.id)
-      .eq('status', 'active'),
+      .eq('status', 'active')
+      .limit(500),
   ]);
 
   if (contactsResult.error) throw contactsResult.error;

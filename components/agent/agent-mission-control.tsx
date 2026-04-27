@@ -306,7 +306,7 @@ export function AgentMissionControl({ slug }: { slug: string }) {
           {/* "N more" overflow link */}
           {hiddenCount > 0 && (
             <Link
-              href={`/s/${slug}/agent?tab=activity`}
+              href={`/s/${slug}/agent`}
               className="flex items-center gap-1 px-5 py-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors border-b border-border"
             >
               +{hiddenCount} more action{hiddenCount !== 1 ? 's' : ''}
