@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { secondaryNavItems } from '@/lib/nav-items';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronRight, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check, Inbox, Sparkles, Home, CalendarDays, Calendar, Flag, BarChart2 } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronRight, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check, Inbox, Sparkles, Home, CalendarDays, Calendar, Flag, BarChart2, ClipboardList } from 'lucide-react';
 import { GlobalSearch } from './global-search';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
@@ -81,6 +81,8 @@ interface HeaderProps {
 export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const [mobileSwitcherOpen, setMobileSwitcherOpen] = useState(false);
+  const [intakeExpanded, setIntakeExpanded] = useState(false);
+  const [analyticsExpanded, setAnalyticsExpanded] = useState(false);
   const pathname = usePathname();
   const base = `/s/${slug}`;
   const { theme, toggleTheme } = useTheme();
@@ -213,7 +215,6 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                     { href: '/calendar', label: 'Calendar', icon: Calendar, exact: false },
                     { href: '/notes', label: 'Notes', icon: FileText, exact: false },
                     { href: '/reviews', label: 'My reviews', icon: Flag, exact: false },
-                    { href: '/analytics', label: 'Analytics', icon: BarChart2, exact: false },
                   ].map((item) => {
                     const href = `${base}${item.href}`;
                     const isActive = item.exact ? pathname === base : pathname.startsWith(href);
@@ -235,21 +236,126 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                     );
                   })}
 
-                  {/* Settings section */}
-                  <p className="px-3 pb-2 pt-5 text-[11px] font-medium text-muted-foreground select-none">Settings</p>
-                  <Link
-                    href={`${base}/settings`}
-                    onClick={() => setOpen(false)}
+                  {/* Intake form — expandable */}
+                  <button
+                    onClick={() => setIntakeExpanded((p) => !p)}
                     className={cn(
-                      'group flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] transition-colors',
-                      pathname.startsWith(`${base}/settings`) || pathname.startsWith(`${base}/billing`) || pathname.startsWith(`${base}/intake`)
+                      'group w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] transition-colors',
+                      pathname.startsWith(`${base}/intake`) || pathname.startsWith(`${base}/settings/appearance`) || pathname.startsWith(`${base}/settings/content`)
                         ? 'bg-accent text-foreground font-medium'
                         : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground'
                     )}
                   >
-                    <Settings size={20} className="flex-shrink-0" />
-                    Settings
-                  </Link>
+                    <ClipboardList size={20} className="flex-shrink-0" />
+                    <span className="flex-1 text-left">Intake form</span>
+                    <ChevronRight size={14} className={cn('text-muted-foreground/50 transition-transform duration-200', intakeExpanded && 'rotate-90')} />
+                  </button>
+                  {intakeExpanded && (
+                    <div className="ml-[18px] pl-3.5 py-1 space-y-0.5 border-l border-border/40">
+                      {[
+                        { href: '/intake', label: 'Overview', exact: true },
+                        { href: '/intake/customize', label: 'Customize' },
+                        { href: '/settings/appearance', label: 'Appearance' },
+                        { href: '/settings/content', label: 'Content' },
+                        { href: '/intake/tracking', label: 'Tracking' },
+                        { href: '/intake/analytics', label: 'Form analytics' },
+                        { href: '/intake/share', label: 'Share' },
+                      ].map((child) => {
+                        const href = `${base}${child.href}`;
+                        const isActive = child.exact ? pathname === href : pathname.startsWith(href);
+                        return (
+                          <Link
+                            key={child.href}
+                            href={href}
+                            onClick={() => setOpen(false)}
+                            className={cn(
+                              'flex items-center min-h-[36px] h-9 px-2.5 rounded-md text-[13px] transition-colors',
+                              isActive
+                                ? 'text-foreground font-medium'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                            )}
+                          >
+                            {child.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Analytics — expandable */}
+                  <button
+                    onClick={() => setAnalyticsExpanded((p) => !p)}
+                    className={cn(
+                      'group w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] transition-colors',
+                      pathname.startsWith(`${base}/analytics`)
+                        ? 'bg-accent text-foreground font-medium'
+                        : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground'
+                    )}
+                  >
+                    <BarChart2 size={20} className="flex-shrink-0" />
+                    <span className="flex-1 text-left">Analytics</span>
+                    <ChevronRight size={14} className={cn('text-muted-foreground/50 transition-transform duration-200', analyticsExpanded && 'rotate-90')} />
+                  </button>
+                  {analyticsExpanded && (
+                    <div className="ml-[18px] pl-3.5 py-1 space-y-0.5 border-l border-border/40">
+                      {[
+                        { href: '/analytics', label: 'Overview', exact: true },
+                        { href: '/analytics/leads', label: 'Leads' },
+                        { href: '/analytics/clients', label: 'Clients' },
+                        { href: '/analytics/tours', label: 'Tours' },
+                        { href: '/analytics/pipeline', label: 'Pipeline' },
+                        { href: '/analytics/form-traffic', label: 'Form traffic' },
+                      ].map((child) => {
+                        const href = `${base}${child.href}`;
+                        const isActive = child.exact ? pathname === href : pathname.startsWith(href);
+                        return (
+                          <Link
+                            key={child.href}
+                            href={href}
+                            onClick={() => setOpen(false)}
+                            className={cn(
+                              'flex items-center min-h-[36px] h-9 px-2.5 rounded-md text-[13px] transition-colors',
+                              isActive
+                                ? 'text-foreground font-medium'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                            )}
+                          >
+                            {child.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Settings section — expanded flat list */}
+                  <p className="px-3 pb-2 pt-5 text-[11px] font-medium text-muted-foreground select-none">Settings</p>
+                  {[
+                    { href: '/settings', label: 'Account', exact: true },
+                    { href: '/settings/profile', label: 'Profile' },
+                    { href: '/settings/notifications', label: 'Notifications' },
+                    { href: '/settings/templates', label: 'Message templates' },
+                    { href: '/settings/integrations', label: 'Integrations' },
+                    { href: '/billing', label: 'Billing' },
+                    { href: '/settings/legal', label: 'Legal' },
+                  ].map((item) => {
+                    const href = `${base}${item.href}`;
+                    const isActive = item.exact ? pathname === href : pathname.startsWith(href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={href}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                          'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] transition-colors',
+                          isActive
+                            ? 'bg-accent text-foreground font-medium'
+                            : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground'
+                        )}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  })}
                 </>
               )}
               {isBroker && showBrokerMobileNavOnly && (

@@ -55,18 +55,16 @@ export interface NavItem {
 // ── Realtor sidebar nav ──────────────────────────────────────────────────────
 //
 // Organized around jobs-to-be-done, not feature modules:
-//   Today    → what needs my attention right now
-//   People   → everyone in my pipeline (new leads → active → past clients)
-//   Deals    → active deal board
-//   Tours    → showings
-//   Calendar → schedule overview
-//   Notes    → my notes
-//   Assistant → AI chat + drafts + automation activity
-//   Settings → configuration (intake form setup lives here)
-//
-// Old top-level items (Leads, Agent, Intake Form) still have working routes —
-// they're just no longer surfaced as primary nav. /leads redirects to
-// /contacts?tab=new; /agent is reachable via the Assistant tabs.
+//   Today       → what needs my attention right now
+//   People      → everyone in my pipeline (new leads → active → past clients)
+//   Deals       → active deal board
+//   Tours       → showings
+//   Calendar    → schedule overview
+//   Notes       → my notes
+//   Intake form → lead capture form + customization + analytics
+//   Analytics   → performance overview + sub-reports
+//   Assistant   → AI chat + drafts + automation activity
+//   Settings    → account configuration
 
 export const realtorNavItems: NavItem[] = [
   {
@@ -113,9 +111,31 @@ export const realtorNavItems: NavItem[] = [
     icon: Flag,
   },
   {
+    href: '/intake',
+    label: 'Intake form',
+    icon: ClipboardList,
+    children: [
+      { href: '/intake', label: 'Overview', exact: true },
+      { href: '/intake/customize', label: 'Customize' },
+      { href: '/settings/appearance', label: 'Appearance' },
+      { href: '/settings/content', label: 'Content' },
+      { href: '/intake/tracking', label: 'Tracking' },
+      { href: '/intake/analytics', label: 'Form analytics' },
+      { href: '/intake/share', label: 'Share' },
+    ],
+  },
+  {
     href: '/analytics',
     label: 'Analytics',
     icon: BarChart2,
+    children: [
+      { href: '/analytics', label: 'Overview', exact: true },
+      { href: '/analytics/leads', label: 'Leads' },
+      { href: '/analytics/clients', label: 'Clients' },
+      { href: '/analytics/tours', label: 'Tours' },
+      { href: '/analytics/pipeline', label: 'Pipeline' },
+      { href: '/analytics/form-traffic', label: 'Form traffic' },
+    ],
   },
   {
     href: '/ai',
@@ -129,11 +149,11 @@ export const realtorNavItems: NavItem[] = [
     icon: Settings,
     children: [
       { href: '/settings', label: 'Account', exact: true },
-      { href: '/intake', label: 'Intake form' },
-      { href: '/settings/templates', label: 'Message templates' },
+      { href: '/settings/profile', label: 'Profile' },
       { href: '/settings/notifications', label: 'Notifications' },
-      { href: '/billing', label: 'Billing' },
+      { href: '/settings/templates', label: 'Message templates' },
       { href: '/settings/integrations', label: 'Integrations' },
+      { href: '/billing', label: 'Billing' },
       { href: '/settings/legal', label: 'Legal' },
     ],
   },

@@ -614,15 +614,36 @@ function RealtorNav({
   const isOnSettings = doesItemOwnPath(settingsItem, pathname, base);
   const [settingsExpanded, setSettingsExpanded] = useState(isOnSettings);
 
+  // Expandable key for main items that have children (e.g. Intake form, Analytics)
+  const getInitialExpandedKey = () => {
+    for (const item of realtorNavItems) {
+      if (item.children && item.href !== '/settings' && doesItemOwnPath(item, pathname, base)) {
+        return item.href;
+      }
+    }
+    return null;
+  };
+  const [expandedKey, setExpandedKey] = useState<string | null>(getInitialExpandedKey);
+
   useEffect(() => {
     if (isOnSettings) setSettingsExpanded(true);
   }, [isOnSettings]);
+
+  // Auto-expand when navigating into a child route
+  useEffect(() => {
+    for (const item of realtorNavItems) {
+      if (item.children && item.href !== '/settings' && doesItemOwnPath(item, pathname, base)) {
+        setExpandedKey(item.href);
+        return;
+      }
+    }
+  }, [pathname, base]);
 
   // AI-related items always sit at the top
   const aiItems = realtorNavItems.filter(
     (item) => item.isAI || item.href === '/agent',
   );
-  // Everything else except settings
+  // Everything else except AI and settings
   const mainItems = realtorNavItems.filter(
     (item) => !item.isAI && item.href !== '/agent' && item.href !== '/settings',
   );
@@ -645,18 +666,21 @@ function RealtorNav({
     return undefined;
   };
 
-  const renderItem = (item: NavItem) => (
-    <CollapsibleNavItem
-      key={item.href}
-      item={item}
-      base={base}
-      pathname={pathname}
-      searchParams={searchParamsString}
-      isExpanded={false}
-      onToggle={() => {}}
-      badge={getBadge(item)}
-    />
-  );
+  const renderItem = (item: NavItem) => {
+    const hasChildren = !!(item.children && item.children.length > 0);
+    return (
+      <CollapsibleNavItem
+        key={item.href}
+        item={item}
+        base={base}
+        pathname={pathname}
+        searchParams={searchParamsString}
+        isExpanded={hasChildren ? expandedKey === item.href : false}
+        onToggle={hasChildren ? () => setExpandedKey((p) => (p === item.href ? null : item.href)) : () => {}}
+        badge={getBadge(item)}
+      />
+    );
+  };
 
   return (
     <nav className="flex-1 px-3 py-2 overflow-y-auto space-y-3">
