@@ -9,6 +9,18 @@ import {
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { ChippiBadge } from './chippi-avatar';
@@ -109,10 +121,10 @@ function DraftCard({
     setActioning('approved');
     const result = await onAction(draft.id, 'approved', isEdited ? editedContent : undefined);
     // Fall back to clipboard copy when delivery isn't configured or failed
-    if (!result?.sent) {
+    if (result !== null && !result?.sent) {
       try { await navigator.clipboard.writeText(editedContent); } catch { /* ignore */ }
     }
-    setActioning(null);
+    if (mountedRef.current) setActioning(null);
   }
 
   async function handleDismiss() {
@@ -220,7 +232,7 @@ function DraftCard({
                 )}
               </div>
               {/* Hover actions on content bubble */}
-              <div className="absolute top-2 right-2 flex items-center gap-1 opacity-50 group-hover/content:opacity-100 focus-within:opacity-100 transition-opacity">
+              <div className="absolute top-2 right-2 flex items-center gap-1 opacity-60 hover:opacity-100 focus-within:opacity-100 transition-opacity sm:opacity-0 sm:group-hover/content:opacity-100">
                 <button
                   onClick={copyContent}
                   className="w-6 h-6 rounded flex items-center justify-center bg-background border text-muted-foreground hover:text-foreground transition-colors"
