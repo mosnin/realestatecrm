@@ -270,18 +270,53 @@ function DraftCard({
         {/* Action bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 px-4 pb-4">
           {/* Primary action */}
-          <Button
-            className="gap-1.5 h-11 w-full sm:w-auto"
-            onClick={handleApprove}
-            disabled={actioning !== null || (overLimit && draft.channel === 'sms')}
-          >
-            {actioning === 'approved' ? (
-              <Loader2 size={13} className="animate-spin" />
-            ) : (
-              <CheckCircle size={13} />
-            )}
-            {editing ? 'Save & Approve' : 'Approve & Send'}
-          </Button>
+          {draft.channel === 'sms' || draft.channel === 'email' ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  className="gap-1.5 h-11 w-full sm:w-auto"
+                  disabled={actioning !== null || (overLimit && draft.channel === 'sms')}
+                >
+                  {actioning === 'approved' ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <CheckCircle size={13} />
+                  )}
+                  {editing ? 'Save & Approve' : 'Approve & Send'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Send this message?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will send a {draft.channel} to {draft.Contact?.name ?? 'this contact'}. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-orange-500 hover:bg-orange-600 text-white"
+                    onClick={handleApprove}
+                  >
+                    Yes, send it
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : (
+            <Button
+              className="gap-1.5 h-11 w-full sm:w-auto"
+              onClick={handleApprove}
+              disabled={actioning !== null}
+            >
+              {actioning === 'approved' ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <CheckCircle size={13} />
+              )}
+              {editing ? 'Save & Approve' : 'Approve & Send'}
+            </Button>
+          )}
 
           {/* Secondary action — Edit (hidden while editing) */}
           {!editing && (
@@ -442,42 +477,63 @@ export function AgentDraftInbox({ slug }: Props) {
     content?: string,
   ): Promise<DeliveryResult | null> {
     // Capture before the async gap — state may update while fetch is in-flight
-    const contactName = drafts.find((d) => d.id === draftId)?.Contact?.name ?? null;
+    const restored = drafts.find((d) => d.id === draftId) ?? null;
+    const contactName = restored?.Contact?.name ?? null;
+
+    // Optimistic removal
+    setDrafts((prev) => prev.filter((d) => d.id !== draftId));
 
     const body: Record<string, unknown> = { status };
     if (content !== undefined) body.content = content;
 
-    const res = await fetch(`/api/agent/drafts/${draftId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    try {
+      const res = await fetch(`/api/agent/drafts/${draftId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
 
-    if (!res.ok) return null;
+      if (!res.ok) {
+        // Restore on API error
+        if (restored) setDrafts((prev) => [restored, ...prev]);
+        toast.error('Action failed — please try again.');
+        return null;
+      }
 
-    const data = await res.json();
-    setDrafts((prev) => prev.filter((d) => d.id !== draftId));
+      const data = await res.json();
 
-    if (status === 'approved' && data.deliveryResult) {
-      showFeedback(contactName, data.deliveryResult as DeliveryResult);
-      return data.deliveryResult as DeliveryResult;
+      if (status === 'approved' && data.deliveryResult) {
+        showFeedback(contactName, data.deliveryResult as DeliveryResult);
+        return data.deliveryResult as DeliveryResult;
+      }
+      return null;
+    } catch {
+      // Restore on network error
+      if (restored) setDrafts((prev) => [restored, ...prev]);
+      toast.error('Network error — please try again.');
+      return null;
     }
-    return null;
   }
 
   async function approveAll() {
+    if (!drafts.length) return;
     setApprovingAll(true);
     try {
-      await Promise.all(
-        drafts.map((d) =>
-          fetch(`/api/agent/drafts/${d.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'approved' }),
-          }),
-        ),
+      const results = await Promise.allSettled(
+        drafts.map((d) => fetch(`/api/agent/drafts/${d.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'approved', content: d.content }),
+        }).then((r) => { if (!r.ok) throw new Error(r.status.toString()); }))
       );
-      setDrafts([]);
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      const succeeded = results.length - failed;
+      if (failed > 0) {
+        toast.error(`${succeeded} approved, ${failed} failed — please retry`);
+      } else {
+        toast.success(`All ${succeeded} drafts approved`);
+      }
+      void load();
     } finally {
       setApprovingAll(false);
     }
