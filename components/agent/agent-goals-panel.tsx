@@ -1,4 +1,5 @@
 'use client';
+
 import { useEffect, useState } from 'react';
 import { Target, Plus, CheckCircle2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,8 +18,6 @@ interface AgentGoal {
   createdAt: string;
   completedAt: string | null;
 }
-
-// ─── Goal type configuration ──────────────────────────────────────────────────
 
 const GOAL_TYPE_CONFIG: Record<string, { label: string; pill: string }> = {
   follow_up_sequence: {
@@ -51,96 +50,70 @@ const GOAL_TYPE_OPTIONS = [
   { value: 'custom', label: 'Custom' },
 ] as const;
 
-// ─── GoalCard ──────────────────────────────────────────────────────────────────
+// ─── GoalRow ───────────────────────────────────────────────────────────────────
 
-function GoalCard({
-  goal,
-  onAction,
-}: {
-  goal: AgentGoal;
-  onAction: (id: string, status: 'completed' | 'cancelled') => Promise<void>;
-}) {
+function GoalRow({ goal, onAction }: { goal: AgentGoal; onAction: (id: string, status: 'completed' | 'cancelled') => Promise<void> }) {
   const [actioning, setActioning] = useState<'completed' | 'cancelled' | null>(null);
-
   const cfg = GOAL_TYPE_CONFIG[goal.goalType] ?? GOAL_TYPE_CONFIG.custom;
 
   async function handleAction(status: 'completed' | 'cancelled') {
     setActioning(status);
-    try {
-      await onAction(goal.id, status);
-    } finally {
-      setActioning(null); // Always clear so buttons re-enable
-    }
+    try { await onAction(goal.id, status); }
+    finally { setActioning(null); }
   }
 
   return (
-    <div className="rounded-xl border bg-card p-4 space-y-2.5">
-      {/* Header: type badge + priority badge */}
-      <div className="flex items-center gap-2">
-        <span className={cn('inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full', cfg.pill)}>
+    <div className="flex items-start gap-4 px-5 py-4">
+      {/* Left: type + priority */}
+      <div className="flex flex-col gap-1.5 flex-shrink-0 pt-0.5">
+        <span className={cn('inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap', cfg.pill)}>
           {cfg.label}
         </span>
         {goal.priority > 0 && (
-          <span
-            className={cn(
-              'text-[10px] font-medium px-1.5 py-0.5 rounded-full',
-              goal.priority >= 8
-                ? 'bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400'
-                : goal.priority >= 5
-                ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400'
-                : 'bg-muted text-muted-foreground',
-            )}
-          >
+          <span className={cn(
+            'text-[10px] font-medium px-1.5 py-0.5 rounded-full text-center',
+            goal.priority >= 8
+              ? 'bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400'
+              : goal.priority >= 5
+              ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400'
+              : 'bg-muted text-muted-foreground',
+          )}>
             P{goal.priority}
           </span>
         )}
       </div>
 
-      {/* Description */}
-      <p className="text-sm text-foreground leading-snug">{goal.description}</p>
-      {goal.instructions && (
-        <p className="text-[12px] text-muted-foreground/80 italic mt-1 line-clamp-2">
-          {goal.instructions}
-        </p>
-      )}
+      {/* Middle: description + contact */}
+      <div className="flex-1 min-w-0 space-y-1">
+        <p className="text-sm text-foreground leading-snug">{goal.description}</p>
+        {goal.instructions && (
+          <p className="text-[12px] text-muted-foreground/80 italic line-clamp-2">{goal.instructions}</p>
+        )}
+        {goal.Contact && (
+          <p className="text-xs text-muted-foreground">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/40 mr-1.5" aria-hidden="true" />
+            {goal.Contact.name}
+          </p>
+        )}
+      </div>
 
-      {/* Contact */}
-      {goal.Contact && (
-        <p className="text-xs text-muted-foreground flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-full bg-muted flex-shrink-0" aria-hidden="true" />
-          {goal.Contact.name}
-        </p>
-      )}
-
-      {/* Actions */}
-      <div className="flex items-center gap-2 pt-0.5">
+      {/* Right: actions */}
+      <div className="flex items-center gap-1.5 flex-shrink-0">
         <button
-          title="Mark as completed"
           onClick={() => void handleAction('completed')}
           disabled={actioning !== null}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
-            'text-muted-foreground border-border hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50',
-            'dark:hover:text-emerald-400 dark:hover:border-emerald-500/30 dark:hover:bg-emerald-500/10',
-            actioning === 'completed' && 'opacity-50 cursor-not-allowed',
-          )}
+          title="Mark as completed"
+          className="w-7 h-7 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50 dark:hover:text-emerald-400 dark:hover:border-emerald-500/30 dark:hover:bg-emerald-500/10 transition-colors disabled:opacity-40"
         >
           <CheckCircle2 size={13} />
-          Complete
         </button>
         <button
-          title="Cancel this goal"
           onClick={() => void handleAction('cancelled')}
           disabled={actioning !== null}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
-            'text-muted-foreground border-border hover:text-red-600 hover:border-red-300 hover:bg-red-50',
-            'dark:hover:text-red-400 dark:hover:border-red-500/30 dark:hover:bg-red-500/10',
-            actioning === 'cancelled' && 'opacity-50 cursor-not-allowed',
-          )}
+          title="Cancel goal"
+          className="w-7 h-7 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-red-600 hover:border-red-300 hover:bg-red-50 dark:hover:text-red-400 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 transition-colors disabled:opacity-40"
         >
           <X size={13} />
-          Cancel
         </button>
       </div>
     </div>
@@ -149,13 +122,7 @@ function GoalCard({
 
 // ─── NewGoalForm ───────────────────────────────────────────────────────────────
 
-function NewGoalForm({
-  onSubmit,
-  onCancel,
-}: {
-  onSubmit: (goalType: string, description: string) => Promise<void>;
-  onCancel: () => void;
-}) {
+function NewGoalForm({ onSubmit, onCancel }: { onSubmit: (goalType: string, description: string) => Promise<void>; onCancel: () => void }) {
   const [goalType, setGoalType] = useState<string>('follow_up_sequence');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -169,83 +136,58 @@ function NewGoalForm({
     if (!canSubmit) return;
     setError(null);
     setSubmitting(true);
-    try {
-      await onSubmit(goalType, description.trim());
-    } catch {
-      setError('Failed to create goal. Please try again.');
-      setSubmitting(false);
-    }
+    try { await onSubmit(goalType, description.trim()); }
+    catch { setError('Failed to create goal. Please try again.'); setSubmitting(false); }
   }
 
   return (
-    <form
-      onSubmit={(e) => void handleSubmit(e)}
-      className="rounded-xl border bg-card p-4 space-y-3"
-    >
-      <p className="text-sm font-semibold">New goal</p>
-
-      <div className="space-y-1">
-        <label htmlFor="goal-type" className="text-xs font-medium text-muted-foreground">
-          Goal type
-        </label>
-        <select
-          id="goal-type"
-          value={goalType}
-          onChange={(e) => setGoalType(e.target.value)}
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          {GOAL_TYPE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="space-y-1">
-        <label htmlFor="goal-description" className="text-xs font-medium text-muted-foreground">
-          Description <span className="text-muted-foreground/60">(min 10 chars)</span>
-        </label>
-        <textarea
-          id="goal-description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
-          placeholder="Describe what the agent should accomplish…"
-          required
-          className={cn(
-            'w-full resize-none rounded-lg border bg-background px-3 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring',
-            descriptionTooShort && 'border-destructive focus:ring-destructive/30',
-          )}
-        />
-        {descriptionTooShort && (
-          <p className="text-xs text-destructive">Description must be at least 10 characters.</p>
-        )}
-      </div>
-
-      {error && <p className="text-xs text-destructive">{error}</p>}
-
-      <div className="flex items-center gap-2 pt-0.5">
-        <button
-          type="submit"
-          disabled={!canSubmit}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-opacity',
-            !canSubmit && 'opacity-50 cursor-not-allowed',
-          )}
-        >
-          <Plus size={13} />
-          {submitting ? 'Creating…' : 'Create goal'}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-2"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
+    <div className="border-t border-border/60 px-5 py-4 bg-muted/20">
+      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
+        <p className="text-xs font-semibold text-foreground uppercase tracking-wide">New goal</p>
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
+          <div className="space-y-2">
+            <select
+              value={goalType}
+              onChange={(e) => setGoalType(e.target.value)}
+              className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              {GOAL_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="Describe what the agent should accomplish…"
+              required
+              className={cn(
+                'w-full resize-none rounded-lg border bg-background px-3 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring',
+                descriptionTooShort && 'border-destructive',
+              )}
+            />
+            {descriptionTooShort && <p className="text-xs text-destructive">At least 10 characters required.</p>}
+            {error && <p className="text-xs text-destructive">{error}</p>}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-opacity',
+              !canSubmit && 'opacity-50 cursor-not-allowed',
+            )}
+          >
+            <Plus size={12} />
+            {submitting ? 'Creating…' : 'Create goal'}
+          </button>
+          <button type="button" onClick={onCancel} className="text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-2">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -276,19 +218,16 @@ export function AgentGoalsPanel() {
       });
       if (res.ok) {
         setGoals((prev) => prev.filter((g) => g.id !== id));
-        if (status === 'completed') {
-          toast.success('Goal completed! 🎉');
-        }
+        if (status === 'completed') toast.success('Goal completed!');
       } else {
         toast.error('Could not update goal — please try again');
-        throw new Error('update failed'); // Re-throw so GoalCard re-enables buttons
+        throw new Error('update failed');
       }
     } catch (err) {
-      // Only show network error toast if we didn't already show a server-error toast
       if (!(err instanceof Error && err.message === 'update failed')) {
         toast.error('Could not reach server');
       }
-      throw err; // Re-throw so GoalCard's finally block still runs
+      throw err;
     }
   }
 
@@ -305,70 +244,61 @@ export function AgentGoalsPanel() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Target size={16} className="text-muted-foreground" />
-          <span className="text-sm font-semibold">Goals</span>
-          {!loading && goals.length > 0 && (
-            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-              {goals.length} active
-            </span>
-          )}
-        </div>
+    <section className="rounded-2xl border bg-card overflow-hidden">
+      {/* Section header */}
+      <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-border/60">
+        <Target size={14} className="text-muted-foreground flex-shrink-0" />
+        <h2 className="text-sm font-semibold">Active Goals</h2>
+        {!loading && goals.length > 0 && (
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground min-w-[20px] text-center">
+            {goals.length}
+          </span>
+        )}
         <button
-          title="Create a new goal"
           onClick={() => setShowForm((v) => !v)}
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+            'ml-auto inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
             showForm
               ? 'border-primary bg-primary/5 text-primary'
               : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted/40',
           )}
         >
-          <Plus size={13} />
+          <Plus size={12} />
           New Goal
         </button>
       </div>
 
-      {/* Inline create form */}
-      {showForm && (
-        <NewGoalForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />
-      )}
-
-      {/* Loading skeleton */}
+      {/* Loading */}
       {loading && (
-        <div className="space-y-3">
-          {[1, 2, 3].map((n) => (
-            <div key={n} className="h-28 rounded-xl bg-muted/40 animate-pulse" />
-          ))}
+        <div className="px-5 py-5 space-y-3">
+          {[1, 2].map((n) => <div key={n} className="h-16 rounded-xl bg-muted/40 animate-pulse" />)}
         </div>
       )}
 
-      {/* Goal cards */}
+      {/* Goal rows */}
       {!loading && goals.length > 0 && (
-        <div className="space-y-3">
+        <div className="divide-y divide-border/40">
           {goals.map((goal) => (
-            <GoalCard key={goal.id} goal={goal} onAction={handleAction} />
+            <GoalRow key={goal.id} goal={goal} onAction={handleAction} />
           ))}
         </div>
       )}
 
       {/* Empty state */}
       {!loading && goals.length === 0 && !showForm && (
-        <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
-          <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
-            <Target size={28} className="text-muted-foreground" />
+        <div className="flex items-center gap-3.5 px-5 py-8">
+          <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+            <Target size={16} className="text-muted-foreground/60" />
           </div>
           <div>
-            <p className="font-semibold text-sm text-foreground">No active goals</p>
-            <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-              Goals help the agent track multi-step objectives for your contacts.
-            </p>
+            <p className="text-sm font-medium text-foreground">No active goals</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Goals let you track multi-step objectives the agent should work toward for specific contacts.</p>
           </div>
         </div>
       )}
-    </div>
+
+      {/* New goal form */}
+      {showForm && <NewGoalForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />}
+    </section>
   );
 }

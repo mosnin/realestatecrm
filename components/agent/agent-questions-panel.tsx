@@ -17,24 +17,13 @@ interface AgentQuestion {
   status: 'pending' | 'answered' | 'expired';
 }
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
 function formatAgentType(raw: string): string {
-  return raw
-    .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+  return raw.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-// ─── QuestionCard ─────────────────────────────────────────────────────────────
+// ─── QuestionCard ──────────────────────────────────────────────────────────────
 
-function QuestionCard({
-  question,
-  onAnswered,
-}: {
-  question: AgentQuestion;
-  onAnswered: (id: string) => void;
-}) {
+function QuestionCard({ question, onAnswered }: { question: AgentQuestion; onAnswered: (id: string) => void }) {
   const [answer, setAnswer] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,13 +36,9 @@ function QuestionCard({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = answer.trim();
-    if (!trimmed) {
-      setError('Please write an answer');
-      return;
-    }
+    if (!trimmed) { setError('Please write an answer'); return; }
     setError(null);
     setSubmitting(true);
-
     try {
       const res = await fetch(`/api/agent/questions/${question.id}`, {
         method: 'PATCH',
@@ -62,7 +47,6 @@ function QuestionCard({
       });
       if (!res.ok) throw new Error('Failed to submit');
       setAnsweredOk(true);
-      // Show "Answered ✓" briefly, then fade out and remove
       setTimeout(() => {
         setFading(true);
         setTimeout(() => onAnswered(question.id), 300);
@@ -78,64 +62,47 @@ function QuestionCard({
     <article
       role="article"
       className={cn(
-        'rounded-xl border border-border bg-card overflow-hidden transition-opacity duration-300',
+        'border-l-2 transition-opacity duration-300',
         fading && 'opacity-0',
-        isHighPriority ? 'border-l-[3px] border-l-amber-400' : 'border-l-[3px] border-l-blue-400',
+        isHighPriority ? 'border-l-amber-500' : 'border-l-blue-400',
       )}
     >
-      <div className="px-4 pt-4 pb-3 space-y-2.5">
-        {/* Top meta row */}
+      <div className="px-5 pt-4 pb-3 space-y-2.5">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Agent type badge */}
-          <span
-            className={cn(
-              'inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full',
-              isHighPriority
-                ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-                : 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
-            )}
-          >
+          <span className={cn(
+            'inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full',
+            isHighPriority
+              ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+              : 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
+          )}>
             {formatAgentType(question.agentType)}
           </span>
-
-          {/* Contact chip */}
           {question.Contact && (
             <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
               <User size={11} />
               {question.Contact.name}
             </span>
           )}
-
-          {/* Time ago */}
-          <span className="ml-auto text-xs text-muted-foreground flex-shrink-0">
+          <span className="ml-auto text-[11px] text-muted-foreground flex-shrink-0">
             {timeAgo(question.createdAt)}
           </span>
         </div>
 
-        {/* Question text */}
         <div>
-          <p
-            className={cn(
-              'text-sm font-medium leading-snug',
-              !expanded && 'line-clamp-3',
-            )}
-          >
+          <p className={cn('text-sm font-medium leading-snug', !expanded && 'line-clamp-3')}>
             {question.question}
           </p>
-          {/* "Show more" toggle — only rendered when text might overflow */}
           {question.question.length > 120 && (
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
               className="mt-0.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-              title={expanded ? 'Collapse question text' : 'Expand question text'}
             >
               {expanded ? 'Show less' : 'Show more'}
             </button>
           )}
         </div>
 
-        {/* Context */}
         {question.context && (
           <p className={cn('text-xs text-muted-foreground italic leading-snug', !expanded && 'line-clamp-2')}>
             {question.context}
@@ -143,8 +110,7 @@ function QuestionCard({
         )}
       </div>
 
-      {/* Answer form */}
-      <form onSubmit={handleSubmit} className="px-4 pb-4 space-y-2">
+      <form onSubmit={handleSubmit} className="px-5 pb-4 space-y-2">
         {answeredOk ? (
           <div className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 py-1">
             <CheckCircle2 size={14} />
@@ -153,28 +119,22 @@ function QuestionCard({
         ) : (
           <>
             <textarea
-              rows={3}
+              rows={2}
               value={answer}
-              onChange={(e) => {
-                setAnswer(e.target.value);
-                if (error) setError(null);
-              }}
+              onChange={(e) => { setAnswer(e.target.value); if (error) setError(null); }}
               placeholder="Your answer..."
               disabled={submitting}
-              className="text-sm w-full border border-border rounded-lg p-2 resize-none bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
+              className="text-sm w-full border border-border rounded-lg p-2.5 resize-none bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
               aria-label="Your answer"
             />
-            {error && (
-              <p className="text-xs text-destructive">{error}</p>
-            )}
+            {error && <p className="text-xs text-destructive">{error}</p>}
             <div className="flex justify-end">
               <button
                 type="submit"
-                disabled={submitting}
-                title="Submit answer"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={submitting || !answer.trim()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Send size={13} />
+                <Send size={12} />
                 {submitting ? 'Sending…' : 'Submit'}
               </button>
             </div>
@@ -200,7 +160,7 @@ export function AgentQuestionsPanel() {
         const res = await fetch('/api/agent/questions');
         if (res.ok) setQuestions(await res.json());
       } catch {
-        // silently fail — panel is not critical path
+        // non-critical
       } finally {
         setLoading(false);
       }
@@ -216,64 +176,61 @@ export function AgentQuestionsPanel() {
   const hiddenCount = questions.length - PAGE_SIZE;
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-2.5">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold">Questions</h2>
-            {!loading && questions.length > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                {questions.length}
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5">The agent needs your input</p>
-        </div>
+    <section className="rounded-2xl border bg-card overflow-hidden">
+      {/* Section header */}
+      <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-border/60">
+        <HelpCircle size={14} className="text-amber-500 flex-shrink-0" />
+        <h2 className="text-sm font-semibold">Questions</h2>
+        {!loading && questions.length > 0 && (
+          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white min-w-[20px] text-center">
+            {questions.length}
+          </span>
+        )}
       </div>
 
-      {/* Loading skeleton */}
+      {/* Loading */}
       {loading && (
-        <div className="space-y-3">
+        <div className="px-5 py-5 space-y-3">
           {[1, 2].map((n) => (
-            <div key={n} className="animate-pulse bg-muted rounded-lg h-16" />
+            <div key={n} className="h-16 rounded-xl bg-muted/40 animate-pulse" />
           ))}
         </div>
       )}
 
       {/* Empty state */}
       {!loading && questions.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-14 text-center gap-3">
-          <HelpCircle size={32} className="text-muted-foreground/40" />
+        <div className="flex items-center gap-3.5 px-5 py-8">
+          <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 size={16} className="text-muted-foreground/60" />
+          </div>
           <div>
             <p className="text-sm font-medium text-foreground">No pending questions</p>
-            <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-              Chippi will ask for guidance when it needs your input.
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">Chippi will ask for your input here when it needs guidance.</p>
           </div>
         </div>
       )}
 
-      {/* Question cards */}
+      {/* Question rows */}
       {!loading && visible.length > 0 && (
-        <div className="space-y-3">
+        <div className="divide-y divide-border/40">
           {visible.map((q) => (
             <QuestionCard key={q.id} question={q} onAnswered={handleAnswered} />
           ))}
         </div>
       )}
 
-      {/* "Show X more" button */}
+      {/* Show more */}
       {!loading && !showAll && hiddenCount > 0 && (
-        <button
-          type="button"
-          onClick={() => setShowAll(true)}
-          title={`Show ${hiddenCount} more question${hiddenCount !== 1 ? 's' : ''}`}
-          className="w-full py-2 text-xs text-muted-foreground hover:text-foreground rounded-lg border border-dashed border-border hover:border-border/80 transition-colors"
-        >
-          Show {hiddenCount} more
-        </button>
+        <div className="px-5 py-3 border-t border-border/40">
+          <button
+            type="button"
+            onClick={() => setShowAll(true)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Show {hiddenCount} more question{hiddenCount !== 1 ? 's' : ''}
+          </button>
+        </div>
       )}
-    </div>
+    </section>
   );
 }

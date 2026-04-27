@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Bot, CheckCircle2, AlertCircle, FileText, Info, Loader2, Zap } from 'lucide-react';
+import { CheckCircle2, AlertCircle, FileText, Info, Loader2, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 
@@ -22,50 +22,52 @@ interface TerminalRun {
 }
 
 interface ChippiTerminalProps {
-  runId?: string;           // if provided, connects to live SSE stream for this runId
+  runId?: string;
   className?: string;
-  maxEvents?: number;       // defaults to 30
-  compact?: boolean;        // compact mode for sidebar use
+  maxEvents?: number;
+  compact?: boolean;
 }
 
 function EventRow({ event }: { event: StreamEvent }) {
-  const icons: Record<StreamEvent['type'], React.ReactNode> = {
-    info: <Info size={12} className="text-muted-foreground flex-shrink-0 mt-0.5" />,
-    action: <CheckCircle2 size={12} className="text-orange-500 flex-shrink-0 mt-0.5" />,
-    draft: <FileText size={12} className="text-orange-400 flex-shrink-0 mt-0.5" />,
-    complete: <Zap size={12} className="text-orange-500 flex-shrink-0 mt-0.5" />,
-    error: <AlertCircle size={12} className="text-red-500 flex-shrink-0 mt-0.5" />,
-    warning: <AlertCircle size={12} className="text-amber-500 flex-shrink-0 mt-0.5" />,
-    connected: null,
-  };
-
   if (event.type === 'connected') return null;
 
   const isComplete = event.type === 'complete';
   const isError = event.type === 'error';
+  const isWarning = event.type === 'warning';
   const isDraft = event.type === 'draft';
+  const isInfo = event.type === 'info';
+
+  const icon = {
+    info: <Info size={11} className="text-zinc-600 flex-shrink-0 mt-0.5" />,
+    action: <CheckCircle2 size={11} className="text-orange-500/80 flex-shrink-0 mt-0.5" />,
+    draft: <FileText size={11} className="text-orange-400 flex-shrink-0 mt-0.5" />,
+    complete: <Zap size={11} className="text-orange-500 flex-shrink-0 mt-0.5" />,
+    error: <AlertCircle size={11} className="text-red-500 flex-shrink-0 mt-0.5" />,
+    warning: <AlertCircle size={11} className="text-amber-500 flex-shrink-0 mt-0.5" />,
+    connected: null,
+  }[event.type];
 
   return (
     <div className={cn(
-      'flex items-start gap-2 py-0.5 font-mono text-[12px] leading-relaxed',
-      isComplete && 'mt-2 pt-2 border-t border-border/40',
-      isError && 'text-red-500',
-      isDraft && 'text-orange-500',
-      !isComplete && !isError && !isDraft && 'text-foreground/80',
+      'flex items-start gap-2 py-0.5 font-mono text-[11.5px] leading-relaxed',
+      isComplete && 'mt-2 pt-2 border-t border-zinc-800',
     )}>
-      {icons[event.type]}
+      {icon}
       <span className={cn(
         'flex-1 min-w-0',
-        event.type === 'action' && 'text-foreground',
-        event.type === 'info' && 'text-muted-foreground text-[11px]',
-        isComplete && 'text-orange-500 font-medium',
+        isComplete && 'text-orange-400 font-medium',
+        isError && 'text-red-400',
+        isWarning && 'text-amber-400',
+        isDraft && 'text-orange-300',
+        isInfo && 'text-zinc-500',
+        !isComplete && !isError && !isWarning && !isDraft && !isInfo && 'text-zinc-300',
       )}>
         {event.agentType && event.type === 'action' && (
-          <span className="text-orange-500/60 mr-1.5">[{event.agentType}]</span>
+          <span className="text-orange-500/50 mr-1.5">[{event.agentType.replace(/_/g, '-')}]</span>
         )}
         {event.message}
       </span>
-      <span className="text-[10px] text-muted-foreground/40 flex-shrink-0 tabular-nums">
+      <span className="text-[10px] text-zinc-700 flex-shrink-0 tabular-nums">
         {new Date(event.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
       </span>
     </div>
@@ -82,7 +84,9 @@ export function ChippiTerminal({ runId, className, maxEvents = 30, compact = fal
   const containerRef = useRef<HTMLDivElement>(null);
   const [userScrolled, setUserScrolled] = useState(false);
 
-  // Load history on mount
+  // Suppress unused TerminalRun warning
+  void (null as unknown as TerminalRun);
+
   useEffect(() => {
     const controller = new AbortController();
     async function loadHistory() {
@@ -99,7 +103,6 @@ export function ChippiTerminal({ runId, className, maxEvents = 30, compact = fal
         }>;
         if (!data.length) { setStatus('idle'); return; }
 
-        // Take first run's events
         const firstRunId = data[0].runId;
         const runEvents = data
           .filter((a) => a.runId === firstRunId)
@@ -124,7 +127,6 @@ export function ChippiTerminal({ runId, className, maxEvents = 30, compact = fal
     return () => controller.abort();
   }, [maxEvents]);
 
-  // Connect to live SSE if runId provided
   useEffect(() => {
     if (!runId) return;
     setEvents([]);
@@ -149,14 +151,10 @@ export function ChippiTerminal({ runId, className, maxEvents = 30, compact = fal
         }
       } catch { /* ignore parse errors */ }
     };
-    es.onerror = () => {
-      setStatus('error');
-      es.close();
-    };
+    es.onerror = () => { setStatus('error'); es.close(); };
     return () => es.close();
   }, [runId, maxEvents]);
 
-  // Auto-scroll
   useEffect(() => {
     if (!userScrolled) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -166,47 +164,46 @@ export function ChippiTerminal({ runId, className, maxEvents = 30, compact = fal
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-    setUserScrolled(!atBottom);
+    setUserScrolled(el.scrollHeight - el.scrollTop - el.clientHeight > 40);
   }, []);
 
   const isRunning = status === 'live';
 
-  // Suppress unused variable warning — TerminalRun is a shared data type
-  void (null as unknown as TerminalRun);
-
   return (
-    <div className={cn('relative rounded-xl border border-border bg-card overflow-hidden', className)}>
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/60 bg-muted/20">
-        <div className={cn(
-          'w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0',
-          isRunning ? 'bg-orange-500' : 'bg-orange-500/20',
-        )}>
-          {isRunning
-            ? <Loader2 size={12} className="text-white animate-spin" />
-            : <Bot size={12} className="text-orange-500" />}
+    <div className={cn('relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950', className)}>
+      {/* Terminal header */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 bg-zinc-900">
+        {/* Traffic lights */}
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
+          <span className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
+          <span className={cn('w-2.5 h-2.5 rounded-full', isRunning ? 'bg-orange-500 animate-pulse' : 'bg-zinc-700')} />
         </div>
+
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-xs font-mono font-semibold text-foreground">
+          {isRunning ? (
+            <Loader2 size={11} className="text-orange-500 animate-spin flex-shrink-0" />
+          ) : null}
+          <span className="text-[12px] font-mono text-zinc-400">
             {isRunning ? 'chippi running...' : 'chippi'}
           </span>
           {agentType && (
-            <span className="text-[10px] font-mono text-orange-500/70 bg-orange-500/10 px-1.5 py-0.5 rounded">
+            <span className="text-[10px] font-mono text-orange-500/60 bg-zinc-800 px-1.5 py-0.5 rounded">
               {agentType.replace(/_/g, '-')}
             </span>
           )}
         </div>
+
         <div className="flex items-center gap-2 flex-shrink-0">
           {runDuration && (
-            <span className="text-[10px] font-mono text-muted-foreground">{runDuration}</span>
+            <span className="text-[10px] font-mono text-zinc-600">{runDuration}</span>
           )}
           {lastRunAt && !isRunning && (
-            <span className="text-[10px] font-mono text-muted-foreground">{timeAgo(lastRunAt)}</span>
+            <span className="text-[10px] font-mono text-zinc-600">{timeAgo(lastRunAt)}</span>
           )}
           <span className={cn(
             'w-1.5 h-1.5 rounded-full flex-shrink-0',
-            isRunning ? 'bg-orange-500 animate-pulse' : status === 'error' ? 'bg-red-500' : 'bg-orange-500/30',
+            isRunning ? 'bg-orange-500 animate-pulse' : status === 'error' ? 'bg-red-500' : 'bg-zinc-700',
           )} />
         </div>
       </div>
@@ -219,42 +216,53 @@ export function ChippiTerminal({ runId, className, maxEvents = 30, compact = fal
         ref={containerRef}
         onScroll={handleScroll}
         className={cn(
-          'overflow-y-auto px-4 py-3 font-mono',
+          'overflow-y-auto px-4 py-3',
           compact ? 'max-h-48' : 'max-h-72',
         )}
       >
         {status === 'loading' && (
-          <div className="flex items-center gap-2 text-[12px] text-muted-foreground font-mono">
-            <Loader2 size={11} className="animate-spin" />
+          <div className="flex items-center gap-2 text-[11.5px] text-zinc-600 font-mono">
+            <Loader2 size={10} className="animate-spin" />
             loading last run...
           </div>
         )}
+
         {status === 'idle' && (
-          <div className="text-[12px] text-muted-foreground font-mono">
-            <span className="text-orange-500">$</span> chippi has not run yet
-            <br />
-            <span className="text-muted-foreground/50">run her now or wait for the next scheduled heartbeat</span>
+          <div className="font-mono text-[11.5px] space-y-1">
+            <div>
+              <span className="text-orange-500">$ </span>
+              <span className="text-zinc-400">chippi</span>
+            </div>
+            <div className="text-zinc-600 pl-3">
+              no runs yet — click{' '}
+              <span className="text-orange-500/80">Run Now</span>
+              {' '}or wait for the next scheduled heartbeat
+            </div>
           </div>
         )}
+
         {events.length > 0 && events.map((event, i) => (
           <EventRow key={`${event.ts}-${i}`} event={event} />
         ))}
+
         {isRunning && (
           <div className="flex items-center gap-1.5 pt-1 font-mono text-[12px] text-orange-500">
             <span className="animate-pulse">▊</span>
           </div>
         )}
+
         <div ref={bottomRef} />
       </div>
+
       {userScrolled && (
         <button
           onClick={() => {
             setUserScrolled(false);
             containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: 'smooth' });
           }}
-          className="absolute bottom-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full bg-orange-500/90 text-white text-[10px] font-medium shadow-md hover:bg-orange-600 transition-colors"
+          className="absolute bottom-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full bg-orange-500/90 text-white text-[10px] font-mono shadow-lg hover:bg-orange-500 transition-colors"
         >
-          ↓ Live
+          ↓ live
         </button>
       )}
     </div>

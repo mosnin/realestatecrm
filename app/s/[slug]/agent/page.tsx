@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Play, FileText, HelpCircle, Target, Activity, Loader2 } from 'lucide-react';
+import { Play, Loader2 } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { AgentDraftInbox } from '@/components/agent/agent-draft-inbox';
@@ -20,7 +20,6 @@ export default function AgentPage() {
   const [running, setRunning] = useState(false);
   const [counts, setCounts] = useState({ drafts: 0, questions: 0, goals: 0 });
   const [countsLoading, setCountsLoading] = useState(true);
-  const [countsError, setCountsError] = useState(false);
 
   useEffect(() => {
     async function loadCounts() {
@@ -41,7 +40,7 @@ export default function AgentPage() {
           goals: Array.isArray(goalsData) ? goalsData.length : 0,
         });
       } catch {
-        setCountsError(true);
+        // non-critical
       } finally {
         setCountsLoading(false);
       }
@@ -55,11 +54,7 @@ export default function AgentPage() {
       const res = await fetch('/api/agent/run-now', { method: 'POST' });
       const data = res.ok ? await res.json() : null;
       if (res.ok && data?.triggered) {
-        if (data.method === 'modal') {
-          toast.success('Agent is running now');
-        } else {
-          toast.success('Queued — will run at next heartbeat (~15 min)');
-        }
+        toast.success(data.method === 'modal' ? 'Agent is running now' : 'Queued — will run at next heartbeat (~15 min)');
       } else {
         toast.error('Could not start agent run');
       }
@@ -71,120 +66,102 @@ export default function AgentPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-8rem)]">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
-        <div className="flex items-center gap-3">
-          <ChippiAvatar size="md" pulse={running} />
-          <div>
-            <h1 className="text-base font-semibold leading-tight">Agent Inbox</h1>
-            <p className="text-xs text-muted-foreground">AI-powered outreach agent</p>
+    <div className="space-y-5">
+      {/* ── Command bar ─────────────────────────────────────── */}
+      <div className="rounded-2xl border bg-card px-5 py-4">
+        <div className="flex items-center gap-4 flex-wrap gap-y-3">
+          {/* Identity */}
+          <div className="flex items-center gap-3.5">
+            <ChippiAvatar size="md" pulse={running} />
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-semibold tracking-tight">Chippi</h1>
+                <span className="flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Active
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">AI outreach agent</p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Tab pills */}
-          <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5 gap-0.5">
+
+          {/* Quick stats */}
+          {countsLoading ? (
+            <div className="flex items-center gap-3">
+              {[80, 72, 60].map((w) => (
+                <div key={w} className={`h-9 w-${w === 80 ? '20' : w === 72 ? '[4.5rem]' : '16'} rounded-lg bg-muted/50 animate-pulse`} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center rounded-xl border border-border overflow-hidden">
+              {[
+                { label: 'Drafts', value: counts.drafts, accent: counts.drafts > 0 ? 'text-orange-500' : 'text-muted-foreground' },
+                { label: 'Questions', value: counts.questions, accent: counts.questions > 0 ? 'text-amber-500' : 'text-muted-foreground' },
+                { label: 'Goals', value: counts.goals, accent: 'text-muted-foreground' },
+              ].map((s, i) => (
+                <div
+                  key={s.label}
+                  className={cn('flex items-baseline gap-2 px-4 py-2.5', i > 0 && 'border-l border-border')}
+                >
+                  <span className={cn('text-base font-bold tabular-nums leading-none', s.accent)}>{s.value}</span>
+                  <span className="text-[11px] text-muted-foreground">{s.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Tabs + Run Now */}
+          <div className="ml-auto flex items-center gap-2">
+            <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5 gap-0.5">
+              <button
+                onClick={() => setView('workspace')}
+                className={cn(
+                  'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                  view === 'workspace' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                Workspace
+              </button>
+              <button
+                onClick={() => setView('settings')}
+                className={cn(
+                  'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                  view === 'settings' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                Settings
+              </button>
+            </div>
             <button
-              onClick={() => setView('workspace')}
-              className={cn(
-                'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                view === 'workspace'
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
+              onClick={() => void handleRunNow()}
+              disabled={running}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-orange-500 text-white text-xs font-semibold hover:bg-orange-600 active:scale-95 transition-all disabled:opacity-50"
             >
-              Workspace
-            </button>
-            <button
-              onClick={() => setView('settings')}
-              className={cn(
-                'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                view === 'settings'
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              Settings
+              {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+              Run Now
             </button>
           </div>
-          {/* Run Now */}
-          <button
-            onClick={() => void handleRunNow()}
-            disabled={running}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-orange-500 text-white text-xs font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50"
-          >
-            {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-            Run Now
-          </button>
         </div>
       </div>
 
-      {/* Settings view */}
+      {/* ── Settings view ───────────────────────────────────── */}
       {view === 'settings' && <AgentSettingsPanel slug={slug} />}
 
-      {/* Workspace view */}
+      {/* ── Workspace view ──────────────────────────────────── */}
       {view === 'workspace' && (
-        <>
-          {countsError && (
-            <p className="text-xs text-destructive mb-4">Could not load counts — refresh to retry.</p>
-          )}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
-            {/* LEFT: Inbox sections */}
-            <div className="space-y-6">
-              {/* Drafts */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <FileText size={14} className="text-orange-500" />
-                  <h2 className="text-sm font-semibold">Awaiting Review</h2>
-                  {!countsLoading && counts.drafts > 0 && (
-                    <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-500 text-white min-w-[18px] text-center">
-                      {counts.drafts}
-                    </span>
-                  )}
-                </div>
-                <AgentDraftInbox slug={slug} />
-              </div>
-              {/* Questions */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <HelpCircle size={14} className="text-amber-500" />
-                  <h2 className="text-sm font-semibold">Questions</h2>
-                  {!countsLoading && counts.questions > 0 && (
-                    <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500 text-white min-w-[18px] text-center">
-                      {counts.questions}
-                    </span>
-                  )}
-                </div>
-                <AgentQuestionsPanel />
-              </div>
-              {/* Goals */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Target size={14} className="text-orange-500/70" />
-                  <h2 className="text-sm font-semibold">Active Goals</h2>
-                  {!countsLoading && counts.goals > 0 && (
-                    <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground min-w-[18px] text-center">
-                      {counts.goals}
-                    </span>
-                  )}
-                </div>
-                <AgentGoalsPanel />
-              </div>
-            </div>
-            {/* RIGHT: Terminal */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Activity size={14} className="text-orange-500" />
-                <h2 className="text-sm font-semibold">Live Terminal</h2>
-                <span className="text-[11px] text-muted-foreground">Real-time agent output</span>
-              </div>
-              <ChippiTerminal className="min-h-[320px]" />
-            </div>
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5 items-start">
+          {/* Left: inbox sections */}
+          <div className="space-y-5">
+            <AgentDraftInbox slug={slug} />
+            <AgentQuestionsPanel />
+            <AgentGoalsPanel />
           </div>
-          <div className="mt-8">
+          {/* Right: terminal + portfolio */}
+          <div className="space-y-5">
+            <ChippiTerminal className="min-h-[280px]" />
             <AgentPortfolioInsights />
           </div>
-        </>
+        </div>
       )}
     </div>
   );

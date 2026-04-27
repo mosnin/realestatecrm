@@ -2,13 +2,12 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  CheckCircle, XCircle, MessageSquare, Mail, StickyNote,
-  Bot, Loader2, RefreshCw, Pencil, Copy, Check,
-  AlertTriangle, Send, TriangleAlert,
+  CheckCircle2, XCircle, MessageSquare, Mail, StickyNote,
+  Loader2, RefreshCw, Pencil, Copy, Check,
+  AlertTriangle, Send, TriangleAlert, CheckCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,23 +64,26 @@ const CHANNEL_CONFIG = {
     label: 'SMS',
     icon: MessageSquare,
     pill: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
+    accent: 'border-l-emerald-500',
     charLimit: 160,
   },
   email: {
     label: 'Email',
     icon: Mail,
     pill: 'bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400',
+    accent: 'border-l-orange-500',
     charLimit: null,
   },
   note: {
     label: 'Note',
     icon: StickyNote,
     pill: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+    accent: 'border-l-amber-500',
     charLimit: null,
   },
 } as const;
 
-// ─── DraftCard ─────────────────────────────────────────────────────────────
+// ─── DraftCard ────────────────────────────────────────────────────────────────
 
 function DraftCard({
   draft,
@@ -120,7 +122,6 @@ function DraftCard({
   async function handleApprove() {
     setActioning('approved');
     const result = await onAction(draft.id, 'approved', isEdited ? editedContent : undefined);
-    // Fall back to clipboard copy when delivery isn't configured or failed
     if (result !== null && !result?.sent) {
       try { await navigator.clipboard.writeText(editedContent); } catch { /* ignore */ }
     }
@@ -147,224 +148,208 @@ function DraftCard({
   }
 
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-0">
-        {/* Header row */}
-        <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1 px-4 pt-4 pb-3 border-b border-border/60 border-l-2 border-l-orange-500">
-          {/* Channel pill */}
-          <span className={cn('inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full', cfg.pill)}>
-            <Icon size={10} />
-            {cfg.label}
-          </span>
-          <ChippiBadge />
+    <div className={cn('border-l-2 group/draft transition-colors', cfg.accent)}>
+      {/* Header row */}
+      <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1 px-5 pt-4 pb-3 border-b border-border/40">
+        <span className={cn('inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full', cfg.pill)}>
+          <Icon size={10} />
+          {cfg.label}
+        </span>
+        <ChippiBadge />
 
-          {/* Contact link */}
-          {draft.Contact ? (
-            <Link
-              href={`/s/${slug}/contacts/${draft.Contact.id}`}
-              className="text-sm font-medium hover:underline underline-offset-2 truncate"
-            >
-              {draft.Contact.name}
-            </Link>
-          ) : (
-            <span className="text-sm font-medium text-muted-foreground">Unknown contact</span>
-          )}
+        {draft.Contact ? (
+          <Link
+            href={`/s/${slug}/contacts/${draft.Contact.id}`}
+            className="text-sm font-medium hover:underline underline-offset-2 truncate"
+          >
+            {draft.Contact.name}
+          </Link>
+        ) : (
+          <span className="text-sm font-medium text-muted-foreground">Unknown contact</span>
+        )}
 
-          {/* Contact address */}
-          {draft.Contact?.phone && draft.channel === 'sms' && (
-            <span className="text-xs text-muted-foreground hidden sm:block truncate">
-              {draft.Contact.phone}
+        {draft.Contact?.phone && draft.channel === 'sms' && (
+          <span className="text-xs text-muted-foreground hidden sm:block truncate">{draft.Contact.phone}</span>
+        )}
+        {draft.Contact?.email && draft.channel === 'email' && (
+          <span className="text-xs text-muted-foreground hidden sm:block truncate">{draft.Contact.email}</span>
+        )}
+
+        <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+          {draft.confidence !== null && draft.confidence !== undefined && (
+            <span className={cn(
+              'text-[11px] px-1.5 py-0.5 rounded-full font-medium',
+              draft.confidence >= 80
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                : draft.confidence >= 50
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
+                : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
+            )}>
+              {draft.confidence}% confident
             </span>
           )}
-          {draft.Contact?.email && draft.channel === 'email' && (
-            <span className="text-xs text-muted-foreground hidden sm:block truncate">
-              {draft.Contact.email}
-            </span>
-          )}
+          <span className="text-[11px] text-muted-foreground">{timeAgo(draft.createdAt)}</span>
+        </div>
+      </div>
 
-          <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-            {draft.confidence !== null && draft.confidence !== undefined && (
-              <span className={cn(
-                "text-[11px] px-1.5 py-0.5 rounded-full font-medium",
-                draft.confidence >= 80
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
-                  : draft.confidence >= 50
-                  ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400"
-                  : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400"
-              )}>
-                {draft.confidence}% confident
-              </span>
-            )}
-            <span className="text-[11px] text-muted-foreground">{timeAgo(draft.createdAt)}</span>
+      {/* Body */}
+      <div className="px-5 py-3.5 space-y-3">
+        {draft.subject && (
+          <p className="text-xs font-semibold text-foreground">{draft.subject}</p>
+        )}
+
+        {editing ? (
+          <div className="space-y-1.5">
+            <textarea
+              ref={textareaRef}
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              rows={Math.max(3, Math.ceil(editedContent.length / 60))}
+              className="w-full resize-none rounded-lg border bg-background px-3 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <span className={cn('text-[11px]', overLimit ? 'text-destructive font-medium' : nearLimit ? 'text-amber-500' : 'text-muted-foreground')}>
+              {editedContent.length}{cfg.charLimit ? `/${cfg.charLimit}` : ''} chars
+              {overLimit && ' — too long for SMS'}
+            </span>
           </div>
-        </div>
-
-        {/* Body */}
-        <div className="px-4 py-3 space-y-2.5">
-          {/* Subject line */}
-          {draft.subject && (
-            <p className="text-xs font-semibold text-foreground">{draft.subject}</p>
-          )}
-
-          {/* Message content */}
-          {editing ? (
-            <div className="space-y-1.5">
-              <textarea
-                ref={textareaRef}
-                value={editedContent}
-                onChange={(e) => setEditedContent(e.target.value)}
-                rows={Math.max(3, Math.ceil(editedContent.length / 60))}
-                className="w-full resize-none rounded-lg border bg-background px-3 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-              <div className="flex items-center">
-                <span className={cn('text-[11px]', overLimit ? 'text-destructive font-medium' : nearLimit ? 'text-amber-500' : 'text-muted-foreground')}>
-                  {editedContent.length}{cfg.charLimit ? `/${cfg.charLimit}` : ''} chars
-                  {overLimit && ' — too long for SMS'}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="group/content relative">
-              <div className="bg-muted/50 rounded-lg px-3 py-2.5 text-sm whitespace-pre-wrap leading-relaxed pr-16">
-                {editedContent}
-                {isEdited && (
-                  <span className="ml-1.5 text-[11px] text-orange-600 dark:text-orange-400 font-medium">(edited)</span>
-                )}
-              </div>
-              {/* Hover actions on content bubble */}
-              <div className="absolute top-2 right-2 flex items-center gap-1 opacity-60 hover:opacity-100 focus-within:opacity-100 transition-opacity sm:opacity-0 sm:group-hover/content:opacity-100">
-                <button
-                  onClick={copyContent}
-                  className="w-6 h-6 rounded flex items-center justify-center bg-background border text-muted-foreground hover:text-foreground transition-colors"
-                  title="Copy to clipboard"
-                >
-                  {copied ? <Check size={11} /> : <Copy size={11} />}
-                </button>
-                <button
-                  onClick={startEdit}
-                  className="w-6 h-6 rounded flex items-center justify-center bg-background border text-muted-foreground hover:text-foreground transition-colors"
-                  title="Edit message"
-                >
-                  <Pencil size={11} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* SMS char warning outside edit mode */}
-          {!editing && cfg.charLimit && editedContent.length > cfg.charLimit && (
-            <p className="flex items-center gap-1.5 text-[11px] text-destructive">
-              <AlertTriangle size={11} />
-              Exceeds {cfg.charLimit}-character SMS limit
-            </p>
-          )}
-
-          {/* Reasoning — always visible blockquote bar */}
-          {draft.reasoning && (
-            <p className="text-xs text-muted-foreground border-l-2 border-muted pl-2.5 leading-relaxed">
-              {draft.reasoning}
-            </p>
-          )}
-        </div>
-
-        {/* Action bar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 px-4 pb-4">
-          {/* Primary action */}
-          {draft.channel === 'sms' || draft.channel === 'email' ? (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  className="gap-1.5 h-11 w-full sm:w-auto"
-                  disabled={actioning !== null || (overLimit && draft.channel === 'sms')}
-                >
-                  {actioning === 'approved' ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <CheckCircle size={13} />
-                  )}
-                  {editing ? 'Save & Approve' : 'Approve & Send'}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Send this message?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will send a {draft.channel} to {draft.Contact?.name ?? 'this contact'}. This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-orange-500 hover:bg-orange-600 text-white"
-                    onClick={handleApprove}
-                  >
-                    Yes, send it
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          ) : (
-            <Button
-              className="gap-1.5 h-11 w-full sm:w-auto"
-              onClick={handleApprove}
-              disabled={actioning !== null}
-            >
-              {actioning === 'approved' ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : (
-                <CheckCircle size={13} />
+        ) : (
+          <div className="group/content relative">
+            <div className="rounded-lg bg-muted/50 px-3.5 py-3 text-sm whitespace-pre-wrap leading-relaxed pr-16">
+              {editedContent}
+              {isEdited && (
+                <span className="ml-1.5 text-[11px] text-orange-600 dark:text-orange-400 font-medium">(edited)</span>
               )}
-              {editing ? 'Save & Approve' : 'Approve & Send'}
-            </Button>
-          )}
+            </div>
+            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-60 hover:opacity-100 focus-within:opacity-100 transition-opacity sm:opacity-0 sm:group-hover/content:opacity-100">
+              <button
+                onClick={copyContent}
+                className="w-6 h-6 rounded flex items-center justify-center bg-background border text-muted-foreground hover:text-foreground transition-colors"
+                title="Copy to clipboard"
+              >
+                {copied ? <Check size={11} /> : <Copy size={11} />}
+              </button>
+              <button
+                onClick={startEdit}
+                className="w-6 h-6 rounded flex items-center justify-center bg-background border text-muted-foreground hover:text-foreground transition-colors"
+                title="Edit message"
+              >
+                <Pencil size={11} />
+              </button>
+            </div>
+          </div>
+        )}
 
-          {/* Secondary action — Edit (hidden while editing) */}
-          {!editing && (
-            <Button size="sm" variant="outline" className="gap-1.5 h-9 w-full sm:w-auto" onClick={startEdit}>
-              <Pencil size={12} />
-              Edit
-            </Button>
-          )}
-
-          {/* Least-prominent action — Cancel (editing) or Dismiss */}
-          {editing ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="gap-1.5 h-9 text-muted-foreground hover:text-foreground w-full sm:w-auto sm:ml-auto"
-              onClick={cancelEdit}
-            >
-              Cancel
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="gap-1.5 h-9 text-muted-foreground hover:text-destructive w-full sm:w-auto sm:ml-auto"
-              onClick={handleDismiss}
-              disabled={actioning !== null}
-            >
-              {actioning === 'dismissed' ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : (
-                <XCircle size={13} />
-              )}
-              Dismiss
-            </Button>
-          )}
-        </div>
-        {dismissError && (
-          <p className="flex items-center gap-1.5 px-4 pb-3 text-xs text-destructive">
+        {!editing && cfg.charLimit && editedContent.length > cfg.charLimit && (
+          <p className="flex items-center gap-1.5 text-[11px] text-destructive">
             <AlertTriangle size={11} />
-            {dismissError}
+            Exceeds {cfg.charLimit}-character SMS limit
           </p>
         )}
-      </CardContent>
-    </Card>
+
+        {draft.reasoning && (
+          <p className="text-xs text-muted-foreground border-l-2 border-muted pl-2.5 leading-relaxed italic">
+            {draft.reasoning}
+          </p>
+        )}
+      </div>
+
+      {/* Action bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 px-5 pb-4">
+        {draft.channel === 'sms' || draft.channel === 'email' ? (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="sm"
+                className="gap-1.5 h-8 w-full sm:w-auto text-xs"
+                disabled={actioning !== null || (overLimit && draft.channel === 'sms')}
+              >
+                {actioning === 'approved' ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Send size={12} />
+                )}
+                {editing ? 'Save & Send' : 'Approve & Send'}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Send this message?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will send a {draft.channel} to {draft.Contact?.name ?? 'this contact'}. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-orange-500 hover:bg-orange-600 text-white"
+                  onClick={handleApprove}
+                >
+                  Yes, send it
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : (
+          <Button
+            size="sm"
+            className="gap-1.5 h-8 w-full sm:w-auto text-xs"
+            onClick={handleApprove}
+            disabled={actioning !== null}
+          >
+            {actioning === 'approved' ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <CheckCircle2 size={12} />
+            )}
+            {editing ? 'Save & Approve' : 'Approve'}
+          </Button>
+        )}
+
+        {!editing && (
+          <Button size="sm" variant="outline" className="gap-1.5 h-8 w-full sm:w-auto text-xs" onClick={startEdit}>
+            <Pencil size={11} />
+            Edit
+          </Button>
+        )}
+
+        {editing ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-muted-foreground hover:text-foreground w-full sm:w-auto text-xs sm:ml-auto"
+            onClick={cancelEdit}
+          >
+            Cancel
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-muted-foreground hover:text-destructive w-full sm:w-auto text-xs sm:ml-auto"
+            onClick={handleDismiss}
+            disabled={actioning !== null}
+          >
+            {actioning === 'dismissed' ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <XCircle size={12} />
+            )}
+            Dismiss
+          </Button>
+        )}
+      </div>
+
+      {dismissError && (
+        <p className="flex items-center gap-1.5 px-5 pb-3 text-xs text-destructive">
+          <AlertTriangle size={11} />
+          {dismissError}
+        </p>
+      )}
+    </div>
   );
 }
 
-// ─── DeliveryBanner ────────────────────────────────────────────────────────
+// ─── DeliveryBanner ────────────────────────────────────────────────────────────
 
 const DELIVERY_LABELS: Record<'email' | 'sms' | 'note', string> = {
   email: 'email',
@@ -372,32 +357,25 @@ const DELIVERY_LABELS: Record<'email' | 'sms' | 'note', string> = {
   note: 'note',
 };
 
-function DeliveryBanner({
-  feedback,
-  onClose,
-}: {
-  feedback: DeliveryFeedback;
-  onClose: () => void;
-}) {
+interface DeliveryFeedback {
+  contactName: string | null;
+  result: DeliveryResult;
+}
+
+function DeliveryBanner({ feedback, onClose }: { feedback: DeliveryFeedback; onClose: () => void }) {
   const { result, contactName } = feedback;
   const isNotConfigured = result.error === 'not_configured';
   const methodLabel = DELIVERY_LABELS[result.method];
 
   if (result.sent) {
-    const msg =
-      result.method === 'note'
-        ? contactName ? `Note logged for ${contactName}` : 'Note logged'
-        : contactName
-        ? `Sent ✓ — ${contactName} via ${methodLabel}`
-        : `Sent ✓ via ${methodLabel}`;
-
+    const msg = result.method === 'note'
+      ? contactName ? `Note logged for ${contactName}` : 'Note logged'
+      : contactName ? `Sent ✓ — ${contactName} via ${methodLabel}` : `Sent ✓ via ${methodLabel}`;
     return (
       <div className="flex items-center gap-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-400">
-        <Send size={14} className="flex-shrink-0" />
+        <Send size={13} className="flex-shrink-0" />
         <span className="font-medium">{msg}</span>
-        <button onClick={onClose} className="ml-auto text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300">
-          <XCircle size={14} />
-        </button>
+        <button onClick={onClose} className="ml-auto text-emerald-500 hover:text-emerald-700"><XCircle size={14} /></button>
       </div>
     );
   }
@@ -405,41 +383,23 @@ function DeliveryBanner({
   if (isNotConfigured) {
     return (
       <div className="flex items-start gap-2.5 rounded-lg bg-muted/50 border border-border px-3 py-2.5 text-sm text-muted-foreground">
-        <Copy size={14} className="flex-shrink-0 mt-0.5" />
-        <span>
-          Queued to clipboard.{' '}
-          <span className="text-foreground/70">
-            Add <code className="text-[11px] bg-muted px-1 rounded">{methodLabel === 'email' ? 'RESEND_API_KEY + FROM_EMAIL' : 'TELNYX_API_KEY + TELNYX_FROM_NUMBER'}</code> to enable auto-send.
-          </span>
-        </span>
-        <button onClick={onClose} className="ml-auto flex-shrink-0 text-muted-foreground hover:text-foreground">
-          <XCircle size={14} />
-        </button>
+        <Copy size={13} className="flex-shrink-0 mt-0.5" />
+        <span>Copied to clipboard. Add <code className="text-[11px] bg-muted px-1 rounded">{methodLabel === 'email' ? 'RESEND_API_KEY' : 'TELNYX_API_KEY'}</code> to enable auto-send.</span>
+        <button onClick={onClose} className="ml-auto flex-shrink-0"><XCircle size={14} /></button>
       </div>
     );
   }
 
   return (
     <div className="flex items-start gap-2.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-400">
-      <TriangleAlert size={14} className="flex-shrink-0 mt-0.5" />
-      <span>
-        <span className="font-medium">Delivery failed</span>
-        {' — '}draft approved but {methodLabel} not sent.{' '}
-        {result.error && <span className="opacity-75">{result.error}</span>}
-      </span>
-      <button onClick={onClose} className="ml-auto flex-shrink-0 text-amber-500 hover:text-amber-700 dark:hover:text-amber-300">
-        <XCircle size={14} />
-      </button>
+      <TriangleAlert size={13} className="flex-shrink-0 mt-0.5" />
+      <span><span className="font-medium">Delivery failed</span> — draft approved but {methodLabel} not sent.{result.error && <span className="opacity-75"> {result.error}</span>}</span>
+      <button onClick={onClose} className="ml-auto flex-shrink-0"><XCircle size={14} /></button>
     </div>
   );
 }
 
-// ─── Main component ────────────────────────────────────────────────────────
-
-interface DeliveryFeedback {
-  contactName: string | null;
-  result: DeliveryResult;
-}
+// ─── AgentDraftInbox ───────────────────────────────────────────────────────────
 
 export function AgentDraftInbox({ slug }: Props) {
   const [drafts, setDrafts] = useState<AgentDraft[]>([]);
@@ -460,7 +420,6 @@ export function AgentDraftInbox({ slug }: Props) {
 
   useEffect(() => {
     void load();
-    // Poll every 30 s so new agent drafts appear without a manual refresh
     const timer = setInterval(() => { void load(); }, 30_000);
     return () => clearInterval(timer);
   }, [load]);
@@ -476,11 +435,9 @@ export function AgentDraftInbox({ slug }: Props) {
     status: 'approved' | 'dismissed',
     content?: string,
   ): Promise<DeliveryResult | null> {
-    // Capture before the async gap — state may update while fetch is in-flight
     const restored = drafts.find((d) => d.id === draftId) ?? null;
     const contactName = restored?.Contact?.name ?? null;
 
-    // Optimistic removal
     setDrafts((prev) => prev.filter((d) => d.id !== draftId));
 
     const body: Record<string, unknown> = { status };
@@ -494,21 +451,18 @@ export function AgentDraftInbox({ slug }: Props) {
       });
 
       if (!res.ok) {
-        // Restore on API error
         if (restored) setDrafts((prev) => [restored, ...prev]);
         toast.error('Action failed — please try again.');
         return null;
       }
 
       const data = await res.json();
-
       if (status === 'approved' && data.deliveryResult) {
         showFeedback(contactName, data.deliveryResult as DeliveryResult);
         return data.deliveryResult as DeliveryResult;
       }
       return null;
     } catch {
-      // Restore on network error
       if (restored) setDrafts((prev) => [restored, ...prev]);
       toast.error('Network error — please try again.');
       return null;
@@ -539,69 +493,73 @@ export function AgentDraftInbox({ slug }: Props) {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2].map((n) => (
-          <div key={n} className="h-40 rounded-xl bg-muted/40 animate-pulse" />
-        ))}
-      </div>
-    );
-  }
-
-  if (drafts.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
-        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-          <Bot size={40} className="text-muted-foreground" />
-        </div>
-        <div>
-          <p className="font-semibold text-foreground">Your agent is watching</p>
-          <p className="text-sm text-muted-foreground mt-1 max-w-xs">
-            When your agent drafts an outreach or flags an action, it shows up here for your review.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-3">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          <span className="font-semibold text-orange-500 dark:text-orange-400">{drafts.length}</span>{' '}
-          pending draft{drafts.length !== 1 ? 's' : ''} awaiting review
-        </p>
-        <div className="flex items-center gap-2">
-          {drafts.length > 1 && (
+    <section className="rounded-2xl border bg-card overflow-hidden">
+      {/* Section header */}
+      <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-border/60">
+        <Mail size={14} className="text-orange-500 flex-shrink-0" />
+        <h2 className="text-sm font-semibold">Awaiting Review</h2>
+        {!loading && drafts.length > 0 && (
+          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white min-w-[20px] text-center">
+            {drafts.length}
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-1">
+          {!loading && drafts.length > 1 && (
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               className="h-7 text-xs gap-1.5"
               onClick={approveAll}
               disabled={approvingAll}
             >
-              {approvingAll ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+              {approvingAll ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle size={11} />}
               Approve all
             </Button>
           )}
-          <Button variant="ghost" size="sm" onClick={load} className="h-7 text-xs gap-1.5">
+          <Button variant="ghost" size="sm" onClick={load} className="h-7 w-7 p-0">
             <RefreshCw size={12} />
-            Refresh
           </Button>
         </div>
       </div>
 
-      {/* Delivery feedback banner */}
+      {/* Delivery banner */}
       {deliveryFeedback && (
-        <DeliveryBanner feedback={deliveryFeedback} onClose={() => setDeliveryFeedback(null)} />
+        <div className="px-5 py-3 border-b border-border/60">
+          <DeliveryBanner feedback={deliveryFeedback} onClose={() => setDeliveryFeedback(null)} />
+        </div>
       )}
 
-      {/* Draft cards */}
-      {drafts.map((draft) => (
-        <DraftCard key={draft.id} draft={draft} slug={slug} onAction={handleAction} />
-      ))}
-    </div>
+      {/* Loading */}
+      {loading && (
+        <div className="px-5 py-5 space-y-3">
+          {[1, 2].map((n) => (
+            <div key={n} className="h-28 rounded-xl bg-muted/40 animate-pulse" />
+          ))}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && drafts.length === 0 && (
+        <div className="flex items-center gap-3.5 px-5 py-8">
+          <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 size={16} className="text-muted-foreground/60" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-foreground">All clear</p>
+            <p className="text-xs text-muted-foreground mt-0.5">No drafts waiting — Chippi will surface new outreach here as it finds opportunities.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Draft rows */}
+      {!loading && drafts.length > 0 && (
+        <div className="divide-y divide-border/40">
+          {drafts.map((draft) => (
+            <DraftCard key={draft.id} draft={draft} slug={slug} onAction={handleAction} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
