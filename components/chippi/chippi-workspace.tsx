@@ -15,6 +15,7 @@ import { blocksFromLegacyContent, type MessageBlock } from '@/lib/ai-tools/block
 import type { Conversation } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { TodayFeed } from './today-feed';
+import { HowChippiWorksTip } from './how-chippi-works-tip';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { toast } from 'sonner';
 
@@ -298,6 +299,50 @@ export function ChippiWorkspace({
   const firstName = user?.firstName ?? '';
   const greeting = useMemo(timeBasedGreeting, []);
 
+  // Counts for the header status sentence. Fetch only when we're rendering
+  // the today view — no point pinging while in an active conversation. The
+  // child sections still self-fetch their own data; this is a lightweight
+  // duplicate read for a one-line summary.
+  const [counts, setCounts] = useState<{ drafts: number; questions: number }>({
+    drafts: 0,
+    questions: 0,
+  });
+  const [countsLoaded, setCountsLoaded] = useState(false);
+  useEffect(() => {
+    if (!isEmpty) return;
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const [draftsRes, questionsRes] = await Promise.all([
+          fetch('/api/agent/drafts?status=pending&limit=50', { signal: controller.signal }),
+          fetch('/api/agent/questions?status=pending&limit=50', { signal: controller.signal }),
+        ]);
+        const drafts = draftsRes.ok ? await draftsRes.json() : [];
+        const questions = questionsRes.ok ? await questionsRes.json() : [];
+        setCounts({
+          drafts: Array.isArray(drafts) ? drafts.length : 0,
+          questions: Array.isArray(questions) ? questions.length : 0,
+        });
+      } catch {
+        // non-critical — header just falls back to a generic line
+      } finally {
+        setCountsLoaded(true);
+      }
+    })();
+    return () => controller.abort();
+  }, [isEmpty]);
+
+  function statusSentence(): string {
+    if (!countsLoaded) return "Here's what Chippi has for you. Ask anything below.";
+    const parts: string[] = [];
+    if (counts.drafts > 0) parts.push(`${counts.drafts} draft${counts.drafts === 1 ? '' : 's'}`);
+    if (counts.questions > 0) parts.push(`${counts.questions} question${counts.questions === 1 ? '' : 's'}`);
+    if (parts.length === 0) {
+      return "Nothing waiting on you — chat below or kick off a sweep.";
+    }
+    return `${parts.join(' · ')} waiting for you.`;
+  }
+
   // Run Now — kicks off a background sweep and tells the user via toast.
   const [running, setRunning] = useState(false);
   async function handleRunNow() {
@@ -485,10 +530,14 @@ export function ChippiWorkspace({
                   {greeting}
                   {firstName ? `, ${firstName}` : ''}.
                 </h1>
-                <p className="text-sm text-muted-foreground">
-                  Here&apos;s what Chippi has for you. Ask anything below.
-                </p>
+                <p className="text-sm text-muted-foreground">{statusSentence()}</p>
               </header>
+
+              {/* How Chippi works — explains the autonomous loop. Dismissed
+                  forever once acknowledged so it doesn't add noise on return
+                  visits. localStorage key is workspace-local. */}
+              <HowChippiWorksTip />
+
 
               {/* Today's work */}
               <TodayFeed slug={slug} />
