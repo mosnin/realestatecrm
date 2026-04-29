@@ -640,12 +640,10 @@ function RealtorNav({
   }, [pathname, base]);
 
   // AI-related items always sit at the top
-  const aiItems = realtorNavItems.filter(
-    (item) => item.isAI || item.href === '/agent',
-  );
+  const aiItems = realtorNavItems.filter((item) => item.isAI);
   // Everything else except AI and settings
   const mainItems = realtorNavItems.filter(
-    (item) => !item.isAI && item.href !== '/agent' && item.href !== '/settings',
+    (item) => !item.isAI && item.href !== '/settings',
   );
 
   const getBadge = (item: NavItem): React.ReactNode => {

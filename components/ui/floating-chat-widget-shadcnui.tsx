@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
-import { ChatInterface } from '@/components/ai/chat-interface';
+import { ChippiWorkspace } from '@/components/chippi/chippi-workspace';
 import type { Conversation } from '@/lib/types';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { cn } from '@/lib/utils';
@@ -121,7 +121,7 @@ export function FloatingChatWidget({ slug }: FloatingChatWidgetProps) {
                   Loading chat…
                 </div>
               ) : (
-                <ChatInterface
+                <ChippiWorkspace
                   key={chatKey}
                   slug={slug}
                   initialMessages={initialMessages}

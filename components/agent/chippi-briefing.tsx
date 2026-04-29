@@ -70,7 +70,7 @@ export function ChippiBriefing({ slug }: { slug: string }) {
     return () => controller.abort();
   }, []);
 
-  const agentHref = `/s/${slug}/agent`;
+  const agentHref = `/s/${slug}/chippi`;
   const hasAnything = data.pendingDrafts > 0 || data.pendingQuestions > 0 || data.priorityItems.length > 0;
 
   if (!data.isLoaded) {
@@ -129,7 +129,7 @@ export function ChippiBriefing({ slug }: { slug: string }) {
           <div className="flex flex-wrap gap-2">
             {data.pendingDrafts > 0 && (
               <Link
-                href={`${agentHref}?tab=inbox`}
+                href={agentHref}
                 className="inline-flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium px-2.5 py-1 rounded-full transition-colors"
               >
                 <Inbox size={11} />
@@ -138,7 +138,7 @@ export function ChippiBriefing({ slug }: { slug: string }) {
             )}
             {data.pendingQuestions > 0 && (
               <Link
-                href={`${agentHref}?tab=inbox`}
+                href={agentHref}
                 className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium px-2.5 py-1 rounded-full transition-colors"
               >
                 <HelpCircle size={11} />

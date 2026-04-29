@@ -55,7 +55,7 @@ export function AgentStatusBar({ slug }: { slug: string }) {
   if (!visible) return null;
 
   const hasActivity = status.pendingDrafts > 0 || status.pendingQuestions > 0;
-  const agentHref = `/s/${slug}/agent`;
+  const agentHref = `/s/${slug}/chippi`;
 
   return (
     <div className={cn(
@@ -89,7 +89,7 @@ export function AgentStatusBar({ slug }: { slug: string }) {
         <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
           {status.pendingDrafts > 0 && (
             <Link
-              href={`${agentHref}?tab=inbox`}
+              href={agentHref}
               className="flex items-center gap-1 bg-orange-500 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full hover:bg-orange-600 transition-colors flex-shrink-0"
             >
               <Inbox size={9} />
@@ -99,7 +99,7 @@ export function AgentStatusBar({ slug }: { slug: string }) {
 
           {status.pendingQuestions > 0 && (
             <Link
-              href={`${agentHref}?tab=inbox`}
+              href={agentHref}
               className="flex items-center gap-1 bg-amber-500 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full hover:bg-amber-600 transition-colors flex-shrink-0"
             >
               <HelpCircle size={9} />

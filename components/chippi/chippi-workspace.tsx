@@ -1,18 +1,22 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ConversationSidebar } from './conversation-sidebar';
+import Link from 'next/link';
+import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { GradientAIChatInput, type MentionItem } from '@/components/ui/gradient-ai-chat-input';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Plus, Mic, Square } from 'lucide-react';
+import { History, X, AlertCircle, Plus, Mic, Square, Settings, ArrowLeft, Play, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { VoiceMode } from './voice-mode';
-import { Transcript } from './blocks/transcript';
-import { useAgentTask, type UiMessage } from './hooks/use-agent-task';
+import { VoiceMode } from '@/components/ai/voice-mode';
+import { Transcript } from '@/components/ai/blocks/transcript';
+import { useAgentTask, type UiMessage } from '@/components/ai/hooks/use-agent-task';
 import { blocksFromLegacyContent, type MessageBlock } from '@/lib/ai-tools/blocks';
 import type { Conversation } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
+import { TodayFeed } from './today-feed';
+import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
+import { toast } from 'sonner';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -25,8 +29,10 @@ interface LegacyMessage {
   blocks?: MessageBlock[] | null;
 }
 
-interface ChatInterfaceProps {
+interface ChippiWorkspaceProps {
   slug: string;
+  /** When 'settings', renders the agent settings panel instead of the workspace. */
+  view?: 'workspace' | 'settings';
   initialMessages: LegacyMessage[];
   initialConversations: Conversation[];
   initialConversationId: string | null;
@@ -70,13 +76,14 @@ function legacyToUi(messages: LegacyMessage[]): UiMessage[] {
   }));
 }
 
-export function ChatInterface({
+export function ChippiWorkspace({
   slug,
+  view = 'workspace',
   initialMessages,
   initialConversations,
   initialConversationId,
   initialInput,
-}: ChatInterfaceProps) {
+}: ChippiWorkspaceProps) {
   const { user } = useUser();
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(initialConversationId);
@@ -291,6 +298,29 @@ export function ChatInterface({
   const firstName = user?.firstName ?? '';
   const greeting = useMemo(timeBasedGreeting, []);
 
+  // Run Now — kicks off a background sweep and tells the user via toast.
+  const [running, setRunning] = useState(false);
+  async function handleRunNow() {
+    setRunning(true);
+    try {
+      const res = await fetch('/api/agent/run-now', { method: 'POST' });
+      const data = res.ok ? await res.json() : null;
+      if (res.ok && data?.triggered) {
+        toast.success(
+          data.method === 'modal'
+            ? 'Chippi is on it — new drafts will appear here'
+            : 'Queued — Chippi will pick this up at the next heartbeat (~15 min)',
+        );
+      } else {
+        toast.error("Couldn't kick off Chippi — please try again");
+      }
+    } catch {
+      toast.error('Could not reach server');
+    } finally {
+      setRunning(false);
+    }
+  }
+
   // The trailing assistant message — used to detect the "thinking" state
   // (streaming but no blocks have landed yet) and to pin the permission
   // prompt at the end of the transcript.
@@ -312,6 +342,37 @@ export function ChatInterface({
     />
   );
 
+  // Settings view — entirely separate surface; no chat input, no today feed.
+  if (view === 'settings') {
+    return (
+      <div className="relative flex flex-col h-full min-h-0 overflow-y-auto">
+        <div className="max-w-3xl w-full mx-auto px-4 sm:px-6 py-8 space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1.5">
+              <Link
+                href={`/s/${slug}/chippi`}
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ArrowLeft size={12} />
+                Back to Chippi
+              </Link>
+              <h1
+                className="text-3xl tracking-tight text-foreground"
+                style={{ fontFamily: 'var(--font-title)' }}
+              >
+                Settings
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Tune what Chippi does on its own and what it brings to you.
+              </p>
+            </div>
+          </div>
+          <AgentSettingsPanel slug={slug} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative flex flex-col h-full min-h-0">
       {/* Floating control cluster — top-right, no top bar chrome */}
@@ -320,6 +381,18 @@ export function ChatInterface({
           <span className="hidden sm:inline text-[11px] tabular-nums text-amber-600 dark:text-amber-400 font-semibold px-2">
             {messages.length}/{MESSAGE_LIMIT}
           </span>
+        )}
+        {isEmpty && (
+          <button
+            type="button"
+            onClick={() => void handleRunNow()}
+            disabled={running}
+            className="hidden sm:inline-flex items-center gap-1.5 mr-1 h-8 px-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-50"
+            title="Run Chippi now"
+          >
+            {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+            Run now
+          </button>
         )}
         <button
           type="button"
@@ -353,6 +426,14 @@ export function ChatInterface({
         >
           <Plus size={15} />
         </button>
+        <Link
+          href={`/s/${slug}/chippi?tab=settings`}
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
+          title="Settings"
+          aria-label="Chippi settings"
+        >
+          <Settings size={15} />
+        </Link>
       </div>
 
       {/* Conversation history drawer — softened overlay */}
@@ -386,49 +467,53 @@ export function ChatInterface({
         </div>
       )}
 
-      {/* ── Empty hero ──────────────────────────────────────────── */}
+      {/* ── Today view (no active conversation) ───────────────────── */}
       {loadingMessages ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
           Loading…
         </div>
       ) : isEmpty ? (
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="min-h-full flex flex-col items-center justify-center px-4 sm:px-6 py-16 gap-10">
-            <div className="text-center space-y-3 max-w-2xl">
-              <h1
-                className="text-3xl sm:text-4xl tracking-tight text-foreground"
-                style={{ fontFamily: 'var(--font-title)' }}
-              >
-                {greeting}
-                {firstName ? `, ${firstName}` : ''}.
-              </h1>
-              <p className="text-base text-muted-foreground">What are we working on?</p>
+        <>
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-6 space-y-10">
+              {/* Greeting + status */}
+              <header className="space-y-1.5">
+                <h1
+                  className="text-3xl sm:text-4xl tracking-tight text-foreground"
+                  style={{ fontFamily: 'var(--font-title)' }}
+                >
+                  {greeting}
+                  {firstName ? `, ${firstName}` : ''}.
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Here&apos;s what Chippi has for you. Ask anything below.
+                </p>
+              </header>
+
+              {/* Today's work */}
+              <TodayFeed slug={slug} />
             </div>
+          </div>
 
-            <div className="w-full max-w-2xl">{renderInput()}</div>
-
-            <div className="flex flex-wrap gap-2 justify-center max-w-2xl">
+          {/* Docked composer + quick prompts */}
+          <div className="flex-shrink-0 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-2 pb-4 space-y-2.5">
+            {renderInput()}
+            <div className="flex flex-wrap gap-1.5">
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s.text}
                   type="button"
                   onClick={() => handleSend(s.text, [])}
                   disabled={isStreaming || pendingApproval !== null}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background hover:bg-accent/40 hover:border-border px-3.5 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background hover:bg-accent/40 hover:border-border px-3 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span aria-hidden>{s.emoji}</span>
                   <span>{s.text}</span>
                 </button>
               ))}
             </div>
-
-            <p className="text-[11px] text-muted-foreground/70 max-w-md text-center">
-              Tag a contact or deal with{' '}
-              <span className="font-medium text-foreground/80">@</span>{' '}
-              and Chippi will work on it with full context.
-            </p>
           </div>
-        </div>
+        </>
       ) : (
         <>
           {/* Active thread */}

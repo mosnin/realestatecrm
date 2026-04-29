@@ -294,7 +294,7 @@ export default async function DashboardPage({
       iconColor: 'text-violet-600 dark:text-violet-400',
       title: `${pendingDraftCount} AI ${pendingDraftCount === 1 ? 'draft' : 'drafts'} waiting for you`,
       sub: 'Review, edit, and send in one tap.',
-      href: `/s/${slug}/agent`,
+      href: `/s/${slug}/chippi`,
       cta: 'Review drafts',
     });
   }

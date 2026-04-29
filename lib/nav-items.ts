@@ -27,7 +27,6 @@ import {
   Flame,
   Bot,
   Flag,
-  Inbox,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -74,9 +73,10 @@ export const realtorNavItems: NavItem[] = [
     exact: true,
   },
   {
-    href: '/agent',
-    label: 'Inbox',
-    icon: Inbox,
+    href: '/chippi',
+    label: 'Chippi',
+    icon: Sparkles,
+    isAI: true,
     badgeKey: 'pendingDrafts',
   },
   {
@@ -138,12 +138,6 @@ export const realtorNavItems: NavItem[] = [
     ],
   },
   {
-    href: '/ai',
-    label: 'Assistant',
-    icon: Sparkles,
-    isAI: true,
-  },
-  {
     href: '/settings',
     label: 'Settings',
     icon: Settings,
@@ -169,7 +163,7 @@ export const primaryNavItems = [
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/notes', label: 'Notes', icon: FileText },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
-  { href: '/ai', label: 'Assistant', icon: Sparkles },
+  { href: '/chippi', label: 'Chippi', icon: Sparkles },
 ] as const;
 
 export const intakeSubItems = [
@@ -200,5 +194,5 @@ export const mobileNavItems = [
   { href: '', label: 'Today', icon: LayoutDashboard },
   { href: '/contacts', label: 'People', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
-  { href: '/ai', label: 'Assistant', icon: Sparkles },
+  { href: '/chippi', label: 'Chippi', icon: Sparkles },
 ] as const;
