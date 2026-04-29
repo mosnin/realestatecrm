@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  CheckCircle2, MessageSquare, Mail, StickyNote, Bell, Activity, Brain, ChevronRight,
+  CheckCircle2, MessageSquare, Mail, StickyNote, Bell, Activity, Brain, ChevronRight, ArrowRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { timeAgo } from '@/lib/formatting';
@@ -95,6 +95,15 @@ export function WhatIDid({ slug }: { slug: string }) {
         </h2>
         {!loading && entries.length > 0 && (
           <span className="text-[11px] text-muted-foreground tabular-nums">{entries.length}</span>
+        )}
+        {!loading && entries.length > 0 && (
+          <Link
+            href={`/s/${slug}/chippi/activity`}
+            className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            See all
+            <ArrowRight size={11} />
+          </Link>
         )}
       </div>
 
