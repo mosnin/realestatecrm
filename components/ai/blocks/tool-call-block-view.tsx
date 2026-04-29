@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolCallBlock } from '@/lib/ai-tools/blocks';
+import { ContactsResult } from './tool-results/contacts-result';
+import { DealsResult } from './tool-results/deals-result';
 
 /** Per-tool icon map. Generic Wrench fallback keeps unknown tools readable. */
 const TOOL_ICONS: Record<string, typeof Users> = {
@@ -96,6 +98,23 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
   })();
 
   const hasDetails = !!block.result?.summary || Object.keys(block.args ?? {}).length > 0;
+
+  // Phase 5 — rich inline result rendering. Tools opt in via the `display`
+  // hint on their handler return. When the result resolves successfully and
+  // the data shape is one we know how to render, we show the rich card stack
+  // BELOW the compact row by default (no expand-click needed).
+  const richResult: React.ReactNode = (() => {
+    if (status !== 'complete' || !block.result?.ok) return null;
+    const data = block.result.data as Record<string, unknown> | undefined;
+    if (!data) return null;
+    if (block.display === 'contacts' && Array.isArray((data as { contacts?: unknown[] }).contacts)) {
+      return <ContactsResult data={data as { contacts: never[] }} />;
+    }
+    if (block.display === 'deals' && Array.isArray((data as { deals?: unknown[] }).deals)) {
+      return <DealsResult data={data as { deals: never[] }} />;
+    }
+    return null;
+  })();
 
   // The handler's `display` hint tints the card so at-a-glance scanning
   // of the transcript tells a realtor which rows landed safely vs which
@@ -197,6 +216,10 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
           </span>
         )}
       </button>
+
+      {/* Rich inline result rendering — visible by default for known data
+          shapes (contacts, deals) so the realtor doesn't have to expand. */}
+      {richResult}
 
       {/* Collapsible details — rendered below the row, slightly indented */}
       {expanded && hasDetails && (

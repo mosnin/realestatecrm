@@ -75,12 +75,12 @@ const OUTCOME_ICON: Record<string, LucideIcon> = {
   muted: Lightbulb,
 };
 
-// Filter values for the toolbar; mirrors AgentActivityLog.outcome.
+// Filter values for the toolbar. Failures aren't a thing the realtor wants
+// to filter to — they appear inline with the rose tone in the All view.
 const FILTERS = [
   { value: null, label: 'All' },
   { value: 'completed', label: 'Done' },
   { value: 'queued_for_approval', label: 'Awaiting you' },
-  { value: 'failed', label: 'Failed' },
 ] as const;
 
 const UNDOABLE_TYPES = new Set(['set_contact_follow_up', 'set_deal_follow_up']);

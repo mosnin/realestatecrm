@@ -214,22 +214,15 @@ export function MemoryFeed({ slug }: { slug: string }) {
                   {group.rows.map((memory) => (
                     <li key={memory.id} className="group/row py-3 first:pt-1">
                       <div className="flex items-start gap-3">
-                        <span
-                          className={cn(
-                            'inline-flex items-center text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0',
-                            memory.memoryType === 'fact' && 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400',
-                            memory.memoryType === 'preference' && 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400',
-                            memory.memoryType === 'observation' && 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400',
-                            memory.memoryType === 'reminder' && 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-                          )}
-                        >
-                          {TYPE_LABEL[memory.memoryType]}
-                        </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-foreground leading-relaxed">
                             {memory.content}
                           </p>
                           <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
+                            <span className="lowercase tracking-wide">
+                              {TYPE_LABEL[memory.memoryType].toLowerCase()}
+                            </span>
+                            <span className="text-muted-foreground/50">·</span>
                             <span className="tabular-nums">{timeAgo(memory.createdAt)}</span>
                             {memory.importance >= 0.7 && (
                               <span className="text-amber-600 dark:text-amber-400">important</span>

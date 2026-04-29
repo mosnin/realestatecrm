@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { GradientAIChatInput, type MentionItem } from '@/components/ui/gradient-ai-chat-input';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Plus, Mic, Square, Settings, ArrowLeft, Play, Loader2, NotebookText } from 'lucide-react';
+import { History, X, AlertCircle, Mic, Square, Settings, ArrowLeft, Play, Loader2, NotebookText } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { VoiceMode } from '@/components/ai/voice-mode';
@@ -461,15 +461,6 @@ export function ChippiWorkspace({
           aria-label="Toggle voice mode"
         >
           <Mic size={15} />
-        </button>
-        <button
-          type="button"
-          onClick={handleNewConversation}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
-          title="New conversation"
-          aria-label="Start a new conversation"
-        >
-          <Plus size={15} />
         </button>
         <Link
           href={`/s/${slug}/chippi/memory`}
