@@ -82,7 +82,7 @@ export function AgentDealPanel({ dealId, slug, dealTitle }: { dealId: string; sl
     return (
       <div className="space-y-3">
         <ChippiAssessmentCard entityType="deal" entityId={dealId} entityName={dealTitle ?? 'this deal'} slug={slug} />
-        <div className="rounded-lg border border-border bg-card p-4">
+        <div className="rounded-lg border border-border/70 bg-card p-4">
           <div className="flex items-center gap-2 mb-3">
             <Brain size={13} className="text-primary animate-pulse" />
             <span className="text-sm font-semibold">Agent Intelligence</span>
@@ -100,7 +100,7 @@ export function AgentDealPanel({ dealId, slug, dealTitle }: { dealId: string; sl
   return (
     <div className="space-y-3">
       <ChippiAssessmentCard entityType="deal" entityId={dealId} entityName={dealTitle ?? 'this deal'} slug={slug} />
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div className="rounded-lg border border-border/70 bg-card overflow-hidden">
       <div className="px-3 py-2.5 border-b border-border flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Brain size={13} className="text-primary" />

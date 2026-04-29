@@ -103,7 +103,7 @@ function DraftCard({
 
   return (
     <div className={cn(
-      'rounded-lg border bg-card text-sm',
+      'rounded-lg border border-border/70 bg-card text-sm',
       draft.status === 'approved' && 'opacity-60',
     )}>
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
@@ -251,7 +251,7 @@ export function AgentContactPanel({ contactId, slug, contactName }: { contactId:
     return (
       <div className="space-y-3">
         <ChippiAssessmentCard entityType="contact" entityId={contactId} entityName={contactName ?? 'this contact'} slug={slug} />
-        <div className="rounded-lg border border-border bg-card p-6">
+        <div className="rounded-lg border border-border/70 bg-card p-6">
           <div className="flex items-center gap-2 mb-4">
             <Brain size={14} className="text-primary animate-pulse" />
             <span className="text-sm font-semibold">Agent Intelligence</span>
@@ -271,7 +271,7 @@ export function AgentContactPanel({ contactId, slug, contactName }: { contactId:
   return (
     <div className="space-y-3">
       <ChippiAssessmentCard entityType="contact" entityId={contactId} entityName={contactName ?? 'this contact'} slug={slug} />
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div className="rounded-lg border border-border/70 bg-card overflow-hidden">
       <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Brain size={14} className="text-primary" />

@@ -65,7 +65,7 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
 
   if (editing) {
     return (
-      <div className="rounded-xl border border-border bg-card p-5">
+      <div className="rounded-lg border border-border/70 bg-card p-5">
         <h1 className="text-lg font-semibold mb-4">Edit property</h1>
         <PropertyForm
           initial={property}
@@ -81,7 +81,7 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)] gap-4">
       {/* Left: hero + facts */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="rounded-lg border border-border/70 bg-card overflow-hidden">
         <div className="aspect-[4/3] bg-muted">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {cover ? (
@@ -223,7 +223,7 @@ function LinkedSection({
   empty: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
+    <div className="rounded-lg border border-border/70 bg-card overflow-hidden">
       <div className="px-4 py-3 border-b border-border flex items-center gap-2">
         <Icon size={14} className="text-muted-foreground" />
         <h2 className="text-sm font-semibold">{title}</h2>

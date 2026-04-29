@@ -80,7 +80,7 @@ interface Insight {
 
 function MissionControlSkeleton() {
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
+    <div className="rounded-lg border border-border/70 bg-card overflow-hidden">
       <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border">
         <div className="w-3.5 h-3.5 rounded-full bg-muted animate-pulse" />
         <div className="w-16 h-4 bg-muted rounded animate-pulse" />
@@ -171,7 +171,7 @@ export function AgentMissionControl({ slug }: { slug: string }) {
   const runFailed = latestRun?.entries.filter((e) => e.outcome === 'failed').length ?? 0;
 
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden shadow-[0_1px_2px_0_rgba(0,0,0,0.03)]">
+    <div className="rounded-lg border border-border/70 bg-card overflow-hidden">
 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-y-1 px-5 py-3.5 border-b border-border">

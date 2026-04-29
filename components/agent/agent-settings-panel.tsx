@@ -247,7 +247,7 @@ export function AgentSettingsPanel({ slug }: Props) {
   if (loading || !settings) {
     return (
       <div className="space-y-4">
-        {[1, 2, 3].map((n) => <div key={n} className="h-20 rounded-xl bg-muted/40 animate-pulse" />)}
+        {[1, 2, 3].map((n) => <div key={n} className="h-20 rounded-lg bg-muted/40 animate-pulse" />)}
       </div>
     );
   }
@@ -256,11 +256,11 @@ export function AgentSettingsPanel({ slug }: Props) {
     <div className="space-y-6 max-w-2xl">
 
       {/* Status + Run Now */}
-      <div className="rounded-xl border bg-card p-4 space-y-4">
+      <div className="rounded-lg border border-border/70 bg-card p-4 space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className={cn(
-              'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0',
+              'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
               settings.enabled
                 ? 'bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400'
                 : 'bg-muted text-muted-foreground',
@@ -383,8 +383,8 @@ export function AgentSettingsPanel({ slug }: Props) {
                   }
                 }}
                 className={cn(
-                  'w-full text-left p-4 rounded-xl border transition-all',
-                  selected ? 'border-orange-500 bg-orange-500/5 ring-1 ring-orange-500/20' : 'border-border bg-card hover:bg-muted/40',
+                  'w-full text-left p-4 rounded-lg border transition-colors',
+                  selected ? 'border-orange-500 bg-orange-500/5 ring-1 ring-orange-500/20' : 'border-border/70 bg-card hover:bg-foreground/[0.04]',
                 )}
               >
                 <div className="flex items-start gap-3">
@@ -474,7 +474,7 @@ export function AgentSettingsPanel({ slug }: Props) {
             const effective = override ?? settings.autonomyLevel;
 
             return (
-              <div key={opt.value} className="rounded-xl border bg-card space-y-0">
+              <div key={opt.value} className="rounded-lg border border-border/70 bg-card space-y-0">
                 {/* Top row */}
                 <div className="flex items-center gap-4 p-4">
                   <div className={cn('w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center flex-shrink-0', opt.iconClass)}>
@@ -562,10 +562,10 @@ export function AgentSettingsPanel({ slug }: Props) {
                 void saveField({ dailyTokenBudget: preset.value }, 'budget');
               }}
               className={cn(
-                'flex flex-col items-center px-4 py-2.5 rounded-xl border text-sm transition-all',
+                'flex flex-col items-center px-4 py-2.5 rounded-lg border text-sm transition-all',
                 settings.dailyTokenBudget === preset.value
                   ? 'border-orange-500 bg-orange-500/5 text-orange-600 dark:text-orange-400 font-semibold ring-1 ring-orange-500/20'
-                  : 'border-border bg-card text-foreground hover:bg-muted/40',
+                  : 'border-border/70 bg-card text-foreground hover:bg-foreground/[0.04]',
               )}
             >
               <span className="font-bold">{preset.label}</span>

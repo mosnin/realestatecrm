@@ -141,7 +141,7 @@ export function PropertiesClient({ slug, initial }: Props) {
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-muted/10 px-6 py-14 text-center">
+        <div className="rounded-lg border border-dashed border-border/70 bg-muted/10 px-6 py-14 text-center">
           <HomeIcon size={22} className="mx-auto text-muted-foreground mb-3" />
           <p className="text-sm font-semibold">No properties yet</p>
           <p className="text-xs text-muted-foreground mt-1">
@@ -162,10 +162,10 @@ export function PropertiesClient({ slug, initial }: Props) {
                 href={`/s/${slug}/properties/${p.id}`}
                 data-row-id={p.id}
                 className={cn(
-                  'group rounded-xl border bg-card overflow-hidden transition-colors',
+                  'group rounded-lg border bg-card overflow-hidden transition-colors',
                   isFocused
                     ? 'border-foreground ring-2 ring-foreground/20'
-                    : 'border-border hover:border-foreground',
+                    : 'border-border/70 hover:border-foreground',
                 )}
               >
                 <div className="aspect-[16/10] bg-muted overflow-hidden">

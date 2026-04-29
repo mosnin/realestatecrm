@@ -627,7 +627,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
 
       {/* ── Loading skeletons ── */}
       {loading && (
-        <div className="space-y-0 rounded-lg border border-border overflow-hidden">
+        <div className="space-y-0 rounded-lg border border-border/70 overflow-hidden">
           {view === 'card' ? (
             <div className="space-y-3 p-3">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -644,8 +644,8 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
 
       {/* ── Empty state ── */}
       {!loading && filtered.length === 0 && (
-        <div className="rounded-lg border border-dashed border-border bg-card py-12 text-center px-6">
-          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center mx-auto mb-4">
+        <div className="rounded-lg border border-dashed border-border/70 bg-card py-12 text-center px-6">
+          <div className="w-10 h-10 rounded-lg bg-foreground/[0.04] flex items-center justify-center mx-auto mb-4">
             <Search size={20} className="text-muted-foreground" />
           </div>
           <p className="font-semibold text-foreground mb-1">
@@ -697,11 +697,11 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
               <div
                 key={lead.id}
                 className={cn(
-                  'group rounded-lg border bg-card overflow-hidden transition-all duration-150 hover:shadow-md',
+                  'group rounded-lg border bg-card overflow-hidden transition-colors duration-150',
                   isSelected ? 'border-primary/40 bg-primary/5' :
                   tierKey === 'hot' ? 'border-red-200/80 dark:border-red-800/50' :
                   tierKey === 'warm' ? 'border-amber-200/80 dark:border-amber-800/50' :
-                  'border-border',
+                  'border-border/70',
                 )}
               >
                 {/* Header */}
@@ -947,7 +947,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
 
       {/* ── List view ── */}
       {!loading && view === 'list' && filtered.length > 0 && (
-        <div className="rounded-lg border border-border overflow-hidden">
+        <div className="rounded-lg border border-border/70 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
