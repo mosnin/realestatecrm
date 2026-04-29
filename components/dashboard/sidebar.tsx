@@ -33,7 +33,7 @@ import {
   CreditCard,
   Plus,
   Check,
-  PanelLeft,
+  Search,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -287,31 +287,39 @@ function CollapsibleNavItem({
 
   return (
     <div>
-      {/* Parent item — 44px min touch target (Apple HIG) */}
+      {/* Parent row — same visual language as FlatNavItem so the realtor
+          sidebar (collapsible items with optional children) and the broker
+          sidebar (flat items) read as one design. AI items show the chip
+          avatar in place of an icon — that's the brand signature. */}
       <Link
         href={href}
         onClick={handleClick}
         className={cn(
-          'group relative flex items-center gap-3 min-h-[44px] h-12 px-3 rounded-xl text-[15px] transition-colors',
+          'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
           isParentActive
-            ? 'bg-accent text-foreground font-medium'
-            : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground',
+            ? 'bg-foreground/[0.045] text-foreground font-medium'
+            : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
         )}
       >
+        {isParentActive && (
+          <span
+            aria-hidden
+            className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
+          />
+        )}
         {item.isAI ? (
           <img
             src="/chip-avatar.png"
-            alt="Chip"
-            className="w-[20px] h-[20px] rounded-full flex-shrink-0"
+            alt=""
+            className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
           />
         ) : (
           <Icon
-            size={20}
+            size={15}
+            strokeWidth={isParentActive ? 2.25 : 1.75}
             className={cn(
               'flex-shrink-0 transition-colors',
-              isParentActive
-                ? 'text-foreground'
-                : 'text-foreground/70 group-hover:text-foreground',
+              isParentActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
             )}
           />
         )}
@@ -322,19 +330,19 @@ function CollapsibleNavItem({
 
         {hasChildren && (
           <ChevronRight
-            size={14}
+            size={11}
             className={cn(
-              'flex-shrink-0 text-muted-foreground/40 transition-transform duration-200',
+              'flex-shrink-0 text-muted-foreground/40 transition-transform duration-150',
               isExpanded && 'rotate-90',
             )}
           />
         )}
       </Link>
 
-      {/* Inline children — no icons, indented, smaller text */}
+      {/* Children — indented, no icons, slightly smaller. Hairline guide. */}
       {hasChildren && (
         <CollapsibleChildren isOpen={isExpanded}>
-          <div className="ml-[18px] pl-3.5 py-1 space-y-0.5 border-l border-border/40">
+          <div className="ml-[14px] pl-3 py-1 space-y-px border-l border-border/50">
             {item.children!.map((child) => {
               const childHref = `${base}${child.href}`;
               const childActive = isChildActive(child, pathname, base, searchParams);
@@ -343,10 +351,10 @@ function CollapsibleNavItem({
                   key={child.href}
                   href={childHref}
                   className={cn(
-                    'flex items-center min-h-[36px] h-9 px-2.5 rounded-md text-[13px] transition-colors',
+                    'flex items-center h-7 px-2 rounded text-[12px] transition-colors duration-150',
                     childActive
                       ? 'text-foreground font-medium'
-                      : 'text-muted-foreground font-normal hover:text-foreground hover:bg-accent',
+                      : 'text-foreground/55 hover:text-foreground hover:bg-foreground/[0.025]',
                   )}
                 >
                   <span className="truncate">{child.label}</span>
@@ -368,7 +376,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   // Empty labels hide entirely so a "label-less" section renders flush.
   if (!children) return null;
   return (
-    <p className="px-2.5 pt-5 pb-2 text-[11px] font-medium text-muted-foreground select-none">
+    <p className="px-3 pt-6 pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60 select-none">
       {children}
     </p>
   );
@@ -387,7 +395,7 @@ function FlatNavItem({
 }: {
   href: string;
   label: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
   isActive: boolean;
   badge?: React.ReactNode;
 }) {
@@ -395,24 +403,73 @@ function FlatNavItem({
     <Link
       href={href}
       className={cn(
-        'group relative flex items-center gap-3 h-11 px-3 rounded-xl text-[15px] transition-colors',
+        // 36px row instead of 44px — desktop-mouse driven, not mobile-touch.
+        // Tighter row reads as "list of decisions" not "list of items".
+        'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
         isActive
-          ? 'bg-accent text-foreground font-medium'
-          : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground',
+          ? 'bg-foreground/[0.045] text-foreground font-medium'
+          : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
       )}
     >
+      {/* Active accent bar — 2px on the left, foreground tone, rounded
+          corner on the inner edge. The signature distinguishing active
+          from hover beyond the background tint. */}
+      {isActive && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
+        />
+      )}
       <Icon
-        size={18}
+        size={15}
+        strokeWidth={isActive ? 2.25 : 1.75}
         className={cn(
           'flex-shrink-0 transition-colors',
-          isActive
-            ? 'text-foreground'
-            : 'text-foreground/70 group-hover:text-foreground',
+          isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
         )}
       />
       <span className="flex-1 truncate">{label}</span>
       {badge}
     </Link>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Search pill — opens the existing CommandPalette
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Quiet "Search · ⌘K" pill below the workspace identity. The CommandPalette
+ * (mounted at the layout level) listens for cmd+k / ctrl+k globally; the
+ * pill triggers it via a synthetic KeyboardEvent so we don't need to plumb
+ * a context. Detects platform for the kbd hint.
+ */
+function SearchPill() {
+  const [isMac, setIsMac] = useState(true);
+  useEffect(() => {
+    if (typeof navigator === 'undefined') return;
+    setIsMac(/Mac|iPhone|iPad/i.test(navigator.userAgent));
+  }, []);
+
+  function open() {
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: false, bubbles: true }),
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={open}
+      className="mx-3 flex items-center gap-2 h-9 pl-3 pr-1.5 rounded-md text-[13px] text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.025] transition-colors duration-150 group"
+      aria-label="Open command palette"
+    >
+      <Search size={13} className="flex-shrink-0" strokeWidth={1.75} />
+      <span className="flex-1 text-left">Search</span>
+      <kbd className="text-[10px] tabular-nums bg-foreground/[0.04] group-hover:bg-foreground/[0.06] text-muted-foreground px-1.5 py-0.5 rounded font-mono transition-colors">
+        {isMac ? '⌘' : 'Ctrl+'}K
+      </kbd>
+    </button>
   );
 }
 
@@ -450,24 +507,35 @@ function WorkspaceSwitcher({
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  // Hide the switcher chevron when there's nothing to switch to. Most solo
+  // realtors won't have a brokerage; in that case the workspace identity
+  // reads as a quiet label, not a teasing dropdown.
+  const hasSwitchTargets = brokerageMemberships.length > 0;
+
   return (
     <div ref={ref} className="relative mx-3">
       <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md border border-border hover:bg-accent transition-colors text-left"
+        onClick={() => hasSwitchTargets && setOpen(!open)}
+        disabled={!hasSwitchTargets}
+        className={cn(
+          'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-left transition-colors',
+          hasSwitchTargets ? 'hover:bg-foreground/[0.025] cursor-pointer' : 'cursor-default',
+        )}
       >
-        <div className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center flex-shrink-0">
-          <Icon size={14} className="text-foreground" />
+        <div className="w-6 h-6 rounded-md bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
+          <Icon size={12} className="text-foreground/80" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold truncate text-foreground leading-tight">
+          <p className="text-[13px] font-medium truncate text-foreground leading-tight">
             {currentName}
           </p>
-          <p className="text-[11px] text-muted-foreground leading-tight">
+          <p className="text-[10px] text-muted-foreground/70 uppercase tracking-[0.08em] leading-tight mt-0.5">
             {currentSubtitle}
           </p>
         </div>
-        <ChevronsUpDown size={13} className="text-muted-foreground/40 flex-shrink-0" />
+        {hasSwitchTargets && (
+          <ChevronsUpDown size={11} className="text-muted-foreground/40 flex-shrink-0" />
+        )}
       </button>
 
       {open && (
@@ -559,29 +627,35 @@ function UserFooter({
   displayName: string;
   imageUrl?: string | null;
 }) {
+  // Quiet user identity pinned to the bottom. Mirrors the sidebar's flat row
+  // language (h-9, 13px text, subtle hover, foreground left tint on press)
+  // so the chip doesn't read as a different surface.
   return (
-    <div className="px-3 py-3">
+    <div className="p-2">
       <Link
         href={href}
-        className="group flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-accent transition-colors"
+        className="group flex items-center gap-2.5 h-9 pl-1 pr-2.5 rounded-md hover:bg-foreground/[0.025] transition-colors duration-150"
       >
         {imageUrl ? (
           <img
             src={imageUrl}
-            alt={displayName}
-            className="w-7 h-7 rounded-full flex-shrink-0 object-cover ring-1 ring-border"
+            alt=""
+            className="w-7 h-7 rounded-full flex-shrink-0 object-cover ring-1 ring-border/50"
           />
         ) : (
-          <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-foreground font-semibold text-xs flex-shrink-0">
+          <div className="w-7 h-7 rounded-full bg-foreground/[0.06] flex items-center justify-center text-foreground/80 font-semibold text-[11px] flex-shrink-0">
             {displayName.charAt(0).toUpperCase()}
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground truncate leading-tight">
+          <p className="text-[13px] font-medium text-foreground truncate leading-tight">
             {displayName}
           </p>
-          <p className="text-[11px] text-muted-foreground leading-tight">View profile</p>
         </div>
+        <ChevronRight
+          size={11}
+          className="flex-shrink-0 text-muted-foreground/0 group-hover:text-muted-foreground/60 transition-colors"
+        />
       </Link>
     </div>
   );
@@ -760,18 +834,18 @@ export function Sidebar({
   // ── Broker settings sub-nav ──────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly) && isOnBrokerSettings) {
     return (
-      <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0">
-        <div className="px-5 pt-5 pb-4">
-          <BrandLogo className="h-7" alt="Chippi" />
+      <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border/70 shrink-0">
+        <div className="px-4 pt-5 pb-3">
+          <BrandLogo className="h-5" alt="Chippi" />
         </div>
 
         <div className="px-3 pb-1">
           <Link
             href="/broker"
-            className="group flex items-center gap-2 h-9 px-2.5 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="group flex items-center gap-2 h-9 px-2.5 rounded-md text-[13px] font-medium transition-colors duration-150 text-muted-foreground hover:bg-foreground/[0.025] hover:text-foreground"
           >
-            <ArrowLeft size={14} className="flex-shrink-0" />
-            <span>Back to dashboard</span>
+            <ArrowLeft size={13} strokeWidth={1.75} className="flex-shrink-0" />
+            <span>Back to team</span>
           </Link>
         </div>
 
@@ -810,22 +884,33 @@ export function Sidebar({
   // ── Broker sidebar ───────────────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
-      <aside className="hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0">
-        <div className="px-5 pt-5 pb-4">
-          <BrandLogo className="h-7" alt="Chippi" />
-        </div>
-
-        <WorkspaceSwitcher
-          currentName={brokerageName ?? 'Brokerage'}
-          currentSubtitle="Brokerage view"
-          currentIcon={Building2}
-          slug={slug}
-          spaceName={spaceName}
-          brokerageMemberships={brokerageMemberships}
-          isOnBrokerPage={isOnBrokerPage}
+      <aside className="relative hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border/70 shrink-0 overflow-hidden">
+        {/* Same brand-warm tint as the realtor sidebar so brokers see the
+            same identity when they switch workspaces. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
         />
+        <div className="relative z-10 flex flex-col h-full">
+          <div className="px-4 pt-5 pb-3">
+            <BrandLogo className="h-5" alt="Chippi" />
+          </div>
 
-        <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
+          <WorkspaceSwitcher
+            currentName={brokerageName ?? 'Brokerage'}
+            currentSubtitle="Brokerage"
+            currentIcon={Building2}
+            slug={slug}
+            spaceName={spaceName}
+            brokerageMemberships={brokerageMemberships}
+            isOnBrokerPage={isOnBrokerPage}
+          />
+
+          <div className="mt-3">
+            <SearchPill />
+          </div>
+
+          <nav className="flex-1 px-3 pb-2 mt-1 space-y-0.5 overflow-y-auto">
           {(brokerageRole === 'realtor_member'
             ? brokerMemberNavSections
             : brokerAdminNavSections
@@ -866,39 +951,37 @@ export function Sidebar({
           })}
         </nav>
 
-        <div className="mx-4 border-t border-border" />
-        <UserFooter
-          href={slug ? `${base}/profile` : '/broker/settings'}
-          displayName={displayName}
-          imageUrl={user?.imageUrl}
-        />
+          <div className="border-t border-border/50" />
+          <UserFooter
+            href={slug ? `${base}/profile` : '/broker/settings'}
+            displayName={displayName}
+            imageUrl={user?.imageUrl}
+          />
+        </div>
       </aside>
     );
   }
 
   // ── Realtor workspace sidebar ────────────────────────────────────────────
   return (
-    <aside className="relative hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border shrink-0 overflow-hidden">
-      {/* Subtle gradient tint at the top — matches reference design */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-pink-100/50 via-purple-50/20 to-transparent dark:from-purple-900/10 dark:via-transparent" />
+    <aside className="relative hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border/70 shrink-0 overflow-hidden">
+      {/* Brand-warm tint at top — replaces the stray pink/purple gradient
+          with a quiet orange wash that signals Chippi without shouting. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
+      />
 
       <div className="relative z-10 flex flex-col h-full">
-        {/* Logo row with panel toggle */}
-        <div className="flex items-center justify-between px-4 pt-5 pb-4">
-          <BrandLogo className="h-7" alt="Chippi" />
-          <button
-            type="button"
-            aria-label="Toggle sidebar"
-            className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-accent transition-colors"
-          >
-            <PanelLeft size={16} />
-          </button>
+        {/* Brand mark — small, monochrome, sets identity without dominating */}
+        <div className="px-4 pt-5 pb-3">
+          <BrandLogo className="h-5" alt="Chippi" />
         </div>
 
-        {/* Workspace switcher */}
+        {/* Workspace identity (with switcher when there's somewhere to go) */}
         <WorkspaceSwitcher
           currentName={spaceName}
-          currentSubtitle="My workspace"
+          currentSubtitle="Solo realtor"
           currentIcon={Briefcase}
           slug={slug}
           spaceName={spaceName}
@@ -906,7 +989,12 @@ export function Sidebar({
           isOnBrokerPage={isOnBrokerPage}
         />
 
-        {/* 3-section nav: AI → Workspace → Settings */}
+        {/* Search */}
+        <div className="mt-3">
+          <SearchPill />
+        </div>
+
+        {/* Primary nav + More + Settings */}
         <RealtorNav
           base={base}
           pathname={pathname}
@@ -916,8 +1004,8 @@ export function Sidebar({
           pendingDraftCount={pendingDraftCount}
         />
 
-        {/* User footer */}
-        <div className="mx-4 border-t border-border" />
+        {/* User footer pinned at bottom, separated by a hairline */}
+        <div className="border-t border-border/50" />
         <UserFooter
           href={`${base}/settings/profile`}
           displayName={displayName}
