@@ -6,7 +6,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
-import { realtorNavItems } from '@/lib/nav-items';
+import { realtorNavItems, realtorMoreNavItems } from '@/lib/nav-items';
 import type { NavItem, NavChild } from '@/lib/nav-items';
 import {
   Building2,
@@ -57,13 +57,15 @@ interface SidebarProps {
 // Broker nav definitions (unchanged structure)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Phase 7 cuts — broker admin sidebar collapses from 14 entries across 5
-// labeled sections to a flat five. Routes the user can still reach by typing
-// or by deep link: /broker/realtors, /broker/leaderboard, /broker/templates,
-// /broker/chat, /broker/announcements, /broker/analytics,
-// /broker/settings/form-builder, /broker/settings/tracking,
-// /broker/import-export. None earn permanent nav real estate. Invitations
-// folds into Members. Realtors merges with Members.
+// Phase 7 — broker admin sidebar collapses from 14 entries across 5 labeled
+// sections to 5 primary items + a quiet "More" section for the rest.
+//
+// Primary (daily): Team · Leads · Pipeline · Members · Settings.
+// More (one glance below — the routes that have existing users but don't
+// earn daily prominence): Realtors, Templates, Team Chat, Announcements,
+// Leaderboard, Analytics, Import/Export. Invitations folds into Members.
+// Settings sub-pages (form-builder, tracking, MCP, auto-assignment, routing
+// rules) live behind /broker/settings's own in-page tab strip.
 const brokerAdminNavSections = [
   {
     label: '',
@@ -75,17 +77,38 @@ const brokerAdminNavSections = [
       { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
     ],
   },
+  {
+    label: 'More',
+    items: [
+      { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
+      { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
+      { href: '/broker/chat', label: 'Team chat', icon: MessageCircle, exact: false, adminOnly: false },
+      { href: '/broker/announcements', label: 'Announcements', icon: Megaphone, exact: false, adminOnly: false },
+      { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
+      { href: '/broker/analytics', label: 'Analytics', icon: BarChart3, exact: false, adminOnly: false },
+      { href: '/broker/import-export', label: 'Import / export', icon: Upload, exact: false, adminOnly: true },
+    ],
+  },
 ];
 
-// Phase 7 cuts — realtor-members of a brokerage see their own work first.
-// Announcements, Team Chat, Templates, Leaderboard all dropped from nav;
-// routes stay reachable by direct link.
+// Phase 7 — realtor-members of a brokerage see their own work first.
+// Team-wide tools live one glance below in the More section; routes are
+// unchanged.
 const brokerMemberNavSections = [
   {
     label: '',
     items: [
       { href: '/broker', label: 'My day', icon: LayoutDashboard, exact: true, adminOnly: false },
       { href: '/broker/my-leads', label: 'My leads', icon: PhoneIncoming, exact: false, adminOnly: false },
+    ],
+  },
+  {
+    label: 'More',
+    items: [
+      { href: '/broker/announcements', label: 'Announcements', icon: Megaphone, exact: false, adminOnly: false },
+      { href: '/broker/chat', label: 'Team chat', icon: MessageCircle, exact: false, adminOnly: false },
+      { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
+      { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
     ],
   },
 ];
@@ -655,17 +678,26 @@ function RealtorNav({
 
   return (
     <nav className="flex-1 px-3 py-2 overflow-y-auto space-y-3">
-      {/* AI section */}
+      {/* Primary nav — daily destinations. AI item rides up top via the
+          existing renderItem treatment; no section label needed when there
+          are only a handful of primaries. */}
       <div>
-        <SectionLabel>AI</SectionLabel>
-        <div className="space-y-0.5">{aiItems.map(renderItem)}</div>
+        <div className="space-y-0.5">
+          {aiItems.map(renderItem)}
+          {mainItems.map(renderItem)}
+        </div>
       </div>
 
-      {/* Main workspace section */}
-      <div>
-        <SectionLabel>Workspace</SectionLabel>
-        <div className="space-y-0.5">{mainItems.map(renderItem)}</div>
-      </div>
+      {/* More — visually subordinate, but reachable in one glance. Houses
+          the routes that have existing users (Tours, Calendar, Notes,
+          Reviews, Intake form, Analytics) until they surface inline through
+          the agent in later phases. */}
+      {realtorMoreNavItems.length > 0 && (
+        <div>
+          <SectionLabel>More</SectionLabel>
+          <div className="space-y-0.5">{realtorMoreNavItems.map(renderItem)}</div>
+        </div>
+      )}
 
       {/* Settings — collapsible, pinned at bottom of scroll area */}
       <div className="pt-1">
