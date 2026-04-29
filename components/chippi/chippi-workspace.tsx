@@ -16,6 +16,7 @@ import type { Conversation } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { TodayFeed } from './today-feed';
 import { HowChippiWorksTip } from './how-chippi-works-tip';
+import { MorningReplay } from './morning-replay';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { toast } from 'sonner';
 
@@ -532,11 +533,16 @@ export function ChippiWorkspace({
                 <p className="text-sm text-muted-foreground">{statusSentence()}</p>
               </header>
 
+              {/* Morning replay — the wow moment. Auto-renders the first
+                  visit each day when there's overnight activity to show.
+                  Self-dismisses for the rest of the day on "Looks good".
+                  Renders nothing when there's no overnight activity. */}
+              <MorningReplay slug={slug} />
+
               {/* How Chippi works — explains the autonomous loop. Dismissed
                   forever once acknowledged so it doesn't add noise on return
                   visits. localStorage key is workspace-local. */}
               <HowChippiWorksTip />
-
 
               {/* Today's work */}
               <TodayFeed slug={slug} />
