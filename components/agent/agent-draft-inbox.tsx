@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   CheckCircle2, XCircle, MessageSquare, Mail, StickyNote,
   Loader2, RefreshCw, Pencil, Copy, Check,
-  AlertTriangle, Send, TriangleAlert, CheckCircle,
+  AlertTriangle, Send, TriangleAlert,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,6 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
-import { ChippiBadge } from './chippi-avatar';
 
 interface DeliveryResult {
   sent: boolean;
@@ -57,35 +56,15 @@ interface Props {
   slug: string;
 }
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
-const CHANNEL_CONFIG = {
-  sms: {
-    label: 'SMS',
-    icon: MessageSquare,
-    pill: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
-    accent: 'border-l-emerald-500',
-    charLimit: 160,
-  },
-  email: {
-    label: 'Email',
-    icon: Mail,
-    pill: 'bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400',
-    accent: 'border-l-orange-500',
-    charLimit: null,
-  },
-  note: {
-    label: 'Note',
-    icon: StickyNote,
-    pill: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
-    accent: 'border-l-amber-500',
-    charLimit: null,
-  },
+const CHANNEL_META = {
+  sms:   { label: 'SMS',   icon: MessageSquare, charLimit: 160 },
+  email: { label: 'Email', icon: Mail,          charLimit: null },
+  note:  { label: 'Note',  icon: StickyNote,    charLimit: null },
 } as const;
 
-// ─── DraftCard ────────────────────────────────────────────────────────────────
+// ─── DraftRow ────────────────────────────────────────────────────────────────
 
-function DraftCard({
+function DraftRow({
   draft,
   slug,
   onAction,
@@ -103,11 +82,11 @@ function DraftCard({
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  const cfg = CHANNEL_CONFIG[draft.channel];
-  const Icon = cfg.icon;
+  const meta = CHANNEL_META[draft.channel];
+  const Icon = meta.icon;
   const isEdited = editedContent.trim() !== draft.content;
-  const overLimit = cfg.charLimit !== null && editedContent.length > cfg.charLimit;
-  const nearLimit = cfg.charLimit !== null && editedContent.length > cfg.charLimit * 0.85;
+  const overLimit = meta.charLimit !== null && editedContent.length > meta.charLimit;
+  const nearLimit = meta.charLimit !== null && editedContent.length > meta.charLimit * 0.85;
 
   function startEdit() {
     setEditing(true);
@@ -148,119 +127,144 @@ function DraftCard({
   }
 
   return (
-    <div className={cn('border-l-2 group/draft transition-colors', cfg.accent)}>
-      {/* Header row */}
-      <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1 px-5 pt-4 pb-3 border-b border-border/40">
-        <span className={cn('inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full', cfg.pill)}>
-          <Icon size={10} />
-          {cfg.label}
-        </span>
-        <ChippiBadge />
-
+    <article className="group/row py-5 first:pt-0 last:pb-0">
+      {/* Meta line: contact · channel · confidence · time */}
+      <div className="flex items-center gap-3 text-sm">
         {draft.Contact ? (
           <Link
             href={`/s/${slug}/contacts/${draft.Contact.id}`}
-            className="text-sm font-medium hover:underline underline-offset-2 truncate"
+            className="font-medium text-foreground hover:underline underline-offset-2 truncate"
           >
             {draft.Contact.name}
           </Link>
         ) : (
-          <span className="text-sm font-medium text-muted-foreground">Unknown contact</span>
+          <span className="font-medium text-muted-foreground">Unknown contact</span>
         )}
+
+        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <Icon size={12} className="opacity-70" />
+          {meta.label}
+        </span>
 
         {draft.Contact?.phone && draft.channel === 'sms' && (
-          <span className="text-xs text-muted-foreground hidden sm:block truncate">{draft.Contact.phone}</span>
+          <span className="hidden sm:inline text-xs text-muted-foreground tabular-nums truncate">
+            {draft.Contact.phone}
+          </span>
         )}
         {draft.Contact?.email && draft.channel === 'email' && (
-          <span className="text-xs text-muted-foreground hidden sm:block truncate">{draft.Contact.email}</span>
+          <span className="hidden sm:inline text-xs text-muted-foreground truncate">
+            {draft.Contact.email}
+          </span>
         )}
 
-        <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+        <span className="ml-auto flex items-center gap-2 flex-shrink-0">
           {draft.confidence !== null && draft.confidence !== undefined && (
-            <span className={cn(
-              'text-[11px] px-1.5 py-0.5 rounded-full font-medium',
-              draft.confidence >= 80
-                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                : draft.confidence >= 50
-                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
-                : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
-            )}>
-              {draft.confidence}% confident
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 text-[11px]',
+                draft.confidence >= 80
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : draft.confidence >= 50
+                    ? 'text-muted-foreground'
+                    : 'text-amber-600 dark:text-amber-400',
+              )}
+              title={`${draft.confidence}% confidence`}
+            >
+              <span
+                className={cn(
+                  'w-1.5 h-1.5 rounded-full',
+                  draft.confidence >= 80
+                    ? 'bg-emerald-500'
+                    : draft.confidence >= 50
+                      ? 'bg-muted-foreground/50'
+                      : 'bg-amber-500',
+                )}
+              />
+              {draft.confidence}%
             </span>
           )}
-          <span className="text-[11px] text-muted-foreground">{timeAgo(draft.createdAt)}</span>
-        </div>
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            {timeAgo(draft.createdAt)}
+          </span>
+        </span>
       </div>
+
+      {/* Subject (email only) */}
+      {draft.subject && (
+        <p className="mt-2 text-sm font-medium text-foreground">{draft.subject}</p>
+      )}
 
       {/* Body */}
-      <div className="px-5 py-3.5 space-y-3">
-        {draft.subject && (
-          <p className="text-xs font-semibold text-foreground">{draft.subject}</p>
-        )}
-
-        {editing ? (
-          <div className="space-y-1.5">
-            <textarea
-              ref={textareaRef}
-              value={editedContent}
-              onChange={(e) => setEditedContent(e.target.value)}
-              rows={Math.max(3, Math.ceil(editedContent.length / 60))}
-              className="w-full resize-none rounded-lg border bg-background px-3 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-            <span className={cn('text-[11px]', overLimit ? 'text-destructive font-medium' : nearLimit ? 'text-amber-500' : 'text-muted-foreground')}>
-              {editedContent.length}{cfg.charLimit ? `/${cfg.charLimit}` : ''} chars
-              {overLimit && ' — too long for SMS'}
-            </span>
-          </div>
-        ) : (
-          <div className="group/content relative">
-            <div className="rounded-lg bg-muted/50 px-3.5 py-3 text-sm whitespace-pre-wrap leading-relaxed pr-16">
-              {editedContent}
-              {isEdited && (
-                <span className="ml-1.5 text-[11px] text-orange-600 dark:text-orange-400 font-medium">(edited)</span>
-              )}
-            </div>
-            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-60 hover:opacity-100 focus-within:opacity-100 transition-opacity sm:opacity-0 sm:group-hover/content:opacity-100">
-              <button
-                onClick={copyContent}
-                className="w-6 h-6 rounded flex items-center justify-center bg-background border text-muted-foreground hover:text-foreground transition-colors"
-                title="Copy to clipboard"
-              >
-                {copied ? <Check size={11} /> : <Copy size={11} />}
-              </button>
-              <button
-                onClick={startEdit}
-                className="w-6 h-6 rounded flex items-center justify-center bg-background border text-muted-foreground hover:text-foreground transition-colors"
-                title="Edit message"
-              >
-                <Pencil size={11} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!editing && cfg.charLimit && editedContent.length > cfg.charLimit && (
-          <p className="flex items-center gap-1.5 text-[11px] text-destructive">
-            <AlertTriangle size={11} />
-            Exceeds {cfg.charLimit}-character SMS limit
+      {editing ? (
+        <div className="mt-2 space-y-1.5">
+          <textarea
+            ref={textareaRef}
+            value={editedContent}
+            onChange={(e) => setEditedContent(e.target.value)}
+            rows={Math.max(3, Math.ceil(editedContent.length / 60))}
+            className="w-full resize-none rounded-md border border-border bg-background px-3 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <span
+            className={cn(
+              'text-[11px] tabular-nums',
+              overLimit ? 'text-destructive font-medium' : nearLimit ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground',
+            )}
+          >
+            {editedContent.length}{meta.charLimit ? ` / ${meta.charLimit}` : ''} chars
+            {overLimit && ' — too long for SMS'}
+          </span>
+        </div>
+      ) : (
+        <div className="group/content relative mt-2">
+          <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap pr-14">
+            {editedContent}
+            {isEdited && (
+              <span className="ml-1.5 text-[11px] text-muted-foreground italic">(edited)</span>
+            )}
           </p>
-        )}
+          <div className="absolute top-0 right-0 flex items-center gap-1 opacity-0 group-hover/content:opacity-100 focus-within:opacity-100 transition-opacity">
+            <button
+              onClick={copyContent}
+              className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              title="Copy"
+              aria-label="Copy message"
+            >
+              {copied ? <Check size={11} /> : <Copy size={11} />}
+            </button>
+            <button
+              onClick={startEdit}
+              className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              title="Edit"
+              aria-label="Edit message"
+            >
+              <Pencil size={11} />
+            </button>
+          </div>
+        </div>
+      )}
 
-        {draft.reasoning && (
-          <p className="text-xs text-muted-foreground border-l-2 border-muted pl-2.5 leading-relaxed italic">
-            {draft.reasoning}
-          </p>
-        )}
-      </div>
+      {!editing && meta.charLimit && editedContent.length > meta.charLimit && (
+        <p className="mt-2 flex items-center gap-1.5 text-[11px] text-destructive">
+          <AlertTriangle size={11} />
+          Exceeds {meta.charLimit}-character SMS limit
+        </p>
+      )}
 
-      {/* Action bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 px-5 pb-4">
+      {/* Reasoning — quieter than before, no left border bar */}
+      {draft.reasoning && !editing && (
+        <p className="mt-2.5 text-[12px] leading-relaxed text-muted-foreground italic">
+          {draft.reasoning}
+        </p>
+      )}
+
+      {/* Actions */}
+      <div className="mt-3.5 flex items-center gap-1.5">
         {draft.channel === 'sms' || draft.channel === 'email' ? (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
                 size="sm"
-                className="gap-1.5 h-8 w-full sm:w-auto text-xs"
+                className="h-8 gap-1.5 text-xs"
                 disabled={actioning !== null || (overLimit && draft.channel === 'sms')}
               >
                 {actioning === 'approved' ? (
@@ -268,7 +272,7 @@ function DraftCard({
                 ) : (
                   <Send size={12} />
                 )}
-                {editing ? 'Save & Send' : 'Approve & Send'}
+                {editing ? 'Save & send' : 'Approve & send'}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -292,7 +296,7 @@ function DraftCard({
         ) : (
           <Button
             size="sm"
-            className="gap-1.5 h-8 w-full sm:w-auto text-xs"
+            className="h-8 gap-1.5 text-xs"
             onClick={handleApprove}
             disabled={actioning !== null}
           >
@@ -301,12 +305,12 @@ function DraftCard({
             ) : (
               <CheckCircle2 size={12} />
             )}
-            {editing ? 'Save & Approve' : 'Approve'}
+            {editing ? 'Save & approve' : 'Approve'}
           </Button>
         )}
 
         {!editing && (
-          <Button size="sm" variant="outline" className="gap-1.5 h-8 w-full sm:w-auto text-xs" onClick={startEdit}>
+          <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground" onClick={startEdit}>
             <Pencil size={11} />
             Edit
           </Button>
@@ -316,7 +320,7 @@ function DraftCard({
           <Button
             size="sm"
             variant="ghost"
-            className="h-8 text-muted-foreground hover:text-foreground w-full sm:w-auto text-xs sm:ml-auto"
+            className="h-8 text-xs text-muted-foreground hover:text-foreground ml-auto"
             onClick={cancelEdit}
           >
             Cancel
@@ -325,7 +329,7 @@ function DraftCard({
           <Button
             size="sm"
             variant="ghost"
-            className="h-8 text-muted-foreground hover:text-destructive w-full sm:w-auto text-xs sm:ml-auto"
+            className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-destructive ml-auto"
             onClick={handleDismiss}
             disabled={actioning !== null}
           >
@@ -340,16 +344,16 @@ function DraftCard({
       </div>
 
       {dismissError && (
-        <p className="flex items-center gap-1.5 px-5 pb-3 text-xs text-destructive">
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-destructive">
           <AlertTriangle size={11} />
           {dismissError}
         </p>
       )}
-    </div>
+    </article>
   );
 }
 
-// ─── DeliveryBanner ────────────────────────────────────────────────────────────
+// ─── DeliveryBanner ──────────────────────────────────────────────────────────
 
 const DELIVERY_LABELS: Record<'email' | 'sms' | 'note', string> = {
   email: 'email',
@@ -370,36 +374,47 @@ function DeliveryBanner({ feedback, onClose }: { feedback: DeliveryFeedback; onC
   if (result.sent) {
     const msg = result.method === 'note'
       ? contactName ? `Note logged for ${contactName}` : 'Note logged'
-      : contactName ? `Sent ✓ — ${contactName} via ${methodLabel}` : `Sent ✓ via ${methodLabel}`;
+      : contactName ? `Sent to ${contactName} via ${methodLabel}` : `Sent via ${methodLabel}`;
     return (
-      <div className="flex items-center gap-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-400">
-        <Send size={13} className="flex-shrink-0" />
-        <span className="font-medium">{msg}</span>
-        <button onClick={onClose} className="ml-auto text-emerald-500 hover:text-emerald-700"><XCircle size={14} /></button>
+      <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 py-2">
+        <Send size={12} className="flex-shrink-0" />
+        <span>{msg}</span>
+        <button onClick={onClose} className="ml-auto text-muted-foreground hover:text-foreground" aria-label="Dismiss">
+          <XCircle size={12} />
+        </button>
       </div>
     );
   }
 
   if (isNotConfigured) {
     return (
-      <div className="flex items-start gap-2.5 rounded-lg bg-muted/50 border border-border px-3 py-2.5 text-sm text-muted-foreground">
-        <Copy size={13} className="flex-shrink-0 mt-0.5" />
-        <span>Copied to clipboard. Add <code className="text-[11px] bg-muted px-1 rounded">{methodLabel === 'email' ? 'RESEND_API_KEY' : 'TELNYX_API_KEY'}</code> to enable auto-send.</span>
-        <button onClick={onClose} className="ml-auto flex-shrink-0"><XCircle size={14} /></button>
+      <div className="flex items-start gap-2 text-xs text-muted-foreground py-2">
+        <Copy size={12} className="flex-shrink-0 mt-0.5" />
+        <span>
+          Copied to clipboard. Add{' '}
+          <code className="text-[11px] bg-muted px-1 rounded">
+            {methodLabel === 'email' ? 'RESEND_API_KEY' : 'TELNYX_API_KEY'}
+          </code>
+          {' '}to enable auto-send.
+        </span>
+        <button onClick={onClose} className="ml-auto flex-shrink-0" aria-label="Dismiss"><XCircle size={12} /></button>
       </div>
     );
   }
 
   return (
-    <div className="flex items-start gap-2.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-400">
-      <TriangleAlert size={13} className="flex-shrink-0 mt-0.5" />
-      <span><span className="font-medium">Delivery failed</span> — draft approved but {methodLabel} not sent.{result.error && <span className="opacity-75"> {result.error}</span>}</span>
-      <button onClick={onClose} className="ml-auto flex-shrink-0"><XCircle size={14} /></button>
+    <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 py-2">
+      <TriangleAlert size={12} className="flex-shrink-0 mt-0.5" />
+      <span>
+        <span className="font-medium">Delivery failed</span> — draft approved but {methodLabel} not sent.
+        {result.error && <span className="opacity-75"> {result.error}</span>}
+      </span>
+      <button onClick={onClose} className="ml-auto flex-shrink-0" aria-label="Dismiss"><XCircle size={12} /></button>
     </div>
   );
 }
 
-// ─── AgentDraftInbox ───────────────────────────────────────────────────────────
+// ─── AgentDraftInbox ─────────────────────────────────────────────────────────
 
 export function AgentDraftInbox({ slug }: Props) {
   const [drafts, setDrafts] = useState<AgentDraft[]>([]);
@@ -494,69 +509,72 @@ export function AgentDraftInbox({ slug }: Props) {
   }
 
   return (
-    <section className="rounded-2xl border bg-card overflow-hidden">
-      {/* Section header */}
-      <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-border/60">
-        <Mail size={14} className="text-orange-500 flex-shrink-0" />
-        <h2 className="text-sm font-semibold">Drafts from Chippi</h2>
+    <section>
+      {/* Section header — typography driven, no card chrome */}
+      <div className="flex items-center gap-3 pb-3 border-b border-border/60">
+        <h2 className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
+          Drafts
+        </h2>
         {!loading && drafts.length > 0 && (
-          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white min-w-[20px] text-center">
+          <span className="text-[11px] text-muted-foreground tabular-nums">
             {drafts.length}
           </span>
         )}
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-2">
           {!loading && drafts.length > 1 && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 text-xs gap-1.5"
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
               onClick={approveAll}
               disabled={approvingAll}
             >
-              {approvingAll ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle size={11} />}
+              {approvingAll ? <Loader2 size={11} className="animate-spin" /> : null}
               Approve all
             </Button>
           )}
-          <Button variant="ghost" size="sm" onClick={load} className="h-7 w-7 p-0">
+          <button
+            onClick={load}
+            className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+            title="Refresh"
+            aria-label="Refresh drafts"
+          >
             <RefreshCw size={12} />
-          </Button>
+          </button>
         </div>
       </div>
 
       {/* Delivery banner */}
       {deliveryFeedback && (
-        <div className="px-5 py-3 border-b border-border/60">
+        <div className="border-b border-border/60">
           <DeliveryBanner feedback={deliveryFeedback} onClose={() => setDeliveryFeedback(null)} />
         </div>
       )}
 
       {/* Loading */}
       {loading && (
-        <div className="px-5 py-5 space-y-3">
+        <div className="space-y-4 pt-5">
           {[1, 2].map((n) => (
-            <div key={n} className="h-28 rounded-xl bg-muted/40 animate-pulse" />
+            <div key={n} className="space-y-2">
+              <div className="h-4 w-48 rounded bg-muted/50 animate-pulse" />
+              <div className="h-12 w-full rounded bg-muted/30 animate-pulse" />
+            </div>
           ))}
         </div>
       )}
 
       {/* Empty state */}
       {!loading && drafts.length === 0 && (
-        <div className="flex items-center gap-3.5 px-5 py-8">
-          <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 size={16} className="text-emerald-500" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-foreground">Inbox is clear</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Chippi will leave new outreach here whenever there&apos;s someone worth following up with.</p>
-          </div>
+        <div className="py-8 text-sm text-muted-foreground">
+          Inbox is clear. Chippi will leave new outreach here whenever there&apos;s someone worth following up with.
         </div>
       )}
 
       {/* Draft rows */}
       {!loading && drafts.length > 0 && (
-        <div className="divide-y divide-border/40">
+        <div className="divide-y divide-border/60">
           {drafts.map((draft) => (
-            <DraftCard key={draft.id} draft={draft} slug={slug} onAction={handleAction} />
+            <DraftRow key={draft.id} draft={draft} slug={slug} onAction={handleAction} />
           ))}
         </div>
       )}

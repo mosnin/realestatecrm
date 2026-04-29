@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Target, Plus, CheckCircle2, X } from 'lucide-react';
+import { Plus, CheckCircle2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -19,27 +19,12 @@ interface AgentGoal {
   completedAt: string | null;
 }
 
-const GOAL_TYPE_CONFIG: Record<string, { label: string; pill: string }> = {
-  follow_up_sequence: {
-    label: 'Follow-up',
-    pill: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
-  },
-  tour_booking: {
-    label: 'Tour booking',
-    pill: 'bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400',
-  },
-  offer_progress: {
-    label: 'Offer progress',
-    pill: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
-  },
-  reengagement: {
-    label: 'Re-engagement',
-    pill: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
-  },
-  custom: {
-    label: 'Custom',
-    pill: 'bg-muted text-muted-foreground',
-  },
+const GOAL_TYPE_LABELS: Record<string, string> = {
+  follow_up_sequence: 'Follow-up',
+  tour_booking: 'Tour booking',
+  offer_progress: 'Offer progress',
+  reengagement: 'Re-engagement',
+  custom: 'Custom',
 };
 
 const GOAL_TYPE_OPTIONS = [
@@ -50,11 +35,12 @@ const GOAL_TYPE_OPTIONS = [
   { value: 'custom', label: 'Custom' },
 ] as const;
 
-// ─── GoalRow ───────────────────────────────────────────────────────────────────
+// ─── GoalRow ──────────────────────────────────────────────────────────────────
 
 function GoalRow({ goal, onAction }: { goal: AgentGoal; onAction: (id: string, status: 'completed' | 'cancelled') => Promise<void> }) {
   const [actioning, setActioning] = useState<'completed' | 'cancelled' | null>(null);
-  const cfg = GOAL_TYPE_CONFIG[goal.goalType] ?? GOAL_TYPE_CONFIG.custom;
+  const label = GOAL_TYPE_LABELS[goal.goalType] ?? GOAL_TYPE_LABELS.custom;
+  const isHighPriority = goal.priority >= 8;
 
   async function handleAction(status: 'completed' | 'cancelled') {
     setActioning(status);
@@ -63,47 +49,33 @@ function GoalRow({ goal, onAction }: { goal: AgentGoal; onAction: (id: string, s
   }
 
   return (
-    <div className="flex items-start gap-4 px-5 py-4">
-      {/* Left: type + priority */}
-      <div className="flex flex-col gap-1.5 flex-shrink-0 pt-0.5">
-        <span className={cn('inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap', cfg.pill)}>
-          {cfg.label}
-        </span>
-        {goal.priority > 0 && (
-          <span className={cn(
-            'text-[10px] font-medium px-1.5 py-0.5 rounded-full text-center',
-            goal.priority >= 8
-              ? 'bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400'
-              : goal.priority >= 5
-              ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400'
-              : 'bg-muted text-muted-foreground',
-          )}>
-            P{goal.priority}
-          </span>
-        )}
-      </div>
+    <div className="group/row flex items-start gap-4 py-4 first:pt-0 last:pb-0">
+      <div className="flex-1 min-w-0">
+        {/* Meta line */}
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground/80">{label}</span>
+          {isHighPriority && (
+            <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              High priority
+            </span>
+          )}
+          {goal.Contact && <span className="truncate">{goal.Contact.name}</span>}
+        </div>
 
-      {/* Middle: description + contact */}
-      <div className="flex-1 min-w-0 space-y-1">
-        <p className="text-sm text-foreground leading-snug">{goal.description}</p>
+        <p className="mt-1 text-sm text-foreground leading-snug">{goal.description}</p>
         {goal.instructions && (
-          <p className="text-[12px] text-muted-foreground/80 italic line-clamp-2">{goal.instructions}</p>
-        )}
-        {goal.Contact && (
-          <p className="text-xs text-muted-foreground">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/40 mr-1.5" aria-hidden="true" />
-            {goal.Contact.name}
-          </p>
+          <p className="mt-1 text-[12px] text-muted-foreground italic line-clamp-2">{goal.instructions}</p>
         )}
       </div>
 
-      {/* Right: actions */}
-      <div className="flex items-center gap-1.5 flex-shrink-0">
+      <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity pt-0.5">
         <button
           onClick={() => void handleAction('completed')}
           disabled={actioning !== null}
           title="Mark as completed"
-          className="w-7 h-7 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50 dark:hover:text-emerald-400 dark:hover:border-emerald-500/30 dark:hover:bg-emerald-500/10 transition-colors disabled:opacity-40"
+          aria-label="Mark goal as completed"
+          className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:text-emerald-400 dark:hover:bg-emerald-500/10 transition-colors disabled:opacity-40"
         >
           <CheckCircle2 size={13} />
         </button>
@@ -111,7 +83,8 @@ function GoalRow({ goal, onAction }: { goal: AgentGoal; onAction: (id: string, s
           onClick={() => void handleAction('cancelled')}
           disabled={actioning !== null}
           title="Cancel goal"
-          className="w-7 h-7 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-red-600 hover:border-red-300 hover:bg-red-50 dark:hover:text-red-400 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 transition-colors disabled:opacity-40"
+          aria-label="Cancel goal"
+          className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40"
         >
           <X size={13} />
         </button>
@@ -120,7 +93,7 @@ function GoalRow({ goal, onAction }: { goal: AgentGoal; onAction: (id: string, s
   );
 }
 
-// ─── NewGoalForm ───────────────────────────────────────────────────────────────
+// ─── NewGoalForm ──────────────────────────────────────────────────────────────
 
 function NewGoalForm({ onSubmit, onCancel }: { onSubmit: (goalType: string, description: string) => Promise<void>; onCancel: () => void }) {
   const [goalType, setGoalType] = useState<string>('follow_up_sequence');
@@ -136,53 +109,56 @@ function NewGoalForm({ onSubmit, onCancel }: { onSubmit: (goalType: string, desc
     if (!canSubmit) return;
     setError(null);
     setSubmitting(true);
-    try { await onSubmit(goalType, description.trim()); }
-    catch { setError('Failed to create goal. Please try again.'); setSubmitting(false); }
+    try {
+      await onSubmit(goalType, description.trim());
+    } catch {
+      setError('Failed to create goal. Please try again.');
+      setSubmitting(false);
+    }
   }
 
   return (
-    <div className="border-t border-border/60 px-5 py-4 bg-muted/20">
+    <div className="py-5 border-t border-border/60">
       <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
-        <p className="text-xs font-semibold text-foreground uppercase tracking-wide">New goal</p>
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
-          <div className="space-y-2">
-            <select
-              value={goalType}
-              onChange={(e) => setGoalType(e.target.value)}
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              {GOAL_TYPE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              placeholder="Describe what the agent should accomplish…"
-              required
-              className={cn(
-                'w-full resize-none rounded-lg border bg-background px-3 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring',
-                descriptionTooShort && 'border-destructive',
-              )}
-            />
-            {descriptionTooShort && <p className="text-xs text-destructive">At least 10 characters required.</p>}
-            {error && <p className="text-xs text-destructive">{error}</p>}
-          </div>
-        </div>
+        <select
+          value={goalType}
+          onChange={(e) => setGoalType(e.target.value)}
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          {GOAL_TYPE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+          placeholder="Describe what Chippi should accomplish…"
+          required
+          className={cn(
+            'w-full resize-none rounded-md border bg-background px-3 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring',
+            descriptionTooShort ? 'border-destructive' : 'border-border',
+          )}
+        />
+        {descriptionTooShort && <p className="text-xs text-destructive">At least 10 characters required.</p>}
+        {error && <p className="text-xs text-destructive">{error}</p>}
         <div className="flex items-center gap-2">
           <button
             type="submit"
             disabled={!canSubmit}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-opacity',
+              'inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity',
               !canSubmit && 'opacity-50 cursor-not-allowed',
             )}
           >
-            <Plus size={12} />
+            <Plus size={11} />
             {submitting ? 'Creating…' : 'Create goal'}
           </button>
-          <button type="button" onClick={onCancel} className="text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5"
+          >
             Cancel
           </button>
         </div>
@@ -191,7 +167,7 @@ function NewGoalForm({ onSubmit, onCancel }: { onSubmit: (goalType: string, desc
   );
 }
 
-// ─── AgentGoalsPanel ───────────────────────────────────────────────────────────
+// ─── AgentGoalsPanel ─────────────────────────────────────────────────────────
 
 export function AgentGoalsPanel() {
   const [goals, setGoals] = useState<AgentGoal[]>([]);
@@ -218,7 +194,7 @@ export function AgentGoalsPanel() {
       });
       if (res.ok) {
         setGoals((prev) => prev.filter((g) => g.id !== id));
-        if (status === 'completed') toast.success('Goal completed!');
+        if (status === 'completed') toast.success('Goal completed');
       } else {
         toast.error('Could not update goal — please try again');
         throw new Error('update failed');
@@ -244,60 +220,48 @@ export function AgentGoalsPanel() {
   }
 
   return (
-    <section className="rounded-2xl border bg-card overflow-hidden">
-      {/* Section header */}
-      <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-border/60">
-        <Target size={14} className="text-muted-foreground flex-shrink-0" />
-        <h2 className="text-sm font-semibold">Active Goals</h2>
+    <section>
+      <div className="flex items-center gap-3 pb-3 border-b border-border/60">
+        <h2 className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
+          Goals
+        </h2>
         {!loading && goals.length > 0 && (
-          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground min-w-[20px] text-center">
+          <span className="text-[11px] text-muted-foreground tabular-nums">
             {goals.length}
           </span>
         )}
         <button
           onClick={() => setShowForm((v) => !v)}
           className={cn(
-            'ml-auto inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
-            showForm
-              ? 'border-primary bg-primary/5 text-primary'
-              : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted/40',
+            'ml-auto inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors',
+            showForm ? 'text-foreground bg-muted/60' : 'text-muted-foreground hover:text-foreground hover:bg-muted/40',
           )}
         >
-          <Plus size={12} />
-          New Goal
+          <Plus size={11} />
+          New goal
         </button>
       </div>
 
-      {/* Loading */}
       {loading && (
-        <div className="px-5 py-5 space-y-3">
-          {[1, 2].map((n) => <div key={n} className="h-16 rounded-xl bg-muted/40 animate-pulse" />)}
+        <div className="space-y-3 pt-5">
+          {[1, 2].map((n) => <div key={n} className="h-12 rounded bg-muted/30 animate-pulse" />)}
         </div>
       )}
 
-      {/* Goal rows */}
       {!loading && goals.length > 0 && (
-        <div className="divide-y divide-border/40">
+        <div className="divide-y divide-border/60">
           {goals.map((goal) => (
             <GoalRow key={goal.id} goal={goal} onAction={handleAction} />
           ))}
         </div>
       )}
 
-      {/* Empty state */}
       {!loading && goals.length === 0 && !showForm && (
-        <div className="flex items-center gap-3.5 px-5 py-8">
-          <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-            <Target size={16} className="text-muted-foreground/60" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-foreground">No active goals</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Goals let you track multi-step objectives the agent should work toward for specific contacts.</p>
-          </div>
+        <div className="py-8 text-sm text-muted-foreground">
+          No active goals. Goals let you track multi-step objectives Chippi should work toward.
         </div>
       )}
 
-      {/* New goal form */}
       {showForm && <NewGoalForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />}
     </section>
   );

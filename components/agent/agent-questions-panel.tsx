@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { HelpCircle, Send, CheckCircle2, User } from 'lucide-react';
+import { Send, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 
@@ -17,26 +17,24 @@ interface AgentQuestion {
   status: 'pending' | 'answered' | 'expired';
 }
 
-function formatAgentType(raw: string): string {
-  return raw.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
+// ─── QuestionRow ─────────────────────────────────────────────────────────────
 
-// ─── QuestionCard ──────────────────────────────────────────────────────────────
-
-function QuestionCard({ question, onAnswered }: { question: AgentQuestion; onAnswered: (id: string) => void }) {
+function QuestionRow({ question, onAnswered }: { question: AgentQuestion; onAnswered: (id: string) => void }) {
   const [answer, setAnswer] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [answeredOk, setAnsweredOk] = useState(false);
   const [fading, setFading] = useState(false);
-  const [expanded, setExpanded] = useState(false);
 
   const isHighPriority = question.priority >= 50;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = answer.trim();
-    if (!trimmed) { setError('Please write an answer'); return; }
+    if (!trimmed) {
+      setError('Please write an answer');
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -60,92 +58,77 @@ function QuestionCard({ question, onAnswered }: { question: AgentQuestion; onAns
 
   return (
     <article
-      role="article"
       className={cn(
-        'border-l-2 transition-opacity duration-300',
+        'py-5 first:pt-0 last:pb-0 transition-opacity duration-300',
         fading && 'opacity-0',
-        isHighPriority ? 'border-l-amber-500' : 'border-l-blue-400',
       )}
     >
-      <div className="px-5 pt-4 pb-3 space-y-2.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={cn(
-            'inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full',
-            isHighPriority
-              ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-              : 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
-          )}>
-            {formatAgentType(question.agentType)}
+      {/* Meta line */}
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        {isHighPriority && (
+          <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            High priority
           </span>
-          {question.Contact && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-              <User size={11} />
-              {question.Contact.name}
-            </span>
-          )}
-          <span className="ml-auto text-[11px] text-muted-foreground flex-shrink-0">
-            {timeAgo(question.createdAt)}
-          </span>
-        </div>
-
-        <div>
-          <p className={cn('text-sm font-medium leading-snug', !expanded && 'line-clamp-3')}>
-            {question.question}
-          </p>
-          {question.question.length > 120 && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="mt-0.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {expanded ? 'Show less' : 'Show more'}
-            </button>
-          )}
-        </div>
-
-        {question.context && (
-          <p className={cn('text-xs text-muted-foreground italic leading-snug', !expanded && 'line-clamp-2')}>
-            {question.context}
-          </p>
         )}
+        {question.Contact && (
+          <span className="truncate">{question.Contact.name}</span>
+        )}
+        <span className="ml-auto tabular-nums">{timeAgo(question.createdAt)}</span>
       </div>
 
-      <form onSubmit={handleSubmit} className="px-5 pb-4 space-y-2">
+      {/* Question */}
+      <p className="mt-1.5 text-sm font-medium text-foreground leading-relaxed">
+        {question.question}
+      </p>
+
+      {/* Context */}
+      {question.context && (
+        <p className="mt-1.5 text-[12px] text-muted-foreground italic leading-relaxed">
+          {question.context}
+        </p>
+      )}
+
+      {/* Answer form */}
+      <form onSubmit={handleSubmit} className="mt-3">
         {answeredOk ? (
-          <div className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 py-1">
+          <div className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 size={14} />
-            Answered ✓
+            Answered, thanks
           </div>
         ) : (
-          <>
+          <div className="space-y-2">
             <textarea
               rows={2}
               value={answer}
-              onChange={(e) => { setAnswer(e.target.value); if (error) setError(null); }}
-              placeholder="Your answer..."
+              onChange={(e) => {
+                setAnswer(e.target.value);
+                if (error) setError(null);
+              }}
+              placeholder="Your answer…"
               disabled={submitting}
-              className="text-sm w-full border border-border rounded-lg p-2.5 resize-none bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
+              className="text-sm w-full border border-border rounded-md p-2.5 resize-none bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 leading-relaxed"
               aria-label="Your answer"
             />
-            {error && <p className="text-xs text-destructive">{error}</p>}
-            <div className="flex justify-end">
+            <div className="flex items-center gap-2">
+              {error && <p className="text-xs text-destructive">{error}</p>}
               <button
                 type="submit"
                 disabled={submitting || !answer.trim()}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-foreground text-background text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Send size={12} />
-                {submitting ? 'Sending…' : 'Submit'}
+                <Send size={11} />
+                {submitting ? 'Sending…' : 'Send'}
               </button>
             </div>
-          </>
+          </div>
         )}
       </form>
     </article>
   );
 }
 
-// ─── AgentQuestionsPanel ──────────────────────────────────────────────────────
+// ─── AgentQuestionsPanel ─────────────────────────────────────────────────────
 
 const PAGE_SIZE = 10;
 
@@ -172,64 +155,54 @@ export function AgentQuestionsPanel() {
     setQuestions((prev) => prev.filter((q) => q.id !== id));
   }
 
+  // Hide the section entirely when there's nothing to weigh in on — keeps the
+  // page calm. The chat surface still tells the user Chippi will check in
+  // when stuck.
+  if (!loading && questions.length === 0) return null;
+
   const visible = showAll ? questions : questions.slice(0, PAGE_SIZE);
   const hiddenCount = questions.length - PAGE_SIZE;
 
   return (
-    <section className="rounded-2xl border bg-card overflow-hidden">
-      {/* Section header */}
-      <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-border/60">
-        <HelpCircle size={14} className="text-amber-500 flex-shrink-0" />
-        <h2 className="text-sm font-semibold">Chippi needs your input</h2>
+    <section>
+      <div className="flex items-center gap-3 pb-3 border-b border-border/60">
+        <h2 className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
+          Needs your input
+        </h2>
         {!loading && questions.length > 0 && (
-          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white min-w-[20px] text-center">
+          <span className="text-[11px] text-muted-foreground tabular-nums">
             {questions.length}
           </span>
         )}
       </div>
 
-      {/* Loading */}
       {loading && (
-        <div className="px-5 py-5 space-y-3">
+        <div className="space-y-4 pt-5">
           {[1, 2].map((n) => (
-            <div key={n} className="h-16 rounded-xl bg-muted/40 animate-pulse" />
+            <div key={n} className="space-y-2">
+              <div className="h-4 w-40 rounded bg-muted/50 animate-pulse" />
+              <div className="h-10 w-full rounded bg-muted/30 animate-pulse" />
+            </div>
           ))}
         </div>
       )}
 
-      {/* Empty state */}
-      {!loading && questions.length === 0 && (
-        <div className="flex items-center gap-3.5 px-5 py-8">
-          <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 size={16} className="text-emerald-500" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-foreground">Nothing to weigh in on</p>
-            <p className="text-xs text-muted-foreground mt-0.5">When Chippi hits a judgment call &mdash; price, tone, timing &mdash; it&apos;ll check with you here first.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Question rows */}
       {!loading && visible.length > 0 && (
-        <div className="divide-y divide-border/40">
+        <div className="divide-y divide-border/60">
           {visible.map((q) => (
-            <QuestionCard key={q.id} question={q} onAnswered={handleAnswered} />
+            <QuestionRow key={q.id} question={q} onAnswered={handleAnswered} />
           ))}
         </div>
       )}
 
-      {/* Show more */}
       {!loading && !showAll && hiddenCount > 0 && (
-        <div className="px-5 py-3 border-t border-border/40">
-          <button
-            type="button"
-            onClick={() => setShowAll(true)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Show {hiddenCount} more question{hiddenCount !== 1 ? 's' : ''}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Show {hiddenCount} more question{hiddenCount !== 1 ? 's' : ''}
+        </button>
       )}
     </section>
   );

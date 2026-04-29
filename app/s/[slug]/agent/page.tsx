@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Play, Loader2 } from 'lucide-react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { AgentDraftInbox } from '@/components/agent/agent-draft-inbox';
 import { AgentQuestionsPanel } from '@/components/agent/agent-questions-panel';
@@ -10,16 +10,33 @@ import { AgentGoalsPanel } from '@/components/agent/agent-goals-panel';
 import { ChippiTerminal } from '@/components/agent/chippi-terminal';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { AgentPortfolioInsights } from '@/components/agent/agent-portfolio-insights';
-import { ChippiAvatar } from '@/components/agent/chippi-avatar';
-import { cn } from '@/lib/utils';
+
+interface Counts {
+  drafts: number;
+  questions: number;
+  goals: number;
+}
+
+function pluralizeWaiting(c: Counts, running: boolean): string {
+  if (running) return 'Working through your pipeline now…';
+  const total = c.drafts + c.questions;
+  if (total === 0) return 'Nothing waiting on you — pipeline looks healthy.';
+  const parts: string[] = [];
+  if (c.drafts > 0) parts.push(`${c.drafts} draft${c.drafts === 1 ? '' : 's'}`);
+  if (c.questions > 0) parts.push(`${c.questions} question${c.questions === 1 ? '' : 's'}`);
+  return `${parts.join(' · ')} waiting for you.`;
+}
 
 export default function AgentPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const slug = params.slug as string;
-  const [view, setView] = useState<'workspace' | 'settings'>('workspace');
+  const tab = searchParams?.get('tab') ?? null;
+  const isSettings = tab === 'settings';
+
   const [running, setRunning] = useState(false);
-  const [counts, setCounts] = useState({ drafts: 0, questions: 0, goals: 0 });
-  const [countsLoading, setCountsLoading] = useState(true);
+  const [counts, setCounts] = useState<Counts>({ drafts: 0, questions: 0, goals: 0 });
+  const [, setCountsLoading] = useState(true);
 
   useEffect(() => {
     async function loadCounts() {
@@ -54,7 +71,11 @@ export default function AgentPage() {
       const res = await fetch('/api/agent/run-now', { method: 'POST' });
       const data = res.ok ? await res.json() : null;
       if (res.ok && data?.triggered) {
-        toast.success(data.method === 'modal' ? 'Chippi is on it — watch the activity feed' : 'Queued — Chippi will pick this up at the next heartbeat (~15 min)');
+        toast.success(
+          data.method === 'modal'
+            ? 'Chippi is on it — watch the activity feed'
+            : 'Queued — Chippi will pick this up at the next heartbeat (~15 min)',
+        );
       } else {
         toast.error("Couldn't kick off Chippi — please try again");
       }
@@ -66,101 +87,47 @@ export default function AgentPage() {
   }
 
   return (
-    <div className="space-y-5">
-      {/* ── Command bar ─────────────────────────────────────── */}
-      <div className="rounded-2xl border bg-card px-5 py-4">
-        <div className="flex items-center gap-4 flex-wrap gap-y-3">
-          {/* Identity */}
-          <div className="flex items-center gap-3.5">
-            <ChippiAvatar size="md" pulse={running} />
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-semibold tracking-tight">Chippi</h1>
-                <span className="flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  {running ? 'Working now' : 'On the clock'}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Your AI cowork &middot; drafts outreach, watches your pipeline, asks when stuck
-              </p>
-            </div>
-          </div>
-
-          {/* Quick stats */}
-          {countsLoading ? (
-            <div className="flex items-center gap-3">
-              {[80, 72, 60].map((w) => (
-                <div key={w} className={`h-9 w-${w === 80 ? '20' : w === 72 ? '[4.5rem]' : '16'} rounded-lg bg-muted/50 animate-pulse`} />
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center rounded-xl border border-border overflow-hidden">
-              {[
-                { label: 'Drafts', value: counts.drafts, accent: counts.drafts > 0 ? 'text-orange-500' : 'text-muted-foreground' },
-                { label: 'Questions', value: counts.questions, accent: counts.questions > 0 ? 'text-amber-500' : 'text-muted-foreground' },
-                { label: 'Goals', value: counts.goals, accent: 'text-muted-foreground' },
-              ].map((s, i) => (
-                <div
-                  key={s.label}
-                  className={cn('flex items-baseline gap-2 px-4 py-2.5', i > 0 && 'border-l border-border')}
-                >
-                  <span className={cn('text-base font-bold tabular-nums leading-none', s.accent)}>{s.value}</span>
-                  <span className="text-[11px] text-muted-foreground">{s.label}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Tabs + Run Now */}
-          <div className="ml-auto flex items-center gap-2">
-            <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5 gap-0.5">
-              <button
-                onClick={() => setView('workspace')}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                  view === 'workspace' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                Workspace
-              </button>
-              <button
-                onClick={() => setView('settings')}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                  view === 'settings' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                Settings
-              </button>
-            </div>
-            <button
-              onClick={() => void handleRunNow()}
-              disabled={running}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-orange-500 text-white text-xs font-semibold hover:bg-orange-600 active:scale-95 transition-all disabled:opacity-50"
-            >
-              {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-              Run Now
-            </button>
-          </div>
+    <div className="space-y-10 pb-12">
+      {/* Page header */}
+      <header className="flex flex-wrap items-end justify-between gap-4 pt-2">
+        <div className="space-y-1.5">
+          <h1
+            className="text-3xl tracking-tight text-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+          >
+            {isSettings ? 'Chippi · Settings' : 'Inbox'}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {isSettings
+              ? 'Tune what Chippi does on its own and what it brings to you.'
+              : pluralizeWaiting(counts, running)}
+          </p>
         </div>
-      </div>
+        {!isSettings && (
+          <button
+            onClick={() => void handleRunNow()}
+            disabled={running}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-foreground text-background text-xs font-semibold hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+            Run now
+          </button>
+        )}
+      </header>
 
-      {/* ── Settings view ───────────────────────────────────── */}
-      {view === 'settings' && <AgentSettingsPanel slug={slug} />}
+      {/* Settings view */}
+      {isSettings && <AgentSettingsPanel slug={slug} />}
 
-      {/* ── Workspace view ──────────────────────────────────── */}
-      {view === 'workspace' && (
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5 items-start">
-          {/* Left: inbox sections */}
-          <div className="space-y-5">
-            <AgentDraftInbox slug={slug} />
-            <AgentQuestionsPanel />
-            <AgentGoalsPanel />
-          </div>
-          {/* Right: terminal + portfolio */}
-          <div className="space-y-5">
-            <ChippiTerminal className="min-h-[280px]" />
+      {/* Workspace view */}
+      {!isSettings && (
+        <div className="space-y-12">
+          <AgentDraftInbox slug={slug} />
+          <AgentQuestionsPanel />
+          <AgentGoalsPanel />
+
+          {/* Activity / context — quieter, lives below the work */}
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-8 items-start pt-2">
+            <ChippiTerminal className="min-h-[260px]" />
             <AgentPortfolioInsights />
           </div>
         </div>
