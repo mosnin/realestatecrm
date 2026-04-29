@@ -513,7 +513,7 @@ export function AgentDraftInbox({ slug }: Props) {
       {/* Section header — typography driven, no card chrome */}
       <div className="flex items-center gap-3 pb-3 border-b border-border/60">
         <h2 className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
-          Drafts
+          Drafts I made
         </h2>
         {!loading && drafts.length > 0 && (
           <span className="text-[11px] text-muted-foreground tabular-nums">

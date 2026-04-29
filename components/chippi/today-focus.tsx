@@ -59,7 +59,7 @@ export function TodayFocus({ slug }: { slug: string }) {
     <section>
       <div className="flex items-center gap-3 pb-3 border-b border-border/60">
         <h2 className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
-          Today&apos;s focus
+          Who to reach today
         </h2>
         {!loading && data.items.length > 0 && (
           <span className="text-[11px] text-muted-foreground tabular-nums">

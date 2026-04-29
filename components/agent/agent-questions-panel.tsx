@@ -167,7 +167,7 @@ export function AgentQuestionsPanel() {
     <section>
       <div className="flex items-center gap-3 pb-3 border-b border-border/60">
         <h2 className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
-          Needs your input
+          Questions I have
         </h2>
         {!loading && questions.length > 0 && (
           <span className="text-[11px] text-muted-foreground tabular-nums">
