@@ -62,9 +62,9 @@ export default async function GeneralSettingsPage({
         </div>
       )}
 
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">General</h1>
-        <p className="text-muted-foreground text-sm">Workspace name, slug, and contact information</p>
+      <div className="space-y-1">
+        <h2 className="text-base font-medium text-foreground">General</h2>
+        <p className="text-[13px] text-muted-foreground">Workspace name, slug, and contact information</p>
       </div>
       <GeneralSettingsForm space={space} settings={settings} />
     </div>

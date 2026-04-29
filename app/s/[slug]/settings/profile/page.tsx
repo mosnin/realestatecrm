@@ -130,9 +130,9 @@ export default function ProfileSettingsPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Profile</h1>
-        <p className="text-muted-foreground text-sm">Your personal information, bio, and social links</p>
+      <div className="space-y-1">
+        <h2 className="text-base font-medium text-foreground">Profile</h2>
+        <p className="text-[13px] text-muted-foreground">Your personal information, bio, and social links</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-5">

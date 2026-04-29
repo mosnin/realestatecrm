@@ -43,9 +43,9 @@ export default async function BrokerageInvitesPage({
   if (!userEmail) {
     return (
       <div className="space-y-6 max-w-3xl">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Brokerage Invites</h1>
-          <p className="text-muted-foreground text-sm">No email address found for your account.</p>
+        <div className="space-y-1">
+          <h2 className="text-base font-medium text-foreground">Brokerage Invites</h2>
+          <p className="text-[13px] text-muted-foreground">No email address found for your account.</p>
         </div>
       </div>
     );
@@ -80,9 +80,9 @@ export default async function BrokerageInvitesPage({
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Brokerage Invites</h1>
-        <p className="text-muted-foreground text-sm">
+      <div className="space-y-1">
+        <h2 className="text-base font-medium text-foreground">Brokerage Invites</h2>
+        <p className="text-[13px] text-muted-foreground">
           Pending brokerage invitations sent to {userEmail}
         </p>
       </div>

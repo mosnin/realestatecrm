@@ -97,9 +97,9 @@ export default function ContentSettingsPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Content</h1>
-        <p className="text-muted-foreground text-sm">Intake page title, intro, video, thank you message, disclaimer, and footer links</p>
+      <div className="space-y-1">
+        <h2 className="text-base font-medium text-foreground">Content</h2>
+        <p className="text-[13px] text-muted-foreground">Intake page title, intro, video, thank you message, disclaimer, and footer links</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-5">

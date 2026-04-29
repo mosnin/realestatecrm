@@ -25,9 +25,9 @@ export default async function TemplatesSettingsPage({
 
   return (
     <div className="space-y-5 max-w-[900px]">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Message templates</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
+      <div className="space-y-1">
+        <h2 className="text-base font-medium text-foreground">Message templates</h2>
+        <p className="text-[13px] text-muted-foreground">
           Canned SMS, email, and note bodies you can fire per deal or contact.
           Use <code className="text-xs bg-muted px-1 rounded">{'{{variable}}'}</code> placeholders
           to personalise — anything that isn&apos;t known becomes blank.

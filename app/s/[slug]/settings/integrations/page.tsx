@@ -98,9 +98,9 @@ export default function IntegrationsSettingsPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Integrations</h1>
-        <p className="text-muted-foreground text-sm">Connect external AI tools to your workspace via MCP and manage API keys</p>
+      <div className="space-y-1">
+        <h2 className="text-base font-medium text-foreground">Integrations</h2>
+        <p className="text-[13px] text-muted-foreground">Connect external AI tools to your workspace via MCP and manage API keys</p>
       </div>
 
       {/* MCP Connection Info */}

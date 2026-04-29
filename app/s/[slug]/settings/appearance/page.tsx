@@ -128,9 +128,9 @@ export default function AppearanceSettingsPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Appearance</h1>
-        <p className="text-muted-foreground text-sm">Branding, colors, fonts, and visual settings for your intake form</p>
+      <div className="space-y-1">
+        <h2 className="text-base font-medium text-foreground">Appearance</h2>
+        <p className="text-[13px] text-muted-foreground">Branding, colors, fonts, and visual settings for your intake form</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-5">

@@ -40,9 +40,9 @@ export default async function LegalSettingsPage({
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Legal &amp; Compliance</h1>
-        <p className="text-muted-foreground text-sm">Privacy policy and consent settings for your intake form</p>
+      <div className="space-y-1">
+        <h2 className="text-base font-medium text-foreground">Legal &amp; Compliance</h2>
+        <p className="text-[13px] text-muted-foreground">Privacy policy and consent settings for your intake form</p>
       </div>
       <LegalSettingsForm
         slug={space.slug}
