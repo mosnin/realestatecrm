@@ -13,6 +13,7 @@ import { LiveNotifications } from '@/components/dashboard/live-notifications';
 import { PlatformBanner } from '@/components/platform-banner';
 import { CommandPalette } from '@/components/command-palette/command-palette';
 import { AgentStatusBar } from '@/components/agent/agent-status-bar';
+import { ChippiBar } from '@/components/chippi/chippi-bar';
 
 
 export default async function DashboardLayout({
@@ -241,7 +242,9 @@ export default async function DashboardLayout({
         <PlatformBanner />
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
         <AgentStatusBar slug={slug} />
-        <main className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
+        {/* pb on main reserves space for the persistent ChippiBar.
+            Mobile bar sits above MobileNav so we add MobileNav's height. */}
+        <main className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-7 pb-40 md:pb-24 bg-background text-foreground">
           <div className="w-full max-w-[1500px] mx-auto">
           <LiveNotifications spaceId={space.id} slug={slug} />
           {children}
@@ -250,6 +253,8 @@ export default async function DashboardLayout({
         </main>
       </div>
       <MobileNav slug={slug} isBroker={isBroker} />
+      {/* Persistent agent presence on every workspace page (hides itself on /chippi). */}
+      <ChippiBar slug={slug} />
       {/* ⌘K palette — listens globally, renders a modal when open. */}
       <CommandPalette slug={slug} />
     </div>
