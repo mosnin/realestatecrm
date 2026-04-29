@@ -3,6 +3,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ContactTable } from '@/components/contacts/contact-table';
 import { PeopleTabs } from '@/components/people/people-tabs';
+import { PageTitle } from '@/components/ui/page-title';
 
 export default async function ContactsPage({
   params,
@@ -21,13 +22,10 @@ export default async function ContactsPage({
     .contains('tags', ['new-lead']);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">People</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Everyone in your pipeline — from first inquiry to closed deal.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageTitle subtitle="Everyone in your pipeline — from first inquiry to closed deal.">
+        People
+      </PageTitle>
       <PeopleTabs slug={slug} newCount={newCount ?? 0} />
       <ContactTable slug={slug} />
     </div>

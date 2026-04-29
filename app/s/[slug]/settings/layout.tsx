@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
+import { PageTitle } from '@/components/ui/page-title';
 
 // Five tabs, not seven. Templates moves to Chippi memory in Phase 4 (the
 // agent owns its own message templates). Legal goes back to a footer link
@@ -45,17 +46,9 @@ export default async function SettingsLayout({
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1.5">
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          Settings
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Account, profile, billing, and how Chippi reaches you.
-        </p>
-      </header>
+      <PageTitle subtitle="Account, profile, billing, and how Chippi reaches you.">
+        Settings
+      </PageTitle>
 
       <nav
         className="flex items-center gap-1 border-b border-border/60 -mx-2 px-2 overflow-x-auto"

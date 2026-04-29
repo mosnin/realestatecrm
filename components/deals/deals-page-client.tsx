@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { KanbanBoard } from './kanban-board';
 import { PipelineSummary } from './pipeline-summary';
 import { PipelineTabs } from './pipeline-tabs';
+import { PageTitle } from '@/components/ui/page-title';
 import type { Pipeline } from '@/lib/types';
 
 export function DealsPageClient({ slug }: { slug: string }) {
@@ -57,13 +58,10 @@ export function DealsPageClient({ slug }: { slug: string }) {
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Deals</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Track your rental and buyer pipeline from lead to close
-          </p>
-        </div>
+      <div className="space-y-6">
+        <PageTitle subtitle="Track your rental and buyer pipeline from lead to close.">
+          Pipeline
+        </PageTitle>
         <div className="h-8 w-64 rounded-lg bg-muted/50 animate-pulse" />
         <div className="h-32 rounded-xl bg-muted/30 animate-pulse" />
       </div>
@@ -71,13 +69,10 @@ export function DealsPageClient({ slug }: { slug: string }) {
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Deals</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Track your rental and buyer pipeline from lead to close
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageTitle subtitle="Track your rental and buyer pipeline from lead to close.">
+        Pipeline
+      </PageTitle>
 
       {/* Pipeline tabs (Trello-like board selector) */}
       <div className="flex items-center gap-2 bg-muted/40 rounded-xl px-3 py-2 border border-border">
