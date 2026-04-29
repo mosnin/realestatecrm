@@ -36,6 +36,29 @@ interface ChatInterfaceProps {
 
 const MESSAGE_LIMIT = 50;
 
+const SUGGESTIONS: { emoji: string; text: string }[] = [
+  { emoji: '✍️', text: 'Draft a follow-up for my hottest lead' },
+  { emoji: '📋', text: 'Who needs a check-in today?' },
+  { emoji: '🏠', text: 'Help me prep for my next tour' },
+  { emoji: '📊', text: "Summarize what changed this week" },
+];
+
+// Neutralize the input's conic gradient so it reads as a calm ring
+// instead of an "AI startup" peach badge. Light/dark stops match
+// existing border tokens.
+const CALM_INPUT_GRADIENT = {
+  light: { topLeft: '#E5E5E5', topRight: '#E5E5E5', bottomRight: '#E5E5E5', bottomLeft: '#E5E5E5' },
+  dark: { topLeft: '#3A3A3A', topRight: '#3A3A3A', bottomRight: '#3A3A3A', bottomLeft: '#3A3A3A' },
+};
+
+function timeBasedGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 5) return 'Working late';
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
 function legacyToUi(messages: LegacyMessage[]): UiMessage[] {
   return messages.map((m, i) => ({
     id: `hist_${i}`,
@@ -264,80 +287,85 @@ export function ChatInterface({
   }, []);
 
   const atLimit = messages.length >= MESSAGE_LIMIT;
-  const userAvatarUrl = user?.imageUrl ?? null;
+  const isEmpty = messages.length === 0 && !loadingMessages;
+  const firstName = user?.firstName ?? '';
+  const greeting = useMemo(timeBasedGreeting, []);
 
-  // The trailing assistant message — used to detect the "typing dots" state
+  // The trailing assistant message — used to detect the "thinking" state
   // (streaming but no blocks have landed yet) and to pin the permission
-  // prompt at the end of the right transcript.
+  // prompt at the end of the transcript.
   const tailMessage = useMemo(() => messages[messages.length - 1] ?? null, [messages]);
-  const showTypingDots =
+  const showThinking =
     isStreaming && tailMessage?.role === 'assistant' && tailMessage.blocks.length === 0;
 
+  // Reusable input — shared between the empty hero and the docked footer
+  // so the focal point lives wherever it should.
+  const renderInput = () => (
+    <GradientAIChatInput
+      placeholder="Message Chippi — draft a follow-up, prep a tour, summarize your day..."
+      onSend={handleSend}
+      onMentionSearch={handleMentionSearch}
+      disabled={isStreaming || pendingApproval !== null}
+      enableShadows={false}
+      mainGradient={CALM_INPUT_GRADIENT}
+      outerGradient={CALM_INPUT_GRADIENT}
+    />
+  );
+
   return (
-    <div className="flex flex-col h-full min-h-0">
-      {/* Minimal top bar */}
-      <div className="flex items-center justify-between px-2 py-2 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground"
-            title="Conversation history"
-          >
-            <History size={16} />
-          </button>
-          {activeConversationId && (
-            <span className="text-xs text-muted-foreground truncate max-w-[200px] hidden sm:inline">
-              {conversations.find((c) => c.id === activeConversationId)?.title}
-            </span>
+    <div className="relative flex flex-col h-full min-h-0">
+      {/* Floating control cluster — top-right, no top bar chrome */}
+      <div className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-0.5">
+        {messages.length >= MESSAGE_LIMIT * 0.8 && (
+          <span className="hidden sm:inline text-[11px] tabular-nums text-amber-600 dark:text-amber-400 font-semibold px-2">
+            {messages.length}/{MESSAGE_LIMIT}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
+          title="Conversation history"
+          aria-label="Open conversation history"
+        >
+          <History size={15} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setVoiceOpen((v) => !v)}
+          className={cn(
+            'w-8 h-8 flex items-center justify-center rounded-lg transition-colors',
+            voiceOpen
+              ? 'bg-foreground text-background'
+              : 'text-muted-foreground/70 hover:text-foreground hover:bg-muted/60',
           )}
-        </div>
-        <div className="flex items-center gap-2">
-          {messages.length > 0 && (
-            <span
-              className={cn(
-                'text-xs tabular-nums',
-                messages.length >= MESSAGE_LIMIT * 0.8
-                  ? 'text-amber-600 dark:text-amber-400 font-semibold'
-                  : 'text-muted-foreground',
-              )}
-            >
-              {messages.length}/{MESSAGE_LIMIT}
-            </span>
-          )}
-          <button
-            onClick={() => setVoiceOpen((v) => !v)}
-            className={cn(
-              'w-8 h-8 rounded-full flex items-center justify-center transition-colors',
-              voiceOpen
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-            )}
-            title="Voice mode"
-          >
-            <Mic size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={handleNewConversation}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground"
-            title="New conversation"
-          >
-            <Plus size={16} />
-          </button>
-        </div>
+          title="Voice mode"
+          aria-label="Toggle voice mode"
+        >
+          <Mic size={15} />
+        </button>
+        <button
+          type="button"
+          onClick={handleNewConversation}
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
+          title="New conversation"
+          aria-label="Start a new conversation"
+        >
+          <Plus size={15} />
+        </button>
       </div>
 
-      {/* Conversation history drawer */}
+      {/* Conversation history drawer — softened overlay */}
       {drawerOpen && (
         <div className="fixed inset-0 z-50 flex">
-          <div className="w-80 max-w-[85vw] bg-background border-r border-border flex flex-col shadow-xl">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="w-80 max-w-[85vw] bg-background border-r border-border flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
               <span className="font-semibold text-sm">History</span>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
                 className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
+                aria-label="Close history"
               >
                 <X size={15} />
               </button>
@@ -354,170 +382,195 @@ export function ChatInterface({
               />
             </div>
           </div>
-          <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
+          <div className="flex-1 bg-foreground/10" onClick={() => setDrawerOpen(false)} />
         </div>
       )}
 
-      {/* Messages area */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        {loadingMessages ? (
-          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-            Loading...
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center gap-6 text-muted-foreground px-6">
-            <div className="relative">
-              <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-orange-500/20">
-                <img src="/chip-avatar.png" alt="Chippi" className="w-full h-full object-cover" />
-              </div>
-              <span className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-background" />
+      {/* ── Empty hero ──────────────────────────────────────────── */}
+      {loadingMessages ? (
+        <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+          Loading…
+        </div>
+      ) : isEmpty ? (
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="min-h-full flex flex-col items-center justify-center px-4 sm:px-6 py-16 gap-10">
+            <div className="text-center space-y-3 max-w-2xl">
+              <h1
+                className="text-3xl sm:text-4xl tracking-tight text-foreground"
+                style={{ fontFamily: 'var(--font-title)' }}
+              >
+                {greeting}
+                {firstName ? `, ${firstName}` : ''}.
+              </h1>
+              <p className="text-base text-muted-foreground">What are we working on?</p>
             </div>
-            <div className="space-y-2">
-              <p className="font-semibold text-foreground text-xl">Chippi</p>
-              <p className="text-xs font-medium text-orange-600 dark:text-orange-400 tracking-wide uppercase">
-                Your AI cowork
-              </p>
-              <p className="text-sm max-w-md">
-                I keep an eye on your pipeline, draft outreach, and prep your day. Tag a contact or
-                deal with <span className="font-medium text-foreground">@</span> and we&apos;ll
-                work on it together.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-md">
-              {[
-                { emoji: '✍️', text: 'Draft a follow-up for my hottest lead' },
-                { emoji: '📋', text: 'Who needs a check-in today?' },
-                { emoji: '🏠', text: 'Help me prep for my next tour' },
-                { emoji: '📊', text: 'Summarize what changed this week' },
-              ].map((s) => (
+
+            <div className="w-full max-w-2xl">{renderInput()}</div>
+
+            <div className="flex flex-wrap gap-2 justify-center max-w-2xl">
+              {SUGGESTIONS.map((s) => (
                 <button
                   key={s.text}
+                  type="button"
                   onClick={() => handleSend(s.text, [])}
-                  className="text-xs text-left p-3 rounded-lg border border-border/60 hover:bg-accent/50 hover:border-border transition-all flex items-start gap-2"
+                  disabled={isStreaming || pendingApproval !== null}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background hover:bg-accent/40 hover:border-border px-3.5 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span className="text-base leading-none mt-0.5">{s.emoji}</span>
-                  <span className="flex-1">{s.text}</span>
+                  <span aria-hidden>{s.emoji}</span>
+                  <span>{s.text}</span>
                 </button>
               ))}
             </div>
+
+            <p className="text-[11px] text-muted-foreground/70 max-w-md text-center">
+              Tag a contact or deal with{' '}
+              <span className="font-medium text-foreground/80">@</span>{' '}
+              and Chippi will work on it with full context.
+            </p>
           </div>
-        ) : (
-          <ScrollArea className="h-full">
-            <div className="max-w-3xl mx-auto space-y-4 px-4 sm:px-6 py-6">
-              {messages.map((msg, i) => {
-                const isTail = i === messages.length - 1;
-                // Skip the assistant placeholder before any text — the
-                // typing-dots renderer below handles that frame.
-                if (
-                  isTail &&
-                  msg.role === 'assistant' &&
-                  msg.blocks.length === 0 &&
-                  isStreaming
-                ) {
-                  return null;
-                }
-                return (
-                  <Transcript
-                    key={msg.id}
-                    blocks={msg.blocks}
-                    role={msg.role}
-                    streaming={msg.streaming && isStreaming}
-                    liveCallIds={liveCallIds}
-                    pendingApproval={
-                      isTail && pendingApproval && !isStreaming
-                        ? {
-                            prompt: pendingApproval,
-                            onApprove: approve,
-                            onDeny: deny,
-                            onAlwaysAllow: alwaysAllow,
-                            busy: isStreaming,
-                          }
-                        : undefined
-                    }
-                  />
-                );
-              })}
-
-              {showTypingDots && (
-                <div className="flex justify-start">
-                  <div className="bg-muted rounded-lg rounded-bl-sm px-4 py-3">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" />
-                      <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce [animation-delay:0.15s]" />
-                      <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce [animation-delay:0.3s]" />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {error && (
-                <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50/70 dark:border-rose-900 dark:bg-rose-950/40 px-3 py-2.5 text-sm text-rose-800 dark:text-rose-200">
-                  <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">{error}</div>
-                  <button
-                    type="button"
-                    onClick={clearError}
-                    className="text-rose-600/70 dark:text-rose-300/70 hover:text-rose-800 dark:hover:text-rose-100"
-                    aria-label="Dismiss"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              )}
-
-              <div ref={bottomRef} />
-            </div>
-          </ScrollArea>
-        )}
-      </div>
-
-      {/* Stop button — docks above the input while a turn is streaming. */}
-      {isStreaming && !atLimit && (
-        <div className="flex-shrink-0 w-full max-w-3xl mx-auto px-4 sm:px-6 flex justify-center pb-1">
-          <button
-            type="button"
-            onClick={abort}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background hover:bg-muted px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground shadow-sm transition-colors"
-            title="Stop generating"
-          >
-            <Square size={11} className="fill-current" />
-            Stop
-          </button>
         </div>
+      ) : (
+        <>
+          {/* Active thread */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <ScrollArea className="h-full">
+              <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-4">
+                {/* Conversation title — quiet, only when we have one */}
+                {activeConversationId && (
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground/60 mb-6 truncate">
+                    {conversations.find((c) => c.id === activeConversationId)?.title ?? ''}
+                  </p>
+                )}
+
+                <div className="space-y-7">
+                  {messages.map((msg, i) => {
+                    const isTail = i === messages.length - 1;
+                    if (
+                      isTail &&
+                      msg.role === 'assistant' &&
+                      msg.blocks.length === 0 &&
+                      isStreaming
+                    ) {
+                      return null;
+                    }
+                    if (msg.role === 'assistant') {
+                      return (
+                        <div key={msg.id} className="flex gap-3">
+                          <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
+                            <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
+                          </div>
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <Transcript
+                              blocks={msg.blocks}
+                              role={msg.role}
+                              streaming={msg.streaming && isStreaming}
+                              liveCallIds={liveCallIds}
+                              pendingApproval={
+                                isTail && pendingApproval && !isStreaming
+                                  ? {
+                                      prompt: pendingApproval,
+                                      onApprove: approve,
+                                      onDeny: deny,
+                                      onAlwaysAllow: alwaysAllow,
+                                      busy: isStreaming,
+                                    }
+                                  : undefined
+                              }
+                            />
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <Transcript
+                        key={msg.id}
+                        blocks={msg.blocks}
+                        role={msg.role}
+                        streaming={msg.streaming && isStreaming}
+                        liveCallIds={liveCallIds}
+                      />
+                    );
+                  })}
+
+                  {showThinking && (
+                    <div className="flex gap-3">
+                      <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
+                        <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground pt-1.5">
+                        <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse" />
+                        <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:0.2s]" />
+                        <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:0.4s]" />
+                        <span className="ml-1 italic">Chippi is thinking…</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {error && (
+                    <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50/70 dark:border-rose-900 dark:bg-rose-950/40 px-3 py-2.5 text-sm text-rose-800 dark:text-rose-200">
+                      <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">{error}</div>
+                      <button
+                        type="button"
+                        onClick={clearError}
+                        className="text-rose-600/70 dark:text-rose-300/70 hover:text-rose-800 dark:hover:text-rose-100"
+                        aria-label="Dismiss"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+
+                  <div ref={bottomRef} />
+                </div>
+              </div>
+            </ScrollArea>
+          </div>
+
+          {/* Stop button — quiet, above the input while streaming */}
+          {isStreaming && !atLimit && (
+            <div className="flex-shrink-0 w-full max-w-3xl mx-auto px-4 sm:px-6 flex justify-center pb-1">
+              <button
+                type="button"
+                onClick={abort}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background hover:bg-muted px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                title="Stop generating"
+              >
+                <Square size={10} className="fill-current" />
+                Stop
+              </button>
+            </div>
+          )}
+
+          {/* Docked input */}
+          <div className="flex-shrink-0 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-2 pb-4">
+            {atLimit ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
+                <div className="flex justify-center mb-2">
+                  <AlertCircle size={20} className="text-amber-600 dark:text-amber-400" />
+                </div>
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
+                  You&apos;ve reached the 50-message limit for this conversation.
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-300 mb-3">
+                  Start a new conversation to continue chatting.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={handleNewConversation}
+                  variant="outline"
+                  className="border-amber-400 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-800"
+                >
+                  Start new conversation
+                </Button>
+              </div>
+            ) : (
+              renderInput()
+            )}
+          </div>
+        </>
       )}
 
-      {/* Input */}
-      <div className="flex-shrink-0 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-2 pb-4">
-        {atLimit ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
-            <div className="flex justify-center mb-2">
-              <AlertCircle size={20} className="text-amber-600 dark:text-amber-400" />
-            </div>
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-              You&apos;ve reached the 50-message limit for this conversation.
-            </p>
-            <p className="text-xs text-amber-700 dark:text-amber-300 mb-3">
-              Start a new conversation to continue chatting.
-            </p>
-            <Button
-              size="sm"
-              onClick={handleNewConversation}
-              variant="outline"
-              className="border-amber-400 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-800"
-            >
-              Start new conversation
-            </Button>
-          </div>
-        ) : (
-          <GradientAIChatInput
-            placeholder="Message Chippi — draft a follow-up, prep a tour, summarize your day..."
-            onSend={handleSend}
-            onMentionSearch={handleMentionSearch}
-            disabled={isStreaming || pendingApproval !== null}
-            enableShadows={true}
-          />
-        )}
-      </div>
       <VoiceMode
         open={voiceOpen}
         onClose={() => setVoiceOpen(false)}
