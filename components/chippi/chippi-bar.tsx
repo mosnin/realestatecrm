@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Send, Square, Loader2, X, ArrowUpRight, Sparkles } from 'lucide-react';
+import { Send, Square, Loader2, X, ArrowUpRight, Sparkles, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Transcript } from '@/components/ai/blocks/transcript';
 import { useAgentTask } from '@/components/ai/hooks/use-agent-task';
+import { useDictation } from './use-dictation';
 
 interface Props {
   slug: string;
@@ -38,6 +39,37 @@ export function ChippiBar({ slug }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Hold-to-dictate. Snapshot the draft when listening starts so the live
+  // transcript appends to (rather than overwrites) anything the user had
+  // typed manually before reaching for the mic.
+  const draftAtDictationStart = useRef('');
+  const dictation = useDictation({
+    onFinal: (text) => {
+      setDraft((prev) => {
+        const prefix = draftAtDictationStart.current.trim();
+        return prefix ? `${prefix} ${text}` : text;
+      });
+    },
+  });
+  // Live preview while listening — mirror the live transcript into the
+  // input so the realtor sees their words land as they speak.
+  useEffect(() => {
+    if (!dictation.listening) return;
+    const prefix = draftAtDictationStart.current.trim();
+    setDraft(prefix ? `${prefix} ${dictation.transcript}` : dictation.transcript);
+  }, [dictation.transcript, dictation.listening]);
+
+  const startDictation = useCallback(() => {
+    if (!dictation.supported || dictation.listening) return;
+    draftAtDictationStart.current = draft;
+    setExpanded(true);
+    dictation.start();
+  }, [dictation, draft]);
+
+  const stopDictation = useCallback(() => {
+    if (dictation.listening) dictation.stop();
+  }, [dictation]);
 
   // Restore the most recent bar conversation for this workspace from session.
   // sessionStorage scopes to the tab — closing the tab gives a fresh start.
@@ -275,14 +307,34 @@ export function ChippiBar({ slug }: Props) {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onFocus={() => setExpanded(true)}
-          placeholder="Ask Chippi or just talk…"
+          placeholder={dictation.listening ? 'Listening…' : 'Ask Chippi or just talk…'}
           disabled={!!pendingApproval}
           aria-label="Message Chippi"
           className="flex-1 min-w-0 bg-transparent border-0 outline-none text-sm placeholder:text-muted-foreground/70 disabled:opacity-50"
         />
-        <kbd className="hidden sm:inline-flex items-center text-[10px] text-muted-foreground/60 px-1.5 py-0.5 rounded bg-muted/60 font-mono">
-          ⌘/
-        </kbd>
+        {dictation.supported && !isStreaming && (
+          <button
+            type="button"
+            // Hold-to-talk: pointer events cover both mouse and touch in
+            // one gesture. PointerLeave + PointerCancel guard against the
+            // recognizer staying live if the user drags off the button.
+            onPointerDown={(e) => { e.preventDefault(); startDictation(); }}
+            onPointerUp={(e) => { e.preventDefault(); stopDictation(); }}
+            onPointerLeave={() => { if (dictation.listening) stopDictation(); }}
+            onPointerCancel={() => { if (dictation.listening) stopDictation(); }}
+            disabled={!!pendingApproval}
+            aria-label={dictation.listening ? 'Listening — release to send' : 'Hold to talk'}
+            title="Hold to talk"
+            className={cn(
+              'w-8 h-8 flex items-center justify-center rounded-full transition-all',
+              dictation.listening
+                ? 'bg-rose-500 text-white scale-110 shadow-lg shadow-rose-500/40'
+                : 'text-muted-foreground/70 hover:text-foreground hover:bg-muted/60',
+            )}
+          >
+            <Mic size={13} className={dictation.listening ? 'animate-pulse' : ''} />
+          </button>
+        )}
         {isStreaming ? (
           <button
             type="button"
