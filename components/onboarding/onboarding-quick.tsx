@@ -156,15 +156,21 @@ export function OnboardingQuick({ defaultName }: Props) {
   return (
     <div className="min-h-screen flex items-center justify-center px-6 py-12 bg-background">
       <div className="w-full max-w-md space-y-10">
-        <div className="space-y-2 text-center">
+        <div className="space-y-3 text-center">
           <h1
             className="text-4xl tracking-tight text-foreground"
             style={{ fontFamily: 'var(--font-title)' }}
           >
-            Welcome to Chippi.
+            I run your follow-up
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Two questions and Chippi is yours.
+          <p
+            className="text-3xl tracking-tight text-muted-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+          >
+            so you don&apos;t have to.
+          </p>
+          <p className="text-sm text-muted-foreground/80 pt-2">
+            Two questions to get started.
           </p>
         </div>
 

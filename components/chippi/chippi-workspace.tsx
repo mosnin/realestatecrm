@@ -333,13 +333,18 @@ export function ChippiWorkspace({
     return () => controller.abort();
   }, [isEmpty]);
 
+  // The empty case is the moment to remind the realtor what Chippi is FOR.
+  // Operational status sentence appears only when there's actually work
+  // pending. The promise line carries the rest of the time. Same pattern
+  // Apple keynotes used: positioning in the quiet moments, status in the
+  // busy ones.
   function statusSentence(): string {
-    if (!countsLoaded) return "Here's what Chippi has for you. Ask anything below.";
+    if (!countsLoaded) return "I run your follow-up so you don't have to.";
     const parts: string[] = [];
     if (counts.drafts > 0) parts.push(`${counts.drafts} draft${counts.drafts === 1 ? '' : 's'}`);
     if (counts.questions > 0) parts.push(`${counts.questions} question${counts.questions === 1 ? '' : 's'}`);
     if (parts.length === 0) {
-      return "Nothing waiting on you — chat below or kick off a sweep.";
+      return "I run your follow-up so you don't have to.";
     }
     return `${parts.join(' · ')} waiting for you.`;
   }
