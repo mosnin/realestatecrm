@@ -57,64 +57,35 @@ interface SidebarProps {
 // Broker nav definitions (unchanged structure)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Phase 7 cuts — broker admin sidebar collapses from 14 entries across 5
+// labeled sections to a flat five. Routes the user can still reach by typing
+// or by deep link: /broker/realtors, /broker/leaderboard, /broker/templates,
+// /broker/chat, /broker/announcements, /broker/analytics,
+// /broker/settings/form-builder, /broker/settings/tracking,
+// /broker/import-export. None earn permanent nav real estate. Invitations
+// folds into Members. Realtors merges with Members.
 const brokerAdminNavSections = [
   {
-    label: 'Overview',
+    label: '',
     items: [
-      { href: '/broker', label: 'Dashboard', icon: LayoutDashboard, exact: true, adminOnly: false },
+      { href: '/broker', label: 'Team', icon: LayoutDashboard, exact: true, adminOnly: false },
       { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
       { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
-    ],
-  },
-  {
-    label: 'Team',
-    items: [
-      { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
-      { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
       { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
-      { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false, adminOnly: true, highlight: true },
-    ],
-  },
-  {
-    label: 'Tools',
-    items: [
-      { href: '/broker/analytics', label: 'Analytics', icon: BarChart3, exact: false, adminOnly: false },
-      { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
-      { href: '/broker/chat', label: 'Team Chat', icon: MessageCircle, exact: false, adminOnly: false },
-      { href: '/broker/announcements', label: 'Announcements', icon: Megaphone, exact: false, adminOnly: false },
-    ],
-  },
-  {
-    label: 'Intake Form',
-    items: [
-      { href: '/broker/settings/form-builder', label: 'Customize', icon: FileText, exact: false, adminOnly: true },
-      { href: '/broker/settings/tracking', label: 'Tracking', icon: BarChart3, exact: false, adminOnly: true },
-    ],
-  },
-  {
-    label: 'Admin',
-    items: [
-      { href: '/broker/import-export', label: 'Import / Export', icon: Upload, exact: false, adminOnly: true },
       { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
     ],
   },
 ];
 
+// Phase 7 cuts — realtor-members of a brokerage see their own work first.
+// Announcements, Team Chat, Templates, Leaderboard all dropped from nav;
+// routes stay reachable by direct link.
 const brokerMemberNavSections = [
   {
-    label: 'My Work',
+    label: '',
     items: [
-      { href: '/broker', label: 'My Dashboard', icon: LayoutDashboard, exact: true, adminOnly: false },
-      { href: '/broker/my-leads', label: 'My Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
-    ],
-  },
-  {
-    label: 'Team',
-    items: [
-      { href: '/broker/announcements', label: 'Announcements', icon: Megaphone, exact: false, adminOnly: false },
-      { href: '/broker/chat', label: 'Team Chat', icon: MessageCircle, exact: false, adminOnly: false },
-      { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
-      { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
+      { href: '/broker', label: 'My day', icon: LayoutDashboard, exact: true, adminOnly: false },
+      { href: '/broker/my-leads', label: 'My leads', icon: PhoneIncoming, exact: false, adminOnly: false },
     ],
   },
 ];
@@ -371,6 +342,8 @@ function CollapsibleNavItem({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
+  // Empty labels hide entirely so a "label-less" section renders flush.
+  if (!children) return null;
   return (
     <p className="px-2.5 pt-5 pb-2 text-[11px] font-medium text-muted-foreground select-none">
       {children}
