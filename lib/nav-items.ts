@@ -3,8 +3,6 @@ import {
   Briefcase,
   Sparkles,
   Settings,
-  ClipboardList,
-  Home,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -31,21 +29,15 @@ export interface NavItem {
 
 // ── Realtor sidebar nav ──────────────────────────────────────────────────────
 //
-// Phase 0 cuts. The sidebar used to mirror the org chart — every CRUD entity
-// got a top-level entry. Tours/Calendar/Notes/Reviews/Analytics are dropped
-// from the nav (routes stay live for direct links and existing deep-links);
-// they will be absorbed into the agent surface in Phase 5 as inline tools.
+// Four items. Chippi is the home — "Today" isn't a separate destination, it's
+// the morning view of the agent surface. Tours/Calendar/Notes/Reviews/
+// Analytics/Intake are reachable by URL but don't earn a nav slot; they'll be
+// absorbed into the agent surface in Phase 5 as inline tools the agent calls.
 //
-// Settings + Intake collapse to single entries — sub-pages remain reachable
-// from inside their parent page, just not in the side nav.
+// Settings stays as the only true configuration destination. Sub-pages live
+// behind an in-page tab strip in app/s/[slug]/settings/layout.tsx.
 
 export const realtorNavItems: NavItem[] = [
-  {
-    href: '',
-    label: 'Today',
-    icon: Home,
-    exact: true,
-  },
   {
     href: '/chippi',
     label: 'Chippi',
@@ -65,11 +57,6 @@ export const realtorNavItems: NavItem[] = [
     icon: Briefcase,
   },
   {
-    href: '/intake',
-    label: 'Intake form',
-    icon: ClipboardList,
-  },
-  {
     href: '/settings',
     label: 'Settings',
     icon: Settings,
@@ -84,8 +71,8 @@ export const secondaryNavItems = [
 
 /** Primary items with shorter labels for the mobile bottom bar. */
 export const mobileNavItems = [
-  { href: '', label: 'Today', icon: Home },
   { href: '/chippi', label: 'Chippi', icon: Sparkles },
   { href: '/contacts', label: 'People', icon: Users },
   { href: '/deals', label: 'Pipeline', icon: Briefcase },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ] as const;

@@ -1,14 +1,15 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
 
+// Five tabs, not seven. Templates moves to Chippi memory in Phase 4 (the
+// agent owns its own message templates). Legal goes back to a footer link
+// because it's not a setting — it's a document. Both routes stay live.
 const SETTINGS_TABS: { href: string; label: string; matchPath: string }[] = [
   { href: '/settings', label: 'Account', matchPath: '/settings' },
   { href: '/settings/profile', label: 'Profile', matchPath: '/settings/profile' },
   { href: '/settings/notifications', label: 'Notifications', matchPath: '/settings/notifications' },
-  { href: '/settings/templates', label: 'Templates', matchPath: '/settings/templates' },
   { href: '/settings/integrations', label: 'Integrations', matchPath: '/settings/integrations' },
   { href: '/billing', label: 'Billing', matchPath: '/billing' },
-  { href: '/settings/legal', label: 'Legal', matchPath: '/settings/legal' },
 ];
 
 /**
