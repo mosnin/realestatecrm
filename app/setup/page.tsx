@@ -2,11 +2,22 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { OnboardingFlow } from '@/components/onboarding/onboarding-flow';
+import { OnboardingQuick } from '@/components/onboarding/onboarding-quick';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 
 export const metadata = { title: 'Create your workspace — Chippi' };
 
-export default async function SetupPage() {
+export default async function SetupPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ type?: string }>;
+}) {
+  const { type } = (await searchParams) ?? {};
+  // Realtor (default) gets the one-screen quick path. Brokers and agents-
+  // joining-a-brokerage get the longer flow that collects brokerage data
+  // via ?type=broker. The quick path itself links over to ?type=broker.
+  const useQuickPath = type !== 'broker';
+
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
 
@@ -85,7 +96,7 @@ export default async function SetupPage() {
         redirect('/broker');
       }
     }
-    redirect(`/s/${dbUser.space.slug}`);
+    redirect(`/s/${dbUser.space.slug}/chippi`);
   }
 
   // Create user record if missing.
@@ -151,7 +162,7 @@ export default async function SetupPage() {
 
   // Check again after upsert — user may already have a space
   if (resolvedUser?.space?.slug) {
-    redirect(`/s/${resolvedUser.space.slug}`);
+    redirect(`/s/${resolvedUser.space.slug}/chippi`);
   }
 
   // If the user has a broker_admin membership (e.g. accepted an admin invitation),
@@ -184,6 +195,10 @@ export default async function SetupPage() {
   // Clerk UserButton already lives in the global header on post-onboarding
   // routes, and the email wasn't used for anything the user could see.
   void email;
+
+  if (useQuickPath) {
+    return <OnboardingQuick defaultName={resolvedUser?.name ?? ''} />;
+  }
 
   return (
     <OnboardingFlow
