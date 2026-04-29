@@ -64,7 +64,30 @@ export default async function RootLayout({
             {body}
           </AmplitudeProvider>
         </ThemeProvider>
-        <Toaster richColors position="top-right" toastOptions={{ duration: 3500 }} />
+        <Toaster
+          position="top-right"
+          theme="system"
+          toastOptions={{
+            duration: 3500,
+            unstyled: true,
+            classNames: {
+              toast:
+                'group pointer-events-auto flex w-full items-start gap-3 rounded-lg border border-border/70 bg-popover p-3.5 text-foreground shadow-lg shadow-foreground/5 transition-all duration-150',
+              title: 'text-sm font-medium leading-snug text-foreground',
+              description: 'text-[13px] leading-snug text-muted-foreground',
+              actionButton:
+                'rounded-md bg-foreground px-2.5 py-1 text-[13px] font-medium text-background transition-colors duration-150 hover:bg-foreground/90',
+              cancelButton:
+                'rounded-md bg-muted px-2.5 py-1 text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted/80',
+              closeButton:
+                'rounded-md border border-border/70 bg-background text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground',
+              success: 'border-l-2 border-l-emerald-500/70',
+              error: 'border-l-2 border-l-red-500/70',
+              warning: 'border-l-2 border-l-orange-500/70',
+              info: 'border-l-2 border-l-sky-500/70',
+            },
+          }}
+        />
         <SpeedInsights />
       </body>
     </html>
