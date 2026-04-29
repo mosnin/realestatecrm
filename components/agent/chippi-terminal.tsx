@@ -185,7 +185,7 @@ export function ChippiTerminal({ runId, className, maxEvents = 30, compact = fal
             <Loader2 size={11} className="text-orange-500 animate-spin flex-shrink-0" />
           ) : null}
           <span className="text-[12px] font-mono text-zinc-400">
-            {isRunning ? 'chippi running...' : 'chippi'}
+            {isRunning ? 'chippi at work...' : 'chippi · activity feed'}
           </span>
           {agentType && (
             <span className="text-[10px] font-mono text-orange-500/60 bg-zinc-800 px-1.5 py-0.5 rounded">
@@ -231,12 +231,12 @@ export function ChippiTerminal({ runId, className, maxEvents = 30, compact = fal
           <div className="font-mono text-[11.5px] space-y-1">
             <div>
               <span className="text-orange-500">$ </span>
-              <span className="text-zinc-400">chippi</span>
+              <span className="text-zinc-400">chippi --standing-by</span>
             </div>
             <div className="text-zinc-600 pl-3">
-              no runs yet — click{' '}
+              ready when you are. hit{' '}
               <span className="text-orange-500/80">Run Now</span>
-              {' '}or wait for the next scheduled heartbeat
+              {' '}to put me to work, or i&apos;ll check in at the next heartbeat.
             </div>
           </div>
         )}

@@ -498,7 +498,7 @@ export function AgentDraftInbox({ slug }: Props) {
       {/* Section header */}
       <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-border/60">
         <Mail size={14} className="text-orange-500 flex-shrink-0" />
-        <h2 className="text-sm font-semibold">Awaiting Review</h2>
+        <h2 className="text-sm font-semibold">Drafts from Chippi</h2>
         {!loading && drafts.length > 0 && (
           <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white min-w-[20px] text-center">
             {drafts.length}
@@ -542,12 +542,12 @@ export function AgentDraftInbox({ slug }: Props) {
       {/* Empty state */}
       {!loading && drafts.length === 0 && (
         <div className="flex items-center gap-3.5 px-5 py-8">
-          <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 size={16} className="text-muted-foreground/60" />
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 size={16} className="text-emerald-500" />
           </div>
           <div>
-            <p className="text-sm font-medium text-foreground">All clear</p>
-            <p className="text-xs text-muted-foreground mt-0.5">No drafts waiting — Chippi will surface new outreach here as it finds opportunities.</p>
+            <p className="text-sm font-medium text-foreground">Inbox is clear</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Chippi will leave new outreach here whenever there&apos;s someone worth following up with.</p>
           </div>
         </div>
       )}

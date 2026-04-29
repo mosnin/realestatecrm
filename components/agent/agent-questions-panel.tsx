@@ -180,7 +180,7 @@ export function AgentQuestionsPanel() {
       {/* Section header */}
       <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-border/60">
         <HelpCircle size={14} className="text-amber-500 flex-shrink-0" />
-        <h2 className="text-sm font-semibold">Questions</h2>
+        <h2 className="text-sm font-semibold">Chippi needs your input</h2>
         {!loading && questions.length > 0 && (
           <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white min-w-[20px] text-center">
             {questions.length}
@@ -200,12 +200,12 @@ export function AgentQuestionsPanel() {
       {/* Empty state */}
       {!loading && questions.length === 0 && (
         <div className="flex items-center gap-3.5 px-5 py-8">
-          <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 size={16} className="text-muted-foreground/60" />
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 size={16} className="text-emerald-500" />
           </div>
           <div>
-            <p className="text-sm font-medium text-foreground">No pending questions</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Chippi will ask for your input here when it needs guidance.</p>
+            <p className="text-sm font-medium text-foreground">Nothing to weigh in on</p>
+            <p className="text-xs text-muted-foreground mt-0.5">When Chippi hits a judgment call &mdash; price, tone, timing &mdash; it&apos;ll check with you here first.</p>
           </div>
         </div>
       )}

@@ -208,16 +208,16 @@ export function AgentMissionControl({ slug }: { slug: string }) {
             <Bot size={14} className="text-muted-foreground" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium">Enable your agent</p>
+            <p className="text-sm font-medium">Bring Chippi on as your cowork</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Automate lead follow-ups and get outreach drafts ready for your review.
+              Chippi watches your leads, drafts the follow-ups, and hands them to you for a quick read.
             </p>
           </div>
           <Link
             href={`/s/${slug}/agent?tab=settings`}
             className="inline-flex items-center gap-1 text-xs font-semibold text-foreground hover:underline flex-shrink-0"
           >
-            Enable <ArrowRight size={12} />
+            Turn on <ArrowRight size={12} />
           </Link>
         </div>
       )}
@@ -319,12 +319,12 @@ export function AgentMissionControl({ slug }: { slug: string }) {
       {/* Agent is on but nothing happened yet */}
       {enabled && !hasActivity && !hasInsights && pendingDrafts === 0 && (
         <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-          <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-            <Bot size={14} className="text-muted-foreground/60" />
+          <div className="w-8 h-8 rounded-md bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+            <Bot size={14} className="text-orange-500" />
           </div>
           <div>
-            <p className="text-sm font-medium">Your agent is warming up</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Activity will appear here after the first run.</p>
+            <p className="text-sm font-medium">Chippi is settling in</p>
+            <p className="text-xs text-muted-foreground mt-0.5">First sweep through your pipeline coming up &mdash; I&apos;ll post anything worth your attention here.</p>
           </div>
         </div>
       )}

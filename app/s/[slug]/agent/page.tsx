@@ -54,9 +54,9 @@ export default function AgentPage() {
       const res = await fetch('/api/agent/run-now', { method: 'POST' });
       const data = res.ok ? await res.json() : null;
       if (res.ok && data?.triggered) {
-        toast.success(data.method === 'modal' ? 'Agent is running now' : 'Queued — will run at next heartbeat (~15 min)');
+        toast.success(data.method === 'modal' ? 'Chippi is on it — watch the activity feed' : 'Queued — Chippi will pick this up at the next heartbeat (~15 min)');
       } else {
-        toast.error('Could not start agent run');
+        toast.error("Couldn't kick off Chippi — please try again");
       }
     } catch {
       toast.error('Could not reach server');
@@ -78,10 +78,12 @@ export default function AgentPage() {
                 <h1 className="text-sm font-semibold tracking-tight">Chippi</h1>
                 <span className="flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Active
+                  {running ? 'Working now' : 'On the clock'}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">AI outreach agent</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Your AI cowork &middot; drafts outreach, watches your pipeline, asks when stuck
+              </p>
             </div>
           </div>
 

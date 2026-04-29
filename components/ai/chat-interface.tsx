@@ -366,30 +366,37 @@ export function ChatInterface({
           </div>
         ) : messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center gap-6 text-muted-foreground px-6">
-            <div className="w-20 h-20 rounded-full overflow-hidden">
-              <img src="/chip-avatar.png" alt="Chip" className="w-full h-full object-cover" />
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-orange-500/20">
+                <img src="/chip-avatar.png" alt="Chippi" className="w-full h-full object-cover" />
+              </div>
+              <span className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-background" />
             </div>
             <div className="space-y-2">
-              <p className="font-semibold text-foreground text-xl">Chip</p>
+              <p className="font-semibold text-foreground text-xl">Chippi</p>
+              <p className="text-xs font-medium text-orange-600 dark:text-orange-400 tracking-wide uppercase">
+                Your AI cowork
+              </p>
               <p className="text-sm max-w-md">
-                Your AI assistant for leads, deals, and pipeline insights. Use{' '}
-                <span className="font-medium text-foreground">@</span> to pull in contacts or
-                deals.
+                I keep an eye on your pipeline, draft outreach, and prep your day. Tag a contact or
+                deal with <span className="font-medium text-foreground">@</span> and we&apos;ll
+                work on it together.
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-md">
               {[
-                'Show me my highest value deals',
-                'Which clients are in tour stage?',
-                'What deals are in Negotiation?',
-                'Summarize my pipeline',
-              ].map((suggestion) => (
+                { emoji: '✍️', text: 'Draft a follow-up for my hottest lead' },
+                { emoji: '📋', text: 'Who needs a check-in today?' },
+                { emoji: '🏠', text: 'Help me prep for my next tour' },
+                { emoji: '📊', text: 'Summarize what changed this week' },
+              ].map((s) => (
                 <button
-                  key={suggestion}
-                  onClick={() => handleSend(suggestion, [])}
-                  className="text-xs text-left p-3 rounded-lg border border-border/60 hover:bg-accent/50 hover:border-border transition-all"
+                  key={s.text}
+                  onClick={() => handleSend(s.text, [])}
+                  className="text-xs text-left p-3 rounded-lg border border-border/60 hover:bg-accent/50 hover:border-border transition-all flex items-start gap-2"
                 >
-                  {suggestion}
+                  <span className="text-base leading-none mt-0.5">{s.emoji}</span>
+                  <span className="flex-1">{s.text}</span>
                 </button>
               ))}
             </div>
@@ -503,7 +510,7 @@ export function ChatInterface({
           </div>
         ) : (
           <GradientAIChatInput
-            placeholder="Ask Chip about your clients, deals, or pipeline..."
+            placeholder="Message Chippi — draft a follow-up, prep a tour, summarize your day..."
             onSend={handleSend}
             onMentionSearch={handleMentionSearch}
             disabled={isStreaming || pendingApproval !== null}

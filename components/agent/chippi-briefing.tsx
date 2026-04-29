@@ -91,8 +91,8 @@ export function ChippiBriefing({ slug }: { slug: string }) {
           <Bot size={15} className="text-orange-500" />
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-medium">All clear</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Chippi has no urgent actions. Your pipeline is in good shape.</p>
+          <p className="text-sm font-medium">You&apos;re ahead of it</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Nothing urgent on Chippi&apos;s desk &mdash; pipeline looks healthy. I&apos;ll surface anything that needs you.</p>
         </div>
       </div>
     );
@@ -107,7 +107,7 @@ export function ChippiBriefing({ slug }: { slug: string }) {
             <Bot size={14} className="text-white" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-orange-700 dark:text-orange-300">Chippi's Briefing</p>
+            <p className="text-sm font-semibold text-orange-700 dark:text-orange-300">From Chippi&apos;s desk</p>
             {data.generatedAt && (
               <p className="text-[10px] text-orange-500/70 dark:text-orange-400/60">
                 Updated {timeAgo(data.generatedAt)}
