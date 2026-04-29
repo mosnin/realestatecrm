@@ -1,35 +1,67 @@
 'use client';
 
+import { useState } from 'react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { AgentDraftInbox } from '@/components/agent/agent-draft-inbox';
 import { AgentQuestionsPanel } from '@/components/agent/agent-questions-panel';
+import { AgentGoalsPanel } from '@/components/agent/agent-goals-panel';
 import { TodayFocus } from './today-focus';
 import { WhatIDid } from './what-i-did';
 import { WhatsComing } from './whats-coming';
+import { FocusCard } from './focus-card';
 
 /**
- * The dispatch console — Chippi's morning briefing. Sections are ordered the
- * way a realtor scans their morning: urgent decisions first, today's
- * activity middle, agent's proof-of-work last.
+ * The default surface — focus mode. One focal item at a time. The realtor
+ * lands on /chippi and sees ONE thing waiting on them with Send / Edit /
+ * Hold for later. When that's done, the next one slides in. When the queue
+ * clears, a calm acknowledgement.
  *
- *   1. Drafts I made    — outreach to send right now
- *   2. Questions I have — judgment calls Chippi paused on
- *   3. Who to reach today — Chippi's curated picks for outreach
- *   4. What's coming    — tours scheduled + follow-ups due
- *   5. What I did       — proof of work; what Chippi handled overnight
+ * "Show full day →" expands into the dispatch console (Drafts I made /
+ * Questions I have / Who to reach today / What's coming / What I did)
+ * for power users who want the dashboard view. The toggle is local state;
+ * focus mode is the default every time.
  *
- * Each child self-fetches and self-empty-states; sections that have nothing
- * to show hide themselves entirely so quiet days stay calm. Goals are no
- * longer surfaced here — the route stays alive for deep-links but the
- * concept is a CRM primitive, not a realtor primitive.
+ * The realtor signal said simplicity wins. This is more simplicity — five
+ * sections to one card. The dashboard view stays one tap away, but the
+ * default is the assistant, not the dashboard.
  */
 export function TodayFeed({ slug }: { slug: string }) {
+  const [showFull, setShowFull] = useState(false);
+
+  if (showFull) {
+    return (
+      <div className="space-y-12">
+        <button
+          type="button"
+          onClick={() => setShowFull(false)}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft size={12} />
+          Back to focus
+        </button>
+        <AgentDraftInbox slug={slug} />
+        <AgentQuestionsPanel />
+        <TodayFocus slug={slug} />
+        <WhatsComing slug={slug} />
+        <WhatIDid slug={slug} />
+        <AgentGoalsPanel />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-12">
-      <AgentDraftInbox slug={slug} />
-      <AgentQuestionsPanel />
-      <TodayFocus slug={slug} />
-      <WhatsComing slug={slug} />
-      <WhatIDid slug={slug} />
+    <div className="space-y-6">
+      <FocusCard slug={slug} onShowFullDay={() => setShowFull(true)} />
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={() => setShowFull(true)}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Show full day
+          <ArrowRight size={12} />
+        </button>
+      </div>
     </div>
   );
 }
