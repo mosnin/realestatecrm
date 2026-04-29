@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { secondaryNavItems } from '@/lib/nav-items';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronRight, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check, Inbox, Sparkles, Home, CalendarDays, Calendar, Flag, BarChart2, ClipboardList } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check, Sparkles, CalendarDays, Calendar, Flag, BarChart2, ClipboardList } from 'lucide-react';
 import { GlobalSearch } from './global-search';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
@@ -81,8 +81,6 @@ interface HeaderProps {
 export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const [mobileSwitcherOpen, setMobileSwitcherOpen] = useState(false);
-  const [intakeExpanded, setIntakeExpanded] = useState(false);
-  const [analyticsExpanded, setAnalyticsExpanded] = useState(false);
   const pathname = usePathname();
   const base = `/s/${slug}`;
   const { theme, toggleTheme } = useTheme();
@@ -90,7 +88,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
   const showBrokerMobileNavOnly = isBroker && isOnBrokerPage;
 
   return (
-    <header className="h-14 border-b border-border flex items-center justify-between px-4 md:px-6 bg-card sticky top-0 z-40 shadow-[0_1px_0_0_var(--border)]">
+    <header className="h-14 border-b border-border/70 flex items-center justify-between px-4 md:px-6 bg-background sticky top-0 z-40">
       <div className="flex items-center gap-3">
         {/* Mobile menu trigger */}
         <Sheet open={open} onOpenChange={setOpen}>
@@ -98,7 +96,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
             <MenuToggleIcon open={open} className="size-5 text-muted-foreground" duration={400} />
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0 border-sidebar-border flex flex-col overflow-hidden relative bg-sidebar">
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-pink-100/50 via-purple-50/20 to-transparent dark:from-purple-900/10 dark:via-transparent z-0" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent z-0" />
             <div className="relative z-10 flex flex-col h-full overflow-y-auto">
             <SheetHeader className="px-4 py-5 border-b border-sidebar-border">
               <SheetTitle className="flex items-center gap-2.5 text-sidebar-foreground">
@@ -180,11 +178,10 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
             <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-2 space-y-0.5">
               {!isBrokerOnly && !showBrokerMobileNavOnly && (
                 <>
-                  {/* AI section */}
-                  <p className="px-3 pb-2 pt-1 text-[11px] font-medium text-muted-foreground select-none">AI</p>
+                  {/* AI — single Chippi entry, matches the redesigned sidebar */}
+                  <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60 select-none">AI</p>
                   {[
-                    { href: `${base}/agent`, label: 'Inbox', icon: Inbox, exact: false },
-                    { href: `${base}/ai`, label: 'Assistant', icon: Sparkles, exact: false },
+                    { href: `${base}/chippi`, label: 'Chippi', icon: Sparkles, exact: false },
                   ].map((item) => {
                     const isActive = pathname.startsWith(item.href);
                     return (
@@ -193,139 +190,101 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                         href={item.href}
                         onClick={() => setOpen(false)}
                         className={cn(
-                          'group flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] transition-colors',
+                          'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
                           isActive
-                            ? 'bg-accent text-foreground font-medium'
-                            : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground'
+                            ? 'bg-foreground/[0.045] text-foreground font-medium'
+                            : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
                         )}
                       >
-                        <item.icon size={20} className="flex-shrink-0" />
+                        {isActive && (
+                          <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground" />
+                        )}
+                        <img
+                          src="/chip-avatar.png"
+                          alt=""
+                          className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
+                        />
                         {item.label}
                       </Link>
                     );
                   })}
 
-                  {/* Workspace section */}
-                  <p className="px-3 pb-2 pt-5 text-[11px] font-medium text-muted-foreground select-none">Workspace</p>
+                  {/* Primary — matches the redesigned realtor sidebar */}
                   {[
-                    { href: '', label: 'Today', icon: Home, exact: true },
-                    { href: '/contacts', label: 'People', icon: Users, exact: false },
-                    { href: '/deals', label: 'Deals', icon: Briefcase, exact: false },
-                    { href: '/tours', label: 'Tours', icon: CalendarDays, exact: false },
-                    { href: '/calendar', label: 'Calendar', icon: Calendar, exact: false },
-                    { href: '/notes', label: 'Notes', icon: FileText, exact: false },
-                    { href: '/reviews', label: 'My reviews', icon: Flag, exact: false },
+                    { href: '/contacts', label: 'People', icon: Users },
+                    { href: '/deals', label: 'Pipeline', icon: Briefcase },
                   ].map((item) => {
                     const href = `${base}${item.href}`;
-                    const isActive = item.exact ? pathname === base : pathname.startsWith(href);
+                    const isActive = pathname.startsWith(href);
                     return (
                       <Link
                         key={item.href}
                         href={href}
                         onClick={() => setOpen(false)}
                         className={cn(
-                          'group flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] transition-colors',
+                          'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
                           isActive
-                            ? 'bg-accent text-foreground font-medium'
-                            : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground'
+                            ? 'bg-foreground/[0.045] text-foreground font-medium'
+                            : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
                         )}
                       >
-                        <item.icon size={20} className="flex-shrink-0" />
+                        {isActive && (
+                          <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground" />
+                        )}
+                        <item.icon
+                          size={15}
+                          strokeWidth={isActive ? 2.25 : 1.75}
+                          className={cn(
+                            'flex-shrink-0',
+                            isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
+                          )}
+                        />
                         {item.label}
                       </Link>
                     );
                   })}
 
-                  {/* Intake form — expandable */}
-                  <button
-                    onClick={() => setIntakeExpanded((p) => !p)}
-                    className={cn(
-                      'group w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] transition-colors',
-                      pathname.startsWith(`${base}/intake`) || pathname.startsWith(`${base}/settings/appearance`) || pathname.startsWith(`${base}/settings/content`)
-                        ? 'bg-accent text-foreground font-medium'
-                        : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground'
-                    )}
-                  >
-                    <ClipboardList size={20} className="flex-shrink-0" />
-                    <span className="flex-1 text-left">Intake form</span>
-                    <ChevronRight size={14} className={cn('text-muted-foreground/50 transition-transform duration-200', intakeExpanded && 'rotate-90')} />
-                  </button>
-                  {intakeExpanded && (
-                    <div className="ml-[18px] pl-3.5 py-1 space-y-0.5 border-l border-border/40">
-                      {[
-                        { href: '/intake', label: 'Overview', exact: true },
-                        { href: '/intake/customize', label: 'Customize' },
-                        { href: '/settings/appearance', label: 'Appearance' },
-                        { href: '/settings/content', label: 'Content' },
-                        { href: '/intake/tracking', label: 'Tracking' },
-                        { href: '/intake/analytics', label: 'Form analytics' },
-                        { href: '/intake/share', label: 'Share' },
-                      ].map((child) => {
-                        const href = `${base}${child.href}`;
-                        const isActive = child.exact ? pathname === href : pathname.startsWith(href);
-                        return (
-                          <Link
-                            key={child.href}
-                            href={href}
-                            onClick={() => setOpen(false)}
-                            className={cn(
-                              'flex items-center min-h-[36px] h-9 px-2.5 rounded-md text-[13px] transition-colors',
-                              isActive
-                                ? 'text-foreground font-medium'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                            )}
-                          >
-                            {child.label}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Analytics — expandable */}
-                  <button
-                    onClick={() => setAnalyticsExpanded((p) => !p)}
-                    className={cn(
-                      'group w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] transition-colors',
-                      pathname.startsWith(`${base}/analytics`)
-                        ? 'bg-accent text-foreground font-medium'
-                        : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground'
-                    )}
-                  >
-                    <BarChart2 size={20} className="flex-shrink-0" />
-                    <span className="flex-1 text-left">Analytics</span>
-                    <ChevronRight size={14} className={cn('text-muted-foreground/50 transition-transform duration-200', analyticsExpanded && 'rotate-90')} />
-                  </button>
-                  {analyticsExpanded && (
-                    <div className="ml-[18px] pl-3.5 py-1 space-y-0.5 border-l border-border/40">
-                      {[
-                        { href: '/analytics', label: 'Overview', exact: true },
-                        { href: '/analytics/leads', label: 'Leads' },
-                        { href: '/analytics/clients', label: 'Clients' },
-                        { href: '/analytics/tours', label: 'Tours' },
-                        { href: '/analytics/pipeline', label: 'Pipeline' },
-                        { href: '/analytics/form-traffic', label: 'Form traffic' },
-                      ].map((child) => {
-                        const href = `${base}${child.href}`;
-                        const isActive = child.exact ? pathname === href : pathname.startsWith(href);
-                        return (
-                          <Link
-                            key={child.href}
-                            href={href}
-                            onClick={() => setOpen(false)}
-                            className={cn(
-                              'flex items-center min-h-[36px] h-9 px-2.5 rounded-md text-[13px] transition-colors',
-                              isActive
-                                ? 'text-foreground font-medium'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                            )}
-                          >
-                            {child.label}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
+                  {/* More — secondary destinations, visually subordinate */}
+                  <p className="px-3 pt-6 pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60 select-none">
+                    More
+                  </p>
+                  {[
+                    { href: '/tours', label: 'Tours', icon: CalendarDays },
+                    { href: '/calendar', label: 'Calendar', icon: Calendar },
+                    { href: '/notes', label: 'Notes', icon: FileText },
+                    { href: '/reviews', label: 'Reviews', icon: Flag },
+                    { href: '/intake', label: 'Intake form', icon: ClipboardList },
+                    { href: '/analytics', label: 'Analytics', icon: BarChart2 },
+                  ].map((item) => {
+                    const href = `${base}${item.href}`;
+                    const isActive = pathname.startsWith(href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={href}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                          'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
+                          isActive
+                            ? 'bg-foreground/[0.045] text-foreground font-medium'
+                            : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
+                        )}
+                      >
+                        {isActive && (
+                          <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground" />
+                        )}
+                        <item.icon
+                          size={15}
+                          strokeWidth={isActive ? 2.25 : 1.75}
+                          className={cn(
+                            'flex-shrink-0',
+                            isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
+                          )}
+                        />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
 
                   {/* Settings section — expanded flat list */}
                   <p className="px-3 pb-2 pt-5 text-[11px] font-medium text-muted-foreground select-none">Settings</p>
@@ -502,42 +461,42 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
           <BrandLogo className="h-5" alt="Chippi" />
         </span>
 
-        {/* Desktop: breadcrumb */}
-        <div className="hidden md:flex items-center gap-1.5 text-sm">
+        {/* Desktop breadcrumb — small, monospaced separator, no chunky pills.
+            The current section reads as the focal label; the workspace name
+            is quiet context. Quick-switch is a borderless link, not a chip. */}
+        <div className="hidden md:flex items-center gap-2 text-[13px]">
           {(pathname.startsWith('/broker') || isBrokerOnly) && brokerageName ? (
             <>
-              <span className="text-muted-foreground">{brokerageName}</span>
-              <span className="text-muted-foreground/40">/</span>
+              <span className="text-muted-foreground/70 truncate max-w-[160px]">{brokerageName}</span>
+              <span className="text-muted-foreground/30">/</span>
               <span className="font-medium text-foreground">
                 {getBreadcrumbLabel(pathname)}
               </span>
-              {/* Quick switch to workspace */}
               {!isBrokerOnly && slug && (
                 <Link
                   href={base}
-                  className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md border border-border hover:bg-accent transition-colors"
+                  className="ml-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors"
                   title={`Switch to ${spaceName}`}
                 >
-                  <ArrowLeftRight size={11} />
+                  <ArrowLeftRight size={10} />
                   {spaceName}
                 </Link>
               )}
             </>
           ) : (
             <>
-              <span className="text-muted-foreground">{title}</span>
-              <span className="text-muted-foreground/40">/</span>
+              <span className="text-muted-foreground/70 truncate max-w-[160px]">{title}</span>
+              <span className="text-muted-foreground/30">/</span>
               <span className="font-medium text-foreground">
                 {getBreadcrumbLabel(pathname, base)}
               </span>
-              {/* Quick switch to brokerage */}
               {isBroker && brokerageName && (
                 <Link
                   href="/broker"
-                  className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md border border-border hover:bg-accent transition-colors"
+                  className="ml-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors"
                   title={`Switch to ${brokerageName}`}
                 >
-                  <ArrowLeftRight size={11} />
+                  <ArrowLeftRight size={10} />
                   {brokerageName}
                 </Link>
               )}
