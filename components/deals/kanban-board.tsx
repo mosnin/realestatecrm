@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
+import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { formatCurrency as _formatCurrency } from '@/lib/formatting';
@@ -1619,24 +1620,23 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
               <tbody className="divide-y divide-border bg-card">
                 {allDeals.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center">
-                      <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
-                        <Briefcase size={20} className="text-muted-foreground" />
-                      </div>
+                    <td colSpan={6} className="p-4">
                       {hasActiveFilter && totalUnfilteredDealCount > 0 ? (
-                        <>
-                          <p className="text-sm font-medium text-foreground">No deals match your filters</p>
-                          <p className="text-xs text-muted-foreground mt-1 max-w-[260px] mx-auto">
-                            Try clearing the search or enabling more status chips above.
-                          </p>
-                        </>
+                        <EmptyState
+                          icon={Briefcase}
+                          title="No deals match your filters"
+                          description="Try clearing the search or enabling more status chips above."
+                          variant="flush"
+                          size="md"
+                        />
                       ) : (
-                        <>
-                          <p className="text-sm font-medium text-foreground">No deals yet</p>
-                          <p className="text-xs text-muted-foreground mt-1 max-w-[220px] mx-auto">
-                            Add your first deal to start tracking your leasing pipeline.
-                          </p>
-                        </>
+                        <EmptyState
+                          icon={Briefcase}
+                          title="No deals yet"
+                          description="Add your first deal to start tracking your leasing pipeline."
+                          variant="flush"
+                          size="md"
+                        />
                       )}
                     </td>
                   </tr>

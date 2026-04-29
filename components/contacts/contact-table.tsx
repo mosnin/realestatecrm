@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { LiquidMetalButton } from '@/components/ui/liquid-metal-button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -706,23 +707,19 @@ export function ContactTable({ slug }: ContactTableProps) {
 
         if (isFreshWorkspace) {
           return (
-            <div className="rounded-2xl border border-dashed border-border bg-card py-16 text-center px-6">
-              <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-                <Users size={20} className="text-muted-foreground" />
-              </div>
-              <p className="font-semibold text-foreground mb-1">No contacts yet</p>
-              <p className="text-sm text-muted-foreground">
-                Add one or import a list to get started.
-              </p>
-              <div className="mt-4 flex gap-2 justify-center">
-                <Button onClick={() => setAddOpen(true)} className="gap-2" size="sm">
-                  <Plus size={14} /> Add contact
-                </Button>
-                <Button onClick={() => setImportOpen(true)} className="gap-2" size="sm" variant="outline">
-                  <Upload size={14} /> Import
-                </Button>
-              </div>
-            </div>
+            <EmptyState
+              icon={Users}
+              title="No contacts yet"
+              description="Add your first lead or client, or import a list to get started."
+              size="lg"
+            >
+              <Button onClick={() => setAddOpen(true)} className="gap-2" size="sm">
+                <Plus size={14} /> Add contact
+              </Button>
+              <Button onClick={() => setImportOpen(true)} className="gap-2" size="sm" variant="outline">
+                <Upload size={14} /> Import
+              </Button>
+            </EmptyState>
           );
         }
 
