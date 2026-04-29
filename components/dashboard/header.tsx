@@ -14,12 +14,10 @@ import {
   SheetTitle,
   SheetTrigger
 } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { secondaryNavItems } from '@/lib/nav-items';
 import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check, Sparkles, CalendarDays, Calendar, Flag, BarChart2, ClipboardList } from 'lucide-react';
-import { GlobalSearch } from './global-search';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { BrokerHelpGuide } from '@/components/broker/help-guide';
@@ -505,19 +503,22 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5">
-        {slug && <GlobalSearch slug={slug} />}
+      {/* Right cluster — quiet icon row in the new sidebar language. Search
+          lives on the sidebar's pill (and ⌘K) so the header doesn't carry a
+          duplicate trigger. */}
+      <div className="flex items-center gap-0.5">
         {slug && <NotificationCenter slug={slug} />}
         {isBroker && <BrokerHelpGuide />}
         {isBrokerOnly && !slug && <NotificationBell />}
-        <Button
-          variant="ghost"
-          size="icon"
+        <button
+          type="button"
           onClick={toggleTheme}
-          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          aria-label="Toggle theme"
+          title="Toggle theme"
+          className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.025] transition-colors"
         >
-          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-        </Button>
+          {theme === 'dark' ? <Sun size={14} strokeWidth={1.75} /> : <Moon size={14} strokeWidth={1.75} />}
+        </button>
         <div className="[&_.cl-userButtonTrigger]:rounded-full">
           <UserButton />
         </div>
