@@ -15,6 +15,7 @@ from agents import RunContextWrapper, function_tool
 from config import settings
 from db import supabase
 from security.context import AgentContext
+from tools.activities import persist_log
 from tools.streaming import publish_event
 
 _ALLOWED_PROPERTY_TYPES = {
@@ -301,6 +302,17 @@ async def send_property_packet(
         f"Packet drafted for {contact_name} — awaiting your approval",
         metadata={"contactId": contact_id, "packetId": packet["id"], "channel": channel},
     )
+
+    try:
+        await persist_log(
+            ctx.context,
+            action_type="packet_drafted",
+            outcome="queued_for_approval",
+            reasoning=f"Sent packet '{packet.get('name', '')[:60]}' via {channel}. {reasoning[:200]}",
+            contact_id=contact_id,
+        )
+    except Exception:
+        pass
 
     return {
         "ok": True,

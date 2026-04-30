@@ -15,6 +15,7 @@ mis-call previews instead of mutating.
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -22,6 +23,7 @@ from agents import RunContextWrapper, function_tool
 
 from db import supabase
 from security.context import AgentContext
+from tools.activities import persist_log
 from tools.streaming import publish_event
 
 
@@ -222,12 +224,51 @@ async def _commit_route(
     rule_id: str | None,
 ) -> dict[str, Any]:
     now = datetime.now(timezone.utc).isoformat()
+
+    # Audit log against the SOURCE space first — this is the realtor whose
+    # contact just left, and they need to see why. Once the Contact row
+    # moves to the destination space the source space loses access to it,
+    # so we have to log before mutating.
+    try:
+        await persist_log(
+            ctx_ctx,
+            action_type="lead_routed_out",
+            outcome="completed",
+            reasoning=(
+                f"Routed to user {dest_user_id[:8]}"
+                + (f" via rule {rule_id[:8]}" if rule_id else " (manual override)")
+            ),
+            contact_id=contact_id,
+        )
+    except Exception:
+        pass
+
     await (
         db.table("Contact")
         .update({"spaceId": dest_space_id, "updatedAt": now})
         .eq("id", contact_id)
         .execute()
     )
+
+    # Mirror the log into the DESTINATION space so the receiving realtor
+    # also sees a "lead_routed_in" entry on their activity feed.
+    try:
+        db_ = await supabase()
+        await db_.table("AgentActivityLog").insert({
+            "id": str(uuid.uuid4()),
+            "spaceId": dest_space_id,
+            "runId": ctx_ctx.run_id,
+            "agentType": ctx_ctx.current_agent_type,
+            "actionType": "lead_routed_in",
+            "reasoning": (
+                f"Received contact via "
+                + (f"rule {rule_id[:8]}" if rule_id else "manual routing")
+            ),
+            "outcome": "completed",
+            "relatedContactId": contact_id,
+        }).execute()
+    except Exception:
+        pass
 
     await publish_event(
         ctx_ctx,

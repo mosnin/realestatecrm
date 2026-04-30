@@ -10,6 +10,7 @@ from agents import RunContextWrapper, function_tool
 
 from db import supabase
 from security.context import AgentContext
+from tools.activities import persist_log
 from tools.streaming import publish_event
 
 _CLIP = 300
@@ -309,6 +310,17 @@ async def advance_deal_stage(
         metadata={"dealId": deal_id, "stageId": new_stage_id},
     )
 
+    try:
+        await persist_log(
+            ctx.context,
+            action_type="deal_stage_advanced",
+            outcome="completed",
+            reasoning=f"{deal_title} → {new_stage_name}. {reason}",
+            deal_id=deal_id,
+        )
+    except Exception:
+        pass
+
     return {
         "ok": True,
         "dealId": deal_id,
@@ -378,6 +390,17 @@ async def request_deal_review(
         agent_type=ctx.context.current_agent_type,
         metadata={"dealId": deal_id, "reviewId": review_id},
     )
+
+    try:
+        await persist_log(
+            ctx.context,
+            action_type="review_requested",
+            outcome="queued_for_approval",
+            reasoning=reason.strip()[:500],
+            deal_id=deal_id,
+        )
+    except Exception:
+        pass
 
     return {
         "ok": True,

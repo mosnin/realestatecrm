@@ -20,6 +20,7 @@ from agents import RunContextWrapper, function_tool
 
 from db import supabase
 from security.context import AgentContext
+from tools.activities import persist_log
 from tools.streaming import publish_event
 
 _VALID_CHANNELS = {"sms", "email", "note"}
@@ -118,6 +119,18 @@ async def draft_message(
         f"Draft {channel.upper()} for {contact_name} — awaiting your approval",
         metadata={"contactId": contact_id, "channel": channel},
     )
+
+    try:
+        await persist_log(
+            ctx.context,
+            action_type="message_drafted",
+            outcome="queued_for_approval",
+            reasoning=f"{channel}: {reasoning[:200]}",
+            contact_id=contact_id,
+            deal_id=deal_id,
+        )
+    except Exception:
+        pass
 
     created = result.data[0] if result.data else draft
     return {

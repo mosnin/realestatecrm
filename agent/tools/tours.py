@@ -19,6 +19,7 @@ from agents import RunContextWrapper, function_tool
 
 from db import supabase
 from security.context import AgentContext
+from tools.activities import persist_log
 from tools.streaming import publish_event
 
 
@@ -135,6 +136,18 @@ async def book_tour(
         agent_type=ctx.context.current_agent_type,
         metadata={"contactId": contact_id, "tourId": tour_id},
     )
+
+    # Audit trail for broker rollup
+    try:
+        await persist_log(
+            ctx.context,
+            action_type="tour_booked",
+            outcome="completed",
+            reasoning=f"Tour at {property_address or 'TBD'} on {starts.isoformat()}",
+            contact_id=contact_id,
+        )
+    except Exception:
+        pass
 
     created = result.data[0] if result.data else tour_row
     return {

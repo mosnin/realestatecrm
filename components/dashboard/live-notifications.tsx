@@ -103,8 +103,8 @@ export function LiveNotifications({ spaceId, slug }: Props) {
             .from('DealStage')
             .select('name')
             .eq('id', newDeal.stageId)
-            .maybeSingle();
-          stageName = (data?.name as string | null) ?? null;
+            .maybeSingle<{ name: string | null }>();
+          stageName = data?.name ?? null;
         }
       } catch {
         // Stage lookup is best-effort. Toast still fires below.
