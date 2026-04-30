@@ -198,7 +198,7 @@ export default async function IntakeOverviewPage({
 
         {recentLeads.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No submissions yet. Share your link and they'll show up here.
+            No submissions yet. Share your link and they&apos;ll show up here.
           </p>
         ) : (
           <StaggerList className="rounded-xl border border-border/70 bg-background overflow-hidden divide-y divide-border/70">

@@ -452,7 +452,7 @@ function EmptyState({
           Nothing listed yet.
         </h2>
         <p className={cn(BODY_MUTED, 'max-w-sm mb-6')}>
-          Add your first property and I'll keep track of the commissions.
+          Add your first property and I&apos;ll keep track of the commissions.
         </p>
         <button
           type="button"

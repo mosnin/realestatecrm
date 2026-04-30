@@ -192,9 +192,9 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
           <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center mx-auto">
             <CheckCircle2 size={24} className="text-emerald-600 dark:text-emerald-400" />
           </div>
-          <h2 className="text-lg font-semibold">You're caught up.</h2>
+          <h2 className="text-lg font-semibold">You&apos;re caught up.</h2>
           <p className="text-sm text-muted-foreground">
-            Nothing to chase. Set a follow-up from a contact or deal and it'll land here.
+            Nothing to chase. Set a follow-up from a contact or deal and it&apos;ll land here.
           </p>
         </div>
       </div>

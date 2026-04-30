@@ -123,7 +123,7 @@ export function TemplatesEditor({ initial }: Props) {
 
         {items.length === 0 ? (
           <div className="px-4 py-6 text-xs text-muted-foreground text-center">
-            No templates yet. Add one and I'll keep it close.
+            No templates yet. Add one and I&apos;ll keep it close.
           </div>
         ) : (
           <ul className="divide-y divide-border max-h-[60vh] overflow-y-auto">

@@ -57,7 +57,7 @@ export function DangerZone({ space }: { space: Space }) {
   return (
     <div className="space-y-3">
       <p className={BODY_MUTED}>
-        Deleting your space is permanent. Every client, deal, and note goes with it. I can't bring it back.
+        Deleting your space is permanent. Every client, deal, and note goes with it. I can&apos;t bring it back.
       </p>
       <button
         type="button"

@@ -165,7 +165,7 @@ function CreateFirstBoardCard({
         No pipeline yet.
       </h2>
       <p className={cn(BODY_MUTED, 'max-w-sm mb-6')}>
-        A board of stages — make one and I'll start tracking your deals.
+        A board of stages — make one and I&apos;ll start tracking your deals.
       </p>
       <button
         type="button"
