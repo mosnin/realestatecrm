@@ -19,28 +19,31 @@ export default async function AnalyticsOverviewPage({
   try {
     const raw = await fetchRawAnalyticsData(space.id);
     const data = buildOverviewData(raw);
-
-    return (
-      <div className="space-y-5">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Analytics Overview</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            High-level insights across your leads, contacts, and deals
-          </p>
-        </div>
-        <OverviewView data={data} />
-      </div>
-    );
+    return <OverviewView data={data} />;
   } catch (err) {
     console.error('[analytics/overview] DB queries failed', err);
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">We couldn&apos;t load your data. This is usually temporary.</p>
-          <a href={`/s/${slug}/analytics`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Try again</a>
-        </div>
-      </div>
-    );
+    return <AnalyticsErrorBlock href={`/s/${slug}/analytics`} />;
   }
+}
+
+function AnalyticsErrorBlock({ href }: { href: string }) {
+  return (
+    <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center space-y-3">
+      <p
+        className="text-3xl tracking-tight text-foreground"
+        style={{ fontFamily: 'var(--font-title)' }}
+      >
+        Something went wrong
+      </p>
+      <p className="text-sm text-muted-foreground">
+        We couldn&apos;t load your data. This is usually temporary.
+      </p>
+      <a
+        href={href}
+        className="bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] rounded-full px-4 h-9 gap-1.5 inline-flex items-center transition-all duration-150 text-sm"
+      >
+        Try again
+      </a>
+    </div>
+  );
 }
