@@ -54,11 +54,15 @@ const parameters = z
   .describe('Schedule a property tour for a contact or walk-in guest.');
 
 interface ScheduleTourResult {
-  tourId: string;
-  startsAt: string;
-  endsAt: string;
-  contactId: string | null;
-  guestName: string;
+  tours: Array<{
+    tourId: string;
+    startsAt: string;
+    endsAt: string;
+    contactId: string | null;
+    guestName: string;
+    propertyAddress: string | null;
+    status: 'scheduled';
+  }>;
 }
 
 export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult>({
@@ -174,11 +178,17 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
     return {
       summary: `Tour scheduled for ${guestName || 'guest'}${where} — ${prettyTime}.`,
       data: {
-        tourId: inserted.id,
-        startsAt: inserted.startsAt,
-        endsAt: inserted.endsAt,
-        contactId,
-        guestName,
+        tours: [
+          {
+            tourId: inserted.id,
+            startsAt: inserted.startsAt,
+            endsAt: inserted.endsAt,
+            contactId,
+            guestName,
+            propertyAddress: args.propertyAddress?.trim() || null,
+            status: 'scheduled',
+          },
+        ],
       },
       display: 'tours',
     };

@@ -205,7 +205,9 @@ describe('scheduleTourTool', () => {
     );
     expect(result.display).toBe('tours');
     expect(result.summary).toMatch(/Tour scheduled/);
-    expect((result.data as { contactId: string | null }).contactId).toBeNull();
+    const tours = (result.data as { tours: { contactId: string | null }[] }).tours;
+    expect(tours).toHaveLength(1);
+    expect(tours[0].contactId).toBeNull();
   });
 });
 

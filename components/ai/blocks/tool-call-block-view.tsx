@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import type { ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { ContactsResult } from './tool-results/contacts-result';
 import { DealsResult } from './tool-results/deals-result';
+import { ToursResult } from './tool-results/tours-result';
 
 /** Per-tool icon map. Generic Wrench fallback keeps unknown tools readable. */
 const TOOL_ICONS: Record<string, typeof Users> = {
@@ -112,6 +113,9 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
     }
     if (block.display === 'deals' && Array.isArray((data as { deals?: unknown[] }).deals)) {
       return <DealsResult data={data as { deals: never[] }} />;
+    }
+    if (block.display === 'tours' && Array.isArray((data as { tours?: unknown[] }).tours)) {
+      return <ToursResult data={data as { tours: never[] }} />;
     }
     return null;
   })();
