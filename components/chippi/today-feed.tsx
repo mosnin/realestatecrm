@@ -25,7 +25,18 @@ import { FocusCard } from './focus-card';
  * sections to one card. The dashboard view stays one tap away, but the
  * default is the assistant, not the dashboard.
  */
-export function TodayFeed({ slug }: { slug: string }) {
+export function TodayFeed({
+  slug,
+  isFresh = false,
+  firstName,
+  onTellMeAboutLead,
+}: {
+  slug: string;
+  /** True when the realtor has done nothing yet — triggers day-one welcome. */
+  isFresh?: boolean;
+  firstName?: string;
+  onTellMeAboutLead?: (prefill: string) => void;
+}) {
   const [showFull, setShowFull] = useState(false);
 
   if (showFull) {
@@ -49,5 +60,13 @@ export function TodayFeed({ slug }: { slug: string }) {
     );
   }
 
-  return <FocusCard slug={slug} onShowFullDay={() => setShowFull(true)} />;
+  return (
+    <FocusCard
+      slug={slug}
+      onShowFullDay={() => setShowFull(true)}
+      isFresh={isFresh}
+      firstName={firstName}
+      onTellMeAboutLead={onTellMeAboutLead}
+    />
+  );
 }

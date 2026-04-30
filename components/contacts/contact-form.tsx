@@ -320,7 +320,7 @@ export function ContactForm({
               />
             </FieldRow>
 
-            <FieldRow id="properties" label="Properties of interest" optional>
+            <FieldRow id="properties" label="Interested in" optional>
               <ChipInput
                 id="properties"
                 values={properties}

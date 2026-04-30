@@ -22,6 +22,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { toast } from 'sonner';
+import { BODY_MUTED, QUIET_LINK, TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
+import { buildIntakeUrl } from '@/lib/intake';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -68,6 +70,19 @@ const CHANNEL_META = {
 interface Props {
   slug: string;
   onShowFullDay: () => void;
+  /**
+   * True only when the realtor has done absolutely nothing yet — no contacts,
+   * no deals, no conversations, no drafts, no questions. Day-one state. The
+   * agent should speak first instead of sitting silent.
+   */
+  isFresh?: boolean;
+  /** First name for the day-one welcome greeting. */
+  firstName?: string;
+  /**
+   * Day-one CTA — the parent prefills the composer with this text and
+   * focuses it. Wired through chippi-workspace.
+   */
+  onTellMeAboutLead?: (prefill: string) => void;
 }
 
 /**
@@ -82,7 +97,13 @@ interface Props {
  * something they're not ready for; the "show full day" link is one tap
  * away when they want the dashboard.
  */
-export function FocusCard({ slug, onShowFullDay }: Props) {
+export function FocusCard({
+  slug,
+  onShowFullDay,
+  isFresh = false,
+  firstName,
+  onTellMeAboutLead,
+}: Props) {
   const [items, setItems] = useState<FocusItem[]>([]);
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -214,6 +235,15 @@ export function FocusCard({ slug, onShowFullDay }: Props) {
 
   // No items at all (server-side empty)
   if (items.length === 0) {
+    if (isFresh) {
+      return (
+        <FocusWelcome
+          slug={slug}
+          firstName={firstName}
+          onTellMeAboutLead={onTellMeAboutLead}
+        />
+      );
+    }
     return (
       <FocusEmpty onShowFullDay={onShowFullDay} variant="all-clear" />
     );
@@ -444,6 +474,77 @@ export function FocusCard({ slug, onShowFullDay }: Props) {
         </Button>
       </div>
     </article>
+  );
+}
+
+// ─── Day-one welcome ────────────────────────────────────────────────────────
+
+/**
+ * Day one. Zero contacts, zero deals, zero conversations. The agent speaks
+ * first instead of waiting to be asked. One idea: tell me about a lead and
+ * I'll start your pipeline. Single primary action, single quiet escape hatch.
+ */
+function FocusWelcome({
+  slug,
+  firstName,
+  onTellMeAboutLead,
+}: {
+  slug: string;
+  firstName?: string;
+  onTellMeAboutLead?: (prefill: string) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyIntakeLink() {
+    const url = buildIntakeUrl(slug);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      toast.success('Intake link copied');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Could not copy — try again');
+    }
+  }
+
+  function handleTellMe() {
+    onTellMeAboutLead?.('Hi Chippi, my most recent lead is ');
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto text-center py-10">
+      {/* Calm warm circle, paper-flat — no shadow, no animation. */}
+      <div
+        aria-hidden
+        className="mx-auto mb-6 w-16 h-16 rounded-full bg-amber-100/70 dark:bg-amber-500/10"
+      />
+      <h2
+        className="text-3xl tracking-tight text-foreground"
+        style={TITLE_FONT}
+      >
+        Welcome{firstName ? `, ${firstName}` : ''}.
+      </h2>
+      <p className={cn(BODY_MUTED, 'mt-2 max-w-md mx-auto leading-relaxed')}>
+        Tell me about your most recent lead and I&apos;ll start your pipeline.
+      </p>
+      <div className="mt-6 flex flex-col items-center gap-3">
+        <button
+          type="button"
+          onClick={handleTellMe}
+          className={PRIMARY_PILL}
+          disabled={!onTellMeAboutLead}
+        >
+          Tell me about a lead
+        </button>
+        <button
+          type="button"
+          onClick={copyIntakeLink}
+          className={QUIET_LINK}
+        >
+          {copied ? 'Link copied' : 'Or share your intake link'}
+        </button>
+      </div>
+    </div>
   );
 }
 

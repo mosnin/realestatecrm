@@ -37,7 +37,9 @@ import {
   Inbox,
   Copy,
   Check,
+  ExternalLink,
 } from 'lucide-react';
+import { BODY_MUTED, TITLE_FONT, QUIET_LINK } from '@/lib/typography';
 import { buildIntakeUrl } from '@/lib/intake';
 import Link from 'next/link';
 import { ApplicationCompare } from './application-compare';
@@ -747,29 +749,40 @@ export function ContactTable({ slug }: ContactTableProps) {
         if (isFreshWorkspace) {
           return (
             <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
-                <Users size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
+              <div className="w-14 h-14 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-5">
+                <Users size={22} className="text-muted-foreground/60" strokeWidth={1.5} />
               </div>
-              <h2 className="text-xl tracking-tight font-semibold text-foreground mb-2">
-                Nobody here yet.
-              </h2>
-              <p className="text-sm text-muted-foreground max-w-sm mb-6">
-                Add your first lead, or share your intake link.
-              </p>
-              <Button
-                onClick={() => setAddOpen(true)}
-                className="h-9 gap-1.5 rounded-full px-4 bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] mb-5"
+              <h2
+                className="text-3xl tracking-tight text-foreground mb-2"
+                style={TITLE_FONT}
               >
-                <Plus size={14} strokeWidth={2.25} />
-                Add a person
-              </Button>
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-muted-foreground">Or share:</span>
-                <code className="bg-foreground/[0.04] rounded px-2 py-1 font-mono text-muted-foreground border border-border/50">
+                Welcome. Let&apos;s get your first lead.
+              </h2>
+              <p className={cn(BODY_MUTED, 'max-w-md mb-6')}>
+                Share this link with anyone interested. New leads land here automatically.
+              </p>
+              <div className="w-full max-w-md flex items-center gap-2 rounded-lg border border-border/70 bg-foreground/[0.04] p-3">
+                <code className="flex-1 truncate text-left font-mono text-sm text-foreground">
                   {intakeUrlWithoutProtocol}
                 </code>
                 <CopyButton url={fullIntakeUrl} />
+                <Link
+                  href={`/apply/${slug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Preview intake page"
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-border/60 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                >
+                  <ExternalLink size={12} strokeWidth={1.75} />
+                </Link>
               </div>
+              <button
+                type="button"
+                onClick={() => setAddOpen(true)}
+                className={cn(QUIET_LINK, 'mt-5 underline-offset-2 hover:underline')}
+              >
+                Or add someone manually
+              </button>
             </div>
           );
         }

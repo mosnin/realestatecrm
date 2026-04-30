@@ -3,7 +3,6 @@ import {
   Briefcase,
   Sparkles,
   Settings,
-  CalendarDays,
   Calendar,
   FileText,
   ClipboardList,
@@ -70,14 +69,14 @@ export const realtorNavItems: NavItem[] = [
 ];
 
 /**
- * Secondary realtor nav — visually subordinate "More" section. These are
- * destinations that have users but don't need daily prominence. Intake form
- * and Tours expand inline so their sub-pages (Customize, Share, Booking,
- * Availability) are reachable in one click instead of buried inside an
- * overview page. Routes are unchanged.
+ * Secondary realtor nav — visually subordinate "More" section. Calendar
+ * absorbs Tours (a tour is just a calendar event with a property + contact
+ * attached), so there is no separate Tours destination. Intake form expands
+ * inline so its sub-pages (Customize, Share, Booking, Availability) are
+ * reachable in one click instead of buried inside an overview page.
  */
 export const realtorMoreNavItems: NavItem[] = [
-  { href: '/tours', label: 'Tours', icon: CalendarDays },
+  { href: '/calendar', label: 'Calendar', icon: Calendar },
   {
     href: '/properties',
     label: 'Properties',
@@ -87,7 +86,6 @@ export const realtorMoreNavItems: NavItem[] = [
       { href: '/properties/commissions', label: 'Commissions' },
     ],
   },
-  { href: '/calendar', label: 'Calendar', icon: Calendar },
   {
     href: '/intake',
     label: 'Intake form',

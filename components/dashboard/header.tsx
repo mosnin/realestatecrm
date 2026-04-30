@@ -21,7 +21,7 @@ import { secondaryNavItems } from '@/lib/nav-items';
 import { SECTION_LABEL } from '@/lib/typography';
 import { PAGE_VARIANTS } from '@/lib/motion';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, FileText, ListChecks, CreditCard, Shield, Settings, Check, Sparkles, CalendarDays, Calendar, BarChart2, ClipboardList, Home } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, FileText, ListChecks, CreditCard, Shield, Settings, Check, Sparkles, Calendar, BarChart2, ClipboardList, Home } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { BrokerHelpGuide } from '@/components/broker/help-guide';
@@ -300,9 +300,8 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                             More
                           </p>
                           {[
-                            { href: '/tours', label: 'Tours', icon: CalendarDays },
-                            { href: '/properties', label: 'Properties', icon: Home },
                             { href: '/calendar', label: 'Calendar', icon: Calendar },
+                            { href: '/properties', label: 'Properties', icon: Home },
                             { href: '/intake', label: 'Intake form', icon: ClipboardList },
                             { href: '/intake/customize', label: 'Customize form', icon: ClipboardList },
                             { href: '/analytics', label: 'Analytics', icon: BarChart2 },

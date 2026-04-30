@@ -325,6 +325,13 @@ export function ChippiWorkspace({
   const firstName = user?.firstName ?? '';
   const greeting = useMemo(timeBasedGreeting, []);
 
+  // Composer prefill — bumped by the day-one welcome's "Tell me about a lead"
+  // action. Nonce so identical text twice in a row still re-applies.
+  const [prefill, setPrefill] = useState<{ text: string; nonce: number } | null>(null);
+  const handleTellMeAboutLead = useCallback((text: string) => {
+    setPrefill({ text, nonce: Date.now() });
+  }, []);
+
   // Counts for the header status sentence. Fetch only when we're rendering
   // the today view — no point pinging while in an active conversation. The
   // child sections still self-fetch their own data; this is a lightweight
@@ -357,6 +364,18 @@ export function ChippiWorkspace({
     })();
     return () => controller.abort();
   }, [isEmpty]);
+
+  // Day-one signal: zero of everything. The realtor has truly never engaged.
+  // We wait for `countsLoaded` so we don't flash the welcome before we know
+  // whether there's pending work. `messages.length === 0` is implied by
+  // `isEmpty`; checking it twice is cheap and explicit.
+  const isFresh =
+    isEmpty &&
+    countsLoaded &&
+    messages.length === 0 &&
+    counts.drafts === 0 &&
+    counts.questions === 0 &&
+    conversations.length === 0;
 
   // The empty case is the moment to remind the realtor what Chippi is FOR.
   // Operational status sentence appears only when there's actually work
@@ -414,6 +433,7 @@ export function ChippiWorkspace({
       onVoiceStart={() => setVoiceOpen(true)}
       disabled={isStreaming || pendingApproval !== null}
       isLoading={isStreaming}
+      prefill={prefill ?? undefined}
     />
   );
 
@@ -574,7 +594,12 @@ export function ChippiWorkspace({
               <HowChippiWorksTip />
 
               {/* Today's work */}
-              <TodayFeed slug={slug} />
+              <TodayFeed
+                slug={slug}
+                isFresh={isFresh}
+                firstName={firstName}
+                onTellMeAboutLead={handleTellMeAboutLead}
+              />
             </div>
           </div>
 

@@ -579,7 +579,7 @@ export default async function ClientDetailPage({
             )}
             {(contact.properties ?? []).length > 0 && (
               <div className="sm:col-span-2">
-                <p className="text-xs text-muted-foreground mb-2">Properties of interest</p>
+                <p className="text-xs text-muted-foreground mb-2">Interested in</p>
                 <div className="flex flex-wrap gap-1.5">
                   {(contact.properties ?? []).map((property) => (
                     <Badge key={property} variant="secondary" className="text-xs font-medium">

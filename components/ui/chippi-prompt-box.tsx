@@ -8,15 +8,12 @@ import {
   Loader2,
   User,
   Briefcase,
-  Globe,
-  BrainCog,
   FileText,
   Paperclip,
   Mic,
   Square,
   StopCircle,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
@@ -27,7 +24,7 @@ export interface MentionItem {
   subtitle?: string;
 }
 
-type Mode = 'search' | 'think' | 'draft' | null;
+type Mode = 'draft' | null;
 
 interface ChippiPromptBoxProps {
   placeholder?: string;
@@ -39,6 +36,13 @@ interface ChippiPromptBoxProps {
   isLoading?: boolean;
   className?: string;
   autoFocus?: boolean;
+  /**
+   * External prefill — when `nonce` changes, the composer adopts `text` as
+   * its current value and focuses the textarea (cursor at end). Used by the
+   * day-one welcome to seed "Hi Chippi, my most recent lead is …" without
+   * having to lift composer state into the parent.
+   */
+  prefill?: { text: string; nonce: number };
 }
 
 type UploadedAttachment = {
@@ -85,27 +89,11 @@ const ACCEPT_ATTR =
 
 const MODE_META: Record<Exclude<Mode, null>, {
   label: string;
-  Icon: typeof Globe;
+  Icon: typeof FileText;
   activeClasses: string;
   placeholder: string;
   prefix: string;
 }> = {
-  search: {
-    label: 'Search',
-    Icon: Globe,
-    activeClasses:
-      'bg-blue-500/10 border-blue-500/40 text-blue-600 dark:text-blue-400',
-    placeholder: 'Search the web…',
-    prefix: 'Search',
-  },
-  think: {
-    label: 'Think',
-    Icon: BrainCog,
-    activeClasses:
-      'bg-orange-500/10 border-orange-500/40 text-orange-600 dark:text-orange-400',
-    placeholder: 'Think this through with me…',
-    prefix: 'Think',
-  },
   draft: {
     label: 'Draft',
     Icon: FileText,
@@ -134,6 +122,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       isLoading = false,
       className,
       autoFocus = false,
+      prefill,
     },
     ref,
   ) {
@@ -187,6 +176,30 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     useEffect(() => {
       if (autoFocus) textareaRef.current?.focus();
     }, [autoFocus]);
+
+    // External prefill — when the parent bumps `prefill.nonce` we adopt the
+    // text and focus the cursor at the end. Used by the day-one welcome to
+    // seed the composer without lifting state up. Nonce-keyed instead of
+    // text-keyed so the realtor can edit/clear without us re-stomping it.
+    const prefillNonceRef = useRef<number | null>(null);
+    useEffect(() => {
+      if (!prefill) return;
+      if (prefillNonceRef.current === prefill.nonce) return;
+      prefillNonceRef.current = prefill.nonce;
+      setMessage(prefill.text);
+      // Defer focus until after the textarea reflects the new value.
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.focus();
+        const end = prefill.text.length;
+        try {
+          el.setSelectionRange(end, end);
+        } catch {
+          /* some browsers/elements throw; harmless */
+        }
+      });
+    }, [prefill]);
 
     // Close mention dropdown on outside click
     useEffect(() => {
@@ -940,54 +953,34 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                   </TooltipContent>
                 </Tooltip>
 
-                {/* Divider */}
-                <span aria-hidden className="w-px h-4 bg-border/60 mx-0.5" />
-
-                {/* Mode toggles */}
-                {(['search', 'think', 'draft'] as const).map((m, idx) => {
-                  const meta = MODE_META[m];
-                  const Icon = meta.Icon;
-                  const isActive = mode === m;
-                  return (
-                    <React.Fragment key={m}>
-                      {idx > 0 && (
-                        <span aria-hidden className="w-px h-4 bg-border/60 mx-0.5" />
+                {/* Draft mode — inline ghost icon-button alongside the other
+                    left-side actions. No segmented strip, no divider. Active
+                    state tints amber. The agent reads the [Draft: …] prefix
+                    as a hint; this is a nudge, not a separate route. */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => toggleMode('draft')}
+                      disabled={disabled || isLoading || isRecording}
+                      aria-pressed={mode === 'draft'}
+                      aria-label="Draft mode"
+                      className={cn(
+                        'inline-flex items-center justify-center w-8 h-8 rounded-full border',
+                        'transition-colors duration-150',
+                        'disabled:opacity-40 disabled:cursor-not-allowed',
+                        mode === 'draft'
+                          ? MODE_META.draft.activeClasses
+                          : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
                       )}
-                      <button
-                        type="button"
-                        onClick={() => toggleMode(m)}
-                        disabled={disabled || isLoading || isRecording}
-                        aria-pressed={isActive}
-                        aria-label={meta.label}
-                        className={cn(
-                          'inline-flex items-center h-8 rounded-full border',
-                          'transition-colors duration-150',
-                          'disabled:opacity-40 disabled:cursor-not-allowed',
-                          isActive
-                            ? meta.activeClasses
-                            : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
-                          isActive ? 'pl-2 pr-3' : 'px-2',
-                        )}
-                      >
-                        <Icon size={14} strokeWidth={1.85} />
-                        <AnimatePresence initial={false}>
-                          {isActive && (
-                            <motion.span
-                              key="label"
-                              initial={{ width: 0, opacity: 0, marginLeft: 0 }}
-                              animate={{ width: 'auto', opacity: 1, marginLeft: 6 }}
-                              exit={{ width: 0, opacity: 0, marginLeft: 0 }}
-                              transition={{ duration: 0.15, ease: 'easeOut' }}
-                              className="overflow-hidden whitespace-nowrap text-[12px] font-medium"
-                            >
-                              {meta.label}
-                            </motion.span>
-                          )}
-                        </AnimatePresence>
-                      </button>
-                    </React.Fragment>
-                  );
-                })}
+                    >
+                      <FileText size={14} strokeWidth={1.85} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={6}>
+                    Draft mode — long-form composition.
+                  </TooltipContent>
+                </Tooltip>
               </div>
 
               {renderRightButton()}
