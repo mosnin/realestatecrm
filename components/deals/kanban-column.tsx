@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { useDroppable } from '@dnd-kit/core';
+import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { DealCard } from './deal-card';
 import { Input } from '@/components/ui/input';
-import { Plus, LayoutList, SquarePen, Trash2, GripVertical } from 'lucide-react';
+import { Plus, SquarePen, Trash2, GripVertical } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { formatCompact } from '@/lib/formatting';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 
 type DealWithRelations = Deal & {
@@ -23,11 +25,16 @@ interface KanbanColumnProps {
   onDeleteDeal: (id: string) => void;
   onDeleteStage: (stage: DealStage) => void;
   onDealCreated: () => void;
-  onStatusChange?: (deal: DealWithRelations, status: 'won' | 'lost' | 'on_hold' | 'active') => void;
+  onStatusChange?: (
+    deal: DealWithRelations,
+    status: 'won' | 'lost' | 'on_hold' | 'active',
+  ) => void;
   /** The stage immediately after this one in the pipeline order. Null if this is the last stage. */
   nextStage?: DealStage | null;
   /** Called when a card's Advance button is clicked. */
   onAdvanceStage?: (deal: DealWithRelations, nextStageId: string) => void;
+  /** Open the deal slide-over panel from a card click. */
+  onOpenDeal?: (deal: DealWithRelations) => void;
   /** Spread onto the drag handle element to enable column reordering */
   dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
 }
@@ -43,9 +50,12 @@ export function KanbanColumn({
   onStatusChange,
   nextStage,
   onAdvanceStage,
+  onOpenDeal,
   dragHandleProps,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
+  const { active } = useDndContext();
+  const isCardDragging = !!active && !active.id.toString().startsWith('stage:');
 
   const totalValue = deals.reduce((s, d) => s + (d.value ?? 0), 0);
 
@@ -53,7 +63,6 @@ export function KanbanColumn({
   const [quickAddTitle, setQuickAddTitle] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  // Guards to avoid double-submit / cancel racing with blur when pressing Enter
   const submittedRef = useRef(false);
 
   function focusInput() {
@@ -63,7 +72,6 @@ export function KanbanColumn({
     el?.focus();
   }
 
-  // Click-outside cancels
   useEffect(() => {
     if (!quickAddOpen) return;
     function onDocPointer(e: MouseEvent) {
@@ -101,7 +109,6 @@ export function KanbanColumn({
         toast.error('Failed to create deal');
         setSubmitting(false);
         submittedRef.current = false;
-        // Keep the input open with the title so user can retry
         focusInput();
         return;
       }
@@ -110,7 +117,6 @@ export function KanbanColumn({
       setSubmitting(false);
       submittedRef.current = false;
       onDealCreated();
-      // Keep the input open for rapid successive adds; refocus
       focusInput();
     } catch {
       toast.error('Failed to create deal');
@@ -131,12 +137,13 @@ export function KanbanColumn({
   }
 
   function onBlur() {
-    // Defer so that Enter-driven submissions aren't cancelled by blur firing.
-    // Also allow click on the "open full form" icon within the container to not cancel.
     setTimeout(() => {
       if (submittedRef.current || submitting) return;
-      // If focus is still somewhere inside the container, keep open
-      if (containerRef.current && containerRef.current.contains(document.activeElement)) return;
+      if (
+        containerRef.current &&
+        containerRef.current.contains(document.activeElement)
+      )
+        return;
       cancelQuickAdd();
     }, 0);
   }
@@ -144,32 +151,30 @@ export function KanbanColumn({
   return (
     <div className="group/column flex flex-col w-72 flex-shrink-0">
       {/* Column header */}
-      <div className="flex items-center justify-between mb-3 px-0.5">
+      <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2 min-w-0">
           {dragHandleProps && (
             <button
               type="button"
               title="Drag to reorder stage"
               aria-label={`Reorder stage ${stage.name}`}
-              className="hidden md:flex h-5 w-5 items-center justify-center rounded text-muted-foreground opacity-0 group-hover/column:opacity-100 hover:bg-muted cursor-grab active:cursor-grabbing transition-opacity flex-shrink-0"
+              className="hidden md:flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 opacity-0 group-hover/column:opacity-100 hover:bg-foreground/[0.04] cursor-grab active:cursor-grabbing transition-opacity flex-shrink-0"
               {...dragHandleProps}
             >
               <GripVertical size={13} className="rotate-90" />
             </button>
           )}
-          <span
-            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-            style={{ backgroundColor: stage.color }}
-          />
-          <span className="font-semibold text-sm truncate">{stage.name}</span>
-          <span className="text-[11px] text-muted-foreground bg-muted rounded-md px-2 py-0.5 font-medium tabular-nums">
+          <span className="text-base font-semibold text-foreground truncate">
+            {stage.name}
+          </span>
+          <span className="text-[11px] text-muted-foreground tabular-nums">
             {deals.length}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           {totalValue > 0 && (
-            <span className="text-xs text-muted-foreground font-medium">
-              ${totalValue.toLocaleString()}
+            <span className="text-[11px] text-muted-foreground tabular-nums">
+              {formatCompact(totalValue)}
             </span>
           )}
           <button
@@ -177,21 +182,21 @@ export function KanbanColumn({
             onClick={() => onDeleteStage(stage)}
             title="Delete stage"
             aria-label={`Delete stage ${stage.name}`}
-            className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover/column:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-[opacity,colors]"
+            className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/60 opacity-0 group-hover/column:opacity-100 hover:bg-foreground/[0.06] hover:text-foreground transition-[opacity,colors]"
           >
-            <Trash2 size={13} />
+            <Trash2 size={12} />
           </button>
         </div>
       </div>
 
-      {/* Drop zone */}
+      {/* Drop zone — paper-flat. Highlight only while a card is being dragged. */}
       <div
         ref={setNodeRef}
-        className={`flex-1 min-h-24 rounded-lg transition-all duration-150 ${
-          isOver
-            ? 'bg-muted/50 border-2 border-dashed border-border'
-            : 'bg-muted/20 border-2 border-transparent'
-        } p-2`}
+        className={cn(
+          'flex-1 min-h-24 rounded-lg p-2 transition-colors duration-150',
+          'bg-foreground/[0.02] border border-border/70',
+          isCardDragging && isOver && 'bg-foreground/[0.04]',
+        )}
       >
         <SortableContext
           items={deals.map((d) => d.id)}
@@ -206,12 +211,12 @@ export function KanbanColumn({
               onStatusChange={onStatusChange}
               nextStage={nextStage}
               onAdvanceStage={onAdvanceStage}
+              onOpenDeal={onOpenDeal}
             />
           ))}
           {deals.length === 0 && !isOver && (
-            <div className="flex flex-col items-center justify-center py-8 gap-2 text-muted-foreground/40">
-              <LayoutList size={20} />
-              <p className="text-xs">No deals yet</p>
+            <div className="flex items-center justify-center py-8 text-muted-foreground/40">
+              <p className="text-xs">No deals</p>
             </div>
           )}
         </SortableContext>
@@ -233,19 +238,13 @@ export function KanbanColumn({
             />
             <button
               type="button"
-              // onMouseDown so the click fires before the input blur cancels
               onMouseDown={(e) => {
                 e.preventDefault();
-                const prefill = quickAddTitle.trim();
                 cancelQuickAdd();
                 onAddDeal(stage.id);
-                // If there is a title typed, we still just open the full form;
-                // the user can paste / retype. Keeping it simple to avoid
-                // cross-component state plumbing.
-                void prefill;
               }}
               title="Open full form"
-              className="h-8 w-8 flex-shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="h-8 w-8 flex-shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
             >
               <SquarePen size={13} />
             </button>
@@ -254,7 +253,7 @@ export function KanbanColumn({
           <div className="flex items-center gap-1">
             <button
               type="button"
-              className="flex-1 flex items-center gap-1.5 px-2 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="flex-1 flex items-center gap-1.5 px-2 py-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
               onClick={() => setQuickAddOpen(true)}
             >
               <Plus size={13} />
@@ -264,7 +263,7 @@ export function KanbanColumn({
               type="button"
               onClick={() => onAddDeal(stage.id)}
               title="Open full form"
-              className="h-8 w-8 flex-shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="h-8 w-8 flex-shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
             >
               <SquarePen size={13} />
             </button>
