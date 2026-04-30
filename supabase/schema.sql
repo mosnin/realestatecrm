@@ -236,6 +236,29 @@ CREATE TABLE IF NOT EXISTS "Message" (
   "createdAt"      timestamptz NOT NULL DEFAULT now()
 );
 
+-- Chat attachments: files the realtor uploads via the prompt box.
+-- Owned by spaceId; the cowork agent reads them via the read_attachment tool.
+CREATE TABLE IF NOT EXISTS "Attachment" (
+  id              text PRIMARY KEY,
+  "spaceId"       text NOT NULL,
+  "userId"        text,
+  "conversationId" text,
+  filename        text NOT NULL,
+  "mimeType"      text NOT NULL,
+  "sizeBytes"     int NOT NULL,
+  "storagePath"   text NOT NULL,
+  "publicUrl"     text NOT NULL,
+  "extractedText" text,
+  "extractionStatus" text NOT NULL DEFAULT 'pending'
+    CHECK ("extractionStatus" IN ('pending','skipped','done','failed')),
+  "createdAt"     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS "Attachment_spaceId_createdAt_idx"
+  ON "Attachment" ("spaceId", "createdAt" DESC);
+CREATE INDEX IF NOT EXISTS "Attachment_conversationId_idx"
+  ON "Attachment" ("conversationId")
+  WHERE "conversationId" IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS "BrokerageMembership" (
   id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   "brokerageId"   text NOT NULL REFERENCES "Brokerage"(id) ON DELETE CASCADE,
