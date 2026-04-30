@@ -18,7 +18,8 @@ import { arrayMove, SortableContext, horizontalListSortingStrategy, useSortable 
 import { CSS } from '@dnd-kit/utilities';
 import { KanbanColumn } from './kanban-column';
 import { Button } from '@/components/ui/button';
-import { LiquidMetalButton } from '@/components/ui/liquid-metal-button';
+import { DealQuickPanel } from './deal-quick-panel';
+import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import {
   Plus,
   GripVertical,
@@ -41,7 +42,12 @@ import {
   ChevronDown,
   Check,
   Palette,
+  ArrowRight,
 } from 'lucide-react';
+import {
+  SECTION_LABEL,
+  TITLE_FONT,
+} from '@/lib/typography';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -1106,45 +1112,11 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Toolbar */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <LiquidMetalButton
-            label="Add deal"
-            onClick={() => {
-              const firstStageId = stages[0]?.id;
-              router.push(
-                firstStageId
-                  ? `/s/${slug}/deals/new?stageId=${firstStageId}`
-                  : `/s/${slug}/deals/new`,
-              );
-            }}
-          />
-        </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Search */}
-          <div className="relative flex-1 sm:flex-none">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search deals…"
-              className="h-8 w-full sm:w-44 rounded-lg border border-border bg-muted/60 pl-8 pr-7 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:bg-background transition-colors"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-
-          {/* Status filter chips */}
-          <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Status filter chips — Active / Won / Lost / On Hold */}
+          <div className="flex items-center gap-1">
             {(
               [
                 { value: 'active', label: 'Active' },
@@ -1161,10 +1133,10 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                   onClick={() => toggleStatus(opt.value)}
                   aria-pressed={selected}
                   className={cn(
-                    'h-8 px-2.5 text-xs font-medium rounded-md border transition-colors',
+                    'inline-flex items-center rounded-full px-3 h-7 text-xs font-medium transition-colors duration-150',
                     selected
-                      ? 'bg-secondary text-foreground border-border'
-                      : 'bg-transparent text-muted-foreground border-border hover:bg-muted hover:text-foreground',
+                      ? 'bg-foreground text-background'
+                      : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
                   )}
                 >
                   {opt.label}
@@ -1173,22 +1145,46 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
             })}
           </div>
 
+          {/* Search */}
+          <div className="relative ml-auto">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search deals…"
+              className="pl-9 pr-7 h-9 w-44 sm:w-56 text-sm rounded-md border border-border/70 bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-150"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
           {/* Advanced filter popover */}
           <Popover>
             <PopoverTrigger asChild>
               <button
                 type="button"
                 className={cn(
-                  'h-8 px-2.5 flex items-center gap-1.5 text-xs font-medium rounded-md border transition-colors',
+                  'inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium transition-colors duration-150',
                   advancedFilterCount > 0
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
+                    ? 'text-foreground bg-foreground/[0.045]'
+                    : 'text-foreground hover:bg-foreground/[0.04]',
                 )}
               >
                 <SlidersHorizontal size={13} />
                 Filters
                 {advancedFilterCount > 0 && (
-                  <span className="ml-0.5 bg-primary-foreground/20 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">
+                  <span className="ml-0.5 bg-foreground/[0.08] rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-semibold tabular-nums">
                     {advancedFilterCount}
                   </span>
                 )}
@@ -1304,40 +1300,42 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
             type="button"
             onClick={exportCSV}
             disabled={allDeals.length === 0}
-            className="h-8 px-2.5 flex items-center gap-1.5 text-xs font-medium rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
             title="Export to CSV"
           >
             <Download size={13} />
             Export
           </button>
 
-          {/* View toggle */}
-          <div className="flex rounded-md border border-border overflow-hidden bg-card ml-auto">
+          {/* View toggle — segmented control */}
+          <div className="flex items-center gap-0.5 rounded-md border border-border/70 bg-background p-0.5">
             <button
               type="button"
               onClick={() => setView('list')}
               className={cn(
-                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
+                'h-7 w-8 flex items-center justify-center rounded transition-colors duration-150',
                 view === 'list'
-                  ? 'bg-secondary text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                  ? 'bg-foreground/[0.045] text-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
               )}
-              title="Table view"
+              title="List view"
+              aria-label="List view"
             >
-              <List size={15} />
+              <List size={14} />
             </button>
             <button
               type="button"
               onClick={() => setView('kanban')}
               className={cn(
-                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
+                'h-7 w-8 flex items-center justify-center rounded transition-colors duration-150',
                 view === 'kanban'
-                  ? 'bg-secondary text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                  ? 'bg-foreground/[0.045] text-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
               )}
               title="Board view"
+              aria-label="Board view"
             >
-              <LayoutGrid size={15} />
+              <LayoutGrid size={14} />
             </button>
           </div>
         </div>
