@@ -258,12 +258,24 @@ async def chat_turn(item: dict):
                 secrets=secrets,
                 timeout=600,
             )
-            proc = await sb.exec.aio("python", "/app/sandbox_runner.py")
+
+            # text=True gives us str lines instead of bytes, and bufsize=1 makes
+            # stdout line-buffered so each emit() in sandbox_runner.py flushes
+            # promptly to our async iterator below.
+            proc = await sb.exec.aio(
+                "python", "/app/sandbox_runner.py",
+                text=True,
+                bufsize=1,
+            )
 
             # Push the JSON payload, then close stdin so the runner unblocks.
-            await proc.stdin.write.aio(stdin_bytes)
+            # Modal's StreamWriter.write is sync but write_eof is what flips
+            # the EOF flag on the inner pipe; drain to make sure the bytes
+            # are on the wire before we start reading stdout.
+            await proc.stdin.write.aio(stdin_bytes.decode("utf-8"))
             await proc.stdin.drain.aio()
-            await proc.stdin.write_eof.aio()
+            proc.stdin.write_eof()
+            await proc.stdin.drain.aio()
 
             # Forward each JSONL line as one SSE frame. The runner flushes
             # after every emit() so lines arrive in real time.

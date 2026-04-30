@@ -1,39 +1,57 @@
 /**
  * POST /api/ai/task — on-demand agent streaming endpoint.
  *
- * Responds with SSE events (see lib/ai-tools/events.ts for the protocol).
- * The client posts `{ spaceSlug, conversationId?, message }`; we:
+ * Thin SSE proxy in front of the Modal `chat_turn` web endpoint. The Modal
+ * function spawns a fresh per-conversation Sandbox, runs the OpenAI Agents
+ * SDK inside it, and streams JSONL events back over text/event-stream. We:
  *
  *   1. Auth the caller + resolve a ToolContext
  *   2. Rate-limit
  *   3. Resolve/create the conversation
  *   4. Save the user message
  *   5. Load recent history
- *   6. Run the tool-use loop, streaming events as they arrive
- *   7. Save the assistant's blocks as a Message row
- *   8. Emit `turn_complete` and close the stream
+ *   6. Hydrate any referenced attachments (best-effort — the table lands in
+ *      a separate commit, so missing-table errors are swallowed for now)
+ *   7. POST to MODAL_CHAT_URL with `{secret, space_id, conversation_id,
+ *      message, history, attachments}` and stream events back to the client
+ *   8. Translate sandbox events (token/tool_call_start/tool_call_result/
+ *      handoff/done/error) into the typed AgentEvent shape the client
+ *      already understands (text_delta / tool_call_start / tool_call_result
+ *      / turn_complete / error). seq+ts framing is stamped here.
+ *   9. After the stream closes, persist the assistant's final text as a
+ *      Message row so the transcript survives a refresh.
  *
- * The loop itself lives in lib/ai-tools/loop.ts; this route is thin glue.
+ * The in-process tool loop in lib/ai-tools/loop.ts is no longer invoked
+ * from here. Tool execution lives inside the sandbox via the openai-agents
+ * SDK; lib/ai-tools/* still backs the legacy approve/deny endpoints until
+ * they migrate.
  */
 
 import crypto from 'crypto';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import type OpenAI from 'openai';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import type { AgentEvent, PushableEvent } from '@/lib/ai-tools/events';
 import { createSeqCounter, encodeEvent } from '@/lib/ai-tools/events';
-import { runTurn } from '@/lib/ai-tools/loop';
-import { getOpenAIClient, MissingOpenAIKeyError } from '@/lib/ai-tools/openai-client';
 import { saveAssistantMessage, saveUserMessage } from '@/lib/ai-tools/persistence';
-import { savePendingApproval } from '@/lib/ai-tools/pending-approvals';
 import { resolveToolContext } from '@/lib/ai-tools/context';
-import { buildSystemPrompt } from '@/lib/ai-tools/system-prompt';
 import type { ToolContext } from '@/lib/ai-tools/types';
+import type { MessageBlock } from '@/lib/ai-tools/blocks';
 
-type ChatMsg = OpenAI.Chat.Completions.ChatCompletionMessageParam;
+interface HistoryRow {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface AttachmentPayload {
+  id: string;
+  filename: string;
+  mime_type: string;
+  extracted_text: string | null;
+  public_url: string;
+}
 
 /** Cap on history messages fed to the model. Matches the existing chat route. */
 const HISTORY_LIMIT = 20;
@@ -42,6 +60,7 @@ interface PostBody {
   spaceSlug: string;
   conversationId?: string | null;
   message: string;
+  attachmentIds?: string[];
 }
 
 function sanitizeTitle(text: string): string {
@@ -58,16 +77,12 @@ async function resolveConversation(
   userMessage: string,
 ): Promise<string> {
   if (conversationId) {
-    // Verify it belongs to this space; otherwise create a new one so the
-    // user message doesn't get orphaned on a conversation they don't own.
     const { data } = await supabase
       .from('Conversation')
       .select('id, spaceId, title')
       .eq('id', conversationId)
       .maybeSingle();
     if (data && data.spaceId === spaceId) {
-      // Auto-title on first message: strip HTML + control chars, trim to
-      // 60 chars, default to "Task" if nothing survives.
       if (data.title === 'New conversation' || !data.title) {
         const autoTitle = sanitizeTitle(userMessage).slice(0, 60) || 'Task';
         await supabase
@@ -90,7 +105,7 @@ async function resolveConversation(
   return id;
 }
 
-async function loadHistory(spaceId: string, conversationId: string): Promise<ChatMsg[]> {
+async function loadHistory(spaceId: string, conversationId: string): Promise<HistoryRow[]> {
   const { data } = await supabase
     .from('Message')
     .select('role, content, createdAt')
@@ -108,8 +123,195 @@ async function loadHistory(spaceId: string, conversationId: string): Promise<Cha
     }));
 }
 
+/**
+ * Best-effort hydration of attachment rows into the shape sandbox_runner.py
+ * expects. The Attachment table lands in a separate commit; until then this
+ * either returns an empty list (no ids passed) or swallows the
+ * relation-does-not-exist error and logs it.
+ */
+async function hydrateAttachments(
+  spaceId: string,
+  ids: string[] | undefined,
+): Promise<AttachmentPayload[]> {
+  if (!ids || ids.length === 0) return [];
+  try {
+    const { data, error } = await supabase
+      .from('Attachment')
+      .select('id, filename, mimeType, extractedText, publicUrl, spaceId')
+      .in('id', ids)
+      .eq('spaceId', spaceId);
+    if (error) throw error;
+    const rows = (data ?? []) as Array<{
+      id: string;
+      filename: string;
+      mimeType: string;
+      extractedText: string | null;
+      publicUrl: string;
+    }>;
+    return rows.map((r) => ({
+      id: r.id,
+      filename: r.filename,
+      mime_type: r.mimeType,
+      extracted_text: r.extractedText,
+      public_url: r.publicUrl,
+    }));
+  } catch (err) {
+    logger.warn('[ai/task] attachment hydration skipped (table may not exist yet)', { spaceId }, err);
+    return [];
+  }
+}
+
+// ── sandbox event → client AgentEvent translation ────────────────────────────
+//
+// The sandbox runner emits raw JSONL with lower-level event types and no
+// per-call ids. We synthesize callIds in FIFO so a tool_call_start pairs with
+// the matching tool_call_result; the runner only emits one tool flight at a
+// time per agent step so FIFO is correct for the current SDK behavior.
+
+interface SandboxToken { type: 'token'; delta: string }
+interface SandboxToolStart { type: 'tool_call_start'; tool: string; args: Record<string, unknown> }
+interface SandboxToolResult { type: 'tool_call_result'; tool: string; ok: boolean; summary: string }
+interface SandboxHandoff { type: 'handoff'; to: string }
+interface SandboxDone { type: 'done'; final_text: string }
+interface SandboxError { type: 'error'; message: string }
+type SandboxEvent =
+  | SandboxToken
+  | SandboxToolStart
+  | SandboxToolResult
+  | SandboxHandoff
+  | SandboxDone
+  | SandboxError;
+
+interface TranslateState {
+  pendingCallIds: string[];
+  finalText: string;
+  textBuffer: string;
+  sawDone: boolean;
+}
+
+function newTranslateState(): TranslateState {
+  return { pendingCallIds: [], finalText: '', textBuffer: '', sawDone: false };
+}
+
+/**
+ * Translate one sandbox event into zero-or-more PushableEvents the client
+ * expects. Side-effects on `state` capture the running final_text so the
+ * route can persist the assistant message after the stream closes.
+ */
+function translate(event: SandboxEvent, state: TranslateState): PushableEvent[] {
+  switch (event.type) {
+    case 'token': {
+      if (!event.delta) return [];
+      state.textBuffer += event.delta;
+      return [{ type: 'text_delta', delta: event.delta }];
+    }
+    case 'tool_call_start': {
+      const callId = crypto.randomUUID();
+      state.pendingCallIds.push(callId);
+      return [{
+        type: 'tool_call_start',
+        callId,
+        name: event.tool,
+        args: event.args ?? {},
+      }];
+    }
+    case 'tool_call_result': {
+      // FIFO match against the most recent pending start. If we somehow have
+      // a result without a start (shouldn't happen), synthesize one so the
+      // client still renders something sensible.
+      const callId = state.pendingCallIds.shift() ?? crypto.randomUUID();
+      return [{
+        type: 'tool_call_result',
+        callId,
+        ok: event.ok,
+        summary: event.summary ?? '',
+      }];
+    }
+    case 'handoff': {
+      // Client's AgentEvent union has no handoff type; surface it as an
+      // italicized text_delta so the user sees the agent switch. Cheap,
+      // visible, doesn't require a client change.
+      const note = `\n\n_Handoff to ${event.to}_\n\n`;
+      state.textBuffer += note;
+      return [{ type: 'text_delta', delta: note }];
+    }
+    case 'done': {
+      state.sawDone = true;
+      state.finalText = event.final_text || state.textBuffer;
+      return [{ type: 'turn_complete', reason: 'complete' }];
+    }
+    case 'error': {
+      return [{ type: 'error', message: event.message, code: 'internal' }];
+    }
+    default:
+      return [];
+  }
+}
+
+/**
+ * Pull `data:` payloads off a Modal SSE stream and yield the parsed JSON
+ * objects. The Modal endpoint emits each sandbox JSONL line as a single
+ * `data: <json>\n\n` frame (no `event:` line) so we only need to scan for
+ * `data:` prefixes and the blank-line separator.
+ */
+async function* parseModalSSE(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): AsyncGenerator<SandboxEvent> {
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      // Flush a trailing frame if any.
+      if (buffer.trim()) {
+        const obj = tryParseFrame(buffer);
+        if (obj) yield obj;
+      }
+      return;
+    }
+    buffer += decoder.decode(value, { stream: true });
+
+    while (true) {
+      const lf = buffer.indexOf('\n\n');
+      const crlf = buffer.indexOf('\r\n\r\n');
+      let idx = -1;
+      let gap = 0;
+      if (lf !== -1 && (crlf === -1 || lf < crlf)) {
+        idx = lf; gap = 2;
+      } else if (crlf !== -1) {
+        idx = crlf; gap = 4;
+      }
+      if (idx === -1) break;
+      const frame = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + gap);
+      const obj = tryParseFrame(frame);
+      if (obj) yield obj;
+    }
+  }
+}
+
+function tryParseFrame(frame: string): SandboxEvent | null {
+  // Concatenate every `data:` line in the frame per SSE spec.
+  let data = '';
+  for (const line of frame.split(/\r?\n/)) {
+    if (line.startsWith(':')) continue; // comment
+    if (line.startsWith('data:')) {
+      data += line.slice(line.charAt(5) === ' ' ? 6 : 5);
+    }
+  }
+  if (!data) return null;
+  try {
+    const parsed = JSON.parse(data) as { type?: unknown };
+    if (parsed && typeof parsed === 'object' && typeof parsed.type === 'string') {
+      return parsed as SandboxEvent;
+    }
+  } catch {
+    /* skip bad frame */
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
-  // Body parse + shape check
   let body: PostBody;
   try {
     body = (await req.json()) as PostBody;
@@ -124,15 +326,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'message too long (8000 char max)' }, { status: 400 });
   }
 
-  // One AbortController per request — the SSE stream cancels it on client
-  // disconnect, which the loop surfaces to every tool handler.
   const abortController = new AbortController();
 
   const ctxOrResponse = await resolveToolContext(spaceSlug, abortController.signal);
   if (ctxOrResponse instanceof NextResponse) return ctxOrResponse;
   const ctx: ToolContext = ctxOrResponse;
 
-  // Rate limit after auth so 401s don't burn quota.
   const { allowed } = await checkRateLimit(`ai:task:${ctx.userId}`, 30, 3600);
   if (!allowed) {
     return NextResponse.json(
@@ -141,8 +340,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Resolve or create the conversation before saving anything so a single
-  // DB row carries both the user message and the assistant response.
   let conversationId: string;
   try {
     conversationId = await resolveConversation(ctx.space.id, body.conversationId ?? null, rawMessage);
@@ -151,8 +348,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Could not start conversation' }, { status: 500 });
   }
 
-  // Persist the user message before streaming — if the stream dies mid-turn
-  // we still have the user's side in the transcript.
   try {
     await saveUserMessage({ spaceId: ctx.space.id, conversationId, content: rawMessage });
   } catch (err) {
@@ -160,8 +355,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Could not save message' }, { status: 500 });
   }
 
-  // Build the messages array: system + history + new turn.
-  let history: ChatMsg[];
+  let history: HistoryRow[];
   try {
     history = await loadHistory(ctx.space.id, conversationId);
   } catch (err) {
@@ -169,90 +363,120 @@ export async function POST(req: NextRequest) {
     history = [];
   }
 
-  // OpenAI client — fail fast if the key is missing rather than after the
-  // user sees a stream open.
-  let openai: OpenAI;
-  try {
-    openai = getOpenAIClient().client;
-  } catch (err) {
-    if (err instanceof MissingOpenAIKeyError) {
-      return NextResponse.json({ error: err.message }, { status: 503 });
-    }
-    throw err;
+  // Drop the just-persisted user message from history if it's the trailing
+  // row — the runner expects history to be PRIOR turns + a separate `message`.
+  if (history.length > 0) {
+    const last = history[history.length - 1];
+    if (last.role === 'user' && last.content === rawMessage) history.pop();
   }
 
-  const systemPrompt = buildSystemPrompt(ctx);
-  const messages: ChatMsg[] = [
-    { role: 'system', content: systemPrompt },
-    // Don't re-include the last message if it matches the new one — happens
-    // when the UI pre-wrote the user message optimistically and the same
-    // message also lives in DB history.
-    ...history.filter((m, i) => !(i === history.length - 1 && m.role === 'user' && m.content === rawMessage)),
-    { role: 'user', content: rawMessage },
-  ];
+  const attachments = await hydrateAttachments(ctx.space.id, body.attachmentIds);
+
+  const modalUrl = process.env.MODAL_CHAT_URL;
+  const sharedSecret = process.env.AGENT_INTERNAL_SECRET;
+  if (!modalUrl || !sharedSecret) {
+    logger.error('[ai/task] missing MODAL_CHAT_URL or AGENT_INTERNAL_SECRET', { spaceSlug });
+    return NextResponse.json(
+      { error: 'Agent backend not configured (set MODAL_CHAT_URL and AGENT_INTERNAL_SECRET)' },
+      { status: 503 },
+    );
+  }
+
+  const modalPayload = {
+    secret: sharedSecret,
+    space_id: ctx.space.id,
+    conversation_id: conversationId,
+    message: rawMessage,
+    history,
+    attachments,
+  };
 
   // ── SSE stream ─────────────────────────────────────────────────────────
-  const encoder = new TextEncoder();
-  void encoder; // eslint no-unused — we use encodeEvent which creates its own TextEncoder internally
-
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const nextSeq = createSeqCounter();
+      const state = newTranslateState();
 
-      const pushEvent = async (event: PushableEvent) => {
+      const pushEvent = (event: PushableEvent) => {
         const full = { ...event, seq: nextSeq(), ts: new Date().toISOString() } as AgentEvent;
         try {
           controller.enqueue(encodeEvent(full));
         } catch {
-          // Controller may be closed if the client disconnected; swallow.
+          /* controller closed */
         }
       };
 
+      let modalRes: Response;
       try {
-        const result = await runTurn({ openai, ctx, messages, pushEvent });
+        modalRes = await fetch(modalUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(modalPayload),
+          signal: abortController.signal,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        logger.error('[ai/task] modal fetch failed', { spaceSlug }, err);
+        pushEvent({ type: 'error', message: `Agent backend unreachable: ${message}`, code: 'internal' });
+        controller.close();
+        return;
+      }
 
-        // Persist whatever blocks completed this turn (pause or complete).
-        // On pause, the pending call is NOT in blocks — it lives in
-        // pendingApproval and will be persisted when Phase 3 stashes it
-        // in Redis. The approval-continuation turn will save its own
-        // assistant message for the resumed portion.
+      if (!modalRes.ok || !modalRes.body) {
+        let detail = `status ${modalRes.status}`;
         try {
-          if (result.blocks.length > 0) {
+          const text = await modalRes.text();
+          if (text) detail += `: ${text.slice(0, 400)}`;
+        } catch {
+          /* ignore */
+        }
+        logger.error('[ai/task] modal returned non-OK', { spaceSlug, detail });
+        pushEvent({ type: 'error', message: `Agent backend error (${detail})`, code: 'internal' });
+        controller.close();
+        return;
+      }
+
+      const reader = modalRes.body.getReader();
+
+      try {
+        for await (const sandboxEvent of parseModalSSE(reader)) {
+          for (const out of translate(sandboxEvent, state)) {
+            pushEvent(out);
+          }
+        }
+        // If the stream closed without a `done`, synthesize a turn_complete
+        // so the client doesn't sit waiting forever.
+        if (!state.sawDone) {
+          pushEvent({ type: 'turn_complete', reason: 'complete' });
+        }
+      } catch (err) {
+        const aborted = (err as { name?: string })?.name === 'AbortError';
+        if (!aborted) {
+          const message = err instanceof Error ? err.message : String(err);
+          logger.error('[ai/task] stream pump crashed', { spaceSlug }, err);
+          pushEvent({ type: 'error', message, code: 'internal' });
+        }
+      } finally {
+        // Persist the assistant message if anything came back. The legacy
+        // schema requires non-null content; saveAssistantMessage handles the
+        // empty-text case with a placeholder.
+        const finalText = state.finalText || state.textBuffer;
+        if (finalText.trim()) {
+          try {
+            const blocks: MessageBlock[] = [{ type: 'text', content: finalText }];
             await saveAssistantMessage({
               spaceId: ctx.space.id,
               conversationId,
-              blocks: result.blocks,
+              blocks,
             });
+          } catch (err) {
+            logger.error('[ai/task] save assistant message failed', { spaceSlug }, err);
           }
-        } catch (err) {
-          logger.error('[ai/task] save assistant message failed', { spaceSlug }, err);
         }
-
-        if (result.reason === 'paused' && result.pendingApproval) {
-          // Stash the paused turn so the approve endpoint can resume it.
-          // Failure here is logged + swallowed; the user already saw the
-          // permission_required event, and the approve endpoint will
-          // return 410 gracefully if the state isn't there.
-          await savePendingApproval({
-            state: result.pendingApproval,
-            userId: ctx.userId,
-            spaceSlug,
-            conversationId,
-            createdAt: new Date().toISOString(),
-          });
-        }
-
-        await pushEvent({ type: 'turn_complete', reason: result.reason });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        logger.error('[ai/task] loop crashed', { spaceSlug }, err);
-        await pushEvent({ type: 'error', message, code: 'internal' });
-      } finally {
         controller.close();
       }
     },
     cancel() {
-      // Client disconnected; propagate to tool handlers via ctx.signal.
       abortController.abort();
     },
   });
@@ -262,8 +486,6 @@ export async function POST(req: NextRequest) {
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
-      // Disable nginx buffering — some deploys front Vercel with a proxy
-      // that otherwise chunks SSE events.
       'X-Accel-Buffering': 'no',
     },
   });
