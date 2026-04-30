@@ -29,43 +29,78 @@ export default async function GeneralSettingsPage({
   } catch (err) {
     console.error('[settings/general] DB query failed', err);
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">We couldn&apos;t load your data. This is usually temporary.</p>
-          <a href={`/s/${slug}/settings`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Try again</a>
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="text-center space-y-3 p-8">
+          <h2
+            className="text-2xl tracking-tight text-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+          >
+            Something went wrong
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            We couldn&apos;t load your data. This is usually temporary.
+          </p>
+          <a
+            href={`/s/${slug}/settings`}
+            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150"
+          >
+            Try again
+          </a>
         </div>
       </div>
     );
   }
 
-  const subStatus = (space as any).stripeSubscriptionStatus ?? 'inactive';
-  const periodEnd = (space as any).stripePeriodEnd;
+  const subStatus = (space as { stripeSubscriptionStatus?: string }).stripeSubscriptionStatus ?? 'inactive';
+  const periodEnd = (space as { stripePeriodEnd?: string }).stripePeriodEnd;
   const isTrialing = subStatus === 'trialing';
   const isActive = subStatus === 'active';
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      {/* Subscription status banner */}
+    <div className="space-y-8 max-w-3xl">
+      <h2
+        className="text-2xl tracking-tight text-foreground"
+        style={{ fontFamily: 'var(--font-title)' }}
+      >
+        General
+      </h2>
+
       {(isTrialing || isActive) && periodEnd && (
-        <div className={`rounded-lg border px-4 py-3 text-sm ${isTrialing ? 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300' : 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'}`}>
+        <div className="rounded-md border border-border/70 bg-foreground/[0.02] px-4 py-3 text-sm text-foreground">
           {isTrialing ? (
-            <>Trial ends on <strong>{new Date(periodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>. <a href={`/s/${slug}/billing`} className="underline font-medium">Manage billing</a></>
+            <>
+              Trial ends on{' '}
+              <strong className="font-medium">
+                {new Date(periodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </strong>
+              .{' '}
+              <a href={`/s/${slug}/billing`} className="underline underline-offset-2 hover:text-foreground/80">
+                Manage billing
+              </a>
+            </>
           ) : (
-            <>Subscription renews on <strong>{new Date(periodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>. <a href={`/s/${slug}/billing`} className="underline font-medium">Manage billing</a></>
+            <>
+              Subscription renews on{' '}
+              <strong className="font-medium">
+                {new Date(periodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </strong>
+              .{' '}
+              <a href={`/s/${slug}/billing`} className="underline underline-offset-2 hover:text-foreground/80">
+                Manage billing
+              </a>
+            </>
           )}
         </div>
       )}
       {subStatus === 'inactive' && (
-        <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          No active subscription. <a href={`/s/${slug}/billing`} className="underline font-medium text-primary">Start your free trial</a>
+        <div className="rounded-md border border-border/70 bg-foreground/[0.02] px-4 py-3 text-sm text-muted-foreground">
+          No active subscription.{' '}
+          <a href={`/s/${slug}/billing`} className="underline underline-offset-2 text-foreground hover:text-foreground/80">
+            Start your free trial
+          </a>
         </div>
       )}
 
-      <div className="space-y-1">
-        <h2 className="text-base font-medium text-foreground">General</h2>
-        <p className="text-[13px] text-muted-foreground">Workspace name, slug, and contact information</p>
-      </div>
       <GeneralSettingsForm space={space} settings={settings} />
     </div>
   );
