@@ -2,25 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Loader2,
-  Save,
-  RotateCcw,
-  Eye,
-  Pencil,
-  Home,
-  Key,
-  CheckCircle2,
-  AlertCircle,
-  Info,
-  Lightbulb,
-  Gauge,
-  Sparkles,
-} from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import { FormBuilder } from '@/components/form-builder';
 import { FormPreview } from '@/components/form-builder/form-preview';
 import { OptimizationPanel } from '@/components/form-builder/optimization-panel';
@@ -36,6 +20,14 @@ function deepClone<T>(obj: T): T {
 
 type FormConfigSource = 'custom' | 'brokerage' | 'legacy';
 type LeadType = 'rental' | 'buyer';
+
+const SUB_TABS: { value: string; label: string }[] = [
+  { value: 'builder', label: 'Questions' },
+  { value: 'preview', label: 'Preview' },
+  { value: 'scoring', label: 'What makes a good lead' },
+  { value: 'test-scoring', label: 'Try it with a sample' },
+  { value: 'optimize', label: 'Improve' },
+];
 
 export default function IntakeCustomizePage() {
   const params = useParams<{ slug: string }>();
@@ -203,7 +195,7 @@ export default function IntakeCustomizePage() {
         console.warn('[intake-customize] Scoring model generation failed (non-blocking)');
       }
 
-      toast.success(`${activeLeadType === 'rental' ? 'Rental' : 'Buyer'} form saved successfully.`);
+      toast.success(`${activeLeadType === 'rental' ? 'Rental' : 'Buyer'} form saved.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
@@ -242,7 +234,7 @@ export default function IntakeCustomizePage() {
         setBuyerHasChanges(false);
         buyerSavedRef.current = JSON.stringify(defaultConfig);
       }
-      toast.success(`${activeLeadType === 'rental' ? 'Rental' : 'Buyer'} form reset to the standard Chippi default.`);
+      toast.success(`${activeLeadType === 'rental' ? 'Rental' : 'Buyer'} form reset to default.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
     }
@@ -251,152 +243,135 @@ export default function IntakeCustomizePage() {
   if (loading) {
     return (
       <div className="space-y-4 animate-pulse">
-        <div className="h-8 bg-muted rounded-lg w-40" />
-        <div className="h-64 bg-muted rounded-lg" />
+        <div className="h-8 bg-foreground/[0.04] rounded-lg w-40" />
+        <div className="h-64 bg-foreground/[0.04] rounded-lg" />
       </div>
     );
   }
 
+  const formLabel = activeLeadType === 'rental' ? 'rental application' : 'buyer inquiry';
+  const isCustom = configSource === 'custom' && hasSavedConfig;
+  const isBrokerage = configSource === 'brokerage';
+
+  // Status line: which version are we editing?
+  let statusLine: string;
+  if (isCustom) {
+    statusLine = `Editing your custom ${formLabel}.`;
+  } else if (isBrokerage) {
+    statusLine = `Editing the brokerage ${formLabel}.`;
+  } else {
+    statusLine = `Editing the default ${formLabel}.`;
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-[1280px]">
       {/* Header */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-          <div className="space-y-1">
-            <h1 className="text-xl font-semibold tracking-tight">Customize Intake Form</h1>
-            <p className="text-muted-foreground text-sm">
-              Customize the forms applicants see. Your intake link shows a &quot;Getting Started&quot; step that routes to the correct form.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {hasChanges ? (
-              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50 gap-1.5">
-                <AlertCircle size={12} />
-                Unsaved changes
-              </Badge>
-            ) : hasSavedConfig ? (
-              <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-300 bg-emerald-50 gap-1.5">
-                <CheckCircle2 size={12} />
-                Saved
-              </Badge>
-            ) : null}
-            <Button variant="outline" size="sm" onClick={handleReset}>
-              <RotateCcw size={14} className="mr-1.5" /> Reset to Default
-            </Button>
-            <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}>
-              {saving ? (
-                <><Loader2 size={14} className="mr-1.5 animate-spin" /> {savingPhase === 'scoring' ? 'Generating scoring model...' : 'Saving form...'}</>
-              ) : (
-                <><Save size={14} className="mr-1.5" /> Save Form</>
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Primary tabs: Rental Form / Buyer Form */}
-        <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Customize
+        </h1>
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             type="button"
-            onClick={() => setActiveLeadType('rental')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
-              activeLeadType === 'rental'
-                ? 'border-orange-400 bg-orange-50 text-orange-700 shadow-sm'
-                : 'border-border text-muted-foreground hover:border-muted-foreground/30'
-            }`}
+            onClick={handleReset}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-150 px-2 h-9 inline-flex items-center"
           >
-            <Home size={16} />
-            Rental Form
-            {rentalHasChanges && (
-              <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
-            )}
+            Reset to default
           </button>
           <button
             type="button"
-            onClick={() => setActiveLeadType('buyer')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
-              activeLeadType === 'buyer'
-                ? 'border-blue-400 bg-blue-50 text-blue-700 shadow-sm'
-                : 'border-border text-muted-foreground hover:border-muted-foreground/30'
-            }`}
-          >
-            <Key size={16} />
-            Buyer Form
-            {buyerHasChanges && (
-              <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+            onClick={handleSave}
+            disabled={saving || !hasChanges}
+            className={cn(
+              'inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium',
+              'hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150',
+              'disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100',
             )}
+          >
+            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {saving
+              ? savingPhase === 'scoring'
+                ? 'Generating scoring…'
+                : 'Saving…'
+              : 'Save'}
           </button>
-        </div>
-
-        {/* Active form status bar */}
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <Pencil size={16} className="text-muted-foreground flex-shrink-0" />
-                <span className="text-sm font-semibold">
-                  Editing: {activeLeadType === 'rental' ? 'Rental Application' : 'Buyer Inquiry'}
-                </span>
-              </div>
-              {configSource === 'custom' && hasSavedConfig && (
-                <Badge variant="secondary" className="text-[10px]">Custom</Badge>
-              )}
-              {configSource === 'brokerage' && (
-                <Badge variant="secondary" className="text-[10px]">Brokerage Template</Badge>
-              )}
-              {configSource === 'legacy' && !hasSavedConfig && (
-                <Badge variant="outline" className="text-[10px]">Default</Badge>
-              )}
-            </div>
-          </div>
-
-          {configSource === 'legacy' && !hasSavedConfig && (
-            <div className="px-5 py-2.5 border-t border-border bg-blue-50/50 flex items-start gap-2">
-              <Info size={14} className="text-blue-500 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-blue-700">
-                You are using the standard Chippi {activeLeadType === 'rental' ? 'rental' : 'buyer'} form. Customize the fields below and save to create your own version.
-              </p>
-            </div>
-          )}
-          {configSource === 'brokerage' && (
-            <div className="px-5 py-2.5 border-t border-border bg-blue-50/50 flex items-start gap-2">
-              <Info size={14} className="text-blue-500 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-blue-700">
-                This form was set by your brokerage. You can customize it and save your own version, or reset to go back to the brokerage default.
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Builder / Preview / What-makes-a-good-lead / Try-it-out / Improve sub-tabs */}
-      <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
-        <TabsList>
-          <TabsTrigger value="builder">
-            <Pencil size={14} className="mr-1.5" /> Questions
-          </TabsTrigger>
-          <TabsTrigger value="preview">
-            <Eye size={14} className="mr-1.5" /> Preview
-          </TabsTrigger>
-          <TabsTrigger value="scoring" title="Tell the assistant what makes a good lead for you — which answers matter and how much.">
-            <Sparkles size={14} className="mr-1.5" /> What makes a good lead
-          </TabsTrigger>
-          <TabsTrigger value="test-scoring" title="See how a sample applicant would rank given your answers.">
-            <Gauge size={14} className="mr-1.5" /> Try it with a sample
-          </TabsTrigger>
-          <TabsTrigger value="optimize" title="Suggestions for how to ask better questions based on real applicants.">
-            <Lightbulb size={14} className="mr-1.5" /> Improve
-          </TabsTrigger>
-        </TabsList>
+      {/* Form picker — underline tabs */}
+      <div className="flex items-center gap-1 border-b border-border/70">
+        {(['rental', 'buyer'] as const).map((type) => {
+          const isActive = activeLeadType === type;
+          const dirty = type === 'rental' ? rentalHasChanges : buyerHasChanges;
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setActiveLeadType(type)}
+              className={cn(
+                'inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-150',
+                isActive
+                  ? 'border-foreground text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
+              )}
+            >
+              {type === 'rental' ? 'Rental Form' : 'Buyer Form'}
+              {dirty && (
+                <span
+                  aria-label="unsaved changes"
+                  className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 flex-shrink-0"
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-        <TabsContent value="builder">
+      {/* Status line — replaces both the "Editing:" badge card and the blue info banner */}
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <p className="text-muted-foreground">
+          {statusLine}
+          {!isCustom && !isBrokerage && (
+            <span className="text-muted-foreground/70"> Save to create your own version.</span>
+          )}
+          {hasChanges && (
+            <span className="text-foreground"> Unsaved changes.</span>
+          )}
+        </p>
+      </div>
+
+      {/* Sub-tabs — secondary underline row */}
+      <div className="flex items-center gap-1 border-b border-border/70 overflow-x-auto">
+        {SUB_TABS.map((tab) => {
+          const isActive = activeSubTab === tab.value;
+          return (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setActiveSubTab(tab.value)}
+              className={cn(
+                'whitespace-nowrap px-3 py-2 text-[13px] font-medium border-b-2 transition-colors duration-150',
+                isActive
+                  ? 'border-foreground text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
+              )}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Sub-tab content */}
+      <div>
+        {activeSubTab === 'builder' && (
           <FormBuilder config={config} onChange={handleConfigChange} />
-        </TabsContent>
-
-        <TabsContent value="preview">
-          <FormPreview config={config} />
-        </TabsContent>
-
-        <TabsContent value="scoring">
+        )}
+        {activeSubTab === 'preview' && <FormPreview config={config} />}
+        {activeSubTab === 'scoring' && (
           <ScoringTab
             config={config}
             slug={slug}
@@ -415,16 +390,10 @@ export default function IntakeCustomizePage() {
               }
             }}
           />
-        </TabsContent>
-
-        <TabsContent value="optimize">
-          <OptimizationPanel slug={slug} />
-        </TabsContent>
-
-        <TabsContent value="test-scoring">
-          <ScoringPreview config={config} slug={slug} />
-        </TabsContent>
-      </Tabs>
+        )}
+        {activeSubTab === 'optimize' && <OptimizationPanel slug={slug} />}
+        {activeSubTab === 'test-scoring' && <ScoringPreview config={config} slug={slug} />}
+      </div>
     </div>
   );
 }

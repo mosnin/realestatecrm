@@ -17,7 +17,7 @@ import {
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { secondaryNavItems } from '@/lib/nav-items';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check, Sparkles, CalendarDays, Calendar, BarChart2, ClipboardList, Home } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, FileText, ListChecks, CreditCard, Shield, Settings, Check, Sparkles, CalendarDays, Calendar, BarChart2, ClipboardList, Home } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { BrokerHelpGuide } from '@/components/broker/help-guide';
@@ -401,12 +401,8 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                       { href: `${base}/settings/profile`, label: 'Profile', icon: User },
                       { href: `${base}/settings/notifications`, label: 'Notifications', icon: Bell },
                       { href: `${base}/settings/integrations`, label: 'Integrations', icon: Plug },
+                      { href: `${base}/settings/templates`, label: 'Templates', icon: FileText },
                       { href: `${base}/settings/legal`, label: 'Legal', icon: Shield },
-                    ]},
-                    { label: 'Intake Form', items: [
-                      { href: `${base}/settings/appearance`, label: 'Appearance', icon: Palette },
-                      { href: `${base}/settings/content`, label: 'Content', icon: FileText },
-                      { href: `${base}/settings/form-fields`, label: 'Form Fields', icon: ListChecks },
                     ]},
                     { label: 'Account', items: [
                       { href: `${base}/billing`, label: 'Billing', icon: CreditCard },

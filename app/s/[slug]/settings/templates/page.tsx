@@ -24,13 +24,18 @@ export default async function TemplatesSettingsPage({
   const templates = (data ?? []) as MessageTemplate[];
 
   return (
-    <div className="space-y-5 max-w-[900px]">
-      <div className="space-y-1">
-        <h2 className="text-base font-medium text-foreground">Message templates</h2>
-        <p className="text-[13px] text-muted-foreground">
-          Canned SMS, email, and note bodies you can fire per deal or contact.
-          Use <code className="text-xs bg-muted px-1 rounded">{'{{variable}}'}</code> placeholders
-          to personalise — anything that isn&apos;t known becomes blank.
+    <div className="space-y-8 max-w-[900px]">
+      <div className="space-y-3">
+        <h2
+          className="text-2xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Message templates
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Canned SMS, email, and note bodies you can fire per deal or contact. Use{' '}
+          <code className="text-xs bg-foreground/[0.06] px-1 rounded">{'{{variable}}'}</code> placeholders to
+          personalize — anything unknown becomes blank.
         </p>
       </div>
       <TemplatesEditor initial={templates} />

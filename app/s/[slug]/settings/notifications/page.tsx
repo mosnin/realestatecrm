@@ -2,11 +2,42 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      {children}
+    </p>
+  );
+}
+
+function ToggleRow({
+  label,
+  description,
+  checked,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  description?: React.ReactNode;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-3 border-b border-border/60 last:border-b-0">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+      </div>
+      <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} />
+    </div>
+  );
+}
 
 export default function NotificationsSettingsPage() {
   const params = useParams<{ slug: string }>();
@@ -78,106 +109,110 @@ export default function NotificationsSettingsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-4 max-w-3xl animate-pulse">
-        <div className="h-8 bg-muted rounded-lg w-40" />
-        <div className="h-64 bg-muted rounded-lg" />
+      <div className="space-y-6 max-w-3xl animate-pulse">
+        <div className="h-8 bg-foreground/[0.04] rounded-md w-40" />
+        <div className="h-64 bg-foreground/[0.04] rounded-md" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="space-y-1">
-        <h2 className="text-base font-medium text-foreground">Notifications</h2>
-        <p className="text-[13px] text-muted-foreground">Choose how and when you get notified about workspace activity</p>
-      </div>
+    <div className="space-y-8 max-w-3xl">
+      <h2
+        className="text-2xl tracking-tight text-foreground"
+        style={{ fontFamily: 'var(--font-title)' }}
+      >
+        Notifications
+      </h2>
 
-      <form onSubmit={handleSave} className="space-y-5">
-        {/* Delivery channels */}
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="px-6 py-4 border-b border-border bg-muted/20">
-            <p className="font-semibold text-sm">Delivery channels</p>
-          </div>
-          <div className="px-6 py-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Email</p>
-                {userEmail && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Notifications sent to <span className="font-medium text-foreground">{userEmail}</span>
-                  </p>
-                )}
-              </div>
-              <Switch checked={notifications} onCheckedChange={setNotifications} />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">SMS</p>
-                {phoneNumber ? (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Text messages sent to <span className="font-medium text-foreground">{phoneNumber}</span>
-                  </p>
+      <form onSubmit={handleSave} className="space-y-10">
+        {/* Channels */}
+        <section className="space-y-4">
+          <SectionLabel>Delivery</SectionLabel>
+          <div>
+            <ToggleRow
+              label="Email"
+              description={
+                userEmail ? (
+                  <>
+                    Sent to <span className="text-foreground">{userEmail}</span>
+                  </>
+                ) : null
+              }
+              checked={notifications}
+              onChange={setNotifications}
+            />
+            <ToggleRow
+              label="SMS"
+              description={
+                phoneNumber ? (
+                  <>
+                    Sent to <span className="text-foreground">{phoneNumber}</span>
+                  </>
                 ) : (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-                    Add your phone number in General settings to enable SMS
-                  </p>
-                )}
-              </div>
-              <Switch checked={smsNotifications} onCheckedChange={setSmsNotifications} disabled={!phoneNumber} />
-            </div>
+                  <span className="text-muted-foreground">
+                    Add your phone number in General settings to enable SMS.
+                  </span>
+                )
+              }
+              checked={smsNotifications}
+              onChange={setSmsNotifications}
+              disabled={!phoneNumber}
+            />
           </div>
-        </div>
+        </section>
 
-        {/* Event toggles */}
-        {anyChannelOn && (
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="px-6 py-4 border-b border-border bg-muted/20">
-              <p className="font-semibold text-sm">Event types</p>
+        {/* Events */}
+        {anyChannelOn ? (
+          <section className="space-y-4 pt-8 border-t border-border/60">
+            <SectionLabel>Events</SectionLabel>
+            <div>
+              <ToggleRow
+                label="New leads"
+                description="When a new lead application is submitted"
+                checked={notifyNewLeads}
+                onChange={setNotifyNewLeads}
+              />
+              <ToggleRow
+                label="Tour bookings"
+                description="When a guest books a property tour"
+                checked={notifyTourBookings}
+                onChange={setNotifyTourBookings}
+              />
+              <ToggleRow
+                label="New deals"
+                description="When a new deal is created in your pipeline"
+                checked={notifyNewDeals}
+                onChange={setNotifyNewDeals}
+              />
+              <ToggleRow
+                label="Follow-up reminders"
+                description="Daily digest of contacts due for follow-up"
+                checked={notifyFollowUps}
+                onChange={setNotifyFollowUps}
+              />
             </div>
-            <div className="px-6 py-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">New leads</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">When a new lead application is submitted</p>
-                </div>
-                <Switch checked={notifyNewLeads} onCheckedChange={setNotifyNewLeads} />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Tour bookings</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">When a guest books a property tour</p>
-                </div>
-                <Switch checked={notifyTourBookings} onCheckedChange={setNotifyTourBookings} />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">New deals</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">When a new deal is created in your pipeline</p>
-                </div>
-                <Switch checked={notifyNewDeals} onCheckedChange={setNotifyNewDeals} />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Follow-up reminders</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Daily digest of contacts due for follow-up</p>
-                </div>
-                <Switch checked={notifyFollowUps} onCheckedChange={setNotifyFollowUps} />
-              </div>
-            </div>
-          </div>
+          </section>
+        ) : (
+          <p className="text-sm text-muted-foreground italic pt-2">
+            Enable at least one delivery channel to configure event notifications.
+          </p>
         )}
 
-        {!anyChannelOn && (
-          <p className="text-xs text-muted-foreground italic">Enable at least one delivery channel to configure event notifications.</p>
-        )}
-
-        <div className="flex items-center gap-3">
-          <Button type="submit" disabled={saving}>
-            {saving ? (
-              <><Loader2 size={14} className="mr-2 animate-spin" /> Saving...</>
-            ) : saved ? 'Saved!' : 'Save notifications'}
-          </Button>
-          {saved && <p className="text-sm text-primary">Changes saved.</p>}
+        <div className="flex items-center gap-3 pt-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className={cn(
+              'inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium',
+              'hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150',
+              'disabled:opacity-60 disabled:cursor-not-allowed',
+            )}
+          >
+            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {saving ? 'Saving' : saved ? 'Saved' : 'Save changes'}
+          </button>
+          {saved && <p className="text-sm text-muted-foreground">Changes saved.</p>}
         </div>
       </form>
     </div>

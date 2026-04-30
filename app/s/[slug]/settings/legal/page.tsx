@@ -28,22 +28,36 @@ export default async function LegalSettingsPage({
   } catch (err) {
     console.error('[settings/legal] DB query failed', err);
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">We couldn&apos;t load your data. This is usually temporary.</p>
-          <a href={`/s/${slug}/settings`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Try again</a>
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="text-center space-y-3 p-8">
+          <h2
+            className="text-2xl tracking-tight text-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+          >
+            Something went wrong
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            We couldn&apos;t load your data. This is usually temporary.
+          </p>
+          <a
+            href={`/s/${slug}/settings/legal`}
+            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150"
+          >
+            Try again
+          </a>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="space-y-1">
-        <h2 className="text-base font-medium text-foreground">Legal &amp; Compliance</h2>
-        <p className="text-[13px] text-muted-foreground">Privacy policy and consent settings for your intake form</p>
-      </div>
+    <div className="space-y-8 max-w-3xl">
+      <h2
+        className="text-2xl tracking-tight text-foreground"
+        style={{ fontFamily: 'var(--font-title)' }}
+      >
+        Legal
+      </h2>
       <LegalSettingsForm
         slug={space.slug}
         privacyPolicyUrl={settings?.privacyPolicyUrl ?? ''}
