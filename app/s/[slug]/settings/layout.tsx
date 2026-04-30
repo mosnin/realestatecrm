@@ -1,7 +1,6 @@
-import Link from 'next/link';
-import { headers } from 'next/headers';
 import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
+import { SettingsTabs } from './settings-tabs';
 
 type Tab = { href: string; label: string; matchPath: string };
 
@@ -21,10 +20,9 @@ const BROKERAGE_TAB: Tab = {
 };
 
 /**
- * Settings layout — single-line underline tab strip above each settings page.
- * No subtitle on the parent header; each child page carries its own serif
- * title. Brokerage tab appears only when the user has a pending invitation
- * or active brokerage membership.
+ * Settings layout — server-side computes which tabs are visible (Brokerage
+ * is conditional on membership), client-side `<SettingsTabs>` renders the
+ * underline strip and resolves the active tab from `usePathname()`.
  */
 export default async function SettingsLayout({
   children,
@@ -34,12 +32,10 @@ export default async function SettingsLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const h = await headers();
-  const pathname = h.get('x-pathname') || h.get('next-url') || '';
 
-  // Brokerage tab visibility — only show if the user has a pending invite or
-  // an active brokerage row keyed off their email. Failures fall back to
-  // hiding the tab; the page itself still works via direct URL.
+  // Brokerage tab visibility — show if the user has a pending invite or an
+  // active brokerage row. Failures fall back to hiding the tab; the page
+  // itself still works via direct URL.
   let showBrokerage = false;
   try {
     const { userId } = await auth();
@@ -68,21 +64,6 @@ export default async function SettingsLayout({
 
   const tabs: Tab[] = showBrokerage ? [...BASE_TABS, BROKERAGE_TAB] : BASE_TABS;
 
-  // Match the deepest tab that is a prefix of the current path. /settings is
-  // exact-only so it doesn't shadow /settings/profile etc.
-  const activeTab = (() => {
-    let best: Tab | null = null;
-    for (const tab of tabs) {
-      const expected = `/s/${slug}${tab.matchPath}`;
-      if (tab.matchPath === '/settings') {
-        if (pathname === expected) return tab;
-      } else if (pathname.startsWith(expected)) {
-        if (!best || tab.matchPath.length > best.matchPath.length) best = tab;
-      }
-    }
-    return best;
-  })();
-
   return (
     <div className="space-y-8">
       <h1
@@ -92,27 +73,7 @@ export default async function SettingsLayout({
         Settings
       </h1>
 
-      <nav
-        className="flex items-center gap-1 border-b border-border/60 -mx-2 px-2 overflow-x-auto"
-        aria-label="Settings sections"
-      >
-        {tabs.map((tab) => {
-          const isActive = activeTab?.href === tab.href;
-          return (
-            <Link
-              key={tab.href}
-              href={`/s/${slug}${tab.href}`}
-              className={`flex items-center px-3 py-2 -mb-px text-sm whitespace-nowrap border-b-2 transition-colors duration-150 ${
-                isActive
-                  ? 'border-foreground text-foreground font-medium'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {tab.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <SettingsTabs slug={slug} tabs={tabs} />
 
       <div>{children}</div>
     </div>

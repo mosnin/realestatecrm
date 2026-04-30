@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { AgentDraftInbox } from '@/components/agent/agent-draft-inbox';
 import { AgentQuestionsPanel } from '@/components/agent/agent-questions-panel';
 import { AgentGoalsPanel } from '@/components/agent/agent-goals-panel';
@@ -49,19 +49,5 @@ export function TodayFeed({ slug }: { slug: string }) {
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <FocusCard slug={slug} onShowFullDay={() => setShowFull(true)} />
-      <div className="flex justify-center">
-        <button
-          type="button"
-          onClick={() => setShowFull(true)}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Show full day
-          <ArrowRight size={12} />
-        </button>
-      </div>
-    </div>
-  );
+  return <FocusCard slug={slug} onShowFullDay={() => setShowFull(true)} />;
 }
