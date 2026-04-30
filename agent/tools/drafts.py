@@ -1,7 +1,13 @@
-"""Draft creation tool — agent writes message drafts for human approval.
+"""Draft message tool — Chippi never sends, only drafts.
 
-The agent never sends messages directly. It creates an AgentDraft record
-with status='pending'. A human approves or dismisses it in the UI.
+Every contact-facing message lands in the realtor's approval inbox as an
+AgentDraft. The realtor approves before anything ships. There is no "send"
+mode, no autonomy override, no confidence gate. One trust boundary.
+
+The tool auto-dedupes: if a draft for the same contact + channel was created
+in the last 48 hours and is still pending, the existing draft is returned
+instead of a new one. Prevents the agent from burying the realtor in copies
+when it loops.
 """
 
 from __future__ import annotations
@@ -16,9 +22,12 @@ from db import supabase
 from security.context import AgentContext
 from tools.streaming import publish_event
 
+_VALID_CHANNELS = {"sms", "email", "note"}
+_DEDUPE_WINDOW_HOURS = 48
+
 
 @function_tool
-async def create_draft_message(
+async def draft_message(
     ctx: RunContextWrapper[AgentContext],
     contact_id: str,
     channel: str,
@@ -28,32 +37,65 @@ async def create_draft_message(
     deal_id: str | None = None,
     priority: int = 0,
 ) -> dict[str, Any]:
-    """Create a draft message for human review before sending.
+    """Create a pending draft message for the realtor to approve.
 
-    channel must be one of: 'sms', 'email', 'note'.
-    Returns the created draft record.
+    channel: 'sms' | 'email' | 'note'.
+    subject: required when channel == 'email'.
+    content: message body. Keep SMS under 160 chars.
+    reasoning: why this outreach is warranted (visible to the realtor).
+    priority: 0 (normal) to 100 (urgent) — affects inbox ordering.
+
+    Auto-dedup: if a pending draft exists for the same contact+channel from
+    the last 48h, returns it instead of creating a duplicate.
+
+    Returns: { "action": "drafted" | "deduped", "draftId": "...", ... }
     """
     space_id = ctx.context.space_id
+
+    if channel not in _VALID_CHANNELS:
+        return {"error": f"channel must be one of {_VALID_CHANNELS}"}
+    if channel == "email" and not subject:
+        return {"error": "subject is required for email channel"}
+
     db = await supabase()
 
-    valid_channels = {"sms", "email", "note"}
-    if channel not in valid_channels:
-        return {"error": f"Invalid channel '{channel}'. Must be one of {valid_channels}"}
-
-    # Validate the contact belongs to this space
     check = await (
         db.table("Contact")
         .select("id,name")
         .eq("id", contact_id)
         .eq("spaceId", space_id)
+        .maybe_single()
         .execute()
     )
     if not check.data:
         return {"error": "Contact not found in space"}
+    contact_name = check.data.get("name", "contact")
 
-    # Drafts expire after 7 days if not actioned
+    # ── Dedup: existing pending draft for same contact+channel in window ──
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=_DEDUPE_WINDOW_HOURS)).isoformat()
+    existing = await (
+        db.table("AgentDraft")
+        .select("id,channel,content,createdAt")
+        .eq("spaceId", space_id)
+        .eq("contactId", contact_id)
+        .eq("channel", channel)
+        .eq("status", "pending")
+        .gte("createdAt", cutoff)
+        .order("createdAt", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        prior = existing.data[0]
+        return {
+            "action": "deduped",
+            "draftId": prior["id"],
+            "contactId": contact_id,
+            "channel": channel,
+            "note": "A pending draft for this contact already exists from the last 48h.",
+        }
+
     expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
-
     draft = {
         "id": str(uuid.uuid4()),
         "spaceId": space_id,
@@ -63,14 +105,13 @@ async def create_draft_message(
         "subject": subject,
         "content": content,
         "reasoning": reasoning,
-        "priority": priority,
+        "priority": max(0, min(100, priority)),
         "status": "pending",
         "expiresAt": expires_at,
     }
 
     result = await db.table("AgentDraft").insert(draft).execute()
 
-    contact_name = check.data[0].get("name", "contact") if check.data else "contact"
     await publish_event(
         ctx.context,
         "draft",
@@ -78,30 +119,10 @@ async def create_draft_message(
         metadata={"contactId": contact_id, "channel": channel},
     )
 
-    return result.data[0] if result.data else draft
-
-
-@function_tool
-async def check_recent_drafts(
-    ctx: RunContextWrapper[AgentContext],
-    contact_id: str,
-    hours: int = 48,
-) -> list[dict[str, Any]]:
-    """Check if a draft was already created for this contact in the last N hours.
-
-    Use this before creating a new draft to avoid duplicate suggestions.
-    """
-    space_id = ctx.context.space_id
-    db = await supabase()
-
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-
-    result = await (
-        db.table("AgentDraft")
-        .select("id,channel,status,createdAt")
-        .eq("spaceId", space_id)
-        .eq("contactId", contact_id)
-        .gte("createdAt", cutoff)
-        .execute()
-    )
-    return result.data or []
+    created = result.data[0] if result.data else draft
+    return {
+        "action": "drafted",
+        "draftId": created.get("id", ""),
+        "contactId": contact_id,
+        "channel": channel,
+    }

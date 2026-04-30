@@ -40,18 +40,3 @@ class AgentContext:
             run_id=run_id,
         )
 
-    def requires_approval_for(self, action_type: str) -> bool:
-        """True when this action needs a draft before execution.
-
-        Internal-only writes (scoring, follow-up reminders, observations,
-        memory) run without approval. Anything that touches a contact or
-        sends a message drafts.
-        """
-        autonomous_actions = {
-            "update_lead_score",
-            "update_deal_probability",
-            "create_follow_up_reminder",
-            "log_observation",
-            "store_memory",
-        }
-        return action_type not in autonomous_actions
