@@ -7,6 +7,13 @@ import { Label } from '@/components/ui/label';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Space } from '@/lib/types';
+import {
+  SECTION_LABEL,
+  BODY_MUTED,
+  CAPTION,
+  FIELD_RHYTHM,
+  PRIMARY_PILL,
+} from '@/lib/typography';
 
 interface GeneralSettingsFormProps {
   space: Space;
@@ -17,11 +24,7 @@ interface GeneralSettingsFormProps {
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-      {children}
-    </p>
-  );
+  return <p className={SECTION_LABEL}>{children}</p>;
 }
 
 export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProps) {
@@ -144,7 +147,7 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
       {/* Workspace */}
       <section className="space-y-5">
         <SectionLabel>Workspace</SectionLabel>
-        <div className="space-y-4">
+        <div className={FIELD_RHYTHM}>
           <div className="space-y-1.5">
             <Label htmlFor="name" className="text-[12.5px] font-medium text-foreground">
               Workspace name
@@ -174,7 +177,7 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
                 </div>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className={CAPTION}>
               Your intake link: chippi.com/apply/{newSlug}
             </p>
           </div>
@@ -184,7 +187,7 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
       {/* Contact & connections */}
       <section className="space-y-5 pt-8 border-t border-border/60">
         <SectionLabel>Contact</SectionLabel>
-        <div className="space-y-4">
+        <div className={FIELD_RHYTHM}>
           <div className="space-y-1.5">
             <Label htmlFor="number" className="text-[12.5px] font-medium text-foreground">
               Phone number
@@ -195,7 +198,7 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
               onChange={(e) => setPhoneNumber(e.target.value)}
               placeholder="(555) 123-4567"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className={CAPTION}>
               Used for SMS notifications and shown on tour booking pages.
             </p>
           </div>
@@ -209,7 +212,7 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
               onChange={(e) => setMyConnections(e.target.value)}
               placeholder="Brokerages, lenders, partners"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className={CAPTION}>
               Visible to AI context for follow-up suggestions.
             </p>
           </div>
@@ -222,16 +225,12 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
           <button
             type="submit"
             disabled={saving || !slugValid}
-            className={cn(
-              'inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium',
-              'hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150',
-              'disabled:opacity-60 disabled:cursor-not-allowed',
-            )}
+            className={cn(PRIMARY_PILL, 'disabled:opacity-60 disabled:cursor-not-allowed')}
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {saving ? 'Saving' : saved ? 'Saved' : 'Save changes'}
           </button>
-          {saved && <p className="text-sm text-muted-foreground">Changes saved.</p>}
+          {saved && <p className={BODY_MUTED}>Changes saved.</p>}
         </div>
         {saveError && <p className="text-sm text-destructive">{saveError}</p>}
       </div>
@@ -240,7 +239,7 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
       <section className="space-y-4 pt-8 border-t border-border/60">
         <SectionLabel>Danger zone</SectionLabel>
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
+          <p className={BODY_MUTED}>
             Deleting your space is permanent and will remove all clients, deals, and data. This cannot be undone.
           </p>
           <button

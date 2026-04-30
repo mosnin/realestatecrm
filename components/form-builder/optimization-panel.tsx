@@ -17,6 +17,7 @@ import {
   Database,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { H2, TITLE_FONT, SECTION_LABEL, STAT_NUMBER_COMPACT, BODY_MUTED } from '@/lib/typography';
 
 // ── Types (mirror server types) ──────────────────────────────────────────────
 
@@ -238,27 +239,21 @@ function PerformanceSummary({ performance }: { performance: FormPerformance }) {
     <div className="bg-background border border-border/70 rounded-lg px-4 py-3">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Submissions</p>
-          <p
-            className="text-xl text-foreground mt-0.5 tabular-nums"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
+          <p className={SECTION_LABEL}>Submissions</p>
+          <p className={cn(STAT_NUMBER_COMPACT, 'mt-0.5')} style={TITLE_FONT}>
             {performance.totalSubmissions}
           </p>
           <p className="text-[10px] text-muted-foreground">last 30 days</p>
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Avg lead score</p>
-          <p
-            className="text-xl text-foreground mt-0.5 tabular-nums"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
+          <p className={SECTION_LABEL}>Avg lead score</p>
+          <p className={cn(STAT_NUMBER_COMPACT, 'mt-0.5')} style={TITLE_FONT}>
             {performance.avgLeadScore}
             <span className="text-sm text-muted-foreground"> /100</span>
           </p>
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Lead quality</p>
+          <p className={SECTION_LABEL}>Lead quality</p>
           <div className="flex flex-col gap-1 mt-1">
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/70 flex-shrink-0" />
@@ -276,7 +271,7 @@ function PerformanceSummary({ performance }: { performance: FormPerformance }) {
         </div>
         {performance.mostCommonDropOff && (
           <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Common drop-off</p>
+            <p className={SECTION_LABEL}>Common drop-off</p>
             <p className="text-xs text-foreground mt-1 truncate" title={performance.mostCommonDropOff}>
               {performance.mostCommonDropOff}
             </p>
@@ -396,13 +391,10 @@ export function OptimizationPanel({ slug }: OptimizationPanelProps) {
   if (!hasLoaded && !loading && !error) {
     return (
       <div className="bg-background border border-border/70 rounded-lg p-10 text-center max-w-2xl mx-auto">
-        <h3
-          className="text-xl text-foreground mb-2"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+        <h3 className={cn(H2, 'mb-2')} style={TITLE_FONT}>
           Get suggestions to improve your form
         </h3>
-        <p className="text-sm text-muted-foreground mb-5 max-w-md mx-auto leading-relaxed">
+        <p className={cn(BODY_MUTED, 'mb-5 max-w-md mx-auto leading-relaxed')}>
           We&apos;ll review how applicants interact with your form — which questions they skip,
           where they drop off, and how their answers affect lead scores — then recommend
           specific changes to get better results.
@@ -422,10 +414,7 @@ export function OptimizationPanel({ slug }: OptimizationPanelProps) {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3
-            className="text-lg text-foreground"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
+          <h3 className={H2} style={TITLE_FONT}>
             Suggestions for your form
           </h3>
           {result?.generatedAt && (

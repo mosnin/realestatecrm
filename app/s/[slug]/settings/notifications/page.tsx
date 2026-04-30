@@ -6,13 +6,19 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import {
+  H2,
+  SECTION_LABEL,
+  BODY,
+  BODY_MUTED,
+  CAPTION,
+  PRIMARY_PILL,
+  SECTION_RHYTHM,
+  READING_MAX,
+} from '@/lib/typography';
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-      {children}
-    </p>
-  );
+  return <p className={SECTION_LABEL}>{children}</p>;
 }
 
 function ToggleRow({
@@ -31,8 +37,8 @@ function ToggleRow({
   return (
     <div className="flex items-center justify-between gap-4 py-3 border-b border-border/60 last:border-b-0">
       <div className="min-w-0">
-        <p className="text-sm font-medium text-foreground">{label}</p>
-        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+        <p className={`${BODY} font-medium`}>{label}</p>
+        {description && <p className={`${CAPTION} mt-0.5`}>{description}</p>}
       </div>
       <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} />
     </div>
@@ -117,13 +123,8 @@ export default function NotificationsSettingsPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-3xl">
-      <h2
-        className="text-2xl tracking-tight text-foreground"
-        style={{ fontFamily: 'var(--font-title)' }}
-      >
-        Notifications
-      </h2>
+    <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
+      <h2 className={H2}>Notifications</h2>
 
       <form onSubmit={handleSave} className="space-y-10">
         {/* Channels */}
@@ -194,7 +195,7 @@ export default function NotificationsSettingsPage() {
             </div>
           </section>
         ) : (
-          <p className="text-sm text-muted-foreground italic pt-2">
+          <p className={`${BODY_MUTED} italic pt-2`}>
             Enable at least one delivery channel to configure event notifications.
           </p>
         )}
@@ -203,16 +204,12 @@ export default function NotificationsSettingsPage() {
           <button
             type="submit"
             disabled={saving}
-            className={cn(
-              'inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium',
-              'hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150',
-              'disabled:opacity-60 disabled:cursor-not-allowed',
-            )}
+            className={cn(PRIMARY_PILL, 'disabled:opacity-60 disabled:cursor-not-allowed')}
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {saving ? 'Saving' : saved ? 'Saved' : 'Save changes'}
           </button>
-          {saved && <p className="text-sm text-muted-foreground">Changes saved.</p>}
+          {saved && <p className={BODY_MUTED}>Changes saved.</p>}
         </div>
       </form>
     </div>

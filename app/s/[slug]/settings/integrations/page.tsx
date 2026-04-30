@@ -6,6 +6,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Copy, Check, Loader2, Plus, Trash2, Key } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  H2,
+  H3,
+  SECTION_LABEL,
+  BODY_MUTED,
+  CAPTION,
+  PRIMARY_PILL,
+  SECTION_RHYTHM,
+  READING_MAX,
+} from '@/lib/typography';
 
 type McpKey = {
   id: string;
@@ -17,11 +27,7 @@ type McpKey = {
 };
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-      {children}
-    </p>
-  );
+  return <p className={SECTION_LABEL}>{children}</p>;
 }
 
 function CredentialRow({
@@ -39,7 +45,7 @@ function CredentialRow({
 }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={SECTION_LABEL}>{label}</p>
       <div className="flex items-center gap-2">
         <div className="flex-1 h-9 rounded-md border border-border/70 bg-background px-3 flex items-center overflow-hidden">
           <span className="text-sm font-mono select-all truncate">
@@ -144,18 +150,13 @@ export default function IntegrationsSettingsPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-3xl">
-      <h2
-        className="text-2xl tracking-tight text-foreground"
-        style={{ fontFamily: 'var(--font-title)' }}
-      >
-        Integrations
-      </h2>
+    <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
+      <h2 className={H2}>Integrations</h2>
 
       {/* MCP connection */}
       <section className="space-y-5">
         <SectionLabel>Model Context Protocol</SectionLabel>
-        <p className="text-sm text-muted-foreground">
+        <p className={BODY_MUTED}>
           Connect external AI tools to your workspace via MCP. Generate an API key below and paste it where indicated.
         </p>
 
@@ -178,7 +179,7 @@ export default function IntegrationsSettingsPage() {
               {mcpCopiedEndpoint ? 'Copied' : 'Copy'}
             </button>
           </div>
-          <p className="text-xs text-muted-foreground">Streamable HTTP transport.</p>
+          <p className={CAPTION}>Streamable HTTP transport.</p>
         </div>
 
         <div className="space-y-2">
@@ -225,7 +226,7 @@ export default function IntegrationsSettingsPage() {
         {mcpNewCreds && (
           <div className="rounded-md border border-border/70 bg-foreground/[0.02] p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-foreground">Your MCP credentials</p>
+              <p className={H3}>Your MCP credentials</p>
               <button
                 type="button"
                 onClick={() => setMcpShowSecrets(!mcpShowSecrets)}
@@ -274,7 +275,7 @@ export default function IntegrationsSettingsPage() {
               }}
               copied={mcpCopiedField === 'key'}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className={CAPTION}>
               These credentials won&apos;t be shown again. Copy them now.
             </p>
             <button
@@ -308,11 +309,7 @@ export default function IntegrationsSettingsPage() {
                 type="button"
                 disabled={mcpCreating || !mcpNewKeyName.trim()}
                 onClick={handleCreateMcpKey}
-                className={cn(
-                  'inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium',
-                  'hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150',
-                  'disabled:opacity-60 disabled:cursor-not-allowed',
-                )}
+                className={cn(PRIMARY_PILL, 'disabled:opacity-60 disabled:cursor-not-allowed')}
               >
                 {mcpCreating && <Loader2 size={13} className="animate-spin" />}
                 Create
@@ -334,7 +331,7 @@ export default function IntegrationsSettingsPage() {
         {mcpKeysLoading ? (
           <div className="h-16 rounded-md bg-foreground/[0.04] animate-pulse" />
         ) : mcpKeys.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic">
+          <p className={`${BODY_MUTED} italic`}>
             No API keys yet. Generate one to connect your MCP client.
           </p>
         ) : (

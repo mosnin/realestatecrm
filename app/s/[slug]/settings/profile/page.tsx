@@ -12,13 +12,18 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { generatePrivacyPolicy } from '@/lib/privacy-policy-template';
+import {
+  H2,
+  SECTION_LABEL,
+  BODY_MUTED,
+  CAPTION,
+  PRIMARY_PILL,
+  SECTION_RHYTHM,
+  READING_MAX,
+} from '@/lib/typography';
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-      {children}
-    </p>
-  );
+  return <p className={SECTION_LABEL}>{children}</p>;
 }
 
 export default function ProfileSettingsPage() {
@@ -139,13 +144,8 @@ export default function ProfileSettingsPage() {
       .toUpperCase() || 'U';
 
   return (
-    <div className="space-y-8 max-w-3xl">
-      <h2
-        className="text-2xl tracking-tight text-foreground"
-        style={{ fontFamily: 'var(--font-title)' }}
-      >
-        Profile
-      </h2>
+    <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
+      <h2 className={H2}>Profile</h2>
 
       <form onSubmit={handleSave} className="space-y-10">
         {/* Identity */}
@@ -191,7 +191,7 @@ export default function ProfileSettingsPage() {
           <div className="space-y-1.5">
             <Label className="text-[12.5px] font-medium text-foreground">Email</Label>
             <Input value={user.emailAddresses[0]?.emailAddress ?? ''} disabled />
-            <p className="text-xs text-muted-foreground">Email is managed via your Clerk account.</p>
+            <p className={CAPTION}>Email is managed via your Clerk account.</p>
           </div>
 
           <div className="space-y-1.5">
@@ -212,7 +212,7 @@ export default function ProfileSettingsPage() {
         {/* Bio & social */}
         <section className="space-y-5 pt-8 border-t border-border/60">
           <SectionLabel>Bio &amp; social</SectionLabel>
-          <p className="text-xs text-muted-foreground">Displayed on your intake page.</p>
+          <p className={CAPTION}>Displayed on your intake page.</p>
 
           <div className="space-y-1.5">
             <Label htmlFor="bio" className="text-[12.5px] font-medium text-foreground">
@@ -286,7 +286,7 @@ export default function ProfileSettingsPage() {
                 }
               }}
             />
-            <p className="text-xs text-muted-foreground">PNG, JPG, or WebP. Max 2MB.</p>
+            <p className={CAPTION}>PNG, JPG, or WebP. Max 2MB.</p>
           </div>
 
           <div className="space-y-2">
@@ -326,7 +326,7 @@ export default function ProfileSettingsPage() {
               Generate template
             </button>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className={CAPTION}>
             Linked on your intake forms. You are responsible for ensuring it complies with applicable laws.
           </p>
           <RichTextEditor
@@ -340,7 +340,7 @@ export default function ProfileSettingsPage() {
         <section className="space-y-5 pt-8 border-t border-border/60">
           <SectionLabel>Account</SectionLabel>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Manage your avatar, password, and connected accounts.</p>
+            <p className={BODY_MUTED}>Manage your avatar, password, and connected accounts.</p>
             <UserButton />
           </div>
         </section>
@@ -349,16 +349,12 @@ export default function ProfileSettingsPage() {
           <button
             type="submit"
             disabled={saving}
-            className={cn(
-              'inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium',
-              'hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150',
-              'disabled:opacity-60 disabled:cursor-not-allowed',
-            )}
+            className={cn(PRIMARY_PILL, 'disabled:opacity-60 disabled:cursor-not-allowed')}
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {saving ? 'Saving' : saved ? 'Saved' : 'Save changes'}
           </button>
-          {saved && <p className="text-sm text-muted-foreground">Changes saved.</p>}
+          {saved && <p className={BODY_MUTED}>Changes saved.</p>}
         </div>
       </form>
     </div>

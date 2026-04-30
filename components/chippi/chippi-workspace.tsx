@@ -519,7 +519,7 @@ export function ChippiWorkspace({
           <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-6 space-y-12">
               {/* Greeting + status */}
-              <header className="space-y-1.5">
+              <header className="space-y-1.5 text-center">
                 <h1
                   className="text-3xl tracking-tight text-foreground"
                   style={{ fontFamily: 'var(--font-title)' }}

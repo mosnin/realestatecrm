@@ -281,7 +281,7 @@ function DetailList({
   if (items.length === 0) return null;
   return (
     <div>
-      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+      <p className={cn(SECTION_LABEL, 'mb-1.5')}>
         {title}
       </p>
       <ul className="space-y-1">
@@ -413,7 +413,7 @@ export function ScoringPreview({ config, slug }: ScoringPreviewProps) {
       <div className="space-y-6">
         {visibleSections.map((section) => (
           <div key={section.id}>
-            <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            <h4 className={cn(SECTION_LABEL, 'mb-3')}>
               {section.title}
             </h4>
             <div className="space-y-4">
@@ -478,9 +478,7 @@ export function ScoringPreview({ config, slug }: ScoringPreviewProps) {
       {scoreResult && scoreResult.scoringStatus === 'scored' && (
         <div className="bg-background border border-border/70 rounded-lg overflow-hidden">
           <div className="px-4 py-3 border-b border-border/70">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-              Scoring result
-            </p>
+            <p className={SECTION_LABEL}>Scoring result</p>
           </div>
           <div className="p-4 space-y-4">
             {/* Score overview */}
@@ -549,7 +547,7 @@ export function ScoringPreview({ config, slug }: ScoringPreviewProps) {
             {/* Next action */}
             {scoreResult.scoreDetails?.recommendedNextAction && (
               <div className="rounded-md bg-foreground/[0.04] px-3 py-2">
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Recommended action</p>
+                <p className={SECTION_LABEL}>Recommended action</p>
                 <p className="text-xs text-foreground mt-0.5">{scoreResult.scoreDetails.recommendedNextAction}</p>
               </div>
             )}

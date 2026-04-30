@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { H2, TITLE_FONT, SECTION_LABEL, BODY_MUTED } from '@/lib/typography';
 import type { IntakeFormConfig, FormQuestion } from './types';
 import type { ScoringModel, QuestionScoringModel, NumberRange } from '@/lib/scoring/scoring-model-types';
 
@@ -243,9 +244,7 @@ function QuestionCard({
           {/* Option scores for radio/select */}
           {hasOptions && model?.optionScores && (
             <div className="space-y-2">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Option Scores
-              </p>
+              <p className={SECTION_LABEL}>Option scores</p>
               {question.options!.map((opt) => {
                 const score = model.optionScores?.[opt.value] ?? 0;
                 return (
@@ -279,9 +278,7 @@ function QuestionCard({
           {/* Range buckets for number fields */}
           {hasRanges && (
             <div className="space-y-2">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Score Ranges
-              </p>
+              <p className={SECTION_LABEL}>Score ranges</p>
               {model!.ranges!.map((range, idx) => (
                 <div key={idx} className="flex items-center gap-2">
                   <Input
@@ -586,13 +583,10 @@ export function ScoringTab({
   if (!scoringModel) {
     return (
       <div className="bg-background border border-border/70 rounded-lg p-10 text-center max-w-2xl mx-auto">
-        <h3
-          className="text-xl text-foreground mb-2"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+        <h3 className={cn(H2, 'mb-2')} style={TITLE_FONT}>
           Teach the assistant what you look for
         </h3>
-        <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed mb-5">
+        <p className={cn(BODY_MUTED, 'max-w-md mx-auto leading-relaxed mb-5')}>
           We&apos;ll read your questions and draft a starting point — which
           answers count as a strong {leadType === 'rental' ? 'rental' : 'buyer'} lead
           vs. a weak one. You can tune it afterwards.
@@ -700,7 +694,7 @@ export function ScoringTab({
       {/* Not scored section */}
       {nonScorableQuestions.length > 0 && (
         <div className="bg-background border border-border/70 rounded-lg px-4 py-3">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+          <p className={cn(SECTION_LABEL, 'mb-2')}>
             Not scored ({nonScorableQuestions.length})
           </p>
           <div className="flex flex-wrap gap-1.5">

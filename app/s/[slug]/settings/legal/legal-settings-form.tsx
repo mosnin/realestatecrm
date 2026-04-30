@@ -5,6 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  SECTION_LABEL,
+  BODY_MUTED,
+  CAPTION,
+  PRIMARY_PILL,
+} from '@/lib/typography';
 
 interface LegalSettingsFormProps {
   slug: string;
@@ -13,11 +19,7 @@ interface LegalSettingsFormProps {
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-      {children}
-    </p>
-  );
+  return <p className={SECTION_LABEL}>{children}</p>;
 }
 
 function isValidHttpsUrl(value: string): boolean {
@@ -83,7 +85,7 @@ export function LegalSettingsForm({
     <form onSubmit={handleSave} className="space-y-10">
       <section className="space-y-5">
         <SectionLabel>Intake compliance</SectionLabel>
-        <p className="text-sm text-muted-foreground">
+        <p className={BODY_MUTED}>
           Privacy policy and consent text shown on your intake form.
         </p>
 
@@ -103,7 +105,7 @@ export function LegalSettingsForm({
             className={urlError ? 'border-destructive' : ''}
           />
           {urlError && <p className="text-xs text-destructive">{urlError}</p>}
-          <p className="text-xs text-muted-foreground">
+          <p className={CAPTION}>
             Required before your intake form can collect submissions.
           </p>
         </div>
@@ -119,7 +121,7 @@ export function LegalSettingsForm({
             value={consentCheckboxLabel}
             onChange={(e) => setConsentCheckboxLabel(e.target.value)}
           />
-          <p className="text-xs text-muted-foreground">
+          <p className={CAPTION}>
             If blank, defaults to: I agree to [Business Name]&apos;s Privacy Policy
           </p>
         </div>
@@ -131,17 +133,13 @@ export function LegalSettingsForm({
         <button
           type="submit"
           disabled={saving}
-          className={cn(
-            'inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium',
-            'hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150',
-            'disabled:opacity-60 disabled:cursor-not-allowed',
-          )}
+          className={cn(PRIMARY_PILL, 'disabled:opacity-60 disabled:cursor-not-allowed')}
         >
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           {saving ? 'Saving' : 'Save changes'}
         </button>
         {saved && (
-          <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+          <span className={`inline-flex items-center gap-1.5 ${BODY_MUTED}`}>
             <CheckCircle2 size={14} className="text-foreground" />
             Saved
           </span>

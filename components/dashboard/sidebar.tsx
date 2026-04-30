@@ -10,12 +10,12 @@ import { realtorNavItems, realtorMoreNavItems } from '@/lib/nav-items';
 import type { NavItem, NavChild } from '@/lib/nav-items';
 import {
   SidebarCollapseProvider,
-  SidebarCollapseToggle,
   CollapsedTooltip,
   useSidebarCollapsed,
 } from '@/components/dashboard/sidebar-collapse';
 import {
   Building2,
+  ChevronLeft,
   ChevronRight,
   Users,
   UserCircle,
@@ -757,6 +757,42 @@ function UserFooter({
 // Realtor nav — 3 sections: AI at top, Workspace in middle, Settings at bottom
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Edge-handle collapse toggle — a small chevron button that sticks half-off the
+// right edge of the realtor sidebar. Discoverable on hover (idle = ghosted,
+// rail-hover = solid). Mirrors the Linear / VS Code resize-handle pattern.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function EdgeCollapseHandle() {
+  const { collapsed, toggle } = useSidebarCollapsed();
+  const Icon = collapsed ? ChevronRight : ChevronLeft;
+  const label = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={label}
+      title={label}
+      className={cn(
+        // Position: vertical centre of the rail, half-off the right edge.
+        'absolute top-1/2 -right-3 z-30 -translate-y-1/2',
+        // Shape: small square with hairline ring + bg matching the page.
+        'flex items-center justify-center w-6 h-6 rounded-full',
+        'border border-border/70 bg-background text-muted-foreground/70',
+        // Visibility: faded by default; full on rail-hover or self-hover.
+        'opacity-0 group-hover/rail:opacity-100 hover:opacity-100',
+        'hover:text-foreground hover:bg-foreground/[0.04]',
+        'transition-opacity duration-150 active:scale-[0.94]',
+        // Subtle shadow so the handle reads as on top of the rail edge.
+        'shadow-sm shadow-foreground/[0.04]',
+      )}
+    >
+      <Icon size={12} strokeWidth={2} />
+    </button>
+  );
+}
+
 function RealtorNav({
   base,
   pathname,
@@ -1136,11 +1172,16 @@ function RealtorSidebarShell({
   return (
     <aside
       className={cn(
-        'relative hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0 overflow-hidden',
+        'group/rail relative hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0',
         'transition-[width] duration-200 ease-in-out',
         collapsed ? 'w-[56px]' : 'w-[240px]',
       )}
     >
+      {/* Edge-handle collapse toggle — sticks half-off the right edge of the
+          rail so it's discoverable without crowding the nav. Idle = nearly
+          invisible (subtle ring), on rail-hover = visible. Click flips
+          collapsed state via the existing context. */}
+      <EdgeCollapseHandle />
       {/* Brand-warm tint at top — clip width follows the rail so the orange
           wash doesn't hint at content beyond the visible edge. */}
       <div
@@ -1188,10 +1229,9 @@ function RealtorSidebarShell({
           pendingDraftCount={pendingDraftCount}
         />
 
-        {/* Collapse toggle — pinned just above the user-footer divider. */}
-        <SidebarCollapseToggle />
-
-        {/* User footer pinned at bottom, separated by a hairline */}
+        {/* User footer pinned at bottom, separated by a hairline. The
+            collapse toggle now lives as an edge-handle on the right rail
+            (see EdgeCollapseHandle above) — discoverable on hover. */}
         <div className="border-t border-border/50" />
         <UserFooter
           href={`${base}/settings/profile`}

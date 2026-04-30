@@ -3,6 +3,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import type { MessageTemplate } from '@/lib/message-templates';
 import { TemplatesEditor } from '@/components/settings/templates-editor';
+import { H2, BODY_MUTED, SECTION_RHYTHM } from '@/lib/typography';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,15 +25,10 @@ export default async function TemplatesSettingsPage({
   const templates = (data ?? []) as MessageTemplate[];
 
   return (
-    <div className="space-y-8 max-w-[900px]">
+    <div className={`${SECTION_RHYTHM} max-w-[900px]`}>
       <div className="space-y-3">
-        <h2
-          className="text-2xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          Message templates
-        </h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className={H2}>Message templates</h2>
+        <p className={BODY_MUTED}>
           Canned SMS, email, and note bodies you can fire per deal or contact. Use{' '}
           <code className="text-xs bg-foreground/[0.06] px-1 rounded">{'{{variable}}'}</code> placeholders to
           personalize — anything unknown becomes blank.
