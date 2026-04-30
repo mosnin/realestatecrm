@@ -236,6 +236,20 @@ export default async function DashboardLayout({
     isBroker = false;
   }
 
+  // Route-aware shell: the Chippi chat surface gets a different chrome
+  // treatment than the dashboard pages — full-height main, no padded
+  // wrapper, no footer, mobile bottom-clearance for MobileNav. Read the
+  // pathname from the request headers (Next.js doesn't surface it on
+  // server layouts directly). Fallback chain matches the broker layout.
+  const headerStore = await headers();
+  const requestPath =
+    headerStore.get('x-pathname') ||
+    headerStore.get('x-invoke-path') ||
+    headerStore.get('x-matched-path') ||
+    headerStore.get('next-url') ||
+    '';
+  const isChippiRoute = /\/s\/[^/]+\/chippi(?:\/|$|\?)/.test(requestPath);
+
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
       <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} pendingDraftCount={pendingDraftCount ?? 0} overdueFollowUpCount={overdueFollowUpCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} />
@@ -243,19 +257,28 @@ export default async function DashboardLayout({
         <PlatformBanner />
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
         <AgentStatusBar slug={slug} />
-        {/* pb on main reserves space for the persistent ChippiBar.
-            Mobile bar sits above MobileNav so we add MobileNav's height. */}
-        <main className="flex-1 overflow-y-auto flex flex-col bg-background text-foreground">
-          {/* Page content grows; footer always pins to the visible bottom of
-              <main> regardless of how short the page is. */}
-          <div className="w-full max-w-[1500px] mx-auto flex-1 px-4 py-5 md:px-8 md:py-7 pb-40 md:pb-24">
+        {isChippiRoute ? (
+          // Chippi is the chat surface — fills the available height, no
+          // dashboard padding wrapper, no footer. Mobile reserves space at
+          // the bottom for MobileNav (the fixed bar) plus a little visual
+          // gap so the composer doesn't kiss the nav.
+          <main className="flex-1 min-h-0 flex flex-col bg-background text-foreground pb-[calc(env(safe-area-inset-bottom)+76px)] md:pb-0">
             <LiveNotifications spaceId={space.id} slug={slug} />
             <PageTransition>{children}</PageTransition>
-          </div>
-          <div className="w-full max-w-[1500px] mx-auto px-4 md:px-8 pb-4">
-            <DashboardFooter />
-          </div>
-        </main>
+          </main>
+        ) : (
+          <main className="flex-1 overflow-y-auto flex flex-col bg-background text-foreground">
+            {/* Page content grows; footer always pins to the visible bottom of
+                <main> regardless of how short the page is. */}
+            <div className="w-full max-w-[1500px] mx-auto flex-1 px-4 py-5 md:px-8 md:py-7 pb-40 md:pb-24">
+              <LiveNotifications spaceId={space.id} slug={slug} />
+              <PageTransition>{children}</PageTransition>
+            </div>
+            <div className="w-full max-w-[1500px] mx-auto px-4 md:px-8 pb-4">
+              <DashboardFooter />
+            </div>
+          </main>
+        )}
       </div>
       <MobileNav slug={slug} isBroker={isBroker} />
       {/* Persistent agent presence on every workspace page (hides itself on /chippi). */}
