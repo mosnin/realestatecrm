@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { LiquidMetalButton } from '@/components/ui/liquid-metal-button';
-import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -34,12 +32,13 @@ import {
   CheckSquare,
   GitCompare,
   CalendarDays,
-  ArrowUpDown,
   MoreHorizontal,
   Users,
   Inbox,
-  Zap,
+  Copy,
+  Check,
 } from 'lucide-react';
+import { buildIntakeUrl } from '@/lib/intake';
 import Link from 'next/link';
 import { ApplicationCompare } from './application-compare';
 import {
@@ -88,11 +87,49 @@ interface ContactTableProps {
   slug: string;
 }
 
+function CopyButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore clipboard rejection */
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      aria-label={copied ? 'Copied' : 'Copy intake link'}
+      className={cn(
+        'inline-flex items-center justify-center w-7 h-7 rounded-md border transition-colors duration-150 active:scale-[0.98]',
+        copied
+          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+          : 'border-border/60 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+      )}
+    >
+      {copied ? <Check size={12} strokeWidth={2.25} /> : <Copy size={12} strokeWidth={1.75} />}
+    </button>
+  );
+}
+
 export function ContactTable({ slug }: ContactTableProps) {
   const [contacts, setContacts] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
-  const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'rental' | 'buyer'>('all');
+  const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'new' | 'rental' | 'buyer'>('all');
   const [tagFilter, setTagFilter] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name-az' | 'name-za' | 'agent-priority'>('agent-priority');
   const [importOpen, setImportOpen] = useState(false);
@@ -329,7 +366,11 @@ export function ContactTable({ slug }: ContactTableProps) {
   // Apply tag + leadType filters and sorting client-side
   const visibleContacts = (() => {
     let list = contacts
-      .filter((c) => leadTypeFilter === 'all' || c.leadType === leadTypeFilter)
+      .filter((c) => {
+        if (leadTypeFilter === 'all') return true;
+        if (leadTypeFilter === 'new') return c.tags.includes('new-lead');
+        return c.leadType === leadTypeFilter;
+      })
       .filter((c) => !tagFilter || c.tags.includes(tagFilter));
     if (sortBy === 'agent-priority') {
       list = [...list].sort((a, b) => (b.leadScore ?? -1) - (a.leadScore ?? -1));
@@ -347,168 +388,182 @@ export function ContactTable({ slug }: ContactTableProps) {
 
   const contactViews = savedViews.filter((v) => v.page === 'contacts');
 
+  const leadTypeChips: { key: 'all' | 'new' | 'rental' | 'buyer'; label: string; count: number }[] = [
+    { key: 'all', label: 'All', count: contacts.length },
+    { key: 'new', label: 'New', count: contacts.filter((c) => c.tags.includes('new-lead')).length },
+    { key: 'rental', label: 'Rental', count: contacts.filter((c) => c.leadType === 'rental').length },
+    { key: 'buyer', label: 'Buyer', count: contacts.filter((c) => c.leadType === 'buyer').length },
+  ];
+
+  const sortLabels: Record<typeof sortBy, string> = {
+    'agent-priority': 'Smart',
+    newest: 'Recently added',
+    oldest: 'Oldest first',
+    'name-az': 'Name A–Z',
+    'name-za': 'Name Z–A',
+  };
+
+  const stageLabels: Record<string, string> = {
+    ALL: 'All stages',
+    QUALIFICATION: 'Qualifying',
+    TOUR: 'Tour',
+    APPLICATION: 'Applied',
+  };
+
+  const fullIntakeUrl = buildIntakeUrl(slug);
+  const intakeUrlWithoutProtocol = fullIntakeUrl.replace(/^https?:\/\//, '');
+
   return (
     <div className="space-y-4">
-      {/* Saved view chips */}
-      {contactViews.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 items-center">
-          <span className="text-xs text-muted-foreground mr-1">Saved:</span>
-          {contactViews.map((v) => (
-            <span key={v.id} className="inline-flex items-center gap-1 text-xs font-medium bg-muted rounded-full pl-2.5 pr-1 py-1">
-              <button type="button" onClick={() => applyView(v)} className="hover:text-foreground transition-colors">
-                {v.name}
-              </button>
-              <button
-                type="button"
-                onClick={() => deleteView(v.id)}
-                className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                <X size={9} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Pipeline mini bar (card view only, non-empty) */}
-      {!loading && contacts.length > 0 && view === 'card' && (
-        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3">
-          {STAGES.map((stage, i) => {
-            const count = stageCounts[stage.key];
-            return (
-              <div key={stage.key} className="flex items-center gap-2">
-                {i > 0 && (
-                  <ArrowRight size={13} className="text-muted-foreground/40 flex-shrink-0" />
-                )}
-                <div className="flex items-center gap-2">
-                  <span className={cn('w-2 h-2 rounded-full flex-shrink-0', stage.dotColor)} />
-                  <span className="text-xs text-muted-foreground">{stage.label}</span>
-                  <span className="text-xs font-semibold tabular-nums text-foreground">{count}</span>
-                </div>
-              </div>
-            );
-          })}
-          <div className="ml-auto text-xs text-muted-foreground">
-            {tagFilter ? `${visibleContacts.length} of ` : ''}{contacts.length} total
-          </div>
-        </div>
-      )}
-
-      {/* Tag filter strip */}
-      {allTags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 items-center">
-          {tagFilter && (
-            <button
-              type="button"
-              onClick={() => setTagFilter('')}
-              className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 py-1 bg-foreground text-background"
-            >
-              <X size={10} />
-              Clear tag
-            </button>
-          )}
-          {allTags.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
-              className={cn(
-                'inline-flex items-center text-xs font-medium rounded-full px-2.5 py-1 border transition-colors',
-                tagFilter === tag
-                  ? 'bg-foreground text-background border-transparent'
-                  : 'bg-muted text-muted-foreground border-transparent hover:text-foreground hover:bg-accent',
-              )}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Lead type filter */}
-      <div className="flex gap-1 items-center">
-        <span className="text-xs text-muted-foreground mr-1">Lead type:</span>
-        {(['all', 'rental', 'buyer'] as const).map((key) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setLeadTypeFilter(key)}
-            className={cn(
-              'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-              leadTypeFilter === key
-                ? 'bg-foreground text-background'
-                : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
-            )}
-          >
-            {key === 'all' ? 'All' : key === 'rental' ? 'Rental' : 'Buyer'}
-            {key !== 'all' && (
-              <span className={cn('ml-1 tabular-nums', leadTypeFilter === key ? 'opacity-80' : 'opacity-60')}>
-                {contacts.filter((c) => c.leadType === key).length}
-              </span>
-            )}
-          </button>
-        ))}
+      {/* Page header */}
+      <div className="flex items-end justify-between mb-6">
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          People
+        </h1>
+        <Button
+          onClick={() => setAddOpen(true)}
+          className="h-9 gap-1.5 rounded-full px-4 bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] transition-all"
+        >
+          <Plus size={14} strokeWidth={2.25} />
+          Add a person
+        </Button>
       </div>
 
-      {/* Controls */}
-      <div className="flex flex-row gap-2.5">
-        <div className="relative flex-1 min-w-0">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search clients..."
-            className="pl-9 bg-card"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      {/* Filter chip row + toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Lead type chips (with New folded in) */}
+        <div className="flex items-center gap-1">
+          {leadTypeChips.map((chip) => {
+            const active = leadTypeFilter === chip.key;
+            return (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={() => setLeadTypeFilter(chip.key)}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full px-3 h-7 text-xs font-medium transition-colors',
+                  active
+                    ? 'bg-foreground text-background'
+                    : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
+                )}
+              >
+                {chip.label}
+                <span className={cn('tabular-nums text-[11px]', active ? 'opacity-70' : 'opacity-60')}>
+                  {chip.count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Mobile overflow menu — Sort / Filter / Save view / Import / Export */}
-        <div className="sm:hidden flex-shrink-0">
+        {/* Toolbar — pushes right */}
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
+          {/* Search */}
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search…"
+              className="pl-9 h-9 w-56 bg-background border-border/70"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Sort dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" className="h-9 px-2.5" title="More options">
-                <MoreHorizontal size={15} />
-              </Button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors"
+              >
+                <span className="text-muted-foreground">Sort:</span>
+                {sortLabels[sortBy]}
+              </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <div className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Sort</div>
-              {([
-                { value: 'agent-priority', label: '⚡ Agent priority' },
-                { value: 'newest', label: 'Newest first' },
-                { value: 'oldest', label: 'Oldest first' },
-                { value: 'name-az', label: 'Name A-Z' },
-                { value: 'name-za', label: 'Name Z-A' },
-              ] as const).map((opt) => (
+            <DropdownMenuContent align="end" className="w-48">
+              {(Object.keys(sortLabels) as (keyof typeof sortLabels)[]).map((key) => (
                 <DropdownMenuItem
-                  key={opt.value}
-                  onSelect={() => setSortBy(opt.value)}
-                  className={cn(sortBy === opt.value && 'font-semibold')}
+                  key={key}
+                  onSelect={() => setSortBy(key)}
+                  className={cn(sortBy === key && 'font-semibold')}
                 >
-                  <ArrowUpDown size={12} />
-                  {opt.label}
+                  {sortLabels[key]}
                 </DropdownMenuItem>
               ))}
-              {(view === 'list' || search) && (
-                <>
-                  <DropdownMenuSeparator />
-                  <div className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Stage</div>
-                  {([
-                    { value: 'ALL', label: 'All stages' },
-                    { value: 'QUALIFICATION', label: 'Qualifying' },
-                    { value: 'TOUR', label: 'Tour' },
-                    { value: 'APPLICATION', label: 'Applied' },
-                  ] as const).map((opt) => (
-                    <DropdownMenuItem
-                      key={opt.value}
-                      onSelect={() => setTypeFilter(opt.value)}
-                      className={cn(typeFilter === opt.value && 'font-semibold')}
-                    >
-                      {opt.label}
-                    </DropdownMenuItem>
-                  ))}
-                </>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Stage filter — keep as dedicated dropdown (commonly used) */}
+          {(view === 'list' || search) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors"
+                >
+                  <span className="text-muted-foreground">Stage:</span>
+                  {stageLabels[typeFilter] ?? 'All stages'}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                {(['ALL', 'QUALIFICATION', 'TOUR', 'APPLICATION'] as const).map((key) => (
+                  <DropdownMenuItem
+                    key={key}
+                    onSelect={() => setTypeFilter(key)}
+                    className={cn(typeFilter === key && 'font-semibold')}
+                  >
+                    {stageLabels[key]}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {/* View toggle */}
+          <div className="flex rounded-md border border-border/70 overflow-hidden bg-background flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setView('list')}
+              aria-label="List view"
+              className={cn(
+                'h-9 w-9 flex items-center justify-center transition-colors',
+                view === 'list'
+                  ? 'bg-foreground/[0.045] text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
               )}
-              <DropdownMenuSeparator />
+            >
+              <List size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('card')}
+              aria-label="Grid view"
+              className={cn(
+                'h-9 w-9 flex items-center justify-center transition-colors',
+                view === 'card'
+                  ? 'bg-foreground/[0.045] text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+              )}
+            >
+              <LayoutGrid size={14} />
+            </button>
+          </div>
+
+          {/* Overflow */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="More options"
+                className="h-9 w-9 flex items-center justify-center rounded-md border border-border/70 bg-background text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+              >
+                <MoreHorizontal size={14} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onSelect={() => setShowSaveInput(true)}>
                 <Bookmark size={12} />
                 Save view
@@ -527,146 +582,134 @@ export function ContactTable({ slug }: ContactTableProps) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-
-        {/* Desktop controls — unchanged layout at sm+ */}
-        <div className="hidden sm:flex gap-2 flex-wrap">
-          {/* Agent priority pill */}
-          <button
-            type="button"
-            onClick={() => setSortBy('agent-priority')}
-            className={cn(
-              'inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 py-1.5 h-9 border transition-colors flex-shrink-0',
-              sortBy === 'agent-priority'
-                ? 'bg-orange-500 text-white border-orange-500 hover:bg-orange-600'
-                : 'bg-card text-orange-600 border-orange-200 dark:border-orange-900/60 hover:bg-orange-50 dark:hover:bg-orange-950/30',
-            )}
-          >
-            <Zap size={11} />
-            Agent
-          </button>
-
-          {/* Sort dropdown */}
-          <div className="relative">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="appearance-none rounded-md border border-border bg-card pl-7 pr-8 py-2 text-xs font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring h-9"
-            >
-              <option value="agent-priority">Agent priority</option>
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-              <option value="name-az">Name A-Z</option>
-              <option value="name-za">Name Z-A</option>
-            </select>
-            <ArrowUpDown size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          </div>
-
-          {/* Stage filter — list view only or when searching */}
-          {(view === 'list' || search) && (
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-40 bg-card">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All stages</SelectItem>
-                <SelectItem value="QUALIFICATION">Qualifying</SelectItem>
-                <SelectItem value="TOUR">Tour</SelectItem>
-                <SelectItem value="APPLICATION">Applied</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-
-          {/* Save current view */}
-          {showSaveInput ? (
-            <div className="flex gap-1">
-              <input
-                ref={saveInputRef}
-                type="text"
-                value={saveViewName}
-                onChange={(e) => setSaveViewName(e.target.value)}
-                placeholder="View name…"
-                className="text-xs rounded-md border border-input bg-card px-2 py-1 w-28 focus:outline-none focus:ring-2 focus:ring-ring"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveView();
-                  if (e.key === 'Escape') setShowSaveInput(false);
-                }}
-                autoFocus
-              />
-              <Button size="sm" variant="outline" onClick={handleSaveView} className="text-xs h-8 px-2">Save</Button>
-              <Button size="sm" variant="ghost" onClick={() => setShowSaveInput(false)} className="h-8 px-2">
-                <X size={13} />
-              </Button>
-            </div>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowSaveInput(true)}
-              className="gap-1.5 text-xs h-9"
-              title="Save current filter as a view"
-            >
-              <Bookmark size={12} />
-              Save view
-            </Button>
-          )}
-
-          {/* Import CSV */}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setImportOpen(true)}
-            className="gap-1.5 text-xs h-9"
-          >
-            <Upload size={12} />
-            Import
-          </Button>
-
-          {/* Export CSV */}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleExportAll}
-            className="gap-1.5 text-xs h-9"
-            disabled={contacts.length === 0}
-          >
-            <Download size={12} />
-            Export
-          </Button>
-        </div>
-
-        {/* View toggle — visible at all breakpoints */}
-        <div className="flex rounded-md border border-border overflow-hidden bg-card flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setView('list')}
-            className={cn(
-              'px-2.5 py-1.5 flex items-center justify-center transition-colors',
-              view === 'list'
-                ? 'bg-secondary text-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-            )}
-          >
-            <List size={15} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('card')}
-            className={cn(
-              'px-2.5 py-1.5 flex items-center justify-center transition-colors',
-              view === 'card'
-                ? 'bg-secondary text-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-            )}
-          >
-            <LayoutGrid size={15} />
-          </button>
-        </div>
-
-        <LiquidMetalButton
-          label="Add client"
-          onClick={() => setAddOpen(true)}
-        />
       </div>
+
+      {/* Save view inline input */}
+      {showSaveInput && (
+        <div className="flex items-center gap-1.5">
+          <input
+            ref={saveInputRef}
+            type="text"
+            value={saveViewName}
+            onChange={(e) => setSaveViewName(e.target.value)}
+            placeholder="Name this view…"
+            className="text-xs rounded-md border border-border/70 bg-background px-2.5 h-8 w-44 focus:outline-none focus:ring-2 focus:ring-ring"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSaveView();
+              if (e.key === 'Escape') setShowSaveInput(false);
+            }}
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={handleSaveView}
+            className="h-8 px-3 rounded-md text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowSaveInput(false)}
+            className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* Saved view chips — paper-flat */}
+      {contactViews.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span className="text-xs text-muted-foreground mr-1">Saved:</span>
+          {contactViews.map((v) => (
+            <span
+              key={v.id}
+              className="inline-flex items-center gap-1 text-xs font-medium rounded-full pl-2.5 pr-1 h-6 border border-border/70 bg-background"
+            >
+              <button
+                type="button"
+                onClick={() => applyView(v)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {v.name}
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteView(v.id)}
+                className="w-4 h-4 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+              >
+                <X size={9} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Tag filter strip — paper-flat */}
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 items-center">
+          {tagFilter && (
+            <button
+              type="button"
+              onClick={() => setTagFilter('')}
+              className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 h-6 bg-foreground text-background"
+            >
+              <X size={10} />
+              Clear tag
+            </button>
+          )}
+          {allTags.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
+              className={cn(
+                'inline-flex items-center text-xs font-medium rounded-full px-2.5 h-6 transition-colors',
+                tagFilter === tag
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground border border-border/70 bg-background',
+              )}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Stage breakdown — pipeline reading line */}
+      {!loading && contacts.length > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-border/70 bg-background px-4 py-3">
+          {STAGES.map((stage, i) => {
+            const count = stageCounts[stage.key];
+            return (
+              <div key={stage.key} className="flex items-center gap-3">
+                {i > 0 && (
+                  <ArrowRight size={13} className="text-muted-foreground/40 flex-shrink-0" />
+                )}
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xs text-muted-foreground">{stage.label}</span>
+                  <span
+                    className="text-lg tabular-nums text-foreground leading-none"
+                    style={{ fontFamily: 'var(--font-title)' }}
+                  >
+                    {count}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+          <div className="ml-auto text-xs text-muted-foreground">
+            {tagFilter ? `${visibleContacts.length} of ` : ''}
+            <span
+              className="text-base tabular-nums text-foreground"
+              style={{ fontFamily: 'var(--font-title)' }}
+            >
+              {contacts.length}
+            </span>{' '}
+            total
+          </div>
+        </div>
+      )}
 
       {/* Loading skeleton — matches final full-width row layout */}
       {loading && (
@@ -693,11 +736,6 @@ export function ContactTable({ slug }: ContactTableProps) {
         const hasTagFilter = !!tagFilter;
         const hasAnyFilter = hasStageFilter || hasLeadTypeFilter || hasTagFilter;
         const isSearchOrFilterCase = !!search || hasTagFilter;
-        // When no search and no tag filter, `contacts` holds the API result filtered
-        // only by stage (server-side). If a server-side filter OR lead-type filter
-        // produced an empty view while contacts exist otherwise, treat it as a
-        // "this view" case. If everything is unset and contacts is empty, the
-        // workspace is fresh.
         const isFreshWorkspace = !search && !hasAnyFilter && contacts.length === 0;
         const clearAllFilters = () => {
           setTypeFilter('ALL');
@@ -707,55 +745,87 @@ export function ContactTable({ slug }: ContactTableProps) {
 
         if (isFreshWorkspace) {
           return (
-            <EmptyState
-              icon={Users}
-              title="No contacts yet"
-              description="Add your first lead or client, or import a list to get started."
-              size="lg"
-            >
-              <Button onClick={() => setAddOpen(true)} className="gap-2" size="sm">
-                <Plus size={14} /> Add contact
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
+                <Users size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
+              </div>
+              <h2
+                className="text-2xl tracking-tight text-foreground mb-2"
+                style={{ fontFamily: 'var(--font-title)' }}
+              >
+                Nobody here yet.
+              </h2>
+              <p className="text-sm text-muted-foreground max-w-sm mb-6">
+                Add your first lead, or share your intake link.
+              </p>
+              <Button
+                onClick={() => setAddOpen(true)}
+                className="h-9 gap-1.5 rounded-full px-4 bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] mb-5"
+              >
+                <Plus size={14} strokeWidth={2.25} />
+                Add a person
               </Button>
-              <Button onClick={() => setImportOpen(true)} className="gap-2" size="sm" variant="outline">
-                <Upload size={14} /> Import
-              </Button>
-            </EmptyState>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground">Or share:</span>
+                <code className="bg-foreground/[0.04] rounded px-2 py-1 font-mono text-muted-foreground border border-border/50">
+                  {intakeUrlWithoutProtocol}
+                </code>
+                <CopyButton url={fullIntakeUrl} />
+              </div>
+            </div>
           );
         }
 
         if (isSearchOrFilterCase) {
           return (
-            <div className="rounded-2xl border border-dashed border-border bg-card py-16 text-center px-6">
-              <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-                <Search size={20} className="text-muted-foreground" />
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
+                <Search size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
               </div>
-              <p className="font-semibold text-foreground mb-1">No matches for that search</p>
+              <p
+                className="text-xl tracking-tight text-foreground mb-1"
+                style={{ fontFamily: 'var(--font-title)' }}
+              >
+                No matches.
+              </p>
               <p className="text-sm text-muted-foreground">
                 Try a shorter query or clear filters.
               </p>
               {hasAnyFilter && (
-                <Button onClick={clearAllFilters} className="mt-4 gap-2" size="sm" variant="outline">
-                  <X size={14} /> Clear filters
-                </Button>
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                >
+                  <X size={13} /> Clear filters
+                </button>
               )}
             </div>
           );
         }
 
-        // Filters cleared of search/tag but stage or lead-type filter hides everything.
         return (
-          <div className="rounded-2xl border border-dashed border-border bg-card py-16 text-center px-6">
-            <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-              <Inbox size={20} className="text-muted-foreground" />
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
+              <Inbox size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
             </div>
-            <p className="font-semibold text-foreground mb-1">This view has no matches right now</p>
+            <p
+              className="text-xl tracking-tight text-foreground mb-1"
+              style={{ fontFamily: 'var(--font-title)' }}
+            >
+              Nothing in this view.
+            </p>
             <p className="text-sm text-muted-foreground">
-              Adjust the current filters to see more contacts.
+              Adjust the current filters to see more.
             </p>
             {hasAnyFilter && (
-              <Button onClick={clearAllFilters} className="mt-4 gap-2" size="sm" variant="outline">
-                <X size={14} /> Clear filters
-              </Button>
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+              >
+                <X size={13} /> Clear filters
+              </button>
             )}
           </div>
         );

@@ -88,7 +88,6 @@ export const realtorMoreNavItems: NavItem[] = [
     ],
   },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
-  { href: '/notes', label: 'Notes', icon: FileText },
   {
     href: '/intake',
     label: 'Intake form',

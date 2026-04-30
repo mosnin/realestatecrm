@@ -259,7 +259,6 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                     { href: '/tours', label: 'Tours', icon: CalendarDays },
                     { href: '/properties', label: 'Properties', icon: Home },
                     { href: '/calendar', label: 'Calendar', icon: Calendar },
-                    { href: '/notes', label: 'Notes', icon: FileText },
                     { href: '/intake', label: 'Intake form', icon: ClipboardList },
                     { href: '/intake/customize', label: 'Customize form', icon: ClipboardList },
                     { href: '/analytics', label: 'Analytics', icon: BarChart2 },
