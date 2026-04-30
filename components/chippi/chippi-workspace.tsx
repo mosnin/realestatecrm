@@ -378,6 +378,7 @@ export function ChippiWorkspace({
       placeholder="Message Chippi — draft a follow-up, prep a tour, summarize your day…"
       onSend={handleSend}
       onMentionSearch={handleMentionSearch}
+      onVoiceStart={() => setVoiceOpen(true)}
       disabled={isStreaming || pendingApproval !== null}
       isLoading={isStreaming}
     />

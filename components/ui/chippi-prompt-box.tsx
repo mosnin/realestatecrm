@@ -1,7 +1,22 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ArrowUp, AtSign, X, Loader2, User, Briefcase } from 'lucide-react';
+import {
+  ArrowUp,
+  AtSign,
+  X,
+  Loader2,
+  User,
+  Briefcase,
+  Globe,
+  BrainCog,
+  FileText,
+  Paperclip,
+  Mic,
+  Square,
+  StopCircle,
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
@@ -12,10 +27,14 @@ export interface MentionItem {
   subtitle?: string;
 }
 
+type Mode = 'search' | 'think' | 'draft' | null;
+
 interface ChippiPromptBoxProps {
   placeholder?: string;
   onSend?: (message: string, mentions: MentionItem[]) => void;
   onMentionSearch?: (query: string) => Promise<MentionItem[]>;
+  onAttach?: (files: File[]) => void;
+  onVoiceStart?: () => void;
   disabled?: boolean;
   isLoading?: boolean;
   className?: string;
@@ -23,6 +42,46 @@ interface ChippiPromptBoxProps {
 }
 
 const MAX_HEIGHT_PX = 240;
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+const MODE_META: Record<Exclude<Mode, null>, {
+  label: string;
+  Icon: typeof Globe;
+  activeClasses: string;
+  placeholder: string;
+  prefix: string;
+}> = {
+  search: {
+    label: 'Search',
+    Icon: Globe,
+    activeClasses:
+      'bg-blue-500/10 border-blue-500/40 text-blue-600 dark:text-blue-400',
+    placeholder: 'Search the web…',
+    prefix: 'Search',
+  },
+  think: {
+    label: 'Think',
+    Icon: BrainCog,
+    activeClasses:
+      'bg-orange-500/10 border-orange-500/40 text-orange-600 dark:text-orange-400',
+    placeholder: 'Think this through with me…',
+    prefix: 'Think',
+  },
+  draft: {
+    label: 'Draft',
+    Icon: FileText,
+    activeClasses:
+      'bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400',
+    placeholder: 'Draft a longer message…',
+    prefix: 'Draft',
+  },
+};
+
+function formatTime(seconds: number) {
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
 
 export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromptBoxProps>(
   function ChippiPromptBox(
@@ -30,6 +89,8 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       placeholder = 'Message Chippi…',
       onSend,
       onMentionSearch,
+      onAttach,
+      onVoiceStart,
       disabled = false,
       isLoading = false,
       className,
@@ -45,15 +106,32 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     const [mentionLoading, setMentionLoading] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(0);
 
+    const [mode, setMode] = useState<Mode>(null);
+    const [files, setFiles] = useState<File[]>([]);
+    const [filePreviews, setFilePreviews] = useState<string[]>([]);
+
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordSeconds, setRecordSeconds] = useState(0);
+    const [, setVisualizerTick] = useState(0);
+
     const containerRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const mentionRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const recordTimerRef = useRef<number | null>(null);
+    const visualizerRafRef = useRef<number | null>(null);
 
-    // Forward textareaRef to parent if it asked for it
     React.useImperativeHandle(ref, () => textareaRef.current as HTMLTextAreaElement, []);
 
-    const hasContent = message.trim().length > 0;
+    const hasContent = message.trim().length > 0 || files.length > 0;
     const sendDisabled = disabled || isLoading || !hasContent;
+
+    const activePlaceholder =
+      isRecording
+        ? ''
+        : mode
+          ? MODE_META[mode].placeholder
+          : placeholder;
 
     // Auto-resize
     useEffect(() => {
@@ -63,7 +141,6 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT_PX)}px`;
     }, [message]);
 
-    // Optional autoFocus — used when the input becomes visible after a mode switch
     useEffect(() => {
       if (autoFocus) textareaRef.current?.focus();
     }, [autoFocus]);
@@ -100,11 +177,80 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       return () => clearTimeout(t);
     }, [mentionQuery, mentionOpen, searchMentions]);
 
+    // Cleanup file preview object URLs
+    useEffect(() => {
+      return () => {
+        filePreviews.forEach((url) => URL.revokeObjectURL(url));
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Recording timer + visualizer animation
+    useEffect(() => {
+      if (!isRecording) return;
+      setRecordSeconds(0);
+      const start = Date.now();
+      recordTimerRef.current = window.setInterval(() => {
+        setRecordSeconds(Math.floor((Date.now() - start) / 1000));
+      }, 250);
+      const tick = () => {
+        setVisualizerTick((t) => (t + 1) % 1_000_000);
+        visualizerRafRef.current = requestAnimationFrame(tick);
+      };
+      visualizerRafRef.current = requestAnimationFrame(tick);
+      return () => {
+        if (recordTimerRef.current) {
+          clearInterval(recordTimerRef.current);
+          recordTimerRef.current = null;
+        }
+        if (visualizerRafRef.current) {
+          cancelAnimationFrame(visualizerRafRef.current);
+          visualizerRafRef.current = null;
+        }
+      };
+    }, [isRecording]);
+
+    function resetFiles() {
+      filePreviews.forEach((url) => URL.revokeObjectURL(url));
+      setFiles([]);
+      setFilePreviews([]);
+    }
+
+    function acceptFiles(incoming: File[]) {
+      if (!onAttach) return;
+      const images = incoming.filter(
+        (f) => f.type.startsWith('image/') && f.size <= MAX_FILE_BYTES,
+      );
+      if (images.length === 0) return;
+      // Max one image per send
+      const next = images.slice(0, 1);
+      filePreviews.forEach((url) => URL.revokeObjectURL(url));
+      setFiles(next);
+      setFilePreviews(next.map((f) => URL.createObjectURL(f)));
+      onAttach(next);
+    }
+
+    function removeFile(idx: number) {
+      const url = filePreviews[idx];
+      if (url) URL.revokeObjectURL(url);
+      setFiles((prev) => prev.filter((_, i) => i !== idx));
+      setFilePreviews((prev) => prev.filter((_, i) => i !== idx));
+    }
+
     function handleSubmit() {
       if (sendDisabled) return;
-      onSend?.(message.trim(), mentions);
+      const base = message.trim();
+      const fileSuffix = files.map((f) => `[Attached: ${f.name}]`).join(' ');
+      const wrapped = mode && base
+        ? `[${MODE_META[mode].prefix}: ${base}]`
+        : base;
+      const finalText = [wrapped, fileSuffix].filter(Boolean).join(' ').trim();
+      if (!finalText) return;
+      onSend?.(finalText, mentions);
       setMessage('');
       setMentions([]);
+      setMode(null);
+      resetFiles();
     }
 
     function selectMention(item: MentionItem) {
@@ -125,6 +271,12 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       setMentionOpen(true);
       setMentionQuery('');
       void searchMentions('');
+    }
+
+    function toggleMode(next: Exclude<Mode, null>) {
+      if (disabled || isLoading) return;
+      setMode((prev) => (prev === next ? null : next));
+      textareaRef.current?.focus();
     }
 
     function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -156,14 +308,170 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       }
     }
 
-    // Drag/drop text (no file uploads — chat backend doesn't accept files)
     function handleDrop(e: React.DragEvent) {
+      // Files first if attach is supported
+      if (onAttach && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        e.preventDefault();
+        acceptFiles(Array.from(e.dataTransfer.files));
+        return;
+      }
       const text = e.dataTransfer.getData('text/plain');
       if (text) {
         e.preventDefault();
         setMessage((m) => (m ? `${m} ${text}` : text));
         textareaRef.current?.focus();
       }
+    }
+
+    function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+      if (!onAttach) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const pastedFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === 'file') {
+          const f = item.getAsFile();
+          if (f && f.type.startsWith('image/')) pastedFiles.push(f);
+        }
+      }
+      if (pastedFiles.length > 0) {
+        e.preventDefault();
+        acceptFiles(pastedFiles);
+      }
+    }
+
+    function startRecording() {
+      if (disabled || isLoading) return;
+      // When the parent wires its own voice surface (the workspace mounts a
+      // dedicated VoiceMode dialog), defer to it entirely — the local
+      // recorder UI is a fallback for chat surfaces without one. Avoids
+      // having two simultaneous voice interfaces.
+      if (onVoiceStart) {
+        onVoiceStart();
+        return;
+      }
+      setIsRecording(true);
+    }
+
+    function stopRecording() {
+      const seconds = recordSeconds;
+      setIsRecording(false);
+      if (seconds > 0) {
+        onSend?.(`[Voice message - ${seconds}s]`, mentions);
+        setMentions([]);
+      }
+    }
+
+    // Right-slot button: Send / Stop (loading) / Mic / StopCircle (recording)
+    function renderRightButton() {
+      if (isLoading) {
+        return (
+          <button
+            type="button"
+            disabled
+            aria-label="Stop generating"
+            className={cn(
+              'inline-flex items-center justify-center w-8 h-8 rounded-full',
+              'bg-foreground/[0.06] text-muted-foreground',
+              'transition-all duration-150',
+            )}
+          >
+            <Square size={13} strokeWidth={2} />
+          </button>
+        );
+      }
+
+      if (isRecording) {
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={stopRecording}
+                aria-label="Stop recording"
+                className={cn(
+                  'inline-flex items-center justify-center w-8 h-8 rounded-full',
+                  'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+                  'hover:bg-rose-500/15 transition-all duration-150 active:scale-[0.96]',
+                )}
+              >
+                <StopCircle size={16} strokeWidth={2} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={6}>
+              Stop recording
+            </TooltipContent>
+          </Tooltip>
+        );
+      }
+
+      if (hasContent) {
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={sendDisabled}
+                aria-label="Send"
+                className={cn(
+                  'inline-flex items-center justify-center w-8 h-8 rounded-full',
+                  'bg-foreground text-background hover:bg-foreground/90',
+                  'transition-all duration-150 active:scale-[0.96]',
+                  sendDisabled && 'cursor-not-allowed opacity-60',
+                )}
+              >
+                <ArrowUp size={15} strokeWidth={2.25} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={6}>
+              Send · Enter
+            </TooltipContent>
+          </Tooltip>
+        );
+      }
+
+      if (onVoiceStart) {
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={startRecording}
+                disabled={disabled}
+                aria-label="Start voice message"
+                className={cn(
+                  'inline-flex items-center justify-center w-8 h-8 rounded-full',
+                  'bg-foreground/[0.06] text-muted-foreground/70 hover:text-foreground',
+                  'hover:bg-foreground/[0.08] transition-all duration-150 active:scale-[0.96]',
+                  disabled && 'cursor-not-allowed opacity-60',
+                )}
+              >
+                <Mic size={15} strokeWidth={2} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={6}>
+              Voice message
+            </TooltipContent>
+          </Tooltip>
+        );
+      }
+
+      // No mic, no content — show inert send slot for layout consistency
+      return (
+        <button
+          type="button"
+          disabled
+          aria-label="Send"
+          className={cn(
+            'inline-flex items-center justify-center w-8 h-8 rounded-full',
+            'bg-foreground/[0.06] text-muted-foreground/60 cursor-not-allowed',
+          )}
+        >
+          <ArrowUp size={15} strokeWidth={2.25} />
+        </button>
+      );
     }
 
     return (
@@ -179,7 +487,60 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
           >
-            {/* Mention chips row — collapses when empty */}
+            {/* Hidden file input */}
+            {onAttach && (
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple={false}
+                className="hidden"
+                onChange={(e) => {
+                  const list = e.target.files;
+                  if (list && list.length > 0) acceptFiles(Array.from(list));
+                  if (e.target) e.target.value = '';
+                }}
+              />
+            )}
+
+            {/* File preview row */}
+            {files.length > 0 && (
+              <div className="flex flex-wrap gap-2 px-3 pt-3">
+                {files.map((file, i) => (
+                  <div
+                    key={`${file.name}-${i}`}
+                    className="relative w-16 h-16 rounded-lg overflow-hidden border border-border/60 bg-foreground/[0.03]"
+                  >
+                    {filePreviews[i] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={filePreviews[i]}
+                        alt={file.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                        <FileText size={18} />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeFile(i)}
+                      aria-label={`Remove ${file.name}`}
+                      className={cn(
+                        'absolute top-0.5 right-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full',
+                        'bg-background/90 border border-border/60 text-foreground',
+                        'hover:bg-background transition-colors',
+                      )}
+                    >
+                      <X size={9} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Mention chips row */}
             {mentions.length > 0 && (
               <div className="flex flex-wrap gap-1 px-3 pt-2.5">
                 {mentions.map((m) => (
@@ -206,33 +567,68 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
               </div>
             )}
 
-            <textarea
-              ref={textareaRef}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={placeholder}
-              disabled={disabled}
-              rows={1}
-              spellCheck
-              className={cn(
-                'w-full resize-none bg-transparent border-0 outline-none',
-                'px-4 pt-3 pb-1 text-[14px] leading-relaxed text-foreground',
-                'placeholder:text-muted-foreground/60',
-                'disabled:cursor-not-allowed',
-              )}
-              style={{ maxHeight: MAX_HEIGHT_PX }}
-            />
+            {/* Recording panel OR textarea */}
+            {isRecording ? (
+              <div className="px-4 pt-4 pb-2">
+                <div className="flex items-center gap-3">
+                  <span className="relative inline-flex w-2 h-2">
+                    <span className="absolute inset-0 rounded-full bg-rose-500 animate-ping opacity-75" />
+                    <span className="relative inline-flex w-2 h-2 rounded-full bg-rose-500" />
+                  </span>
+                  <span className="text-[12px] tabular-nums text-muted-foreground">
+                    {formatTime(recordSeconds)}
+                  </span>
+                  <div className="flex-1 flex items-center gap-[2px] h-6 overflow-hidden">
+                    {Array.from({ length: 32 }).map((_, i) => {
+                      const heightPct =
+                        30 + Math.abs(Math.sin(Date.now() / 200 + i * 0.4)) * 70;
+                      return (
+                        <span
+                          key={i}
+                          aria-hidden
+                          className="w-0.5 rounded-full bg-foreground/40"
+                          style={{ height: `${heightPct}%` }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <textarea
+                ref={textareaRef}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                placeholder={activePlaceholder}
+                disabled={disabled}
+                rows={1}
+                spellCheck
+                className={cn(
+                  'w-full resize-none bg-transparent border-0 outline-none',
+                  'px-4 pt-3 pb-1 text-[14px] leading-relaxed text-foreground',
+                  'placeholder:text-muted-foreground/60',
+                  'disabled:cursor-not-allowed',
+                  '[&::-webkit-scrollbar]:w-1.5',
+                  '[&::-webkit-scrollbar-track]:bg-transparent',
+                  '[&::-webkit-scrollbar-thumb]:bg-foreground/10',
+                  '[&::-webkit-scrollbar-thumb]:rounded-full',
+                )}
+                style={{ maxHeight: MAX_HEIGHT_PX }}
+              />
+            )}
 
             {/* Action row */}
             <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-1">
               <div className="flex items-center gap-0.5">
+                {/* @-mention */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
                       type="button"
                       onClick={openMention}
-                      disabled={disabled || isLoading}
+                      disabled={disabled || isLoading || isRecording}
                       aria-label="Mention a contact or deal"
                       className={cn(
                         'inline-flex items-center justify-center w-8 h-8 rounded-full',
@@ -249,39 +645,87 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                     Mention a contact or deal
                   </TooltipContent>
                 </Tooltip>
+
+                {/* Paperclip — image attach */}
+                {onAttach && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={disabled || isLoading || isRecording}
+                        aria-label="Attach an image"
+                        className={cn(
+                          'inline-flex items-center justify-center w-8 h-8 rounded-full',
+                          'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+                          'transition-colors duration-150',
+                          'disabled:opacity-40 disabled:cursor-not-allowed',
+                        )}
+                      >
+                        <Paperclip size={15} strokeWidth={1.75} />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" sideOffset={6}>
+                      Attach an image
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+
+                {/* Divider */}
+                <span aria-hidden className="w-px h-4 bg-border/60 mx-0.5" />
+
+                {/* Mode toggles */}
+                {(['search', 'think', 'draft'] as const).map((m, idx) => {
+                  const meta = MODE_META[m];
+                  const Icon = meta.Icon;
+                  const isActive = mode === m;
+                  return (
+                    <React.Fragment key={m}>
+                      {idx > 0 && (
+                        <span aria-hidden className="w-px h-4 bg-border/60 mx-0.5" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => toggleMode(m)}
+                        disabled={disabled || isLoading || isRecording}
+                        aria-pressed={isActive}
+                        aria-label={meta.label}
+                        className={cn(
+                          'inline-flex items-center h-8 rounded-full border',
+                          'transition-colors duration-150',
+                          'disabled:opacity-40 disabled:cursor-not-allowed',
+                          isActive
+                            ? meta.activeClasses
+                            : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+                          isActive ? 'pl-2 pr-3' : 'px-2',
+                        )}
+                      >
+                        <Icon size={14} strokeWidth={1.85} />
+                        <AnimatePresence initial={false}>
+                          {isActive && (
+                            <motion.span
+                              key="label"
+                              initial={{ width: 0, opacity: 0, marginLeft: 0 }}
+                              animate={{ width: 'auto', opacity: 1, marginLeft: 6 }}
+                              exit={{ width: 0, opacity: 0, marginLeft: 0 }}
+                              transition={{ duration: 0.15, ease: 'easeOut' }}
+                              className="overflow-hidden whitespace-nowrap text-[12px] font-medium"
+                            >
+                              {meta.label}
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                      </button>
+                    </React.Fragment>
+                  );
+                })}
               </div>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={sendDisabled}
-                    aria-label={isLoading ? 'Chippi is responding' : 'Send'}
-                    className={cn(
-                      'inline-flex items-center justify-center w-8 h-8 rounded-full',
-                      'transition-all duration-150 active:scale-[0.96]',
-                      hasContent && !isLoading
-                        ? 'bg-foreground text-background hover:bg-foreground/90'
-                        : 'bg-foreground/[0.06] text-muted-foreground/60',
-                      sendDisabled && 'cursor-not-allowed',
-                    )}
-                  >
-                    {isLoading ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <ArrowUp size={15} strokeWidth={2.25} />
-                    )}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" sideOffset={6}>
-                  {isLoading ? 'Responding…' : 'Send · Enter'}
-                </TooltipContent>
-              </Tooltip>
+              {renderRightButton()}
             </div>
           </div>
 
-          {/* Mention dropdown — quiet popover anchored above the input */}
+          {/* Mention dropdown */}
           {mentionOpen && (
             <div
               ref={mentionRef}
