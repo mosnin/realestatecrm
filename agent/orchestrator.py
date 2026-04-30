@@ -146,7 +146,7 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
     )
 
     # Build the Coordinator with handoffs to only the enabled specialists
-    from agents.coordinator import make_coordinator_agent
+    from specialists.coordinator import make_coordinator_agent
     coordinator = make_coordinator_agent(agent_settings.enabled_agents)
 
     prompt = _build_coordinator_prompt(space, ctx, memory_context, triggers)

@@ -105,7 +105,7 @@ async def run_space(space_id: str) -> None:
         db.table("AgentSettings")
         .select("*")
         .eq("spaceId", space_id)
-        .single()
+        .maybe_single()
         .execute()
     )
     if not settings_result.data:
@@ -116,7 +116,7 @@ async def run_space(space_id: str) -> None:
         db.table("Space")
         .select("id,slug,name")
         .eq("id", space_id)
-        .single()
+        .maybe_single()
         .execute()
     )
     if not space_result.data:
@@ -161,8 +161,8 @@ async def run_now_webhook(item: dict) -> dict:
         from db import supabase
         from schemas import AgentSettings, Space
         db = await supabase()
-        sr = await db.table("AgentSettings").select("*").eq("spaceId", space_id).single().execute()
-        spr = await db.table("Space").select("id,slug,name").eq("id", space_id).single().execute()
+        sr = await db.table("AgentSettings").select("*").eq("spaceId", space_id).maybe_single().execute()
+        spr = await db.table("Space").select("id,slug,name").eq("id", space_id).maybe_single().execute()
         if sr.data and spr.data:
             await run_agent_for_space(
                 Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"]),
@@ -229,8 +229,8 @@ async def chat_turn(item: dict):
     from db import supabase
     db = await supabase()
 
-    sr = await db.table("AgentSettings").select("*").eq("spaceId", space_id).single().execute()
-    spr = await db.table("Space").select("id,slug,name").eq("id", space_id).single().execute()
+    sr = await db.table("AgentSettings").select("*").eq("spaceId", space_id).maybe_single().execute()
+    spr = await db.table("Space").select("id,slug,name").eq("id", space_id).maybe_single().execute()
 
     if not sr.data or not spr.data:
         return {"error": f"space or agent settings not found: {space_id}"}

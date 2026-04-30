@@ -42,7 +42,7 @@ from typing import Any
 
 from agents import Runner
 
-from agents.cowork import make_cowork_agent
+from specialists.cowork import make_cowork_agent
 from security.context import AgentContext
 
 
