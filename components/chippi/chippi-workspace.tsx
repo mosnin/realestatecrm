@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
-import { GradientAIChatInput, type MentionItem } from '@/components/ui/gradient-ai-chat-input';
+import { ChippiPromptBox, type MentionItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
 import { History, X, AlertCircle, Mic, Square, Settings, ArrowLeft, Play, Loader2, NotebookText } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -50,14 +50,6 @@ const SUGGESTIONS: { emoji: string; text: string }[] = [
   { emoji: '🏠', text: 'Help me prep for my next tour' },
   { emoji: '📊', text: "Summarize what changed this week" },
 ];
-
-// Neutralize the input's conic gradient so it reads as a calm ring
-// instead of an "AI startup" peach badge. Light/dark stops match
-// existing border tokens.
-const CALM_INPUT_GRADIENT = {
-  light: { topLeft: '#E5E5E5', topRight: '#E5E5E5', bottomRight: '#E5E5E5', bottomLeft: '#E5E5E5' },
-  dark: { topLeft: '#3A3A3A', topRight: '#3A3A3A', bottomRight: '#3A3A3A', bottomLeft: '#3A3A3A' },
-};
 
 function timeBasedGreeting(): string {
   const h = new Date().getHours();
@@ -382,14 +374,12 @@ export function ChippiWorkspace({
   // Reusable input — shared between the empty hero and the docked footer
   // so the focal point lives wherever it should.
   const renderInput = () => (
-    <GradientAIChatInput
-      placeholder="Message Chippi — draft a follow-up, prep a tour, summarize your day..."
+    <ChippiPromptBox
+      placeholder="Message Chippi — draft a follow-up, prep a tour, summarize your day…"
       onSend={handleSend}
       onMentionSearch={handleMentionSearch}
       disabled={isStreaming || pendingApproval !== null}
-      enableShadows={false}
-      mainGradient={CALM_INPUT_GRADIENT}
-      outerGradient={CALM_INPUT_GRADIENT}
+      isLoading={isStreaming}
     />
   );
 
