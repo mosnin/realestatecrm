@@ -209,7 +209,7 @@ export function PropertiesClient({ slug, initial, stats }: Props) {
                 type="button"
                 onClick={() => setStatusFilter(chip.key)}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-full px-3 h-7 text-xs font-medium transition-colors duration-150',
+                  'inline-flex items-center gap-1 rounded-full px-3 h-8 sm:h-7 text-xs font-medium transition-colors duration-150',
                   active
                     ? 'bg-foreground text-background'
                     : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
@@ -230,8 +230,8 @@ export function PropertiesClient({ slug, initial, stats }: Props) {
           })}
         </div>
 
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
-          <div className="relative">
+        <div className="ml-auto flex items-center gap-2 flex-wrap w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-initial min-w-[160px]">
             <Search
               size={14}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -241,7 +241,7 @@ export function PropertiesClient({ slug, initial, stats }: Props) {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search address, city, MLS#"
-              className="pl-9 pr-3 h-9 w-64 text-sm rounded-md border border-border/70 bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-150"
+              className="pl-9 pr-3 h-9 w-full sm:w-64 text-sm rounded-md border border-border/70 bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-150"
             />
           </div>
 
@@ -387,10 +387,10 @@ export function PropertiesClient({ slug, initial, stats }: Props) {
           onClick={() => !submitting && setCreating(false)}
         >
           <div
-            className="w-full max-w-[640px] rounded-xl border border-border/70 bg-background"
+            className="w-full max-w-[640px] max-h-[85vh] flex flex-col rounded-xl border border-border/70 bg-background"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 py-3.5 border-b border-border/70 flex items-center gap-2">
+            <div className="px-5 py-3.5 border-b border-border/70 flex items-center gap-2 flex-shrink-0">
               <Building2 size={15} className="text-muted-foreground" />
               <h2 className={H3}>New property</h2>
               {submitting && (
@@ -400,7 +400,7 @@ export function PropertiesClient({ slug, initial, stats }: Props) {
                 />
               )}
             </div>
-            <div className="p-5">
+            <div className="p-5 overflow-y-auto">
               <PropertyForm
                 onCancel={() => setCreating(false)}
                 onSubmit={onCreate}

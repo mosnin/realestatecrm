@@ -447,7 +447,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                 type="button"
                 onClick={() => setLeadTypeFilter(chip.key)}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-full px-3 h-7 text-xs font-medium transition-colors',
+                  'inline-flex items-center gap-1 rounded-full px-3 h-8 sm:h-7 text-xs font-medium transition-colors',
                   active
                     ? 'bg-foreground text-background'
                     : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
@@ -465,11 +465,11 @@ export function ContactTable({ slug }: ContactTableProps) {
         {/* Toolbar — pushes right */}
         <div className="ml-auto flex items-center gap-2 flex-wrap">
           {/* Search */}
-          <div className="relative">
+          <div className="relative flex-1 sm:flex-initial min-w-[160px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search…"
-              className="pl-9 h-9 w-56 bg-background border-border/70"
+              className="pl-9 h-9 w-full sm:w-56 bg-background border-border/70"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -655,7 +655,7 @@ export function ContactTable({ slug }: ContactTableProps) {
             <button
               type="button"
               onClick={() => setTagFilter('')}
-              className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 h-6 bg-foreground text-background"
+              className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 h-7 sm:h-6 bg-foreground text-background"
             >
               <X size={10} />
               Clear tag
@@ -667,7 +667,7 @@ export function ContactTable({ slug }: ContactTableProps) {
               type="button"
               onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
               className={cn(
-                'inline-flex items-center text-xs font-medium rounded-full px-2.5 h-6 transition-colors',
+                'inline-flex items-center text-xs font-medium rounded-full px-2.5 h-7 sm:h-6 transition-colors',
                 tagFilter === tag
                   ? 'bg-foreground text-background'
                   : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground border border-border/70 bg-background',

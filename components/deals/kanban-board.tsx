@@ -1169,7 +1169,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
       <div className="space-y-3">
         <div className="flex items-center gap-2 flex-wrap">
           {/* Status filter chips — Active / Won / Lost / On Hold */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-wrap">
             {(
               [
                 { value: 'active', label: 'Active' },
@@ -1186,7 +1186,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                   onClick={() => toggleStatus(opt.value)}
                   aria-pressed={selected}
                   className={cn(
-                    'inline-flex items-center rounded-full px-3 h-7 text-xs font-medium transition-colors duration-150',
+                    'inline-flex items-center rounded-full px-3 h-8 sm:h-7 text-xs font-medium transition-colors duration-150',
                     selected
                       ? 'bg-foreground text-background'
                       : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
@@ -1199,7 +1199,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
           </div>
 
           {/* Search */}
-          <div className="relative ml-auto">
+          <div className="relative ml-auto flex-1 sm:flex-initial min-w-[140px]">
             <Search
               size={14}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
@@ -1209,7 +1209,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search deals…"
-              className="pl-9 pr-7 h-9 w-44 sm:w-56 text-sm rounded-md border border-border/70 bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-150"
+              className="pl-9 pr-7 h-9 w-full sm:w-56 text-sm rounded-md border border-border/70 bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-150"
             />
             {searchQuery && (
               <button
@@ -1348,12 +1348,12 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
             </PopoverContent>
           </Popover>
 
-          {/* Export CSV */}
+          {/* Export CSV — hidden on mobile to keep toolbar from wrapping */}
           <button
             type="button"
             onClick={exportCSV}
             disabled={allDeals.length === 0}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="hidden sm:inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
             title="Export to CSV"
           >
             <Download size={13} />
@@ -1396,11 +1396,11 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
 
       {/* Bulk action bar */}
       {selectedDealIds.size > 0 && view === 'list' && (
-        <div className="flex items-center gap-3 rounded-md border border-border/70 bg-foreground/[0.02] px-4 py-2.5">
+        <div className="flex items-center gap-3 flex-wrap rounded-md border border-border/70 bg-foreground/[0.02] px-4 py-2.5">
           <span className="text-sm text-foreground tabular-nums">
             {selectedDealIds.size} selected
           </span>
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
             <button
               type="button"
               onClick={() => {
