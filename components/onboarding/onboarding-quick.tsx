@@ -161,7 +161,7 @@ export function OnboardingQuick({ defaultName }: Props) {
             className="text-4xl tracking-tight text-foreground"
             style={{ fontFamily: 'var(--font-title)' }}
           >
-            I run your follow-up
+            I keep your day moving
           </h1>
           <p
             className="text-3xl tracking-tight text-muted-foreground"

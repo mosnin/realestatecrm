@@ -1,12 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { CalendarClock, AlertTriangle, Clock, ArrowRight, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatCurrency } from '@/lib/formatting';
+import { formatCompact } from '@/lib/formatting';
 import type { Deal, DealStage } from '@/lib/types';
-import { classifyForStrips, dealHealth } from '@/lib/deals/health';
+import { dealHealth } from '@/lib/deals/health';
+import { AnimatedNumber } from '@/components/motion/animated-number';
+import {
+  STAT_NUMBER_COMPACT,
+  TITLE_FONT,
+  BODY,
+  SECTION_LABEL,
+} from '@/lib/typography';
 
 interface PipelineSummaryProps {
   slug: string;
@@ -14,26 +19,25 @@ interface PipelineSummaryProps {
 }
 
 type StageWithDeals = DealStage & { deals: Deal[] };
-type StripDeal = Pick<Deal, 'id' | 'title' | 'status' | 'updatedAt' | 'closeDate' | 'followUpAt' | 'value' | 'nextAction' | 'nextActionDueAt'>;
 
-interface StripSpec {
-  key: 'closing' | 'at-risk' | 'waiting';
-  icon: typeof CalendarClock;
-  title: string;
-  subtitle: string;
-  tintBg: string;
-  tintText: string;
-  deals: StripDeal[];
-  emptyLabel: string;
-  renderRowMeta: (d: StripDeal) => string;
+interface PipelineStats {
+  active: number;
+  closingThisMonth: number;
+  closingThisMonthValue: number;
+  atRisk: number;
+  wonThisMonth: number;
+  wonThisMonthValue: number;
+  /** A short Chippi narration that names the most-pressing fact. */
+  narration: string;
 }
 
 /**
- * Attention strips above the kanban board. Replaces the old 6-stat summary.
+ * Stat strip above the pipeline board.
  *
- * Goal: answer the realtor's three morning questions — "what's closing this
- * week," "what's sliding," and "what am I blocking." Every deal shown is a
- * click away, and the strip shows names, not sums.
+ * Answers the realtor's morning question — "what's actually moving, what's
+ * stuck, and what closes this month?" — in four cells. Each cell is a focal
+ * serif number plus a label and sub. Cells share a hairline grid; numbers
+ * count up via AnimatedNumber.
  */
 export function PipelineSummary({ slug, pipelineId }: PipelineSummaryProps) {
   const [stages, setStages] = useState<StageWithDeals[]>([]);
@@ -65,153 +69,185 @@ export function PipelineSummary({ slug, pipelineId }: PipelineSummaryProps) {
     };
   }, [slug, pipelineId]);
 
-  const { strips, activeCount, pipelineValue } = useMemo(() => {
-    const allDeals: StripDeal[] = stages
-      .flatMap((s) => s.deals ?? [])
-      .map((d) => ({
-        id: d.id,
-        title: d.title,
-        status: d.status,
-        updatedAt: d.updatedAt,
-        closeDate: d.closeDate,
-        followUpAt: d.followUpAt,
-        value: d.value,
-        nextAction: d.nextAction,
-        nextActionDueAt: d.nextActionDueAt,
-      }));
+  const stats: PipelineStats = useMemo(() => {
+    const allDeals = stages.flatMap((s) => s.deals ?? []);
 
-    const active = allDeals.filter((d) => d.status === 'active');
-    const totalValue = active.reduce((s, d) => s + (typeof d.value === 'number' ? d.value : 0), 0);
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    const { closingThisWeek, atRisk, waitingOnMe } = classifyForStrips(active);
+    let active = 0;
+    let closingThisMonth = 0;
+    let closingThisMonthValue = 0;
+    let atRisk = 0;
+    let wonThisMonth = 0;
+    let wonThisMonthValue = 0;
 
-    const closingValue = closingThisWeek.reduce((s, d) => s + (typeof d.value === 'number' ? d.value : 0), 0);
+    // Track the most-pressing line for the narration.
+    let stuckCount = 0;
+    let stuckMaxDays = 0;
 
-    const specs: StripSpec[] = [
-      {
-        key: 'closing',
-        icon: CalendarClock,
-        title: 'Closing this week',
-        subtitle: closingThisWeek.length > 0
-          ? `${closingThisWeek.length} deal${closingThisWeek.length === 1 ? '' : 's'} · ${formatCurrency(closingValue)}`
-          : 'Next 7 days',
-        tintBg: 'bg-amber-50 dark:bg-amber-500/10',
-        tintText: 'text-amber-700 dark:text-amber-400',
-        deals: closingThisWeek.slice(0, 5),
-        emptyLabel: 'Nothing closing in the next 7 days.',
-        renderRowMeta: (d) => {
-          if (!d.closeDate) return '';
-          const close = new Date(d.closeDate);
-          return close.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-        },
-      },
-      {
-        key: 'at-risk',
-        icon: AlertTriangle,
-        title: 'At risk or stuck',
-        subtitle: atRisk.length > 0
-          ? `${atRisk.length} deal${atRisk.length === 1 ? '' : 's'} need attention`
-          : 'Stage age & expected close',
-        tintBg: 'bg-red-50 dark:bg-red-500/10',
-        tintText: 'text-red-700 dark:text-red-400',
-        deals: atRisk.slice(0, 5),
-        emptyLabel: 'Every active deal is moving. Nice.',
-        renderRowMeta: (d) => dealHealth(d).reason || '',
-      },
-      {
-        key: 'waiting',
-        icon: Clock,
-        title: 'Waiting on me',
-        subtitle: waitingOnMe.length > 0
-          ? `${waitingOnMe.length} follow-up${waitingOnMe.length === 1 ? '' : 's'} overdue`
-          : 'Overdue follow-ups',
-        tintBg: 'bg-violet-50 dark:bg-violet-500/10',
-        tintText: 'text-violet-700 dark:text-violet-400',
-        deals: waitingOnMe.slice(0, 5),
-        emptyLabel: 'No follow-ups overdue.',
-        renderRowMeta: (d) => {
-          if (!d.followUpAt) return '';
-          const fu = new Date(d.followUpAt);
-          const diffDays = Math.floor((Date.now() - fu.getTime()) / (1000 * 60 * 60 * 24));
-          return diffDays >= 1 ? `${diffDays} day${diffDays === 1 ? '' : 's'} overdue` : 'Overdue';
-        },
-      },
-    ];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekOut = new Date(today);
+    weekOut.setDate(weekOut.getDate() + 7);
+    let closingThisWeek = 0;
 
-    return { strips: specs, activeCount: active.length, pipelineValue: totalValue };
+    for (const d of allDeals) {
+      const status = (d.status ?? 'active') as 'active' | 'won' | 'lost' | 'on_hold';
+      const value = typeof d.value === 'number' ? d.value : 0;
+
+      if (status === 'active') {
+        active += 1;
+        const close = d.closeDate ? new Date(d.closeDate as unknown as string) : null;
+        if (close && !isNaN(close.getTime())) {
+          if (close >= monthStart && close < monthEnd) {
+            closingThisMonth += 1;
+            closingThisMonthValue += value;
+          }
+          if (close >= today && close <= weekOut) {
+            closingThisWeek += 1;
+          }
+        }
+        const health = dealHealth(d);
+        if (health.state !== 'on-track') {
+          atRisk += 1;
+          if (health.state === 'stuck') {
+            stuckCount += 1;
+            // Try to extract day count for the narration.
+            const m = health.reason.match(/(\d+)\s+days?/);
+            if (m) stuckMaxDays = Math.max(stuckMaxDays, parseInt(m[1], 10));
+          }
+        }
+      } else if (status === 'won') {
+        // closeDate or updatedAt — closeDate first; fall back to updatedAt.
+        const ref = d.closeDate
+          ? new Date(d.closeDate as unknown as string)
+          : d.updatedAt
+            ? new Date(d.updatedAt as unknown as string)
+            : null;
+        if (ref && !isNaN(ref.getTime()) && ref >= monthStart && ref < monthEnd) {
+          wonThisMonth += 1;
+          wonThisMonthValue += value;
+        }
+      }
+    }
+
+    // Compose Chippi's one-line narration. Pick the most-pressing fact.
+    let narration = '';
+    if (stuckCount > 0) {
+      narration =
+        stuckCount === 1
+          ? `1 deal hasn't moved in ${stuckMaxDays || 'weeks'} ${stuckMaxDays ? 'days' : ''}. Take a look.`
+          : `${stuckCount} deals are stuck — they need a nudge.`;
+    } else if (closingThisWeek > 0) {
+      narration =
+        closingThisWeek === 1
+          ? '1 deal is closing this week.'
+          : `${closingThisWeek} deals are closing this week.`;
+    } else if (closingThisMonth > 0) {
+      narration =
+        closingThisMonth === 1
+          ? '1 deal closes this month. Keep it on track.'
+          : `${closingThisMonth} deals close this month. Keep them on track.`;
+    } else if (active === 0 && wonThisMonth === 0) {
+      narration = 'Nothing in flight. Add a deal to get started.';
+    } else {
+      narration = active === 1 ? '1 active deal. Steady.' : `${active} active deals. Steady.`;
+    }
+
+    return {
+      active,
+      closingThisMonth,
+      closingThisMonthValue,
+      atRisk,
+      wonThisMonth,
+      wonThisMonthValue,
+      narration,
+    };
   }, [stages]);
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-4 text-xs text-muted-foreground px-1">
-        <span className="inline-flex items-center gap-1.5">
-          <Briefcase size={12} />
-          {activeCount} active {activeCount === 1 ? 'deal' : 'deals'}
-        </span>
-        {pipelineValue > 0 && (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
-            {formatCurrency(pipelineValue)} in pipeline
-          </span>
+    <div className="space-y-4">
+      {/* Brand-voice narration line — the page's one sentence. */}
+      <p
+        className={cn(
+          'text-lg text-muted-foreground',
+          loading && 'opacity-60',
         )}
-      </div>
+        style={TITLE_FONT}
+      >
+        {loading ? ' ' : stats.narration}
+      </p>
 
-      <div className={cn('grid gap-3 md:grid-cols-3', loading && 'opacity-60')}>
-        {strips.map((strip) => {
-          const { key, ...rest } = strip;
-          return <AttentionStrip key={key} slug={slug} {...rest} />;
-        })}
+      {/* 4-cell stat strip — paper-flat, hairline-divided */}
+      <div
+        className={cn(
+          'grid grid-cols-2 md:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70',
+          loading && 'opacity-60',
+        )}
+      >
+        <StatCell
+          number={<AnimatedNumber value={stats.active} />}
+          label="Active deals"
+          sub={stats.active === 1 ? 'in flight' : 'in flight'}
+        />
+        <StatCell
+          number={<AnimatedNumber value={stats.closingThisMonth} />}
+          label="Closing this month"
+          sub={
+            stats.closingThisMonth > 0
+              ? `${formatCompact(stats.closingThisMonthValue)} on the line`
+              : 'no close dates this month'
+          }
+        />
+        <StatCell
+          number={<AnimatedNumber value={stats.atRisk} />}
+          label="At risk"
+          sub={stats.atRisk > 0 ? 'need attention' : 'all moving'}
+          dim={stats.atRisk === 0}
+        />
+        <StatCell
+          number={<AnimatedNumber value={stats.wonThisMonth} />}
+          label="Won this month"
+          sub={
+            stats.wonThisMonth > 0
+              ? `${formatCompact(stats.wonThisMonthValue)} closed`
+              : 'nothing closed yet'
+          }
+        />
       </div>
     </div>
   );
 }
 
-function AttentionStrip({
-  slug,
-  icon: Icon,
-  title,
-  subtitle,
-  tintBg,
-  tintText,
-  deals,
-  emptyLabel,
-  renderRowMeta,
-}: { slug: string } & StripSpec) {
+function StatCell({
+  number,
+  label,
+  sub,
+  dim,
+}: {
+  number: React.ReactNode;
+  label: string;
+  sub: string;
+  dim?: boolean;
+}) {
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
-      <div className="px-4 py-3 flex items-center gap-3 border-b border-border">
-        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0', tintBg, tintText)}>
-          <Icon size={15} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-foreground truncate">{title}</p>
-          <p className="text-[11px] text-muted-foreground truncate">{subtitle}</p>
-        </div>
-      </div>
-
-      {deals.length === 0 ? (
-        <div className="px-4 py-5 text-xs text-muted-foreground text-center">{emptyLabel}</div>
-      ) : (
-        <ul className="divide-y divide-border">
-          {deals.map((d) => {
-            const meta = renderRowMeta(d);
-            return (
-              <li key={d.id}>
-                <Link
-                  href={`/s/${slug}/deals/${d.id}`}
-                  className="group flex items-center gap-2 px-4 py-2.5 hover:bg-muted/30 transition-colors"
-                >
-                  <span className="text-sm font-medium text-foreground truncate flex-1 min-w-0">{d.title}</span>
-                  {meta && (
-                    <span className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0">{meta}</span>
-                  )}
-                  <ArrowRight size={11} className="text-muted-foreground/40 group-hover:text-foreground transition-colors flex-shrink-0" />
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+    <div className="bg-background p-5">
+      <p
+        className={cn(
+          STAT_NUMBER_COMPACT,
+          'leading-none',
+          dim && 'text-muted-foreground',
+        )}
+        style={TITLE_FONT}
+      >
+        {number}
+      </p>
+      <p className={cn(BODY, 'mt-2')}>{label}</p>
+      <p className={cn(SECTION_LABEL, 'mt-1 normal-case tracking-normal text-[11px]')}>
+        {sub}
+      </p>
     </div>
   );
 }

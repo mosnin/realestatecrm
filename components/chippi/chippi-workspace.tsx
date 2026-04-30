@@ -332,12 +332,12 @@ export function ChippiWorkspace({
   // Apple keynotes used: positioning in the quiet moments, status in the
   // busy ones.
   function statusSentence(): string {
-    if (!countsLoaded) return "I run your follow-up so you don't have to.";
+    if (!countsLoaded) return "I keep your day moving so you don't have to.";
     const parts: string[] = [];
     if (counts.drafts > 0) parts.push(`${counts.drafts} draft${counts.drafts === 1 ? '' : 's'}`);
     if (counts.questions > 0) parts.push(`${counts.questions} question${counts.questions === 1 ? '' : 's'}`);
     if (parts.length === 0) {
-      return "I run your follow-up so you don't have to.";
+      return "I keep your day moving so you don't have to.";
     }
     return `${parts.join(' · ')} waiting for you.`;
   }
@@ -519,15 +519,15 @@ export function ChippiWorkspace({
           <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-6 space-y-12">
               {/* Greeting + status */}
-              <header className="space-y-1.5 text-center">
+              <header className="space-y-2 text-center">
                 <h1
-                  className="text-3xl tracking-tight text-foreground"
+                  className="text-4xl sm:text-5xl tracking-tight text-foreground"
                   style={{ fontFamily: 'var(--font-title)' }}
                 >
                   {greeting}
                   {firstName ? `, ${firstName}` : ''}.
                 </h1>
-                <p className="text-sm text-muted-foreground">{statusSentence()}</p>
+                <p className="text-base text-muted-foreground">{statusSentence()}</p>
               </header>
 
               {/* Morning replay — the wow moment. Auto-renders the first

@@ -151,7 +151,7 @@ export function AuthPageLayout({ children, heading, subheading, variant: _varian
           {/* Brand promise — serif Times, two-line treatment */}
           <div className="text-center px-8 -mt-8">
             <p style={TITLE_FONT} className="text-3xl tracking-tight text-foreground">
-              I run your follow-up
+              I keep your day moving
             </p>
             <p style={TITLE_FONT} className="text-2xl tracking-tight text-muted-foreground">
               so you don&apos;t have to.
