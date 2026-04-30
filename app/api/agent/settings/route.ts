@@ -14,21 +14,17 @@ export async function GET(_req: NextRequest) {
 
   const { data } = await supabase
     .from('AgentSettings')
-    .select('*')
+    .select('spaceId, enabled, dailyTokenBudget')
     .eq('spaceId', space.id)
     .maybeSingle();
 
-  // Return defaults if no settings row exists yet
+  // Default if no row yet (shouldn't happen since we have an auto-seed
+  // trigger, but defensive: never make the UI block on a missing row).
   if (!data) {
     return NextResponse.json({
       spaceId: space.id,
       enabled: false,
-      autonomyLevel: 'suggest_only',
-      dailyTokenBudget: 50000,
-      heartbeatIntervalMinutes: 15,
-      enabledAgents: ['lead_nurture'],
-      perAgentAutonomy: {},
-      confidenceThreshold: 0,
+      dailyTokenBudget: 50_000,
     });
   }
 
@@ -44,24 +40,14 @@ export async function PATCH(req: NextRequest) {
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body = await req.json();
-
-  const validAutonomy = ['autonomous', 'draft_required', 'suggest_only'];
-  const validAgents = ['lead_nurture', 'deal_sentinel', 'long_term_nurture', 'lead_scorer', 'tour_followup'];
-
   const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
 
   if (body.enabled !== undefined) {
     patch.enabled = Boolean(body.enabled);
   }
-  if (body.autonomyLevel !== undefined) {
-    if (!validAutonomy.includes(body.autonomyLevel)) {
-      return NextResponse.json({ error: 'Invalid autonomyLevel' }, { status: 400 });
-    }
-    patch.autonomyLevel = body.autonomyLevel;
-  }
   if (body.dailyTokenBudget !== undefined) {
-    const budget = parseInt(body.dailyTokenBudget);
-    if (isNaN(budget) || budget < 1000 || budget > 500_000) {
+    const budget = parseInt(String(body.dailyTokenBudget), 10);
+    if (Number.isNaN(budget) || budget < 1000 || budget > 500_000) {
       return NextResponse.json(
         { error: 'dailyTokenBudget must be between 1,000 and 500,000' },
         { status: 400 },
@@ -69,39 +55,13 @@ export async function PATCH(req: NextRequest) {
     }
     patch.dailyTokenBudget = budget;
   }
-  if (Array.isArray(body.enabledAgents)) {
-    const agents = body.enabledAgents.filter((a: unknown) => validAgents.includes(a as string));
-    patch.enabledAgents = agents;
-  }
-  if (body.perAgentAutonomy !== undefined && typeof body.perAgentAutonomy === 'object' && !Array.isArray(body.perAgentAutonomy)) {
-    const validated: Record<string, string> = {};
-    for (const [agent, level] of Object.entries(body.perAgentAutonomy as Record<string, unknown>)) {
-      if (validAgents.includes(agent) && validAutonomy.includes(level as string)) {
-        validated[agent] = level as string;
-      }
-    }
-    patch.perAgentAutonomy = validated;
-  }
-  if (body.confidenceThreshold !== undefined) {
-    const threshold = parseInt(String(body.confidenceThreshold), 10);
-    if (isNaN(threshold) || threshold < 0 || threshold > 100) {
-      return NextResponse.json({ error: 'confidenceThreshold must be 0–100' }, { status: 400 });
-    }
-    patch.confidenceThreshold = threshold;
-  }
-  if (body.heartbeatIntervalMinutes !== undefined) {
-    const interval = parseInt(String(body.heartbeatIntervalMinutes), 10);
-    if (isNaN(interval) || interval < 1 || interval > 1440) {
-      return NextResponse.json({ error: 'heartbeatIntervalMinutes must be 1–1440' }, { status: 400 });
-    }
-    patch.heartbeatIntervalMinutes = interval;
-  }
 
-  // Upsert — creates the row on first save
+  // Upsert — creates the row on first save (defensive; the auto-seed
+  // trigger should have already inserted it).
   const { data, error } = await supabase
     .from('AgentSettings')
     .upsert({ spaceId: space.id, ...patch }, { onConflict: 'spaceId' })
-    .select()
+    .select('spaceId, enabled, dailyTokenBudget')
     .single();
 
   if (error) throw error;
