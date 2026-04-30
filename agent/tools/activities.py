@@ -1,14 +1,13 @@
 """Run-level audit logging.
 
-The end-of-run summary that lands in AgentActivityLog. Other "log this"
-moves have been folded into the tools that cause them — follow-ups are
-written by update_contact/update_deal, observations by store_memory.
+End-of-run summary that lands in AgentActivityLog. Other "log this"
+moves were folded into the tools that cause them — follow-ups by
+update_contact / update_deal, observations by store_memory.
 """
 
 from __future__ import annotations
 
 import uuid
-from typing import Any
 
 from agents import RunContextWrapper, function_tool
 
@@ -24,11 +23,9 @@ async def log_activity_run(
     reasoning: str,
     contact_id: str | None = None,
     deal_id: str | None = None,
-    metadata: dict[str, Any] | None = None,
 ) -> str:
-    """Persist an entry to AgentActivityLog so the realtor has an audit trail.
-
-    Call once per substantive run. Skip for trivial lookups.
+    """Persist an entry to AgentActivityLog so the realtor has an audit
+    trail. Call once per substantive run. Skip for trivial lookups.
 
     action_type: short label, e.g. 'sweep', 'tour_followup', 'lead_qualification'.
     outcome: 'completed' | 'queued_for_approval' | 'suggested' | 'failed'.
@@ -48,6 +45,5 @@ async def log_activity_run(
         "outcome": outcome,
         "relatedContactId": contact_id,
         "relatedDealId": deal_id,
-        "metadata": metadata or {},
     }).execute()
     return entry_id
