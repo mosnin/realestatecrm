@@ -567,7 +567,7 @@ export function ChippiWorkspace({
       ) : isEmpty ? (
         <>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-6 space-y-12">
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 sm:pt-14 pb-40 sm:pb-32 space-y-10 sm:space-y-12">
               {/* Greeting + status */}
               <header className="space-y-1.5 text-center">
                 <h1
@@ -602,11 +602,12 @@ export function ChippiWorkspace({
           </div>
 
           {/* Docked composer + quick prompts — sticky to viewport bottom so
-              the input stays reachable as the realtor scrolls or as content
-              shifts above it. The bg-gradient fades content under the dock. */}
+              the input stays reachable as the realtor scrolls. Suggestions
+              sit ABOVE the composer so the input is the bottom-most element
+              (no detached chips below the box). The bg-gradient fades
+              content under the dock. */}
           <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-4 space-y-2.5 bg-gradient-to-t from-background via-background to-background/0">
-            {renderInput()}
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 justify-center sm:justify-start">
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s.text}
@@ -620,6 +621,7 @@ export function ChippiWorkspace({
                 </button>
               ))}
             </div>
+            {renderInput()}
           </div>
         </>
       ) : (

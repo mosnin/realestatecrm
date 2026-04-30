@@ -113,7 +113,10 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
               <MenuToggleIcon open={open} className="size-5" duration={400} />
             </button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-0 border-sidebar-border flex flex-col overflow-hidden relative bg-sidebar">
+          <SheetContent
+            side="left"
+            className="w-72 sm:max-w-xs p-0 border-r border-border/70 bg-sidebar text-sidebar-foreground flex flex-col overflow-hidden"
+          >
             <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent z-0" />
             <div className="relative z-10 flex flex-col h-full overflow-y-auto">
             <SheetHeader className="px-4 py-5 border-b border-sidebar-border">
