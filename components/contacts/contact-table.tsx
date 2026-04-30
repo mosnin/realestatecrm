@@ -655,7 +655,7 @@ export function ContactTable({ slug }: ContactTableProps) {
             <button
               type="button"
               onClick={() => setTagFilter('')}
-              className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 h-7 sm:h-6 bg-foreground text-background"
+              className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 h-8 sm:h-6 bg-foreground text-background"
             >
               <X size={10} />
               Clear tag
@@ -667,7 +667,7 @@ export function ContactTable({ slug }: ContactTableProps) {
               type="button"
               onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
               className={cn(
-                'inline-flex items-center text-xs font-medium rounded-full px-2.5 h-7 sm:h-6 transition-colors',
+                'inline-flex items-center text-xs font-medium rounded-full px-2.5 h-8 sm:h-6 transition-colors',
                 tagFilter === tag
                   ? 'bg-foreground text-background'
                   : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground border border-border/70 bg-background',
@@ -1005,7 +1005,7 @@ export function ContactTable({ slug }: ContactTableProps) {
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="sticky bottom-4 mx-auto w-fit z-30 flex items-center flex-wrap gap-2 rounded-lg border border-border bg-card shadow-lg px-3 sm:px-4 py-2 sm:py-3 max-w-[calc(100vw-2rem)]">
+        <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] mx-auto w-fit z-30 flex items-center flex-wrap gap-2 rounded-lg border border-border bg-card shadow-lg px-3 sm:px-4 py-2 sm:py-3 max-w-[calc(100vw-2rem)]">
           <CheckSquare size={14} className="text-foreground" />
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="h-4 w-px bg-border mx-1" />

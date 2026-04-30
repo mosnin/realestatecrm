@@ -133,7 +133,7 @@ function TimePeriodSelector({
             aria-label={p.label}
             onClick={() => onChange(p.days)}
             className={cn(
-              'px-3 h-7 text-xs rounded-full transition-all duration-150 active:scale-[0.98]',
+              'px-3 h-8 sm:h-7 text-xs rounded-full transition-all duration-150 active:scale-[0.98]',
               active
                 ? 'bg-background text-foreground font-medium border border-border/70'
                 : 'text-muted-foreground hover:text-foreground',

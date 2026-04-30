@@ -201,6 +201,18 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
   const [view, setView] = useState<'kanban' | 'list'>('list');
+  // Force list view on mobile (< md). Stored preference is preserved so
+  // desktop kanban resumes when the viewport widens.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 767px)');
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  const effectiveView: 'kanban' | 'list' = isMobile ? 'list' : view;
   const [searchQuery, setSearchQuery] = useState('');
   // Slide-over panel state — clicking a card opens the deal here without nav.
   const [panelDealId, setPanelDealId] = useState<string | null>(null);
@@ -1262,7 +1274,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                           })
                         }
                         className={cn(
-                          'flex-1 h-7 text-xs font-medium rounded-md border transition-colors',
+                          'flex-1 h-8 sm:h-7 text-xs font-medium rounded-md border transition-colors',
                           on
                             ? p === 'LOW'
                               ? 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-500/20 dark:text-slate-300 dark:border-slate-500/40'
@@ -1289,7 +1301,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                     value={filterValueMin}
                     onChange={(e) => setFilterValueMin(e.target.value)}
                     placeholder="Min"
-                    className="h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+                    className="h-8 sm:h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
                   />
                   <span className="text-muted-foreground text-xs flex-shrink-0">to</span>
                   <input
@@ -1298,7 +1310,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                     value={filterValueMax}
                     onChange={(e) => setFilterValueMax(e.target.value)}
                     placeholder="Max"
-                    className="h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+                    className="h-8 sm:h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
               </div>
@@ -1314,7 +1326,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                     value={filterProbMin}
                     onChange={(e) => setFilterProbMin(e.target.value)}
                     placeholder="Min"
-                    className="h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+                    className="h-8 sm:h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
                   />
                   <span className="text-muted-foreground text-xs flex-shrink-0">to</span>
                   <input
@@ -1324,7 +1336,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                     value={filterProbMax}
                     onChange={(e) => setFilterProbMax(e.target.value)}
                     placeholder="Max"
-                    className="h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+                    className="h-8 sm:h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
               </div>
@@ -1340,7 +1352,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                     setFilterProbMin('');
                     setFilterProbMax('');
                   }}
-                  className="w-full h-7 text-xs font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted transition-colors"
+                  className="w-full h-8 sm:h-7 text-xs font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted transition-colors"
                 >
                   Reset filters
                 </button>
@@ -1366,7 +1378,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
               type="button"
               onClick={() => setView('list')}
               className={cn(
-                'h-7 w-8 flex items-center justify-center rounded transition-colors duration-150',
+                'h-8 sm:h-7 w-8 flex items-center justify-center rounded transition-colors duration-150',
                 view === 'list'
                   ? 'bg-foreground/[0.045] text-foreground'
                   : 'text-muted-foreground hover:text-foreground',
@@ -1380,7 +1392,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
               type="button"
               onClick={() => setView('kanban')}
               className={cn(
-                'h-7 w-8 flex items-center justify-center rounded transition-colors duration-150',
+                'h-8 sm:h-7 w-8 flex items-center justify-center rounded transition-colors duration-150',
                 view === 'kanban'
                   ? 'bg-foreground/[0.045] text-foreground'
                   : 'text-muted-foreground hover:text-foreground',
@@ -1395,7 +1407,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
       </div>
 
       {/* Bulk action bar */}
-      {selectedDealIds.size > 0 && view === 'list' && (
+      {selectedDealIds.size > 0 && effectiveView === 'list' && (
         <div className="flex items-center gap-3 flex-wrap rounded-md border border-border/70 bg-foreground/[0.02] px-4 py-2.5">
           <span className="text-sm text-foreground tabular-nums">
             {selectedDealIds.size} selected
@@ -1439,7 +1451,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
             Pick at least one status above to see deals.
           </p>
         </div>
-      ) : view === 'kanban' ? (
+      ) : effectiveView === 'kanban' ? (
         <>
         {/* Mobile stacked view — paper-flat hairline rows. */}
         <div className="md:hidden space-y-4">

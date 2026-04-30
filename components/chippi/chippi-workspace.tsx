@@ -480,11 +480,11 @@ export function ChippiWorkspace({
             type="button"
             onClick={() => void handleRunNow()}
             disabled={running}
-            className="hidden sm:inline-flex items-center gap-1.5 mr-1 h-8 px-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 mr-1 h-8 px-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-50"
             title="Run Chippi now"
           >
             {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-            Run now
+            <span className="hidden sm:inline">Run now</span>
           </button>
         )}
         <button
@@ -606,7 +606,7 @@ export function ChippiWorkspace({
               sit ABOVE the composer so the input is the bottom-most element
               (no detached chips below the box). The bg-gradient fades
               content under the dock. */}
-          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-4 space-y-2.5 bg-gradient-to-t from-background via-background to-background/0">
+          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-2.5 bg-gradient-to-t from-background via-background to-background/0">
             <div className="flex flex-wrap gap-1.5 justify-center sm:justify-start">
               {SUGGESTIONS.map((s) => (
                 <button
@@ -730,7 +730,7 @@ export function ChippiWorkspace({
 
           {/* Docked input — sticky to viewport bottom (matches the empty
               state's composer dock so the input never rides up with messages). */}
-          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-4 bg-gradient-to-t from-background via-background to-background/0">
+          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0">
             {atLimit ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
                 <div className="flex justify-center mb-2">

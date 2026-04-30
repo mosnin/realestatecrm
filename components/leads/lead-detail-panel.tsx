@@ -486,7 +486,7 @@ export function LeadDetailPanel({
         </div>
 
         {/* Convert CTA — sticky footer */}
-        <div className="flex-shrink-0 px-5 py-4 border-t border-border bg-card">
+        <div className="flex-shrink-0 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-border bg-card">
           <button
             type="button"
             onClick={() => {
