@@ -2,18 +2,15 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
   Plus,
-  FileText,
   Trash2,
   Check,
   Loader2,
   StickyNote,
   Download,
-  Menu,
   ArrowLeft,
 } from 'lucide-react';
 
@@ -502,67 +499,99 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
   }, [title, content, mentionLookup, escHtml]);
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full flex-col">
+      {/* ── Page header ─────────────────────────────────────────────────── */}
+      <header className="flex items-end justify-between gap-4 px-6 pt-6 pb-4">
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Notes
+        </h1>
+        <button
+          type="button"
+          onClick={createNote}
+          disabled={creating}
+          className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 h-8 text-xs font-medium text-background hover:bg-foreground/90 transition-colors duration-150 disabled:opacity-50"
+        >
+          {creating ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Plus className="h-3.5 w-3.5" />
+          )}
+          New note
+        </button>
+      </header>
+
+      <div className="flex flex-1 min-h-0 border-t border-border/70">
       {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
       <div className={cn(
-        'w-full md:w-56 shrink-0 border-r bg-muted/30 flex-col',
+        'w-full md:w-64 shrink-0 border-r border-border/70 bg-background flex-col',
         // Mobile: show sidebar when mobileSidebar is true, hide when editing
         mobileSidebar ? 'flex md:flex' : 'hidden md:flex',
       )}>
-        <div className="px-3 py-3 border-b">
-          <h2 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
-            <StickyNote className="h-4 w-4" />
-            Notes
-          </h2>
-        </div>
-
         <ScrollArea className="flex-1">
-          <div className="p-1.5 space-y-0.5">
-            {notes.map((note) => (
-              <div
-                key={note.id}
-                className={cn(
-                  'group flex items-center justify-between rounded-md px-2 py-1.5 text-sm cursor-pointer transition-colors',
-                  activeId === note.id
-                    ? 'bg-primary/10 text-foreground'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                )}
-                onClick={() => loadNote(note.id)}
-              >
-                <span className="flex items-center gap-1.5 truncate">
-                  <FileText className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{note.icon ? `${note.icon} ` : ''}{note.title || 'Untitled'}</span>
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteNote(note.id);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-destructive/10 hover:text-destructive transition-opacity"
+          <div>
+            {notes.length === 0 ? (
+              <div className="flex flex-col items-center text-center py-12 px-6 space-y-3">
+                <StickyNote size={28} className="text-muted-foreground/40" />
+                <p
+                  className="text-base text-foreground"
+                  style={{ fontFamily: 'var(--font-title)' }}
                 >
-                  <Trash2 className="h-3 w-3" />
-                </button>
+                  No notes yet
+                </p>
+                <p className="text-sm text-muted-foreground max-w-xs">
+                  Capture meeting notes, ideas, and property details — they live here.
+                </p>
               </div>
-            ))}
+            ) : (
+              notes.map((note) => {
+                const isActive = activeId === note.id;
+                return (
+                  <div
+                    key={note.id}
+                    className={cn(
+                      'group relative flex items-start justify-between gap-2 px-4 py-3 text-sm cursor-pointer border-b border-border/70 transition-colors duration-150',
+                      isActive
+                        ? 'bg-foreground/[0.045]'
+                        : 'hover:bg-foreground/[0.04]',
+                    )}
+                    onClick={() => loadNote(note.id)}
+                  >
+                    {isActive && (
+                      <span
+                        aria-hidden
+                        className="absolute left-0 top-0 bottom-0 w-0.5 bg-foreground"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <p className="truncate text-sm text-foreground">
+                        {note.icon ? `${note.icon} ` : ''}{note.title || 'Untitled'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(note.updatedAt).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteNote(note.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-destructive transition-opacity"
+                      aria-label="Delete note"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                );
+              })
+            )}
           </div>
         </ScrollArea>
-
-        <div className="p-2 border-t">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full border-dashed text-muted-foreground"
-            onClick={createNote}
-            disabled={creating}
-          >
-            {creating ? (
-              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-            ) : (
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-            )}
-            New page
-          </Button>
-        </div>
       </div>
 
       {/* ── Editor ──────────────────────────────────────────────────────────── */}
@@ -734,30 +763,22 @@ export function NotesClient({ slug, initialNotes, contacts, deals }: NotesClient
           </div>
         ) : (
           /* Empty state */
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-            <div className="rounded-full bg-muted p-4 mb-4">
-              <StickyNote className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-semibold mb-1">
-              {notes.length === 0 ? 'Create your first note' : 'Select a note'}
-            </h3>
-            <p className="text-sm text-muted-foreground mb-4 max-w-xs">
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-3">
+            <StickyNote size={28} className="text-muted-foreground/40" />
+            <p
+              className="text-base text-foreground"
+              style={{ fontFamily: 'var(--font-title)' }}
+            >
+              {notes.length === 0 ? 'No notes yet' : 'Select a note'}
+            </p>
+            <p className="text-sm text-muted-foreground max-w-xs">
               {notes.length === 0
-                ? 'Notes help you keep track of ideas, meeting notes, and property details.'
+                ? 'Capture meeting notes, ideas, and property details — they live here.'
                 : 'Choose a note from the sidebar to start editing.'}
             </p>
-            {notes.length === 0 && (
-              <Button onClick={createNote} disabled={creating}>
-                {creating ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4 mr-2" />
-                )}
-                New page
-              </Button>
-            )}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
