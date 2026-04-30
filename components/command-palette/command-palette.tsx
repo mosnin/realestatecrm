@@ -71,7 +71,7 @@ export function CommandPalette({ slug }: Props) {
     { kind: 'route', id: 'nav-assistant',group: 'Navigate', label: 'Assistant', icon: Sparkles,     href: `${base}/ai` },
     { kind: 'route', id: 'nav-drafts',   group: 'Navigate', label: 'AI drafts', icon: Sparkles,     href: `${base}/agent` },
     { kind: 'route', id: 'nav-settings', group: 'Navigate', label: 'Settings',  icon: Settings,     href: `${base}/settings` },
-    { kind: 'route', id: 'nav-templates',group: 'Navigate', label: 'Message templates', icon: MessageSquare, href: `${base}/settings/templates` },
+    { kind: 'route', id: 'nav-templates',group: 'Navigate', label: 'Message templates', icon: MessageSquare, href: `${base}/settings/integrations#templates` },
 
     // Create
     { kind: 'route', id: 'new-deal',    group: 'Create', label: 'New deal',      icon: Plus,      href: `${base}/deals/new` },

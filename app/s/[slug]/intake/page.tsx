@@ -178,13 +178,22 @@ export default async function IntakeOverviewPage({
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className={H3}>Recent submissions</h2>
-          <Link
-            href={`/s/${slug}/leads`}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 inline-flex items-center gap-1"
-          >
-            View all
-            <ArrowRight size={12} strokeWidth={1.75} />
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href={`/s/${slug}/intake/analytics`}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 inline-flex items-center gap-1"
+            >
+              View all submissions
+              <ArrowRight size={12} strokeWidth={1.75} />
+            </Link>
+            <Link
+              href={`/s/${slug}/contacts`}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 inline-flex items-center gap-1"
+            >
+              View as people
+              <ArrowRight size={12} strokeWidth={1.75} />
+            </Link>
+          </div>
         </div>
 
         {recentLeads.length === 0 ? (

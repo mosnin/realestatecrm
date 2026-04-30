@@ -88,7 +88,7 @@ export function TemplatePicker({ channel, ctx, onPick, label = 'Templates', disa
               {channel} templates
             </p>
             <a
-              href="/settings/templates"
+              href="/settings/integrations#templates"
               className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
             >
               Manage <ArrowRight size={9} />
@@ -99,7 +99,7 @@ export function TemplatePicker({ channel, ctx, onPick, label = 'Templates', disa
             <div className="px-3 py-6 text-center text-xs text-muted-foreground">
               No {channel} templates yet.
               <br />
-              <a href="/settings/templates" className="underline">Create one →</a>
+              <a href="/settings/integrations#templates" className="underline">Create one →</a>
             </div>
           ) : (
             <ul className="max-h-72 overflow-y-auto divide-y divide-border">

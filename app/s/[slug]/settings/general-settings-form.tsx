@@ -23,10 +23,6 @@ interface GeneralSettingsFormProps {
   } | null;
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <p className={SECTION_LABEL}>{children}</p>;
-}
-
 export function DangerZone({ space }: { space: Space }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
