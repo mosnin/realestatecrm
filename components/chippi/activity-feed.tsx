@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   CheckCircle2, MessageSquare, Mail, StickyNote, Bell, Activity, Brain,
   ChevronRight, Loader2, Undo2, AlertCircle, CircleX, HelpCircle, Lightbulb,
+  CalendarCheck, ArrowUpRight, Flag, Paperclip, ArrowRightLeft,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,8 @@ const ACTION_META: Record<string, { verb: string; icon: LucideIcon }> = {
   send_email: { verb: 'sent email to', icon: Mail },
   log_note: { verb: 'logged a note about', icon: StickyNote },
   create_draft_message: { verb: 'drafted a message for', icon: MessageSquare },
+  message_drafted: { verb: 'drafted a message for', icon: MessageSquare },
+  packet_drafted: { verb: 'drafted a packet share for', icon: Paperclip },
   set_contact_follow_up: { verb: 'scheduled a follow-up with', icon: Bell },
   set_deal_follow_up: { verb: 'scheduled a deal follow-up on', icon: Bell },
   log_agent_observation: { verb: 'noted something about', icon: Brain },
@@ -40,6 +43,12 @@ const ACTION_META: Record<string, { verb: string; icon: LucideIcon }> = {
   update_lead_score: { verb: 'updated the score for', icon: Activity },
   update_deal_probability: { verb: 'updated the probability on', icon: Activity },
   create_follow_up_reminder: { verb: 'set a reminder for', icon: Bell },
+  // Lifecycle actions added with the broker rollup work
+  tour_booked: { verb: 'booked a tour for', icon: CalendarCheck },
+  deal_stage_advanced: { verb: 'moved a deal forward:', icon: ArrowUpRight },
+  review_requested: { verb: 'flagged a deal for your broker:', icon: Flag },
+  lead_routed_out: { verb: 'routed a contact to a teammate:', icon: ArrowRightLeft },
+  lead_routed_in: { verb: 'received a contact from a teammate:', icon: ArrowRightLeft },
 };
 
 function metaFor(actionType: string): { verb: string; icon: LucideIcon } {

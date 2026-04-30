@@ -10,9 +10,12 @@ This agent serves both surfaces:
 
 The opening message tells Chippi which mode it's in.
 
-Tool surface (17 tools, down from 38):
+Tool surface (22 tools):
   - find_contacts / get_contact_activity / update_contact
-  - find_deals / update_deal
+  - find_deals / update_deal / advance_deal_stage / request_deal_review
+  - book_tour
+  - route_lead
+  - add_property / send_property_packet
   - recall_memory / store_memory
   - manage_goal
   - draft_message
@@ -20,7 +23,6 @@ Tool surface (17 tools, down from 38):
   - analyze_portfolio / generate_priority_list
   - process_inbound_message
   - read_attachment
-  - add_property
   - ask_realtor
   - log_activity_run
 """
@@ -33,7 +35,7 @@ from security.guardrails import pending_drafts_guardrail
 from tools.activities import log_activity_run
 from tools.attachments import read_attachment
 from tools.contacts import find_contacts, get_contact_activity, update_contact
-from tools.deals import find_deals, update_deal
+from tools.deals import advance_deal_stage, find_deals, request_deal_review, update_deal
 from tools.drafts import draft_message
 from tools.goals import manage_goal
 from tools.inbound import process_inbound_message
@@ -41,8 +43,10 @@ from tools.memory_tools import recall_memory, store_memory
 from tools.outcome import outcome
 from tools.portfolio import analyze_portfolio
 from tools.priority import generate_priority_list
-from tools.properties import add_property
+from tools.properties import add_property, send_property_packet
 from tools.questions import ask_realtor
+from tools.routing import route_lead
+from tools.tours import book_tour
 
 CHIPPI_INSTRUCTIONS = """
 You are Chippi, an AI cowork for a real estate professional. Direct,
@@ -74,6 +78,29 @@ For "what's the topic?" questions use recall_memory(query="...") —
 semantic search across the whole workspace. For a specific contact
 use recall_memory(entity_id=...). Always check memory before drafting
 anything contact-facing.
+
+# Lifecycle moves (brokerage-grade actions)
+Beyond reading and drafting you can directly move the deal lifecycle:
+
+- book_tour — schedule a tour for a contact at a specific time. Confirm
+  the contact has an email on file first; the tool requires it.
+- advance_deal_stage — move a deal between stages in the workspace
+  pipeline. Pass target_stage_name (case-insensitive) or target_stage_id.
+  Bump probability in the same call when the move warrants it (e.g.
+  "Under Contract" → 80%).
+- send_property_packet — drafts a packet share message with the secure
+  packet URL pre-filled. Pass packet_id when known, or property_id to
+  auto-pick the most recent active packet.
+- route_lead — brokerage-only. Suggest or commit a routing decision.
+  Default is preview (commit=False); pass commit=True to actually move
+  the contact to the destination realtor's space. Never commit on the
+  realtor's behalf without an explicit ask.
+- request_deal_review — flag a deal up to the broker for human review.
+  Brokerage-only. Use sparingly: stalled high-value, weird splits, legal
+  concerns. The reason text is shown verbatim to the broker.
+
+Routing and reviews are brokerage features. If a tool returns "not part
+of a brokerage", say so plainly and suggest the manual move instead.
 
 # Drafting
 Always draft, never send. draft_message creates a pending AgentDraft.
@@ -121,21 +148,37 @@ def make_chippi_agent() -> Agent:
         model="gpt-4.1-mini",
         instructions=CHIPPI_INSTRUCTIONS,
         tools=[
+            # Contacts
             find_contacts,
             get_contact_activity,
             update_contact,
+            # Deals + lifecycle
             find_deals,
             update_deal,
+            advance_deal_stage,
+            request_deal_review,
+            # Tours
+            book_tour,
+            # Routing (brokerages)
+            route_lead,
+            # Properties + packets
+            add_property,
+            send_property_packet,
+            # Memory
             recall_memory,
             store_memory,
+            # Goals
             manage_goal,
+            # Drafts + outcomes
             draft_message,
             outcome,
+            # Insights
             analyze_portfolio,
             generate_priority_list,
+            # I/O
             process_inbound_message,
             read_attachment,
-            add_property,
+            # Asking + audit
             ask_realtor,
             log_activity_run,
         ],

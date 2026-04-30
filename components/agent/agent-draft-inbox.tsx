@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   CheckCircle2, XCircle, MessageSquare, Mail, StickyNote,
   Loader2, RefreshCw, Pencil, Copy, Check,
-  AlertTriangle, Send, TriangleAlert, Sparkles,
+  AlertTriangle, Send, TriangleAlert, Sparkles, Paperclip,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -98,6 +98,11 @@ function DraftRow({
 
   const meta = CHANNEL_META[draft.channel];
   const Icon = meta.icon;
+  // A draft carrying a property packet — recognised by the secure
+  // /packet/<token> path the agent's send_property_packet tool produces.
+  // Subtle pill in the meta row so the realtor knows what they're approving
+  // before reading the body.
+  const hasPacket = /\/packet\/[a-zA-Z0-9_-]+/i.test(draft.content);
   const isEdited = editedContent.trim() !== draft.content;
   const overLimit = meta.charLimit !== null && editedContent.length > meta.charLimit;
   const nearLimit = meta.charLimit !== null && editedContent.length > meta.charLimit * 0.85;
@@ -201,6 +206,16 @@ function DraftRow({
           <Icon size={12} className="opacity-70" />
           {meta.label}
         </span>
+
+        {hasPacket && (
+          <span
+            className="inline-flex items-center gap-1 text-[11px] text-orange-600 dark:text-orange-400"
+            title="Packet attached"
+          >
+            <Paperclip size={11} className="opacity-80" />
+            Packet
+          </span>
+        )}
 
         {draft.Contact?.phone && draft.channel === 'sms' && (
           <span className="hidden sm:inline text-xs text-muted-foreground tabular-nums truncate">

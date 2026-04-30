@@ -10,6 +10,7 @@ from agents import RunContextWrapper, function_tool
 
 from db import supabase
 from security.context import AgentContext
+from tools.activities import persist_log
 from tools.streaming import publish_event
 
 _CLIP = 300
@@ -192,3 +193,218 @@ async def update_deal(
         )
 
     return {"ok": True, "dealId": deal_id, "changes": summary_parts or ["no-op"]}
+
+
+@function_tool
+async def advance_deal_stage(
+    ctx: RunContextWrapper[AgentContext],
+    deal_id: str,
+    reason: str,
+    target_stage_name: str | None = None,
+    target_stage_id: str | None = None,
+    new_probability: int | None = None,
+) -> dict[str, Any]:
+    """Move a deal to a different stage in the workspace pipeline.
+
+    Pass exactly one of:
+      target_stage_name — case-insensitive match on a DealStage in this
+                          workspace, e.g. "Under Contract", "Closed Won".
+      target_stage_id   — when you already have the stage id.
+
+    Optional:
+      new_probability — 0-100. Set when the stage move warrants a
+                        probability change (e.g. "Under Contract" → 80).
+
+    reason: required short string; logs a DealActivity row so the realtor
+    can audit who moved the deal and why.
+    """
+    if not target_stage_name and not target_stage_id:
+        return {"error": "Pass either target_stage_name or target_stage_id"}
+    if new_probability is not None and not (0 <= new_probability <= 100):
+        return {"error": "new_probability must be 0-100"}
+
+    space_id = ctx.context.space_id
+    db = await supabase()
+    now = datetime.now(timezone.utc).isoformat()
+
+    deal_check = await (
+        db.table("Deal")
+        .select("id,title,stageId,probability")
+        .eq("id", deal_id)
+        .eq("spaceId", space_id)
+        .maybe_single()
+        .execute()
+    )
+    if not deal_check.data:
+        return {"error": "Deal not found in space"}
+    deal = deal_check.data
+    deal_title = deal.get("title") or deal_id[:8]
+
+    # Resolve the target stage in this workspace
+    if target_stage_id:
+        stage_check = await (
+            db.table("DealStage")
+            .select("id,name")
+            .eq("id", target_stage_id)
+            .eq("spaceId", space_id)
+            .maybe_single()
+            .execute()
+        )
+    else:
+        # Case-insensitive match by name
+        stages_res = await (
+            db.table("DealStage")
+            .select("id,name")
+            .eq("spaceId", space_id)
+            .ilike("name", target_stage_name or "")
+            .limit(1)
+            .execute()
+        )
+        stage_check = type("R", (), {"data": (stages_res.data[0] if stages_res.data else None)})
+
+    if not stage_check.data:
+        return {"error": "Target stage not found in workspace pipeline"}
+
+    new_stage_id = stage_check.data["id"]
+    new_stage_name = stage_check.data["name"]
+
+    if deal.get("stageId") == new_stage_id and new_probability is None:
+        return {"ok": True, "unchanged": True, "stage": new_stage_name}
+
+    update: dict[str, Any] = {"stageId": new_stage_id, "updatedAt": now}
+    if new_probability is not None:
+        update["probability"] = new_probability
+
+    await (
+        db.table("Deal")
+        .update(update)
+        .eq("id", deal_id)
+        .eq("spaceId", space_id)
+        .execute()
+    )
+
+    activity_content = f"[Agent] Stage → {new_stage_name}. {reason}"
+    if new_probability is not None:
+        activity_content += f" (probability {new_probability}%)"
+
+    await db.table("DealActivity").insert({
+        "id": str(uuid.uuid4()),
+        "dealId": deal_id,
+        "spaceId": space_id,
+        "type": "note",
+        "content": activity_content,
+        "metadata": {
+            "source": "agent",
+            "agentRunId": ctx.context.run_id,
+            "oldStageId": deal.get("stageId"),
+            "newStageId": new_stage_id,
+            "newProbability": new_probability,
+        },
+    }).execute()
+
+    await publish_event(
+        ctx.context,
+        "action",
+        f"Deal '{deal_title}' → {new_stage_name}",
+        agent_type=ctx.context.current_agent_type,
+        metadata={"dealId": deal_id, "stageId": new_stage_id},
+    )
+
+    try:
+        await persist_log(
+            ctx.context,
+            action_type="deal_stage_advanced",
+            outcome="completed",
+            reasoning=f"{deal_title} → {new_stage_name}. {reason}",
+            deal_id=deal_id,
+        )
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "dealId": deal_id,
+        "stage": new_stage_name,
+        "probability": new_probability,
+    }
+
+
+@function_tool
+async def request_deal_review(
+    ctx: RunContextWrapper[AgentContext],
+    deal_id: str,
+    reason: str,
+) -> dict[str, Any]:
+    """Flag a deal up to the brokerage for human review.
+
+    Use when something looks off — a stalled high-value deal, an unusual
+    commission split, a client raising legal concerns. Creates a
+    DealReviewRequest visible to brokers in the brokerage.
+
+    Only works for spaces inside a brokerage. Solo realtors get an error.
+
+    reason: required, 10+ chars. Surfaces verbatim to the broker.
+    """
+    if not reason or len(reason.strip()) < 10:
+        return {"error": "reason must be at least 10 characters"}
+
+    space_id = ctx.context.space_id
+    db = await supabase()
+
+    deal_check = await (
+        db.table("Deal")
+        .select("id,title")
+        .eq("id", deal_id)
+        .eq("spaceId", space_id)
+        .maybe_single()
+        .execute()
+    )
+    if not deal_check.data:
+        return {"error": "Deal not found in space"}
+    deal_title = deal_check.data.get("title") or deal_id[:8]
+
+    space_check = await (
+        db.table("Space")
+        .select("id,ownerId,brokerageId")
+        .eq("id", space_id)
+        .maybe_single()
+        .execute()
+    )
+    if not space_check.data or not space_check.data.get("brokerageId"):
+        return {"error": "Space is not part of a brokerage — review requests need a broker"}
+
+    review_id = str(uuid.uuid4())
+    await db.table("DealReviewRequest").insert({
+        "id": review_id,
+        "dealId": deal_id,
+        "requestingUserId": space_check.data["ownerId"],
+        "brokerageId": space_check.data["brokerageId"],
+        "status": "open",
+        "reason": reason.strip(),
+    }).execute()
+
+    await publish_event(
+        ctx.context,
+        "action",
+        f"Review requested on '{deal_title}'",
+        agent_type=ctx.context.current_agent_type,
+        metadata={"dealId": deal_id, "reviewId": review_id},
+    )
+
+    try:
+        await persist_log(
+            ctx.context,
+            action_type="review_requested",
+            outcome="queued_for_approval",
+            reasoning=reason.strip()[:500],
+            deal_id=deal_id,
+        )
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "reviewId": review_id,
+        "dealId": deal_id,
+        "status": "open",
+    }

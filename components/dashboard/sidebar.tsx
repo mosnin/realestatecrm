@@ -42,6 +42,8 @@ import {
   Plus,
   Check,
   Search,
+  Sparkles,
+  Flag,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -81,13 +83,15 @@ const brokerAdminNavSections = [
       { href: '/broker', label: 'Team', icon: LayoutDashboard, exact: true, adminOnly: false },
       { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
       { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
-      { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
+      { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
+      { href: '/broker/agent-activity', label: 'Chippi', icon: Sparkles, exact: false, adminOnly: false },
       { href: '/broker/settings', label: 'Settings', icon: SlidersHorizontal, exact: false, adminOnly: true },
     ],
   },
   {
     label: 'More',
     items: [
+      { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
       { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
       { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
       { href: '/broker/chat', label: 'Team chat', icon: MessageCircle, exact: false, adminOnly: false },
