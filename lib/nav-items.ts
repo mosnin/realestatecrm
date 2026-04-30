@@ -8,6 +8,7 @@ import {
   FileText,
   ClipboardList,
   BarChart2,
+  Home,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -77,6 +78,15 @@ export const realtorNavItems: NavItem[] = [
  */
 export const realtorMoreNavItems: NavItem[] = [
   { href: '/tours', label: 'Tours', icon: CalendarDays },
+  {
+    href: '/properties',
+    label: 'Properties',
+    icon: Home,
+    children: [
+      { href: '/properties', label: 'All', exact: true },
+      { href: '/properties/commissions', label: 'Commissions' },
+    ],
+  },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/notes', label: 'Notes', icon: FileText },
   {

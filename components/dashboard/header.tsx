@@ -17,7 +17,7 @@ import {
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { secondaryNavItems } from '@/lib/nav-items';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check, Sparkles, CalendarDays, Calendar, BarChart2, ClipboardList } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check, Sparkles, CalendarDays, Calendar, BarChart2, ClipboardList, Home } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { BrokerHelpGuide } from '@/components/broker/help-guide';
@@ -257,6 +257,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                   </p>
                   {[
                     { href: '/tours', label: 'Tours', icon: CalendarDays },
+                    { href: '/properties', label: 'Properties', icon: Home },
                     { href: '/calendar', label: 'Calendar', icon: Calendar },
                     { href: '/notes', label: 'Notes', icon: FileText },
                     { href: '/intake', label: 'Intake form', icon: ClipboardList },

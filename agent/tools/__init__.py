@@ -6,6 +6,6 @@ re-export every submodule at package init to keep import side-effects to
 the minimum the importer asked for.
 """
 
-from . import attachments
+from . import attachments, properties
 
-__all__ = ["attachments"]
+__all__ = ["attachments", "properties"]

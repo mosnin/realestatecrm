@@ -213,6 +213,7 @@ def make_cowork_agent() -> Agent:
     from agents.long_term_nurture import make_long_term_nurture_agent
     from agents.offer_agent import make_offer_agent
     from agents.tour_followup import make_tour_followup_agent
+    from tools.properties import add_property
 
     specialists = [
         (
@@ -306,6 +307,8 @@ def make_cowork_agent() -> Agent:
             check_recent_drafts,
             # Attachments
             read_attachment,
+            # Properties
+            add_property,
         ],
         handoffs=handoffs_list,
     )
