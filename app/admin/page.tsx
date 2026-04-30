@@ -555,7 +555,7 @@ export default async function AdminOverviewPage() {
       {/* ── Platform Overview ────────────────────────────────────────── */}
       <div className="space-y-3">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Platform Overview</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {[
             {
               label: 'Total users',
@@ -631,7 +631,7 @@ export default async function AdminOverviewPage() {
       {/* ── Revenue ──────────────────────────────────────────────────── */}
       <div className="space-y-3">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Revenue</h2>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
           {[
             {
               label: 'MRR',

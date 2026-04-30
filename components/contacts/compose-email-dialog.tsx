@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { TemplatePicker } from '@/components/templates/template-picker';
 
 interface ComposeEmailDialogProps {
   contactId: string;
@@ -82,9 +83,23 @@ export function ComposeEmailDialog({ contactId, contactName, contactEmail }: Com
               </div>
             </div>
 
-            {/* Subject */}
+            {/* Subject + template picker */}
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Subject</p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs text-muted-foreground">Subject</p>
+                <TemplatePicker
+                  channel="email"
+                  ctx={{
+                    contactName,
+                    contactFirstName: contactName.split(' ')[0] ?? contactName,
+                  }}
+                  onPick={({ subject: s, body: b }) => {
+                    if (s) setSubject(s);
+                    setBody(b);
+                  }}
+                  disabled={sending}
+                />
+              </div>
               <Input
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}

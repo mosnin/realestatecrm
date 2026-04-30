@@ -1,22 +1,40 @@
 /**
  * POST /api/agent/trigger
  *
- * Pushes an event into the Redis trigger queue for a space so the next
- * agent heartbeat processes it promptly.
+ * Fires an agent trigger for a CRM event. Two things happen:
  *
- * Secured with Clerk auth. Rate-limited to 20 triggers per space per minute
- * to prevent Redis abuse.
+ * 1. The trigger is pushed to the Redis queue so the agent has it when it runs.
+ * 2. If MODAL_WEBHOOK_URL is configured, the Modal agent is called immediately
+ *    so event-driven agents (tour_followup, offer_agent) respond in seconds
+ *    rather than waiting up to 15 minutes for the next heartbeat.
+ *
+ * The Redis push always happens first. If the Modal call fails, the trigger is
+ * still in Redis and will be processed at the next heartbeat — no data loss.
+ *
+ * Secured with Clerk auth. Rate-limited to 20 triggers per space per minute.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 
-const VALID_EVENTS = ['new_lead', 'tour_completed', 'deal_stage_changed', 'application_submitted'] as const;
+const VALID_EVENTS = [
+  'new_lead',
+  'tour_completed',
+  'deal_stage_changed',
+  'application_submitted',
+] as const;
 type TriggerEvent = typeof VALID_EVENTS[number];
 
-const RATE_LIMIT = 20;     // max triggers per window
-const RATE_WINDOW_S = 60;  // 1 minute window
+const RATE_LIMIT = 20;
+const RATE_WINDOW_S = 60;
+
+// Time-critical events that should fire Modal immediately, not just queue.
+// These have specialist agents that need to act within minutes.
+const IMMEDIATE_EVENTS = new Set<TriggerEvent>(['tour_completed', 'application_submitted']);
+
+const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
+const MODAL_WEBHOOK_URL = process.env.MODAL_WEBHOOK_URL ?? '';
 
 export async function POST(req: NextRequest) {
   const authResult = await requireAuth();
@@ -34,10 +52,7 @@ export async function POST(req: NextRequest) {
   };
 
   if (!event || !VALID_EVENTS.includes(event)) {
-    return NextResponse.json(
-      { error: 'Invalid event type' },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'Invalid event type' }, { status: 400 });
   }
 
   const kvUrl = process.env.KV_REST_API_URL;
@@ -56,7 +71,6 @@ export async function POST(req: NextRequest) {
   if (rateRes.ok) {
     const { result: count } = await rateRes.json() as { result: number };
     if (count === 1) {
-      // First request in this window — set TTL so the key self-cleans
       await fetch(`${kvUrl}/expire/${encodeURIComponent(rateKey)}/${RATE_WINDOW_S * 2}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${kvToken}` },
@@ -77,7 +91,8 @@ export async function POST(req: NextRequest) {
 
   const key = `agent:triggers:${space.id}`;
 
-  const res = await fetch(`${kvUrl}/rpush/${encodeURIComponent(key)}`, {
+  // Step 1: Push to Redis. Always happens, regardless of Modal availability.
+  const redisRes = await fetch(`${kvUrl}/rpush/${encodeURIComponent(key)}`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${kvToken}`,
@@ -86,10 +101,37 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify([trigger]),
   });
 
-  if (!res.ok) {
-    console.error('[agent/trigger] Redis push failed', await res.text());
+  if (!redisRes.ok) {
+    console.error('[agent/trigger] Redis push failed', await redisRes.text());
     return NextResponse.json({ queued: false, reason: 'Redis error' });
   }
 
-  return NextResponse.json({ queued: true, event, spaceId: space.id });
+  // Step 2: For time-critical events, fire the Modal agent immediately.
+  // Non-blocking: we don't await this or let it fail the request.
+  // The trigger is already in Redis, so worst case the agent catches it at
+  // the next heartbeat.
+  let firedImmediately = false;
+  if (IMMEDIATE_EVENTS.has(event) && MODAL_WEBHOOK_URL && AGENT_INTERNAL_SECRET) {
+    // Fire-and-forget. The agent will pop the trigger from Redis when it runs.
+    fetch(MODAL_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ space_id: space.id, secret: AGENT_INTERNAL_SECRET }),
+    }).then(async (res) => {
+      if (!res.ok) {
+        console.warn('[agent/trigger] Modal immediate fire returned', res.status, await res.text());
+      }
+    }).catch((err) => {
+      console.warn('[agent/trigger] Modal immediate fire failed (trigger still in Redis)', err);
+    });
+    firedImmediately = true;
+  }
+
+  return NextResponse.json({
+    queued: true,
+    event,
+    spaceId: space.id,
+    firedImmediately,
+    method: firedImmediately ? 'redis+modal' : 'redis',
+  });
 }

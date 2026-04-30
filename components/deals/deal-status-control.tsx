@@ -128,7 +128,7 @@ export function DealStatusControl({
     } catch {
       // Roll back the optimistic update
       setStatus(previous);
-      toast.error('Failed to update status');
+      toast.error("Couldn't update the status. Try again.");
     } finally {
       setSaving(false);
     }

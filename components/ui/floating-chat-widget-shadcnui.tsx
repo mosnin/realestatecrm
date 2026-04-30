@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
-import { ChatInterface } from '@/components/ai/chat-interface';
+import { ChippiWorkspace } from '@/components/chippi/chippi-workspace';
 import type { Conversation } from '@/lib/types';
+import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { cn } from '@/lib/utils';
 
 interface FloatingChatWidgetProps {
@@ -14,6 +15,7 @@ interface FloatingChatWidgetProps {
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  blocks?: MessageBlock[] | null;
 }
 
 export function FloatingChatWidget({ slug }: FloatingChatWidgetProps) {
@@ -50,11 +52,12 @@ export function FloatingChatWidget({ slug }: FloatingChatWidgetProps) {
         setInitialConversationId(latest.id);
         const msgRes = await fetch(`/api/ai/messages?conversationId=${latest.id}`);
         if (msgRes.ok) {
-          const msgs = (await msgRes.json()) as Array<{ role: string; content: string }>;
+          const msgs = (await msgRes.json()) as Array<{ role: string; content: string; blocks?: MessageBlock[] | null }>;
           setInitialMessages(
             msgs.map((m) => ({
               role: m.role as 'user' | 'assistant',
               content: m.content,
+              blocks: m.blocks ?? null,
             }))
           );
         } else {
@@ -118,7 +121,7 @@ export function FloatingChatWidget({ slug }: FloatingChatWidgetProps) {
                   Loading chat…
                 </div>
               ) : (
-                <ChatInterface
+                <ChippiWorkspace
                   key={chatKey}
                   slug={slug}
                   initialMessages={initialMessages}

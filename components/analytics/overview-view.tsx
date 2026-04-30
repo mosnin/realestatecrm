@@ -8,35 +8,41 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Cell,
 } from 'recharts';
 import {
-  StatCard,
+  StatCell,
   ChartSection,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   formatCurrency,
+  PAPER_GRID,
 } from './chart-primitives';
 import type { ChartConfig } from './chart-primitives';
 import type { OverviewData } from '@/lib/analytics-data';
+import { SECTION_RHYTHM } from '@/lib/typography';
 
 const leadsConfig = {
-  count: { label: 'Leads', color: 'hsl(var(--chart-1))' },
+  count: { label: 'Leads', color: 'hsl(var(--foreground))' },
 } satisfies ChartConfig;
 
 const dealsConfig = {
-  count: { label: 'Deals', color: 'hsl(var(--chart-2))' },
+  count: { label: 'Deals', color: 'hsl(var(--foreground))' },
 } satisfies ChartConfig;
 
 export function OverviewView({ data }: { data: OverviewData }) {
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Total leads" value={data.totalLeads} sub="all time" />
-        <StatCard label="Contacts" value={data.totalContacts} sub="in CRM" />
-        <StatCard label="Active deals" value={data.totalDeals} />
-        <StatCard label="Pipeline value" value={formatCurrency(data.totalPipelineValue)} sub="combined" />
+    <div className={SECTION_RHYTHM}>
+      {/* Stats strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+        <StatCell label="Total leads" value={data.totalLeads} sub="all time" />
+        <StatCell label="Contacts" value={data.totalContacts} sub="in CRM" />
+        <StatCell label="Active deals" value={data.totalDeals} />
+        <StatCell
+          label="Pipeline value"
+          value={formatCurrency(data.totalPipelineValue)}
+          sub="combined"
+        />
       </div>
 
       <div className="grid sm:grid-cols-2 gap-4">
@@ -45,11 +51,11 @@ export function OverviewView({ data }: { data: OverviewData }) {
             <AreaChart data={data.leadsOverTime}>
               <defs>
                 <linearGradient id="leadsGradOverview" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.05} />
+                  <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
               <XAxis
                 dataKey="month"
                 tickLine={false}
@@ -72,17 +78,17 @@ export function OverviewView({ data }: { data: OverviewData }) {
                 name="Leads"
                 stroke="var(--color-count)"
                 fill="url(#leadsGradOverview)"
-                strokeWidth={2}
+                strokeWidth={1.5}
                 dot={false}
               />
             </AreaChart>
           </ChartContainer>
         </ChartSection>
 
-        <ChartSection title="Pipeline by stage" sub="Deals and value per stage">
+        <ChartSection title="Pipeline by stage" sub="Deals per stage">
           <ChartContainer config={dealsConfig} className="h-[200px] w-full">
             <BarChart data={data.dealsByStage} barSize={18}>
-              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
               <XAxis
                 dataKey="name"
                 tickLine={false}
@@ -99,11 +105,12 @@ export function OverviewView({ data }: { data: OverviewData }) {
                 tick={{ fontSize: 11 }}
               />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="count" name="Deals" radius={[4, 4, 0, 0]}>
-                {data.dealsByStage.map((entry) => (
-                  <Cell key={entry.name} fill={entry.color} />
-                ))}
-              </Bar>
+              <Bar
+                dataKey="count"
+                name="Deals"
+                fill="var(--color-count)"
+                radius={[2, 2, 0, 0]}
+              />
             </BarChart>
           </ChartContainer>
         </ChartSection>

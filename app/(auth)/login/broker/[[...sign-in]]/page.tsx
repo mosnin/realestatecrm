@@ -2,6 +2,8 @@ import { AuthPageLayout } from '@/components/auth/auth-page-layout';
 import { ThemedSignIn } from '@/components/auth/clerk-sign-in';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { BODY_MUTED, QUIET_LINK } from '@/lib/typography';
+import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = { title: 'Broker Sign In — Chippi' };
 
@@ -25,8 +27,7 @@ export default async function BrokerSignInPage({
   return (
     <AuthPageLayout
       variant="broker"
-      heading="Broker sign in"
-      subheading="Sign in to manage your brokerage"
+      heading="Welcome back, broker."
     >
       <div className="w-full space-y-4">
         <ThemedSignIn
@@ -35,12 +36,9 @@ export default async function BrokerSignInPage({
           forceRedirectUrl={postSignInUrl}
           signUpUrl={signUpUrl}
         />
-        <p className="text-center text-sm text-muted-foreground">
+        <p className={cn(BODY_MUTED, 'text-center')}>
           Don&apos;t have an account?{' '}
-          <Link
-            href={signUpUrl}
-            className="font-medium text-primary underline underline-offset-4 hover:text-primary/80 transition-colors"
-          >
+          <Link href={signUpUrl} className={cn(QUIET_LINK, 'underline underline-offset-4')}>
             Sign up
           </Link>
         </p>

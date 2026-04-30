@@ -72,10 +72,10 @@ export function DealDetailClient({ dealId, slug: _slug, initialActivities }: Pro
         setActivities((prev) => [created, ...prev]);
         setContent('');
       } else {
-        setError('Failed to save. Please try again.');
+        setError("Couldn't save that. Try again.");
       }
     } catch {
-      setError('Failed to save. Please try again.');
+      setError("Couldn't save that. Try again.");
     } finally {
       setPosting(false);
     }

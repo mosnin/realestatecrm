@@ -21,6 +21,7 @@ import { sendNewDealNotification } from '@/lib/email';
 import { sendAgentNotification, type TourEmailData } from '@/lib/tour-emails';
 import { sendSMS, newLeadSMS, newTourSMS, newDealSMS } from '@/lib/sms';
 import { formatCompact } from '@/lib/formatting';
+import { logger } from '@/lib/logger';
 
 interface SpaceOwnerInfo {
   ownerEmail: string;
@@ -62,11 +63,11 @@ async function getSpaceOwnerInfo(spaceId: string): Promise<SpaceOwnerInfo | null
 
     // Log diagnostic info for SMS delivery issues
     if (!settings) {
-      console.warn(`[notify] No SpaceSetting row found for spaceId ${spaceId} — SMS disabled by default`);
+      logger.warn('[notify] no SpaceSetting row — SMS disabled by default', { spaceId });
     } else if (smsEnabled && !ownerPhone) {
-      console.warn(`[notify] SMS is enabled for spaceId ${spaceId} but no phone number is configured — SMS will be skipped`);
+      logger.warn('[notify] SMS enabled but no phone configured — skipping', { spaceId });
     } else if (!smsEnabled) {
-      console.info('[notify] SMS disabled for space');
+      logger.debug('[notify] SMS disabled for space', { spaceId });
     }
 
     return {
@@ -82,7 +83,7 @@ async function getSpaceOwnerInfo(spaceId: string): Promise<SpaceOwnerInfo | null
       notifyFollowUps: settings?.notifyFollowUps ?? true,
     };
   } catch (err) {
-    console.error('[notify] Failed to fetch space owner info', err);
+    logger.error('[notify] failed to fetch space owner info', { spaceId }, err);
     return null;
   }
 }
@@ -108,9 +109,9 @@ export interface NotifyNewLeadParams {
  */
 export async function notifyNewLead(params: NotifyNewLeadParams): Promise<void> {
   const info = await getSpaceOwnerInfo(params.spaceId);
-  if (!info) { console.warn('[notify] No space owner info found for spaceId:', params.spaceId); return; }
-  if (!info.notifyNewLeads) { console.warn('[notify] notifyNewLeads is disabled for space:', params.spaceId); return; }
-  console.info('[notify] Sending lead notification', { spaceId: params.spaceId, emailEnabled: info.emailEnabled, smsEnabled: info.smsEnabled });
+  if (!info) { logger.warn('[notify] no space owner info', { spaceId: params.spaceId }); return; }
+  if (!info.notifyNewLeads) { logger.debug('[notify] notifyNewLeads disabled', { spaceId: params.spaceId }); return; }
+  logger.info('[notify] sending lead notification', { spaceId: params.spaceId, emailEnabled: info.emailEnabled, smsEnabled: info.smsEnabled });
 
   const promises: Promise<unknown>[] = [];
 
@@ -130,7 +131,7 @@ export async function notifyNewLead(params: NotifyNewLeadParams): Promise<void> 
         scoreLabel: params.scoreLabel,
         scoreSummary: params.scoreSummary,
         applicationData: params.applicationData,
-      }).catch((err) => console.error('[notify] lead email failed', err))
+      }).catch((err) => logger.error('[notify] lead email failed', { spaceId: params.spaceId }, err))
     );
   }
 
@@ -145,7 +146,7 @@ export async function notifyNewLead(params: NotifyNewLeadParams): Promise<void> 
           phone: info.ownerPhone,
           scoreLabel: params.scoreLabel,
         })
-      ).catch((err) => console.error('[notify] lead SMS failed', err))
+      ).catch((err) => logger.error('[notify] lead SMS failed', { spaceId: params.spaceId }, err))
     );
   }
 
@@ -173,7 +174,7 @@ export async function notifyNewTour(params: NotifyNewTourParams): Promise<void> 
   if (info.emailEnabled) {
     promises.push(
       sendAgentNotification(info.ownerEmail, params.tourData)
-        .catch((err) => console.error('[notify] tour email failed', err))
+        .catch((err) => logger.error('[notify] tour email failed', { spaceId: params.spaceId }, err))
     );
   }
 
@@ -190,7 +191,7 @@ export async function notifyNewTour(params: NotifyNewTourParams): Promise<void> 
           property: params.tourData.propertyAddress,
           phone: info.ownerPhone,
         })
-      ).catch((err) => console.error('[notify] tour SMS failed', err))
+      ).catch((err) => logger.error('[notify] tour SMS failed', { spaceId: params.spaceId }, err))
     );
   }
 
@@ -230,7 +231,7 @@ export async function notifyNewDeal(params: NotifyNewDealParams): Promise<void> 
         dealAddress: params.dealAddress,
         dealPriority: params.dealPriority,
         contactNames: params.contactNames,
-      }).catch((err) => console.error('[notify] deal email failed', err))
+      }).catch((err) => logger.error('[notify] deal email failed', { spaceId: params.spaceId }, err))
     );
   }
 
@@ -244,7 +245,7 @@ export async function notifyNewDeal(params: NotifyNewDealParams): Promise<void> 
           value: params.dealValue != null ? formatCompact(params.dealValue) : null,
           phone: info.ownerPhone,
         })
-      ).catch((err) => console.error('[notify] deal SMS failed', err))
+      ).catch((err) => logger.error('[notify] deal SMS failed', { spaceId: params.spaceId }, err))
     );
   }
 
@@ -283,7 +284,7 @@ export async function notifyNewContact(params: NotifyNewContactParams): Promise<
         })
       );
     } catch (err) {
-      console.error('[notify] contact SMS failed', err);
+      logger.error('[notify] contact SMS failed', { spaceId: params.spaceId }, err);
     }
   }
 }

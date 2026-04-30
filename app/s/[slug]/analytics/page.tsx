@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { fetchRawAnalyticsData, buildOverviewData } from '@/lib/analytics-data';
 import { OverviewView } from '@/components/analytics/overview-view';
+import { H1, TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
 
 export default async function AnalyticsOverviewPage({
   params,
@@ -19,28 +20,25 @@ export default async function AnalyticsOverviewPage({
   try {
     const raw = await fetchRawAnalyticsData(space.id);
     const data = buildOverviewData(raw);
-
-    return (
-      <div className="space-y-5">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Analytics Overview</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            High-level insights across your leads, contacts, and deals
-          </p>
-        </div>
-        <OverviewView data={data} />
-      </div>
-    );
+    return <OverviewView data={data} />;
   } catch (err) {
     console.error('[analytics/overview] DB queries failed', err);
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">We couldn&apos;t load your data. This is usually temporary.</p>
-          <a href={`/s/${slug}/analytics`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Try again</a>
-        </div>
-      </div>
-    );
+    return <AnalyticsErrorBlock href={`/s/${slug}/analytics`} />;
   }
+}
+
+function AnalyticsErrorBlock({ href }: { href: string }) {
+  return (
+    <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center space-y-3">
+      <p className={H1} style={TITLE_FONT}>
+        Something went wrong
+      </p>
+      <p className={BODY_MUTED}>
+        We couldn&apos;t load your data. This is usually temporary.
+      </p>
+      <a href={href} className={PRIMARY_PILL}>
+        Try again
+      </a>
+    </div>
+  );
 }

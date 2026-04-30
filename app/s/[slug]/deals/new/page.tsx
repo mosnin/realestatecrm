@@ -86,12 +86,12 @@ export default function NewDealPage() {
         router.push(`/s/${slug}/deals/${newDeal.id}`);
       } else {
         const body = await res.json().catch(() => ({}));
-        const message = (body as { error?: string }).error ?? 'Failed to create deal';
+        const message = (body as { error?: string }).error ?? "Couldn't create that deal.";
         setSubmitError(message);
         toast.error(message);
       }
     } catch {
-      const message = 'Failed to create deal. Please try again.';
+      const message = "Couldn't create that deal. Try again.";
       setSubmitError(message);
       toast.error(message);
     } finally {

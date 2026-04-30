@@ -24,7 +24,14 @@ import {
 } from '@/components/ui/sheet';
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
+import { SeatUsagePill, normalizeSeatUsage, type SeatPlan } from '@/components/broker/seat-usage-pill';
 import { useState } from 'react';
+
+export interface BrokerShellSeatUsage {
+  plan: SeatPlan;
+  used: number;
+  seatLimit: number | null;
+}
 
 const navItems = [
   { href: '/broker', label: 'Overview', icon: LayoutDashboard, exact: true },
@@ -67,9 +74,18 @@ interface BrokerShellProps {
   children: React.ReactNode;
   brokerageName: string;
   realtorSlug: string; // link back to the realtor's workspace
+  /**
+   * Optional seat usage data for the current brokerage. When provided and
+   * well-formed, a compact SeatUsagePill is rendered in the top bar. If the
+   * prop is absent or malformed (e.g. pre-migration, when plan/seatLimit
+   * columns don't exist yet) the pill is omitted without crashing the shell.
+   */
+  seatUsage?: BrokerShellSeatUsage;
 }
 
-export function BrokerShell({ children, brokerageName, realtorSlug }: BrokerShellProps) {
+export function BrokerShell({ children, brokerageName, realtorSlug, seatUsage }: BrokerShellProps) {
+  // Pre-migration resilience: silently drop the pill if the shape is off.
+  const normalizedSeatUsage = normalizeSeatUsage(seatUsage);
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const [open, setOpen] = useState(false);
@@ -154,6 +170,19 @@ export function BrokerShell({ children, brokerageName, realtorSlug }: BrokerShel
             </span>
           </div>
           <div className="flex items-center gap-1.5">
+            {normalizedSeatUsage && (
+              <Link
+                href="/broker/billing"
+                className="hidden sm:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-full"
+                aria-label="Brokerage seat usage — open billing"
+              >
+                <SeatUsagePill
+                  plan={normalizedSeatUsage.plan}
+                  used={normalizedSeatUsage.used}
+                  seatLimit={normalizedSeatUsage.seatLimit}
+                />
+              </Link>
+            )}
             <Button
               variant="ghost"
               size="icon"

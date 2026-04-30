@@ -2,22 +2,16 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useAuth } from '@clerk/nextjs';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import {
-  AlertTriangle,
-  Loader2,
-  Check,
-  XCircle,
-  Clock,
-} from 'lucide-react';
+import { useAuth, useClerk } from '@clerk/nextjs';
+import { Loader2 } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
-import { BackgroundPlus } from '@/components/ui/background-plus';
-import { BorderBeam } from '@/components/ui/border-beam';
+import { OnboardingBrandMark } from '@/components/onboarding/onboarding-brand-mark';
+import { BODY_MUTED, GHOST_PILL, PRIMARY_PILL, TITLE_FONT } from '@/lib/typography';
+import { cn } from '@/lib/utils';
 
 function BillingRequiredContent() {
   const { isSignedIn, isLoaded } = useAuth();
+  const { signOut } = useClerk();
   const searchParams = useSearchParams();
   const [slug, setSlug] = useState(searchParams.get('slug') ?? '');
   const reason = searchParams.get('reason') ?? 'past_due';
@@ -50,6 +44,14 @@ function BillingRequiredContent() {
   const isInactive = reason === 'inactive';
   const needsResubscribe = isCanceled || isInactive;
 
+  // Headline: a calm fact. Body voice: forward-looking, in Chippi's tone.
+  const title = needsResubscribe
+    ? 'Your access ended.'
+    : 'Payment didn’t go through.';
+  const subhead = needsResubscribe
+    ? 'Subscribe to keep your pipeline moving.'
+    : 'Update your card to keep your pipeline moving.';
+
   async function handleManageBilling() {
     setLoading(true);
     setError('');
@@ -63,11 +65,11 @@ function BillingRequiredContent() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        setError(data.error || 'Could not open billing portal. Try the billing settings link below.');
+        setError(data.error || 'Could not open billing portal.');
         setLoading(false);
       }
     } catch {
-      setError('Something went wrong. Try the billing settings link below.');
+      setError('Something went wrong. Please try again.');
       setLoading(false);
     }
   }
@@ -94,137 +96,93 @@ function BillingRequiredContent() {
     }
   }
 
-  const title = isCanceled
-    ? 'Subscription canceled'
-    : isInactive
-      ? 'Subscription expired'
-      : 'Payment issue';
-
-  const description = isCanceled
-    ? 'Your subscription has been canceled. Resubscribe to regain access to your dashboard and all your data.'
-    : isInactive
-      ? 'Your subscription has expired. Resubscribe to continue using Chippi.'
-      : 'There was an issue processing your payment. Please update your billing information to continue using Chippi.';
-
-  const StatusIcon = isCanceled ? XCircle : isInactive ? Clock : AlertTriangle;
-
-  const impactItems = [
-    'Dashboard access is paused',
-    'New leads will not be captured',
-    'Scheduled tours are on hold',
-    'Voice AI assistant is offline',
-  ];
+  const primaryLabel = needsResubscribe ? 'Subscribe' : 'Update payment method';
+  const primaryAction = needsResubscribe ? handleResubscribe : handleManageBilling;
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-background px-4 overflow-hidden">
-      <BackgroundPlus plusColor="#ff964f" plusSize={60} />
-      <div className="relative z-10 w-full max-w-3xl space-y-6">
-        {/* Branding */}
-        <div className="flex justify-center">
-          <BrandLogo className="h-8" />
-        </div>
+    <div className="relative min-h-screen w-full overflow-hidden bg-background text-foreground">
+      {/* Brand-warm wash — same as onboarding-shell, so trial-end feels like
+          another staged moment in the same flow. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-orange-50/40 via-background to-orange-50/30 dark:from-orange-500/[0.04] dark:via-background dark:to-orange-500/[0.03]"
+      />
 
-        {/* Split alert card */}
-        <Card className="relative rounded-3xl border border-amber-300/50 shadow-xl overflow-hidden p-0">
-          <BorderBeam lightColor="#ff964f" lightWidth={300} duration={8} borderWidth={2} />
-          <div className="flex flex-col md:flex-row">
-            {/* Left side — Status & Action */}
-            <div className="flex flex-col justify-center gap-6 bg-amber-50 dark:bg-amber-950/20 p-8 md:p-10 md:w-5/12">
-              <div className="space-y-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/40">
-                  <StatusIcon size={24} className="text-amber-600 dark:text-amber-400" />
-                </div>
-                <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {description}
-                </p>
-              </div>
+      {/* Logo, top-left */}
+      <div className="absolute left-6 top-6 z-20">
+        <BrandLogo className="h-7" />
+      </div>
 
-              {/* Error */}
-              {error && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 py-20">
+        <OnboardingBrandMark />
 
-              {/* CTA */}
-              {needsResubscribe ? (
-                <Button
-                  onClick={handleResubscribe}
-                  disabled={loading || !slug}
-                  size="lg"
-                  className="w-full rounded-full text-base font-semibold"
-                >
-                  {loading ? <Loader2 size={18} className="animate-spin mr-2" /> : null}
-                  {loading ? 'Redirecting...' : 'Resubscribe'}
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleManageBilling}
-                  disabled={loading || !slug}
-                  size="lg"
-                  className="w-full rounded-full text-base font-semibold"
-                >
-                  {loading ? <Loader2 size={18} className="animate-spin mr-2" /> : null}
-                  {loading ? 'Redirecting...' : 'Update payment method'}
-                </Button>
-              )}
-
-              <a
-                href={slug ? `/s/${slug}/billing` : '/setup'}
-                className="text-sm text-muted-foreground hover:text-foreground underline text-center"
-              >
-                Go to billing settings
-              </a>
-            </div>
-
-            {/* Right side — Impact details */}
-            <div className="flex flex-col justify-center gap-6 p-8 md:p-10 md:w-7/12">
-              <p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-                What&apos;s affected
-              </p>
-              <ul className="grid grid-cols-1 gap-3">
-                {impactItems.map((item) => (
-                  <li key={item} className="flex items-center gap-3 text-sm">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
-                      <AlertTriangle size={12} className="text-amber-600 dark:text-amber-400" />
-                    </span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="border-t border-border pt-4 space-y-3">
-                <p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-                  What you keep
-                </p>
-                <ul className="grid grid-cols-1 gap-3">
-                  {['All your contacts & deal history', 'Saved forms & templates', 'Analytics data'].map(
-                    (item) => (
-                      <li key={item} className="flex items-center gap-3 text-sm">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                          <Check size={12} className="text-primary" />
-                        </span>
-                        <span>{item}</span>
-                      </li>
-                    ),
-                  )}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Help */}
-        <p className="text-center text-xs text-muted-foreground">
-          Need help?{' '}
-          <a
-            href="mailto:support@usechippi.com"
-            className="text-primary underline hover:text-primary/80"
+        <div className="mt-7 flex w-full max-w-xl flex-col items-center text-center">
+          {/* Title — serif Times, calm fact */}
+          <h1
+            className="text-4xl tracking-tight text-foreground"
+            style={TITLE_FONT}
           >
-            Contact support
-          </a>
-        </p>
+            {title}
+          </h1>
+
+          {/* One-line subhead in brand voice */}
+          <p className={cn(BODY_MUTED, 'mt-3 text-base')}>{subhead}</p>
+
+          {/* Brand promise — same two-line treatment as auth right panel.
+              Reinforces the brand at the moment they're choosing to pay. */}
+          <div className="mt-10">
+            <p style={TITLE_FONT} className="text-2xl tracking-tight text-foreground">
+              I keep your day moving
+            </p>
+            <p style={TITLE_FONT} className="text-xl tracking-tight text-muted-foreground">
+              so you don&apos;t have to.
+            </p>
+          </div>
+
+          {/* Error — quiet, not a colored panel */}
+          {error && (
+            <p className="mt-6 text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
+
+          {/* Primary action — single pill */}
+          <div className="mt-10 flex flex-col items-center gap-3">
+            <button
+              type="button"
+              onClick={primaryAction}
+              disabled={loading || !slug}
+              className={cn(
+                PRIMARY_PILL,
+                'h-10 px-6',
+                'disabled:cursor-not-allowed disabled:opacity-40',
+              )}
+            >
+              {loading ? <Loader2 size={14} className="animate-spin" /> : null}
+              {loading ? 'Redirecting…' : primaryLabel}
+            </button>
+
+            {/* Quiet secondary — sign out */}
+            <button
+              type="button"
+              onClick={() => signOut({ redirectUrl: '/login/realtor' })}
+              className={GHOST_PILL}
+            >
+              Sign out
+            </button>
+          </div>
+
+          {/* Help — tiny caption, no urgency */}
+          <p className="mt-12 text-xs text-muted-foreground">
+            Need help?{' '}
+            <a
+              href="mailto:support@usechippi.com"
+              className="underline underline-offset-4 hover:text-foreground transition-colors"
+            >
+              Contact support
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );

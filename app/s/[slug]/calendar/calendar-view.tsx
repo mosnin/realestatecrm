@@ -12,8 +12,12 @@ import {
   Plus,
   X,
   StickyNote,
+  CalendarPlus,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { H1, H2, H3, TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
+import { TourStatsStrip } from '@/components/tours/tour-stats-strip';
+import { cn } from '@/lib/utils';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -58,14 +62,26 @@ interface CalendarNote {
   note: string;
 }
 
+interface TourStat {
+  startsAt: string;
+  status: string;
+  sourceDealId: string | null;
+  createdAt?: string;
+}
+
 interface CalendarViewProps {
   slug: string;
   tours: Tour[];
+  /** Wider window of tours used to compute the stat strip. */
+  tourStats: TourStat[];
   contactFollowUps: ContactFollowUp[];
   dealFollowUps: DealFollowUp[];
   customEvents: CustomEvent[];
   calendarNotes: CalendarNote[];
 }
+
+/** What's visible on the calendar grid. */
+type LayerFilter = 'all' | 'tours' | 'followups';
 
 type UrgencyLevel = 'overdue' | 'today' | 'soon' | 'upcoming';
 
@@ -173,12 +189,21 @@ function colorToBgClass(color: string): string {
 
 export function CalendarView({
   slug,
-  tours,
-  contactFollowUps,
-  dealFollowUps,
+  tours: rawTours,
+  tourStats,
+  contactFollowUps: rawContactFollowUps,
+  dealFollowUps: rawDealFollowUps,
   customEvents: initialCustomEvents,
   calendarNotes: initialCalendarNotes,
 }: CalendarViewProps) {
+  const [layer, setLayer] = useState<LayerFilter>('all');
+
+  // Filter chip state. "Tours" hides follow-ups; "Follow-ups" hides tours.
+  // Custom events + notes always show — they're the user's own annotations,
+  // not a queryable layer.
+  const tours = layer === 'followups' ? [] : rawTours;
+  const contactFollowUps = layer === 'tours' ? [] : rawContactFollowUps;
+  const dealFollowUps = layer === 'tours' ? [] : rawDealFollowUps;
   const today = new Date();
   const todayKey = toDateKey(today);
 
@@ -476,14 +501,15 @@ export function CalendarView({
     return (
       <div className="space-y-1 mt-1 overflow-y-auto max-h-32">
         {dayTours.map((t) => (
-          <Link
+          <button
             key={t.id}
-            href={`/s/${slug}/tours`}
-            className="block text-[10px] leading-tight bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded px-1 py-0.5 truncate hover:bg-orange-100 dark:hover:bg-orange-950/50 transition-colors"
+            type="button"
+            onClick={() => selectDate(dateKey)}
+            className="block w-full text-left text-[10px] leading-tight bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded px-1 py-0.5 truncate hover:bg-orange-100 dark:hover:bg-orange-950/50 transition-colors"
           >
             <span className="font-medium">{t.guestName}</span>
             <span className="text-muted-foreground ml-1">{formatTime(t.startsAt)}</span>
-          </Link>
+          </button>
         ))}
         {dayContacts.map((c) => (
           <Link
@@ -533,7 +559,7 @@ export function CalendarView({
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-muted-foreground">
+          <h3 className={H3}>
             {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
               weekday: 'long',
               month: 'long',
@@ -630,7 +656,7 @@ export function CalendarView({
                     disabled={formSubmitting}
                     className="px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-80 disabled:opacity-50 transition-opacity"
                   >
-                    {formSubmitting ? 'Saving...' : 'Save event'}
+                    {formSubmitting ? 'Saving' : 'Save event'}
                   </button>
                   <button
                     type="button"
@@ -685,44 +711,42 @@ export function CalendarView({
 
         {!hasSelectedEvents && !showAddForm && !showAddNote && (
           <p className="text-sm text-muted-foreground">
-            No events on this day.
+            Nothing on this day.
           </p>
         )}
 
-        {/* Tours */}
+        {/* Tours — calendar absorbs the tour surface, so no link out. */}
         {selectedTours.map((tour) => (
-          <Link key={tour.id} href={`/s/${slug}/tours`} className="block group">
-            <Card className="transition-colors group-hover:border-border">
-              <CardContent className="p-4 flex items-start gap-3">
-                <span className="mt-1 w-2 h-2 rounded-full bg-orange-500 shrink-0" />
-                <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-sm truncate">
-                      {tour.guestName}
-                    </span>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
-                        tour.status === 'confirmed'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                      }`}
-                    >
-                      {tour.status}
-                    </span>
-                  </div>
-                  {tour.propertyAddress && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {tour.propertyAddress}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    {formatTime(tour.startsAt)} &ndash; {formatTime(tour.endsAt)}
-                  </p>
+          <Card key={tour.id} className="transition-colors">
+            <CardContent className="p-4 flex items-start gap-3">
+              <span className="mt-1 w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-sm truncate">
+                    {tour.guestName}
+                  </span>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
+                      tour.status === 'confirmed'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                    }`}
+                  >
+                    {tour.status}
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
-          </Link>
+                {tour.propertyAddress && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    {tour.propertyAddress}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {formatTime(tour.startsAt)} &ndash; {formatTime(tour.endsAt)}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         ))}
 
         {/* Contact follow-ups */}
@@ -830,6 +854,50 @@ export function CalendarView({
 
   return (
     <div className="space-y-4">
+      {/* Header — title + the tour-booking primary action. Calendar absorbed
+          Tours, so the "Schedule tour" pill lives here now. */}
+      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <h1 className={H1} style={TITLE_FONT}>
+          Calendar
+        </h1>
+        <Link
+          href={`/book/${slug}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={PRIMARY_PILL}
+        >
+          <CalendarPlus className="h-4 w-4" />
+          Schedule tour
+        </Link>
+      </header>
+
+      {/* Tour stat strip — paper-flat, sits above the grid. */}
+      <TourStatsStrip tours={tourStats} />
+
+      {/* Layer filter — narrow the grid down to one event class. Custom
+          events + notes always render; they aren't a queryable layer. */}
+      <div className="flex items-center gap-1.5">
+        {([
+          { key: 'all', label: 'All' },
+          { key: 'tours', label: 'Tours' },
+          { key: 'followups', label: 'Follow-ups' },
+        ] as const).map((chip) => (
+          <button
+            key={chip.key}
+            type="button"
+            onClick={() => setLayer(chip.key)}
+            className={cn(
+              'h-7 rounded-full border px-3 text-xs font-medium transition-colors duration-150',
+              layer === chip.key
+                ? 'border-foreground bg-foreground text-background'
+                : 'border-border/70 bg-background text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+            )}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+
       {/* View mode tabs */}
       <div className="flex items-center gap-1 border-b border-border">
         {(['month', 'week', 'day'] as const).map((mode) => (
@@ -858,14 +926,14 @@ export function CalendarView({
         </button>
 
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold">
+          <h2 className={H2}>
             {view === 'month' && `${MONTH_NAMES[currentMonth]} ${currentYear}`}
             {view === 'week' && weekLabel()}
             {view === 'day' && dayLabel()}
           </h2>
           <button
             onClick={goToday}
-            className="px-2.5 py-1 text-xs font-medium rounded-md border border-border hover:bg-muted transition-colors"
+            className="px-3 h-7 text-xs rounded-md border border-border/70 bg-background hover:bg-foreground/[0.04] transition-colors duration-150"
           >
             Today
           </button>

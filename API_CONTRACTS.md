@@ -176,11 +176,42 @@ All protected routes use one of these auth helpers from `lib/api-auth.ts`:
 
 ## AI endpoints
 
-### `POST /api/ai/chat`
-- **Auth**: `requireAuth()`
-- **Body**: `{ slug, message, conversationId? }`
-- **Response**: Streaming text (SSE/ReadableStream)
-- **Side effects**: Persists user + assistant messages to `Message` table, RAG context lookup
+### `POST /api/ai/task`
+- **Auth**: `resolveToolContext(spaceSlug)` — resolves the caller, their space, and an abortable `ToolContext`; returns 401/403/404 on failure
+- **Rate limit**: `30 tasks/hour` per user (key `ai:task:{userId}`, returns `429` with `{ error: 'Rate limit exceeded (30 tasks/hour). Please wait.' }`)
+- **Body**: `{ spaceSlug: string, conversationId?: string | null, message: string }`
+  - `message` is trimmed; empty → `400 message required`
+  - `message` max length is `8000` chars → `400 message too long (8000 char max)`
+  - `spaceSlug` required → `400 spaceSlug required`
+  - If `conversationId` is missing or doesn't belong to the space, a new `Conversation` row is created (title auto-derived from the first 60 sanitised chars of the message, or `"Task"`)
+- **Response**: `text/event-stream; charset=utf-8` (`Cache-Control: no-cache, no-transform`, `X-Accel-Buffering: no`).
+  Each frame is `event: <type>\ndata: <json>\n\n` where the JSON is an `AgentEvent` (see `lib/ai-tools/events.ts`). Every event carries monotonic `seq: number` and ISO `ts: string`. The union:
+
+  | Event `type` | Key fields | When emitted |
+  |---|---|---|
+  | `text_delta` | `delta: string` | Each streamed assistant-text token |
+  | `tool_call_start` | `callId, name, args, display?` | Read-only tool is about to run |
+  | `tool_call_result` | `callId, ok, summary, data?, error?` | Tool finished (or errored) |
+  | `permission_required` | `requestId, callId, name, args, summary, display?, otherPendingCalls?` | Mutating tool is pending — loop pauses |
+  | `permission_resolved` | `requestId, callId, decision, editedArgs?` | Emitted by the approve endpoint after the user decides |
+  | `turn_complete` | `reason: 'complete' \| 'paused' \| 'aborted'` | End-of-turn sentinel (always last) |
+  | `error` | `message, code?: 'rate_limited' \| 'quota' \| 'internal' \| 'auth'` | Unrecoverable turn failure |
+
+  Error responses before the stream opens use `NextResponse.json` with `{ error }` at `400`/`429`/`500`/`503` as appropriate.
+- **Side effects**:
+  - Persists the user message to `Message` (role `user`) before streaming
+  - Persists the assistant turn to `Message` (role `assistant`, `blocks: MessageBlock[]`) once the loop completes or pauses — `blocks` is the canonical renderable transcript (text / tool_call / permission blocks; see `lib/ai-tools/blocks.ts`); `content` is a legacy concatenation of text blocks, falling back to `'(tool-only turn)'`
+  - On `paused`, stashes a `PendingApprovalState` in Redis keyed by `requestId` (consumed by the approve endpoint)
+
+### `POST /api/ai/task/approve/[requestId]`
+- **Auth**: `requireAuth()` + the stashed `PendingApprovalState.userId` must equal the caller's `userId` (`403 Forbidden` otherwise)
+- **Rate limit**: `60/hour` per user (key `ai:task-approve:{userId}`, returns `429 { error: 'Rate limit exceeded for approvals' }`)
+- **Body**: `{ decision: 'approved' | 'denied', editedArgs?: Record<string, unknown> }`
+  - `decision` must be one of those two literals → `400 decision must be "approved" or "denied"`
+  - `editedArgs` is accepted only as a plain object (arrays ignored); overrides the pending call's args before execution (Phase 3d)
+- **Errors**: `400` (bad body / missing `requestId`), `403` (not owner), `410 Approval request not found or expired` (state missing or already consumed), `503` (missing OpenAI key)
+- **Response**: Same SSE shape as `/api/ai/task` — the continuation stream emits `permission_resolved`, the resumed `tool_call_start` / `tool_call_result` (or cascade `PermissionBlock`s on deny), optionally more `text_delta`, and a final `turn_complete`. If the resumed turn hits another mutating call, it re-emits `permission_required` and a new `PendingApprovalState` is stashed.
+- **Side effects**: Atomically `consumePendingApproval(requestId)` (one-shot, no replays); writes a new assistant `Message` row for the continuation blocks.
 
 ### `GET /api/ai/conversations?slug=X`
 - **Auth**: `requireSpaceOwner(slug)`

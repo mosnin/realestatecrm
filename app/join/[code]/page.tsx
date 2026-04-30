@@ -58,12 +58,12 @@ export default async function JoinWithCodePage({ params }: Params) {
               <>
                 <div>
                   <p className="text-sm text-foreground leading-relaxed">
-                    You've been invited to join{' '}
+                    You&apos;ve been invited to join{' '}
                     <span className="font-semibold">{brokerage.name}</span> as a{' '}
                     <span className="font-semibold">Realtor Member</span>.
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">
-                    You'll keep your own workspace, leads, and pipeline — this just adds you to the brokerage network.
+                    You&apos;ll keep your own workspace, leads, and pipeline — this just adds you to the brokerage network.
                   </p>
                 </div>
                 <JoinCodeAcceptButton code={normalizedCode} />

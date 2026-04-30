@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { pickContrastColor } from '@/lib/color';
 import {
   CheckCircle2,
   Loader2,
@@ -498,10 +499,10 @@ export function ApplicationForm({
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="rounded-2xl bg-card border border-border shadow-xl p-8 text-center space-y-3"
+          className="p-8 text-center space-y-3"
         >
-          <Loader2 size={28} className="animate-spin text-primary mx-auto" />
-          <p className="text-sm font-medium text-foreground">Processing your application...</p>
+          <Loader2 size={28} className="animate-spin text-foreground/70 mx-auto" />
+          <p className="text-sm font-medium text-foreground">Processing your application</p>
           <p className="text-xs text-muted-foreground">This will only take a moment</p>
         </motion.div>
       </motion.div>
@@ -517,18 +518,21 @@ export function ApplicationForm({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
-          className="rounded-xl bg-card border border-border/60 shadow-sm p-6 md:p-8 text-center space-y-5"
+          className="p-6 md:p-8 text-center space-y-5"
         >
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 15 }}
-            className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto"
+            className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto"
           >
-            <CheckCircle2 size={28} className="text-green-600 dark:text-green-400" />
+            <CheckCircle2 size={24} className="text-emerald-600 dark:text-emerald-400" />
           </motion.div>
           <div className="space-y-1.5">
-            <h2 className="text-xl font-semibold text-foreground">
+            <h2
+              className="text-3xl tracking-tight text-foreground"
+              style={{ fontFamily: 'var(--font-title)' }}
+            >
               {customization?.thankYouTitle || 'Application received'}
             </h2>
             <p className="text-sm text-muted-foreground">
@@ -538,7 +542,7 @@ export function ApplicationForm({
           {scoreState?.applicationRef && (
             <a
               href={`/apply/${slug}/status?ref=${scoreState.applicationRef}`}
-              className="inline-flex items-center gap-2 text-sm text-primary font-medium hover:underline"
+              className="inline-flex items-center gap-2 text-sm text-foreground hover:text-foreground/70 transition-colors"
             >
               Track your application status &rarr;
             </a>
@@ -551,6 +555,7 @@ export function ApplicationForm({
   const radiusClass = RADIUS_CLASS_MAP[customization?.borderRadius || 'rounded'] || 'rounded-xl';
   const fontClass = FONT_CLASS_MAP[customization?.font || 'system'] || '';
   const accentColor = customization?.accentColor || '#ff964f';
+  const primaryTextColor = pickContrastColor(accentColor);
   const embedUrl = customization?.videoUrl ? toEmbedUrl(customization.videoUrl) : null;
 
   // ── Shared step renderers ──
@@ -568,6 +573,7 @@ export function ApplicationForm({
           <Input
             id="name"
             type="text"
+            autoComplete="name"
             placeholder="Alex Johnson"
             value={get('name')}
             onChange={(e) => set('name', e.target.value)}
@@ -582,6 +588,7 @@ export function ApplicationForm({
           <Input
             id="email"
             type="email"
+            autoComplete="email"
             placeholder="alex@email.com"
             value={get('email')}
             onChange={(e) => set('email', e.target.value)}
@@ -596,6 +603,7 @@ export function ApplicationForm({
           <Input
             id="phone"
             type="tel"
+            autoComplete="tel"
             placeholder="(555) 123-4567"
             value={get('phone')}
             onChange={(e) => set('phone', e.target.value)}
@@ -1128,6 +1136,7 @@ export function ApplicationForm({
               <Input
                 id="occupants"
                 type="number"
+                inputMode="numeric"
                 min={1}
                 placeholder="e.g., 2"
                 value={get('occupants')}
@@ -1267,8 +1276,8 @@ export function ApplicationForm({
             <Button
               type="button"
               onClick={goNext}
-              className="flex-shrink-0 rounded-full px-6 text-white shadow-md hover:shadow-lg transition-shadow"
-              style={{ backgroundColor: accentColor }}
+              className="flex-shrink-0 rounded-full px-6 shadow-md hover:shadow-lg transition-shadow"
+              style={{ backgroundColor: accentColor, color: primaryTextColor }}
             >
               Continue
               <ChevronRight size={15} className="ml-1" />
@@ -1279,8 +1288,8 @@ export function ApplicationForm({
               onClick={onSubmit}
               disabled={submitting}
               size="lg"
-              className="flex-1 sm:flex-none rounded-full px-8 text-white shadow-md hover:shadow-lg transition-shadow"
-              style={{ backgroundColor: accentColor }}
+              className="flex-1 sm:flex-none rounded-full px-8 shadow-md hover:shadow-lg transition-shadow"
+              style={{ backgroundColor: accentColor, color: primaryTextColor }}
             >
               {submitting ? (
                 <>

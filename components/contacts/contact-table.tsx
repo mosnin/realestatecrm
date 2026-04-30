@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { LiquidMetalButton } from '@/components/ui/liquid-metal-button';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -12,6 +11,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ContactForm } from './contact-form';
+import { LeadScoreBar } from '@/components/agent/lead-score-bar';
+import { ContactAgentContext } from '@/components/agent/contact-agent-context';
 import {
   Plus,
   Search,
@@ -31,10 +32,25 @@ import {
   CheckSquare,
   GitCompare,
   CalendarDays,
-  ArrowUpDown,
+  MoreHorizontal,
+  Users,
+  Inbox,
+  Copy,
+  Check,
+  ExternalLink,
 } from 'lucide-react';
+import { BODY_MUTED, TITLE_FONT, QUIET_LINK } from '@/lib/typography';
+import { buildIntakeUrl } from '@/lib/intake';
 import Link from 'next/link';
 import { ApplicationCompare } from './application-compare';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { downloadCSV } from '@/lib/csv';
 import type { SavedView } from '@/lib/types';
@@ -43,6 +59,7 @@ import { CONTACT_STAGES } from '@/lib/constants';
 import { CsvImportModal } from './csv-import-modal';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { motion } from 'framer-motion';
 
 type Client = {
   id: string;
@@ -59,6 +76,7 @@ type Client = {
   tags: string[];
   followUpAt: string | null;
   leadType: 'rental' | 'buyer';
+  leadScore: number | null;
 };
 
 const STAGES = CONTACT_STAGES;
@@ -72,13 +90,51 @@ interface ContactTableProps {
   slug: string;
 }
 
+function CopyButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore clipboard rejection */
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      aria-label={copied ? 'Copied' : 'Copy intake link'}
+      className={cn(
+        'inline-flex items-center justify-center w-7 h-7 rounded-md border transition-colors duration-150 active:scale-[0.98]',
+        copied
+          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+          : 'border-border/60 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+      )}
+    >
+      {copied ? <Check size={12} strokeWidth={2.25} /> : <Copy size={12} strokeWidth={1.75} />}
+    </button>
+  );
+}
+
 export function ContactTable({ slug }: ContactTableProps) {
   const [contacts, setContacts] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
-  const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'rental' | 'buyer'>('all');
+  const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'new' | 'rental' | 'buyer'>('all');
   const [tagFilter, setTagFilter] = useState('');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name-az' | 'name-za'>('newest');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name-az' | 'name-za' | 'agent-priority'>('agent-priority');
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editContact, setEditContact] = useState<Client | null>(null);
@@ -188,19 +244,19 @@ export function ContactTable({ slug }: ContactTableProps) {
   async function handleDelete(id: string) {
     const contact = contacts.find((c) => c.id === id);
     const confirmed = await confirm({
-      title: 'Remove this client?',
-      description: contact ? `"${contact.name}" will be permanently removed from your CRM.` : 'This client will be permanently removed.',
+      title: 'Delete this client?',
+      description: contact ? `"${contact.name}" will be gone. I can't bring them back.` : "This client will be gone. I can't bring them back.",
     });
     if (!confirmed) return;
     try {
       const res = await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        toast.success('Contact deleted');
+        toast.success('Contact deleted.');
       } else {
-        toast.error('Failed to delete contact');
+        toast.error("Couldn't delete that contact. Try again.");
       }
     } catch {
-      toast.error('Failed to delete contact');
+      toast.error("Couldn't delete that contact. Try again.");
     }
     fetchContacts();
   }
@@ -226,22 +282,22 @@ export function ContactTable({ slug }: ContactTableProps) {
     const ids = [...selectedIds];
     const confirmed = await confirm({
       title: `Delete ${ids.length} client${ids.length !== 1 ? 's' : ''}?`,
-      description: 'This will permanently remove the selected clients from your CRM. This cannot be undone.',
+      description: "These will be gone. I can't bring them back.",
     });
     if (!confirmed) return;
     try {
       const results = await Promise.allSettled(ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })));
       const failures = results.filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));
       if (failures.length === 0) {
-        toast.success(`Deleted ${ids.length} contacts`);
+        toast.success(`Deleted ${ids.length} contacts.`);
       } else if (failures.length === ids.length) {
-        toast.error('Failed to delete contacts');
+        toast.error("Couldn't delete those contacts. Try again.");
       } else {
-        toast.success(`Deleted ${ids.length - failures.length} contacts`);
-        toast.error(`${failures.length} failed to delete`);
+        toast.success(`Deleted ${ids.length - failures.length} contacts.`);
+        toast.error(`${failures.length} got stuck. Try those again.`);
       }
     } catch {
-      toast.error('Failed to delete contacts');
+      toast.error("Couldn't delete those contacts. Try again.");
     } finally {
       setSelectedIds(new Set());
       fetchContacts();
@@ -262,10 +318,10 @@ export function ContactTable({ slug }: ContactTableProps) {
       );
       const failures = results.filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));
       if (failures.length > 0) {
-        toast.error(`${failures.length} contact${failures.length !== 1 ? 's' : ''} failed to update`);
+        toast.error(`${failures.length} contact${failures.length !== 1 ? 's' : ''} got stuck. Try those again.`);
       }
     } catch {
-      toast.error('Failed to update contacts');
+      toast.error("Couldn't update those contacts. Try again.");
     } finally {
       setSelectedIds(new Set());
       fetchContacts();
@@ -313,9 +369,15 @@ export function ContactTable({ slug }: ContactTableProps) {
   // Apply tag + leadType filters and sorting client-side
   const visibleContacts = (() => {
     let list = contacts
-      .filter((c) => leadTypeFilter === 'all' || c.leadType === leadTypeFilter)
+      .filter((c) => {
+        if (leadTypeFilter === 'all') return true;
+        if (leadTypeFilter === 'new') return c.tags.includes('new-lead');
+        return c.leadType === leadTypeFilter;
+      })
       .filter((c) => !tagFilter || c.tags.includes(tagFilter));
-    if (sortBy === 'oldest') {
+    if (sortBy === 'agent-priority') {
+      list = [...list].sort((a, b) => (b.leadScore ?? -1) - (a.leadScore ?? -1));
+    } else if (sortBy === 'oldest') {
       list = [...list].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     } else if (sortBy === 'newest') {
       list = [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -329,21 +391,255 @@ export function ContactTable({ slug }: ContactTableProps) {
 
   const contactViews = savedViews.filter((v) => v.page === 'contacts');
 
+  const leadTypeChips: { key: 'all' | 'new' | 'rental' | 'buyer'; label: string; count: number }[] = [
+    { key: 'all', label: 'All', count: contacts.length },
+    { key: 'new', label: 'New', count: contacts.filter((c) => c.tags.includes('new-lead')).length },
+    { key: 'rental', label: 'Rental', count: contacts.filter((c) => c.leadType === 'rental').length },
+    { key: 'buyer', label: 'Buyer', count: contacts.filter((c) => c.leadType === 'buyer').length },
+  ];
+
+  const sortLabels: Record<typeof sortBy, string> = {
+    'agent-priority': 'Smart',
+    newest: 'Recently added',
+    oldest: 'Oldest first',
+    'name-az': 'Name A–Z',
+    'name-za': 'Name Z–A',
+  };
+
+  const stageLabels: Record<string, string> = {
+    ALL: 'All stages',
+    QUALIFICATION: 'Qualifying',
+    TOUR: 'Tour',
+    APPLICATION: 'Applied',
+  };
+
+  const fullIntakeUrl = buildIntakeUrl(slug);
+  const intakeUrlWithoutProtocol = fullIntakeUrl.replace(/^https?:\/\//, '');
+
   return (
     <div className="space-y-4">
-      {/* Saved view chips */}
+      {/* Page header */}
+      <div className="flex items-end justify-between mb-6">
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          People
+        </h1>
+        <Button
+          onClick={() => setAddOpen(true)}
+          className="h-9 gap-1.5 rounded-full px-4 bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] transition-all"
+        >
+          <Plus size={14} strokeWidth={2.25} />
+          Add a person
+        </Button>
+      </div>
+
+      {/* Filter chip row + toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Lead type chips (with New folded in) */}
+        <div className="flex items-center gap-1">
+          {leadTypeChips.map((chip) => {
+            const active = leadTypeFilter === chip.key;
+            return (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={() => setLeadTypeFilter(chip.key)}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full px-3 h-8 sm:h-7 text-xs font-medium transition-colors',
+                  active
+                    ? 'bg-foreground text-background'
+                    : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
+                )}
+              >
+                {chip.label}
+                <span className={cn('tabular-nums text-[11px]', active ? 'opacity-70' : 'opacity-60')}>
+                  {chip.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Toolbar — pushes right */}
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
+          {/* Search */}
+          <div className="relative flex-1 sm:flex-initial min-w-[160px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search…"
+              className="pl-9 h-9 w-full sm:w-56 bg-background border-border/70"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Sort dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors"
+              >
+                <span className="text-muted-foreground">Sort:</span>
+                {sortLabels[sortBy]}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {(Object.keys(sortLabels) as (keyof typeof sortLabels)[]).map((key) => (
+                <DropdownMenuItem
+                  key={key}
+                  onSelect={() => setSortBy(key)}
+                  className={cn(sortBy === key && 'font-semibold')}
+                >
+                  {sortLabels[key]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Stage filter — keep as dedicated dropdown (commonly used) */}
+          {(view === 'list' || search) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors"
+                >
+                  <span className="text-muted-foreground">Stage:</span>
+                  {stageLabels[typeFilter] ?? 'All stages'}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                {(['ALL', 'QUALIFICATION', 'TOUR', 'APPLICATION'] as const).map((key) => (
+                  <DropdownMenuItem
+                    key={key}
+                    onSelect={() => setTypeFilter(key)}
+                    className={cn(typeFilter === key && 'font-semibold')}
+                  >
+                    {stageLabels[key]}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {/* View toggle */}
+          <div className="flex rounded-md border border-border/70 overflow-hidden bg-background flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setView('list')}
+              aria-label="List view"
+              className={cn(
+                'h-9 w-9 flex items-center justify-center transition-colors',
+                view === 'list'
+                  ? 'bg-foreground/[0.045] text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+              )}
+            >
+              <List size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('card')}
+              aria-label="Grid view"
+              className={cn(
+                'h-9 w-9 flex items-center justify-center transition-colors',
+                view === 'card'
+                  ? 'bg-foreground/[0.045] text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+              )}
+            >
+              <LayoutGrid size={14} />
+            </button>
+          </div>
+
+          {/* Overflow */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="More options"
+                className="h-9 w-9 flex items-center justify-center rounded-md border border-border/70 bg-background text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+              >
+                <MoreHorizontal size={14} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onSelect={() => setShowSaveInput(true)}>
+                <Bookmark size={12} />
+                Save view
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setImportOpen(true)}>
+                <Upload size={12} />
+                Import
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => handleExportAll()}
+                disabled={contacts.length === 0}
+              >
+                <Download size={12} />
+                Export
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      {/* Save view inline input */}
+      {showSaveInput && (
+        <div className="flex items-center gap-1.5">
+          <input
+            ref={saveInputRef}
+            type="text"
+            value={saveViewName}
+            onChange={(e) => setSaveViewName(e.target.value)}
+            placeholder="Name this view…"
+            className="text-xs rounded-md border border-border/70 bg-background px-2.5 h-8 w-44 focus:outline-none focus:ring-2 focus:ring-ring"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSaveView();
+              if (e.key === 'Escape') setShowSaveInput(false);
+            }}
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={handleSaveView}
+            className="h-8 px-3 rounded-md text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowSaveInput(false)}
+            className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* Saved view chips — paper-flat */}
       {contactViews.length > 0 && (
         <div className="flex flex-wrap gap-1.5 items-center">
           <span className="text-xs text-muted-foreground mr-1">Saved:</span>
           {contactViews.map((v) => (
-            <span key={v.id} className="inline-flex items-center gap-1 text-xs font-medium bg-muted rounded-full pl-2.5 pr-1 py-1">
-              <button type="button" onClick={() => applyView(v)} className="hover:text-foreground transition-colors">
+            <span
+              key={v.id}
+              className="inline-flex items-center gap-1 text-xs font-medium rounded-full pl-2.5 pr-1 h-6 border border-border/70 bg-background"
+            >
+              <button
+                type="button"
+                onClick={() => applyView(v)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
                 {v.name}
               </button>
               <button
                 type="button"
                 onClick={() => deleteView(v.id)}
-                className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                className="w-4 h-4 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
               >
                 <X size={9} />
               </button>
@@ -352,38 +648,14 @@ export function ContactTable({ slug }: ContactTableProps) {
         </div>
       )}
 
-      {/* Pipeline mini bar (card view only, non-empty) */}
-      {!loading && contacts.length > 0 && view === 'card' && (
-        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3">
-          {STAGES.map((stage, i) => {
-            const count = stageCounts[stage.key];
-            return (
-              <div key={stage.key} className="flex items-center gap-2">
-                {i > 0 && (
-                  <ArrowRight size={13} className="text-muted-foreground/40 flex-shrink-0" />
-                )}
-                <div className="flex items-center gap-2">
-                  <span className={cn('w-2 h-2 rounded-full flex-shrink-0', stage.dotColor)} />
-                  <span className="text-xs text-muted-foreground">{stage.label}</span>
-                  <span className="text-xs font-semibold tabular-nums text-foreground">{count}</span>
-                </div>
-              </div>
-            );
-          })}
-          <div className="ml-auto text-xs text-muted-foreground">
-            {tagFilter ? `${visibleContacts.length} of ` : ''}{contacts.length} total
-          </div>
-        </div>
-      )}
-
-      {/* Tag filter strip */}
+      {/* Tag filter strip — paper-flat */}
       {allTags.length > 0 && (
         <div className="flex flex-wrap gap-1.5 items-center">
           {tagFilter && (
             <button
               type="button"
               onClick={() => setTagFilter('')}
-              className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 py-1 bg-foreground text-background"
+              className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 h-8 sm:h-6 bg-foreground text-background"
             >
               <X size={10} />
               Clear tag
@@ -395,10 +667,10 @@ export function ContactTable({ slug }: ContactTableProps) {
               type="button"
               onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
               className={cn(
-                'inline-flex items-center text-xs font-medium rounded-full px-2.5 py-1 border transition-colors',
+                'inline-flex items-center text-xs font-medium rounded-full px-2.5 h-8 sm:h-6 transition-colors',
                 tagFilter === tag
-                  ? 'bg-foreground text-background border-transparent'
-                  : 'bg-muted text-muted-foreground border-transparent hover:text-foreground hover:bg-accent',
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground border border-border/70 bg-background',
               )}
             >
               {tag}
@@ -407,208 +679,166 @@ export function ContactTable({ slug }: ContactTableProps) {
         </div>
       )}
 
-      {/* Lead type filter */}
-      <div className="flex gap-1 items-center">
-        <span className="text-xs text-muted-foreground mr-1">Lead type:</span>
-        {(['all', 'rental', 'buyer'] as const).map((key) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setLeadTypeFilter(key)}
-            className={cn(
-              'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-              leadTypeFilter === key
-                ? 'bg-foreground text-background'
-                : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
-            )}
-          >
-            {key === 'all' ? 'All' : key === 'rental' ? 'Rental' : 'Buyer'}
-            {key !== 'all' && (
-              <span className={cn('ml-1 tabular-nums', leadTypeFilter === key ? 'opacity-80' : 'opacity-60')}>
-                {contacts.filter((c) => c.leadType === key).length}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-2.5">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search clients..."
-            className="pl-9 bg-card"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {/* Sort dropdown */}
-          <div className="relative">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="appearance-none rounded-md border border-border bg-card pl-7 pr-8 py-2 text-xs font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring h-9"
-            >
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-              <option value="name-az">Name A-Z</option>
-              <option value="name-za">Name Z-A</option>
-            </select>
-            <ArrowUpDown size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          </div>
-
-          {/* Stage filter — list view only or when searching */}
-          {(view === 'list' || search) && (
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-40 bg-card">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All stages</SelectItem>
-                <SelectItem value="QUALIFICATION">Qualifying</SelectItem>
-                <SelectItem value="TOUR">Tour</SelectItem>
-                <SelectItem value="APPLICATION">Applied</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-
-          {/* Save current view */}
-          {showSaveInput ? (
-            <div className="flex gap-1">
-              <input
-                ref={saveInputRef}
-                type="text"
-                value={saveViewName}
-                onChange={(e) => setSaveViewName(e.target.value)}
-                placeholder="View name…"
-                className="text-xs rounded-md border border-input bg-card px-2 py-1 w-28 focus:outline-none focus:ring-2 focus:ring-ring"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveView();
-                  if (e.key === 'Escape') setShowSaveInput(false);
-                }}
-                autoFocus
-              />
-              <Button size="sm" variant="outline" onClick={handleSaveView} className="text-xs h-8 px-2">Save</Button>
-              <Button size="sm" variant="ghost" onClick={() => setShowSaveInput(false)} className="h-8 px-2">
-                <X size={13} />
-              </Button>
-            </div>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowSaveInput(true)}
-              className="gap-1.5 text-xs h-9"
-              title="Save current filter as a view"
-            >
-              <Bookmark size={12} />
-              Save view
-            </Button>
-          )}
-
-          {/* Import CSV */}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setImportOpen(true)}
-            className="gap-1.5 text-xs h-9"
-          >
-            <Upload size={12} />
-            Import
-          </Button>
-
-          {/* Export CSV */}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleExportAll}
-            className="gap-1.5 text-xs h-9"
-            disabled={contacts.length === 0}
-          >
-            <Download size={12} />
-            Export
-          </Button>
-
-          {/* View toggle */}
-          <div className="flex rounded-md border border-border overflow-hidden bg-card">
-            <button
-              type="button"
-              onClick={() => setView('list')}
-              className={cn(
-                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
-                view === 'list'
-                  ? 'bg-secondary text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-              )}
-            >
-              <List size={15} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('card')}
-              className={cn(
-                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
-                view === 'card'
-                  ? 'bg-secondary text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-              )}
-            >
-              <LayoutGrid size={15} />
-            </button>
-          </div>
-
-          <LiquidMetalButton
-            label="Add client"
-            onClick={() => setAddOpen(true)}
-          />
-        </div>
-      </div>
-
-      {/* Loading skeleton */}
-      {loading && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="rounded-lg border border-border bg-card px-5 py-4 animate-pulse">
-              <div className="flex gap-3">
-                <div className="w-9 h-9 rounded-full bg-muted flex-shrink-0" />
-                <div className="flex-1 space-y-2 pt-1">
-                  <div className="h-3.5 bg-muted rounded w-3/4" />
-                  <div className="h-3 bg-muted rounded w-1/2" />
+      {/* Stage breakdown — pipeline reading line */}
+      {!loading && contacts.length > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-border/70 bg-background px-4 py-3">
+          {STAGES.map((stage, i) => {
+            const count = stageCounts[stage.key];
+            return (
+              <div key={stage.key} className="flex items-center gap-3">
+                {i > 0 && (
+                  <ArrowRight size={13} className="text-muted-foreground/40 flex-shrink-0" />
+                )}
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xs text-muted-foreground">{stage.label}</span>
+                  <span
+                    className="text-lg tabular-nums text-foreground leading-none"
+                    style={{ fontFamily: 'var(--font-title)' }}
+                  >
+                    {count}
+                  </span>
                 </div>
               </div>
+            );
+          })}
+          <div className="ml-auto text-xs text-muted-foreground">
+            {tagFilter ? `${visibleContacts.length} of ` : ''}
+            <span
+              className="text-base tabular-nums text-foreground"
+              style={{ fontFamily: 'var(--font-title)' }}
+            >
+              {contacts.length}
+            </span>{' '}
+            total
+          </div>
+        </div>
+      )}
+
+      {/* Loading skeleton — matches final full-width row layout */}
+      {loading && (
+        <div className="rounded-lg border border-border overflow-hidden bg-card divide-y divide-border">
+          {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3 h-[56px]">
+              <Skeleton className="h-4 w-4 rounded-sm flex-shrink-0" />
+              <Skeleton className="h-7 w-7 rounded-full flex-shrink-0" />
+              <Skeleton className="h-3.5 w-32 sm:w-40 flex-shrink-0" />
+              <Skeleton className="h-5 w-16 rounded-full hidden sm:block flex-shrink-0" />
+              <Skeleton className="h-3 flex-1 max-w-[220px] hidden sm:block" />
+              <Skeleton className="h-3 w-16 hidden md:block flex-shrink-0" />
+              <Skeleton className="h-3 w-28 hidden lg:block flex-shrink-0" />
+              <Skeleton className="ml-auto h-3 w-12 hidden xl:block flex-shrink-0" />
             </div>
           ))}
         </div>
       )}
 
-      {/* Empty state */}
-      {!loading && visibleContacts.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-border bg-card py-16 text-center px-6">
-          <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-            <Search size={20} className="text-muted-foreground" />
+      {/* Empty state — context-aware */}
+      {!loading && visibleContacts.length === 0 && (() => {
+        const hasStageFilter = typeFilter !== 'ALL';
+        const hasLeadTypeFilter = leadTypeFilter !== 'all';
+        const hasTagFilter = !!tagFilter;
+        const hasAnyFilter = hasStageFilter || hasLeadTypeFilter || hasTagFilter;
+        const isSearchOrFilterCase = !!search || hasTagFilter;
+        const isFreshWorkspace = !search && !hasAnyFilter && contacts.length === 0;
+        const clearAllFilters = () => {
+          setTypeFilter('ALL');
+          setLeadTypeFilter('all');
+          setTagFilter('');
+        };
+
+        if (isFreshWorkspace) {
+          return (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-14 h-14 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-5">
+                <Users size={22} className="text-muted-foreground/60" strokeWidth={1.5} />
+              </div>
+              <h2
+                className="text-3xl tracking-tight text-foreground mb-2"
+                style={TITLE_FONT}
+              >
+                Welcome. Let&apos;s get your first lead.
+              </h2>
+              <p className={cn(BODY_MUTED, 'max-w-md mb-6')}>
+                Share this link with anyone interested. New leads land here automatically.
+              </p>
+              <div className="w-full max-w-md flex items-center gap-2 rounded-lg border border-border/70 bg-foreground/[0.04] p-3">
+                <code className="flex-1 truncate text-left font-mono text-sm text-foreground">
+                  {intakeUrlWithoutProtocol}
+                </code>
+                <CopyButton url={fullIntakeUrl} />
+                <Link
+                  href={`/apply/${slug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Preview intake page"
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-border/60 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                >
+                  <ExternalLink size={12} strokeWidth={1.75} />
+                </Link>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAddOpen(true)}
+                className={cn(QUIET_LINK, 'mt-5 underline-offset-2 hover:underline')}
+              >
+                Or add someone manually
+              </button>
+            </div>
+          );
+        }
+
+        if (isSearchOrFilterCase) {
+          return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
+                <Search size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
+              </div>
+              <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
+                No matches.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Try a shorter query or clear filters.
+              </p>
+              {hasAnyFilter && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                >
+                  <X size={13} /> Clear filters
+                </button>
+              )}
+            </div>
+          );
+        }
+
+        return (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
+              <Inbox size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
+            </div>
+            <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
+              Nothing in this view.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Adjust the current filters to see more.
+            </p>
+            {hasAnyFilter && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+              >
+                <X size={13} /> Clear filters
+              </button>
+            )}
           </div>
-          <p className="font-semibold text-foreground mb-1">No clients found</p>
-          <p className="text-sm text-muted-foreground">
-            {tagFilter ? `No clients tagged "${tagFilter}".` : search ? `No clients match "${search}".` : 'Add your first client to get started.'}
-          </p>
-          {tagFilter && (
-            <Button onClick={() => setTagFilter('')} className="mt-4 gap-2" size="sm" variant="outline">
-              <X size={14} /> Clear filter
-            </Button>
-          )}
-          {!search && !tagFilter && (
-            <Button onClick={() => setAddOpen(true)} className="mt-4 gap-2" size="sm">
-              <Plus size={14} /> Add client
-            </Button>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Card view — stage-grouped ── */}
       {!loading && visibleContacts.length > 0 && view === 'card' && (
-        <div className="grid gap-5 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
           {STAGES.map((stage) => {
             const stageContacts = visibleContacts.filter((c) => c.type === stage.key);
             if (stageContacts.length === 0 && !search && !tagFilter) return (
@@ -625,7 +855,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                 <div className={cn('flex items-center gap-2 rounded-lg px-3 py-2', stage.headerBg)}>
                   <span className={cn('w-2 h-2 rounded-full flex-shrink-0', stage.dotColor)} />
                   <span className="text-xs font-semibold text-foreground">{stage.label}</span>
-                  <span className={cn('ml-auto text-[11px] font-bold rounded-md px-1.5 py-0.5', stage.className)}>
+                  <span className={cn('ml-auto text-[11px] font-semibold rounded-md px-1.5 py-0.5', stage.className)}>
                     {stageContacts.length}
                   </span>
                 </div>
@@ -664,24 +894,29 @@ export function ContactTable({ slug }: ContactTableProps) {
                       className="rounded border-border cursor-pointer"
                     />
                   </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Stage</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Contact</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Budget</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Preferences</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden xl:table-cell">Follow-up</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Name</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Stage</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Contact</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Budget</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Preferences</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Follow-up</th>
                   <th className="px-4 py-3 w-20" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border bg-card">
-                {visibleContacts.map((contact) => {
+                {visibleContacts.map((contact, idx) => {
                   const stage = STAGES.find((s) => s.key === contact.type)!;
                   const isSelected = selectedIds.has(contact.id);
+                  // Cap stagger to first 10 rows — past that, no entrance.
+                  const delay = idx < 10 ? idx * 0.04 : 0;
                   return (
-                    <tr
+                    <motion.tr
                       key={contact.id}
+                      initial={idx < 10 ? { opacity: 0, y: 4 } : false}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1], delay }}
                       className={cn(
-                        'group hover:bg-muted/30 transition-colors',
+                        'group hover:bg-muted/30 hover:scale-[1.005] transition-[colors,transform] duration-150',
                         isSelected && 'bg-primary/5',
                       )}
                     >
@@ -698,9 +933,13 @@ export function ContactTable({ slug }: ContactTableProps) {
                           <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
                             {getInitials(contact.name)}
                           </div>
-                          <Link href={`/s/${slug}/contacts/${contact.id}`} className="font-medium hover:text-foreground transition-colors">
-                            {contact.name}
-                          </Link>
+                          <div className="min-w-0">
+                            <Link href={`/s/${slug}/contacts/${contact.id}`} className="font-medium hover:text-foreground transition-colors block">
+                              {contact.name}
+                            </Link>
+                            <LeadScoreBar score={contact.leadScore ?? null} />
+                            <ContactAgentContext contactId={contact.id} />
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -755,7 +994,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                           </button>
                         </div>
                       </td>
-                    </tr>
+                    </motion.tr>
                   );
                 })}
               </tbody>
@@ -766,7 +1005,7 @@ export function ContactTable({ slug }: ContactTableProps) {
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-lg border border-border bg-card shadow-lg px-4 py-3">
+        <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] mx-auto w-fit z-30 flex items-center flex-wrap gap-2 rounded-lg border border-border bg-card shadow-lg px-3 sm:px-4 py-2 sm:py-3 max-w-[calc(100vw-2rem)]">
           <CheckSquare size={14} className="text-foreground" />
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="h-4 w-px bg-border mx-1" />
@@ -781,7 +1020,7 @@ export function ContactTable({ slug }: ContactTableProps) {
             </SelectContent>
           </Select>
           {selectedIds.size >= 2 && (
-            <Button size="sm" variant="outline" onClick={() => setShowCompare(true)} className="h-8 gap-1.5 text-xs">
+            <Button size="sm" variant="outline" onClick={() => setShowCompare(true)} className="h-8 gap-1.5 text-xs hidden sm:inline-flex">
               <GitCompare size={12} />
               Compare
             </Button>
@@ -810,12 +1049,12 @@ export function ContactTable({ slug }: ContactTableProps) {
           onClose={() => setShowCompare(false)}
         />
       )}
-      <ContactForm open={addOpen} onOpenChange={setAddOpen} onSubmit={handleAdd} title="Add Client" />
+      <ContactForm open={addOpen} onOpenChange={setAddOpen} onSubmit={handleAdd} mode="add" slug={slug} />
       <ContactForm
         open={!!editContact}
         onOpenChange={(o) => !o && setEditContact(null)}
         onSubmit={handleEdit}
-        title="Edit Client"
+        mode="edit"
         defaultValues={
           editContact
             ? {
@@ -841,7 +1080,7 @@ export function ContactTable({ slug }: ContactTableProps) {
           onImported={(count) => {
             setImportOpen(false);
             if (count > 0) {
-              toast.success('Contacts imported successfully');
+              toast.success('Contacts imported.');
               fetchContacts();
             }
           }}

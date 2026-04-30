@@ -6,6 +6,7 @@ import { getSpaceForUser } from '@/lib/space';
 import crypto from 'crypto';
 import { audit } from '@/lib/audit';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
+import type { SpaceSetting } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const [{ data: settings }, { data: owner }] = await Promise.all([
+  const [settingsRes, ownerRes] = await Promise.all([
     supabase
       .from('SpaceSetting')
       .select(
@@ -40,6 +41,14 @@ export async function GET(req: NextRequest) {
       .eq('id', userSpace.ownerId)
       .maybeSingle(),
   ]);
+  // Supabase's string-based `.select(...)` can't be inferred by TS, so the
+  // response `data` narrows to `GenericStringError`. Cast to the shape we
+  // actually read; `??` fallbacks below handle nulls.
+  const settings = settingsRes.data as (Partial<SpaceSetting> & {
+    logoUrl?: string | null;
+    realtorPhotoUrl?: string | null;
+  }) | null;
+  const owner = ownerRes.data as { email: string } | null;
 
   return NextResponse.json({
     settings: {

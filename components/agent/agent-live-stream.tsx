@@ -88,7 +88,7 @@ export function AgentLiveStream({ runId, onClose }: Props) {
   }, [events]);
 
   return (
-    <div className="rounded-xl border bg-card overflow-hidden flex flex-col max-h-[420px]">
+    <div className="rounded-lg border border-border/70 bg-card overflow-hidden flex flex-col max-h-[420px]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b bg-muted/30 flex-shrink-0">
         <div className="flex items-center gap-2">

@@ -5,6 +5,7 @@ import { PublicPageShell } from '@/components/public-page-shell';
 import { FormUnavailable } from '@/components/form-unavailable';
 import { TrackingPixels } from '@/components/tracking-pixels';
 import { ApplicationFormLoader } from './application-form-loader';
+import { PreviewBridge } from './preview-bridge';
 import { clerkClient } from '@clerk/nextjs/server';
 import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
 import type { Metadata } from 'next';
@@ -38,10 +39,11 @@ export default async function PublicApplyPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ resume?: string }>;
+  searchParams: Promise<{ resume?: string; preview?: string }>;
 }) {
   const { slug } = await params;
-  const { resume: resumeToken } = await searchParams;
+  const { resume: resumeToken, preview } = await searchParams;
+  const isPreview = preview === '1';
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
@@ -134,6 +136,11 @@ export default async function PublicApplyPage({
     return <FormUnavailable agentName={agentName} />;
   }
 
+  // Hide the Chippi mark on paid tiers — visible only on the free tier as
+  // a value-exchange brand exposure. The realtor pays for white-label when
+  // they're on an active paid plan (or trialing into one).
+  const hidePoweredBy = status === 'active' || status === 'trialing';
+
   // ── Resolve dynamic form configs (dual: rental + buyer) ──────────────────
   type IFC = import('@/lib/types').IntakeFormConfig;
   let resolvedFormConfig: IFC | null = null;
@@ -217,6 +224,7 @@ export default async function PublicApplyPage({
 
   return (
     <>
+      {isPreview && <PreviewBridge />}
       <TrackingPixels pixels={trackingPixels} />
       <PublicPageShell
         logoUrl={logoUrl}
@@ -227,6 +235,8 @@ export default async function PublicApplyPage({
         pageTitle={pageTitle}
         pageIntro={pageIntro}
         trustLine={`Your information is shared only with ${agentName} and used solely for your inquiry.`}
+        agentPresenceLabel="Applying with"
+        hidePoweredBy={hidePoweredBy}
         customization={customization}
       >
         <ApplicationFormLoader slug={slug} spaceId={space.id} businessName={businessName} customization={customization} formConfig={resolvedFormConfig} rentalFormConfig={resolvedRentalFormConfig} buyerFormConfig={resolvedBuyerFormConfig} resumeToken={resumeToken} />

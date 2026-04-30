@@ -98,7 +98,7 @@ export function PipelineTabs({
         body: JSON.stringify({ slug, name, color: newColor }),
       });
       if (!res.ok) {
-        toast.error('Failed to create board');
+        toast.error("Couldn't create that board. Try again.");
         return;
       }
       const created: Pipeline = await res.json();
@@ -107,9 +107,9 @@ export function PipelineTabs({
       setCreating(false);
       setNewName('');
       setNewColor(BOARD_COLORS[0]);
-      toast.success(`Board "${created.name}" created`);
+      toast.success(`Board "${created.name}" added.`);
     } catch {
-      toast.error('Failed to create board');
+      toast.error("Couldn't create that board. Try again.");
     } finally {
       setCreatePending(false);
     }
@@ -128,14 +128,14 @@ export function PipelineTabs({
         body: JSON.stringify({ name }),
       });
       if (!res.ok) {
-        toast.error('Failed to rename board');
+        toast.error("Couldn't rename the board. Try again.");
         return;
       }
       const updated: Pipeline = await res.json();
       onPipelinesChange(pipelines.map((p) => (p.id === pipeline.id ? updated : p)));
-      toast.success('Board renamed');
+      toast.success('Board renamed.');
     } catch {
-      toast.error('Failed to rename board');
+      toast.error("Couldn't rename the board. Try again.");
     } finally {
       setRenaming(null);
     }
@@ -151,13 +151,13 @@ export function PipelineTabs({
         body: JSON.stringify({ color }),
       });
       if (!res.ok) {
-        toast.error('Failed to update color');
+        toast.error("Couldn't change the color. Try again.");
         return;
       }
       const updated: Pipeline = await res.json();
       onPipelinesChange(pipelines.map((p) => (p.id === pipeline.id ? updated : p)));
     } catch {
-      toast.error('Failed to update color');
+      toast.error("Couldn't change the color. Try again.");
     }
   }
 
@@ -171,7 +171,7 @@ export function PipelineTabs({
         if (activePipelineId === pipeline.id && remaining.length > 0) {
           onSelect(remaining[0].id);
         }
-        toast.success(`Board "${pipeline.name}" deleted`);
+        toast.success(`Board "${pipeline.name}" deleted.`);
         return;
       }
       const body = await res.json().catch(() => ({}));
@@ -185,10 +185,10 @@ export function PipelineTabs({
           submitting: false,
         });
       } else {
-        toast.error('Failed to delete board');
+        toast.error("Couldn't delete the board. Try again.");
       }
     } catch {
-      toast.error('Failed to delete board');
+      toast.error("Couldn't delete the board. Try again.");
     }
   }
 
@@ -202,7 +202,7 @@ export function PipelineTabs({
         { method: 'DELETE' },
       );
       if (!res.ok) {
-        toast.error('Failed to delete board');
+        toast.error("Couldn't delete the board. Try again.");
         setDeleteState((prev) => prev && { ...prev, submitting: false });
         return;
       }
@@ -211,10 +211,10 @@ export function PipelineTabs({
       if (activePipelineId === deleteState.pipeline.id && remaining.length > 0) {
         onSelect(remaining[0].id);
       }
-      toast.success(`Board deleted. Deals moved to "${remaining.find((p) => p.id === deleteState.targetPipelineId)?.name ?? 'target board'}"`);
+      toast.success(`Board deleted. Deals moved to "${remaining.find((p) => p.id === deleteState.targetPipelineId)?.name ?? 'target board'}".`);
       setDeleteState(null);
     } catch {
-      toast.error('Failed to delete board');
+      toast.error("Couldn't delete the board. Try again.");
       setDeleteState((prev) => prev && { ...prev, submitting: false });
     }
   }
@@ -266,10 +266,10 @@ export function PipelineTabs({
                   type="button"
                   onClick={() => onSelect(pipeline.id)}
                   className={cn(
-                    'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors pr-1.5',
+                    'flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors -mb-px border-b-2',
                     isActive
-                      ? 'bg-background border border-border shadow-sm text-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+                      ? 'border-foreground text-foreground'
+                      : 'border-transparent text-muted-foreground hover:text-foreground',
                   )}
                 >
                   <span
@@ -430,10 +430,11 @@ export function PipelineTabs({
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            title="New board"
+            aria-label="New board"
+            className="ml-1 flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
           >
-            <Plus size={13} />
-            New board
+            <Plus size={14} />
           </button>
         )}
       </div>
@@ -443,7 +444,7 @@ export function PipelineTabs({
         <Dialog open onOpenChange={(open) => { if (!open && !deleteState.submitting) setDeleteState(null); }}>
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
-              <DialogTitle>Delete "{deleteState.pipeline.name}"?</DialogTitle>
+              <DialogTitle>Delete &ldquo;{deleteState.pipeline.name}&rdquo;?</DialogTitle>
               <DialogDescription>
                 This board has {deleteState.dealCount} deal{deleteState.dealCount === 1 ? '' : 's'} across{' '}
                 {deleteState.stageCount} stage{deleteState.stageCount === 1 ? '' : 's'}. Choose a board to move them to before deleting.

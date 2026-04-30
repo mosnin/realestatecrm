@@ -3,7 +3,7 @@
 import { UserButton } from '@clerk/nextjs';
 import { Sun, Moon } from 'lucide-react';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -14,15 +14,19 @@ import {
   SheetTitle,
   SheetTrigger
 } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/theme-provider';
+import { AnimatePresence, motion } from 'framer-motion';
 import { BrandLogo } from '@/components/brand-logo';
-import { primaryNavItems, secondaryNavItems } from '@/lib/nav-items';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronRight, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check } from 'lucide-react';
-import { GlobalSearch } from './global-search';
+import { secondaryNavItems } from '@/lib/nav-items';
+import { SECTION_LABEL } from '@/lib/typography';
+import { PAGE_VARIANTS } from '@/lib/motion';
+import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, Sparkles, Calendar, BarChart2, ClipboardList, Home } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { BrokerHelpGuide } from '@/components/broker/help-guide';
+import { ShareLinksMenu } from './share-links-menu';
+import { getBreadcrumbLabel } from '@/lib/breadcrumb-routes';
 
 const brokerMobileNavItems = [
   { href: '/broker', label: 'Team Overview', icon: LayoutDashboard, exact: true },
@@ -80,21 +84,41 @@ interface HeaderProps {
 export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const [mobileSwitcherOpen, setMobileSwitcherOpen] = useState(false);
+  const [mobileShowPages, setMobileShowPages] = useState(false);
   const pathname = usePathname();
   const base = `/s/${slug}`;
   const { theme, toggleTheme } = useTheme();
   const isOnBrokerPage = pathname.startsWith('/broker');
   const showBrokerMobileNavOnly = isBroker && isOnBrokerPage;
+  const isOnChippi = pathname.startsWith(`${base}/chippi`);
+  // Reset the "show pages" override whenever the route changes so the sheet
+  // always opens to the right default for the current page.
+  useEffect(() => {
+    setMobileShowPages(false);
+  }, [pathname]);
 
   return (
-    <header className="h-14 border-b border-border flex items-center justify-between px-4 md:px-6 bg-card sticky top-0 z-40 shadow-[0_1px_0_0_var(--border)]">
+    <header className="h-14 border-b border-border/70 flex items-center justify-between px-4 md:px-6 bg-background sticky top-0 z-40">
       <div className="flex items-center gap-3">
-        {/* Mobile menu trigger */}
+        {/* Mobile menu trigger — explicit 44×44 tap target with proper hover
+            state, not a bare SVG. Radix's Trigger wraps whatever child you
+            give it; without dimensions the click area is just the icon. */}
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger className="md:hidden">
-            <MenuToggleIcon open={open} className="size-5 text-muted-foreground" duration={400} />
+          <SheetTrigger asChild>
+            <button
+              type="button"
+              aria-label={open ? 'Close menu' : 'Open menu'}
+              className="md:hidden inline-flex items-center justify-center w-10 h-10 -ml-2 rounded-md text-muted-foreground/80 hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 active:scale-[0.98]"
+            >
+              <MenuToggleIcon open={open} className="size-5" duration={400} />
+            </button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border flex flex-col overflow-hidden">
+          <SheetContent
+            side="left"
+            className="w-72 sm:max-w-xs p-0 border-r border-border/70 bg-sidebar text-sidebar-foreground flex flex-col overflow-hidden"
+          >
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent z-0" />
+            <div className="relative z-10 flex flex-col h-full overflow-y-auto">
             <SheetHeader className="px-4 py-5 border-b border-sidebar-border">
               <SheetTitle className="flex items-center gap-2.5 text-sidebar-foreground">
                 <BrandLogo className="h-5" alt="Chippi" />
@@ -113,7 +137,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold truncate">{pathname.startsWith('/broker') ? (brokerageName ?? 'Brokerage') : spaceName}</p>
-                        <p className="text-[10px] text-muted-foreground">{pathname.startsWith('/broker') ? 'Brokerage Dashboard' : 'Realtor Dashboard'}</p>
+                        <p className="text-[10px] text-muted-foreground">{pathname.startsWith('/broker') ? 'Brokerage view' : 'My workspace'}</p>
                       </div>
                       <ChevronDown size={14} className={cn('text-muted-foreground transition-transform', mobileSwitcherOpen && 'rotate-180')} />
                     </button>
@@ -132,7 +156,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{spaceName}</p>
-                            <p className="text-[10px] text-muted-foreground">Realtor Dashboard</p>
+                            <p className="text-[10px] text-muted-foreground">My workspace</p>
                           </div>
                           {!pathname.startsWith('/broker') && <Check size={14} className="text-foreground flex-shrink-0" />}
                         </Link>
@@ -166,7 +190,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate">{spaceName}</p>
-                      <p className="text-[10px] text-muted-foreground">Realtor Dashboard</p>
+                      <p className="text-[10px] text-muted-foreground">My workspace</p>
                     </div>
                   </div>
                 )}
@@ -175,28 +199,181 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
             <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-2 space-y-0.5">
               {!isBrokerOnly && !showBrokerMobileNavOnly && (
                 <>
-                  <p className="px-3 pb-1.5 text-[10px] font-medium text-muted-foreground">
-                    Workspace
-                  </p>
-                  {primaryNavItems.map((item) => {
+                  {/* AI — single Chippi entry, matches the redesigned sidebar */}
+                  <p className={`${SECTION_LABEL} px-3 pb-2 pt-1 select-none`}>AI</p>
+                  {[
+                    { href: `${base}/chippi`, label: 'Chippi', icon: Sparkles, exact: false },
+                  ].map((item) => {
+                    const isActive = pathname.startsWith(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                          'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
+                          isActive
+                            ? 'bg-foreground/[0.045] text-foreground font-medium'
+                            : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
+                        )}
+                      >
+                        {isActive && (
+                          <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground" />
+                        )}
+                        <img
+                          src="/chip-avatar.png"
+                          alt=""
+                          className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
+                        />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+
+                  {/* Primary — matches the redesigned realtor sidebar */}
+                  {[
+                    { href: '/contacts', label: 'People', icon: Users },
+                    { href: '/deals', label: 'Pipeline', icon: Briefcase },
+                  ].map((item) => {
                     const href = `${base}${item.href}`;
-                    const isActive =
-                      item.href === ''
-                        ? pathname === base
-                        : pathname.startsWith(`${base}${item.href}`);
+                    const isActive = pathname.startsWith(href);
                     return (
                       <Link
                         key={item.href}
                         href={href}
                         onClick={() => setOpen(false)}
                         className={cn(
-                          'group flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
+                          'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
                           isActive
-                            ? 'bg-accent text-foreground font-medium'
-                            : 'text-muted-foreground font-normal hover:bg-accent hover:text-foreground'
+                            ? 'bg-foreground/[0.045] text-foreground font-medium'
+                            : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
                         )}
                       >
-                        <item.icon size={16} className={cn('flex-shrink-0', isActive ? 'opacity-100' : 'opacity-55 group-hover:opacity-80')} />
+                        {isActive && (
+                          <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground" />
+                        )}
+                        <item.icon
+                          size={15}
+                          strokeWidth={isActive ? 2.25 : 1.75}
+                          className={cn(
+                            'flex-shrink-0',
+                            isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
+                          )}
+                        />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+
+                  {/* Context-aware second section — Chippi conversations on
+                      /chippi, the static "More" pages everywhere else. The
+                      cross-fade reuses PAGE_VARIANTS so the swap reads as a
+                      page-level mode change, not a list refresh. */}
+                  <div className="pt-4">
+                    <AnimatePresence mode="wait" initial={false}>
+                      {isOnChippi && !mobileShowPages ? (
+                        <motion.div
+                          key="chats"
+                          variants={PAGE_VARIANTS}
+                          initial="initial"
+                          animate="enter"
+                          exit="exit"
+                        >
+                          <SidebarConversations
+                            slug={slug}
+                            onSelect={() => setOpen(false)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setMobileShowPages(true)}
+                            className="mt-2 w-full text-left px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            Show pages →
+                          </button>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="pages"
+                          variants={PAGE_VARIANTS}
+                          initial="initial"
+                          animate="enter"
+                          exit="exit"
+                        >
+                          <p className={`${SECTION_LABEL} px-3 pb-2 select-none`}>
+                            More
+                          </p>
+                          {[
+                            { href: '/calendar', label: 'Calendar', icon: Calendar },
+                            { href: '/properties', label: 'Properties', icon: Home },
+                            { href: '/intake', label: 'Intake form', icon: ClipboardList },
+                            { href: '/intake/customize', label: 'Customize form', icon: ClipboardList },
+                            { href: '/analytics', label: 'Analytics', icon: BarChart2 },
+                          ].map((item) => {
+                            const href = `${base}${item.href}`;
+                            const isActive = pathname.startsWith(href);
+                            return (
+                              <Link
+                                key={item.href}
+                                href={href}
+                                onClick={() => setOpen(false)}
+                                className={cn(
+                                  'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
+                                  isActive
+                                    ? 'bg-foreground/[0.045] text-foreground font-medium'
+                                    : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
+                                )}
+                              >
+                                {isActive && (
+                                  <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground" />
+                                )}
+                                <item.icon
+                                  size={15}
+                                  strokeWidth={isActive ? 2.25 : 1.75}
+                                  className={cn(
+                                    'flex-shrink-0',
+                                    isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
+                                  )}
+                                />
+                                {item.label}
+                              </Link>
+                            );
+                          })}
+                          {isOnChippi && (
+                            <button
+                              type="button"
+                              onClick={() => setMobileShowPages(false)}
+                              className="mt-2 w-full text-left px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              ← Back to chats
+                            </button>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Settings section — expanded flat list */}
+                  <p className={`${SECTION_LABEL} px-3 pb-2 pt-5 select-none`}>Settings</p>
+                  {[
+                    { href: '/settings', label: 'Account', exact: true },
+                    { href: '/settings/profile', label: 'Profile' },
+                    { href: '/settings/integrations', label: 'Integrations' },
+                    { href: '/billing', label: 'Billing' },
+                  ].map((item) => {
+                    const href = `${base}${item.href}`;
+                    const isActive = item.exact ? pathname === href : pathname.startsWith(href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={href}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                          'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] transition-colors',
+                          isActive
+                            ? 'bg-accent text-foreground font-medium'
+                            : 'text-foreground/70 font-normal hover:bg-accent hover:text-foreground'
+                        )}
+                      >
                         {item.label}
                       </Link>
                     );
@@ -207,7 +384,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                 <>
                   {brokerMobileNavSections.map((section) => (
                     <div key={section.title} className="pb-2">
-                      <p className="px-3 pb-1.5 text-[10px] font-medium text-muted-foreground">
+                      <p className={`${SECTION_LABEL} px-3 pb-1.5`}>
                         {section.title}
                       </p>
                       {section.items.map((item) => {
@@ -238,7 +415,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
             </nav>
             {isBroker && !showBrokerMobileNavOnly && (
               <div className="px-3 pb-2 space-y-0.5 border-t border-sidebar-border pt-3">
-                <p className="px-3 pb-1.5 text-[10px] font-medium text-muted-foreground">
+                <p className={`${SECTION_LABEL} px-3 pb-1.5`}>
                   Team
                 </p>
                 {brokerMobileNavItems.map((item) => {
@@ -278,21 +455,14 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                     { label: 'Settings', items: [
                       { href: `${base}/settings`, label: 'General', icon: Settings },
                       { href: `${base}/settings/profile`, label: 'Profile', icon: User },
-                      { href: `${base}/settings/notifications`, label: 'Notifications', icon: Bell },
                       { href: `${base}/settings/integrations`, label: 'Integrations', icon: Plug },
-                      { href: `${base}/settings/legal`, label: 'Legal', icon: Shield },
-                    ]},
-                    { label: 'Intake Form', items: [
-                      { href: `${base}/settings/appearance`, label: 'Appearance', icon: Palette },
-                      { href: `${base}/settings/content`, label: 'Content', icon: FileText },
-                      { href: `${base}/settings/form-fields`, label: 'Form Fields', icon: ListChecks },
                     ]},
                     { label: 'Account', items: [
                       { href: `${base}/billing`, label: 'Billing', icon: CreditCard },
                     ]},
                   ].map((section) => (
                     <div key={section.label}>
-                      <p className="px-3 pb-1 pt-2 text-[10px] font-medium text-muted-foreground">{section.label}</p>
+                      <p className={`${SECTION_LABEL} px-3 pb-1 pt-2`}>{section.label}</p>
                       {section.items.map((item) => {
                         const isActive = item.href === `${base}/settings` ? pathname === item.href : pathname.startsWith(item.href);
                         return (
@@ -310,7 +480,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                 </>
               ) : (
                 <>
-                  <p className="px-3 pb-1.5 text-[10px] font-medium text-muted-foreground">
+                  <p className={`${SECTION_LABEL} px-3 pb-1.5`}>
                     Account
                   </p>
                   {secondaryNavItems.map((item) => {
@@ -339,6 +509,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                 <BrandLogo className="h-4" alt="Chippi" />
               </div>
             </div>
+            </div>
           </SheetContent>
         </Sheet>
 
@@ -346,56 +517,42 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
           <BrandLogo className="h-5" alt="Chippi" />
         </span>
 
-        {/* Desktop: breadcrumb */}
-        <div className="hidden md:flex items-center gap-1.5 text-sm">
+        {/* Desktop breadcrumb — small, monospaced separator, no chunky pills.
+            The current section reads as the focal label; the workspace name
+            is quiet context. Quick-switch is a borderless link, not a chip. */}
+        <div className="hidden md:flex items-center gap-2 text-[13px]">
           {(pathname.startsWith('/broker') || isBrokerOnly) && brokerageName ? (
             <>
-              <span className="text-muted-foreground">{brokerageName}</span>
-              <span className="text-muted-foreground/40">/</span>
+              <span className="text-muted-foreground/70 truncate max-w-[160px]">{brokerageName}</span>
+              <span className="text-muted-foreground/30">/</span>
               <span className="font-medium text-foreground">
-                {pathname === '/broker' ? 'Overview' :
-                 pathname.startsWith('/broker/realtors') ? 'Realtors' :
-                 pathname.startsWith('/broker/members') ? 'Members' :
-                 pathname.startsWith('/broker/invitations') ? 'Invitations' :
-                 pathname.startsWith('/broker/settings') ? 'Settings' : 'Team'}
+                {getBreadcrumbLabel(pathname)}
               </span>
-              {/* Quick switch to workspace */}
               {!isBrokerOnly && slug && (
                 <Link
                   href={base}
-                  className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md border border-border hover:bg-accent transition-colors"
+                  className="ml-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors"
                   title={`Switch to ${spaceName}`}
                 >
-                  <ArrowLeftRight size={11} />
+                  <ArrowLeftRight size={10} />
                   {spaceName}
                 </Link>
               )}
             </>
           ) : (
             <>
-              <span className="text-muted-foreground">{title}</span>
-              {(() => {
-                const allItems = [...primaryNavItems, ...secondaryNavItems];
-                const match = allItems
-                  .filter((item) => item.href !== '')
-                  .find((item) => pathname.startsWith(`${base}${item.href}`));
-                return match ? (
-                  <>
-                    <span className="text-muted-foreground/40">/</span>
-                    <span className="font-medium text-foreground">{match.label}</span>
-                  </>
-                ) : (
-                  <><span className="text-muted-foreground/40">/</span><span className="font-medium text-foreground">Overview</span></>
-                );
-              })()}
-              {/* Quick switch to brokerage */}
+              <span className="text-muted-foreground/70 truncate max-w-[160px]">{title}</span>
+              <span className="text-muted-foreground/30">/</span>
+              <span className="font-medium text-foreground">
+                {getBreadcrumbLabel(pathname, base)}
+              </span>
               {isBroker && brokerageName && (
                 <Link
                   href="/broker"
-                  className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md border border-border hover:bg-accent transition-colors"
+                  className="ml-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors"
                   title={`Switch to ${brokerageName}`}
                 >
-                  <ArrowLeftRight size={11} />
+                  <ArrowLeftRight size={10} />
                   {brokerageName}
                 </Link>
               )}
@@ -404,19 +561,23 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5">
-        {slug && <GlobalSearch slug={slug} />}
+      {/* Right cluster — quiet icon row in the new sidebar language. Search
+          lives on the sidebar's pill (and ⌘K) so the header doesn't carry a
+          duplicate trigger. */}
+      <div className="flex items-center gap-0.5">
+        {slug && !isOnBrokerPage && <ShareLinksMenu slug={slug} />}
         {slug && <NotificationCenter slug={slug} />}
         {isBroker && <BrokerHelpGuide />}
         {isBrokerOnly && !slug && <NotificationBell />}
-        <Button
-          variant="ghost"
-          size="icon"
+        <button
+          type="button"
           onClick={toggleTheme}
-          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          aria-label="Toggle theme"
+          title="Toggle theme"
+          className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.025] transition-colors"
         >
-          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-        </Button>
+          {theme === 'dark' ? <Sun size={14} strokeWidth={1.75} /> : <Moon size={14} strokeWidth={1.75} />}
+        </button>
         <div className="[&_.cl-userButtonTrigger]:rounded-full">
           <UserButton />
         </div>

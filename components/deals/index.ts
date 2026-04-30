@@ -4,6 +4,7 @@ export { DealCard } from './deal-card';
 export { KanbanColumn } from './kanban-column';
 export { PipelineSummary } from './pipeline-summary';
 export { DealDetailClient } from './deal-detail-client';
+export { DealQuickPanel } from './deal-quick-panel';
 export { DealInlineField } from './deal-inline-field';
 export { DealFollowUpField } from './deal-follow-up-field';
 export { DealStatusControl } from './deal-status-control';

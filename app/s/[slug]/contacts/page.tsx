@@ -11,15 +11,7 @@ export default async function ContactsPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Contacts</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Manage your contacts and renter pipeline from qualification to application
-        </p>
-      </div>
-      <ContactTable slug={slug} />
-    </div>
-  );
+  // Header lives inside ContactTable so the "Add a person" button shares state
+  // with the modal. One client component, one source of truth for the surface.
+  return <ContactTable slug={slug} />;
 }

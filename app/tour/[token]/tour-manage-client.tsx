@@ -1,19 +1,27 @@
 'use client';
 
 import { useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import {
-  CalendarDays,
-  Clock,
-  MapPin,
-  User,
-  XCircle,
-  CalendarPlus,
-  CheckCircle2,
-  Loader2,
-  AlertTriangle,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 import { PostTourFeedback } from '@/components/tours/post-tour-feedback';
+import {
+  BODY,
+  BODY_MUTED,
+  CAPTION,
+  GHOST_PILL,
+  PRIMARY_PILL,
+  TITLE_FONT,
+} from '@/lib/typography';
 
 interface TourData {
   id: string;
@@ -32,17 +40,40 @@ interface TourManageClientProps {
   bookingSlug: string;
 }
 
+// Sanctioned status tones — pulled from the design language. Default is the
+// muted neutral pill; confirmed and cancelled get explicit colour signals.
+const STATUS_TONE: Record<string, { label: string; className: string }> = {
+  scheduled: {
+    label: 'Scheduled',
+    className: 'bg-foreground/[0.06] text-muted-foreground',
+  },
+  confirmed: {
+    label: 'Confirmed',
+    className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+  },
+  completed: {
+    label: 'Completed',
+    className: 'bg-foreground/[0.06] text-muted-foreground',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    className: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+  },
+};
+
 export function TourManageClient({ tour, token, businessName, bookingSlug }: TourManageClientProps) {
   const [status, setStatus] = useState(tour.status);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const isCancelled = status === 'cancelled';
   const isPast = new Date(tour.startsAt) < new Date();
   const isCompleted = status === 'completed';
+  const canCancel = !isCancelled && !isPast && !isCompleted;
+  const canRebook = (isCancelled || isPast) && bookingSlug;
 
   async function cancelTour() {
-    if (!confirm('Are you sure you want to cancel this tour?')) return;
     setLoading(true);
     setError('');
     try {
@@ -61,6 +92,7 @@ export function TourManageClient({ tour, token, businessName, bookingSlug }: Tou
       setError('Network error. Please try again.');
     } finally {
       setLoading(false);
+      setConfirmOpen(false);
     }
   }
 
@@ -68,101 +100,180 @@ export function TourManageClient({ tour, token, businessName, bookingSlug }: Tou
   const end = new Date(tour.endsAt);
   const duration = Math.round((end.getTime() - start.getTime()) / 60000);
 
+  const dateLabel = start.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const timeLabel = `${start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} – ${end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+
+  const tone = STATUS_TONE[status] ?? STATUS_TONE.scheduled;
+
+  // After cancellation: calm, serif, no chunky chrome.
+  if (isCancelled) {
+    return (
+      <div className="w-full max-w-md">
+        <div className="rounded-xl bg-background border border-border/70 p-6 text-center space-y-4">
+          <h1
+            className="text-3xl tracking-tight text-foreground"
+            style={TITLE_FONT}
+          >
+            Cancelled.
+          </h1>
+          <p className={cn(BODY_MUTED, 'max-w-sm mx-auto')}>
+            Your tour with {businessName} has been cancelled. You can book a new
+            time below.
+          </p>
+          {canRebook && (
+            <div className="pt-2">
+              <a
+                href={`/book/${bookingSlug}`}
+                className={cn(PRIMARY_PILL, 'justify-center')}
+              >
+                Book a new tour
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-md">
-      <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-sm p-6 space-y-5">
-        <div className="text-center space-y-1">
-          <h1 className="text-xl font-semibold">Your Tour</h1>
-          <p className="text-sm text-muted-foreground">
-            with {businessName}
-          </p>
+      <div className="rounded-xl bg-background border border-border/70 p-6">
+        {/* ─── Heading ─────────────────────────────────────────────── */}
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1
+              className="text-3xl tracking-tight text-foreground"
+              style={TITLE_FONT}
+            >
+              Your tour
+            </h1>
+            <p className={cn(BODY_MUTED, 'mt-1')}>with {businessName}</p>
+          </div>
+          <span
+            className={cn(
+              'rounded-md px-2 py-0.5 text-xs flex-shrink-0 mt-1',
+              tone.className,
+            )}
+          >
+            {tone.label}
+          </span>
         </div>
 
-        {/* Status banner */}
-        {isCancelled && (
-          <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-center">
-            <XCircle size={24} className="mx-auto text-red-500 mb-2" />
-            <p className="text-sm font-medium text-red-700 dark:text-red-300">Tour cancelled</p>
-            <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">
-              This tour has been cancelled. You can rebook below.
-            </p>
-          </div>
-        )}
+        {/* ─── Tour summary — hairline-divided rows ──────────────── */}
+        <div className="border-t border-border/60 mt-6 pt-2 divide-y divide-border/60">
+          <SummaryRow label="Guest" value={tour.guestName} />
+          <SummaryRow label="Date" value={dateLabel} />
+          <SummaryRow label="Time" value={`${timeLabel} (${duration} min)`} />
+          {tour.propertyAddress && (
+            <SummaryRow label="Property" value={tour.propertyAddress} />
+          )}
+        </div>
 
+        {/* ─── Post-tour feedback (only on completed) ────────────── */}
         {isCompleted && (
-          <>
-            <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-4 text-center">
-              <CheckCircle2 size={24} className="mx-auto text-emerald-500 mb-2" />
-              <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Tour completed</p>
-            </div>
+          <div className="mt-8">
             <PostTourFeedback
               token={token}
               guestName={tour.guestName}
               businessName={businessName}
             />
-          </>
+          </div>
         )}
 
-        {/* Tour details */}
-        <div className="space-y-3 rounded-xl bg-muted/30 p-4">
-          <div className="flex items-center gap-3 text-sm">
-            <User size={15} className="text-muted-foreground flex-shrink-0" />
-            <span className="font-medium">{tour.guestName}</span>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <CalendarDays size={15} className="text-muted-foreground flex-shrink-0" />
-            <span>{start.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <Clock size={15} className="text-muted-foreground flex-shrink-0" />
-            <span>
-              {start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} – {end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} ({duration} min)
-            </span>
-          </div>
-          {tour.propertyAddress && (
-            <div className="flex items-center gap-3 text-sm">
-              <MapPin size={15} className="text-muted-foreground flex-shrink-0" />
-              <span>{tour.propertyAddress}</span>
-            </div>
-          )}
-        </div>
-
+        {/* ─── Error ─────────────────────────────────────────────── */}
         {error && (
-          <div className="flex items-center gap-2 text-sm text-destructive">
-            <AlertTriangle size={14} />
+          <p className="text-xs text-rose-600 dark:text-rose-400 mt-4">
             {error}
+          </p>
+        )}
+
+        {/* ─── Actions ───────────────────────────────────────────── */}
+        {(canCancel || canRebook) && (
+          <div className="border-t border-border/60 mt-8 pt-6 flex items-center justify-between gap-3">
+            <p className={CAPTION}>
+              Need help? Contact {businessName} directly.
+            </p>
+            {canCancel && (
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(true)}
+                disabled={loading}
+                className={cn(GHOST_PILL, 'disabled:opacity-60')}
+              >
+                {loading && <Loader2 size={14} className="animate-spin" />}
+                Cancel tour
+              </button>
+            )}
+            {canRebook && (
+              <a
+                href={`/book/${bookingSlug}`}
+                className={cn(PRIMARY_PILL, 'justify-center')}
+              >
+                Book a new tour
+              </a>
+            )}
           </div>
         )}
 
-        {/* Actions */}
-        <div className="space-y-2">
-          {!isCancelled && !isPast && !isCompleted && (
-            <Button
-              variant="destructive"
-              className="w-full"
-              onClick={cancelTour}
+        {!canCancel && !canRebook && (
+          <p className={cn(CAPTION, 'mt-8 text-center')}>
+            Need help? Contact {businessName} directly.
+          </p>
+        )}
+      </div>
+
+      {/* ─── Cancel confirmation ──────────────────────────────────── */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle
+              className="text-2xl tracking-tight font-normal text-foreground"
+              style={TITLE_FONT}
+            >
+              Cancel this tour?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This releases your time slot. {businessName} will be notified.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className={cn(GHOST_PILL, 'border-0 shadow-none')}
               disabled={loading}
             >
-              {loading ? <Loader2 size={16} className="mr-2 animate-spin" /> : <XCircle size={16} className="mr-2" />}
-              Cancel Tour
-            </Button>
-          )}
-
-          {(isCancelled || isPast) && bookingSlug && (
-            <a
-              href={`/book/${bookingSlug}`}
-              className="flex items-center justify-center gap-2 w-full rounded-lg bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:bg-primary/90 transition-colors"
+              Keep tour
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                cancelTour();
+              }}
+              disabled={loading}
+              className={cn(
+                PRIMARY_PILL,
+                'bg-rose-600 text-white hover:bg-rose-600/90 disabled:opacity-60',
+              )}
             >
-              <CalendarPlus size={16} />
-              Book a New Tour
-            </a>
-          )}
-        </div>
+              {loading && <Loader2 size={14} className="animate-spin" />}
+              Cancel tour
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
 
-        <p className="text-xs text-muted-foreground text-center leading-relaxed">
-          Need help? Contact {businessName} directly.
-        </p>
-      </div>
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-3">
+      <span className={CAPTION}>{label}</span>
+      <span className={cn(BODY, 'text-right')}>{value}</span>
     </div>
   );
 }

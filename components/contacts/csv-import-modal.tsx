@@ -116,7 +116,7 @@ export function CsvImportModal({ slug, onClose, onImported }: Props) {
       const text = ev.target?.result as string;
       const parsed = parseCSV(text);
       if (!parsed.headers.length) {
-        setError('Could not parse CSV. Make sure it has a header row and at least one data row.');
+        setError("I couldn't read that CSV. Make sure it has a header row and at least one row of data.");
         return;
       }
       setError(null);

@@ -34,7 +34,7 @@ export async function GET(
 
   const [stageResult, dcResult, activityResult] = await Promise.all([
     supabase.from('DealStage').select('*').eq('id', deal.stageId).maybeSingle(),
-    supabase.from('DealContact').select('dealId, contactId, Contact(id, name, type)').eq('dealId', id),
+    supabase.from('DealContact').select('dealId, contactId, role, Contact(id, name, type)').eq('dealId', id),
     supabase.from('DealActivity').select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(50),
   ]);
 
@@ -44,6 +44,7 @@ export async function GET(
   const dealContacts = (dcResult.data ?? []).map((row: any) => ({
     dealId: row.dealId,
     contactId: row.contactId,
+    role: row.role ?? null,
     contact: row.Contact ? { id: row.Contact.id, name: row.Contact.name, type: row.Contact.type } : null,
   }));
 
@@ -170,6 +171,26 @@ export async function PATCH(
       }
     }
 
+    // next-action: free-form string + optional due timestamp.
+    let nextActionVal: string | null | undefined = undefined;
+    if (body.nextAction !== undefined) {
+      if (body.nextAction === null || body.nextAction === '') {
+        nextActionVal = null;
+      } else {
+        nextActionVal = String(body.nextAction).trim().slice(0, 280);
+      }
+    }
+    let nextActionDueAtVal: string | null | undefined = undefined;
+    if (body.nextActionDueAt !== undefined) {
+      if (!body.nextActionDueAt) {
+        nextActionDueAtVal = null;
+      } else {
+        const d = new Date(body.nextActionDueAt);
+        if (isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid nextActionDueAt' }, { status: 400 });
+        nextActionDueAtVal = d.toISOString();
+      }
+    }
+
     const stageChanged = body.stageId && body.stageId !== existing.stageId;
     const statusChanged = body.status && body.status !== existing.status;
 
@@ -244,6 +265,21 @@ export async function PATCH(
         ...(body.status !== undefined && { status: body.status }),
         ...(followUpAtVal !== undefined && { followUpAt: followUpAtVal }),
         ...(milestonesVal !== undefined && { milestones: milestonesVal }),
+        ...(nextActionVal !== undefined && { nextAction: nextActionVal }),
+        ...(nextActionDueAtVal !== undefined && { nextActionDueAt: nextActionDueAtVal }),
+        // propertyId: null unlinks; otherwise validated as string referencing a
+        // Property in this space. We don't load the row here — the FK will
+        // reject a mismatched id; validating at edit time adds a round-trip
+        // without additional safety.
+        ...(body.propertyId !== undefined && {
+          propertyId: body.propertyId ? String(body.propertyId).slice(0, 64) : null,
+        }),
+        // Won/lost post-mortem fields — captured from the kanban dialog.
+        // When the deal transitions back to active we clear them so stale
+        // reasons don't confuse a later close.
+        ...(body.wonLostReason !== undefined && { wonLostReason: body.wonLostReason ? String(body.wonLostReason).slice(0, 120) : null }),
+        ...(body.wonLostNote !== undefined && { wonLostNote: body.wonLostNote ? String(body.wonLostNote).slice(0, 2000) : null }),
+        ...(body.status === 'active' && { wonLostReason: null, wonLostNote: null }),
         updatedAt: new Date().toISOString(),
       })
       .eq('id', id)
@@ -306,7 +342,7 @@ export async function PATCH(
       stage: stageRow || null
     } as Deal & { stage: DealStage | null };
 
-    syncDeal(deal).catch(console.error);
+    syncDeal({ ...deal, stage: deal.stage ?? undefined }).catch(console.error);
     void audit({ actorClerkId: userId, action: 'UPDATE', resource: 'Deal', resourceId: id, spaceId: space.id, req });
 
     return NextResponse.json(deal);

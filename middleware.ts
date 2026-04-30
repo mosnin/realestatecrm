@@ -56,6 +56,8 @@ const isFullyPublicRoute = createRouteMatcher([
   '/apply/b/(.*)',
   '/book/(.*)',
   '/status/(.*)',
+  '/packet/(.*)',            // tokenised listing-packet share pages (Phase 11)
+  '/api/packet/(.*)',        // token-scoped signed-URL endpoint for packet docs
   '/api/public/(.*)',
   '/api/webhooks/(.*)',
   '/api/mcp',
@@ -129,7 +131,7 @@ export default clerkMiddleware(async (auth, request) => {
             .from('User')
             .select('platformRole')
             .eq('clerkId', session.userId)
-            .maybeSingle();
+            .maybeSingle<{ platformRole: string | null }>();
           if (dbUser?.platformRole === 'banned') {
             const bannedUrl = new URL('/login/realtor', request.url);
             bannedUrl.searchParams.set('reason', 'suspended');

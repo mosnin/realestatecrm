@@ -156,7 +156,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Members',         value: members.length,              icon: Users,     color: 'text-blue-500'   },
           { label: 'Pending invites', value: pendingInviteCount.count ?? 0, icon: Mail,    color: 'text-amber-500'  },

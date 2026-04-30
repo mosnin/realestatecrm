@@ -15,28 +15,22 @@ import {
 
 const testimonials = [
   {
-    text: 'Chippi helped me stop guessing. I can see qualified renter leads first and follow up with confidence.',
-    image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&h=120&fit=crop&crop=faces',
-    name: 'Sofia Bennett',
-    role: '@sofia_leasing',
+    text: "Chippi completely changed how I manage new leads. The AI scoring saves me hours every week — I know exactly who to call first.",
+    name: 'Sarah M.',
+    role: 'Residential Realtor',
+    initials: 'SM',
   },
   {
-    text: 'The intake form made my workflow cleaner overnight. Every application arrives with usable context.',
-    image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop&crop=faces',
-    name: 'Marcus Hill',
-    role: '@marcushill_re',
+    text: "I used to lose track of follow-ups constantly. Now my pipeline actually moves. Chippi is the first CRM I've actually stuck with.",
+    name: 'James T.',
+    role: "Buyer's Agent",
+    initials: 'JT',
   },
   {
-    text: 'I finally have one place to review budgets, move-in dates, and score signals before calling.',
-    image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop&crop=faces',
-    name: 'Elena Brooks',
-    role: '@elenabrooks',
-  },
-  {
-    text: 'Chippi gives me a polished intake flow that clients trust, and it saves me hours every week.',
-    image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&h=120&fit=crop&crop=faces',
-    name: 'Priya Shah',
-    role: '@priya_rentals',
+    text: "The intake form alone is worth it. My leads come in pre-scored and my brokerage team is way more organized.",
+    name: 'Priya K.',
+    role: 'Team Lead',
+    initials: 'PK',
   },
 ];
 
@@ -242,7 +236,7 @@ export default function TrialPage() {
       {/* ── Testimonials — horizontal cards ───────────────────────────────── */}
       <section className="px-6 pb-20 sm:pb-28">
         <div className="max-w-6xl mx-auto">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {testimonials.map((t, i) => (
               <motion.div
                 key={i}
@@ -255,13 +249,9 @@ export default function TrialPage() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2.5">
-                    <img
-                      src={t.image}
-                      alt={t.name}
-                      width={40}
-                      height={40}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
+                    <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-semibold flex-shrink-0">
+                      {t.initials}
+                    </div>
                     <div>
                       <p className="text-sm font-semibold text-foreground leading-tight">{t.name}</p>
                       <p className="text-xs text-muted-foreground">{t.role}</p>

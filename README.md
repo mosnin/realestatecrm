@@ -15,7 +15,8 @@ Chippi is a SaaS platform that helps realtors capture, qualify, and manage renta
 - **CRM pipeline** — Kanban-style deal management with customizable stages, drag-and-drop, and contact linking
 - **Tour scheduling** — Public booking page, calendar integration, automated confirmations/reminders
 - **Brokerage management** — Multi-user team dashboards, invite system, performance tracking across realtors
-- **AI assistant** — Context-aware chat with RAG-enriched vector search across contacts and deals
+- **AI assistant** — On-demand agent with a tool-use loop over the realtor's CRM (read-only tools auto-run; mutating tools — email, SMS, deal/stage changes, tours — require per-call user approval). Delegates research questions to read-only sub-agents so profile lookups don't bloat the orchestrator's context. See `lib/ai-tools/tools/index.ts` for the tool registry and `lib/ai-tools/skills/*` for the sub-agents.
+- **Brokerage tier** — Multi-agent organisation with per-seat billing: brokerage membership + role tiers (`broker_owner`, `broker_admin`, `realtor_member`) in `lib/permissions.ts`; lead routing across agents (`lib/brokerage-routing.ts`); commission ledger (`lib/commissions.ts`); Stripe-backed seat subscriptions (`lib/brokerage-seats.ts`, `app/api/billing/*`)
 - **Notifications** — Email (Resend) and SMS (Telnyx) notifications for leads, tours, deals, and follow-ups
 - **Analytics** — Weekly trends, conversion funnels, and team performance metrics
 

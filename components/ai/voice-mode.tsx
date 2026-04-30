@@ -2,8 +2,9 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, X, Loader2, Volume2, Phone } from 'lucide-react';
+import { Mic, MicOff, X, Volume2, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AILoader } from '@/components/ui/ai-loader';
 
 type VoiceState = 'connecting' | 'connected' | 'speaking' | 'idle';
 
@@ -217,8 +218,8 @@ export function VoiceMode({ open, onClose, slug, onTranscript }: VoiceModeProps)
             animate={{ opacity: 1, y: 0 }}
             className="text-sm text-muted-foreground mb-8"
           >
-            {state === 'connecting' ? 'Connecting to Chip...' :
-             state === 'speaking' ? 'Chip is speaking' :
+            {state === 'connecting' ? 'Connecting…' :
+             state === 'speaking' ? 'Speaking' :
              error ? '' :
              'Listening — just speak naturally'}
           </motion.p>
@@ -256,14 +257,16 @@ export function VoiceMode({ open, onClose, slug, onTranscript }: VoiceModeProps)
               transition={state === 'speaking' ? { duration: 1.2, repeat: Infinity } : {}}
               className={cn(
                 'w-40 h-40 rounded-full flex items-center justify-center transition-colors relative',
-                state === 'connecting' ? 'bg-muted' :
+                // No backdrop for `connecting` — the AILoader carries its own
+                // ring + letters; a muted circle behind it would compete.
+                state === 'connecting' ? 'bg-transparent' :
                 state === 'speaking' ? 'bg-primary shadow-2xl shadow-primary/30' :
                 isActive ? 'bg-primary/90 shadow-xl shadow-primary/20' :
                 'bg-muted'
               )}
             >
               {state === 'connecting' ? (
-                <Loader2 size={40} className="animate-spin text-muted-foreground" />
+                <AILoader word="Connecting" />
               ) : state === 'speaking' ? (
                 <Volume2 size={40} className="text-primary-foreground" />
               ) : (
@@ -306,7 +309,7 @@ export function VoiceMode({ open, onClose, slug, onTranscript }: VoiceModeProps)
                 animate={{ opacity: 1, y: 0 }}
                 className="text-sm text-primary"
               >
-                <span className="text-muted-foreground">Chip: </span>{assistantText}
+                {assistantText}
               </motion.p>
             )}
           </div>

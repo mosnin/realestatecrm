@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Lightbulb,
   RefreshCw,
@@ -13,15 +11,13 @@ import {
   Pencil,
   Plus,
   BarChart3,
-  AlertTriangle,
   ChevronDown,
   ChevronRight,
-  TrendingUp,
-  TrendingDown,
   Sparkles,
   Database,
-  HelpCircle,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { H2, TITLE_FONT, SECTION_LABEL, STAT_NUMBER_COMPACT, BODY_MUTED } from '@/lib/typography';
 
 // ── Types (mirror server types) ──────────────────────────────────────────────
 
@@ -55,21 +51,30 @@ interface OptimizationResult {
   message?: string;
 }
 
-// ── Sub-components ───────────────────────────────────────────────────────────
+// ── Style maps ───────────────────────────────────────────────────────────────
 
-const IMPACT_STYLES: Record<string, { className: string; label: string }> = {
-  high: { className: 'bg-red-100 text-red-700 border-red-200', label: 'High Impact' },
-  medium: { className: 'bg-amber-100 text-amber-700 border-amber-200', label: 'Medium Impact' },
-  low: { className: 'bg-blue-100 text-blue-700 border-blue-200', label: 'Low Impact' },
+/**
+ * Severity dot tone (sanctioned subtle).
+ * Severity is the message — the rest of the row stays paper-flat.
+ */
+const IMPACT_DOT: Record<string, string> = {
+  high: 'bg-rose-500/70',
+  medium: 'bg-amber-500/70',
+  low: 'bg-muted-foreground/40',
 };
 
-/** Human-readable labels for suggestion types (no raw enum values in the UI) */
+const IMPACT_LABEL: Record<string, string> = {
+  high: 'High impact',
+  medium: 'Medium impact',
+  low: 'Low impact',
+};
+
 const TYPE_LABELS: Record<string, string> = {
-  reorder: 'Reorder Fields',
-  remove: 'Remove Field',
-  modify: 'Edit Field',
-  add: 'Add Field',
-  scoring: 'Adjust Scoring',
+  reorder: 'Reorder',
+  remove: 'Remove',
+  modify: 'Edit',
+  add: 'Add',
+  scoring: 'Scoring',
 };
 
 const TYPE_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
@@ -80,15 +85,89 @@ const TYPE_ICONS: Record<string, React.ComponentType<{ size?: number; className?
   scoring: BarChart3,
 };
 
-/** Loading messages that rotate during AI analysis to reassure the user */
 const LOADING_STEPS = [
-  'Gathering your submission data...',
-  'Analyzing answer patterns across questions...',
-  'Identifying drop-off points...',
-  'Generating personalized suggestions...',
+  'Gathering your submission data…',
+  'Analyzing answer patterns across questions…',
+  'Identifying drop-off points…',
+  'Generating personalized suggestions…',
 ];
 
-function SuggestionCard({
+// ── Subtle pill ──────────────────────────────────────────────────────────────
+
+function MutedPill({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 text-muted-foreground bg-foreground/[0.06] rounded px-1.5 py-0.5 text-[10px] font-mono',
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+// ── Buttons ─────────────────────────────────────────────────────────────────
+
+function PrimaryButton({
+  onClick,
+  disabled,
+  children,
+  className,
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium',
+        'hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150',
+        'disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100',
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function GhostButton({
+  onClick,
+  disabled,
+  children,
+  className,
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-sm text-muted-foreground',
+        'hover:bg-foreground/[0.04] hover:text-foreground transition-colors duration-150',
+        'disabled:opacity-40 disabled:cursor-not-allowed',
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ── Suggestion row ───────────────────────────────────────────────────────────
+
+function SuggestionRow({
   suggestion,
   onDismiss,
 }: {
@@ -97,50 +176,44 @@ function SuggestionCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const Icon = TYPE_ICONS[suggestion.type] ?? Lightbulb;
-  const impact = IMPACT_STYLES[suggestion.impact] ?? IMPACT_STYLES.low;
   const isAI = suggestion.source === 'ai';
+  const dotTone = IMPACT_DOT[suggestion.impact] ?? IMPACT_DOT.low;
+  const impactLabel = IMPACT_LABEL[suggestion.impact] ?? IMPACT_LABEL.low;
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
-      <div className="flex items-start gap-3 px-4 py-3">
-        <div className="flex-shrink-0 mt-0.5 w-7 h-7 rounded-md bg-muted flex items-center justify-center">
-          <Icon size={14} className="text-muted-foreground" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <Badge
-              variant="outline"
-              className={`text-[10px] px-1.5 py-0 font-semibold ${impact.className}`}
-            >
-              {impact.label}
-            </Badge>
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-              {TYPE_LABELS[suggestion.type] ?? suggestion.type}
-            </Badge>
-            {isAI ? (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-0.5 text-violet-600 border-violet-200 bg-violet-50">
-                <Sparkles size={9} /> AI Suggestion
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-0.5 text-slate-600 border-slate-200 bg-slate-50">
-                <Database size={9} /> Based on Your Data
-              </Badge>
-            )}
-          </div>
-          <p className="text-sm font-medium leading-snug">{suggestion.title}</p>
-          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{suggestion.description}</p>
+    <div className="px-4 py-3 hover:bg-foreground/[0.04] transition-colors duration-150">
+      <div className="flex items-start gap-3">
+        {/* Severity dot — single tinted point, the row body stays paper-flat */}
+        <span
+          aria-label={impactLabel}
+          title={impactLabel}
+          className={cn('w-2 h-2 rounded-full flex-shrink-0 mt-1.5', dotTone)}
+        />
 
-          {/* Reasoning shown by default so users always see WHY */}
+        {/* Type icon, muted */}
+        <Icon size={14} className="text-muted-foreground/70 flex-shrink-0 mt-0.5" />
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+            <p className="text-sm font-medium text-foreground leading-snug">{suggestion.title}</p>
+            <MutedPill>{TYPE_LABELS[suggestion.type] ?? suggestion.type}</MutedPill>
+            <MutedPill>
+              {isAI ? <Sparkles size={9} /> : <Database size={9} />}
+              {isAI ? 'AI' : 'data'}
+            </MutedPill>
+          </div>
+          <p className="text-xs text-muted-foreground leading-relaxed">{suggestion.description}</p>
+
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 mt-2 transition-colors"
+            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground mt-2 transition-colors duration-150"
           >
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             {expanded ? 'Hide details' : 'Why this suggestion?'}
           </button>
           {expanded && (
-            <p className="text-[11px] text-muted-foreground mt-1 pl-4 border-l-2 border-border leading-relaxed">
+            <p className="text-[11px] text-muted-foreground mt-1 pl-3.5 border-l border-border/70 leading-relaxed">
               {suggestion.reasoning}
             </p>
           )}
@@ -148,9 +221,9 @@ function SuggestionCard({
         <button
           type="button"
           onClick={onDismiss}
-          className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted transition-colors"
+          className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
           aria-label="Dismiss this suggestion"
-          title="Dismiss suggestion"
+          title="Dismiss"
         >
           <X size={14} />
         </button>
@@ -159,40 +232,47 @@ function SuggestionCard({
   );
 }
 
+// ── Performance summary ──────────────────────────────────────────────────────
+
 function PerformanceSummary({ performance }: { performance: FormPerformance }) {
   return (
-    <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
+    <div className="bg-background border border-border/70 rounded-lg px-4 py-3">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Submissions</p>
-          <p className="text-lg font-bold mt-0.5">{performance.totalSubmissions}</p>
+          <p className={SECTION_LABEL}>Submissions</p>
+          <p className={cn(STAT_NUMBER_COMPACT, 'mt-0.5')} style={TITLE_FONT}>
+            {performance.totalSubmissions}
+          </p>
           <p className="text-[10px] text-muted-foreground">last 30 days</p>
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Avg Lead Score</p>
-          <p className="text-lg font-bold mt-0.5">{performance.avgLeadScore}/100</p>
+          <p className={SECTION_LABEL}>Avg lead score</p>
+          <p className={cn(STAT_NUMBER_COMPACT, 'mt-0.5')} style={TITLE_FONT}>
+            {performance.avgLeadScore}
+            <span className="text-sm text-muted-foreground"> /100</span>
+          </p>
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Lead Quality</p>
+          <p className={SECTION_LABEL}>Lead quality</p>
           <div className="flex flex-col gap-1 mt-1">
             <div className="flex items-center gap-1.5">
-              <TrendingUp size={12} className="text-emerald-500" />
-              <span className="text-xs font-medium">{performance.scoreDistribution.hot}% Hot</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/70 flex-shrink-0" />
+              <span className="text-xs text-foreground">{performance.scoreDistribution.hot}% hot</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
-              <span className="text-xs font-medium">{performance.scoreDistribution.warm}% Warm</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500/70 flex-shrink-0" />
+              <span className="text-xs text-foreground">{performance.scoreDistribution.warm}% warm</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <TrendingDown size={12} className="text-blue-400" />
-              <span className="text-xs font-medium">{performance.scoreDistribution.cold}% Cold</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 flex-shrink-0" />
+              <span className="text-xs text-foreground">{performance.scoreDistribution.cold}% cold</span>
             </div>
           </div>
         </div>
         {performance.mostCommonDropOff && (
           <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Common Drop-off</p>
-            <p className="text-xs font-medium mt-1 truncate" title={performance.mostCommonDropOff}>
+            <p className={SECTION_LABEL}>Common drop-off</p>
+            <p className="text-xs text-foreground mt-1 truncate" title={performance.mostCommonDropOff}>
               {performance.mostCommonDropOff}
             </p>
             <p className="text-[10px] text-muted-foreground">where applicants stop</p>
@@ -215,19 +295,20 @@ function AnalyzingProgress() {
   }, []);
 
   return (
-    <div className="rounded-lg border border-border bg-card p-8 text-center">
-      <Loader2 size={24} className="mx-auto animate-spin text-primary mb-3" />
-      <p className="text-sm font-medium">Analyzing your form...</p>
-      <p className="text-xs text-muted-foreground mt-2 h-4 transition-opacity duration-300">
+    <div className="bg-background border border-border/70 rounded-lg p-8 text-center">
+      <Loader2 size={20} className="mx-auto animate-spin text-muted-foreground mb-3" />
+      <p className="text-sm text-foreground">Analyzing your form…</p>
+      <p className="text-xs text-muted-foreground mt-2 h-4 transition-opacity duration-150">
         {LOADING_STEPS[step]}
       </p>
       <div className="flex justify-center gap-1.5 mt-4">
         {LOADING_STEPS.map((_, i) => (
           <div
             key={i}
-            className={`h-1 rounded-full transition-all duration-500 ${
-              i <= step ? 'w-6 bg-primary' : 'w-3 bg-muted'
-            }`}
+            className={cn(
+              'h-1 rounded-full transition-all duration-150',
+              i <= step ? 'w-6 bg-foreground' : 'w-3 bg-foreground/[0.06]',
+            )}
           />
         ))}
       </div>
@@ -241,25 +322,24 @@ export interface OptimizationPanelProps {
   slug: string;
 }
 
-/** Maps raw API error text to friendly, actionable messages for realtors */
 function friendlyErrorMessage(raw: string): { title: string; detail: string } {
   const lower = raw.toLowerCase();
   if (lower.includes('rate limit')) {
     return {
       title: 'You have reached the analysis limit',
-      detail: 'You can refresh suggestions up to 5 times per hour. Please wait a bit and try again.',
+      detail: 'Five refreshes an hour is the cap. Give it a few minutes and try again.',
     };
   }
   if (lower.includes('openai') || lower.includes('ai') || lower.includes('timeout')) {
     return {
       title: 'Our AI assistant is temporarily unavailable',
-      detail: 'The analysis service is experiencing high demand. Your data-driven suggestions will still appear. Try again in a minute.',
+      detail: 'The analysis service is busy. Your data-driven suggestions will still appear. Try again in a minute.',
     };
   }
   if (lower.includes('no custom form')) {
     return {
       title: 'No form set up yet',
-      detail: 'Switch to the Builder tab to create your intake form before running an analysis.',
+      detail: 'Switch to Questions to create your intake form before running an analysis.',
     };
   }
   return {
@@ -307,25 +387,24 @@ export function OptimizationPanel({ slug }: OptimizationPanelProps) {
     (s) => !dismissedIds.has(`${s.type}:${s.target}`)
   ) ?? [];
 
-  // Initial state: show analyze button with clear explanation
+  // Initial state
   if (!hasLoaded && !loading && !error) {
     return (
-      <div className="space-y-4">
-        <div className="rounded-xl border-2 border-dashed border-border p-8 text-center">
-          <Lightbulb size={32} className="mx-auto text-muted-foreground/50 mb-3" />
-          <h3 className="text-sm font-semibold mb-1">Get Suggestions to Improve Your Form</h3>
-          <p className="text-xs text-muted-foreground mb-4 max-w-md mx-auto leading-relaxed">
-            We will review how applicants interact with your form -- which questions they skip,
-            where they drop off, and how their answers affect lead scores -- then recommend
-            specific changes to get better results.
-          </p>
-          <Button onClick={() => fetchSuggestions()} disabled={loading}>
-            <Lightbulb size={14} className="mr-1.5" /> Analyze My Form
-          </Button>
-          <p className="text-[10px] text-muted-foreground mt-3">
-            Works best with at least 10 submissions in the last 30 days.
-          </p>
-        </div>
+      <div className="bg-background border border-border/70 rounded-lg p-10 text-center max-w-2xl mx-auto">
+        <h3 className={cn(H2, 'mb-2')} style={TITLE_FONT}>
+          Get suggestions to improve your form
+        </h3>
+        <p className={cn(BODY_MUTED, 'mb-5 max-w-md mx-auto leading-relaxed')}>
+          We&apos;ll review how applicants interact with your form — which questions they skip,
+          where they drop off, and how their answers affect lead scores — then recommend
+          specific changes to get better results.
+        </p>
+        <PrimaryButton onClick={() => fetchSuggestions()} disabled={loading} className="mx-auto">
+          <Lightbulb size={14} /> Analyze my form
+        </PrimaryButton>
+        <p className="text-[10px] text-muted-foreground mt-3">
+          Works best with at least 10 submissions in the last 30 days.
+        </p>
       </div>
     );
   }
@@ -333,51 +412,44 @@ export function OptimizationPanel({ slug }: OptimizationPanelProps) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold">Suggestions for Your Form</h3>
+          <h3 className={H2} style={TITLE_FONT}>
+            Suggestions for your form
+          </h3>
           {result?.generatedAt && (
             <p className="text-[10px] text-muted-foreground mt-0.5">
               Last analyzed {new Date(result.generatedAt).toLocaleString()}
             </p>
           )}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => fetchSuggestions(true)}
-          disabled={loading}
-        >
+        <GhostButton onClick={() => fetchSuggestions(true)} disabled={loading}>
           {loading ? (
             <Loader2 size={14} className="animate-spin" />
           ) : (
             <RefreshCw size={14} />
           )}
-          <span className="ml-1.5">Re-analyze</span>
-        </Button>
+          Re-analyze
+        </GhostButton>
       </div>
 
-      {/* Loading -- stepped progress instead of a bare spinner */}
+      {/* Loading */}
       {loading && <AnalyzingProgress />}
 
-      {/* Error -- friendly, structured, with recovery action */}
+      {/* Error — sanctioned subtle rose, severity is the message */}
       {error && !loading && (() => {
         const { title, detail } = friendlyErrorMessage(error);
         return (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-3">
-            <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-red-700">{title}</p>
-              <p className="text-xs text-red-600/80 mt-0.5">{detail}</p>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-red-600 hover:text-red-700 mt-2 h-auto p-0 text-xs"
-                onClick={() => fetchSuggestions()}
-              >
-                Try again
-              </Button>
-            </div>
+          <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3">
+            <p className="text-sm font-medium text-rose-700 dark:text-rose-400">{title}</p>
+            <p className="text-xs text-rose-700/80 dark:text-rose-400/80 mt-0.5">{detail}</p>
+            <button
+              type="button"
+              onClick={() => fetchSuggestions()}
+              className="text-xs text-rose-700 dark:text-rose-400 hover:underline mt-2 transition-colors duration-150"
+            >
+              Try again
+            </button>
           </div>
         );
       })()}
@@ -388,24 +460,21 @@ export function OptimizationPanel({ slug }: OptimizationPanelProps) {
           {/* Performance summary */}
           <PerformanceSummary performance={result.performance} />
 
-          {/* Message (e.g., not enough data) -- with guidance */}
+          {/* Message (e.g., not enough data) — sanctioned subtle amber */}
           {result.message && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-2">
-              <HelpCircle size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs text-amber-700 font-medium">{result.message}</p>
-                <p className="text-[11px] text-amber-600/80 mt-1">
-                  Share your form link with more applicants to collect enough data. Once you reach the threshold, come back here for personalized recommendations.
-                </p>
-              </div>
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">{result.message}</p>
+              <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-1 leading-relaxed">
+                Share your form link with more applicants to collect enough data. Once you reach the threshold, come back here for personalized recommendations.
+              </p>
             </div>
           )}
 
-          {/* Suggestions list */}
+          {/* Suggestions list — hairline-divided rows, paper-flat */}
           {visibleSuggestions.length > 0 ? (
-            <div className="space-y-3">
+            <div className="bg-background border border-border/70 rounded-lg overflow-hidden divide-y divide-border/70">
               {visibleSuggestions.map((suggestion) => (
-                <SuggestionCard
+                <SuggestionRow
                   key={`${suggestion.type}:${suggestion.target}`}
                   suggestion={suggestion}
                   onDismiss={() => handleDismiss(suggestion.target, suggestion.type)}
@@ -413,17 +482,17 @@ export function OptimizationPanel({ slug }: OptimizationPanelProps) {
               ))}
             </div>
           ) : result.suggestions.length > 0 ? (
-            <div className="rounded-lg border border-border bg-card p-6 text-center">
+            <div className="bg-background border border-border/70 rounded-lg p-6 text-center">
               <p className="text-sm text-muted-foreground">
-                All suggestions dismissed. Click <strong>Re-analyze</strong> to get fresh recommendations.
+                All suggestions dismissed. Click <strong className="font-medium text-foreground">Re-analyze</strong> to get fresh recommendations.
               </p>
             </div>
           ) : !result.message ? (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-center">
-              <p className="text-sm font-medium text-emerald-700">
-                Your form looks great! No changes needed right now.
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-6 text-center">
+              <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                Your form looks great. No changes needed right now.
               </p>
-              <p className="text-xs text-emerald-600/70 mt-1">
+              <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 mt-1">
                 Check back after you get more submissions for new insights.
               </p>
             </div>

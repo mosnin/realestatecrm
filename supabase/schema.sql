@@ -236,6 +236,29 @@ CREATE TABLE IF NOT EXISTS "Message" (
   "createdAt"      timestamptz NOT NULL DEFAULT now()
 );
 
+-- Chat attachments: files the realtor uploads via the prompt box.
+-- Owned by spaceId; the cowork agent reads them via the read_attachment tool.
+CREATE TABLE IF NOT EXISTS "Attachment" (
+  id              text PRIMARY KEY,
+  "spaceId"       text NOT NULL,
+  "userId"        text,
+  "conversationId" text,
+  filename        text NOT NULL,
+  "mimeType"      text NOT NULL,
+  "sizeBytes"     int NOT NULL,
+  "storagePath"   text NOT NULL,
+  "publicUrl"     text NOT NULL,
+  "extractedText" text,
+  "extractionStatus" text NOT NULL DEFAULT 'pending'
+    CHECK ("extractionStatus" IN ('pending','skipped','done','failed')),
+  "createdAt"     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS "Attachment_spaceId_createdAt_idx"
+  ON "Attachment" ("spaceId", "createdAt" DESC);
+CREATE INDEX IF NOT EXISTS "Attachment_conversationId_idx"
+  ON "Attachment" ("conversationId")
+  WHERE "conversationId" IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS "BrokerageMembership" (
   id              text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   "brokerageId"   text NOT NULL REFERENCES "Brokerage"(id) ON DELETE CASCADE,
@@ -660,3 +683,23 @@ BEGIN
   LIMIT match_count;
 END;
 $$;
+
+-- ============================================================
+-- TelemetryEvent: first-value product analytics
+-- See lib/telemetry.ts and supabase/migrations/20260518000000_telemetry_event.sql
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS "TelemetryEvent" (
+  id          TEXT        PRIMARY KEY,
+  "spaceId"   TEXT,
+  "userId"    TEXT,
+  event       TEXT        NOT NULL,
+  payload     JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS "TelemetryEvent_event_createdAt_idx"
+  ON "TelemetryEvent" (event, "createdAt" DESC);
+
+CREATE INDEX IF NOT EXISTS "TelemetryEvent_spaceId_event_idx"
+  ON "TelemetryEvent" ("spaceId", event);

@@ -10,8 +10,11 @@ import { supabase } from '@/lib/supabase';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 import { getBrokerContext } from '@/lib/permissions';
 import { LiveNotifications } from '@/components/dashboard/live-notifications';
-import { FloatingChatWidget } from '@/components/ui/floating-chat-widget-shadcnui';
 import { PlatformBanner } from '@/components/platform-banner';
+import { CommandPalette } from '@/components/command-palette/command-palette';
+import { AgentStatusBar } from '@/components/agent/agent-status-bar';
+import { ChippiBar } from '@/components/chippi/chippi-bar';
+import { PageTransition } from '@/components/motion/page-transition';
 
 
 export default async function DashboardLayout({
@@ -31,7 +34,12 @@ export default async function DashboardLayout({
   // Gate: user must exist in our DB. On DB error, render error UI
   // (NOT .catch(() => null) which caused redirect loops, NOT throw which
   // shows the generic "Application error" page).
-  let dbUser;
+  let dbUser: {
+    id: string;
+    onboard: boolean;
+    isPlatformAdmin: boolean;
+    space: { id: string } | null;
+  } | null | undefined;
   try {
     const { data: row, error } = await supabase
       .from('User')
@@ -170,8 +178,9 @@ export default async function DashboardLayout({
 
   let unreadLeadCount = 0;
   let overdueFollowUpCount = 0;
+  let pendingDraftCount = 0;
   try {
-    const [leadResult, followUpResult] = await Promise.all([
+    const [leadResult, followUpResult, draftResult] = await Promise.all([
       supabase
         .from('Contact')
         .select('*', { count: 'exact', head: true })
@@ -185,13 +194,20 @@ export default async function DashboardLayout({
         .is('brokerageId', null)
         .not('followUpAt', 'is', null)
         .lte('followUpAt', new Date().toISOString()),
+      supabase
+        .from('AgentDraft')
+        .select('id', { count: 'exact', head: true })
+        .eq('spaceId', space.id)
+        .eq('status', 'pending'),
     ]);
     if (leadResult.error) throw leadResult.error;
     unreadLeadCount = leadResult.count ?? 0;
     overdueFollowUpCount = followUpResult.count ?? 0;
+    pendingDraftCount = draftResult.count ?? 0;
   } catch {
     unreadLeadCount = 0;
     overdueFollowUpCount = 0;
+    pendingDraftCount = 0;
   }
 
   // Check broker context and brokerage memberships for sidebar
@@ -222,20 +238,30 @@ export default async function DashboardLayout({
 
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
-      <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} overdueFollowUpCount={overdueFollowUpCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} />
+      <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} pendingDraftCount={pendingDraftCount ?? 0} overdueFollowUpCount={overdueFollowUpCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <PlatformBanner />
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
-        <main className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-7 pb-24 md:pb-7 bg-background text-foreground">
-          <div className="w-full max-w-[1500px] mx-auto">
-          <LiveNotifications spaceId={space.id} slug={slug} />
-          {children}
-          <DashboardFooter />
+        <AgentStatusBar slug={slug} />
+        {/* pb on main reserves space for the persistent ChippiBar.
+            Mobile bar sits above MobileNav so we add MobileNav's height. */}
+        <main className="flex-1 overflow-y-auto flex flex-col bg-background text-foreground">
+          {/* Page content grows; footer always pins to the visible bottom of
+              <main> regardless of how short the page is. */}
+          <div className="w-full max-w-[1500px] mx-auto flex-1 px-4 py-5 md:px-8 md:py-7 pb-40 md:pb-24">
+            <LiveNotifications spaceId={space.id} slug={slug} />
+            <PageTransition>{children}</PageTransition>
+          </div>
+          <div className="w-full max-w-[1500px] mx-auto px-4 md:px-8 pb-4">
+            <DashboardFooter />
           </div>
         </main>
-        <FloatingChatWidget slug={slug} />
       </div>
       <MobileNav slug={slug} isBroker={isBroker} />
+      {/* Persistent agent presence on every workspace page (hides itself on /chippi). */}
+      <ChippiBar slug={slug} />
+      {/* ⌘K palette — listens globally, renders a modal when open. */}
+      <CommandPalette slug={slug} />
     </div>
   );
 }

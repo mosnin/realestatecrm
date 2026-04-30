@@ -15,6 +15,11 @@ export async function GET(req: NextRequest) {
 
   const search = req.nextUrl.searchParams.get('search') ?? '';
   const type = req.nextUrl.searchParams.get('type');
+  // Snooze hygiene: by default hide currently-snoozed contacts from the main
+  // People view. Callers that need them (e.g. a "Snoozed" tab, or the
+  // command palette fuzzy search) can pass ?includeSnoozed=1.
+  const includeSnoozed = req.nextUrl.searchParams.get('includeSnoozed') === '1';
+  const onlySnoozed = req.nextUrl.searchParams.get('onlySnoozed') === '1';
 
   let query = supabase
     .from('Contact')
@@ -22,15 +27,39 @@ export async function GET(req: NextRequest) {
     .eq('spaceId', space.id)
     .is('brokerageId', null); // Exclude brokerage leads — those show on /broker/leads
 
+  if (!includeSnoozed && !onlySnoozed) {
+    query = query.or(`snoozedUntil.is.null,snoozedUntil.lte.${new Date().toISOString()}`);
+  } else if (onlySnoozed) {
+    query = query.gt('snoozedUntil', new Date().toISOString());
+  }
+
   if (search) {
     // Cap length to prevent expensive full-table-scan patterns
-    const limitedSearch = search.slice(0, 100);
-    // Escape PostgreSQL ILIKE special characters before wrapping in wildcards
-    const escaped = limitedSearch.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
-    // Strip PostgREST filter-breaking characters (commas, parens)
-    const sanitized = escaped.replace(/[,()]/g, '');
-    const pattern = `%${sanitized}%`;
-    query = query.or(`name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},preferences.ilike.${pattern}`);
+    const limitedSearch = search.slice(0, 100).trim().toLowerCase();
+    // Forgiving multi-token search:
+    //   - split on whitespace into tokens
+    //   - each non-empty token must match (AND across tokens, via chained .or())
+    //   - each token can match ANY of name/email/phone/preferences (OR within token)
+    // Example: "jane hot" matches a contact named "Jane" tagged "hot".
+    const tokens = limitedSearch
+      .split(/\s+/)
+      .filter((t) => t.length > 0)
+      // Cap the number of tokens to avoid pathological queries
+      .slice(0, 8);
+
+    for (const token of tokens) {
+      // Escape PostgreSQL ILIKE special characters before wrapping in wildcards
+      const escaped = token.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+      // Strip PostgREST filter-breaking characters (commas, parens)
+      const sanitized = escaped.replace(/[,()]/g, '');
+      if (!sanitized) continue;
+      const pattern = `%${sanitized}%`;
+      // Chained .or() calls are AND-combined by PostgREST, giving us
+      // "(field OR field OR ...) AND (field OR field OR ...)" across tokens.
+      query = query.or(
+        `name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},preferences.ilike.${pattern}`
+      );
+    }
   }
 
   if (type && type !== 'ALL') {

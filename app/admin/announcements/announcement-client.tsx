@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Plus, Pencil, Trash2, Megaphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export type Announcement = {
   id: string;
@@ -241,12 +242,12 @@ export function AnnouncementClient({
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card px-5 py-12 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-            <Megaphone size={20} className="text-muted-foreground" />
-          </div>
-          <p className="font-semibold mb-1">No announcements yet</p>
-          <p className="text-sm text-muted-foreground">Create one to show a banner to users.</p>
+        <div className="rounded-xl border border-border bg-card">
+          <EmptyState
+            icon={Megaphone}
+            title="No announcements yet"
+            description="Create one to show a banner to users."
+          />
         </div>
       ) : (
         <div className="rounded-xl border border-border overflow-hidden">

@@ -44,7 +44,7 @@ realestatecrm/
 │   ├── (auth)/                 # Sign-in / sign-up (Clerk hosted components)
 │   ├── admin/                  # Admin dashboard (legacy Redis-based)
 │   ├── api/
-│   │   ├── ai/chat/            # AI assistant streaming endpoint
+│   │   ├── ai/task/            # On-demand agent streaming endpoint (+ approve/[requestId])
 │   │   ├── contacts/           # Contact CRUD + [id] routes
 │   │   ├── deals/              # Deal CRUD + [id] + reorder routes
 │   │   ├── onboarding/         # Onboarding wizard API (multi-action POST)
@@ -82,7 +82,7 @@ realestatecrm/
 │   ├── space.ts                # Space lookup helpers
 │   ├── slugs.ts                # Legacy slug helpers (Redis-based)
 │   ├── supabase.ts             # Supabase client singleton (service-role)
-│   ├── types.ts                # TypeScript model types (replaces Prisma generated)
+│   ├── types.ts                # TypeScript model types (hand-written; Prisma is not in use)
 │   ├── utils.ts                # cn(), protocol, rootDomain
 │   ├── vectorize.ts            # Contact/deal → vector sync
 │   └── zilliz.ts               # Vector storage (Supabase pgvector, interface unchanged)
@@ -91,7 +91,6 @@ realestatecrm/
 ├── scripts/
 ├── middleware.ts               # Clerk auth middleware + route protection
 ├── next.config.ts              # Next.js config (TS/ESLint errors ignored)
-├── prisma.config.ts            # Prisma config
 └── package.json                # Dependencies, scripts
 ```
 
@@ -111,7 +110,7 @@ realestatecrm/
 | Contacts API | `app/api/contacts/route.ts`, `[id]/route.ts` | CRUD with search/filter, async vector sync on create |
 | Deals API | `app/api/deals/route.ts`, `[id]/route.ts`, `reorder/route.ts` | CRUD with stage association, position ordering, async vector sync |
 | Stages API | `app/api/stages/route.ts`, `[id]/route.ts` | Deal stage CRUD |
-| AI assistant | `app/api/ai/chat/route.ts`, `lib/ai.ts` | Streaming chat with RAG context from Supabase pgvector, message persistence |
+| AI assistant | `app/api/ai/task/route.ts`, `app/api/ai/task/approve/[requestId]/route.ts`, `lib/ai-tools/loop.ts`, `lib/ai.ts` | SSE-streamed on-demand agent with a tool-use loop, approval-gated mutations, sub-agent delegation, RAG context from Supabase pgvector, and `Message.blocks` persistence |
 | Vector system | `lib/embeddings.ts`, `lib/zilliz.ts`, `lib/vectorize.ts`, `app/api/vectorize/sync/route.ts` | OpenAI embeddings → Supabase `DocumentEmbedding` table, `match_documents` RPC |
 | Data model | `supabase/schema.sql` | User, Space, SpaceSetting, Contact, Deal, DealStage, DealContact, Message, DocumentEmbedding |
 | Dashboard gate | `app/dashboard/page.tsx` | Redirects to workspace if onboarding complete, or to `/onboarding` |
@@ -233,7 +232,6 @@ Completion sets `onboardingCurrentStep = 7` and `onboardingCompletedAt = now()`.
 - **`next.config.ts`**: ignores TypeScript and ESLint build errors (`ignoreBuildErrors: true`, `ignoreDuringBuilds: true`)
 - **Vercel packages**: `@vercel/analytics`, `@vercel/speed-insights` present
 - **Domain handling**: `NEXT_PUBLIC_ROOT_DOMAIN` env var, falls back to `workflowrouting.com` (prod) or `localhost:3000` (dev). Protocol derived from `NODE_ENV`.
-- **Postinstall**: runs `ensure-prisma-client-shim.cjs`
 
 ---
 
@@ -280,15 +278,20 @@ Key constraints:
 - One membership per user per brokerage — `UNIQUE(brokerageId, userId)`
 - Realtor workspace stays fully independent even when linked to a brokerage
 
-### Permission Helpers (`lib/permissions.ts`)
+### Permission Helpers (`lib/permissions.ts` + `lib/api-auth.ts`)
 
-```ts
-isPlatformAdmin()       // bool — DB check + Clerk metadata fallback
-requirePlatformAdmin()  // throws if not admin
-getBrokerContext()      // returns { brokerage, membership, dbUserId } | null
-requireBroker()         // throws if not broker
-getCurrentDbUser()      // resolves Clerk userId → internal User row
-```
+Four helpers gate every API route and server component. They all share an **offboarding hard-stop**: if the caller's `User.status === 'offboarded'`, the helper rejects (or returns `null`) even when Clerk auth is otherwise valid — a broker-initiated offboarding has to lock the user out of the API immediately, before their Clerk session naturally expires. The check is wrapped in a try/catch so a missing `status` column (pre-BP1a migration) falls through as active.
+
+| Helper | Module | Returns | Use when |
+|---|---|---|---|
+| `requireAuth()` | `lib/api-auth.ts` | `{ userId }` or a `401`/`403` `NextResponse` | Default on every protected API route — gates on Clerk session + `User.status != 'offboarded'` |
+| `requireBroker()` | `lib/permissions.ts` | `{ brokerage, membership, dbUserId }` — throws `Forbidden: broker access required` otherwise | Routes restricted to `broker_owner` or `broker_admin` (loads `BrokerageMembership` after the shared auth + offboarding check) |
+| `getBrokerContext()` | `lib/permissions.ts` | Same shape as `requireBroker` **or `null`** | Server components / pages that want to redirect instead of 500 on non-brokers (e.g. `app/broker/activity/page.tsx`) |
+| `getBrokerMemberContext()` | `lib/permissions.ts` | Same shape as `getBrokerContext`, including `realtor_member` | Broker-scoped pages that need to be reachable by any brokerage member, not just admins/owners |
+
+Supporting helpers: `isPlatformAdmin()` + `requirePlatformAdmin()` for `/admin` routes, `getCurrentDbUser()` for resolving Clerk `userId` → internal `User` row, and role predicates `canManageLeads` / `canEditSettings` / `canManageRoles` / `canChangeRole`.
+
+**Dual-auth pattern** — `POST /api/broker/reviews/[id]/comments` (`app/api/broker/reviews/[id]/comments/route.ts`) accepts **either** a broker member of the review's brokerage **or** the requesting agent who opened the review. This is the canonical template for "a broker OR the involved agent can do X" endpoints: call `requireAuth()` first, load the resource, then allow access if the caller is in the brokerage (via `getBrokerMemberContext` / direct membership lookup) OR if `resource.requestingUserId === dbUser.id`.
 
 ### Invitation Lifecycle
 

@@ -15,15 +15,5 @@ export default async function FormTrafficAnalyticsPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Form Traffic</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Completion funnel, drop-off analysis, and form performance metrics
-        </p>
-      </div>
-      <FormAnalytics slug={slug} showRecentLeads />
-    </div>
-  );
+  return <FormAnalytics slug={slug} showRecentLeads />;
 }

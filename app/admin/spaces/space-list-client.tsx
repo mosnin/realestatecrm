@@ -3,9 +3,10 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Search, X, Building } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { EmptyState } from '@/components/ui/empty-state';
 
 type SpaceRow = {
   id: string;
@@ -157,19 +158,15 @@ export function SpaceListClient({
       {/* Table */}
       {filtered.length === 0 ? (
         <Card>
-          <CardContent className="px-5 py-12 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-              <Building size={20} className="text-muted-foreground" />
-            </div>
-            <p className="font-semibold text-foreground mb-1">
-              No spaces found
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {search
+          <EmptyState
+            icon={Building}
+            title="No spaces found"
+            description={
+              search
                 ? 'Try a different search term.'
-                : 'No spaces match the current filter.'}
-            </p>
-          </CardContent>
+                : 'No spaces match the current filter.'
+            }
+          />
         </Card>
       ) : (
         <Card>

@@ -1,21 +1,61 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Send, ShieldCheck } from 'lucide-react';
+import { Send, ShieldCheck, ArrowUpRight } from 'lucide-react';
+import {
+  SeatUsagePill,
+  normalizeSeatUsage,
+  type SeatPlan,
+} from '@/components/broker/seat-usage-pill';
+
+export interface InviteFormSeatUsage {
+  plan: SeatPlan;
+  used: number;
+  seatLimit: number | null;
+}
 
 interface InviteFormProps {
   isOwner?: boolean;
+  /**
+   * Current seat usage for the brokerage. When present and well-formed, an
+   * inline pill is rendered next to the submit button and the form blocks
+   * submit when the cap would be exceeded. Absent / malformed = no pill.
+   */
+  seatUsage?: InviteFormSeatUsage;
 }
 
-export function InviteForm({ isOwner = true }: InviteFormProps) {
+interface InviteErrorState {
+  text: string;
+  /** Present when the API returned `code: 'seat_limit'` (HTTP 402). */
+  seatLimit?: boolean;
+}
+
+export function InviteForm({ isOwner = true, seatUsage }: InviteFormProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'realtor_member' | 'broker_admin'>('realtor_member');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<
+    | { type: 'success'; text: string }
+    | ({ type: 'error' } & InviteErrorState)
+    | null
+  >(null);
+
+  const normalizedUsage = normalizeSeatUsage(seatUsage);
+  const remaining: number =
+    normalizedUsage === null
+      ? Number.POSITIVE_INFINITY
+      : normalizedUsage.seatLimit === null
+        ? Number.POSITIVE_INFINITY
+        : Math.max(0, normalizedUsage.seatLimit - normalizedUsage.used);
+
+  // A single invite needs 1 seat. Disable the submit when we know we're over cap.
+  const overCap = remaining < 1;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (overCap) return; // client-side gate; server still enforces
     setLoading(true);
     setMessage(null);
     try {
@@ -33,6 +73,12 @@ export function InviteForm({ isOwner = true }: InviteFormProps) {
         setEmail('');
         // Refresh to show the new invite in the list
         if (!data.duplicate) window.location.reload();
+      } else if (res.status === 402 && data?.code === 'seat_limit') {
+        setMessage({
+          type: 'error',
+          text: typeof data.error === 'string' ? data.error : 'Seat limit reached.',
+          seatLimit: true,
+        });
       } else {
         setMessage({ type: 'error', text: data.error ?? 'Failed to send invitation.' });
       }
@@ -86,11 +132,35 @@ export function InviteForm({ isOwner = true }: InviteFormProps) {
         ) : (
           <input type="hidden" name="role" value="realtor_member" />
         )}
-        <Button type="submit" size="sm" disabled={loading} className="flex items-center gap-1.5">
+        <Button
+          type="submit"
+          size="sm"
+          disabled={loading || overCap}
+          className="flex items-center gap-1.5"
+        >
           <Send size={14} />
           {loading ? 'Sending...' : 'Send invite'}
         </Button>
       </div>
+      {normalizedUsage && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <SeatUsagePill
+            compact
+            plan={normalizedUsage.plan}
+            used={normalizedUsage.used}
+            seatLimit={normalizedUsage.seatLimit}
+          />
+          {overCap && (
+            <span className="text-xs text-rose-600 dark:text-rose-400">
+              Only {Math.max(0, Math.floor(remaining))} seats available.{' '}
+              <Link href="/broker/billing" className="underline underline-offset-2">
+                Upgrade plan
+              </Link>{' '}
+              to invite more.
+            </span>
+          )}
+        </div>
+      )}
       {role === 'broker_admin' && isOwner && (
         <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
           <ShieldCheck size={12} />
@@ -98,13 +168,21 @@ export function InviteForm({ isOwner = true }: InviteFormProps) {
         </p>
       )}
       {message && (
-        <p
+        <div
           className={`text-xs ${
             message.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'
           }`}
         >
-          {message.text}
-        </p>
+          <p>{message.text}</p>
+          {message.type === 'error' && message.seatLimit && (
+            <Link
+              href="/broker/billing"
+              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-destructive underline underline-offset-2 hover:opacity-80"
+            >
+              Manage plan <ArrowUpRight size={11} />
+            </Link>
+          )}
+        </div>
       )}
     </form>
   );

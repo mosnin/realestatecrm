@@ -9,20 +9,13 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { isPlatformAdmin } from '@/lib/permissions';
+import { SUBSCRIPTION_STATUS_COLORS } from '@/lib/constants/colors';
 import { redirect } from 'next/navigation';
 
 type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'inactive';
 
 const PRICE_PER_SEAT = 97;
 
-const statusColors: Record<SubscriptionStatus, string> = {
-  active: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
-  trialing: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15',
-  past_due: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
-  canceled: 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15',
-  unpaid: 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15',
-  inactive: 'text-gray-700 bg-gray-50 dark:text-gray-400 dark:bg-gray-500/15',
-};
 
 const statusBarColors: Record<SubscriptionStatus, string> = {
   active: 'bg-emerald-500',
@@ -274,7 +267,7 @@ export default async function AdminBillingPage() {
                 {displayStatuses.map((status) => (
                   <tr key={status} className="border-b border-border last:border-0">
                     <td className="py-2 pr-4">
-                      <span className={`inline-flex text-[11px] font-semibold rounded-full px-2 py-0.5 ${statusColors[status]}`}>
+                      <span className={`inline-flex text-[11px] font-semibold rounded-full px-2 py-0.5 ${SUBSCRIPTION_STATUS_COLORS[status]}`}>
                         {status}
                       </span>
                     </td>
@@ -361,7 +354,7 @@ export default async function AdminBillingPage() {
                       </td>
                       <td className="py-3 px-4 text-muted-foreground truncate max-w-[200px]">{space.ownerEmail}</td>
                       <td className="py-3 px-4">
-                        <span className={`inline-flex text-[11px] font-semibold rounded-full px-2 py-0.5 ${statusColors[space.stripeSubscriptionStatus]}`}>
+                        <span className={`inline-flex text-[11px] font-semibold rounded-full px-2 py-0.5 ${SUBSCRIPTION_STATUS_COLORS[space.stripeSubscriptionStatus]}`}>
                           {space.stripeSubscriptionStatus}
                         </span>
                       </td>

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Calendar, CheckCircle2, Phone, Mail, ChevronDown, ChevronUp, Timer } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LEAD_SCORE_COLORS } from '@/lib/constants/colors';
 
 export interface FollowUpContact {
   id: string;
@@ -28,12 +29,6 @@ const SNOOZE_OPTIONS = [
   { label: 'Next week', hours: 168 },
 ] as const;
 
-const SCORE_COLORS: Record<string, string> = {
-  hot: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400',
-  warm: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
-  cold: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
-  unqualified: 'bg-muted text-muted-foreground',
-};
 
 const TYPE_LABELS: Record<string, string> = {
   QUALIFICATION: 'Qual',
@@ -163,7 +158,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
                       <span
                         className={cn(
                           'inline-flex items-center text-[10px] font-semibold rounded px-1.5 py-0.5 leading-none',
-                          SCORE_COLORS[contact.scoreLabel] ?? SCORE_COLORS.unqualified
+                          (LEAD_SCORE_COLORS[contact.scoreLabel as keyof typeof LEAD_SCORE_COLORS]?.badge) ?? LEAD_SCORE_COLORS.unscored.badge
                         )}
                       >
                         {contact.scoreLabel}

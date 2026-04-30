@@ -125,6 +125,8 @@ export default async function BrokerageApplyPage({
     intakeFaviconUrl: string | null;
     bio: string | null;
     socialLinks: Record<string, string> | null;
+    privacyPolicyUrl: string | null;
+    consentCheckboxLabel: string | null;
   } | null;
 
   // Use brokerage name for title, fall back to space settings
@@ -142,6 +144,11 @@ export default async function BrokerageApplyPage({
   if (formPaused) {
     return <FormUnavailable agentName={agentName} />;
   }
+
+  // Hide the Chippi mark on paid tiers — visible only on the free tier as
+  // a value-exchange brand exposure. The brokerage owner pays for white-label
+  // when their linked space is on an active paid plan (or trialing into one).
+  const hidePoweredBy = status === 'active' || status === 'trialing';
 
   const customization = {
     accentColor: settings?.intakeAccentColor || '#ff964f',
@@ -174,6 +181,8 @@ export default async function BrokerageApplyPage({
       pageTitle={pageTitle}
       pageIntro={pageIntro}
       trustLine={`Your information is shared only with ${agentName} and used solely for your inquiry.`}
+      agentPresenceLabel="Applying to"
+      hidePoweredBy={hidePoweredBy}
       customization={customization}
     >
       <ApplicationFormLoader

@@ -42,11 +42,11 @@ export function DealPrioritySelector({ dealId, initialPriority }: DealPrioritySe
       });
       if (!res.ok) {
         setPriority(previous);
-        toast.error('Failed to update priority');
+        toast.error("Couldn't update priority. Try again.");
       }
     } catch {
       setPriority(previous);
-      toast.error('Failed to update priority');
+      toast.error("Couldn't update priority. Try again.");
     } finally {
       setSaving(false);
     }

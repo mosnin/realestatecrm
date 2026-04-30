@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { requireBroker, canManageLeads } from '@/lib/permissions';
 import { getSpaceByOwnerId } from '@/lib/space';
+import { routeBrokerageLead } from '@/lib/brokerage-routing';
+import { logger } from '@/lib/logger';
 
 const addLeadSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required').max(100),
@@ -59,12 +61,48 @@ export async function POST(req: NextRequest) {
 
   try {
     // ── Find the brokerage owner's space ─────────────────────────────────
-    const space = await getSpaceByOwnerId(brokerage.ownerId);
-    if (!space) {
+    const ownerSpace = await getSpaceByOwnerId(brokerage.ownerId);
+    if (!ownerSpace) {
       return NextResponse.json(
         { error: 'Brokerage owner does not have a workspace configured.' },
         { status: 500 },
       );
+    }
+
+    // ── Lead routing: if auto-assignment is on and an eligible agent ────
+    // exists, insert into their space; otherwise fall back to the owner
+    // space. `routeBrokerageLead` never throws — null = broker fallback.
+    // Pass the validated lead shape so the BP7d rules layer can match on
+    // leadType / budget / tags before falling back to round-robin/score.
+    const routing = await routeBrokerageLead(brokerage.id, {
+      leadType,
+      budget: budget ?? null,
+      tags: ['brokerage-lead', 'new-lead'],
+    });
+    const spaceIdForInsert = routing?.agentSpaceId ?? ownerSpace.id;
+
+    // Resolve the assigned agent's display info for the response UI.
+    // Keep backward-compatible: this block never blocks the insert and
+    // only adds the new `assignedAgent` field to the response.
+    let assignedAgent: { userId: string; name: string } | null = null;
+    if (routing) {
+      try {
+        const { data: agentUser } = await supabase
+          .from('User')
+          .select('id, name, email')
+          .eq('id', routing.agentUserId)
+          .maybeSingle();
+        const row = agentUser as { id: string; name: string | null; email: string } | null;
+        assignedAgent = row
+          ? { userId: row.id, name: row.name ?? row.email ?? row.id }
+          : { userId: routing.agentUserId, name: routing.agentUserId };
+      } catch (err) {
+        logger.warn('[brokerages/leads] failed to resolve assigned agent name', {
+          brokerageId: brokerage.id,
+          agentUserId: routing.agentUserId,
+        }, err);
+        assignedAgent = { userId: routing.agentUserId, name: routing.agentUserId };
+      }
     }
 
     // ── Insert the Contact record ─────────────────────────────────────────
@@ -72,7 +110,7 @@ export async function POST(req: NextRequest) {
       .from('Contact')
       .insert({
         id: crypto.randomUUID(),
-        spaceId: space.id,
+        spaceId: spaceIdForInsert,
         brokerageId: brokerage.id,
         name: fullName,
         email: email || null,
@@ -92,19 +130,22 @@ export async function POST(req: NextRequest) {
 
     if (insertError) throw insertError;
 
-    console.info('[brokerages/leads] manual lead created', {
+    logger.info('[brokerages/leads] manual lead created', {
       contactId: contact.id,
-      spaceId: space.id,
+      spaceId: spaceIdForInsert,
       brokerageId: brokerage.id,
       leadType,
+      routed: routing !== null,
+      routingMethod: routing?.method ?? null,
+      routingRuleId: routing?.ruleId ?? null,
+      assignedUserId: routing?.agentUserId ?? null,
     });
 
-    return NextResponse.json({ success: true, contact }, { status: 201 });
+    return NextResponse.json({ success: true, contact, assignedAgent }, { status: 201 });
   } catch (error) {
-    console.error('[brokerages/leads] unhandled error', {
+    logger.error('[brokerages/leads] unhandled error', {
       brokerageId: brokerage.id,
-      error,
-    });
+    }, error);
     return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 });
   }
 }

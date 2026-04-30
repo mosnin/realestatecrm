@@ -1,15 +1,25 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CheckCircle2, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  SECTION_LABEL,
+  BODY_MUTED,
+  CAPTION,
+  PRIMARY_PILL,
+} from '@/lib/typography';
 
 interface LegalSettingsFormProps {
   slug: string;
   privacyPolicyUrl: string;
   consentCheckboxLabel: string;
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <p className={SECTION_LABEL}>{children}</p>;
 }
 
 function isValidHttpsUrl(value: string): boolean {
@@ -22,7 +32,11 @@ function isValidHttpsUrl(value: string): boolean {
   }
 }
 
-export function LegalSettingsForm({ slug, privacyPolicyUrl: initialUrl, consentCheckboxLabel: initialLabel }: LegalSettingsFormProps) {
+export function LegalSettingsForm({
+  slug,
+  privacyPolicyUrl: initialUrl,
+  consentCheckboxLabel: initialLabel,
+}: LegalSettingsFormProps) {
   const [privacyPolicyUrl, setPrivacyPolicyUrl] = useState(initialUrl);
   const [consentCheckboxLabel, setConsentCheckboxLabel] = useState(initialLabel);
   const [saving, setSaving] = useState(false);
@@ -35,7 +49,6 @@ export function LegalSettingsForm({ slug, privacyPolicyUrl: initialUrl, consentC
     setUrlError('');
     setSaveError('');
 
-    // Validate URL if provided
     const trimmedUrl = privacyPolicyUrl.trim();
     if (trimmedUrl && !isValidHttpsUrl(trimmedUrl)) {
       setUrlError('URL must start with https:// and be a valid URL');
@@ -56,7 +69,7 @@ export function LegalSettingsForm({ slug, privacyPolicyUrl: initialUrl, consentC
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setSaveError(data.error || 'Failed to save settings. Please try again.');
+        setSaveError(data.error || "Couldn't save those settings. Try again.");
         return;
       }
       setSaved(true);
@@ -69,10 +82,17 @@ export function LegalSettingsForm({ slug, privacyPolicyUrl: initialUrl, consentC
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-6">
-      <div className="rounded-lg border border-border bg-card p-6 space-y-5">
+    <form onSubmit={handleSave} className="space-y-10">
+      <section className="space-y-5">
+        <SectionLabel>Intake compliance</SectionLabel>
+        <p className={BODY_MUTED}>
+          Privacy policy and consent text shown on your intake form.
+        </p>
+
         <div className="space-y-1.5">
-          <Label htmlFor="privacyPolicyUrl">Privacy Policy URL</Label>
+          <Label htmlFor="privacyPolicyUrl" className="text-[12.5px] font-medium text-foreground">
+            Privacy policy URL
+          </Label>
           <Input
             id="privacyPolicyUrl"
             type="url"
@@ -85,13 +105,15 @@ export function LegalSettingsForm({ slug, privacyPolicyUrl: initialUrl, consentC
             className={urlError ? 'border-destructive' : ''}
           />
           {urlError && <p className="text-xs text-destructive">{urlError}</p>}
-          <p className="text-xs text-muted-foreground">
-            Required before your intake form can collect submissions. Link to your privacy policy.
+          <p className={CAPTION}>
+            Required before your intake form can collect submissions.
           </p>
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="consentCheckboxLabel">Custom Consent Checkbox Label</Label>
+          <Label htmlFor="consentCheckboxLabel" className="text-[12.5px] font-medium text-foreground">
+            Custom consent checkbox label
+          </Label>
           <Input
             id="consentCheckboxLabel"
             type="text"
@@ -99,30 +121,26 @@ export function LegalSettingsForm({ slug, privacyPolicyUrl: initialUrl, consentC
             value={consentCheckboxLabel}
             onChange={(e) => setConsentCheckboxLabel(e.target.value)}
           />
-          <p className="text-xs text-muted-foreground">
+          <p className={CAPTION}>
             If blank, defaults to: I agree to [Business Name]&apos;s Privacy Policy
           </p>
         </div>
-      </div>
+      </section>
 
-      {saveError && (
-        <p className="text-sm text-destructive">{saveError}</p>
-      )}
+      {saveError && <p className="text-sm text-destructive">{saveError}</p>}
 
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={saving}>
-          {saving ? (
-            <>
-              <Loader2 size={15} className="mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            'Save'
-          )}
-        </Button>
+      <div className="flex items-center gap-3 pt-2">
+        <button
+          type="submit"
+          disabled={saving}
+          className={cn(PRIMARY_PILL, 'disabled:opacity-60 disabled:cursor-not-allowed')}
+        >
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {saving ? 'Saving' : 'Save changes'}
+        </button>
         {saved && (
-          <span className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 size={15} />
+          <span className={`inline-flex items-center gap-1.5 ${BODY_MUTED}`}>
+            <CheckCircle2 size={14} className="text-foreground" />
             Saved
           </span>
         )}

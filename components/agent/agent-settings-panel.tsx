@@ -3,12 +3,24 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Bot, Loader2, Play, CheckCircle2, Circle,
-  Zap, Shield, Eye, UserCheck, Briefcase, Clock, TrendingUp,
+  Zap, Shield, Eye, UserCheck, Briefcase, Clock, TrendingUp, CalendarCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { timeAgo } from '@/lib/formatting';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface AgentSettings {
   spaceId: string;
@@ -17,6 +29,8 @@ interface AgentSettings {
   dailyTokenBudget: number;
   heartbeatIntervalMinutes: number;
   enabledAgents: string[];
+  perAgentAutonomy: Record<string, 'autonomous' | 'draft_required' | 'suggest_only'>;
+  confidenceThreshold: number;
 }
 
 interface AgentUsage {
@@ -52,7 +66,7 @@ const AUTONOMY_OPTIONS = [
     label: 'Autonomous',
     description: 'Schedules follow-ups and takes low-risk actions automatically.',
     icon: Zap,
-    iconClass: 'text-blue-500',
+    iconClass: 'text-orange-500',
   },
 ] as const;
 
@@ -62,21 +76,21 @@ const AGENT_OPTIONS = [
     label: 'Lead Nurture',
     description: 'Drafts personalised follow-ups for leads not contacted in 7+ days.',
     icon: UserCheck,
-    iconClass: 'text-emerald-500',
+    iconClass: 'text-orange-500',
   },
   {
     value: 'deal_sentinel',
     label: 'Deal Sentinel',
     description: 'Flags stalled deals and warns on approaching close dates.',
     icon: Briefcase,
-    iconClass: 'text-violet-500',
+    iconClass: 'text-orange-600',
   },
   {
     value: 'long_term_nurture',
     label: 'Long-Term Nurture',
     description: 'Re-engages cold leads at 30, 60, 90, and 180+ day intervals.',
     icon: Clock,
-    iconClass: 'text-sky-500',
+    iconClass: 'text-orange-400',
   },
   {
     value: 'lead_scorer',
@@ -85,7 +99,26 @@ const AGENT_OPTIONS = [
     icon: TrendingUp,
     iconClass: 'text-orange-500',
   },
+  {
+    value: 'tour_followup',
+    label: 'Tour Follow-Up',
+    description: 'Instantly drafts a personal follow-up when a contact completes a tour.',
+    icon: CalendarCheck,
+    iconClass: 'text-orange-500',
+  },
 ] as const;
+
+const AUTONOMY_ICONS = {
+  suggest_only: Eye,
+  draft_required: Shield,
+  autonomous: Zap,
+} as const;
+
+const AUTONOMY_LABELS = {
+  suggest_only: 'Suggest only',
+  draft_required: 'Draft + approval',
+  autonomous: 'Autonomous',
+} as const;
 
 const BUDGET_PRESETS = [
   { label: '10k', value: 10_000, desc: '~40 runs/day' },
@@ -93,16 +126,6 @@ const BUDGET_PRESETS = [
   { label: '50k', value: 50_000, desc: '~200 runs/day' },
   { label: '100k', value: 100_000, desc: '~400 runs/day' },
 ] as const;
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 function timeUntil(dateStr: string): string {
   const diff = new Date(dateStr).getTime() - Date.now();
@@ -121,6 +144,7 @@ export function AgentSettingsPanel({ slug }: Props) {
   const [savedField, setSavedField] = useState<string | null>(null);
   const [triggeringRun, setTriggeringRun] = useState(false);
   const [runResult, setRunResult] = useState<string | null>(null);
+  const [showDisableConfirm, setShowDisableConfirm] = useState(false);
 
   const load = useCallback(async () => {
     const [settingsRes, usageRes, draftsRes, activityRes] = await Promise.all([
@@ -150,6 +174,7 @@ export function AgentSettingsPanel({ slug }: Props) {
 
   async function saveField(patch: Partial<AgentSettings>, fieldKey: string) {
     if (!settings) return;
+    const previous = settings;
     setSaving(true);
     const merged = { ...settings, ...patch };
     try {
@@ -162,7 +187,13 @@ export function AgentSettingsPanel({ slug }: Props) {
         setSettings(await res.json());
         setSavedField(fieldKey);
         setTimeout(() => setSavedField(null), 2000);
+      } else {
+        setSettings(previous);
+        toast.error("Couldn't save that. Try again.");
       }
+    } catch {
+      setSettings(previous);
+      toast.error("I lost the connection. Try again.");
     } finally {
       setSaving(false);
     }
@@ -178,6 +209,18 @@ export function AgentSettingsPanel({ slug }: Props) {
     void saveField({ enabledAgents: next }, `agent_${agent}`);
   }
 
+  function setAgentAutonomy(agent: string, level: 'autonomous' | 'draft_required' | 'suggest_only' | null) {
+    if (!settings) return;
+    const next = { ...(settings.perAgentAutonomy ?? {}) };
+    if (level === null) {
+      delete next[agent];
+    } else {
+      next[agent] = level;
+    }
+    setSettings({ ...settings, perAgentAutonomy: next });
+    void saveField({ perAgentAutonomy: next }, `autonomy_${agent}`);
+  }
+
   async function triggerRun() {
     setTriggeringRun(true);
     setRunResult(null);
@@ -186,15 +229,15 @@ export function AgentSettingsPanel({ slug }: Props) {
       if (res.ok) {
         const data = await res.json() as { triggered: boolean; method?: string; note?: string };
         if (data.triggered) {
-          setRunResult(data.method === 'modal' ? 'Run started!' : (data.note ?? 'Queued for next heartbeat'));
+          setRunResult(data.method === 'modal' ? 'On it.' : (data.note ?? 'Queued for the next sweep.'));
           // Refresh status after a moment
           setTimeout(() => void load(), 3000);
         } else {
-          setRunResult('Could not trigger run — check Modal deployment');
+          setRunResult("Couldn't kick myself off — check the Modal deployment.");
         }
       }
     } catch {
-      setRunResult('Network error');
+      setRunResult("I lost the connection.");
     } finally {
       setTriggeringRun(false);
       setTimeout(() => setRunResult(null), 5000);
@@ -204,7 +247,7 @@ export function AgentSettingsPanel({ slug }: Props) {
   if (loading || !settings) {
     return (
       <div className="space-y-4">
-        {[1, 2, 3].map((n) => <div key={n} className="h-20 rounded-xl bg-muted/40 animate-pulse" />)}
+        {[1, 2, 3].map((n) => <div key={n} className="h-20 rounded-lg bg-muted/40 animate-pulse" />)}
       </div>
     );
   }
@@ -213,13 +256,13 @@ export function AgentSettingsPanel({ slug }: Props) {
     <div className="space-y-6 max-w-2xl">
 
       {/* Status + Run Now */}
-      <div className="rounded-xl border bg-card p-4 space-y-4">
+      <div className="rounded-lg border border-border/70 bg-card p-4 space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className={cn(
-              'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0',
+              'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
               settings.enabled
-                ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400'
+                ? 'bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400'
                 : 'bg-muted text-muted-foreground',
             )}>
               <Bot size={18} />
@@ -228,9 +271,9 @@ export function AgentSettingsPanel({ slug }: Props) {
               <div className="flex items-center gap-2">
                 <p className="font-semibold text-sm">Background Agent</p>
                 <span className={cn(
-                  'text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                  'text-[11px] font-semibold px-1.5 py-0.5 rounded-full',
                   settings.enabled
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
+                    ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400'
                     : 'bg-muted text-muted-foreground',
                 )}>
                   {settings.enabled ? 'ACTIVE' : 'DISABLED'}
@@ -249,7 +292,7 @@ export function AgentSettingsPanel({ slug }: Props) {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 gap-1.5 text-xs"
+                className="h-9 gap-1.5 text-xs"
                 onClick={() => void triggerRun()}
                 disabled={triggeringRun || !settings.enabled}
               >
@@ -257,14 +300,20 @@ export function AgentSettingsPanel({ slug }: Props) {
                 Run now
               </Button>
               {runResult && (
-                <p className="text-[10px] text-muted-foreground">{runResult}</p>
+                <p className="text-[11px] text-muted-foreground">{runResult}</p>
               )}
             </div>
             <Switch
               checked={settings.enabled}
-              onCheckedChange={(v) => {
-                setSettings({ ...settings, enabled: v });
-                void saveField({ enabled: v }, 'enabled');
+              onCheckedChange={(checked) => {
+                if (!checked) {
+                  // Turning OFF — require confirmation
+                  setShowDisableConfirm(true);
+                } else {
+                  // Turning ON — save immediately
+                  setSettings({ ...settings, enabled: true });
+                  void saveField({ enabled: true }, 'enabled');
+                }
               }}
             />
           </div>
@@ -288,7 +337,7 @@ export function AgentSettingsPanel({ slug }: Props) {
               <div
                 className={cn(
                   'h-full rounded-full transition-all',
-                  usage.pct >= 90 ? 'bg-destructive' : usage.pct >= 70 ? 'bg-amber-400' : 'bg-primary',
+                  usage.pct >= 90 ? 'bg-destructive' : usage.pct >= 70 ? 'bg-amber-400' : 'bg-orange-500',
                 )}
                 style={{ width: `${usage.pct}%` }}
               />
@@ -300,25 +349,42 @@ export function AgentSettingsPanel({ slug }: Props) {
       {/* Autonomy level */}
       <div className="space-y-3">
         <div>
-          <Label className="text-sm font-semibold">How much should the agent do on its own?</Label>
+          <Label id="autonomy-label" className="text-sm font-semibold">How much should the agent do on its own?</Label>
           <p className="text-xs text-muted-foreground mt-0.5">
             We recommend starting with &quot;Draft + approval&quot; — you stay in control.
           </p>
         </div>
-        <div className="space-y-2">
+        <div role="radiogroup" aria-labelledby="autonomy-label" className="space-y-2">
           {AUTONOMY_OPTIONS.map((opt) => {
             const Icon = opt.icon;
             const selected = settings.autonomyLevel === opt.value;
             return (
               <button
                 key={opt.value}
+                role="radio"
+                aria-checked={selected}
                 onClick={() => {
                   setSettings({ ...settings, autonomyLevel: opt.value });
                   void saveField({ autonomyLevel: opt.value }, 'autonomyLevel');
                 }}
+                onKeyDown={(e) => {
+                  const opts = AUTONOMY_OPTIONS.map(o => o.value);
+                  const idx = opts.indexOf(settings.autonomyLevel);
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const next = opts[(idx + 1) % opts.length];
+                    setSettings({ ...settings, autonomyLevel: next as typeof settings.autonomyLevel });
+                    void saveField({ autonomyLevel: next as typeof settings.autonomyLevel }, 'autonomyLevel');
+                  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const prev = opts[(idx - 1 + opts.length) % opts.length];
+                    setSettings({ ...settings, autonomyLevel: prev as typeof settings.autonomyLevel });
+                    void saveField({ autonomyLevel: prev as typeof settings.autonomyLevel }, 'autonomyLevel');
+                  }
+                }}
                 className={cn(
-                  'w-full text-left p-4 rounded-xl border transition-all',
-                  selected ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border bg-card hover:bg-muted/40',
+                  'w-full text-left p-4 rounded-lg border transition-colors',
+                  selected ? 'border-orange-500 bg-orange-500/5 ring-1 ring-orange-500/20' : 'border-border/70 bg-card hover:bg-foreground/[0.04]',
                 )}
               >
                 <div className="flex items-start gap-3">
@@ -328,11 +394,11 @@ export function AgentSettingsPanel({ slug }: Props) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       {selected
-                        ? <CheckCircle2 size={14} className="text-primary flex-shrink-0" />
+                        ? <CheckCircle2 size={14} className="text-orange-500 flex-shrink-0" />
                         : <Circle size={14} className="text-muted-foreground/40 flex-shrink-0" />}
                       <span className="text-sm font-medium">{opt.label}</span>
                       {'recommended' in opt && opt.recommended && (
-                        <span className="text-[10px] bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded-full">
+                        <span className="text-[11px] bg-orange-500/10 text-orange-600 dark:text-orange-400 font-semibold px-1.5 py-0.5 rounded-full">
                           Recommended
                         </span>
                       )}
@@ -349,27 +415,130 @@ export function AgentSettingsPanel({ slug }: Props) {
         )}
       </div>
 
+      {/* Confidence threshold */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Confidence threshold</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Drafts actions below this confidence score even in autonomous mode (0 = disabled)
+            </p>
+          </div>
+          <span className="text-sm font-mono text-muted-foreground w-10 text-right">
+            {settings.confidenceThreshold ?? 0}
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={settings.confidenceThreshold ?? 0}
+          onChange={(e) => {
+            if (!settings) return;
+            const v = parseInt(e.target.value, 10);
+            if (!Number.isNaN(v)) setSettings({ ...settings, confidenceThreshold: v });
+          }}
+          onMouseUp={(e) => {
+            const v = parseInt((e.target as HTMLInputElement).value, 10);
+            if (!Number.isNaN(v)) void saveField({ confidenceThreshold: v }, 'confidenceThreshold');
+          }}
+          onTouchEnd={(e) => {
+            const v = parseInt((e.target as HTMLInputElement).value, 10);
+            void saveField({ confidenceThreshold: v }, 'confidenceThreshold');
+          }}
+          className="w-full accent-orange-500"
+          disabled={saving}
+        />
+        {savedField === 'confidenceThreshold' && (
+          <span className="text-xs text-emerald-600 flex items-center gap-1">
+            <CheckCircle2 size={11} /> Saved
+          </span>
+        )}
+      </div>
+
       {/* Active agents */}
       <div className="space-y-3">
-        <Label className="text-sm font-semibold">Active agents</Label>
+        <div>
+          <Label className="text-sm font-semibold">Active agents</Label>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Each agent inherits the workspace autonomy level above. Override per-agent when enabled.
+          </p>
+        </div>
         <div className="space-y-2">
           {AGENT_OPTIONS.map((opt) => {
             const Icon = opt.icon;
-            const enabled = (settings.enabledAgents ?? []).includes(opt.value);
+            const isEnabled = (settings.enabledAgents ?? []).includes(opt.value);
+            const override = (settings.perAgentAutonomy ?? {})[opt.value] as
+              'autonomous' | 'draft_required' | 'suggest_only' | undefined;
+            const effective = override ?? settings.autonomyLevel;
+
             return (
-              <div key={opt.value} className="flex items-center gap-4 p-4 rounded-xl border bg-card">
-                <div className={cn('w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center flex-shrink-0', opt.iconClass)}>
-                  <Icon size={15} />
+              <div key={opt.value} className="rounded-lg border border-border/70 bg-card space-y-0">
+                {/* Top row */}
+                <div className="flex items-center gap-4 p-4">
+                  <div className={cn('w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center flex-shrink-0', opt.iconClass)}>
+                    <Icon size={15} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{opt.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{opt.description}</p>
+                  </div>
+                  <Switch
+                    checked={isEnabled}
+                    onCheckedChange={() => toggleAgent(opt.value)}
+                    disabled={saving}
+                  />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{opt.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{opt.description}</p>
-                </div>
-                <Switch
-                  checked={enabled}
-                  onCheckedChange={() => toggleAgent(opt.value)}
-                  disabled={saving}
-                />
+
+                {/* Per-agent autonomy row — only when enabled */}
+                {isEnabled && (
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border">
+                    <span className="text-xs text-muted-foreground flex-shrink-0">Autonomy</span>
+                    <div className="flex items-center rounded-lg border border-border overflow-hidden ml-auto">
+                      {(['suggest_only', 'draft_required', 'autonomous'] as const).map((level) => {
+                        const LevelIcon = AUTONOMY_ICONS[level];
+                        const isSelected = effective === level;
+                        const isWorkspaceDefault = settings.autonomyLevel === level && !override;
+                        return (
+                          <button
+                            key={level}
+                            title={AUTONOMY_LABELS[level] + (isWorkspaceDefault ? ' (workspace default)' : '')}
+                            aria-label={`Set to ${AUTONOMY_LABELS[level] ?? level}`}
+                            onClick={() => setAgentAutonomy(opt.value, level === override ? null : level)}
+                            className={cn(
+                              'flex items-center gap-1 px-2.5 py-2 min-h-[36px] text-xs transition-colors border-r border-border last:border-r-0',
+                              isSelected && override
+                                ? 'bg-orange-500 text-white'
+                                : isSelected
+                                ? 'bg-muted text-foreground'
+                                : 'hover:bg-muted/40 text-muted-foreground',
+                            )}
+                          >
+                            <LevelIcon size={11} />
+                            {isWorkspaceDefault && !override && (
+                              <span className="w-1 h-1 rounded-full bg-orange-500 inline-block flex-shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {override && (
+                      <button
+                        onClick={() => setAgentAutonomy(opt.value, null)}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                        title="Reset to workspace default"
+                      >
+                        Reset
+                      </button>
+                    )}
+                    {savedField === `autonomy_${opt.value}` && (
+                      <span className="text-xs text-emerald-600 flex items-center gap-1 flex-shrink-0">
+                        <CheckCircle2 size={11} /> Saved
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -393,14 +562,14 @@ export function AgentSettingsPanel({ slug }: Props) {
                 void saveField({ dailyTokenBudget: preset.value }, 'budget');
               }}
               className={cn(
-                'flex flex-col items-center px-4 py-2.5 rounded-xl border text-sm transition-all',
+                'flex flex-col items-center px-4 py-2.5 rounded-lg border text-sm transition-all',
                 settings.dailyTokenBudget === preset.value
-                  ? 'border-primary bg-primary/5 text-primary font-semibold ring-1 ring-primary/20'
-                  : 'border-border bg-card text-foreground hover:bg-muted/40',
+                  ? 'border-orange-500 bg-orange-500/5 text-orange-600 dark:text-orange-400 font-semibold ring-1 ring-orange-500/20'
+                  : 'border-border/70 bg-card text-foreground hover:bg-foreground/[0.04]',
               )}
             >
               <span className="font-bold">{preset.label}</span>
-              <span className="text-[10px] text-muted-foreground mt-0.5">{preset.desc}</span>
+              <span className="text-[11px] text-muted-foreground mt-0.5">{preset.desc}</span>
             </button>
           ))}
         </div>
@@ -408,6 +577,29 @@ export function AgentSettingsPanel({ slug }: Props) {
           <p className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 size={11} /> Saved</p>
         )}
       </div>
+
+      <AlertDialog open={showDisableConfirm} onOpenChange={setShowDisableConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pause me?</AlertDialogTitle>
+            <AlertDialogDescription>
+              I'll stop everything I'm doing on my own. Turn me back on whenever you want.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep enabled</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setSettings({ ...settings, enabled: false });
+                void saveField({ enabled: false }, 'enabled');
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Yes, disable
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

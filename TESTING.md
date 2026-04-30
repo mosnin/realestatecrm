@@ -12,15 +12,15 @@ No automated test framework is currently configured in this repository. All vali
 |---|---|
 | Node.js | 18+ |
 | Package manager | pnpm (v10.12 configured in `package.json`) |
-| Database | PostgreSQL with `DATABASE_URL` configured |
+| Database | Supabase project (PostgreSQL) with `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` configured |
 | Clerk | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` configured |
-| Schema | Migrations applied: `pnpm exec prisma migrate deploy` |
+| Schema | Run `supabase/schema.sql` in the Supabase SQL Editor (enable the `vector` extension first) |
 
 ### Basic run flow
 
 ```bash
 pnpm install
-pnpm exec prisma migrate deploy
+# Apply supabase/schema.sql via the Supabase SQL Editor
 pnpm dev
 ```
 
@@ -31,8 +31,11 @@ Dev server runs at `http://localhost:3000` with Turbopack.
 | Service | Required for | Env vars |
 |---|---|---|
 | OpenAI | Lead scoring, embeddings, AI assistant | `OPENAI_API_KEY` |
-| Zilliz/Milvus | Vector search (RAG context) | `ZILLIZ_URI`, `ZILLIZ_TOKEN` |
-| Upstash Redis | Legacy admin/slug path | `KV_REST_API_URL`, `KV_REST_API_TOKEN` |
+| Supabase pgvector | Vector search (RAG context) — same Supabase project; enable `vector` extension and run `supabase/schema.sql` | (none beyond Supabase) |
+| Upstash Redis | Rate limiting, pending-approval state for the AI agent, legacy admin/slug path | `KV_REST_API_URL`, `KV_REST_API_TOKEN` |
+| Resend | Transactional emails | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` |
+| Telnyx | SMS notifications + `send_sms` AI tool | `TELNYX_API_KEY`, `TELNYX_FROM_NUMBER` |
+| Stripe | Brokerage billing (`/api/billing/*`) | `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_TEAM`, `STRIPE_PRICE_ENTERPRISE` (+ the Stripe secret/webhook vars) |
 
 ---
 
@@ -101,14 +104,21 @@ Run these after any change to confirm nothing is fundamentally broken:
 - [ ] Deal drag-and-drop reorders within and across stages
 - [ ] Deal stage CRUD works (create, update, delete)
 
-### E. AI assistant
+### E. AI assistant (on-demand agent)
 
-- [ ] Chat page (`/s/[slug]/ai`) loads
-- [ ] Sending a message streams a response
-- [ ] Messages are persisted in `Message` table (both user and assistant)
-- [ ] Missing `OPENAI_API_KEY` returns explicit error text
-- [ ] Vector context enrichment works when Zilliz is configured (verify response references CRM data)
-- [ ] Chat works without Zilliz configured (RAG failure is silent)
+Exercises `POST /api/ai/task` (streaming SSE, `lib/ai-tools/loop.ts`) and `POST /api/ai/task/approve/[requestId]` (`lib/ai-tools/continue-turn.ts`). Each bullet should be verifiable in the network panel — watch for the `event: <type>` SSE frames defined in `lib/ai-tools/events.ts`.
+
+- [ ] Assistant page (`/s/[slug]/ai`) loads
+- [ ] Sending a message opens a `text/event-stream` response and `text_delta` events arrive incrementally (visible in DevTools → Network → EventStream)
+- [ ] A read-only prompt such as "summarise my pipeline" emits `tool_call_start` for `pipeline_summary`, then `tool_call_result` with `ok: true`, then text, then `turn_complete { reason: 'complete' }` — no permission prompt
+- [ ] A prompt that triggers a mutating tool (e.g. "send Jane an email asking for her lease end date") emits `permission_required` for `send_email` and the stream closes with `turn_complete { reason: 'paused' }`; no `Message` is sent
+- [ ] Approving via `POST /api/ai/task/approve/[requestId]` with `{ "decision": "approved" }` opens a second SSE stream: `permission_resolved`, `tool_call_start` → `tool_call_result` for `send_email`, optional follow-up text, `turn_complete`
+- [ ] Denying with `{ "decision": "denied" }` records a `PermissionBlock` (`decision: 'denied'`) in the persisted transcript; on a multi-call batch, the `otherPendingCalls` listed in the original `permission_required` event cascade to `PermissionBlock`s without re-prompting
+- [ ] A research prompt like "tell me about Jane Doe" triggers a `tool_call_start` for `delegate_to_subagent` (the orchestrator's handle on the skill registry — see `lib/ai-tools/tools/delegate-to-subagent.ts` and `lib/ai-tools/skills/contact-researcher.ts`); the sub-agent's raw tool calls do NOT appear as orchestrator tool calls, only the summarised `tool_call_result`
+- [ ] Each turn writes a new `Message` row: `role: 'user'` with plain `content`, then `role: 'assistant'` with `blocks: MessageBlock[]` (text / tool_call / permission blocks per `lib/ai-tools/blocks.ts`). Tool-only turns still get a content placeholder (`(tool-only turn)`)
+- [ ] Missing `OPENAI_API_KEY` returns `503 { error: '...' }` before the stream opens (`MissingOpenAIKeyError` in `lib/ai-tools/openai-client.ts`)
+- [ ] Exceeding the task rate limit (31st task inside the hour on a fresh key) returns `429 { error: 'Rate limit exceeded (30 tasks/hour). Please wait.' }`
+- [ ] RAG context enrichment works when `DocumentEmbedding` has vectors for the space (verify assistant references CRM records); the assistant still answers when the table is empty (RAG failure is silent)
 
 ### F. Auth checks
 

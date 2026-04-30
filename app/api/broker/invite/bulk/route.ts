@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { sendBrokerageInvitation } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { audit } from '@/lib/audit';
+import { checkSeatCapacity } from '@/lib/brokerage-seats';
 
 /**
  * POST /api/broker/invite/bulk
@@ -62,6 +63,26 @@ export async function POST(req: Request) {
   const remaining = 100 - (pendingCount ?? 0);
   if (remaining <= 0) {
     return NextResponse.json({ error: 'Too many pending invitations. Cancel some first.' }, { status: 429 });
+  }
+
+  // Seat-limit enforcement (BP3b): check once against the full requested count
+  // so the batch is atomic — either everything fits under the plan cap or the
+  // whole request is rejected. No partial commits.
+  const seatCheck = await checkSeatCapacity(brokerage.id, entries.length);
+  if (!seatCheck.ok) {
+    const { plan, seatLimit, used } = seatCheck.usage;
+    const needed = seatCheck.needed ?? entries.length;
+    return NextResponse.json(
+      {
+        error: `Seat limit reached — your ${plan} plan allows ${seatLimit} seats and ${used} are in use. Upgrade or remove a member to invite ${needed} more.`,
+        code: 'seat_limit',
+        plan,
+        used,
+        limit: seatLimit,
+        needed,
+      },
+      { status: 402 }
+    );
   }
 
   // Resolve inviter name

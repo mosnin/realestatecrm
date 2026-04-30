@@ -2,11 +2,18 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CheckCircle2, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { Space } from '@/lib/types';
+import {
+  SECTION_LABEL,
+  BODY_MUTED,
+  CAPTION,
+  FIELD_RHYTHM,
+  PRIMARY_PILL,
+} from '@/lib/typography';
 
 interface GeneralSettingsFormProps {
   space: Space;
@@ -14,6 +21,59 @@ interface GeneralSettingsFormProps {
     phoneNumber?: string | null;
     myConnections?: string | null;
   } | null;
+}
+
+export function DangerZone({ space }: { space: Space }) {
+  const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (
+      !confirm(
+        `Delete "${space.name}"? Every client, deal, and note goes with it. I can't bring it back.`,
+      )
+    )
+      return;
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/spaces', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: space.slug }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Couldn't delete the workspace. Try again.");
+        return;
+      }
+      router.push('/');
+    } catch {
+      alert("I lost the connection. Check it and try again.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className={BODY_MUTED}>
+        Deleting your space is permanent. Every client, deal, and note goes with it. I can&apos;t bring it back.
+      </p>
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={deleting}
+        className={cn(
+          'inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-sm font-medium',
+          'bg-destructive text-white hover:bg-destructive/90 active:scale-[0.98] transition-all duration-150',
+          'disabled:opacity-60 disabled:cursor-not-allowed',
+        )}
+      >
+        {deleting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+        {deleting ? 'Deleting' : 'Delete space'}
+      </button>
+    </div>
+  );
 }
 
 export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProps) {
@@ -27,24 +87,32 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const [deleting, setDeleting] = useState(false);
 
-  const checkSlug = useCallback(async (value: string) => {
-    if (value === space.slug) { setSlugAvailable(null); return; }
-    if (value.length < 3) { setSlugAvailable(null); return; }
-    setCheckingSlug(true);
-    try {
-      const res = await fetch('/api/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'check_slug', slug: value }),
-      });
-      const data = await res.json();
-      setSlugAvailable(data.available);
-    } finally {
-      setCheckingSlug(false);
-    }
-  }, [space.slug]);
+  const checkSlug = useCallback(
+    async (value: string) => {
+      if (value === space.slug) {
+        setSlugAvailable(null);
+        return;
+      }
+      if (value.length < 3) {
+        setSlugAvailable(null);
+        return;
+      }
+      setCheckingSlug(true);
+      try {
+        const res = await fetch('/api/onboarding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'check_slug', slug: value }),
+        });
+        const data = await res.json();
+        setSlugAvailable(data.available);
+      } finally {
+        setCheckingSlug(false);
+      }
+    },
+    [space.slug],
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => checkSlug(newSlug), 400);
@@ -77,7 +145,7 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
           setSaveError('That slug was just taken. Please pick a different one.');
           return;
         }
-        setSaveError(data.error || 'Failed to save settings. Please try again.');
+        setSaveError(data.error || "Couldn't save those settings. Try again.");
         return;
       }
       const updated = await res.json().catch(() => ({}));
@@ -95,107 +163,94 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
     }
   }
 
-  async function handleDelete() {
-    if (!confirm(`Are you sure you want to delete "${space.name}"? This will permanently delete all clients, deals, and data. This cannot be undone.`)) return;
-    setDeleting(true);
-    try {
-      const res = await fetch('/api/spaces', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug: space.slug }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        alert(data.error || 'Failed to delete workspace. Please try again.');
-        return;
-      }
-      router.push('/');
-    } catch {
-      alert('Network error. Please check your connection and try again.');
-    } finally {
-      setDeleting(false);
-    }
-  }
-
   return (
-    <form onSubmit={handleSave} className="space-y-5">
-      {/* Workspace */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="px-6 py-4 border-b border-border bg-muted/20">
-          <p className="font-semibold text-sm">Workspace</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Your workspace name and slug.</p>
+    <form onSubmit={handleSave} className="space-y-10">
+      {/* Workspace fields — section label provided by parent page */}
+      <div className={FIELD_RHYTHM}>
+        <div className="space-y-1.5">
+          <Label htmlFor="name" className="text-[12.5px] font-medium text-foreground">
+            Workspace name
+          </Label>
+          <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
-        <div className="px-6 py-5 space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="slug" className="text-[12.5px] font-medium text-foreground">
+            Slug
+          </Label>
+          <div className="relative">
+            <Input
+              id="slug"
+              value={newSlug}
+              onChange={(e) => setNewSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+              className="pr-16"
+            />
+            {slugChanged && newSlug.length >= 3 && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                {checkingSlug ? (
+                  <Loader2 size={14} className="animate-spin text-muted-foreground" />
+                ) : slugAvailable === true ? (
+                  <CheckCircle2 size={14} className="text-foreground" />
+                ) : slugAvailable === false ? (
+                  <span className="text-xs font-medium text-destructive">taken</span>
+                ) : null}
+              </div>
+            )}
+          </div>
+          <p className={CAPTION}>
+            Your intake link: chippi.com/apply/{newSlug}
+          </p>
+        </div>
+      </div>
+
+      {/* Contact fields — separator + label rendered as a sub-section header */}
+      <div className="pt-8 border-t border-border/60 space-y-5">
+        <p className={SECTION_LABEL}>Contact</p>
+        <div className={FIELD_RHYTHM}>
           <div className="space-y-1.5">
-            <Label htmlFor="name">Workspace name</Label>
-            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+            <Label htmlFor="number" className="text-[12.5px] font-medium text-foreground">
+              Phone number
+            </Label>
+            <Input
+              id="number"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              placeholder="(555) 123-4567"
+            />
+            <p className={CAPTION}>
+              Used for SMS notifications and shown on tour booking pages.
+            </p>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="slug">Slug</Label>
-            <div className="relative">
-              <Input
-                id="slug"
-                value={newSlug}
-                onChange={(e) => setNewSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                className="pr-8"
-              />
-              {slugChanged && newSlug.length >= 3 && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  {checkingSlug ? (
-                    <Loader2 size={14} className="animate-spin text-muted-foreground" />
-                  ) : slugAvailable === true ? (
-                    <CheckCircle2 size={14} className="text-green-500 dark:text-green-400" />
-                  ) : slugAvailable === false ? (
-                    <span className="text-red-500 dark:text-red-400 text-xs font-medium">taken</span>
-                  ) : null}
-                </div>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">Your intake link: chippi.com/apply/{newSlug}</p>
+            <Label htmlFor="connections" className="text-[12.5px] font-medium text-foreground">
+              My connections
+            </Label>
+            <Input
+              id="connections"
+              value={myConnections}
+              onChange={(e) => setMyConnections(e.target.value)}
+              placeholder="Brokerages, lenders, partners"
+            />
+            <p className={CAPTION}>
+              Visible to AI context for follow-up suggestions.
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Contact */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="px-6 py-4 border-b border-border bg-muted/20">
-          <p className="font-semibold text-sm">Contact &amp; connections</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Your phone number and partner connections visible to AI context.</p>
-        </div>
-        <div className="px-6 py-5 space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="number">Phone number</Label>
-            <Input id="number" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="(555) 123-4567" />
-            <p className="text-xs text-muted-foreground">Used for SMS notifications and displayed on tour booking pages</p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="connections">My connections</Label>
-            <Input id="connections" value={myConnections} onChange={(e) => setMyConnections(e.target.value)} placeholder="Brokerages, lenders, partners" />
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-2 pt-1">
+      {/* Save bar */}
+      <div className="space-y-2 pt-2">
         <div className="flex items-center gap-3">
-          <Button type="submit" disabled={saving || !slugValid}>
-            {saving ? 'Saving...' : saved ? 'Saved!' : 'Save settings'}
-          </Button>
-          {saved && <p className="text-sm text-primary">Changes saved.</p>}
+          <button
+            type="submit"
+            disabled={saving || !slugValid}
+            className={cn(PRIMARY_PILL, 'disabled:opacity-60 disabled:cursor-not-allowed')}
+          >
+            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {saving ? 'Saving' : saved ? 'Saved' : 'Save changes'}
+          </button>
+          {saved && <p className={BODY_MUTED}>Changes saved.</p>}
         </div>
         {saveError && <p className="text-sm text-destructive">{saveError}</p>}
-      </div>
-
-      {/* Danger zone */}
-      <div className="rounded-xl border border-destructive/30 bg-card overflow-hidden mt-8">
-        <div className="px-6 py-4 border-b border-destructive/20 bg-destructive/5">
-          <p className="font-semibold text-sm text-destructive">Danger zone</p>
-        </div>
-        <div className="px-6 py-5">
-          <p className="text-sm text-muted-foreground mb-4">Deleting your space is permanent and will remove all clients, deals, and data. This cannot be undone.</p>
-          <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleting}>
-            {deleting ? 'Deleting...' : 'Delete space'}
-          </Button>
-        </div>
       </div>
     </form>
   );

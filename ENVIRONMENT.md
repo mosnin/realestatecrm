@@ -21,8 +21,11 @@ All variables found or inferable from code usage:
 | `NEXT_PUBLIC_APP_URL` | `lib/email.ts` | Base URL for links in notification emails (e.g. `https://app.yourdomain.com`) | **Medium** | Email links fall back to `https://app.yourdomain.com` placeholder |
 | `RESEND_API_KEY` | `lib/email.ts`, `lib/tour-emails.ts` | Resend API key for sending all transactional emails (leads, tours, invitations) | **Medium** | Email notifications silently skipped; leads still saved normally |
 | `RESEND_FROM_EMAIL` | `lib/email.ts`, `lib/tour-emails.ts` | Sender address for notification emails (must be verified in Resend) | **Medium** | Falls back to `notifications@updates.yourdomain.com`; must be set to a verified domain |
-| `TELNYX_API_KEY` | `lib/sms.ts` | Telnyx API key for SMS notifications | **Medium** | SMS notifications silently skipped |
-| `TELNYX_FROM_NUMBER` | `lib/sms.ts` | Telnyx phone number to send SMS from (E.164 format) | **Medium** | SMS notifications silently skipped |
+| `TELNYX_API_KEY` | `lib/sms.ts` | Telnyx API key for SMS notifications and the `send_sms` AI tool | **Medium** | SMS notifications silently skipped; `send_sms` tool returns an error |
+| `TELNYX_FROM_NUMBER` | `lib/sms.ts` | Telnyx phone number to send SMS from (E.164 format, validated `^\+\d{10,15}$`) | **Medium** | SMS notifications silently skipped |
+| `STRIPE_PRICE_STARTER` | `app/api/billing/checkout/route.ts` | Stripe price ID for the Starter brokerage plan | **Medium** | Starter plan checkout cannot be created |
+| `STRIPE_PRICE_TEAM` | `app/api/billing/checkout/route.ts` | Stripe price ID for the Team brokerage plan | **Medium** | Team plan checkout cannot be created |
+| `STRIPE_PRICE_ENTERPRISE` | `app/api/billing/checkout/route.ts` | Stripe price ID for the Enterprise brokerage plan | **Medium** | Enterprise plan checkout cannot be created |
 | `NODE_ENV` | `lib/utils.ts` | Protocol selection (http vs https) | **Auto-set** | Set automatically by Next.js; do not override manually |
 
 ### Clerk-specific variables
@@ -50,7 +53,8 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 | **Supabase pgvector** | Vector storage and similarity search for RAG-enriched AI assistant context, scoped per workspace | `lib/zilliz.ts`, `lib/vectorize.ts`, `supabase/schema.sql` (`DocumentEmbedding` table + `match_documents` RPC) |
 | **Resend** | Transactional email — sends lead notifications, tour confirmations/reminders/follow-ups, brokerage invitations, follow-up digests, and CRM emails | `lib/email.ts`, `lib/tour-emails.ts`, `app/api/public/apply/route.ts` |
 | **Telnyx** | SMS notifications — sends text messages to workspace owners for new leads, tour bookings, and deals (opt-in per workspace via settings) | `lib/sms.ts`, `lib/notify.ts` |
-| **Upstash Redis** | Legacy slug metadata storage, admin dashboard data | `lib/redis.ts`, `lib/slugs.ts`, `app/actions.ts` |
+| **Upstash Redis** | Rate limiting (`lib/rate-limit.ts`), pending-approval state for the AI agent (`lib/ai-tools/pending-approvals.ts`), legacy slug metadata + admin dashboard | `lib/redis.ts`, `lib/rate-limit.ts`, `lib/ai-tools/pending-approvals.ts`, `lib/slugs.ts`, `app/actions.ts` |
+| **Stripe** | Brokerage seat-based billing checkout/portal/webhook | `lib/stripe.ts`, `app/api/billing/checkout/route.ts`, `app/api/billing/portal/route.ts`, `app/api/billing/cancel/route.ts` |
 | **Vercel** | Deployment target, analytics, speed insights | `@vercel/analytics`, `@vercel/speed-insights` packages |
 
 ---
@@ -80,7 +84,8 @@ Clerk requires additional environment variables that are standard for `@clerk/ne
 | `NEXT_PUBLIC_ROOT_DOMAIN` | Falls back to defaults. Set for correct intake link URLs. |
 | `NEXT_PUBLIC_APP_URL` | For correct contact links in notification emails. |
 | `RESEND_API_KEY` + `RESEND_FROM_EMAIL` | Required for lead notification emails. Notifications are silently skipped if unset. |
-| `TELNYX_API_KEY` + `TELNYX_FROM_NUMBER` | Required for SMS notifications. SMS silently skipped if unset. Users must enable SMS in workspace settings. |
+| `TELNYX_API_KEY` + `TELNYX_FROM_NUMBER` | Required for SMS notifications and the `send_sms` AI tool. SMS silently skipped if unset. Users must enable SMS in workspace settings. |
+| `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_TEAM` / `STRIPE_PRICE_ENTERPRISE` | Required to initiate brokerage checkout sessions at each tier. Billing flow fails without the tier's price ID. |
 
 ---
 
@@ -110,8 +115,8 @@ All `.env*` files are gitignored. Create a `.env.local` file locally with the re
 | Upstash Redis | Yes | `@upstash/redis@^1.34.9` | Legacy metadata path |
 | Vercel | Yes (packages) | `@vercel/analytics@^1.5.0`, `@vercel/speed-insights@^1.2.0` | Deployment target |
 | Resend | Yes | `resend@^4.8.0` | All transactional emails (leads, tours, invitations, digests), fully integrated |
-| Telnyx | Yes | `telnyx@^2.x` | SMS notifications for leads, tours, and deals, fully integrated |
-| Stripe | **Not confirmed** | Not in dependencies | Billing field exists in DB schema but no Stripe integration |
+| Telnyx | Yes | `telnyx@^6.26.0` | SMS notifications for leads, tours, and deals, plus the `send_sms` AI tool |
+| Stripe | Yes | `stripe@^20.4.1` | Brokerage seat-based billing (checkout, portal, cancel). Requires `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_TEAM` / `STRIPE_PRICE_ENTERPRISE` <!-- TODO: verify full list of Stripe secrets (webhook secret, API key) — not inspected in this pass --> |
 
 ---
 

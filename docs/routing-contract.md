@@ -35,6 +35,6 @@ Chippi does **not** use tenant subdomains.
 
 ## Storage mapping note
 
-Runtime uses `Space.slug`. For deploy safety, the Prisma model maps this field to the existing DB column via `@map("subdomain")`.
+Runtime uses `Space.slug`, and the database column is now named `slug` directly (see `supabase/schema.sql`). No mapping layer is in play: the code field and the DB column match one-to-one.
 
-This keeps runtime slug-only while avoiding destructive column renames during rollout.
+Historical context: during the earlier slug rollout the Prisma model mapped this field to the existing DB column via `@map("subdomain")` as a deploy-safety mechanism to avoid destructive column renames. That indirection is gone — Prisma has been removed from the stack (queries now go through `@supabase/supabase-js` / raw SQL) and the column itself has been renamed to `slug`.

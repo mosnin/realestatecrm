@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { audit } from '@/lib/audit';
+import { sendDraft, type DeliveryResult } from '@/lib/delivery';
 
 export async function PATCH(
   req: NextRequest,
@@ -32,10 +33,10 @@ export async function PATCH(
     );
   }
 
-  // Verify the draft belongs to this space before updating
+  // Verify the draft belongs to this space and is still pending
   const { data: existing, error: fetchError } = await supabase
     .from('AgentDraft')
-    .select('id, status, contactId, channel, content')
+    .select('id, status, contactId, dealId, channel, subject, content, outcome')
     .eq('id', id)
     .eq('spaceId', space.id)
     .single();
@@ -51,18 +52,75 @@ export async function PATCH(
     );
   }
 
-  const patch: Record<string, unknown> = {
-    status: newStatus,
-    updatedAt: new Date().toISOString(),
-  };
-
   // Allow the realtor to edit content before approving
+  let finalContent: string = existing.content;
   if (newStatus === 'approved' && body.content !== undefined) {
     if (typeof body.content !== 'string' || body.content.trim().length === 0) {
       return NextResponse.json({ error: 'content must be a non-empty string' }, { status: 400 });
     }
-    patch.content = body.content.trim();
+    finalContent = body.content.trim();
   }
+
+  // ── Dismissed: simple status update ──────────────────────────────────────
+  if (newStatus === 'dismissed') {
+    const dismissPatch: Record<string, unknown> = {
+      status: 'dismissed',
+      updatedAt: new Date().toISOString(),
+    };
+    if (!existing.outcome) {
+      dismissPatch.outcome = 'no_response';
+      dismissPatch.outcomeDetectedAt = new Date().toISOString();
+    }
+    const { data: updated, error: updateError } = await supabase
+      .from('AgentDraft')
+      .update(dismissPatch)
+      .eq('id', id)
+      .eq('spaceId', space.id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    void audit({
+      actorClerkId: userId,
+      action: 'UPDATE',
+      resource: 'AgentDraft',
+      resourceId: id,
+      spaceId: space.id,
+      metadata: { newStatus: 'dismissed', contactId: existing.contactId },
+    });
+
+    return NextResponse.json(updated);
+  }
+
+  // ── Approved: attempt delivery, then set final status ────────────────────
+
+  // Fetch contact info needed for delivery (email / phone)
+  let contact = { name: 'Contact', email: null as string | null, phone: null as string | null };
+  if (existing.contactId) {
+    const { data: contactRow } = await supabase
+      .from('Contact')
+      .select('name, email, phone')
+      .eq('id', existing.contactId)
+      .eq('spaceId', space.id)
+      .maybeSingle();
+    if (contactRow) contact = contactRow;
+  }
+
+  const deliveryResult: DeliveryResult = await sendDraft(
+    { channel: existing.channel, subject: existing.subject, content: finalContent },
+    contact,
+    space.name,
+  );
+
+  // sent=true → "sent"; sent=false → "approved" (human reviewed, delivery unconfigured/failed)
+  const finalStatus = deliveryResult.sent ? 'sent' : 'approved';
+
+  const patch: Record<string, unknown> = {
+    status: finalStatus,
+    updatedAt: new Date().toISOString(),
+  };
+  if (finalContent !== existing.content) patch.content = finalContent;
 
   const { data: updated, error: updateError } = await supabase
     .from('AgentDraft')
@@ -81,11 +139,15 @@ export async function PATCH(
     resourceId: id,
     spaceId: space.id,
     metadata: {
-      newStatus,
+      newStatus: finalStatus,
       contactId: existing.contactId,
-      contentEdited: newStatus === 'approved' && body.content !== undefined && body.content.trim() !== existing.content,
+      channel: existing.channel,
+      contentEdited: finalContent !== existing.content,
+      deliverySent: deliveryResult.sent,
+      deliveryError: deliveryResult.error,
     },
   });
 
-  return NextResponse.json(updated);
+  // Return draft + delivery result so the client can show appropriate feedback
+  return NextResponse.json({ ...updated, deliveryResult });
 }

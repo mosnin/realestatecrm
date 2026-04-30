@@ -9,6 +9,7 @@ import {
   DragOverlay,
   DragStartEvent,
   PointerSensor,
+  useDndContext,
   useSensor,
   useSensors,
   closestCorners,
@@ -17,13 +18,13 @@ import { arrayMove, SortableContext, horizontalListSortingStrategy, useSortable 
 import { CSS } from '@dnd-kit/utilities';
 import { KanbanColumn } from './kanban-column';
 import { Button } from '@/components/ui/button';
-import { LiquidMetalButton } from '@/components/ui/liquid-metal-button';
+import { DealQuickPanel } from './deal-quick-panel';
+import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import {
   Plus,
   GripVertical,
   LayoutGrid,
   List,
-  Pencil,
   Trash2,
   MapPin,
   Search,
@@ -40,9 +41,15 @@ import {
   ChevronDown,
   Check,
   Palette,
+  ArrowRight,
 } from 'lucide-react';
+import {
+  SECTION_LABEL,
+  TITLE_FONT,
+} from '@/lib/typography';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
+import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { formatCurrency as _formatCurrency } from '@/lib/formatting';
@@ -82,6 +89,9 @@ interface SortableKanbanColumnProps {
   onDeleteStage: (stage: DealStage) => void;
   onDealCreated: () => void;
   onStatusChange: (deal: DealWithRelations, status: 'won' | 'lost' | 'on_hold' | 'active') => void;
+  nextStage?: DealStage | null;
+  onAdvanceStage?: (deal: DealWithRelations, nextStageId: string) => void;
+  onOpenDeal?: (deal: DealWithRelations) => void;
 }
 
 function SortableKanbanColumn({
@@ -93,6 +103,9 @@ function SortableKanbanColumn({
   onDeleteStage,
   onDealCreated,
   onStatusChange,
+  nextStage,
+  onAdvanceStage,
+  onOpenDeal,
 }: SortableKanbanColumnProps) {
   const {
     attributes,
@@ -103,6 +116,19 @@ function SortableKanbanColumn({
     isDragging,
   } = useSortable({ id: `stage:${stage.id}` });
 
+  // Observe the global DnD state so we can highlight this column as a drop
+  // target when a deal card is hovering over it. We explicitly ignore the
+  // stage-column reorder drag (ids that start with `stage:`) — the highlight
+  // is only meaningful for card drops.
+  const { active, over } = useDndContext();
+  const activeId = active?.id?.toString() ?? null;
+  const overId = over?.id?.toString() ?? null;
+  const isDealDrag = !!activeId && !activeId.startsWith('stage:');
+  const overMatchesStage =
+    !!overId &&
+    (overId === stage.id || deals.some((d) => d.id === overId));
+  const isDropTarget = isDealDrag && overMatchesStage;
+
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -110,7 +136,15 @@ function SortableKanbanColumn({
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'rounded-lg transition-colors duration-150',
+        // Restrained drop indicator — paper-flat, no bright accent.
+        isDropTarget && 'bg-foreground/[0.04]',
+      )}
+    >
       <KanbanColumn
         stage={stage}
         deals={deals}
@@ -120,22 +154,41 @@ function SortableKanbanColumn({
         onDeleteStage={onDeleteStage}
         onDealCreated={onDealCreated}
         onStatusChange={onStatusChange}
+        nextStage={nextStage}
+        onAdvanceStage={onAdvanceStage}
+        onOpenDeal={onOpenDeal}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
     </div>
   );
 }
 
-const PRIORITY_META: Record<string, { label: string; className: string }> = {
-  LOW: { label: 'Low', className: 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400' },
-  MEDIUM: { label: 'Medium', className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' },
-  HIGH: { label: 'High', className: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
-};
-
 function formatCurrency(n: number | null) {
   if (n == null) return null;
   return _formatCurrency(n);
 }
+
+/**
+ * Pulls a human-readable error message from a failed API response.
+ * Routes in this app return `{ error: string }` on non-2xx. Falls back to
+ * the HTTP status text, then a generic label, if the body is empty/malformed.
+ */
+async function parseApiError(res: Response): Promise<string> {
+  try {
+    const data = await res.clone().json();
+    if (data && typeof data.error === 'string' && data.error.trim()) {
+      return data.error.trim();
+    }
+    if (data && typeof data.message === 'string' && data.message.trim()) {
+      return data.message.trim();
+    }
+  } catch {
+    // fall through to status-based message
+  }
+  return res.statusText || `Request failed (${res.status})`;
+}
+
+const NETWORK_ERROR_MSG = 'lost the connection';
 
 interface KanbanBoardProps {
   slug: string;
@@ -148,7 +201,21 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
   const [view, setView] = useState<'kanban' | 'list'>('list');
+  // Force list view on mobile (< md). Stored preference is preserved so
+  // desktop kanban resumes when the viewport widens.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 767px)');
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  const effectiveView: 'kanban' | 'list' = isMobile ? 'list' : view;
   const [searchQuery, setSearchQuery] = useState('');
+  // Slide-over panel state — clicking a card opens the deal here without nav.
+  const [panelDealId, setPanelDealId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<
     Set<'active' | 'won' | 'lost' | 'on_hold'>
   >(new Set(['active']));
@@ -283,7 +350,8 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         body: JSON.stringify({ slug, name, color: newStageColor, pipelineId }),
       });
       if (!res.ok) {
-        toast.error('Failed to create stage');
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't create stage: ${detail}`);
         return;
       }
       setAddingStage(false);
@@ -291,7 +359,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
       setNewStageColor('#6b7280');
       fetchData();
     } catch {
-      toast.error('Failed to create stage');
+      toast.error(`Couldn't create stage: ${NETWORK_ERROR_MSG}`);
     } finally {
       setAddingStageSubmitting(false);
     }
@@ -510,12 +578,13 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
           body: JSON.stringify({ stageIds }),
         });
         if (!res.ok) {
-          toast.error('Failed to save stage order');
+          const detail = await parseApiError(res);
+          toast.error(`Couldn't save stage order: ${detail}`);
           // Revert to the original order on failure
           setStages(previousStages);
         }
       } catch {
-        toast.error('Failed to save stage order');
+        toast.error(`Couldn't save stage order: ${NETWORK_ERROR_MSG}`);
         setStages(previousStages);
       } finally {
         // Flush any realtime refetch that was queued during the drag
@@ -536,6 +605,12 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
     );
     if (!targetStage) return;
 
+    // Capture the dragged deal's title up-front so the success toast can
+    // reference it even if `fetchData()` replaces the reference mid-flight.
+    const draggedDeal = targetStage.deals.find((d) => d.id === active.id)
+      ?? stages.flatMap((s) => s.deals).find((d) => d.id === active.id);
+    const dealTitle = draggedDeal?.title ?? 'Deal';
+
     const targetIndex = targetStage.deals.findIndex((d) => d.id === over.id);
     // When dropped onto the column droppable (not onto a deal), targetIndex is -1.
     // In that case place at end. After handleDragOver the dragged deal is already in
@@ -550,12 +625,13 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         body: JSON.stringify({ dealId: active.id, newStageId: targetStage.id, newPosition }),
       });
       if (res.ok) {
-        toast.success(`Deal moved to ${targetStage.name}`);
+        toast.success(`Moved "${dealTitle}" → ${targetStage.name}.`);
       } else {
-        toast.error('Failed to move deal');
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't move deal: ${detail}`);
       }
     } catch {
-      toast.error('Failed to move deal');
+      toast.error(`Couldn't move deal: ${NETWORK_ERROR_MSG}`);
     } finally {
       fetchData();
       // Clear any queued realtime refetch since we just refetched
@@ -567,18 +643,19 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
     const deal = stages.flatMap((s) => s.deals).find((d) => d.id === id);
     const confirmed = await confirm({
       title: 'Delete this deal?',
-      description: deal ? `"${deal.title}" will be permanently removed. This cannot be undone.` : 'This deal will be permanently removed.',
+      description: deal ? `"${deal.title}" will be gone. I can't bring it back.` : "This deal will be gone. I can't bring it back.",
     });
     if (!confirmed) return;
     try {
       const res = await fetch(`/api/deals/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        toast.success('Deal deleted');
+        toast.success('Deal deleted.');
       } else {
-        toast.error('Failed to delete deal');
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't delete deal: ${detail}`);
       }
     } catch {
-      toast.error('Failed to delete deal');
+      toast.error(`Couldn't delete deal: ${NETWORK_ERROR_MSG}`);
     }
     fetchData();
   }
@@ -591,14 +668,14 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
     const confirmed = await confirm({
       title: `Delete "${stage.name}"?`,
       description:
-        'This stage will be removed from the pipeline. Deals in this stage will need to be moved first.',
+        "I'll remove this stage from the pipeline. Move any deals out first.",
     });
     if (!confirmed) return;
 
     try {
       const res = await fetch(`/api/stages/${stage.id}`, { method: 'DELETE' });
       if (res.ok) {
-        toast.success('Stage deleted');
+        toast.success('Stage deleted.');
         fetchData();
         return;
       }
@@ -615,10 +692,14 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
           submitting: false,
         });
       } else {
-        toast.error('Failed to delete stage');
+        const detail =
+          (typeof body?.error === 'string' && body.error.trim())
+            ? body.error.trim()
+            : res.statusText || `Request failed (${res.status})`;
+        toast.error(`Couldn't delete stage: ${detail}`);
       }
     } catch {
-      toast.error('Failed to delete stage');
+      toast.error(`Couldn't delete stage: ${NETWORK_ERROR_MSG}`);
     }
   }
 
@@ -634,17 +715,18 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         { method: 'DELETE' },
       );
       if (!res.ok) {
-        toast.error('Failed to delete stage');
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't delete stage: ${detail}`);
         setStageDelete((prev) => (prev ? { ...prev, submitting: false } : prev));
         return;
       }
       toast.success(
-        `Moved ${stageDelete.dealCount} deal${stageDelete.dealCount === 1 ? '' : 's'} and deleted stage`,
+        `Moved ${stageDelete.dealCount} deal${stageDelete.dealCount === 1 ? '' : 's'} and deleted the stage.`,
       );
       setStageDelete(null);
       fetchData();
     } catch {
-      toast.error('Failed to delete stage');
+      toast.error(`Couldn't delete stage: ${NETWORK_ERROR_MSG}`);
       setStageDelete((prev) => (prev ? { ...prev, submitting: false } : prev));
     }
   }
@@ -686,7 +768,8 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        toast.error('Failed to update status');
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't update status: ${detail}`);
         // Roll back optimistic update
         fetchData();
       } else {
@@ -696,11 +779,11 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
           on_hold: 'On Hold',
           active: 'Active',
         };
-        toast.success(`Deal marked as ${labelMap[status]}`);
+        toast.success(`Deal marked as ${labelMap[status]}.`);
         fetchData();
       }
     } catch {
-      toast.error('Failed to update status');
+      toast.error(`Couldn't update status: ${NETWORK_ERROR_MSG}`);
       fetchData();
     } finally {
       setStatusChangePending(false);
@@ -716,6 +799,104 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
 
   function openAddDeal(stageId: string) {
     router.push(`/s/${slug}/deals/new?stageId=${stageId}`);
+  }
+
+  /**
+   * Open the slide-over panel for a deal. The panel stays in sync with the
+   * board because we look the deal up by id from current state on every render.
+   */
+  function handleOpenDeal(deal: DealWithRelations) {
+    setPanelDealId(deal.id);
+  }
+
+  /**
+   * Stage change from the slide-over. Routes through the same reorder
+   * endpoint the kanban drag handler uses so server-side position rebalancing
+   * stays consistent. Optimistically moves the card.
+   */
+  async function handlePanelStageChange(dealId: string, newStageId: string) {
+    const currentStage = stages.find((s) => s.deals.some((d) => d.id === dealId));
+    const newStage = stages.find((s) => s.id === newStageId);
+    if (!currentStage || !newStage || currentStage.id === newStageId) return;
+
+    const deal = currentStage.deals.find((d) => d.id === dealId);
+    if (!deal) return;
+
+    // Optimistic move
+    setStages((prev) =>
+      prev.map((s) => {
+        if (s.id === currentStage.id) {
+          return { ...s, deals: s.deals.filter((d) => d.id !== dealId) };
+        }
+        if (s.id === newStageId) {
+          return { ...s, deals: [...s.deals, { ...deal, stageId: newStageId, stage: newStage }] };
+        }
+        return s;
+      }),
+    );
+
+    try {
+      const newPosition = newStage.deals.length;
+      const res = await fetch('/api/deals/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealId, newStageId, newPosition }),
+      });
+      if (res.ok) {
+        toast.success(`Moved to ${newStage.name}.`);
+      } else {
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't move deal: ${detail}`);
+      }
+    } catch {
+      toast.error(`Couldn't move deal: ${NETWORK_ERROR_MSG}`);
+    } finally {
+      fetchData();
+      pendingRefetchRef.current = false;
+    }
+  }
+
+  /**
+   * Advance a deal to the next stage. Uses the same reorder endpoint the drag
+   * handler uses so the server-side position rebalancing stays consistent.
+   * Optimistically moves the card, toasts on success/failure.
+   */
+  async function handleAdvanceStage(deal: DealWithRelations, nextStageId: string) {
+    const nextStage = stages.find((s) => s.id === nextStageId);
+    if (!nextStage) return;
+
+    // Optimistic move — pop from current stage, append to next stage.
+    setStages((prev) =>
+      prev.map((s) => {
+        if (s.id === deal.stageId) {
+          return { ...s, deals: s.deals.filter((d) => d.id !== deal.id) };
+        }
+        if (s.id === nextStageId) {
+          return { ...s, deals: [...s.deals, { ...deal, stageId: nextStageId, stage: nextStage }] };
+        }
+        return s;
+      }),
+    );
+
+    try {
+      const newPosition = nextStage.deals.length;
+      const res = await fetch('/api/deals/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealId: deal.id, newStageId: nextStageId, newPosition }),
+      });
+      if (res.ok) {
+        toast.success(`Advanced to ${nextStage.name}.`);
+      } else {
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't advance deal: ${detail}`);
+      }
+    } catch {
+      toast.error(`Couldn't advance deal: ${NETWORK_ERROR_MSG}`);
+    } finally {
+      fetchData();
+      pendingRefetchRef.current = false;
+    }
   }
 
   // CSV export
@@ -761,12 +942,16 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
           contactIds: deal.dealContacts.map((dc) => dc.contactId),
         }),
       });
-      if (!res.ok) { toast.error('Failed to duplicate deal'); return; }
+      if (!res.ok) {
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't duplicate deal: ${detail}`);
+        return;
+      }
       const newDeal = await res.json();
-      toast.success('Deal duplicated');
+      toast.success('Deal duplicated.');
       router.push(`/s/${slug}/deals/${newDeal.id}`);
     } catch {
-      toast.error('Failed to duplicate deal');
+      toast.error(`Couldn't duplicate deal: ${NETWORK_ERROR_MSG}`);
     }
   }
 
@@ -791,17 +976,48 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
     const ids = Array.from(selectedDealIds);
     const confirmed = await confirm({
       title: `Delete ${ids.length} deal${ids.length === 1 ? '' : 's'}?`,
-      description: 'These deals will be permanently removed. This cannot be undone.',
+      description: "These will be gone. I can't bring them back.",
     });
     if (!confirmed) return;
     setBulkPending(true);
     try {
-      await Promise.allSettled(ids.map((id) => fetch(`/api/deals/${id}`, { method: 'DELETE' })));
-      toast.success(`Deleted ${ids.length} deal${ids.length === 1 ? '' : 's'}`);
-      setSelectedDealIds(new Set());
+      const results = await Promise.allSettled(
+        ids.map((id) => fetch(`/api/deals/${id}`, { method: 'DELETE' })),
+      );
+
+      // Count network-level rejections separately from API-level failures so
+      // we can surface a useful detail in the error toast.
+      let networkFailures = 0;
+      const apiErrors: string[] = [];
+      for (const r of results) {
+        if (r.status === 'rejected') {
+          networkFailures += 1;
+          continue;
+        }
+        if (!r.value.ok) {
+          apiErrors.push(await parseApiError(r.value));
+        }
+      }
+
+      const failed = networkFailures + apiErrors.length;
+      if (failed === 0) {
+        toast.success(`Deleted ${ids.length} deal${ids.length === 1 ? '' : 's'}.`);
+        setSelectedDealIds(new Set());
+      } else if (failed === ids.length) {
+        const detail = networkFailures === ids.length
+          ? NETWORK_ERROR_MSG
+          : apiErrors[0] ?? 'Unknown error';
+        toast.error(`Couldn't delete deals: ${detail}`);
+      } else {
+        const succeeded = ids.length - failed;
+        const detail = apiErrors[0] ?? NETWORK_ERROR_MSG;
+        toast.error(
+          `Deleted ${succeeded} of ${ids.length}; ${failed} failed: ${detail}`,
+        );
+      }
       fetchData();
     } catch {
-      toast.error('Failed to delete some deals');
+      toast.error(`Couldn't delete deals: ${NETWORK_ERROR_MSG}`);
     } finally {
       setBulkPending(false);
     }
@@ -812,7 +1028,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
     const ids = Array.from(selectedDealIds);
     setBulkPending(true);
     try {
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         ids.map((id) =>
           fetch(`/api/deals/${id}`, {
             method: 'PATCH',
@@ -821,14 +1037,43 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
           }),
         ),
       );
+
+      // Distinguish network-level rejections from API-level failures so the
+      // error toast can point the realtor at an actionable cause.
+      let networkFailures = 0;
+      const apiErrors: string[] = [];
+      for (const r of results) {
+        if (r.status === 'rejected') {
+          networkFailures += 1;
+          continue;
+        }
+        if (!r.value.ok) {
+          apiErrors.push(await parseApiError(r.value));
+        }
+      }
+
       const stageName = stages.find((s) => s.id === bulkStageTarget)?.name ?? '';
-      toast.success(`Moved ${ids.length} deal${ids.length === 1 ? '' : 's'} to ${stageName}`);
-      setBulkStagePicker(false);
-      setBulkStageTarget('');
-      setSelectedDealIds(new Set());
+      const failed = networkFailures + apiErrors.length;
+      if (failed === 0) {
+        toast.success(`Moved ${ids.length} deal${ids.length === 1 ? '' : 's'} to ${stageName}.`);
+        setBulkStagePicker(false);
+        setBulkStageTarget('');
+        setSelectedDealIds(new Set());
+      } else if (failed === ids.length) {
+        const detail = networkFailures === ids.length
+          ? NETWORK_ERROR_MSG
+          : apiErrors[0] ?? 'Unknown error';
+        toast.error(`Couldn't move deals: ${detail}`);
+      } else {
+        const succeeded = ids.length - failed;
+        const detail = apiErrors[0] ?? NETWORK_ERROR_MSG;
+        toast.error(
+          `Moved ${succeeded} of ${ids.length} to ${stageName}; ${failed} failed: ${detail}`,
+        );
+      }
       fetchData();
     } catch {
-      toast.error('Failed to move some deals');
+      toast.error(`Couldn't move deals: ${NETWORK_ERROR_MSG}`);
     } finally {
       setBulkPending(false);
     }
@@ -932,45 +1177,11 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Toolbar */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <LiquidMetalButton
-            label="Add deal"
-            onClick={() => {
-              const firstStageId = stages[0]?.id;
-              router.push(
-                firstStageId
-                  ? `/s/${slug}/deals/new?stageId=${firstStageId}`
-                  : `/s/${slug}/deals/new`,
-              );
-            }}
-          />
-        </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Search */}
-          <div className="relative flex-1 sm:flex-none">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search deals…"
-              className="h-8 w-full sm:w-44 rounded-lg border border-border bg-muted/60 pl-8 pr-7 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:bg-background transition-colors"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-
-          {/* Status filter chips */}
-          <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Status filter chips — Active / Won / Lost / On Hold */}
+          <div className="flex items-center gap-1 flex-wrap">
             {(
               [
                 { value: 'active', label: 'Active' },
@@ -987,10 +1198,10 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                   onClick={() => toggleStatus(opt.value)}
                   aria-pressed={selected}
                   className={cn(
-                    'h-8 px-2.5 text-xs font-medium rounded-md border transition-colors',
+                    'inline-flex items-center rounded-full px-3 h-8 sm:h-7 text-xs font-medium transition-colors duration-150',
                     selected
-                      ? 'bg-secondary text-foreground border-border'
-                      : 'bg-transparent text-muted-foreground border-border hover:bg-muted hover:text-foreground',
+                      ? 'bg-foreground text-background'
+                      : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
                   )}
                 >
                   {opt.label}
@@ -999,22 +1210,46 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
             })}
           </div>
 
+          {/* Search */}
+          <div className="relative ml-auto flex-1 sm:flex-initial min-w-[140px]">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search deals…"
+              className="pl-9 pr-7 h-9 w-full sm:w-56 text-sm rounded-md border border-border/70 bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-150"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
           {/* Advanced filter popover */}
           <Popover>
             <PopoverTrigger asChild>
               <button
                 type="button"
                 className={cn(
-                  'h-8 px-2.5 flex items-center gap-1.5 text-xs font-medium rounded-md border transition-colors',
+                  'inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium transition-colors duration-150',
                   advancedFilterCount > 0
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
+                    ? 'text-foreground bg-foreground/[0.045]'
+                    : 'text-foreground hover:bg-foreground/[0.04]',
                 )}
               >
                 <SlidersHorizontal size={13} />
                 Filters
                 {advancedFilterCount > 0 && (
-                  <span className="ml-0.5 bg-primary-foreground/20 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">
+                  <span className="ml-0.5 bg-foreground/[0.08] rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-semibold tabular-nums">
                     {advancedFilterCount}
                   </span>
                 )}
@@ -1039,7 +1274,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                           })
                         }
                         className={cn(
-                          'flex-1 h-7 text-xs font-medium rounded-md border transition-colors',
+                          'flex-1 h-8 sm:h-7 text-xs font-medium rounded-md border transition-colors',
                           on
                             ? p === 'LOW'
                               ? 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-500/20 dark:text-slate-300 dark:border-slate-500/40'
@@ -1066,7 +1301,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                     value={filterValueMin}
                     onChange={(e) => setFilterValueMin(e.target.value)}
                     placeholder="Min"
-                    className="h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+                    className="h-8 sm:h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
                   />
                   <span className="text-muted-foreground text-xs flex-shrink-0">to</span>
                   <input
@@ -1075,7 +1310,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                     value={filterValueMax}
                     onChange={(e) => setFilterValueMax(e.target.value)}
                     placeholder="Max"
-                    className="h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+                    className="h-8 sm:h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
               </div>
@@ -1091,7 +1326,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                     value={filterProbMin}
                     onChange={(e) => setFilterProbMin(e.target.value)}
                     placeholder="Min"
-                    className="h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+                    className="h-8 sm:h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
                   />
                   <span className="text-muted-foreground text-xs flex-shrink-0">to</span>
                   <input
@@ -1101,7 +1336,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                     value={filterProbMax}
                     onChange={(e) => setFilterProbMax(e.target.value)}
                     placeholder="Max"
-                    className="h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+                    className="h-8 sm:h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
               </div>
@@ -1117,7 +1352,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                     setFilterProbMin('');
                     setFilterProbMax('');
                   }}
-                  className="w-full h-7 text-xs font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted transition-colors"
+                  className="w-full h-8 sm:h-7 text-xs font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted transition-colors"
                 >
                   Reset filters
                 </button>
@@ -1125,85 +1360,84 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
             </PopoverContent>
           </Popover>
 
-          {/* Export CSV */}
+          {/* Export CSV — hidden on mobile to keep toolbar from wrapping */}
           <button
             type="button"
             onClick={exportCSV}
             disabled={allDeals.length === 0}
-            className="h-8 px-2.5 flex items-center gap-1.5 text-xs font-medium rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="hidden sm:inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
             title="Export to CSV"
           >
             <Download size={13} />
             Export
           </button>
 
-          {/* View toggle */}
-          <div className="flex rounded-md border border-border overflow-hidden bg-card ml-auto">
+          {/* View toggle — segmented control */}
+          <div className="flex items-center gap-0.5 rounded-md border border-border/70 bg-background p-0.5">
             <button
               type="button"
               onClick={() => setView('list')}
               className={cn(
-                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
+                'h-8 sm:h-7 w-8 flex items-center justify-center rounded transition-colors duration-150',
                 view === 'list'
-                  ? 'bg-secondary text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                  ? 'bg-foreground/[0.045] text-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
               )}
-              title="Table view"
+              title="List view"
+              aria-label="List view"
             >
-              <List size={15} />
+              <List size={14} />
             </button>
             <button
               type="button"
               onClick={() => setView('kanban')}
               className={cn(
-                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
+                'h-8 sm:h-7 w-8 flex items-center justify-center rounded transition-colors duration-150',
                 view === 'kanban'
-                  ? 'bg-secondary text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                  ? 'bg-foreground/[0.045] text-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
               )}
               title="Board view"
+              aria-label="Board view"
             >
-              <LayoutGrid size={15} />
+              <LayoutGrid size={14} />
             </button>
           </div>
         </div>
       </div>
 
       {/* Bulk action bar */}
-      {selectedDealIds.size > 0 && view === 'list' && (
-        <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5">
-          <span className="text-sm font-medium">
-            {selectedDealIds.size} deal{selectedDealIds.size === 1 ? '' : 's'} selected
+      {selectedDealIds.size > 0 && effectiveView === 'list' && (
+        <div className="flex items-center gap-3 flex-wrap rounded-md border border-border/70 bg-foreground/[0.02] px-4 py-2.5">
+          <span className="text-sm text-foreground tabular-nums">
+            {selectedDealIds.size} selected
           </span>
-          <div className="flex items-center gap-2 ml-auto">
-            {/* Move to stage */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setBulkStageTarget(stages[0]?.id ?? '');
-                  setBulkStagePicker(true);
-                }}
-                disabled={bulkPending}
-                className="h-7 px-3 flex items-center gap-1.5 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors disabled:opacity-50"
-              >
-                Move to stage
-                <ChevronDown size={11} />
-              </button>
-            </div>
-            {/* Bulk delete */}
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
+            <button
+              type="button"
+              onClick={() => {
+                setBulkStageTarget(stages[0]?.id ?? '');
+                setBulkStagePicker(true);
+              }}
+              disabled={bulkPending}
+              className="h-7 px-3 flex items-center gap-1.5 text-xs font-medium rounded-md border border-border/70 bg-background hover:bg-foreground/[0.04] transition-colors duration-150 disabled:opacity-50"
+            >
+              Move to stage
+              <ChevronDown size={11} />
+            </button>
             <button
               type="button"
               onClick={bulkDelete}
               disabled={bulkPending}
-              className="h-7 px-3 text-xs font-medium rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50"
+              className="h-7 px-3 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 disabled:opacity-50"
             >
               {bulkPending ? 'Working…' : 'Delete'}
             </button>
             <button
               type="button"
               onClick={() => setSelectedDealIds(new Set())}
-              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground transition-colors duration-150"
+              aria-label="Clear selection"
             >
               <X size={13} />
             </button>
@@ -1212,55 +1446,54 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
       )}
 
       {statusFilter.size === 0 ? (
-        <div className="rounded-lg border border-border bg-card px-4 py-12 text-center">
+        <div className="rounded-xl border border-border/70 bg-background px-4 py-12 text-center">
           <p className="text-sm text-muted-foreground">
-            No status selected — pick at least one status above.
+            Pick at least one status above to see deals.
           </p>
         </div>
-      ) : view === 'kanban' ? (
+      ) : effectiveView === 'kanban' ? (
         <>
-        {/* Mobile stacked view */}
+        {/* Mobile stacked view — paper-flat hairline rows. */}
         <div className="md:hidden space-y-4">
           {filteredStages.map((stage) => (
-            <div key={stage.id} className="rounded-lg border border-border overflow-hidden">
-              <div className="flex items-center gap-2 px-3 py-2.5 bg-muted/40 border-b border-border">
-                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
-                <span className="text-xs font-semibold">{stage.name}</span>
-                <span className="text-[11px] text-muted-foreground bg-muted rounded-md px-1.5 py-0.5 ml-auto">{stage.deals.length}</span>
+            <div key={stage.id} className="rounded-xl border border-border/70 bg-background overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-foreground/[0.02] border-b border-border/70">
+                <span className="text-sm font-semibold text-foreground">{stage.name}</span>
+                <span className="text-[11px] text-muted-foreground tabular-nums ml-auto">{stage.deals.length}</span>
               </div>
               {stage.deals.length === 0 ? (
                 <div className="px-3 py-4 text-center">
-                  <p className="text-xs text-muted-foreground">No deals in this stage</p>
+                  <p className="text-xs text-muted-foreground">Nothing in this stage yet.</p>
                 </div>
               ) : (
-                <div className="divide-y divide-border">
-                  {stage.deals.map((deal) => {
-                    const priorityMeta = PRIORITY_META[deal.priority] ?? PRIORITY_META.MEDIUM;
-                    return (
-                      <div
-                        key={deal.id}
-                        className="flex items-center gap-3 px-3 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/s/${slug}/deals/${deal.id}`)}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{deal.title}</p>
-                          {deal.address && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                              <MapPin size={10} />{deal.address}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {deal.value != null && (
-                            <span className="text-xs font-medium">{formatCurrency(deal.value)}</span>
-                          )}
-                          <span className={cn('text-[10px] font-semibold rounded-md px-1.5 py-0.5', priorityMeta.className)}>
-                            {priorityMeta.label}
-                          </span>
-                        </div>
+                <div className="divide-y divide-border/70">
+                  {stage.deals.map((deal) => (
+                    <div
+                      key={deal.id}
+                      className="flex items-center gap-3 px-3 py-3 hover:bg-foreground/[0.04] transition-colors duration-150 cursor-pointer"
+                      onClick={() => setPanelDealId(deal.id)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate text-foreground">{deal.title}</p>
+                        {deal.address && (
+                          <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                            <MapPin size={10} />{deal.address}
+                          </p>
+                        )}
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {deal.value != null && (
+                          <span
+                            className="text-sm tabular-nums text-foreground"
+                            style={TITLE_FONT}
+                          >
+                            {formatCurrency(deal.value)}
+                          </span>
+                        )}
+                        <ArrowRight size={12} className="text-muted-foreground/50" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1279,19 +1512,23 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
               items={filteredStages.map((s) => `stage:${s.id}`)}
               strategy={horizontalListSortingStrategy}
             >
-              <div className="flex gap-4 min-w-max items-start">
-                {filteredStages.map((stage) => (
-                  <SortableKanbanColumn
-                    key={stage.id}
-                    stage={stage}
-                    deals={stage.deals}
-                    slug={slug}
-                    onAddDeal={openAddDeal}
-                    onDeleteDeal={handleDeleteDeal}
-                    onDeleteStage={handleDeleteStage}
-                    onDealCreated={fetchData}
-                    onStatusChange={handleCardStatusChange}
-                  />
+              <StaggerList className="flex gap-4 min-w-max items-start">
+                {filteredStages.map((stage, idx) => (
+                  <StaggerItem key={stage.id}>
+                    <SortableKanbanColumn
+                      stage={stage}
+                      deals={stage.deals}
+                      slug={slug}
+                      onAddDeal={openAddDeal}
+                      onDeleteDeal={handleDeleteDeal}
+                      onDeleteStage={handleDeleteStage}
+                      onDealCreated={fetchData}
+                      onStatusChange={handleCardStatusChange}
+                      nextStage={filteredStages[idx + 1] ?? null}
+                      onAdvanceStage={handleAdvanceStage}
+                      onOpenDeal={handleOpenDeal}
+                    />
+                  </StaggerItem>
                 ))}
 
                 {/* Inline "Add Stage" card */}
@@ -1373,19 +1610,19 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                     </button>
                   )}
                 </div>
-              </div>
+              </StaggerList>
             </SortableContext>
             <DragOverlay>
               {activeDeal && (
-                <div className="w-72 rounded-lg border border-border bg-card px-3.5 py-3 shadow-lg opacity-95 rotate-1">
+                <div className="w-72 rounded-md border border-border bg-background px-3 py-3 shadow-md opacity-95">
                   <div className="flex items-center gap-2">
-                    <GripVertical size={15} className="text-muted-foreground/50 flex-shrink-0" />
-                    <p className="font-semibold text-sm truncate">{activeDeal.title}</p>
+                    <GripVertical size={14} className="text-muted-foreground/40 flex-shrink-0" />
+                    <p className="text-sm font-medium truncate text-foreground">{activeDeal.title}</p>
                   </div>
                 </div>
               )}
               {activeStage && (
-                <div className="w-72 rounded-lg border-2 border-border bg-card shadow-xl opacity-90 p-3">
+                <div className="w-72 rounded-lg border border-border bg-background shadow-md opacity-95 p-3">
                   <div className="flex items-center gap-2 mb-2">
                     <GripVertical size={13} className="text-muted-foreground/50 flex-shrink-0 rotate-90" />
                     <span
@@ -1406,12 +1643,12 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         </>
       ) : (
         /* ── List / table view ── */
-        <div className="rounded-lg border border-border overflow-hidden">
+        <div className="rounded-xl border border-border/70 bg-background overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  <th className="px-3 py-3 w-10">
+                <tr className="border-b border-border/70 bg-foreground/[0.02]">
+                  <th className="px-3 py-2.5 w-10">
                     <input
                       type="checkbox"
                       checked={allDeals.length > 0 && selectedDealIds.size === allDeals.length}
@@ -1419,65 +1656,78 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                         if (el) el.indeterminate = selectedDealIds.size > 0 && selectedDealIds.size < allDeals.length;
                       }}
                       onChange={toggleSelectAll}
-                      className="h-3.5 w-3.5 rounded border-border cursor-pointer accent-primary"
+                      className="h-3.5 w-3.5 rounded border-border cursor-pointer accent-foreground"
                       aria-label="Select all"
                     />
                   </th>
-                  <th className="text-left px-4 py-3">
+                  <th className="text-left px-4 py-2.5">
                     <SortHeader field="title" label="Deal" />
                   </th>
-                  <th className="text-left px-4 py-3 hidden sm:table-cell">
+                  <th className="text-left px-4 py-2.5 hidden sm:table-cell">
                     <SortHeader field="stage" label="Stage" />
                   </th>
-                  <th className="text-left px-4 py-3 hidden md:table-cell">
-                    <SortHeader field="value" label="Value" />
+                  <th className="text-right px-4 py-2.5 hidden md:table-cell">
+                    <SortHeader field="value" label="Value" className="ml-auto" />
                   </th>
-                  <th className="text-left px-4 py-3 hidden md:table-cell">
-                    <SortHeader field="priority" label="Priority" />
+                  <th className="text-left px-4 py-2.5 hidden md:table-cell">
+                    <SortHeader field="closeDate" label="Close" />
                   </th>
-                  <th className="text-left px-4 py-3 hidden lg:table-cell text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Contacts
+                  <th className="text-left px-4 py-2.5 hidden lg:table-cell">
+                    <span className={SECTION_LABEL}>Last activity</span>
                   </th>
-                  <th className="px-4 py-3 w-24" />
+                  <th className="px-4 py-2.5 w-20" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border bg-card">
+              <tbody className="divide-y divide-border/70">
                 {allDeals.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center">
-                      <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
-                        <Briefcase size={20} className="text-muted-foreground" />
-                      </div>
+                    <td colSpan={6} className="p-4">
                       {hasActiveFilter && totalUnfilteredDealCount > 0 ? (
-                        <>
-                          <p className="text-sm font-medium text-foreground">No deals match your filters</p>
-                          <p className="text-xs text-muted-foreground mt-1 max-w-[260px] mx-auto">
-                            Try clearing the search or enabling more status chips above.
-                          </p>
-                        </>
+                        <EmptyState
+                          icon={Briefcase}
+                          title="Nothing matches those filters."
+                          description="Clear the search or widen the status above."
+                          variant="flush"
+                          size="md"
+                        />
                       ) : (
-                        <>
-                          <p className="text-sm font-medium text-foreground">No deals yet</p>
-                          <p className="text-xs text-muted-foreground mt-1 max-w-[220px] mx-auto">
-                            Add your first deal to start tracking your leasing pipeline.
-                          </p>
-                        </>
+                        <EmptyState
+                          icon={Briefcase}
+                          title="No deals yet."
+                          description="Add the first one and I'll start tracking the pipeline."
+                          variant="flush"
+                          size="md"
+                        />
                       )}
                     </td>
                   </tr>
                 ) : (
                   allDeals.map((deal) => {
-                    const priorityMeta = PRIORITY_META[deal.priority] ?? PRIORITY_META.MEDIUM;
                     const stage = stages.find((s) => s.id === deal.stageId);
                     const isSelected = selectedDealIds.has(deal.id);
+                    const lastActivity = deal.updatedAt
+                      ? (() => {
+                          const d = new Date(deal.updatedAt as unknown as string);
+                          const diffDays = Math.floor((Date.now() - d.getTime()) / 86_400_000);
+                          if (diffDays === 0) return 'today';
+                          if (diffDays < 30) return `${diffDays}d ago`;
+                          return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                        })()
+                      : '—';
+                    const closeLabel = deal.closeDate
+                      ? new Date(deal.closeDate as unknown as string).toLocaleDateString(
+                          undefined,
+                          { month: 'short', day: 'numeric' },
+                        )
+                      : '—';
                     return (
                       <tr
                         key={deal.id}
                         className={cn(
-                          'group hover:bg-muted/30 transition-colors cursor-pointer',
-                          isSelected && 'bg-primary/5 hover:bg-primary/8',
+                          'group transition-colors duration-150 cursor-pointer hover:bg-foreground/[0.04]',
+                          isSelected && 'bg-foreground/[0.045]',
                         )}
-                        onClick={() => router.push(`/s/${slug}/deals/${deal.id}`)}
+                        onClick={() => setPanelDealId(deal.id)}
                       >
                         <td className="px-3 py-3 w-10">
                           <input
@@ -1485,70 +1735,41 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                             checked={isSelected}
                             onChange={(e) => { e.stopPropagation(); toggleDealSelect(deal.id); }}
                             onClick={(e) => e.stopPropagation()}
-                            className="h-3.5 w-3.5 rounded border-border cursor-pointer accent-primary"
+                            className="h-3.5 w-3.5 rounded border-border cursor-pointer accent-foreground"
                             aria-label={`Select ${deal.title}`}
                           />
                         </td>
                         <td className="px-4 py-3">
-                          <div>
-                            <p className="font-medium">{deal.title}</p>
-                            {deal.address && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                                <MapPin size={10} />
-                                {deal.address}
-                              </p>
-                            )}
-                          </div>
+                          <p className="text-sm font-medium text-foreground truncate">{deal.title}</p>
+                          {deal.address && (
+                            <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                              <MapPin size={10} />
+                              {deal.address}
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell">
                           {stage && (
-                            <span className="flex items-center gap-1.5 text-xs">
-                              <span
-                                className="w-2 h-2 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: stage.color }}
-                              />
+                            <span className="text-xs text-muted-foreground">
                               {stage.name}
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 hidden md:table-cell text-xs font-medium">
-                          {deal.value != null ? (
-                            <span className="flex items-center gap-1 text-foreground">
-                              {formatCurrency(deal.value)}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
+                        <td className="px-4 py-3 hidden md:table-cell text-sm tabular-nums text-foreground text-right">
+                          {deal.value != null ? formatCurrency(deal.value) : '—'}
                         </td>
-                        <td className="px-4 py-3 hidden md:table-cell">
-                          <span
-                            className={cn(
-                              'inline-flex text-[10px] font-semibold rounded-md px-2 py-0.5',
-                              priorityMeta.className,
-                            )}
-                          >
-                            {priorityMeta.label}
-                          </span>
+                        <td className="px-4 py-3 hidden md:table-cell text-xs tabular-nums text-muted-foreground">
+                          {closeLabel}
                         </td>
-                        <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
-                          {deal.dealContacts.length > 0
-                            ? deal.dealContacts.map((dc) => dc.contact.name).join(', ')
-                            : '—'}
+                        <td className="px-4 py-3 hidden lg:table-cell text-xs tabular-nums text-muted-foreground">
+                          {lastActivity}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); router.push(`/s/${slug}/deals/${deal.id}`); }}
-                              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                              title="Edit"
-                            >
-                              <Pencil size={13} />
-                            </button>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleDuplicateDeal(deal); }}
-                              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground transition-colors"
                               title="Duplicate"
                             >
                               <Copy size={13} />
@@ -1556,11 +1777,16 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleDeleteDeal(deal.id); }}
-                              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground transition-colors"
                               title="Delete"
                             >
                               <Trash2 size={13} />
                             </button>
+                            <ArrowRight
+                              size={13}
+                              className="ml-1 text-muted-foreground/50"
+                              strokeWidth={1.75}
+                            />
                           </div>
                         </td>
                       </tr>
@@ -1792,6 +2018,23 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
           </Dialog>
         );
       })()}
+
+      {/* Slide-over deal panel — opens on card click, no navigation. */}
+      <DealQuickPanel
+        deal={
+          panelDealId
+            ? stages.flatMap((s) => s.deals).find((d) => d.id === panelDealId) ?? null
+            : null
+        }
+        slug={slug}
+        stages={stages as DealStage[]}
+        open={!!panelDealId}
+        onOpenChange={(open) => {
+          if (!open) setPanelDealId(null);
+        }}
+        onStatusChange={handleCardStatusChange}
+        onStageChange={handlePanelStageChange}
+      />
     </div>
   );
 }

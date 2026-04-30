@@ -28,8 +28,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -48,44 +46,8 @@ import {
   Eye,
 } from 'lucide-react';
 import { QUESTION_TYPES, getQuestionTypeConfig } from './question-types';
+import { H3, SECTION_LABEL } from '@/lib/typography';
 import type { IntakeFormConfig, FormSection, FormQuestion } from './types';
-
-// ── Field type color map ──
-
-const FIELD_TYPE_COLORS: Record<string, string> = {
-  text:         'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-  textarea:     'bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
-  email:        'bg-sky-50 dark:bg-sky-950/30 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800',
-  phone:        'bg-teal-50 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800',
-  number:       'bg-orange-50 dark:bg-orange-950/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
-  select:       'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800',
-  multi_select: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-  radio:        'bg-violet-50 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800',
-  checkbox:     'bg-pink-50 dark:bg-pink-950/30 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800',
-  date:         'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-};
-
-// Icon-only color classes (no bg/border) for use on icon elements
-const FIELD_TYPE_ICON_COLORS: Record<string, string> = {
-  text:         'text-blue-600 dark:text-blue-400',
-  textarea:     'text-purple-600 dark:text-purple-400',
-  email:        'text-sky-600 dark:text-sky-400',
-  phone:        'text-teal-600 dark:text-teal-400',
-  number:       'text-orange-600 dark:text-orange-400',
-  select:       'text-green-600 dark:text-green-400',
-  multi_select: 'text-emerald-600 dark:text-emerald-400',
-  radio:        'text-violet-600 dark:text-violet-400',
-  checkbox:     'text-pink-600 dark:text-pink-400',
-  date:         'text-amber-600 dark:text-amber-400',
-};
-
-function fieldTypeBadgeClass(type: string): string {
-  return FIELD_TYPE_COLORS[type] ?? 'bg-muted text-muted-foreground border-border';
-}
-
-function fieldTypeIconClass(type: string): string {
-  return FIELD_TYPE_ICON_COLORS[type] ?? 'text-muted-foreground';
-}
 
 // ── Helpers ──
 
@@ -134,13 +96,12 @@ function PaletteItem({ type, label, icon: Icon, onClick }: { type: string; label
       {...listeners}
       onClick={onClick}
       className={cn(
-        'flex flex-col items-center justify-center gap-1.5 rounded-lg border border-border bg-card p-3 cursor-grab text-center hover:border-orange-300 dark:hover:border-orange-700 hover:bg-orange-50/50 dark:hover:bg-orange-950/10 transition-colors active:cursor-grabbing',
-        isDragging && 'ring-2 ring-orange-300/50 dark:ring-orange-700/50',
+        'flex flex-col items-center justify-center gap-1.5 rounded-lg border border-border/70 bg-foreground/[0.04] p-3 text-center cursor-grab active:cursor-grabbing transition-colors duration-150 hover:bg-foreground/[0.06]',
+        isDragging && 'ring-1 ring-foreground/20',
       )}
     >
-      <Icon size={18} className={fieldTypeIconClass(type)} />
-      <span className="text-[11px] font-medium text-muted-foreground leading-tight">{label}</span>
-      <GripVertical size={10} className="text-muted-foreground/30" />
+      <Icon size={16} className="text-muted-foreground" />
+      <span className="text-[11px] font-medium text-foreground leading-tight">{label}</span>
     </div>
   );
 }
@@ -179,33 +140,40 @@ function SortableQuestion({
       style={style}
       onClick={onSelect}
       className={cn(
-        'group flex items-center gap-2 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors',
+        'group relative flex items-center gap-2 rounded-md px-3 py-2.5 cursor-pointer transition-colors duration-150',
         isSelected
-          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-          : 'border-border bg-card hover:border-primary/30',
-        question.system && 'bg-muted/40',
+          ? 'bg-foreground/[0.045]'
+          : 'hover:bg-foreground/[0.04]',
       )}
     >
+      {isSelected && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-foreground"
+        />
+      )}
       <button
-        className="flex-shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors touch-none"
+        className="flex-shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors duration-150 touch-none"
         title="Drag to reorder"
         {...attributes}
         {...listeners}
       >
         <GripVertical size={14} />
       </button>
-      {Icon && <Icon size={14} className={cn('flex-shrink-0', fieldTypeIconClass(question.type))} />}
-      <span className="text-sm font-medium truncate flex-1">{question.label}</span>
+      {Icon && <Icon size={14} className="flex-shrink-0 text-muted-foreground" />}
+      <span className="text-sm font-medium truncate flex-1 text-foreground">
+        {question.label}
+        {question.required && (
+          <span className="ml-2 text-xs font-normal text-muted-foreground/60">required</span>
+        )}
+      </span>
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        {/* Field type pill */}
-        <span className={cn('hidden sm:inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-5', fieldTypeBadgeClass(question.type))}>
+        {/* Field type tag — flat, mono */}
+        <span className="hidden sm:inline-flex items-center rounded-md bg-foreground/[0.04] text-muted-foreground px-1.5 py-0.5 text-[10px] font-mono">
           {question.type.replace('_', ' ')}
         </span>
-        {question.required ? (
-          <span className="text-[10px] font-semibold text-rose-500" title="Required field">&#42;</span>
-        ) : null}
         {question.system && (
-          <Lock size={12} className="text-muted-foreground" />
+          <Lock size={12} className="text-muted-foreground/50" />
         )}
         {!question.system && (
           confirmDelete ? (
@@ -213,14 +181,14 @@ function SortableQuestion({
               <button
                 type="button"
                 onClick={() => { onDelete(); setConfirmDelete(false); }}
-                className="px-2 py-0.5 text-[10px] font-medium rounded bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors duration-150"
               >
                 Delete
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmDelete(false)}
-                className="px-2 py-0.5 text-[10px] font-medium rounded border border-border hover:bg-muted"
+                className="px-2 py-0.5 text-[10px] font-medium rounded-md border border-border/70 hover:bg-foreground/[0.04] transition-colors duration-150"
               >
                 Cancel
               </button>
@@ -229,7 +197,7 @@ function SortableQuestion({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
-              className="opacity-0 group-hover:opacity-100 flex-shrink-0 w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+              className="opacity-0 group-hover:opacity-100 flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-all duration-150"
               title="Delete question"
             >
               <Trash2 size={12} />
@@ -288,21 +256,21 @@ function SortableSection({
       }}
       style={style}
       className={cn(
-        'rounded-xl border-2 overflow-hidden transition-colors',
+        'rounded-xl border bg-background overflow-hidden transition-colors duration-150',
         isOver
-          ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+          ? 'border-foreground/40'
           : isSectionSelected
-            ? 'border-primary ring-1 ring-primary/20'
-            : 'border-border',
+            ? 'border-foreground/30'
+            : 'border-border/70',
       )}
     >
-      {/* Section header */}
+      {/* Section header — flat, hairline divider */}
       <div
-        className="flex items-center gap-2 px-4 py-3 bg-orange-50 dark:bg-orange-950/20 border-b border-orange-200 dark:border-orange-800 cursor-pointer"
+        className="flex items-start gap-2 px-4 py-3 border-b border-border/70 cursor-pointer hover:bg-foreground/[0.04] transition-colors duration-150"
         onClick={() => onSelectSection(section.id)}
       >
         <button
-          className="flex-shrink-0 cursor-grab active:cursor-grabbing text-orange-400 dark:text-orange-600 hover:text-orange-600 dark:hover:text-orange-400 transition-colors touch-none"
+          className="flex-shrink-0 mt-0.5 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors duration-150 touch-none"
           title="Drag to reorder section"
           {...attributes}
           {...listeners}
@@ -311,29 +279,30 @@ function SortableSection({
           <GripVertical size={14} />
         </button>
         <button
-          className="flex-shrink-0 text-muted-foreground hover:text-foreground"
+          className="flex-shrink-0 mt-0.5 text-muted-foreground hover:text-foreground transition-colors duration-150"
           onClick={(e) => {
             e.stopPropagation();
             setCollapsed(!collapsed);
           }}
+          aria-label={collapsed ? 'Expand section' : 'Collapse section'}
         >
           {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <p className="text-sm font-semibold truncate text-orange-900 dark:text-orange-100">{section.title}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold truncate text-foreground">{section.title}</p>
             {section.visibleWhen && (
-              <Badge variant="outline" className="text-[10px] flex-shrink-0 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 gap-1">
+              <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5 flex-shrink-0">
                 <Eye size={10} />
                 Conditional
-              </Badge>
+              </span>
             )}
           </div>
           {section.description && (
-            <p className="text-xs text-muted-foreground truncate">{section.description}</p>
+            <p className="text-xs text-muted-foreground truncate mt-0.5">{section.description}</p>
           )}
           {section.visibleWhen && (
-            <p className="text-[10px] text-blue-500 truncate">
+            <p className="text-[11px] text-muted-foreground/80 truncate mt-0.5">
               Shown when &quot;{(() => {
                 const allQs = allSections.flatMap((s) => s.questions);
                 const refQ = allQs.find((q) => q.id === section.visibleWhen?.questionId);
@@ -347,14 +316,14 @@ function SortableSection({
             </p>
           )}
         </div>
-        <Badge variant="outline" className="text-[10px] flex-shrink-0 border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300 bg-orange-50/50 dark:bg-orange-950/10">
+        <span className="text-xs text-muted-foreground flex-shrink-0 mt-0.5 tabular-nums">
           {section.questions.length} {section.questions.length === 1 ? 'question' : 'questions'}
-        </Badge>
+        </span>
       </div>
 
       {/* Questions */}
       {!collapsed && (
-        <div className="p-3 space-y-2">
+        <div className="p-2 space-y-1">
           <SortableContext
             items={section.questions.map((q) => q.id)}
             strategy={verticalListSortingStrategy}
@@ -373,9 +342,9 @@ function SortableSection({
           <button
             type="button"
             onClick={() => onAddQuestion(section.id)}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors pt-1"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 px-3 py-2"
           >
-            <Plus size={14} /> Add question
+            <Plus size={13} /> Add question
           </button>
         </div>
       )}
@@ -406,11 +375,11 @@ function QuestionEditor({
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Edit Question</h3>
+        <h3 className={H3}>Edit question</h3>
         {isSystem && (
-          <Badge variant="secondary" className="text-[10px]">
-            <Lock size={10} className="mr-1" /> System Field
-          </Badge>
+          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5">
+            <Lock size={10} /> System field
+          </span>
         )}
       </div>
 
@@ -528,7 +497,7 @@ function QuestionEditor({
               const newOpts = [...(question.options || []), { value: `option_${(question.options?.length || 0) + 1}`, label: `Option ${(question.options?.length || 0) + 1}` }];
               updateField('options', newOpts);
             }}
-            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors duration-150"
           >
             <Plus size={12} /> Add option
           </button>
@@ -677,7 +646,7 @@ function SectionEditor({
 
   return (
     <div className="space-y-5">
-      <h3 className="text-sm font-semibold">Edit Section</h3>
+      <h3 className={H3}>Edit section</h3>
 
       <div className="space-y-1.5">
         <Label className="text-xs">Title</Label>
@@ -814,8 +783,8 @@ function SectionEditor({
               )}
 
               {section.visibleWhen?.questionId && section.visibleWhen?.value && (
-                <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 px-3 py-2">
-                  <p className="text-[11px] text-blue-700 dark:text-blue-300">
+                <div className="rounded-md border border-border/70 bg-foreground/[0.04] px-3 py-2">
+                  <p className="text-[11px] text-muted-foreground">
                     Applicants will see this step only when they answer &quot;{(() => {
                       const refQ = earlierQuestions.find((q) => q.id === section.visibleWhen?.questionId);
                       const refOpt = refQ?.options?.find((o) => o.value === section.visibleWhen?.value);
@@ -1149,27 +1118,25 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex flex-col lg:flex-row gap-4 min-h-[600px]">
+      <div className="flex flex-col lg:flex-row gap-6 min-h-[600px]">
         {/* Left Panel - Palette */}
         <div className="w-full lg:w-48 flex-shrink-0">
-          <div className="rounded-xl border border-border bg-card overflow-hidden sticky top-4">
-            <div className="px-4 py-3 border-b border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20">
-              <p className="text-xs font-semibold text-orange-700 dark:text-orange-300 uppercase tracking-wider">Field Types</p>
+          <div className="sticky top-4 space-y-3">
+            <p className={SECTION_LABEL}>Field types</p>
+            <div className="grid grid-cols-2 gap-2">
+              {QUESTION_TYPES.map((qt) => (
+                <PaletteItem
+                  key={qt.type}
+                  type={qt.type}
+                  label={qt.label}
+                  icon={qt.icon}
+                  onClick={() => handlePaletteClick(qt.type as FormQuestion['type'])}
+                />
+              ))}
             </div>
-            <div className="p-3">
-              <div className="grid grid-cols-2 lg:grid-cols-2 gap-2">
-                {QUESTION_TYPES.map((qt) => (
-                  <PaletteItem
-                    key={qt.type}
-                    type={qt.type}
-                    label={qt.label}
-                    icon={qt.icon}
-                    onClick={() => handlePaletteClick(qt.type as FormQuestion['type'])}
-                  />
-                ))}
-              </div>
-              <p className="text-[10px] text-muted-foreground text-center mt-3">Drag onto a section or click to add</p>
-            </div>
+            <p className="text-[10px] text-muted-foreground/70 leading-snug">
+              Drag onto a section or click to add.
+            </p>
           </div>
         </div>
 
@@ -1196,24 +1163,29 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
             </SortableContext>
 
             {config.sections.length === 0 && (
-              <div className="rounded-xl border-2 border-dashed border-border p-8 text-center">
+              <div className="rounded-xl border border-dashed border-border/70 p-8 text-center">
                 <p className="text-sm text-muted-foreground">No sections yet. Add one to get started.</p>
               </div>
             )}
 
-            <Button variant="outline" size="sm" onClick={handleAddSection} className="w-full">
-              <Plus size={14} className="mr-1.5" /> Add Section
-            </Button>
+            <button
+              type="button"
+              onClick={handleAddSection}
+              className="w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-md border border-dashed border-border/70 text-sm text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
+            >
+              <Plus size={14} /> Add section
+            </button>
           </div>
         </div>
 
         {/* Right Panel - Property Editor */}
         <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
-          <div className="rounded-xl border border-border bg-card overflow-hidden sticky top-4">
-            <div className="px-4 py-3 border-b border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20">
-              <p className="text-xs font-semibold text-orange-700 dark:text-orange-300 uppercase tracking-wider">Properties</p>
-            </div>
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 160px)' }}>
+          <div className="sticky top-4 space-y-3">
+            <p className={SECTION_LABEL}>Properties</p>
+            <div
+              className="rounded-xl border border-border/70 bg-background overflow-y-auto"
+              style={{ maxHeight: 'calc(100vh - 160px)' }}
+            >
               <div className="p-4">
                 {selectedQuestion ? (
                   <QuestionEditor
@@ -1231,7 +1203,7 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
                     onDelete={handleDeleteSection}
                   />
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">
+                  <p className="text-sm text-muted-foreground py-8">
                     Select a question or section to edit its properties.
                   </p>
                 )}
@@ -1251,8 +1223,8 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
             if (qtConfig) {
               const OverlayIcon = qtConfig.icon;
               return (
-                <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-card px-3 py-2 shadow-lg text-sm font-medium opacity-90">
-                  <OverlayIcon size={16} className="text-primary" />
+                <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
+                  <OverlayIcon size={14} className="text-muted-foreground" />
                   {qtConfig.label}
                 </div>
               );
@@ -1264,7 +1236,7 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
             const qtConfig = getQuestionTypeConfig(draggedQuestion.type);
             const OverlayIcon = qtConfig?.icon;
             return (
-              <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-card px-3 py-2 shadow-lg text-sm font-medium opacity-90">
+              <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
                 {OverlayIcon && <OverlayIcon size={14} className="text-muted-foreground" />}
                 {draggedQuestion.label}
               </div>
@@ -1274,15 +1246,15 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
           const draggedSection = config.sections.find((s) => s.id === activeDragId);
           if (draggedSection) {
             return (
-              <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-card px-3 py-2 shadow-lg text-sm font-medium opacity-90">
+              <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
                 <GripVertical size={14} className="text-muted-foreground" />
                 {draggedSection.title}
               </div>
             );
           }
           return (
-            <div className="rounded-lg border border-primary/30 bg-card px-3 py-2 shadow-lg text-sm font-medium opacity-90">
-              Dragging...
+            <div className="rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
+              Dragging…
             </div>
           );
         })()}

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { CalendarView } from './calendar-view';
+import { PAGE_RHYTHM } from '@/lib/typography';
 import type { Metadata } from 'next';
 
 export async function generateMetadata({
@@ -22,19 +23,22 @@ export default async function CalendarPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  // Calendar pulls a wider tour window than the live grid needs so the stat
+  // strip above can compute this-week / conversion / no-show across recent
+  // history. Status filter widened — past completed/no_show tours feed the
+  // metrics, and cancelled tours are filtered client-side.
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
   const [toursResult, contactFollowUpsResult, dealFollowUpsResult] =
     await Promise.all([
       supabase
         .from('Tour')
         .select(
-          'id, guestName, guestEmail, propertyAddress, startsAt, endsAt, status'
+          'id, guestName, guestEmail, propertyAddress, startsAt, endsAt, status, createdAt'
         )
         .eq('spaceId', space.id)
-        .in('status', ['scheduled', 'confirmed'])
-        .gte('startsAt', thirtyDaysAgo.toISOString())
+        .gte('startsAt', ninetyDaysAgo.toISOString())
         .order('startsAt'),
       supabase
         .from('Contact')
@@ -58,7 +62,42 @@ export default async function CalendarPage({
     startsAt: string;
     endsAt: string;
     status: string;
+    createdAt: string | null;
   }[];
+
+  // Stat strip wants the full set; the calendar grid only wants live ones.
+  const liveTours = tours.filter(
+    (t) => t.status === 'scheduled' || t.status === 'confirmed'
+  );
+
+  // Pull deal links so conversion-rate is real, not a guess. Non-blocking —
+  // if the join fails (sourceTourId column missing in older spaces), every
+  // tour just shows sourceDealId = null and conversion = 0%.
+  let dealsByTour = new Map<string, string>();
+  if (tours.length > 0) {
+    try {
+      const tourIds = tours.map((t) => t.id);
+      const { data: dealLinks } = await supabase
+        .from('Deal')
+        .select('id, sourceTourId')
+        .in('sourceTourId', tourIds);
+      dealsByTour = new Map(
+        (dealLinks ?? []).map((d: { id: string; sourceTourId: string }) => [
+          d.sourceTourId,
+          d.id,
+        ])
+      );
+    } catch {
+      // ignore — column may not exist
+    }
+  }
+
+  const tourStats = tours.map((t) => ({
+    startsAt: t.startsAt,
+    status: t.status,
+    sourceDealId: dealsByTour.get(t.id) ?? null,
+    createdAt: t.createdAt ?? undefined,
+  }));
 
   const contactFollowUps = (contactFollowUpsResult.data ?? []) as {
     id: string;
@@ -108,16 +147,11 @@ export default async function CalendarPage({
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Calendar</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Tours and follow-ups at a glance.
-        </p>
-      </div>
+    <div className={PAGE_RHYTHM}>
       <CalendarView
         slug={slug}
-        tours={tours}
+        tours={liveTours}
+        tourStats={tourStats}
         contactFollowUps={contactFollowUps}
         dealFollowUps={dealFollowUps}
         customEvents={customEvents}

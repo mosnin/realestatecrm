@@ -1,31 +1,13 @@
 import {
-  LayoutDashboard,
   Users,
   Briefcase,
-  PhoneIncoming,
   Sparkles,
   Settings,
-  BarChart2,
-  BarChart3,
-  CalendarDays,
   Calendar,
-  Clock,
   FileText,
-  TrendingUp,
-  UserCheck,
-  MapPin,
-  GitBranch,
-  FormInput,
   ClipboardList,
-  Pencil,
-  Share2,
+  BarChart2,
   Home,
-  Bell,
-  Puzzle,
-  Palette,
-  Shield,
-  Flame,
-  Bot,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -51,137 +33,75 @@ export interface NavItem {
 }
 
 // ── Realtor sidebar nav ──────────────────────────────────────────────────────
+//
+// Four items. Chippi is the home — "Today" isn't a separate destination, it's
+// the morning view of the agent surface. Tours/Calendar/Notes/Reviews/
+// Analytics/Intake are reachable by URL but don't earn a nav slot; they'll be
+// absorbed into the agent surface in Phase 5 as inline tools the agent calls.
+//
+// Settings stays as the only true configuration destination. Sub-pages live
+// behind an in-page tab strip in app/s/[slug]/settings/layout.tsx.
 
 export const realtorNavItems: NavItem[] = [
   {
-    href: '',
-    label: 'Home',
-    icon: Home,
-    exact: true,
-  },
-  {
-    href: '/leads',
-    label: 'Leads',
-    icon: PhoneIncoming,
-    badgeKey: 'leads',
-    children: [
-      { href: '/leads', label: 'All Leads', exact: true },
-      { href: '/leads?sort=newest', label: 'Most Recent' },
-      { href: '/leads?type=rental', label: 'Rental Leads' },
-      { href: '/leads?type=buyer', label: 'Buyer Leads' },
-      { href: '/leads?tier=hot', label: 'Hot Leads' },
-    ],
+    href: '/chippi',
+    label: 'Chippi',
+    icon: Sparkles,
+    isAI: true,
+    badgeKey: 'pendingDrafts',
   },
   {
     href: '/contacts',
-    label: 'Contacts',
+    label: 'People',
     icon: Users,
+    badgeKey: 'leads',
   },
   {
     href: '/deals',
-    label: 'Deals',
+    label: 'Pipeline',
     icon: Briefcase,
-  },
-  {
-    href: '/tours',
-    label: 'Tours',
-    icon: CalendarDays,
-  },
-  {
-    href: '/calendar',
-    label: 'Calendar',
-    icon: Calendar,
-  },
-  {
-    href: '/intake',
-    label: 'Intake Form',
-    icon: ClipboardList,
-    children: [
-      { href: '/intake', label: 'Overview', exact: true },
-      { href: '/intake/customize', label: 'Customize' },
-      { href: '/settings/appearance', label: 'Appearance' },
-      { href: '/settings/content', label: 'Content' },
-      { href: '/intake/tracking', label: 'Tracking' },
-      { href: '/intake/share', label: 'Share' },
-    ],
-  },
-  {
-    href: '/analytics',
-    label: 'Analytics',
-    icon: BarChart2,
-    children: [
-      { href: '/analytics', label: 'Overview', exact: true },
-      { href: '/analytics/leads', label: 'Leads' },
-      { href: '/analytics/clients', label: 'Clients' },
-      { href: '/analytics/tours', label: 'Tours' },
-      { href: '/analytics/pipeline', label: 'Pipeline' },
-      { href: '/analytics/form-traffic', label: 'Form Traffic' },
-    ],
-  },
-  {
-    href: '/notes',
-    label: 'Notes',
-    icon: FileText,
-  },
-  {
-    href: '/agent',
-    label: 'Agent',
-    icon: Bot,
-    badgeKey: 'agentDrafts',
-  },
-  {
-    href: '/ai',
-    label: 'AI Assistant',
-    icon: Sparkles,
-    isAI: true,
   },
   {
     href: '/settings',
     label: 'Settings',
     icon: Settings,
-    children: [
-      { href: '/settings', label: 'Account', exact: true },
-      { href: '/billing', label: 'Billing' },
-      { href: '/settings/notifications', label: 'Notifications' },
-      { href: '/settings/integrations', label: 'API & MCP' },
-      { href: '/settings/legal', label: 'Legal' },
-    ],
   },
 ];
 
-// ── Legacy exports for backward compatibility ────────────────────────────────
-
-export const primaryNavItems = [
-  { href: '', label: 'Overview', icon: LayoutDashboard },
-  { href: '/leads', label: 'Leads', icon: PhoneIncoming },
-  { href: '/contacts', label: 'Clients', icon: Users },
-  { href: '/deals', label: 'Deals', icon: Briefcase },
-  { href: '/follow-ups', label: 'Follow-ups', icon: Clock },
-  { href: '/tours', label: 'Tours', icon: CalendarDays },
+/**
+ * Secondary realtor nav — visually subordinate "More" section. Calendar
+ * absorbs Tours (a tour is just a calendar event with a property + contact
+ * attached), so there is no separate Tours destination. Intake form expands
+ * inline so its sub-pages (Customize, Share, Booking, Availability) are
+ * reachable in one click instead of buried inside an overview page.
+ */
+export const realtorMoreNavItems: NavItem[] = [
   { href: '/calendar', label: 'Calendar', icon: Calendar },
-  { href: '/notes', label: 'Notes', icon: FileText },
+  {
+    href: '/properties',
+    label: 'Properties',
+    icon: Home,
+    children: [
+      { href: '/properties', label: 'All', exact: true },
+      { href: '/properties/commissions', label: 'Commissions' },
+    ],
+  },
+  {
+    href: '/intake',
+    label: 'Intake form',
+    icon: ClipboardList,
+    children: [
+      { href: '/intake', label: 'Overview', exact: true },
+      { href: '/intake/customize', label: 'Customize' },
+      { href: '/intake/share', label: 'Share' },
+      { href: '/intake/tracking', label: 'Tracking' },
+      { href: '/intake/analytics', label: 'Submissions' },
+    ],
+  },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
-  { href: '/ai', label: 'Chip', icon: Sparkles },
-] as const;
+];
 
-export const intakeSubItems = [
-  { href: '/intake', label: 'Overview', icon: ClipboardList, exact: true },
-  { href: '/intake/customize', label: 'Customize', icon: Pencil },
-  { href: '/settings/appearance', label: 'Appearance', icon: Palette },
-  { href: '/settings/content', label: 'Content', icon: FileText },
-  { href: '/intake/tracking', label: 'Tracking', icon: BarChart3 },
-  { href: '/intake/analytics', label: 'Form Analytics', icon: FormInput },
-  { href: '/intake/share', label: 'Share', icon: Share2 },
-] as const;
-
-export const analyticsSubItems = [
-  { href: '/analytics', label: 'Overview', icon: BarChart2, exact: true },
-  { href: '/analytics/leads', label: 'Leads', icon: TrendingUp },
-  { href: '/analytics/clients', label: 'Clients', icon: UserCheck },
-  { href: '/analytics/tours', label: 'Tours', icon: MapPin },
-  { href: '/analytics/pipeline', label: 'Pipeline', icon: GitBranch },
-  { href: '/analytics/form-traffic', label: 'Form Traffic', icon: FormInput },
-] as const;
+// ── Header right-side menu ───────────────────────────────────────────────────
 
 export const secondaryNavItems = [
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -189,8 +109,8 @@ export const secondaryNavItems = [
 
 /** Primary items with shorter labels for the mobile bottom bar. */
 export const mobileNavItems = [
-  { href: '', label: 'Home', icon: LayoutDashboard },
-  { href: '/leads', label: 'Leads', icon: PhoneIncoming },
-  { href: '/contacts', label: 'Clients', icon: Users },
-  { href: '/deals', label: 'Deals', icon: Briefcase },
+  { href: '/chippi', label: 'Chippi', icon: Sparkles },
+  { href: '/contacts', label: 'People', icon: Users },
+  { href: '/deals', label: 'Pipeline', icon: Briefcase },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ] as const;

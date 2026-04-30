@@ -122,7 +122,7 @@ export default async function AcceptInvitationPage({ params }: Params) {
                 )}
                 <div>
                   <p className="text-sm text-foreground leading-relaxed">
-                    You've been invited to join{' '}
+                    You&apos;ve been invited to join{' '}
                     <span className="font-semibold">{inv.brokerageName}</span> as a{' '}
                     <span className="font-semibold">{roleLabel(inv.roleToAssign)}</span>.
                   </p>

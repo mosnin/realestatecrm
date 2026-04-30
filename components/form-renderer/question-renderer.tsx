@@ -1,83 +1,105 @@
 'use client';
 
 import { useId } from 'react';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { CheckCircle2 } from 'lucide-react';
 import type { FormQuestion } from '@/lib/types';
 
-// ── Selection card (radio-style pill) — matches the existing form aesthetic ──
-function SelectionCard({
+// ─── Locked paper-flat input language ──────────────────────────────────────
+// Same family as booking-form's INPUT_CLASS / TEXTAREA_CLASS / FIELD_LABEL.
+// Drop shadcn's chunky focus rings — the focus signal is a quiet border
+// transition to foreground/30. Inputs read as one family with the wrapper.
+
+const FIELD_BASE =
+  'w-full bg-background border border-border/70 rounded-md px-3 text-base focus:border-foreground/30 focus:outline-none transition-colors placeholder:text-muted-foreground/70';
+const INPUT_CLASS = cn(FIELD_BASE, 'h-10');
+const TEXTAREA_CLASS = cn(FIELD_BASE, 'py-2 min-h-[80px] resize-y');
+const FIELD_LABEL = 'text-sm font-medium text-foreground';
+const HELPER_TEXT = 'text-xs text-muted-foreground mt-0.5';
+const ERROR_TEXT = 'text-xs text-rose-600 dark:text-rose-400 mt-1';
+const OPTIONAL_TAG = 'ml-1.5 text-xs font-normal text-muted-foreground';
+
+// Tile cards (radio / single-select). Selection uses foreground tone — no
+// bright accent ring, just a subtle wash + faint ring.
+const TILE_BASE =
+  'w-full text-left flex items-start gap-3 p-4 rounded-lg border transition-colors';
+const TILE_IDLE = 'border-border/70 hover:bg-foreground/[0.04]';
+const TILE_ACTIVE = 'border-foreground/40 bg-foreground/[0.045] ring-2 ring-foreground/10';
+
+// Multi-select pills (chip pattern from contact-form).
+const PILL_BASE =
+  'inline-flex items-center gap-1.5 h-8 pl-3 pr-3 rounded-full border text-sm transition-colors';
+const PILL_IDLE =
+  'border-border/70 text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground';
+const PILL_ACTIVE = 'border-foreground/40 bg-foreground/[0.045] text-foreground';
+
+// Helper — renders the locked label + optional tag.
+function FieldLabel({
+  htmlFor,
+  question,
+}: {
+  htmlFor?: string;
+  question: FormQuestion;
+}) {
+  return (
+    <label htmlFor={htmlFor} className={FIELD_LABEL}>
+      {question.label}
+      {!question.required && <span className={OPTIONAL_TAG}>(optional)</span>}
+    </label>
+  );
+}
+
+function FieldDescription({ description }: { description?: string }) {
+  if (!description) return null;
+  return <p className={HELPER_TEXT}>{description}</p>;
+}
+
+function FieldError({ error }: { error?: string }) {
+  if (!error) return null;
+  return <p className={ERROR_TEXT}>{error}</p>;
+}
+
+// ─── Selection tile (radio / single-select) ────────────────────────────────
+function SelectionTile({
   label,
   selected,
   onClick,
-  accentColor,
 }: {
   label: string;
   selected: boolean;
   onClick: () => void;
-  accentColor: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        'w-full text-left px-4 py-3.5 rounded-xl border transition-all text-sm',
-        selected
-          ? 'border-2 shadow-sm font-medium'
-          : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
-      )}
-      style={
-        selected
-          ? { borderColor: accentColor, backgroundColor: `${accentColor}08` }
-          : undefined
-      }
+      className={cn(TILE_BASE, selected ? TILE_ACTIVE : TILE_IDLE)}
     >
-      {label}
+      <span className="flex-1 text-sm font-medium text-foreground">{label}</span>
+      {selected && (
+        <CheckCircle2 size={16} className="text-foreground flex-shrink-0 mt-0.5" />
+      )}
     </button>
   );
 }
 
-// ── Multi-select chip (checkbox-style card) ──
-function MultiSelectChip({
+// ─── Multi-select pill (checkbox-style chip) ───────────────────────────────
+function MultiSelectPill({
   label,
   checked,
   onClick,
-  accentColor,
 }: {
   label: string;
   checked: boolean;
   onClick: () => void;
-  accentColor: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        'flex items-center gap-2.5 px-3.5 py-3 rounded-xl border transition-all text-sm text-left',
-        checked
-          ? 'border-2 shadow-sm font-medium'
-          : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
-      )}
-      style={
-        checked
-          ? { borderColor: accentColor, backgroundColor: `${accentColor}08` }
-          : undefined
-      }
+      className={cn(PILL_BASE, checked ? PILL_ACTIVE : PILL_IDLE)}
     >
-      <div
-        className={cn(
-          'w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all',
-          checked ? 'border-0' : 'border-muted-foreground/40',
-        )}
-        style={checked ? { backgroundColor: accentColor } : undefined}
-      >
-        {checked && <CheckCircle2 size={12} className="text-white" />}
-      </div>
+      {checked && <CheckCircle2 size={13} className="text-foreground flex-shrink-0" />}
       {label}
     </button>
   );
@@ -88,6 +110,9 @@ export interface QuestionRendererProps {
   value: string | string[];
   onChange: (value: string | string[]) => void;
   error?: string;
+  // Preserved for API compatibility with the wrapper. Locked language no
+  // longer paints selection states with the brand accent — selection uses
+  // foreground tones. The prop is retained but intentionally unused.
   accentColor?: string;
 }
 
@@ -100,7 +125,6 @@ export function QuestionRenderer({
   value,
   onChange,
   error,
-  accentColor = '#ff964f',
 }: QuestionRendererProps) {
   const generatedId = useId();
   const inputId = `q-${question.id}-${generatedId}`;
@@ -108,31 +132,26 @@ export function QuestionRenderer({
   const arrValue = Array.isArray(value) ? value : [];
 
   const hasError = !!error;
-  const inputClass = cn('h-12 rounded-xl', hasError && 'border-destructive');
+  const errorBorder = hasError ? 'border-rose-500/60 focus:border-rose-500/60' : '';
 
   switch (question.type) {
     // ── Text input ──
     case 'text':
       return (
         <div className="space-y-1.5">
-          <Label htmlFor={inputId}>
-            {question.label}
-            {question.required && <span className="text-destructive"> *</span>}
-          </Label>
-          {question.description && (
-            <p className="text-xs text-muted-foreground">{question.description}</p>
-          )}
-          <Input
+          <FieldLabel htmlFor={inputId} question={question} />
+          <FieldDescription description={question.description} />
+          <input
             id={inputId}
             type="text"
             placeholder={question.placeholder}
             value={strValue}
             onChange={(e) => onChange(e.target.value)}
-            className={inputClass}
+            className={cn(INPUT_CLASS, errorBorder)}
             minLength={question.validation?.minLength}
             maxLength={question.validation?.maxLength}
           />
-          {hasError && <p className="text-xs text-destructive">{error}</p>}
+          <FieldError error={error} />
         </div>
       );
 
@@ -140,23 +159,18 @@ export function QuestionRenderer({
     case 'textarea':
       return (
         <div className="space-y-1.5">
-          <Label htmlFor={inputId}>
-            {question.label}
-            {question.required && <span className="text-destructive"> *</span>}
-          </Label>
-          {question.description && (
-            <p className="text-xs text-muted-foreground">{question.description}</p>
-          )}
-          <Textarea
+          <FieldLabel htmlFor={inputId} question={question} />
+          <FieldDescription description={question.description} />
+          <textarea
             id={inputId}
             placeholder={question.placeholder}
             value={strValue}
             onChange={(e) => onChange(e.target.value)}
             rows={4}
-            className={cn('rounded-xl', hasError && 'border-destructive')}
+            className={cn(TEXTAREA_CLASS, errorBorder)}
             maxLength={question.validation?.maxLength}
           />
-          {hasError && <p className="text-xs text-destructive">{error}</p>}
+          <FieldError error={error} />
         </div>
       );
 
@@ -164,22 +178,17 @@ export function QuestionRenderer({
     case 'email':
       return (
         <div className="space-y-1.5">
-          <Label htmlFor={inputId}>
-            {question.label}
-            {question.required && <span className="text-destructive"> *</span>}
-          </Label>
-          {question.description && (
-            <p className="text-xs text-muted-foreground">{question.description}</p>
-          )}
-          <Input
+          <FieldLabel htmlFor={inputId} question={question} />
+          <FieldDescription description={question.description} />
+          <input
             id={inputId}
             type="email"
             placeholder={question.placeholder || 'alex@email.com'}
             value={strValue}
             onChange={(e) => onChange(e.target.value)}
-            className={inputClass}
+            className={cn(INPUT_CLASS, errorBorder)}
           />
-          {hasError && <p className="text-xs text-destructive">{error}</p>}
+          <FieldError error={error} />
         </div>
       );
 
@@ -187,22 +196,17 @@ export function QuestionRenderer({
     case 'phone':
       return (
         <div className="space-y-1.5">
-          <Label htmlFor={inputId}>
-            {question.label}
-            {question.required && <span className="text-destructive"> *</span>}
-          </Label>
-          {question.description && (
-            <p className="text-xs text-muted-foreground">{question.description}</p>
-          )}
-          <Input
+          <FieldLabel htmlFor={inputId} question={question} />
+          <FieldDescription description={question.description} />
+          <input
             id={inputId}
             type="tel"
             placeholder={question.placeholder || '(555) 123-4567'}
             value={strValue}
             onChange={(e) => onChange(e.target.value)}
-            className={inputClass}
+            className={cn(INPUT_CLASS, errorBorder)}
           />
-          {hasError && <p className="text-xs text-destructive">{error}</p>}
+          <FieldError error={error} />
         </div>
       );
 
@@ -210,56 +214,47 @@ export function QuestionRenderer({
     case 'number':
       return (
         <div className="space-y-1.5">
-          <Label htmlFor={inputId}>
-            {question.label}
-            {question.required && <span className="text-destructive"> *</span>}
-          </Label>
-          {question.description && (
-            <p className="text-xs text-muted-foreground">{question.description}</p>
-          )}
-          <Input
+          <FieldLabel htmlFor={inputId} question={question} />
+          <FieldDescription description={question.description} />
+          <input
             id={inputId}
             type="number"
+            inputMode="numeric"
             placeholder={question.placeholder}
             value={strValue}
             onChange={(e) => onChange(e.target.value)}
-            className={inputClass}
+            className={cn(INPUT_CLASS, errorBorder)}
             min={question.validation?.min}
             max={question.validation?.max}
           />
-          {hasError && <p className="text-xs text-destructive">{error}</p>}
+          <FieldError error={error} />
         </div>
       );
 
-    // ── Select (selection cards — single choice) ──
+    // ── Select (selection tiles — single choice) ──
     case 'select':
       return (
         <div className="space-y-1.5">
-          <Label>
-            {question.label}
-            {question.required && <span className="text-destructive"> *</span>}
-          </Label>
-          {question.description && (
-            <p className="text-xs text-muted-foreground">{question.description}</p>
-          )}
-          <div className="space-y-2.5">
+          <FieldLabel question={question} />
+          <FieldDescription description={question.description} />
+          <div className="space-y-2 pt-1">
             {(question.options ?? []).map((option) => (
-              <SelectionCard
+              <SelectionTile
                 key={option.value}
                 label={option.label}
                 selected={strValue === option.value}
                 onClick={() => onChange(option.value)}
-                accentColor={accentColor}
               />
             ))}
           </div>
-          {hasError && <p className="text-xs text-destructive">{error}</p>}
+          <FieldError error={error} />
         </div>
       );
 
-    // ── Multi-select (checkbox-style chips) ──
+    // ── Multi-select (pill chips) ──
     case 'multi_select': {
-      const selected = arrValue.length > 0 ? arrValue : strValue ? strValue.split(',').filter(Boolean) : [];
+      const selected =
+        arrValue.length > 0 ? arrValue : strValue ? strValue.split(',').filter(Boolean) : [];
       const toggle = (val: string) => {
         const updated = selected.includes(val)
           ? selected.filter((v) => v !== val)
@@ -268,52 +263,40 @@ export function QuestionRenderer({
       };
       return (
         <div className="space-y-1.5">
-          <Label>
-            {question.label}
-            {question.required && <span className="text-destructive"> *</span>}
-          </Label>
-          {question.description && (
-            <p className="text-xs text-muted-foreground">{question.description}</p>
-          )}
-          <div className="grid grid-cols-2 gap-2.5">
+          <FieldLabel question={question} />
+          <FieldDescription description={question.description} />
+          <div className="flex flex-wrap gap-2 pt-1">
             {(question.options ?? []).map((option) => (
-              <MultiSelectChip
+              <MultiSelectPill
                 key={option.value}
                 label={option.label}
                 checked={selected.includes(option.value)}
                 onClick={() => toggle(option.value)}
-                accentColor={accentColor}
               />
             ))}
           </div>
-          {hasError && <p className="text-xs text-destructive">{error}</p>}
+          <FieldError error={error} />
         </div>
       );
     }
 
-    // ── Radio (selection cards — same visual as select) ──
+    // ── Radio (selection tiles — same visual as select) ──
     case 'radio':
       return (
         <div className="space-y-1.5">
-          <Label>
-            {question.label}
-            {question.required && <span className="text-destructive"> *</span>}
-          </Label>
-          {question.description && (
-            <p className="text-xs text-muted-foreground">{question.description}</p>
-          )}
-          <div className="space-y-2.5">
+          <FieldLabel question={question} />
+          <FieldDescription description={question.description} />
+          <div className="space-y-2 pt-1">
             {(question.options ?? []).map((option) => (
-              <SelectionCard
+              <SelectionTile
                 key={option.value}
                 label={option.label}
                 selected={strValue === option.value}
                 onClick={() => onChange(option.value)}
-                accentColor={accentColor}
               />
             ))}
           </div>
-          {hasError && <p className="text-xs text-destructive">{error}</p>}
+          <FieldError error={error} />
         </div>
       );
 
@@ -327,17 +310,20 @@ export function QuestionRenderer({
               id={inputId}
               checked={strValue === 'true'}
               onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
-              className="mt-0.5 rounded border-border cursor-pointer"
+              className="mt-0.5 h-4 w-4 rounded border-border/70 cursor-pointer accent-foreground focus:outline-none focus:ring-2 focus:ring-foreground/30"
             />
-            <label htmlFor={inputId} className="text-sm text-foreground leading-snug cursor-pointer">
+            <label
+              htmlFor={inputId}
+              className="text-sm text-foreground leading-snug cursor-pointer"
+            >
               {question.label}
-              {question.required && <span className="text-destructive"> *</span>}
+              {!question.required && <span className={OPTIONAL_TAG}>(optional)</span>}
             </label>
           </div>
           {question.description && (
             <p className="text-xs text-muted-foreground ml-7">{question.description}</p>
           )}
-          {hasError && <p className="text-xs text-destructive ml-7">{error}</p>}
+          {hasError && <p className="text-xs text-rose-600 dark:text-rose-400 ml-7">{error}</p>}
         </div>
       );
 
@@ -345,21 +331,16 @@ export function QuestionRenderer({
     case 'date':
       return (
         <div className="space-y-1.5">
-          <Label htmlFor={inputId}>
-            {question.label}
-            {question.required && <span className="text-destructive"> *</span>}
-          </Label>
-          {question.description && (
-            <p className="text-xs text-muted-foreground">{question.description}</p>
-          )}
-          <Input
+          <FieldLabel htmlFor={inputId} question={question} />
+          <FieldDescription description={question.description} />
+          <input
             id={inputId}
             type="date"
             value={strValue}
             onChange={(e) => onChange(e.target.value)}
-            className={inputClass}
+            className={cn(INPUT_CLASS, errorBorder)}
           />
-          {hasError && <p className="text-xs text-destructive">{error}</p>}
+          <FieldError error={error} />
         </div>
       );
 
@@ -371,7 +352,7 @@ export function QuestionRenderer({
 // ── Validation helper ────────────────────────────────────────────────────────
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^[\d\s()+\-]{7,}$/;
+const PHONE_REGEX = /^[\d\s()+\-.]{7,}$/;
 
 /**
  * Validate a single question's answer.

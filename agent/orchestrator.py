@@ -1,14 +1,15 @@
-"""Main orchestrator — runs all enabled agents for every active space.
+"""Main orchestrator — runs the Coordinator agent for every active space.
 
 Flow per space:
-  1. Load AgentSettings — skip if disabled or budget exhausted
+  1. Load AgentSettings — skip if disabled or daily budget exhausted
   2. Prune expired memories
-  3. Load space-level memories to give agents historical context
-  4. Build AgentContext with runtime-injected spaceId
-  5. Check for pending event triggers (new_lead, tour_completed, etc.)
-  6. Run each enabled specialist agent sequentially
-  7. Record token usage against daily budget
-  8. Store run-summary memory
+  3. Load space-level memories for historical context
+  4. Build AgentContext with runtime-injected spaceId (security boundary)
+  5. Pop any pending Redis event triggers
+  6. Run the CoordinatorAgent — it surveys the workspace and hands off to
+     only the specialist agents that have a real signal to act on
+  7. Record total token usage against the daily budget
+  8. Store a run-summary memory for future runs
 
 Security: spaceId is set once in AgentContext and flows through RunContextWrapper.
 No tool ever accepts spaceId as a parameter — it is always read from context.
@@ -18,17 +19,17 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 import uuid
 from datetime import datetime, timezone
 
 import structlog
 from agents import Runner, RunConfig, ModelSettings
+from agents import InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 
 from config import settings
 from db import supabase
 from memory.store import format_memories_for_prompt, load_memories, prune_expired, save_memory
-from schemas import AgentSettings, Space
+from schemas import AgentSettings, CoordinatorRunReport, Space
 from security.budget import check_budget, record_usage
 from security.context import AgentContext
 from tools.streaming import publish_event
@@ -76,9 +77,8 @@ async def pop_triggers(space_id: str) -> list[dict]:
     """Pop any pending event triggers from Redis for this space.
 
     Triggers are pushed by POST /api/agent/trigger when events happen
-    (new lead, tour completed, deal stage change). Processing them here
-    means the agent reacts within the next heartbeat (~15 min) rather
-    than waiting for the next scheduled analysis.
+    (new lead, tour completed, deal stage change). The coordinator receives
+    these in its initial prompt so it can prioritise the relevant specialists.
     """
     try:
         from upstash_redis.asyncio import Redis
@@ -105,7 +105,7 @@ async def pop_triggers(space_id: str) -> list[dict]:
 
 
 async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> None:
-    """Execute all enabled agents for one space."""
+    """Execute the Coordinator (and via handoffs, the relevant specialists) for one space."""
     run_id = str(uuid.uuid4())
     log = logger.bind(space_id=space.id, space_slug=space.slug, run_id=run_id)
 
@@ -133,104 +133,108 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
 
     ctx = AgentContext.from_settings(agent_settings, run_id=run_id, space_name=space.name)
 
-    # Check for triggered events (new lead, tour completed, etc.)
+    # Pop pending event triggers (new_lead, tour_completed, deal_stage_changed, etc.)
     triggers = await pop_triggers(space.id)
     if triggers:
-        log.info("triggers_found", count=len(triggers), triggers=[t.get("event") for t in triggers])
+        log.info("triggers_found", count=len(triggers), events=[t.get("event") for t in triggers])
 
-    log.info("agent_run_started", enabled_agents=agent_settings.enabled_agents)
-    await publish_event(ctx, "info", f"Starting run for '{space.name}' — {len(agent_settings.enabled_agents)} agent(s)")
-    total_tokens = 0
+    log.info("coordinator_run_started", enabled_agents=agent_settings.enabled_agents)
+    await publish_event(
+        ctx, "info",
+        f"Starting run for '{space.name}' — {len(agent_settings.enabled_agents)} agent(s) available",
+        agent_type="coordinator",
+    )
 
-    # Lazy imports so Modal only loads code that's actually needed
-    from agents.lead_nurture import make_lead_nurture_agent
-    from agents.deal_sentinel import make_deal_sentinel_agent
-    from agents.long_term_nurture import make_long_term_nurture_agent
-    from agents.lead_scorer import make_lead_scorer_agent
+    # Build the Coordinator with handoffs to only the enabled specialists
+    from agents.coordinator import make_coordinator_agent
+    coordinator = make_coordinator_agent(agent_settings.enabled_agents)
 
-    agent_registry = {
-        "lead_nurture": make_lead_nurture_agent,
-        "deal_sentinel": make_deal_sentinel_agent,
-        "long_term_nurture": make_long_term_nurture_agent,
-        "lead_scorer": make_lead_scorer_agent,
-    }
+    prompt = _build_coordinator_prompt(space, ctx, memory_context, triggers)
 
-    AGENT_DISPLAY_NAMES = {
-        "lead_nurture": "Lead Nurture Agent",
-        "deal_sentinel": "Deal Sentinel Agent",
-        "long_term_nurture": "Long-Term Nurture Agent",
-        "lead_scorer": "Lead Scorer Agent",
-    }
-
+    # max_turns covers the full chain: coordinator survey turns + all specialist handoff turns.
+    # We do NOT set RunConfig.model so each agent uses its own defined model
+    # (coordinator=gpt-4o, specialists=gpt-4o-mini).
     run_config = RunConfig(
-        model=settings.orchestrator_model,
-        max_turns=settings.max_react_iterations,
+        max_turns=settings.coordinator_max_turns,
         tracing_disabled=False,
         model_settings=ModelSettings(
             max_tokens=settings.max_output_tokens,
-            truncation="auto",  # SDK auto-trims oldest context if window fills up
+            truncation="auto",
         ),
     )
 
-    # If there are triggers, prioritise the relevant agents regardless of schedule
-    agents_to_run = list(agent_settings.enabled_agents)
-    for trigger in triggers:
-        event = trigger.get("event", "")
-        if event == "new_lead" and "lead_nurture" not in agents_to_run:
-            agents_to_run.insert(0, "lead_nurture")
-        elif event == "tour_completed" and "lead_scorer" not in agents_to_run:
-            agents_to_run.insert(0, "lead_scorer")
-        elif event == "deal_stage_changed" and "deal_sentinel" not in agents_to_run:
-            agents_to_run.insert(0, "deal_sentinel")
+    total_tokens = 0
+    report: CoordinatorRunReport | None = None
 
-    for agent_name in agents_to_run:
-        factory = agent_registry.get(agent_name)
-        if not factory:
-            log.warning("unknown_agent_skipped", agent=agent_name)
-            continue
+    try:
+        result = await Runner.run(
+            coordinator,
+            input=prompt,
+            context=ctx,
+            run_config=run_config,
+        )
 
-        display_name = AGENT_DISPLAY_NAMES.get(agent_name, agent_name)
-        agent = factory()
-        agent_log = log.bind(agent=agent_name)
-        agent_log.info("agent_started")
-        await publish_event(ctx, "info", f"Starting {display_name}…", agent_type=agent_name)
+        usage = getattr(result, "usage", None)
+        if usage:
+            total_tokens = getattr(usage, "total_tokens", 0)
+            ctx.tokens_used = total_tokens
 
-        try:
-            prompt = _build_agent_prompt(
-                agent_name, space, ctx, memory_context, triggers
-            )
-            result = await Runner.run(
-                agent,
-                input=prompt,
-                context=ctx,
-                run_config=run_config,
-            )
+        report = result.final_output if isinstance(result.final_output, CoordinatorRunReport) else None
+        log.info("coordinator_run_completed", total_tokens=total_tokens,
+                 agents_activated=report.agents_activated if report else [])
 
-            usage = getattr(result, "usage", None)
-            if usage:
-                run_tokens = getattr(usage, "total_tokens", 0)
-                total_tokens += run_tokens
-                ctx.tokens_used += run_tokens
+    except InputGuardrailTripwireTriggered as exc:
+        info = exc.guardrail_result.output.output_info or {}
+        pending = info.get("pending_drafts", "?")
+        reason = info.get("reason", "Too many pending drafts")
+        log.info("agent_run_blocked_input_guardrail", pending_drafts=pending)
+        await publish_event(
+            ctx, "info",
+            f"Run skipped — {pending} draft(s) awaiting review. Review your inbox first.",
+            agent_type="coordinator",
+        )
+        return
 
-            agent_log.info("agent_completed", tokens=total_tokens)
-            await publish_event(ctx, "action", f"{display_name} finished", agent_type=agent_name)
+    except OutputGuardrailTripwireTriggered as exc:
+        info = exc.guardrail_result.output.output_info or {}
+        log.warning("agent_run_output_guardrail_tripped", issues=info.get("issues"))
+        await publish_event(
+            ctx, "error",
+            "Run completed but the summary report failed validation — results are in the activity log.",
+            agent_type="coordinator",
+        )
+        # Fall through — still record usage and emit complete event
 
-        except Exception as exc:
-            agent_log.exception("agent_run_failed")
-            await publish_event(ctx, "error", f"{display_name} error: {exc}", agent_type=agent_name)
+    except Exception as exc:
+        log.exception("coordinator_run_failed")
+        await publish_event(ctx, "error", f"Coordinator error: {exc}", agent_type="coordinator")
 
-    # Store a run-summary memory so future runs know this happened
+    # Store a structured run-summary memory so future runs have typed continuity
     if total_tokens > 0:
+        if report:
+            memory_content = (
+                f"Run {report.run_date}: {report.overall_summary} "
+                f"Agents: {', '.join(report.agents_activated) or 'none'}. "
+                f"Drafts: {report.total_drafts_created}, "
+                f"Follow-ups: {report.total_follow_ups_set}."
+            )
+            memory_importance = 0.1 if report.nothing_to_do else 0.35
+        else:
+            memory_content = (
+                f"Agent run on {datetime.now(timezone.utc).strftime('%Y-%m-%d')} — "
+                f"{len(agent_settings.enabled_agents)} specialist(s) available, "
+                f"{total_tokens:,} tokens used."
+            )
+            memory_importance = 0.2
+
         await save_memory(
             space_id=space.id,
             entity_type="space",
             entity_id=space.id,
             memory_type="observation",
-            content=f"Agent run completed on {datetime.now(timezone.utc).strftime('%Y-%m-%d')} — {len(agents_to_run)} agent(s), {total_tokens:,} tokens.",
-            importance=0.2,
+            content=memory_content,
+            importance=memory_importance,
         )
-
-    if total_tokens > 0:
         await record_usage(space.id, total_tokens)
 
     await publish_event(
@@ -241,8 +245,7 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
     log.info("agent_run_finished", total_tokens=total_tokens)
 
 
-def _build_agent_prompt(
-    agent_name: str,
+def _build_coordinator_prompt(
     space: Space,
     ctx: AgentContext,
     memory_context: str,
@@ -250,26 +253,38 @@ def _build_agent_prompt(
 ) -> str:
     now = datetime.now(timezone.utc).strftime("%A, %B %d, %Y at %H:%M UTC")
 
-    trigger_context = ""
+    trigger_section = ""
     if triggers:
-        _valid = {"new_lead", "tour_completed", "deal_stage_changed", "application_submitted"}
-        events = [t["event"] for t in triggers if t.get("event") in _valid]
-        if events:
-            trigger_context = f"\n\nTriggered by recent events: {', '.join(events)}. Prioritise contacts/deals related to these events."
+        _valid = {"new_lead", "tour_completed", "deal_stage_changed", "application_submitted", "inbound_message", "goal_completed"}
+        lines = []
+        for t in triggers:
+            event = t.get("event", "")
+            if event not in _valid:
+                continue
+            # Surface contactId and dealId so event-driven agents (e.g. tour_followup)
+            # know exactly which entity to act on without scanning the whole workspace.
+            parts = [f"- {event}"]
+            if t.get("contactId"):
+                parts.append(f"contactId: {t['contactId']}")
+            if t.get("dealId"):
+                parts.append(f"dealId: {t['dealId']}")
+            lines.append("  ".join(parts))
+        if lines:
+            trigger_section = "\n\nActive triggers:\n" + "\n".join(lines)
 
     return (
-        f"You are running as the {agent_name} agent for the real estate workspace '{space.name}'.\n"
+        f"Workspace: '{space.name}'\n"
         f"Current time: {now}\n"
         f"Autonomy level: {ctx.autonomy_level}\n"
-        f"{trigger_context}\n\n"
+        f"Enabled agents: {', '.join(ctx.enabled_agents)}"
+        f"{trigger_section}\n\n"
         f"{memory_context}\n\n"
-        "Review the workspace and take appropriate actions within your role.\n"
-        "Be concise. Prioritise high-impact actions. Stop after handling the most important items."
+        "Survey the workspace and activate the agents that have a real signal to act on."
     ).strip()
 
 
 async def run_all_spaces() -> None:
-    """Entry point called by Modal heartbeat — runs agents for all enabled spaces."""
+    """Entry point called by Modal heartbeat — runs the coordinator for all enabled spaces."""
     log = logger.bind(trigger="heartbeat")
     log.info("heartbeat_started")
 

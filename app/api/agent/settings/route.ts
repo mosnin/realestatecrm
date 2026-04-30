@@ -27,6 +27,8 @@ export async function GET(_req: NextRequest) {
       dailyTokenBudget: 50000,
       heartbeatIntervalMinutes: 15,
       enabledAgents: ['lead_nurture'],
+      perAgentAutonomy: {},
+      confidenceThreshold: 0,
     });
   }
 
@@ -44,7 +46,7 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json();
 
   const validAutonomy = ['autonomous', 'draft_required', 'suggest_only'];
-  const validAgents = ['lead_nurture', 'deal_sentinel', 'long_term_nurture', 'lead_scorer'];
+  const validAgents = ['lead_nurture', 'deal_sentinel', 'long_term_nurture', 'lead_scorer', 'tour_followup'];
 
   const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
 
@@ -70,6 +72,29 @@ export async function PATCH(req: NextRequest) {
   if (Array.isArray(body.enabledAgents)) {
     const agents = body.enabledAgents.filter((a: unknown) => validAgents.includes(a as string));
     patch.enabledAgents = agents;
+  }
+  if (body.perAgentAutonomy !== undefined && typeof body.perAgentAutonomy === 'object' && !Array.isArray(body.perAgentAutonomy)) {
+    const validated: Record<string, string> = {};
+    for (const [agent, level] of Object.entries(body.perAgentAutonomy as Record<string, unknown>)) {
+      if (validAgents.includes(agent) && validAutonomy.includes(level as string)) {
+        validated[agent] = level as string;
+      }
+    }
+    patch.perAgentAutonomy = validated;
+  }
+  if (body.confidenceThreshold !== undefined) {
+    const threshold = parseInt(String(body.confidenceThreshold), 10);
+    if (isNaN(threshold) || threshold < 0 || threshold > 100) {
+      return NextResponse.json({ error: 'confidenceThreshold must be 0–100' }, { status: 400 });
+    }
+    patch.confidenceThreshold = threshold;
+  }
+  if (body.heartbeatIntervalMinutes !== undefined) {
+    const interval = parseInt(String(body.heartbeatIntervalMinutes), 10);
+    if (isNaN(interval) || interval < 1 || interval > 1440) {
+      return NextResponse.json({ error: 'heartbeatIntervalMinutes must be 1–1440' }, { status: 400 });
+    }
+    patch.heartbeatIntervalMinutes = interval;
   }
 
   // Upsert — creates the row on first save

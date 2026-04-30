@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -12,55 +11,49 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Eye } from 'lucide-react';
+import { GitBranch } from 'lucide-react';
 import type { IntakeFormConfig, FormSection, FormQuestion } from './types';
-import { getQuestionTypeConfig } from './question-types';
 
 // ── Preview question renderer ──
 
 function PreviewQuestion({ question }: { question: FormQuestion }) {
-  const typeConfig = getQuestionTypeConfig(question.type);
-
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center gap-1.5">
-        <Label className="text-sm">
-          {question.label}
-          {question.required && <span className="text-destructive ml-0.5">*</span>}
-        </Label>
-      </div>
+      <Label className="text-sm">
+        {question.label}
+        {question.required && <span className="text-muted-foreground ml-0.5">*</span>}
+      </Label>
       {question.description && (
         <p className="text-xs text-muted-foreground">{question.description}</p>
       )}
 
-      {/* Render based on type */}
       {question.type === 'text' && (
-        <Input placeholder={question.placeholder || ''} readOnly className="bg-muted/30 border-border" />
+        <Input placeholder={question.placeholder || ''} readOnly className="bg-background border-border/70 h-9" />
       )}
 
       {question.type === 'textarea' && (
-        <Textarea placeholder={question.placeholder || ''} disabled className="bg-muted/20 min-h-[80px]" />
+        <Textarea placeholder={question.placeholder || ''} disabled className="bg-background border-border/70 min-h-[80px]" />
       )}
 
       {question.type === 'email' && (
-        <Input type="email" placeholder={question.placeholder || 'name@example.com'} readOnly className="bg-muted/30 border-border" />
+        <Input type="email" placeholder={question.placeholder || 'name@example.com'} readOnly className="bg-background border-border/70 h-9" />
       )}
 
       {question.type === 'phone' && (
-        <Input type="tel" placeholder={question.placeholder || '(555) 123-4567'} readOnly className="bg-muted/30 border-border" />
+        <Input type="tel" placeholder={question.placeholder || '(555) 123-4567'} readOnly className="bg-background border-border/70 h-9" />
       )}
 
       {question.type === 'number' && (
-        <Input type="number" placeholder={question.placeholder || '0'} readOnly className="bg-muted/30 border-border" />
+        <Input type="number" placeholder={question.placeholder || '0'} readOnly className="bg-background border-border/70 h-9" />
       )}
 
       {question.type === 'date' && (
-        <Input type="date" readOnly className="bg-muted/30 border-border" />
+        <Input type="date" readOnly className="bg-background border-border/70 h-9" />
       )}
 
       {question.type === 'select' && (
         <Select disabled>
-          <SelectTrigger className="w-full bg-muted/20">
+          <SelectTrigger className="w-full bg-background border-border/70 h-9">
             <SelectValue placeholder="Select an option..." />
           </SelectTrigger>
           <SelectContent>
@@ -75,7 +68,7 @@ function PreviewQuestion({ question }: { question: FormQuestion }) {
         <div className="space-y-1.5">
           {(question.options || []).map((opt) => (
             <label key={opt.value} className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input type="checkbox" disabled className="rounded border-border" />
+              <input type="checkbox" disabled className="rounded border-border/70" />
               {opt.label}
             </label>
           ))}
@@ -95,7 +88,7 @@ function PreviewQuestion({ question }: { question: FormQuestion }) {
 
       {question.type === 'checkbox' && (
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <input type="checkbox" disabled className="rounded border-border" />
+          <input type="checkbox" disabled className="rounded border-border/70" />
           {question.label}
         </label>
       )}
@@ -110,7 +103,6 @@ function formatCondition(condition: FormSection['visibleWhen'], allSections: For
   const allQuestions = allSections.flatMap((s) => s.questions);
   const refQuestion = allQuestions.find((q) => q.id === condition.questionId);
   const questionLabel = refQuestion?.label || condition.questionId;
-  // Resolve the value to its human-readable label if the referenced question has options
   const refOption = refQuestion?.options?.find((o) => o.value === condition.value);
   const valueLabel = refOption?.label || condition.value;
   const operatorLabel =
@@ -126,15 +118,20 @@ function PreviewSection({ section, allSections }: { section: FormSection; allSec
   const isConditional = !!section.visibleWhen;
 
   return (
-    <div className={cn('space-y-4', isConditional && 'opacity-50 relative')}>
+    <div className={cn('space-y-4', isConditional && 'opacity-70')}>
       {isConditional && (
-        <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 rounded-md px-2.5 py-1.5 border border-blue-200 dark:border-blue-800">
-          <Eye size={12} className="flex-shrink-0" />
-          <span>Applicants see this step only when {formatCondition(section.visibleWhen, allSections)}</span>
+        <div className="inline-flex items-center gap-1.5 rounded bg-foreground/[0.06] text-muted-foreground px-1.5 py-0.5 text-[10px] font-mono">
+          <GitBranch size={10} className="text-muted-foreground/60 flex-shrink-0" />
+          <span>Conditional · shown when {formatCondition(section.visibleWhen, allSections)}</span>
         </div>
       )}
       <div className="space-y-1">
-        <h3 className="text-base font-semibold">{section.title}</h3>
+        <h3
+          className="text-base text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          {section.title}
+        </h3>
         {section.description && (
           <p className="text-sm text-muted-foreground">{section.description}</p>
         )}
@@ -157,39 +154,25 @@ export interface FormPreviewProps {
 export function FormPreview({ config }: FormPreviewProps) {
   if (config.sections.length === 0) {
     return (
-      <div className="rounded-xl border-2 border-dashed border-border p-8 text-center">
-        <p className="text-sm text-muted-foreground">No form content to preview. Add sections and questions to see a preview.</p>
+      <div className="bg-background border border-border/70 rounded-lg p-8 max-w-2xl mx-auto text-center">
+        <p className="text-sm text-muted-foreground">
+          No form content to preview. Add sections and questions to see a preview.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-xl mx-auto">
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        {/* Form header */}
-        <div className="px-6 py-5 border-b border-border bg-muted/10">
-          <h2 className="text-lg font-semibold">
-            Application Form Preview
-          </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Preview of how applicants will see your form
-          </p>
-        </div>
+    <div className="bg-background border border-border/70 rounded-lg p-6 max-w-2xl mx-auto">
+      <div className="space-y-8">
+        {config.sections.map((section) => (
+          <PreviewSection key={section.id} section={section} allSections={config.sections} />
+        ))}
+      </div>
 
-        {/* Sections */}
-        <div className="px-6 py-5 space-y-8">
-          {config.sections.map((section) => (
-            <PreviewSection key={section.id} section={section} allSections={config.sections} />
-          ))}
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-border bg-muted/10">
-          <div className="flex justify-end">
-            <div className="h-9 px-6 rounded-md bg-primary/30 text-primary-foreground/50 flex items-center text-sm font-medium">
-              Submit
-            </div>
-          </div>
+      <div className="pt-6 mt-6 border-t border-border/70 flex justify-end">
+        <div className="inline-flex items-center h-9 px-4 rounded-full bg-foreground/[0.06] text-muted-foreground text-sm">
+          Submit
         </div>
       </div>
     </div>

@@ -38,7 +38,7 @@ export function ConvertLeadDialog({
       // the PATCH handler does a full-row update.
       const getRes = await fetch(`/api/contacts/${leadId}`);
       if (!getRes.ok) {
-        toast.error('Failed to load contact data');
+        toast.error("Couldn't pull this contact. Try again.");
         return;
       }
       const contact = await getRes.json();
@@ -64,14 +64,14 @@ export function ConvertLeadDialog({
         }),
       });
       if (res.ok) {
-        toast.success('Lead converted to client');
+        toast.success('Converted to client.');
         onConverted(leadId);
         onOpenChange(false);
       } else {
-        toast.error('Failed to convert lead');
+        toast.error("Couldn't convert this lead. Try again.");
       }
     } catch {
-      toast.error('Failed to convert lead');
+      toast.error("Couldn't convert this lead. Try again.");
     } finally {
       setLoading(false);
     }
@@ -90,7 +90,7 @@ export function ConvertLeadDialog({
           <p className="text-sm text-muted-foreground leading-relaxed">
             Move{' '}
             <span className="font-semibold text-foreground">{leadName}</span> to
-            your Clients pipeline? They'll be removed from the Leads inbox and
+            your Clients pipeline? They&apos;ll be removed from the Leads inbox and
             you can track them through Qualifying → Tour → Applied.
           </p>
           <div className="flex gap-2 justify-end">

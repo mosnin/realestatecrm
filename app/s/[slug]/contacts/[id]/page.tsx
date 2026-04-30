@@ -23,7 +23,9 @@ import {
 } from 'lucide-react';
 import type { Contact, ApplicationData, LeadScoreDetails, IntakeFormConfig } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
+import { CopyApplicantPortalLink } from '@/components/contacts/copy-applicant-portal-link';
 import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-field';
+import { ContactLifecycleFields } from '@/components/contacts/contact-lifecycle-fields';
 import { FollowUpSuggestions } from '@/components/contacts/follow-up-suggestions';
 import { StageProgression } from '@/components/contacts/stage-progression';
 import { RescoreButton } from '@/components/contacts/rescore-button';
@@ -139,7 +141,7 @@ export default async function ClientDetailPage({
                 {getInitials(contact.name)}
               </div>
               <div className="min-w-0">
-                <h1 className="text-xl font-semibold leading-tight truncate">{contact.name}</h1>
+                <h1 className="text-xl tracking-tight font-semibold text-foreground leading-tight truncate">{contact.name}</h1>
                 <p className="text-sm text-muted-foreground truncate">{contact.sourceLabel ?? 'Intake lead'}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Added {new Date(contact.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -148,9 +150,30 @@ export default async function ClientDetailPage({
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <Link href={`/s/${slug}/tours?schedule=${contact.id}`} className="inline-flex items-center justify-center gap-1 text-xs rounded-md border border-border py-2 hover:bg-muted transition-colors"><CalendarPlus size={12} /> Task</Link>
+              <Link href={`/s/${slug}/calendar`} className="inline-flex items-center justify-center gap-1 text-xs rounded-md border border-border py-2 hover:bg-muted transition-colors"><CalendarPlus size={12} /> Task</Link>
               <Link href={`/s/${slug}/deals`} className="inline-flex items-center justify-center gap-1 text-xs rounded-md border border-border py-2 hover:bg-muted transition-colors"><Briefcase size={12} /> Deal</Link>
             </div>
+
+            {/* Applicant portal — quiet share affordance. Only renders when
+                this contact actually has an applicant portal (came in via
+                the intake form), keyed off applicationRef + statusPortalToken.
+                URL points at the existing /apply/[slug]/status portal. */}
+            {contact.applicationRef && contact.statusPortalToken && (
+              <div className="rounded-lg border border-border p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">Applicant portal</p>
+                  <span className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70">
+                    Live
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {contact.name.split(' ')[0]} can see status, message you, and request tours here.
+                </p>
+                <CopyApplicantPortalLink
+                  url={`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com'}/apply/${slug}/status?ref=${encodeURIComponent(contact.applicationRef)}&token=${encodeURIComponent(contact.statusPortalToken)}`}
+                />
+              </div>
+            )}
 
             <div className="space-y-3 rounded-lg border border-border p-3">
               <p className="text-sm font-semibold">Contact details</p>
@@ -167,6 +190,12 @@ export default async function ClientDetailPage({
                 lastContactedAt={contact.lastContactedAt ? String(contact.lastContactedAt) : null}
               />
             </div>
+
+            <ContactLifecycleFields
+              contactId={contact.id}
+              initialReferralSource={contact.referralSource ?? null}
+              initialSnoozedUntil={contact.snoozedUntil ? String(contact.snoozedUntil) : null}
+            />
 
             <div className="space-y-2 rounded-lg border border-border p-3">
               <p className="text-sm font-semibold">Pipeline stage</p>
@@ -186,16 +215,20 @@ export default async function ClientDetailPage({
               <Link href={tabHref('deals')} className={`${activeTab === 'deals' ? 'font-medium border-b-2 border-foreground' : 'text-muted-foreground hover:text-foreground'} pb-2 whitespace-nowrap`}>Deals</Link>
             </div>
 
-      {/* Smart follow-up suggestions */}
+      {/* Next-best-action: AI suggestions + drafts surface at the top of Overview
+          so the realtor can approve/send without navigating to Intelligence. */}
       {activeTab === 'overview' && (
-      <FollowUpSuggestions
-        contactId={contact.id}
-        scoreLabel={contact.scoreLabel}
-        contactType={contact.type}
-        hasTours={contact.tours.length > 0}
-        hasDeals={contact.dealContacts.length > 0}
-        hasFollowUp={!!contact.followUpAt}
-      />
+        <>
+          <AgentContactPanel contactId={contact.id} slug={slug} contactName={contact.name} />
+          <FollowUpSuggestions
+            contactId={contact.id}
+            scoreLabel={contact.scoreLabel}
+            contactType={contact.type}
+            hasTours={contact.tours.length > 0}
+            hasDeals={contact.dealContacts.length > 0}
+            hasFollowUp={!!contact.followUpAt}
+          />
+        </>
       )}
 
       {/* ── AI Lead Score Card ── */}
@@ -204,7 +237,7 @@ export default async function ClientDetailPage({
           <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-primary" />
-              <h2 className="text-sm font-semibold">AI Lead Score</h2>
+              <h2 className="text-base font-semibold text-foreground">AI Lead Score</h2>
             </div>
             <RescoreButton contactId={contact.id} />
           </div>
@@ -212,7 +245,12 @@ export default async function ClientDetailPage({
             {/* Score + tier + status badges */}
             <div>
               <div className="flex items-center gap-4 flex-wrap">
-                <span className="text-4xl font-bold tabular-nums">{contact.leadScore != null ? Math.round(contact.leadScore) : '—'}</span>
+                <span
+                  className="text-3xl tracking-tight text-foreground tabular-nums"
+                  style={{ fontFamily: 'var(--font-title)' }}
+                >
+                  {contact.leadScore != null ? Math.round(contact.leadScore) : '—'}
+                </span>
                 <span className={`inline-flex text-xs font-semibold rounded-full px-3 py-1.5 uppercase ${tierBadgeClasses(contact.scoreLabel ?? 'cold')}`}>
                   {contact.scoreLabel}
                 </span>
@@ -266,7 +304,7 @@ export default async function ClientDetailPage({
             {/* ── Strengths + Weaknesses ── */}
             {(details?.strengths?.length || details?.weaknesses?.length) && (
               <div className="border-t border-border pt-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Assessment</p>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-3">Assessment</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {details?.strengths && details.strengths.length > 0 && (
                     <div className="space-y-2">
@@ -366,14 +404,14 @@ export default async function ClientDetailPage({
 
       {/* ── Agent Intelligence Panel ── */}
       {activeTab === 'intelligence' && (
-        <AgentContactPanel contactId={contact.id} slug={slug} />
+        <AgentContactPanel contactId={contact.id} slug={slug} contactName={contact.name} />
       )}
 
       {/* ── Application Details (rich structured data) ── */}
       {activeTab === 'overview' && (app ? (
         <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-emerald-500/40">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold">Application details</h2>
+            <h2 className="text-base font-semibold text-foreground">Application details</h2>
             <div className="flex items-center gap-2 flex-wrap">
               {app.submittedAt && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -514,7 +552,7 @@ export default async function ClientDetailPage({
         /* Legacy application details (no structured data) */
         <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-emerald-500/40">
           <div className="px-4 sm:px-6 py-4 border-b border-border">
-            <h2 className="text-sm font-semibold">Application details</h2>
+            <h2 className="text-base font-semibold text-foreground">Application details</h2>
           </div>
           <div className="px-4 sm:px-6 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             {contact.budget != null && (
@@ -541,7 +579,7 @@ export default async function ClientDetailPage({
             )}
             {(contact.properties ?? []).length > 0 && (
               <div className="sm:col-span-2">
-                <p className="text-xs text-muted-foreground mb-2">Properties of interest</p>
+                <p className="text-xs text-muted-foreground mb-2">Interested in</p>
                 <div className="flex flex-wrap gap-1.5">
                   {(contact.properties ?? []).map((property) => (
                     <Badge key={property} variant="secondary" className="text-xs font-medium">
@@ -560,7 +598,7 @@ export default async function ClientDetailPage({
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
             <ShieldCheck size={14} className="text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Privacy Consent</h2>
+            <h2 className="text-base font-semibold text-foreground">Privacy Consent</h2>
           </div>
           <div className="px-4 sm:px-6 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -638,7 +676,7 @@ export default async function ClientDetailPage({
         <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-amber-500/40">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
             <CalendarDays size={14} className="text-amber-600 dark:text-amber-400" />
-            <h2 className="text-sm font-semibold">Tour History</h2>
+            <h2 className="text-base font-semibold text-foreground">Tour History</h2>
             <span className="ml-auto text-xs text-muted-foreground">{contact.tours.length} tours</span>
           </div>
           <div className="px-4 sm:px-6 py-3 space-y-2">
@@ -653,7 +691,7 @@ export default async function ClientDetailPage({
               return (
                 <Link
                   key={tour.id}
-                  href={`/s/${slug}/tours`}
+                  href={`/s/${slug}/calendar`}
                   className="flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -686,7 +724,7 @@ export default async function ClientDetailPage({
       <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-indigo-500/40">
         <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
           <Briefcase size={14} className="text-indigo-600 dark:text-indigo-400" />
-          <h2 className="text-sm font-semibold">Linked Deals</h2>
+          <h2 className="text-base font-semibold text-foreground">Linked Deals</h2>
           {contact.dealContacts.length > 0 && (
             <span className="ml-auto text-xs text-muted-foreground">{contact.dealContacts.length} {contact.dealContacts.length === 1 ? 'deal' : 'deals'}</span>
           )}

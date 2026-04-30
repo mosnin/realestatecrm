@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getSupabaseBrowser } from '@/lib/supabase-browser';
+import { H3 } from '@/lib/typography';
 
 interface Notification {
   id: string;
@@ -106,7 +107,7 @@ export function NotificationCenter({ slug }: { slug: string }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <span className="text-sm font-semibold">Notifications</span>
+          <span className={H3}>Notifications</span>
           <button onClick={() => setOpen(false)} className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground">
             <X size={14} />
           </button>
@@ -157,18 +158,19 @@ export function NotificationCenter({ slug }: { slug: string }) {
       <button
         ref={btnRef}
         onClick={() => setOpen(!open)}
-        className="relative h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+        className="relative h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.025] transition-colors"
         title="Notifications"
+        aria-label={totalCount > 0 ? `${totalCount} notifications` : 'Notifications'}
       >
-        <Bell size={15} />
+        <Bell size={14} strokeWidth={1.75} />
         {totalCount > 0 && (
           <span className={cn(
-            'absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full text-[10px] font-bold flex items-center justify-center px-1',
+            'absolute top-1 right-1 min-w-[14px] h-3.5 rounded-full text-[9px] font-semibold flex items-center justify-center px-1 leading-none ring-2 ring-background',
             highCount > 0
-              ? 'bg-red-500 text-white'
-              : 'bg-muted-foreground/20 text-muted-foreground'
+              ? 'bg-orange-500 text-white'
+              : 'bg-foreground/15 text-foreground/70'
           )}>
-            {totalCount}
+            {totalCount > 9 ? '9+' : totalCount}
           </span>
         )}
       </button>

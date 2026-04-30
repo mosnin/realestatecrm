@@ -24,16 +24,23 @@ export function DealFollowUpField({
     const previous = followUpAt;
     setFollowUpAt(next);
 
+    let res: Response;
     try {
-      const res = await fetch(`/api/deals/${dealId}`, {
+      res = await fetch(`/api/deals/${dealId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ followUpAt: next }),
       });
-      if (!res.ok) throw new Error('Failed to save');
     } catch {
       setFollowUpAt(previous);
-      toast.error('Failed to update follow-up date');
+      toast.error("I lost the connection. Check it and try again.");
+      return;
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({} as { error?: string; message?: string }));
+      const detail = body?.error || body?.message || `HTTP ${res.status}`;
+      setFollowUpAt(previous);
+      toast.error(`Couldn't save the follow-up: ${detail}`);
     }
   }
 

@@ -13,9 +13,9 @@
   --color-lead-hot: var(--lead-hot);
   --color-lead-warm: var(--lead-warm);
   --color-lead-cold: var(--lead-cold);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-open-sans), "Open Sans", sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-heading: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
   --font-title: "Times New Roman MT", "Times New Roman", Times, serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -270,7 +270,10 @@
   }
 }
 
-/* ── Clerk component overrides ────────────────────── */
+/* ── Clerk component overrides ──────────────────────
+   Paper-flat: rounded-md, h-9, foreground primary (no orange),
+   border-border/70, no shadows, no chunky borders. Drives the
+   look of the Clerk-rendered SignIn / SignUp inside auth-page-layout. */
 .cl-rootBox {
   width: 100%;
   overflow: visible !important;
@@ -297,160 +300,155 @@
 .cl-header {
   display: none !important;
 }
+/* OAuth provider buttons (Google, etc.) — paper-flat, no chunky border. */
 .cl-socialButtonsBlockButton {
-  border: 1px solid #d4d4d4 !important;
+  border: 1px solid var(--border) !important;
   background: transparent !important;
-  border-radius: 0.75rem !important;
+  border-radius: 0.375rem !important;
   box-shadow: none !important;
-  height: 2.75rem !important;
+  height: 2.25rem !important;
+  font-size: 0.875rem !important;
   font-weight: 500 !important;
-  transition: background 0.15s ease !important;
+  color: var(--foreground) !important;
+  transition: background-color 0.15s ease !important;
 }
 .cl-socialButtonsBlockButton:hover {
-  background: #fafafa !important;
+  background: rgba(17, 17, 19, 0.04) !important;
 }
 .cl-dividerLine {
-  background: #e5e5e5 !important;
+  background: var(--border) !important;
 }
 .cl-dividerText {
-  color: #78716c !important;
+  color: var(--muted-foreground) !important;
   font-size: 0.75rem !important;
 }
 .cl-formFieldLabel {
   font-size: 0.875rem !important;
   font-weight: 500 !important;
-  color: #1c1917 !important;
+  color: var(--foreground) !important;
 }
+/* Inputs — paper-flat, focus ring is foreground (no orange). */
 .cl-formFieldInput {
-  border: 1px solid #d4d4d4 !important;
-  background: transparent !important;
-  border-radius: 0.75rem !important;
+  border: 1px solid var(--border) !important;
+  background: var(--background) !important;
+  border-radius: 0.375rem !important;
   box-shadow: none !important;
-  height: 2.75rem !important;
+  height: 2.25rem !important;
+  padding: 0 0.75rem !important;
   font-size: 0.875rem !important;
-  color: #1c1917 !important;
+  color: var(--foreground) !important;
 }
 .cl-formFieldInput__emailAddress,
 .cl-formFieldInput__password,
 .cl-formFieldInput__phoneNumber,
 .cl-formFieldInput__identifier {
-  border-radius: 0.75rem !important;
+  border-radius: 0.375rem !important;
 }
 .cl-formFieldRow {
-  border-radius: 0.75rem !important;
+  border-radius: 0.375rem !important;
 }
 .cl-formFieldInput:focus {
-  border-color: #ff964f !important;
-  box-shadow: 0 0 0 2px rgba(255, 150, 79, 0.15) !important;
-}
-.cl-formButtonPrimary {
-  background: #1c1917 !important;
-  color: #ffffff !important;
-  border: none !important;
-  border-radius: 0.75rem !important;
+  border-color: rgba(17, 17, 19, 0.3) !important;
   box-shadow: none !important;
-  height: 2.75rem !important;
-  font-weight: 600 !important;
+  outline: none !important;
+}
+/* Primary button — pill, foreground bg, no orange, no shadow. */
+.cl-formButtonPrimary {
+  background: var(--foreground) !important;
+  color: var(--background) !important;
+  border: none !important;
+  border-radius: 9999px !important;
+  box-shadow: none !important;
+  height: 2.25rem !important;
+  padding: 0 1rem !important;
+  font-weight: 500 !important;
   font-size: 0.875rem !important;
-  transition: opacity 0.15s ease !important;
+  transition: background-color 0.15s ease, transform 0.15s ease !important;
 }
 .cl-formButtonPrimary:hover {
-  opacity: 0.9 !important;
+  background: rgba(17, 17, 19, 0.9) !important;
+  opacity: 1 !important;
+}
+.cl-formButtonPrimary:active {
+  transform: scale(0.98) !important;
 }
 .cl-footerAction {
   background: transparent !important;
 }
 .cl-footerActionLink {
-  color: #1c1917 !important;
-  font-weight: 600 !important;
+  color: var(--muted-foreground) !important;
+  font-weight: 500 !important;
   text-decoration: underline !important;
   text-underline-offset: 4px !important;
+  transition: color 0.15s ease !important;
+}
+.cl-footerActionLink:hover {
+  color: var(--foreground) !important;
 }
 .cl-footerActionText {
-  color: #78716c !important;
+  color: var(--muted-foreground) !important;
   font-size: 0.875rem !important;
 }
 .cl-footer {
   display: none !important;
 }
 .cl-identityPreview {
-  border: 1px solid #d4d4d4 !important;
-  border-radius: 0.75rem !important;
-  background: transparent !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.375rem !important;
+  background: var(--background) !important;
   box-shadow: none !important;
 }
 .cl-alternativeMethodsBlockButton {
-  border: 1px solid #d4d4d4 !important;
-  border-radius: 0.75rem !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.375rem !important;
   background: transparent !important;
   box-shadow: none !important;
+  height: 2.25rem !important;
+  font-size: 0.875rem !important;
+  color: var(--foreground) !important;
+}
+.cl-alternativeMethodsBlockButton:hover {
+  background: rgba(17, 17, 19, 0.04) !important;
 }
 .cl-otpCodeFieldInput {
-  border: 1px solid #d4d4d4 !important;
-  border-radius: 0.75rem !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.375rem !important;
   box-shadow: none !important;
+  background: var(--background) !important;
+  color: var(--foreground) !important;
 }
 .cl-formFieldErrorText {
-  color: #dc2626 !important;
+  color: #be123c !important; /* rose-700 */
   font-size: 0.75rem !important;
 }
 .cl-alert {
-  border: 1px solid rgba(220, 38, 38, 0.2) !important;
-  background: rgba(220, 38, 38, 0.05) !important;
-  border-radius: 0.75rem !important;
+  border: 1px solid rgba(190, 18, 60, 0.2) !important;
+  background: rgba(190, 18, 60, 0.05) !important;
+  color: #be123c !important;
+  border-radius: 0.375rem !important;
   box-shadow: none !important;
 }
 /* Dark mode overrides */
 .dark .cl-socialButtonsBlockButton {
-  border-color: #32353a !important;
-  color: #f1f3f5 !important;
+  color: var(--foreground) !important;
 }
 .dark .cl-socialButtonsBlockButton:hover {
-  background: #24262a !important;
-}
-.dark .cl-dividerLine {
-  background: #32353a !important;
-}
-.dark .cl-dividerText {
-  color: #9ca3af !important;
-}
-.dark .cl-formFieldLabel {
-  color: #f1f3f5 !important;
-}
-.dark .cl-formFieldInput {
-  border-color: #404348 !important;
-  color: #f1f3f5 !important;
+  background: rgba(241, 243, 245, 0.04) !important;
 }
 .dark .cl-formFieldInput:focus {
-  border-color: #ff964f !important;
-  box-shadow: 0 0 0 2px rgba(255, 150, 79, 0.15) !important;
+  border-color: rgba(241, 243, 245, 0.3) !important;
+  box-shadow: none !important;
 }
-.dark .cl-formButtonPrimary {
-  background: #f1f3f5 !important;
-  color: #121314 !important;
-}
-.dark .cl-footerActionLink {
-  color: #f1f3f5 !important;
-}
-.dark .cl-footerActionText {
-  color: #9ca3af !important;
-}
-.dark .cl-identityPreview,
-.dark .cl-alternativeMethodsBlockButton {
-  border-color: #32353a !important;
-  color: #f1f3f5 !important;
-}
-.dark .cl-otpCodeFieldInput {
-  border-color: #32353a !important;
-  color: #f1f3f5 !important;
-  background: transparent !important;
+.dark .cl-formButtonPrimary:hover {
+  background: rgba(241, 243, 245, 0.9) !important;
 }
 .dark .cl-formFieldErrorText {
-  color: #f87171 !important;
+  color: #fb7185 !important; /* rose-400 */
 }
 .dark .cl-alert {
-  border: 1px solid rgba(248, 113, 113, 0.25) !important;
-  background: rgba(248, 113, 113, 0.08) !important;
+  border: 1px solid rgba(251, 113, 133, 0.25) !important;
+  background: rgba(251, 113, 133, 0.08) !important;
+  color: #fb7185 !important;
 }
 
 /* ── Scrollbar utilities ──────────────────────────── */
@@ -549,3 +547,136 @@
   }
 }
 
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * AI loader — used by voice-mode + any "Chippi is generating" surface.
+ * Orange-themed (Chippi brand-warm) variant of the rotating gradient + letter
+ * pulse pattern. Box-shadow stops cycle through warm tones; letters fade and
+ * scale slightly to add a typewriter-meets-breath feel.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+@keyframes loader-rotate {
+  0% {
+    transform: rotate(90deg);
+    box-shadow: 0 10px 20px 0 var(--background) inset,
+      0 20px 30px 0 #fdba74 inset,
+      0 60px 60px 0 #c2410c inset;
+  }
+  50% {
+    transform: rotate(270deg);
+    box-shadow: 0 10px 20px 0 var(--background) inset,
+      0 20px 10px 0 #fb923c inset,
+      0 40px 60px 0 #9a3412 inset;
+  }
+  100% {
+    transform: rotate(450deg);
+    box-shadow: 0 10px 20px 0 var(--background) inset,
+      0 20px 30px 0 #fdba74 inset,
+      0 60px 60px 0 #c2410c inset;
+  }
+}
+
+/* Dark mode — slightly cooler, less-saturated stops so the ring doesn't bloom
+   against the near-black voice-mode backdrop. */
+@keyframes loader-rotate-dark {
+  0% {
+    transform: rotate(90deg);
+    box-shadow: 0 10px 20px 0 var(--background) inset,
+      0 20px 30px 0 #fb923c inset,
+      0 60px 60px 0 #9a3412 inset;
+  }
+  50% {
+    transform: rotate(270deg);
+    box-shadow: 0 10px 20px 0 var(--background) inset,
+      0 20px 10px 0 #f97316 inset,
+      0 40px 60px 0 #7c2d12 inset;
+  }
+  100% {
+    transform: rotate(450deg);
+    box-shadow: 0 10px 20px 0 var(--background) inset,
+      0 20px 30px 0 #fb923c inset,
+      0 60px 60px 0 #9a3412 inset;
+  }
+}
+
+@keyframes loader-letter-anim {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: translateY(0);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  40% {
+    opacity: 0.7;
+    transform: translateY(0);
+  }
+}
+
+.ai-loader-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 8rem;
+  height: 8rem;
+  font-family: var(--font-title), serif;
+}
+.ai-loader-letter {
+  display: inline-block;
+  opacity: 0.4;
+  font-size: 0.875rem;
+  letter-spacing: 0.08em;
+  color: hsl(var(--foreground));
+  animation: loader-letter-anim 2s infinite;
+  z-index: 1;
+}
+.ai-loader-letter:nth-child(1)  { animation-delay: 0s; }
+.ai-loader-letter:nth-child(2)  { animation-delay: 0.1s; }
+.ai-loader-letter:nth-child(3)  { animation-delay: 0.2s; }
+.ai-loader-letter:nth-child(4)  { animation-delay: 0.3s; }
+.ai-loader-letter:nth-child(5)  { animation-delay: 0.4s; }
+.ai-loader-letter:nth-child(6)  { animation-delay: 0.5s; }
+.ai-loader-letter:nth-child(7)  { animation-delay: 0.6s; }
+.ai-loader-letter:nth-child(8)  { animation-delay: 0.7s; }
+.ai-loader-letter:nth-child(9)  { animation-delay: 0.8s; }
+.ai-loader-letter:nth-child(10) { animation-delay: 0.9s; }
+.ai-loader-letter:nth-child(11) { animation-delay: 1.0s; }
+
+.ai-loader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: auto;
+  width: 6rem;
+  height: 6rem;
+  border-radius: 50%;
+  animation: loader-rotate 2s linear infinite;
+}
+.dark .ai-loader {
+  animation-name: loader-rotate-dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-loader { animation: none; }
+  .ai-loader-letter { animation: none; opacity: 0.7; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Chippi thinking shimmer — used by the chat transcript while the agent is
+ * spinning up or between tool calls. Plays through the muted→foreground→
+ * muted gradient so the word "Thinking" reads as alive but calm.
+ * ────────────────────────────────────────────────────────────────────────── */
+@keyframes chippi-thinking-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Reduced-motion: stop the shimmer, keep the gradient at a static contrast point. */
+  [style*="chippi-thinking-shimmer"] { animation: none !important; background-position: 0 0 !important; }
+}

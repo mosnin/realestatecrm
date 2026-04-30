@@ -1,12 +1,16 @@
 'use client';
 
 import React from 'react';
+import { motion } from 'framer-motion';
 import { BrandLogo } from '@/components/brand-logo';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Building2, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Globe } from '@/components/ui/cobe-globe';
+import { BODY_MUTED, CAPTION, H1, TITLE_FONT } from '@/lib/typography';
+import { DURATION_BASE, EASE_OUT, PAGE_VARIANTS } from '@/lib/motion';
+import { useTheme } from '@/components/theme-provider';
 
 const leadMarkers = [
   { id: "hot-lead", location: [40.7, -74.0] as [number, number], label: "Hot Lead" },
@@ -23,17 +27,26 @@ const leadArcs = [
   { id: "nyc-saopaulo", from: [40.7, -74.0] as [number, number], to: [-23.55, -46.63] as [number, number] },
 ];
 
+// Right-panel variant: same fade as PAGE_VARIANTS but delayed 100ms so the
+// form lands first, then the brand promise settles in. Stagger feels intentional.
+const RIGHT_PANEL_VARIANTS = {
+  initial: { opacity: 0, y: 4 },
+  enter: { opacity: 1, y: 0, transition: { duration: DURATION_BASE, ease: EASE_OUT, delay: 0.1 } },
+} as const;
+
 // ═════════════════════════════════════════════════════════════════════════════
 
 export interface AuthPageLayoutProps {
   children: React.ReactNode;
   heading: string;
-  subheading: string;
+  subheading?: string;
   variant?: 'realtor' | 'broker';
 }
 
-export function AuthPageLayout({ children, heading, subheading, variant }: AuthPageLayoutProps) {
+export function AuthPageLayout({ children, heading, subheading, variant: _variant }: AuthPageLayoutProps) {
   const pathname = usePathname();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   const isBrokerLogin = pathname.startsWith('/login/broker');
   const isRealtorLogin = pathname.startsWith('/login/realtor');
@@ -44,7 +57,7 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
     <main className="relative min-h-screen bg-background lg:flex lg:h-screen lg:overflow-y-auto lg:overflow-x-hidden">
 
       {/* ── Left form panel ── */}
-      <div className="relative flex w-full min-h-screen flex-col bg-card px-6 py-6 sm:px-10 sm:py-8 lg:min-h-0 lg:w-[480px] lg:min-w-[480px] lg:overflow-y-auto lg:py-10">
+      <div className="relative flex w-full min-h-screen flex-col bg-background px-6 py-6 sm:px-10 sm:py-8 lg:min-h-0 lg:w-[480px] lg:min-w-[480px] lg:overflow-y-auto lg:border-r lg:border-border/70 lg:py-10">
 
         {/* Logo */}
         <div className="shrink-0">
@@ -53,11 +66,16 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
 
         {/* Form area */}
         <div className="flex flex-1 flex-col justify-center py-6 sm:py-8 lg:py-0">
-          <div className="mx-auto w-full max-w-[380px]">
+          <motion.div
+            variants={PAGE_VARIANTS}
+            initial="initial"
+            animate="enter"
+            className="mx-auto w-full max-w-[380px]"
+          >
 
-            {/* Role switcher — fully rounded */}
+            {/* Role switcher — fully rounded, paper-flat */}
             {showRoleSwitcher && (
-              <div role="tablist" aria-label="Account type" className="mb-6 flex rounded-full border border-border bg-muted/50 p-1">
+              <div role="tablist" aria-label="Account type" className="mb-6 flex rounded-full bg-foreground/[0.04] p-1">
                 <Link
                   href="/login/realtor"
                   role="tab"
@@ -65,7 +83,7 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
                   className={cn(
                     'flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-2.5 text-sm font-medium transition-all sm:py-2',
                     isRealtorLogin
-                      ? 'bg-card text-foreground shadow-sm'
+                      ? 'bg-background border border-border/70 text-foreground'
                       : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
@@ -79,7 +97,7 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
                   className={cn(
                     'flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-2.5 text-sm font-medium transition-all sm:py-2',
                     isBrokerLogin
-                      ? 'bg-card text-foreground shadow-sm'
+                      ? 'bg-background border border-border/70 text-foreground'
                       : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
@@ -89,17 +107,14 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
               </div>
             )}
 
-            {/* Heading — "Welcome back" on login pages */}
+            {/* Heading — serif Times, the screen's headline */}
             {heading && (
               <div className="mb-6 space-y-1.5">
-                {isLoginPage && (
-                  <p className="text-sm font-medium text-primary mb-1">Welcome back</p>
-                )}
-                <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+                <h1 className={H1} style={TITLE_FONT}>
                   {heading}
                 </h1>
                 {subheading && (
-                  <p className="text-sm text-muted-foreground">{subheading}</p>
+                  <p className={BODY_MUTED}>{subheading}</p>
                 )}
               </div>
             )}
@@ -107,11 +122,11 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
             <div className="w-full">
               {children}
             </div>
-          </div>
+          </motion.div>
         </div>
 
         {/* ToS / Privacy */}
-        <p className="shrink-0 pt-4 text-center text-xs text-muted-foreground/70 leading-relaxed sm:text-left">
+        <p className={cn(CAPTION, 'shrink-0 pt-4 text-center leading-relaxed sm:text-left')}>
           By continuing, you agree to our{' '}
           <Link href="/legal/terms" className="underline underline-offset-4 hover:text-foreground transition-colors">
             Terms of Service
@@ -126,40 +141,44 @@ export function AuthPageLayout({ children, heading, subheading, variant }: AuthP
 
       {/* ── Right decorative panel ── */}
       <div className="hidden lg:relative lg:flex lg:flex-1 lg:flex-col lg:items-center lg:justify-center overflow-hidden">
-        {/* Grid + subtle orange glow background */}
-        <div className="absolute inset-0 h-full w-full bg-white bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] bg-[size:6rem_4rem]">
-          <div className="absolute bottom-0 left-0 right-0 top-0 bg-[radial-gradient(circle_500px_at_50%_200px,#ffe8d6,transparent)]" />
-        </div>
 
-        {/* Catchy heading */}
-        <div className="relative z-10 text-center px-8 -mt-8">
-          <p className="text-sm font-medium uppercase tracking-widest text-primary mb-3">
-            Your leads, everywhere
-          </p>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground leading-tight">
-            Every lead. Scored.<br />
-            <span className="text-primary">Ready to close.</span>
-          </h2>
-          <p className="mt-3 text-sm text-muted-foreground max-w-sm mx-auto">
-            AI-powered scoring, instant notifications, and a pipeline built for how realtors actually work.
-          </p>
-        </div>
+        {/* Brand-warm wash — same as the realtor sidebar top */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent" />
 
-        {/* Globe — exact cobe-globe component, orange markers */}
-        <div className="relative z-10 w-full max-w-[480px] mt-2">
-          <Globe
-            markers={leadMarkers}
-            arcs={leadArcs}
-            markerColor={[1, 0.59, 0.31]}
-            baseColor={[1, 1, 1]}
-            arcColor={[1, 0.59, 0.31]}
-            glowColor={[0.94, 0.93, 0.91]}
-            dark={0}
-            mapBrightness={10}
-            markerSize={0.025}
-            markerElevation={0.01}
-          />
-        </div>
+        <motion.div
+          variants={RIGHT_PANEL_VARIANTS}
+          initial="initial"
+          animate="enter"
+          className="relative z-10 flex w-full flex-col items-center"
+        >
+          {/* Brand promise — serif Times, two-line treatment */}
+          <div className="text-center px-8 -mt-8">
+            <p style={TITLE_FONT} className="text-3xl tracking-tight text-foreground">
+              I keep your day moving
+            </p>
+            <p style={TITLE_FONT} className="text-2xl tracking-tight text-muted-foreground">
+              so you don&apos;t have to.
+            </p>
+          </div>
+
+          {/* Globe — orange markers, premium dimensional flourish.
+              Theme-aware: dark mode uses a near-black base + dimmer glow so
+              the white sphere doesn't bloom against the dark backdrop. */}
+          <div className="w-full max-w-[480px] mt-2">
+            <Globe
+              markers={leadMarkers}
+              arcs={leadArcs}
+              markerColor={[1, 0.59, 0.31]}
+              baseColor={isDark ? [0.09, 0.09, 0.1] : [1, 1, 1]}
+              arcColor={[1, 0.59, 0.31]}
+              glowColor={isDark ? [0.18, 0.18, 0.2] : [0.94, 0.93, 0.91]}
+              dark={isDark ? 1 : 0}
+              mapBrightness={isDark ? 6 : 10}
+              markerSize={0.025}
+              markerElevation={0.01}
+            />
+          </div>
+        </motion.div>
       </div>
     </main>
   );

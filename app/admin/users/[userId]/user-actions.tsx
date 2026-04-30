@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { toastCopied } from '@/lib/toast-helpers';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
@@ -81,6 +82,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   async function handleCopy() {
     await navigator.clipboard.writeText(text);
     setCopied(true);
+    toastCopied('Copied!');
     setTimeout(() => setCopied(false), 1800);
   }
 

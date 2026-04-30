@@ -3,8 +3,6 @@
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -12,42 +10,64 @@ import {
   PieChart,
   Pie,
 } from 'recharts';
-import { StatCard, ChartSection } from './chart-primitives';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
-import type { ChartConfig } from '@/components/ui/chart';
+import {
+  StatCell,
+  ChartSection,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  PAPER_SERIES,
+  PAPER_GRID,
+} from './chart-primitives';
+import type { ChartConfig } from './chart-primitives';
 import type { ToursAnalyticsData } from '@/lib/analytics-data';
+import {
+  SECTION_RHYTHM,
+  STAT_NUMBER,
+  TITLE_FONT,
+  CAPTION,
+  H3,
+  BODY_MUTED,
+} from '@/lib/typography';
 
 const toursOverTimeConfig = {
-  count: { label: 'Tours', color: 'hsl(var(--chart-1))' },
+  count: { label: 'Tours', color: 'hsl(var(--foreground))' },
 } satisfies ChartConfig;
 
 const toursByStatusConfig = {
-  Completed: { label: 'Completed', color: 'hsl(var(--chart-1))' },
-  Scheduled: { label: 'Scheduled', color: 'hsl(var(--chart-2))' },
-  Confirmed: { label: 'Confirmed', color: 'hsl(var(--chart-3))' },
-  Cancelled: { label: 'Cancelled', color: 'hsl(var(--chart-4))' },
-  'No-show': { label: 'No-show', color: 'hsl(var(--chart-5))' },
-  Pending: { label: 'Pending', color: 'hsl(var(--chart-5))' },
+  Completed: { label: 'Completed', color: 'hsl(var(--foreground))' },
+  Scheduled: { label: 'Scheduled', color: 'hsl(var(--foreground) / 0.7)' },
+  Confirmed: { label: 'Confirmed', color: 'hsl(var(--foreground) / 0.55)' },
+  Cancelled: { label: 'Cancelled', color: 'hsl(var(--muted-foreground) / 0.4)' },
+  'No-show': { label: 'No-show', color: 'hsl(var(--muted-foreground) / 0.55)' },
+  Pending: { label: 'Pending', color: 'hsl(var(--muted-foreground) / 0.25)' },
 } satisfies ChartConfig;
 
-const statusColors: Record<string, string> = {
-  Completed: '#10b981',
-  Scheduled: '#3b82f6',
-  Confirmed: '#6366f1',
-  Cancelled: '#f87171',
-  'No-show': '#f59e0b',
-  Pending: '#94a3b8',
+// Status fills — outcome-ordered: Completed darkest (success), Cancelled lightest.
+const STATUS_FILLS: Record<string, string> = {
+  Completed: 'hsl(var(--foreground))',
+  Scheduled: 'hsl(var(--foreground) / 0.7)',
+  Confirmed: 'hsl(var(--foreground) / 0.55)',
+  'No-show': 'hsl(var(--muted-foreground) / 0.55)',
+  Cancelled: 'hsl(var(--muted-foreground) / 0.4)',
+  Pending: 'hsl(var(--muted-foreground) / 0.25)',
 };
 
 export function ToursView({ data }: { data: ToursAnalyticsData }) {
   return (
-    <div className="space-y-5">
-      {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Total tours" value={data.totalTours} sub="all time" />
-        <StatCard label="Completed" value={data.completedTours} sub="tours finished" />
-        <StatCard label="Cancelled / No-show" value={data.cancelledTours + data.noShowTours} sub={`${data.noShowTours} no-show`} />
-        <StatCard
+    <div className={SECTION_RHYTHM}>
+      {/* Summary strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+        <StatCell label="Total tours" value={data.totalTours} sub="all time" />
+        <StatCell label="Completed" value={data.completedTours} sub="tours finished" />
+        <StatCell
+          label="Cancelled / No-show"
+          value={data.cancelledTours + data.noShowTours}
+          sub={`${data.noShowTours} no-show`}
+        />
+        <StatCell
           label="Tour-to-deal rate"
           value={data.completedTours > 0 ? `${data.tourConversionRate}%` : '--'}
           sub={`${data.toursConvertedToDeals} converted`}
@@ -61,13 +81,13 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
             <AreaChart data={data.toursOverTime}>
               <defs>
                 <linearGradient id="toursGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.05} />
+                  <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} />
+              <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Area
                 type="monotone"
@@ -75,8 +95,8 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
                 name="Tours"
                 stroke="var(--color-count)"
                 fill="url(#toursGrad)"
-                strokeWidth={2}
-                dot={{ r: 3, fill: 'var(--color-count)' }}
+                strokeWidth={1.5}
+                dot={false}
               />
             </AreaChart>
           </ChartContainer>
@@ -95,9 +115,14 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
                   innerRadius={55}
                   outerRadius={85}
                   paddingAngle={3}
+                  stroke="hsl(var(--background))"
+                  strokeWidth={2}
                 >
-                  {data.toursByStatus.map((entry) => (
-                    <Cell key={entry.label} fill={statusColors[entry.label] ?? '#94a3b8'} />
+                  {data.toursByStatus.map((entry, i) => (
+                    <Cell
+                      key={entry.label}
+                      fill={STATUS_FILLS[entry.label] ?? PAPER_SERIES[i % PAPER_SERIES.length]}
+                    />
                   ))}
                 </Pie>
                 <ChartTooltip content={<ChartTooltipContent nameKey="label" hideLabel />} />
@@ -106,43 +131,51 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
             </ChartContainer>
           ) : (
             <div className="flex items-center justify-center h-[220px] text-sm text-muted-foreground">
-              No tour data yet
+              No tour data yet.
             </div>
           )}
         </ChartSection>
       </div>
 
-      {/* Conversion metrics */}
+      {/* Conversion funnel */}
       <ChartSection title="Tour conversion funnel" sub="From booked tours to closed deals">
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center justify-center py-2">
+        <div className="flex flex-col sm:flex-row gap-4 items-stretch py-2">
           {[
-            { label: 'Booked', count: data.totalTours, color: '#3b82f6' },
-            { label: 'Completed', count: data.completedTours, color: '#f59e0b' },
-            { label: 'Converted to deal', count: data.toursConvertedToDeals, color: '#10b981' },
-          ].map((stage, i) => (
-            <div key={stage.label} className="flex sm:flex-col items-center gap-3 sm:gap-2 flex-1">
+            { label: 'Booked', count: data.totalTours },
+            { label: 'Completed', count: data.completedTours },
+            { label: 'Converted to deal', count: data.toursConvertedToDeals },
+          ].map((stage, i) => {
+            const opacity = 1 - i * 0.15;
+            const pct =
+              data.totalTours > 0 && i > 0
+                ? Math.round((stage.count / data.totalTours) * 100)
+                : null;
+            return (
               <div
-                className="rounded-lg flex items-center justify-center text-white font-bold text-lg tabular-nums w-16 h-14 sm:w-full sm:h-16 shrink-0"
-                style={{ backgroundColor: stage.color }}
+                key={stage.label}
+                className="flex-1 rounded-xl border border-border/70 bg-background px-5 py-4 flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1"
               >
-                {stage.count}
+                <p
+                  className={STAT_NUMBER}
+                  style={{ ...TITLE_FONT, opacity }}
+                >
+                  {stage.count}
+                </p>
+                <div className="flex flex-col">
+                  <p className={H3}>{stage.label}</p>
+                  {pct != null && (
+                    <p className={CAPTION}>{pct}% of booked</p>
+                  )}
+                </div>
               </div>
-              <div className="sm:text-center">
-                <p className="text-sm font-semibold text-foreground">{stage.label}</p>
-                {i > 0 && data.totalTours > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    {Math.round((stage.count / data.totalTours) * 100)}% of booked
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </ChartSection>
 
       {data.totalTours === 0 && (
-        <div className="rounded-lg border border-border bg-card px-6 py-12 text-center">
-          <p className="text-sm text-muted-foreground">
+        <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center">
+          <p className={BODY_MUTED}>
             Tour analytics will appear here once tours are scheduled and completed.
           </p>
         </div>

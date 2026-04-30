@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { mobileNavItems } from '@/lib/nav-items';
-import { LayoutDashboard, UserCircle, Users, Briefcase, Building2, PhoneIncoming, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, UserCircle, Users, Briefcase, Building2, PhoneIncoming } from 'lucide-react';
 
 const brokerMobileItems = [
   { href: '/broker', label: 'Team', icon: LayoutDashboard, exact: true },
@@ -55,8 +55,8 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
             >
               <div
                 className={cn(
-                  'w-9 h-6 rounded-md flex items-center justify-center transition-colors',
-                  isActive ? 'bg-primary/10' : ''
+                  'w-10 h-7 rounded-lg flex items-center justify-center transition-colors',
+                  isActive ? 'bg-primary/15' : ''
                 )}
               >
                 <item.icon size={18} />
@@ -74,8 +74,7 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex safe-area-bottom">
       {mobileNavItems.map((item) => {
         const href = `${base}${item.href}`;
-        const isActive =
-          item.href === '' ? pathname === base : pathname.startsWith(`${base}${item.href}`);
+        const isActive = pathname.startsWith(`${base}${item.href}`);
         return (
           <Link
             key={item.href}
@@ -87,8 +86,8 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
           >
             <div
               className={cn(
-                'w-9 h-6 rounded-md flex items-center justify-center transition-colors',
-                isActive ? 'bg-primary/10' : ''
+                'w-10 h-7 rounded-lg flex items-center justify-center transition-colors',
+                isActive ? 'bg-primary/15' : ''
               )}
             >
               <item.icon size={18} />
@@ -97,24 +96,6 @@ export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: Mobi
           </Link>
         );
       })}
-      {/* Intake form link */}
-      <Link
-        href={`${base}/intake`}
-        className={cn(
-          'flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors',
-          pathname.startsWith(`${base}/intake`) ? 'text-primary' : 'text-muted-foreground'
-        )}
-      >
-        <div
-          className={cn(
-            'w-9 h-6 rounded-md flex items-center justify-center transition-colors',
-            pathname.startsWith(`${base}/intake`) ? 'bg-primary/10' : ''
-          )}
-        >
-          <ClipboardList size={18} />
-        </div>
-        <span>Intake</span>
-      </Link>
       {/* Broker users get a quick link to brokerage */}
       {isBroker && (
         <Link

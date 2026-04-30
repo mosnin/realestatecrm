@@ -19,6 +19,7 @@ from config import settings
 from tools.activities import log_activity_run
 from tools.contacts import get_contact, get_contact_activity, list_contacts
 from tools.memory_tools import store_fact, store_observation
+from tools.brief import set_score_explanation
 from security.context import AgentContext
 
 LEAD_SCORER_INSTRUCTIONS = """
@@ -45,6 +46,10 @@ A contact's score is stale when ANY of these are true:
 - Skip contacts with no applicationData (nothing to score against).
 - After each rescore, call store_observation to note what triggered it.
 - Call log_activity_run at the end.
+After updating a contact's lead score, call set_score_explanation with a 1-2 sentence
+plain-English explanation of why this score was assigned or changed. Be specific:
+mention the signals (toured twice, pre-approved, going quiet, etc.) rather than
+just restating the number.
 """.strip()
 
 
@@ -90,6 +95,7 @@ def make_lead_scorer_agent() -> Agent:
             trigger_rescore,
             store_fact,
             store_observation,
+            set_score_explanation,
             log_activity_run,
         ],
     )

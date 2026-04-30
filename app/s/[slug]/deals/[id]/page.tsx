@@ -14,9 +14,19 @@ import { DealStatusControl } from '@/components/deals/deal-status-control';
 import { DealStageSelector } from '@/components/deals/deal-stage-selector';
 import { DealContactsManager } from '@/components/deals/deal-contacts-manager';
 import { DealMilestones } from '@/components/deals/deal-milestones';
+import { DealChecklist } from '@/components/deals/deal-checklist';
+import { DealCloseDateField } from '@/components/deals/deal-close-date-field';
+import { DealCommissionSplits } from '@/components/deals/deal-commission-splits';
+import { DealDocuments } from '@/components/deals/deal-documents';
+import { DealNextActionField } from '@/components/deals/deal-next-action-field';
+import { DealPropertyPicker } from '@/components/deals/deal-property-picker';
 import { DealPrioritySelector } from '@/components/deals/deal-priority-selector';
 import { DeleteDealButton } from '@/components/deals/deal-delete-button';
+import { FlagForReviewButton } from '@/components/deals/flag-for-review-button';
 import { AgentDealPanel } from '@/components/agent/agent-deal-panel';
+import type { DealChecklistItem } from '@/lib/deals/checklist';
+import type { DealDocument } from '@/lib/deals/documents';
+import type { Property } from '@/lib/types';
 
 
 export default async function DealDetailPage({
@@ -28,15 +38,19 @@ export default async function DealDetailPage({
 }) {
   const { slug, id } = await params;
   const { tab } = await searchParams;
-  const activeTab = tab === 'activity' || tab === 'milestones' ? tab : 'overview';
+  const activeTab = tab === 'activity' || tab === 'checklist' || tab === 'documents' || tab === 'milestones' ? tab : 'overview';
 
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
   let dealRow: Record<string, unknown>;
-  let dealContacts: { dealId: string; contactId: string; contact: { id: string; name: string; email: string | null; phone: string | null } | null }[];
+  let dealContacts: { dealId: string; contactId: string; role: string | null; contact: { id: string; name: string; email: string | null; phone: string | null } | null }[];
   let activities: DealActivity[];
   let allStages: DealStage[];
+  let checklist: DealChecklistItem[];
+  let documents: DealDocument[];
+  let linkedProperty: Property | null = null;
+  let hasOpenReview = false;
 
   try {
     const { data: dealData, error: dealError } = await supabase
@@ -50,22 +64,62 @@ export default async function DealDetailPage({
     if (!dealData) notFound();
     dealRow = dealData as Record<string, unknown>;
 
-    const [stagesResult, dcResult, activityResult] = await Promise.all([
+    const [stagesResult, dcResult, activityResult, checklistResult, docsResult] = await Promise.all([
       supabase.from('DealStage').select('*').eq('spaceId', space.id).order('position'),
-      supabase.from('DealContact').select('dealId, contactId, Contact(id, name, type, email, phone)').eq('dealId', id),
+      supabase.from('DealContact').select('dealId, contactId, role, Contact(id, name, type, email, phone)').eq('dealId', id),
       supabase.from('DealActivity').select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(100),
+      supabase.from('DealChecklistItem').select('*').eq('dealId', id).order('position', { ascending: true }),
+      supabase.from('DealDocument').select('*').eq('dealId', id).order('createdAt', { ascending: false }),
     ]);
 
     if (stagesResult.error) throw stagesResult.error;
     if (dcResult.error) throw dcResult.error;
     if (activityResult.error) throw activityResult.error;
+    if (checklistResult.error) throw checklistResult.error;
+    if (docsResult.error) throw docsResult.error;
 
     allStages = (stagesResult.data ?? []) as DealStage[];
+    checklist = (checklistResult.data ?? []) as DealChecklistItem[];
+    documents = (docsResult.data ?? []) as DealDocument[];
+
+    // Load the linked Property, if any. Kept as a small separate fetch so we
+    // don't join here — Property rows can be referenced from multiple deals.
+    const linkedPropertyId = (dealRow.propertyId as string | null | undefined) ?? null;
+    if (linkedPropertyId) {
+      const { data: propData } = await supabase
+        .from('Property')
+        .select('*')
+        .eq('id', linkedPropertyId)
+        .eq('spaceId', space.id)
+        .maybeSingle();
+      linkedProperty = (propData as Property | null) ?? null;
+    }
+    // Lookup whether this deal already has an open broker review request.
+    // Only meaningful when the space is in a brokerage; we still issue the
+    // query unconditionally (it's a single indexed lookup) so the UI below
+    // stays simple, and we swallow errors so an as-yet-unapplied migration
+    // on another branch doesn't break the page.
+    if (space.brokerageId) {
+      try {
+        const { data: openReview } = await supabase
+          .from('DealReviewRequest')
+          .select('id')
+          .eq('dealId', id)
+          .eq('status', 'open')
+          .maybeSingle();
+        hasOpenReview = !!openReview;
+      } catch (reviewErr) {
+        console.warn('[deal-detail] review-request lookup failed (ignored)', reviewErr);
+        hasOpenReview = false;
+      }
+    }
+
     dealContacts = ((dcResult.data ?? []) as Record<string, unknown>[]).map((row) => {
       const contact = row.Contact as { id: string; name: string; type: string; email: string | null; phone: string | null } | null;
       return {
         dealId: row.dealId as string,
         contactId: row.contactId as string,
+        role: (row.role as string | null) ?? null,
         contact: contact
           ? { id: contact.id, name: contact.name, email: contact.email ?? null, phone: contact.phone ?? null }
           : null,
@@ -101,13 +155,15 @@ export default async function DealDetailPage({
   const followUpAt = dealRow.followUpAt != null ? (dealRow.followUpAt as string) : null;
   const address = dealRow.address != null ? (dealRow.address as string) : null;
   const description = dealRow.description != null ? (dealRow.description as string) : null;
+  const nextAction = dealRow.nextAction != null ? (dealRow.nextAction as string) : null;
+  const nextActionDueAt = dealRow.nextActionDueAt != null ? (dealRow.nextActionDueAt as string) : null;
   const milestones = (dealRow.milestones ?? []) as DealMilestone[];
   const createdAt = dealRow.createdAt as string;
   const updatedAt = dealRow.updatedAt as string;
 
   const linkedContacts = dealContacts
     .filter((dc) => dc.contact !== null)
-    .map((dc) => dc.contact!);
+    .map((dc) => ({ ...dc.contact!, role: dc.role as import('@/lib/types').DealContactRole | null }));
 
   return (
     <div className="space-y-0">
@@ -128,10 +184,17 @@ export default async function DealDetailPage({
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
-        {/* Header bar with title + delete button */}
+        {/* Header bar with title + actions */}
         <div className="px-5 py-3.5 border-b border-border flex items-center justify-between gap-4">
           <h1 className="text-base font-semibold truncate">{title}</h1>
-          <DeleteDealButton dealId={id} slug={slug} dealTitle={title} />
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <FlagForReviewButton
+              dealId={id}
+              hasOpenReview={hasOpenReview}
+              visible={!!space.brokerageId}
+            />
+            <DeleteDealButton dealId={id} slug={slug} dealTitle={title} />
+          </div>
         </div>
 
         {/* Sidebar + main grid */}
@@ -223,24 +286,11 @@ export default async function DealDetailPage({
             {/* Close Date */}
             <div>
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Expected Close</p>
-              <DealInlineField
-                dealId={id}
-                field="closeDate"
-                value={closeDate ? closeDate.substring(0, 10) : null}
-                type="date"
-                label="Close Date"
-                displayValue={
-                  closeDate
-                    ? new Date(closeDate).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })
-                    : ''
-                }
-                placeholder="Not set"
-              />
+              <DealCloseDateField dealId={id} initial={closeDate} />
             </div>
+
+            {/* Property link */}
+            <DealPropertyPicker dealId={id} slug={slug} initial={linkedProperty} />
 
             {/* Contacts */}
             <div>
@@ -276,8 +326,9 @@ export default async function DealDetailPage({
               {(
                 [
                   ['overview', 'Overview'],
+                  ['checklist', 'Closing checklist'],
+                  ['documents', 'Documents'],
                   ['activity', 'Activity'],
-                  ['milestones', 'Milestones'],
                 ] as [string, string][]
               ).map(([key, label]) => (
                 <Link
@@ -298,6 +349,11 @@ export default async function DealDetailPage({
             {/* Tab content */}
             {activeTab === 'overview' && (
               <div className="space-y-5">
+                <DealNextActionField
+                  dealId={id}
+                  initialAction={nextAction}
+                  initialDueAt={nextActionDueAt}
+                />
                 <div>
                   <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Title</p>
                   <DealInlineField
@@ -331,7 +387,12 @@ export default async function DealDetailPage({
                     placeholder="Add notes or description…"
                   />
                 </div>
-                <AgentDealPanel dealId={id} />
+                <DealCommissionSplits
+                  dealId={id}
+                  dealValue={value}
+                  dealCommissionRate={commissionRate}
+                />
+                <AgentDealPanel dealId={id} slug={slug} dealTitle={title} />
               </div>
             )}
 
@@ -343,6 +404,16 @@ export default async function DealDetailPage({
               />
             )}
 
+            {activeTab === 'checklist' && (
+              <DealChecklist dealId={id} initial={checklist} />
+            )}
+
+            {activeTab === 'documents' && (
+              <DealDocuments dealId={id} initial={documents} />
+            )}
+
+            {/* Legacy milestones tab kept reachable via explicit ?tab=milestones
+                for any pre-existing bookmarks; no longer in the tab bar. */}
             {activeTab === 'milestones' && (
               <DealMilestones dealId={id} initialMilestones={milestones} />
             )}

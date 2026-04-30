@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import {
   Brain,
   MessageSquare,
@@ -10,12 +11,14 @@ import {
   XCircle,
   Copy,
   Check,
-  ChevronDown,
-  ChevronUp,
   RefreshCw,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { timeAgo } from '@/lib/formatting';
+import { ImportanceDot } from './importance-dot';
+import { ChippiAssessmentCard } from '@/components/agent/chippi-assessment-card';
 
 interface AgentMemory {
   id: string;
@@ -65,23 +68,6 @@ const AGENT_LABELS: Record<string, string> = {
   lead_scorer: 'Lead Scorer',
 };
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
-function ImportanceDot({ importance }: { importance: number }) {
-  if (importance >= 0.7)
-    return <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 mt-1.5" />;
-  if (importance >= 0.4)
-    return <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 mt-1.5" />;
-  return <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 shrink-0 mt-1.5" />;
-}
 
 function DraftCard({
   draft,
@@ -94,7 +80,6 @@ function DraftCard({
 }) {
   const [editing, setEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(draft.content);
-  const [showReasoning, setShowReasoning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState<'approve' | 'dismiss' | null>(null);
 
@@ -118,7 +103,7 @@ function DraftCard({
 
   return (
     <div className={cn(
-      'rounded-lg border bg-card text-sm',
+      'rounded-lg border border-border/70 bg-card text-sm',
       draft.status === 'approved' && 'opacity-60',
     )}>
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
@@ -156,18 +141,9 @@ function DraftCard({
         )}
 
         {draft.reasoning && (
-          <button
-            onClick={() => setShowReasoning(v => !v)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {showReasoning ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-            Why this message?
-          </button>
-        )}
-        {showReasoning && draft.reasoning && (
-          <p className="text-xs text-muted-foreground bg-muted/30 rounded p-2 leading-relaxed">
+          <blockquote className="border-l-2 border-muted-foreground/20 pl-2 text-xs text-muted-foreground leading-relaxed">
             {draft.reasoning}
-          </p>
+          </blockquote>
         )}
       </div>
 
@@ -183,7 +159,7 @@ function DraftCard({
             <button
               onClick={handleDismiss}
               disabled={!!loading}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs border border-border hover:bg-muted/60 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] rounded-md text-xs border border-border hover:bg-muted/60 transition-colors disabled:opacity-50"
             >
               {loading === 'dismiss' ? <Loader2 size={11} className="animate-spin" /> : <XCircle size={11} />}
               Dismiss
@@ -191,7 +167,7 @@ function DraftCard({
             <button
               onClick={handleApprove}
               disabled={!!loading || overLimit}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-md text-xs bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               {loading === 'approve'
                 ? <Loader2 size={11} className="animate-spin" />
@@ -207,7 +183,7 @@ function DraftCard({
   );
 }
 
-export function AgentContactPanel({ contactId, slug }: { contactId: string; slug: string }) {
+export function AgentContactPanel({ contactId, slug, contactName }: { contactId: string; slug: string; contactName?: string }) {
   const [data, setData] = useState<AgentContactData | null>(null);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
@@ -273,15 +249,18 @@ export function AgentContactPanel({ contactId, slug }: { contactId: string; slug
 
   if (loading) {
     return (
-      <div className="rounded-lg border border-border bg-card p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Brain size={14} className="text-primary animate-pulse" />
-          <span className="text-sm font-semibold">Agent Intelligence</span>
-        </div>
-        <div className="space-y-2">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-4 bg-muted rounded animate-pulse" style={{ width: `${60 + i * 10}%` }} />
-          ))}
+      <div className="space-y-3">
+        <ChippiAssessmentCard entityType="contact" entityId={contactId} entityName={contactName ?? 'this contact'} slug={slug} />
+        <div className="rounded-lg border border-border/70 bg-card p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Brain size={14} className="text-primary animate-pulse" />
+            <span className="text-sm font-semibold">Agent Intelligence</span>
+          </div>
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-4 bg-muted rounded animate-pulse" style={{ width: `${60 + i * 10}%` }} />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -290,7 +269,9 @@ export function AgentContactPanel({ contactId, slug }: { contactId: string; slug
   const hasContent = allDrafts.length > 0 || memories.length > 0 || activity.length > 0;
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div className="space-y-3">
+      <ChippiAssessmentCard entityType="contact" entityId={contactId} entityName={contactName ?? 'this contact'} slug={slug} />
+    <div className="rounded-lg border border-border/70 bg-card overflow-hidden">
       <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Brain size={14} className="text-primary" />
@@ -302,6 +283,13 @@ export function AgentContactPanel({ contactId, slug }: { contactId: string; slug
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href={`/s/${slug}/chippi?q=${encodeURIComponent(`Tell me about ${contactName ?? 'this contact'} and suggest what I should do next`)}`}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted/60 transition-colors"
+          >
+            <Sparkles size={11} />
+            Ask Chippi
+          </Link>
           <button
             onClick={() => void load()}
             className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/60 transition-colors"
@@ -432,6 +420,7 @@ export function AgentContactPanel({ contactId, slug }: { contactId: string; slug
           </div>
         </>
       )}
+    </div>
     </div>
   );
 }

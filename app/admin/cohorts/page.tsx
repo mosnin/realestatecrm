@@ -224,28 +224,28 @@ export default async function AdminCohortsPage() {
           <table className="w-full text-sm">
             <thead className="bg-muted/40 border-b border-border">
               <tr className="text-left">
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
                   Week
                 </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
                   Signups
                 </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
                   Onboarded
                 </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
                   Workspace
                 </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
                   Trial
                 </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
                   Paid
                 </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
                   Churned
                 </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
                   Still active
                 </th>
               </tr>
@@ -277,7 +277,7 @@ export default async function AdminCohortsPage() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
           Overall
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {[
             {
               label: 'Total signups',

@@ -35,6 +35,17 @@ export type Brokerage = {
   brokerageBuyerFormConfig: IntakeFormConfig | null;
   brokerageRentalScoringModel: import('@/lib/scoring/scoring-model-types').ScoringModel | null;
   brokerageBuyerScoringModel: import('@/lib/scoring/scoring-model-types').ScoringModel | null;
+  /**
+   * Plan tier — controls seatLimit (BP3). 'starter' → 5, 'team' → 15,
+   * 'enterprise' → unlimited (seatLimit = null).
+   */
+  plan: 'starter' | 'team' | 'enterprise';
+  /** Max members + pending invites. Null = unlimited (enterprise). */
+  seatLimit: number | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripeSubscriptionStatus: 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'inactive';
+  stripePeriodEnd: Date | null;
   createdAt: Date;
 };
 
@@ -176,6 +187,10 @@ export type Contact = {
   consentPrivacyPolicyUrl: string | null;
   formConfigSnapshot: IntakeFormConfig | null;
   formLeadType: 'rental' | 'buyer' | null;
+  /** Who sent this lead — free-form. Used for referral-fee tracking later. */
+  referralSource: string | null;
+  /** Hide this contact from the main People view until this date. */
+  snoozedUntil: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -293,9 +308,79 @@ export type Deal = {
   commissionRate: number | null;
   probability: number | null;
   milestones: DealMilestone[];
+  /** Realtor-authored "what's next" — shown prominently on the card and in the Today inbox. */
+  nextAction: string | null;
+  nextActionDueAt: Date | null;
+  /** Captured when a deal is marked won or lost so we can learn from it later. */
+  wonLostReason: string | null;
+  wonLostNote: string | null;
+  /** Nullable FK to Property. Deals without a linked property still work. */
+  propertyId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type DealStageKind =
+  | 'lead'
+  | 'qualified'
+  | 'active'
+  | 'under_contract'
+  | 'closing'
+  | 'closed';
+
+export type PropertyType =
+  | 'single_family'
+  | 'condo'
+  | 'townhouse'
+  | 'multi_family'
+  | 'land'
+  | 'commercial'
+  | 'other';
+
+export type PropertyListingStatus =
+  | 'active'
+  | 'pending'
+  | 'sold'
+  | 'off_market'
+  | 'owned';
+
+export interface PropertyPacket {
+  id: string;
+  spaceId: string;
+  propertyId: string;
+  name: string;
+  token: string;
+  includeDocumentIds: string[];
+  expiresAt: string | null;
+  viewCount: number;
+  lastViewedAt: string | null;
+  createdAt: string;
+  revokedAt: string | null;
+}
+
+export interface Property {
+  id: string;
+  spaceId: string;
+  address: string;
+  unitNumber: string | null;
+  city: string | null;
+  stateRegion: string | null;
+  postalCode: string | null;
+  mlsNumber: string | null;
+  propertyType: PropertyType | null;
+  beds: number | null;
+  baths: number | null;
+  squareFeet: number | null;
+  lotSizeSqft: number | null;
+  yearBuilt: number | null;
+  listPrice: number | null;
+  listingStatus: PropertyListingStatus;
+  listingUrl: string | null;
+  photos: string[];
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export type DealActivity = {
   id: string;
@@ -327,11 +412,28 @@ export type DealStage = {
   position: number;
   pipelineType: string | null;
   pipelineId: string | null;
+  /** Typed view of the stage. Null for custom user stages. */
+  kind: DealStageKind | null;
 };
+
+export type DealContactRole =
+  | 'buyer'
+  | 'seller'
+  | 'buyer_agent'
+  | 'listing_agent'
+  | 'co_agent'
+  | 'lender'
+  | 'title'
+  | 'escrow'
+  | 'inspector'
+  | 'appraiser'
+  | 'attorney'
+  | 'other';
 
 export type DealContact = {
   dealId: string;
   contactId: string;
+  role: DealContactRole | null;
 };
 
 export type ContactActivity = {
@@ -357,6 +459,13 @@ export type Message = {
   conversationId: string | null;
   role: string;
   content: string;
+  /**
+   * Ordered list of rendered blocks (text + tool calls + permission
+   * prompts) for messages produced by the on-demand agent. Null for
+   * legacy plain-text messages — the client falls back to rendering
+   * `content` as a single text block. See lib/ai-tools/blocks.ts.
+   */
+  blocks: unknown[] | null;
   createdAt: Date;
 };
 

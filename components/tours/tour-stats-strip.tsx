@@ -1,6 +1,7 @@
 'use client';
 
-import { CalendarDays, TrendingUp, UserX, Clock } from 'lucide-react';
+import { STAT_NUMBER_COMPACT, TITLE_FONT, CAPTION } from '@/lib/typography';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 
 interface TourStats {
   toursThisWeek: number;
@@ -65,32 +66,38 @@ function computeStats(tours: TourStatsStripProps['tours']): TourStats {
 export function TourStatsStrip({ tours }: TourStatsStripProps) {
   const stats = computeStats(tours);
 
-  const items = [
-    { label: 'This Week', value: String(stats.toursThisWeek), icon: CalendarDays, color: 'text-orange-500' },
-    { label: 'Conversion', value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-emerald-500' },
-    { label: 'No-Show', value: `${stats.noShowRate}%`, icon: UserX, color: stats.noShowRate > 20 ? 'text-red-500' : 'text-amber-500' },
-    { label: 'Lead Time', value: stats.avgConfirmTime, icon: Clock, color: 'text-muted-foreground' },
+  const items: Array<{ label: string; value: React.ReactNode }> = [
+    {
+      label: 'This Week',
+      value: <AnimatedNumber value={stats.toursThisWeek} />,
+    },
+    {
+      label: 'Conversion',
+      value: <AnimatedNumber value={stats.conversionRate} format={(n) => `${Math.round(n)}%`} />,
+    },
+    {
+      label: 'No-Show',
+      value: <AnimatedNumber value={stats.noShowRate} format={(n) => `${Math.round(n)}%`} />,
+    },
+    { label: 'Lead Time', value: stats.avgConfirmTime },
   ];
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      {items.map((item) => {
-        const Icon = item.icon;
-        return (
-          <div
-            key={item.label}
-            className="rounded-lg border border-border bg-card px-4 py-3 flex items-center gap-3"
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="rounded-lg border border-border/70 bg-background p-5 flex flex-col items-start gap-1"
+        >
+          <p
+            className={`${STAT_NUMBER_COMPACT} leading-none`}
+            style={TITLE_FONT}
           >
-            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-              <Icon size={15} className={item.color} />
-            </div>
-            <div>
-              <p className="text-lg font-bold tabular-nums leading-none">{item.value}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{item.label}</p>
-            </div>
-          </div>
-        );
-      })}
+            {item.value}
+          </p>
+          <p className={CAPTION}>{item.label}</p>
+        </div>
+      ))}
     </div>
   );
 }

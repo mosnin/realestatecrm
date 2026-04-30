@@ -47,6 +47,7 @@ import { timeAgo, formatMoney, getInitials, formatFollowUpDate, toDateInputValue
 import { LEAD_TIERS, type TierKey } from '@/lib/constants';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { TableRowSkeleton, CardSkeleton } from '@/components/ui/skeleton';
 
 const TIERS = LEAD_TIERS;
 
@@ -142,6 +143,7 @@ interface LeadsViewProps {
   leads: Contact[];
   slug: string;
   newLeadIds: Set<string>;
+  loading?: boolean;
 }
 
 type SortKey = 'newest' | 'oldest' | 'score' | 'score-low' | 'name-az' | 'name-za' | 'followup';
@@ -171,7 +173,7 @@ function isValidView(v: string | null): v is ViewMode {
   return v != null && ['card', 'list'].includes(v);
 }
 
-export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewProps) {
+export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = false }: LeadsViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -361,18 +363,18 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
         body: JSON.stringify(patch),
       });
       if (!res.ok) {
-        toast.error('Failed to update lead');
+        toast.error("Couldn't update that lead. Try again.");
         return;
       }
       const updated = await res.json();
       setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...updated } : l)));
       if ('followUpAt' in patch) {
-        toast.success(patch.followUpAt ? 'Follow-up date set' : 'Follow-up date cleared');
+        toast.success(patch.followUpAt ? 'Follow-up set.' : 'Follow-up cleared.');
       } else if ('lastContactedAt' in patch) {
-        toast.success(patch.lastContactedAt ? 'Marked as contacted' : 'Contacted status removed');
+        toast.success(patch.lastContactedAt ? 'Marked as contacted.' : 'Contacted status removed.');
       }
     } catch {
-      toast.error('Failed to update lead');
+      toast.error("Couldn't update that lead. Try again.");
     }
   }, []);
 
@@ -397,7 +399,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
     const ids = [...selectedIds];
     const confirmed = await confirm({
       title: `Delete ${ids.length} lead${ids.length !== 1 ? 's' : ''}?`,
-      description: 'This will permanently remove the selected leads. This cannot be undone.',
+      description: "These will be gone. I can't bring them back.",
     });
     if (!confirmed) return;
     try {
@@ -407,13 +409,13 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
       );
       const failed = ids.length - successIds.length;
       if (failed > 0) {
-        toast.error(`Failed to delete ${failed} of ${ids.length} leads`);
+        toast.error(`Couldn't delete ${failed} of ${ids.length} leads. Try those again.`);
       } else {
-        toast.success(`Deleted ${ids.length} lead${ids.length !== 1 ? 's' : ''}`);
+        toast.success(`Deleted ${ids.length} lead${ids.length !== 1 ? 's' : ''}.`);
       }
       setLeads((prev) => prev.filter((l) => !successIds.includes(l.id)));
     } catch {
-      toast.error('Failed to delete leads');
+      toast.error("Couldn't delete those leads. Try again.");
     }
     setSelectedIds(new Set());
   }
@@ -428,7 +430,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
   }
 
   function exportLeadsCSV(items: Contact[]) {
-    toast.success('Leads exported');
+    toast.success('Exported.');
     // Use dynamic-aware CSV export that handles formConfigSnapshot
     downloadLeadsCSV('leads.csv', items);
   }
@@ -623,23 +625,40 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
         </div>
       </div>
 
+      {/* ── Loading skeletons ── */}
+      {loading && (
+        <div className="space-y-0 rounded-lg border border-border/70 overflow-hidden">
+          {view === 'card' ? (
+            <div className="space-y-3 p-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <CardSkeleton key={i} />
+              ))}
+            </div>
+          ) : (
+            Array.from({ length: 5 }).map((_, i) => (
+              <TableRowSkeleton key={i} cols={4} />
+            ))
+          )}
+        </div>
+      )}
+
       {/* ── Empty state ── */}
-      {filtered.length === 0 && (
-        <div className="rounded-lg border border-dashed border-border bg-card py-12 text-center px-6">
-          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center mx-auto mb-4">
+      {!loading && filtered.length === 0 && (
+        <div className="rounded-lg border border-dashed border-border/70 bg-card py-12 text-center px-6">
+          <div className="w-10 h-10 rounded-lg bg-foreground/[0.04] flex items-center justify-center mx-auto mb-4">
             <Search size={20} className="text-muted-foreground" />
           </div>
           <p className="font-semibold text-foreground mb-1">
-            {search ? 'No matching leads' : tierFilter === 'needs-followup' ? 'No overdue follow-ups' : tierFilter !== 'all' ? `No ${tierFilter} leads` : 'No leads'}
+            {search ? 'Nothing matches.' : tierFilter === 'needs-followup' ? "You're caught up." : tierFilter !== 'all' ? `Nothing in ${tierFilter}.` : 'No leads yet.'}
           </p>
           <p className="text-sm text-muted-foreground">
             {search
-              ? `No leads match "${search}". Try a different search term.`
+              ? `Nothing matches "${search}". Try a different word.`
               : tierFilter === 'needs-followup'
-              ? 'All follow-ups are up to date.'
+              ? "Every follow-up is in good shape."
               : tierFilter !== 'all'
               ? 'Try a different filter.'
-              : 'Share your intake link to receive applications.'}
+              : "Share your intake link and they'll show up here."}
           </p>
           {(search || tierFilter !== 'all' || leadTypeFilter !== 'all') && (
             <button
@@ -655,7 +674,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
       )}
 
       {/* ── Card view ── */}
-      {view === 'card' && filtered.length > 0 && (
+      {!loading && view === 'card' && filtered.length > 0 && (
         <div className="space-y-3">
           {filtered.map((lead) => {
             const isNew = newLeadIds.has(lead.id);
@@ -678,11 +697,11 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
               <div
                 key={lead.id}
                 className={cn(
-                  'group rounded-lg border bg-card overflow-hidden transition-all duration-150 hover:shadow-md',
+                  'group rounded-lg border bg-card overflow-hidden transition-colors duration-150',
                   isSelected ? 'border-primary/40 bg-primary/5' :
                   tierKey === 'hot' ? 'border-red-200/80 dark:border-red-800/50' :
                   tierKey === 'warm' ? 'border-amber-200/80 dark:border-amber-800/50' :
-                  'border-border',
+                  'border-border/70',
                 )}
               >
                 {/* Header */}
@@ -927,8 +946,8 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
       )}
 
       {/* ── List view ── */}
-      {view === 'list' && filtered.length > 0 && (
-        <div className="rounded-lg border border-border overflow-hidden">
+      {!loading && view === 'list' && filtered.length > 0 && (
+        <div className="rounded-lg border border-border/70 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -1068,7 +1087,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds }: LeadsViewPr
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-lg border border-border bg-card shadow-lg px-4 py-3">
+        <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] mx-auto w-fit z-30 flex items-center gap-2 rounded-lg border border-border bg-card shadow-lg px-4 py-3">
           <CheckSquare size={14} className="text-foreground" />
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="h-4 w-px bg-border mx-1" />

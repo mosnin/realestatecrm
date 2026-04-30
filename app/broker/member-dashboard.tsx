@@ -1,5 +1,9 @@
 import { supabase } from '@/lib/supabase';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
+
+// ── Lead score threshold constants ───────────────────────────────────────────
+const SCORE_THRESHOLD_HOT = 80;
+const SCORE_THRESHOLD_WARM = 50;
 import { Card, CardContent } from '@/components/ui/card';
 import {
   PhoneIncoming,
@@ -199,9 +203,9 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
     if (!scoreLabel && leadScore == null) return null;
     const label = scoreLabel ?? `${leadScore}`;
     const color =
-      scoreLabel === 'Hot' || (leadScore && leadScore >= 80)
+      scoreLabel === 'Hot' || (leadScore && leadScore >= SCORE_THRESHOLD_HOT)
         ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15'
-        : scoreLabel === 'Warm' || (leadScore && leadScore >= 50)
+        : scoreLabel === 'Warm' || (leadScore && leadScore >= SCORE_THRESHOLD_WARM)
           ? 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
           : 'text-muted-foreground bg-muted';
     return (

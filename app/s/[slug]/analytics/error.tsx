@@ -2,14 +2,20 @@
 
 export default function AnalyticsError({ reset }: { error: Error; reset: () => void }) {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center">
-      <div className="text-center space-y-3 p-6">
-        <h2 className="text-base font-semibold">Failed to load analytics</h2>
-        <p className="text-sm text-muted-foreground">Please try again.</p>
-        <button onClick={reset} className="text-sm text-primary font-medium hover:underline underline-offset-2">
-          Retry
-        </button>
-      </div>
+    <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center space-y-3">
+      <p
+        className="text-3xl tracking-tight text-foreground"
+        style={{ fontFamily: 'var(--font-title)' }}
+      >
+        Failed to load analytics
+      </p>
+      <p className="text-sm text-muted-foreground">Please try again.</p>
+      <button
+        onClick={reset}
+        className="bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] rounded-full px-4 h-9 gap-1.5 inline-flex items-center transition-all duration-150 text-sm"
+      >
+        Retry
+      </button>
     </div>
   );
 }
