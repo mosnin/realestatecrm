@@ -25,7 +25,6 @@ import {
   GripVertical,
   LayoutGrid,
   List,
-  Pencil,
   Trash2,
   MapPin,
   Search,
@@ -163,12 +162,6 @@ function SortableKanbanColumn({
     </div>
   );
 }
-
-const PRIORITY_META: Record<string, { label: string; className: string }> = {
-  LOW: { label: 'Low', className: 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400' },
-  MEDIUM: { label: 'Medium', className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' },
-  HIGH: { label: 'High', className: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
-};
 
 function formatCurrency(n: number | null) {
   if (n == null) return null;
@@ -797,6 +790,61 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
   }
 
   /**
+   * Open the slide-over panel for a deal. The panel stays in sync with the
+   * board because we look the deal up by id from current state on every render.
+   */
+  function handleOpenDeal(deal: DealWithRelations) {
+    setPanelDealId(deal.id);
+  }
+
+  /**
+   * Stage change from the slide-over. Routes through the same reorder
+   * endpoint the kanban drag handler uses so server-side position rebalancing
+   * stays consistent. Optimistically moves the card.
+   */
+  async function handlePanelStageChange(dealId: string, newStageId: string) {
+    const currentStage = stages.find((s) => s.deals.some((d) => d.id === dealId));
+    const newStage = stages.find((s) => s.id === newStageId);
+    if (!currentStage || !newStage || currentStage.id === newStageId) return;
+
+    const deal = currentStage.deals.find((d) => d.id === dealId);
+    if (!deal) return;
+
+    // Optimistic move
+    setStages((prev) =>
+      prev.map((s) => {
+        if (s.id === currentStage.id) {
+          return { ...s, deals: s.deals.filter((d) => d.id !== dealId) };
+        }
+        if (s.id === newStageId) {
+          return { ...s, deals: [...s.deals, { ...deal, stageId: newStageId, stage: newStage }] };
+        }
+        return s;
+      }),
+    );
+
+    try {
+      const newPosition = newStage.deals.length;
+      const res = await fetch('/api/deals/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealId, newStageId, newPosition }),
+      });
+      if (res.ok) {
+        toast.success(`Moved to ${newStage.name}`);
+      } else {
+        const detail = await parseApiError(res);
+        toast.error(`Couldn't move deal: ${detail}`);
+      }
+    } catch {
+      toast.error(`Couldn't move deal: ${NETWORK_ERROR_MSG}`);
+    } finally {
+      fetchData();
+      pendingRefetchRef.current = false;
+    }
+  }
+
+  /**
    * Advance a deal to the next stage. Uses the same reorder endpoint the drag
    * handler uses so the server-side position rebalancing stays consistent.
    * Optimistically moves the card, toasts on success/failure.
@@ -1348,39 +1396,36 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
 
       {/* Bulk action bar */}
       {selectedDealIds.size > 0 && view === 'list' && (
-        <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5">
-          <span className="text-sm font-medium">
-            {selectedDealIds.size} deal{selectedDealIds.size === 1 ? '' : 's'} selected
+        <div className="flex items-center gap-3 rounded-md border border-border/70 bg-foreground/[0.02] px-4 py-2.5">
+          <span className="text-sm text-foreground tabular-nums">
+            {selectedDealIds.size} selected
           </span>
           <div className="flex items-center gap-2 ml-auto">
-            {/* Move to stage */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setBulkStageTarget(stages[0]?.id ?? '');
-                  setBulkStagePicker(true);
-                }}
-                disabled={bulkPending}
-                className="h-7 px-3 flex items-center gap-1.5 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors disabled:opacity-50"
-              >
-                Move to stage
-                <ChevronDown size={11} />
-              </button>
-            </div>
-            {/* Bulk delete */}
+            <button
+              type="button"
+              onClick={() => {
+                setBulkStageTarget(stages[0]?.id ?? '');
+                setBulkStagePicker(true);
+              }}
+              disabled={bulkPending}
+              className="h-7 px-3 flex items-center gap-1.5 text-xs font-medium rounded-md border border-border/70 bg-background hover:bg-foreground/[0.04] transition-colors duration-150 disabled:opacity-50"
+            >
+              Move to stage
+              <ChevronDown size={11} />
+            </button>
             <button
               type="button"
               onClick={bulkDelete}
               disabled={bulkPending}
-              className="h-7 px-3 text-xs font-medium rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50"
+              className="h-7 px-3 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 disabled:opacity-50"
             >
               {bulkPending ? 'Working…' : 'Delete'}
             </button>
             <button
               type="button"
               onClick={() => setSelectedDealIds(new Set())}
-              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground transition-colors duration-150"
+              aria-label="Clear selection"
             >
               <X size={13} />
             </button>
@@ -1389,55 +1434,54 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
       )}
 
       {statusFilter.size === 0 ? (
-        <div className="rounded-lg border border-border bg-card px-4 py-12 text-center">
+        <div className="rounded-xl border border-border/70 bg-background px-4 py-12 text-center">
           <p className="text-sm text-muted-foreground">
             No status selected — pick at least one status above.
           </p>
         </div>
       ) : view === 'kanban' ? (
         <>
-        {/* Mobile stacked view */}
+        {/* Mobile stacked view — paper-flat hairline rows. */}
         <div className="md:hidden space-y-4">
           {filteredStages.map((stage) => (
-            <div key={stage.id} className="rounded-lg border border-border overflow-hidden">
-              <div className="flex items-center gap-2 px-3 py-2.5 bg-muted/40 border-b border-border">
-                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
-                <span className="text-xs font-semibold">{stage.name}</span>
-                <span className="text-[11px] text-muted-foreground bg-muted rounded-md px-1.5 py-0.5 ml-auto">{stage.deals.length}</span>
+            <div key={stage.id} className="rounded-xl border border-border/70 bg-background overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-foreground/[0.02] border-b border-border/70">
+                <span className="text-sm font-semibold text-foreground">{stage.name}</span>
+                <span className="text-[11px] text-muted-foreground tabular-nums ml-auto">{stage.deals.length}</span>
               </div>
               {stage.deals.length === 0 ? (
                 <div className="px-3 py-4 text-center">
                   <p className="text-xs text-muted-foreground">No deals in this stage</p>
                 </div>
               ) : (
-                <div className="divide-y divide-border">
-                  {stage.deals.map((deal) => {
-                    const priorityMeta = PRIORITY_META[deal.priority] ?? PRIORITY_META.MEDIUM;
-                    return (
-                      <div
-                        key={deal.id}
-                        className="flex items-center gap-3 px-3 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/s/${slug}/deals/${deal.id}`)}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{deal.title}</p>
-                          {deal.address && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                              <MapPin size={10} />{deal.address}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {deal.value != null && (
-                            <span className="text-xs font-medium">{formatCurrency(deal.value)}</span>
-                          )}
-                          <span className={cn('text-[10px] font-semibold rounded-md px-1.5 py-0.5', priorityMeta.className)}>
-                            {priorityMeta.label}
-                          </span>
-                        </div>
+                <div className="divide-y divide-border/70">
+                  {stage.deals.map((deal) => (
+                    <div
+                      key={deal.id}
+                      className="flex items-center gap-3 px-3 py-3 hover:bg-foreground/[0.04] transition-colors duration-150 cursor-pointer"
+                      onClick={() => setPanelDealId(deal.id)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate text-foreground">{deal.title}</p>
+                        {deal.address && (
+                          <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                            <MapPin size={10} />{deal.address}
+                          </p>
+                        )}
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {deal.value != null && (
+                          <span
+                            className="text-sm tabular-nums text-foreground"
+                            style={TITLE_FONT}
+                          >
+                            {formatCurrency(deal.value)}
+                          </span>
+                        )}
+                        <ArrowRight size={12} className="text-muted-foreground/50" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1456,21 +1500,23 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
               items={filteredStages.map((s) => `stage:${s.id}`)}
               strategy={horizontalListSortingStrategy}
             >
-              <div className="flex gap-4 min-w-max items-start">
+              <StaggerList className="flex gap-4 min-w-max items-start">
                 {filteredStages.map((stage, idx) => (
-                  <SortableKanbanColumn
-                    key={stage.id}
-                    stage={stage}
-                    deals={stage.deals}
-                    slug={slug}
-                    onAddDeal={openAddDeal}
-                    onDeleteDeal={handleDeleteDeal}
-                    onDeleteStage={handleDeleteStage}
-                    onDealCreated={fetchData}
-                    onStatusChange={handleCardStatusChange}
-                    nextStage={filteredStages[idx + 1] ?? null}
-                    onAdvanceStage={handleAdvanceStage}
-                  />
+                  <StaggerItem key={stage.id}>
+                    <SortableKanbanColumn
+                      stage={stage}
+                      deals={stage.deals}
+                      slug={slug}
+                      onAddDeal={openAddDeal}
+                      onDeleteDeal={handleDeleteDeal}
+                      onDeleteStage={handleDeleteStage}
+                      onDealCreated={fetchData}
+                      onStatusChange={handleCardStatusChange}
+                      nextStage={filteredStages[idx + 1] ?? null}
+                      onAdvanceStage={handleAdvanceStage}
+                      onOpenDeal={handleOpenDeal}
+                    />
+                  </StaggerItem>
                 ))}
 
                 {/* Inline "Add Stage" card */}
@@ -1552,19 +1598,19 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                     </button>
                   )}
                 </div>
-              </div>
+              </StaggerList>
             </SortableContext>
             <DragOverlay>
               {activeDeal && (
-                <div className="w-72 rounded-lg border border-border bg-card px-3.5 py-3 shadow-lg opacity-95 rotate-1">
+                <div className="w-72 rounded-md border border-border bg-background px-3 py-3 shadow-md opacity-95">
                   <div className="flex items-center gap-2">
-                    <GripVertical size={15} className="text-muted-foreground/50 flex-shrink-0" />
-                    <p className="font-semibold text-sm truncate">{activeDeal.title}</p>
+                    <GripVertical size={14} className="text-muted-foreground/40 flex-shrink-0" />
+                    <p className="text-sm font-medium truncate text-foreground">{activeDeal.title}</p>
                   </div>
                 </div>
               )}
               {activeStage && (
-                <div className="w-72 rounded-lg border-2 border-border bg-card shadow-xl opacity-90 p-3">
+                <div className="w-72 rounded-lg border border-border bg-background shadow-md opacity-95 p-3">
                   <div className="flex items-center gap-2 mb-2">
                     <GripVertical size={13} className="text-muted-foreground/50 flex-shrink-0 rotate-90" />
                     <span
@@ -1585,12 +1631,12 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         </>
       ) : (
         /* ── List / table view ── */
-        <div className="rounded-lg border border-border overflow-hidden">
+        <div className="rounded-xl border border-border/70 bg-background overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  <th className="px-3 py-3 w-10">
+                <tr className="border-b border-border/70 bg-foreground/[0.02]">
+                  <th className="px-3 py-2.5 w-10">
                     <input
                       type="checkbox"
                       checked={allDeals.length > 0 && selectedDealIds.size === allDeals.length}
@@ -1598,29 +1644,29 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                         if (el) el.indeterminate = selectedDealIds.size > 0 && selectedDealIds.size < allDeals.length;
                       }}
                       onChange={toggleSelectAll}
-                      className="h-3.5 w-3.5 rounded border-border cursor-pointer accent-primary"
+                      className="h-3.5 w-3.5 rounded border-border cursor-pointer accent-foreground"
                       aria-label="Select all"
                     />
                   </th>
-                  <th className="text-left px-4 py-3">
+                  <th className="text-left px-4 py-2.5">
                     <SortHeader field="title" label="Deal" />
                   </th>
-                  <th className="text-left px-4 py-3 hidden sm:table-cell">
+                  <th className="text-left px-4 py-2.5 hidden sm:table-cell">
                     <SortHeader field="stage" label="Stage" />
                   </th>
-                  <th className="text-left px-4 py-3 hidden md:table-cell">
-                    <SortHeader field="value" label="Value" />
+                  <th className="text-right px-4 py-2.5 hidden md:table-cell">
+                    <SortHeader field="value" label="Value" className="ml-auto" />
                   </th>
-                  <th className="text-left px-4 py-3 hidden md:table-cell">
-                    <SortHeader field="priority" label="Priority" />
+                  <th className="text-left px-4 py-2.5 hidden md:table-cell">
+                    <SortHeader field="closeDate" label="Close" />
                   </th>
-                  <th className="text-left px-4 py-3 hidden lg:table-cell text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Contacts
+                  <th className="text-left px-4 py-2.5 hidden lg:table-cell">
+                    <span className={SECTION_LABEL}>Last activity</span>
                   </th>
-                  <th className="px-4 py-3 w-24" />
+                  <th className="px-4 py-2.5 w-20" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border bg-card">
+              <tbody className="divide-y divide-border/70">
                 {allDeals.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="p-4">
@@ -1645,17 +1691,31 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                   </tr>
                 ) : (
                   allDeals.map((deal) => {
-                    const priorityMeta = PRIORITY_META[deal.priority] ?? PRIORITY_META.MEDIUM;
                     const stage = stages.find((s) => s.id === deal.stageId);
                     const isSelected = selectedDealIds.has(deal.id);
+                    const lastActivity = deal.updatedAt
+                      ? (() => {
+                          const d = new Date(deal.updatedAt as unknown as string);
+                          const diffDays = Math.floor((Date.now() - d.getTime()) / 86_400_000);
+                          if (diffDays === 0) return 'today';
+                          if (diffDays < 30) return `${diffDays}d ago`;
+                          return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                        })()
+                      : '—';
+                    const closeLabel = deal.closeDate
+                      ? new Date(deal.closeDate as unknown as string).toLocaleDateString(
+                          undefined,
+                          { month: 'short', day: 'numeric' },
+                        )
+                      : '—';
                     return (
                       <tr
                         key={deal.id}
                         className={cn(
-                          'group hover:bg-muted/30 transition-colors cursor-pointer',
-                          isSelected && 'bg-primary/5 hover:bg-primary/8',
+                          'group transition-colors duration-150 cursor-pointer hover:bg-foreground/[0.04]',
+                          isSelected && 'bg-foreground/[0.045]',
                         )}
-                        onClick={() => router.push(`/s/${slug}/deals/${deal.id}`)}
+                        onClick={() => setPanelDealId(deal.id)}
                       >
                         <td className="px-3 py-3 w-10">
                           <input
@@ -1663,70 +1723,41 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                             checked={isSelected}
                             onChange={(e) => { e.stopPropagation(); toggleDealSelect(deal.id); }}
                             onClick={(e) => e.stopPropagation()}
-                            className="h-3.5 w-3.5 rounded border-border cursor-pointer accent-primary"
+                            className="h-3.5 w-3.5 rounded border-border cursor-pointer accent-foreground"
                             aria-label={`Select ${deal.title}`}
                           />
                         </td>
                         <td className="px-4 py-3">
-                          <div>
-                            <p className="font-medium">{deal.title}</p>
-                            {deal.address && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                                <MapPin size={10} />
-                                {deal.address}
-                              </p>
-                            )}
-                          </div>
+                          <p className="text-sm font-medium text-foreground truncate">{deal.title}</p>
+                          {deal.address && (
+                            <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                              <MapPin size={10} />
+                              {deal.address}
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell">
                           {stage && (
-                            <span className="flex items-center gap-1.5 text-xs">
-                              <span
-                                className="w-2 h-2 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: stage.color }}
-                              />
+                            <span className="text-xs text-muted-foreground">
                               {stage.name}
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 hidden md:table-cell text-xs font-medium">
-                          {deal.value != null ? (
-                            <span className="flex items-center gap-1 text-foreground">
-                              {formatCurrency(deal.value)}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
+                        <td className="px-4 py-3 hidden md:table-cell text-sm tabular-nums text-foreground text-right">
+                          {deal.value != null ? formatCurrency(deal.value) : '—'}
                         </td>
-                        <td className="px-4 py-3 hidden md:table-cell">
-                          <span
-                            className={cn(
-                              'inline-flex text-[10px] font-semibold rounded-md px-2 py-0.5',
-                              priorityMeta.className,
-                            )}
-                          >
-                            {priorityMeta.label}
-                          </span>
+                        <td className="px-4 py-3 hidden md:table-cell text-xs tabular-nums text-muted-foreground">
+                          {closeLabel}
                         </td>
-                        <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
-                          {deal.dealContacts.length > 0
-                            ? deal.dealContacts.map((dc) => dc.contact.name).join(', ')
-                            : '—'}
+                        <td className="px-4 py-3 hidden lg:table-cell text-xs tabular-nums text-muted-foreground">
+                          {lastActivity}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); router.push(`/s/${slug}/deals/${deal.id}`); }}
-                              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                              title="Edit"
-                            >
-                              <Pencil size={13} />
-                            </button>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleDuplicateDeal(deal); }}
-                              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground transition-colors"
                               title="Duplicate"
                             >
                               <Copy size={13} />
@@ -1734,11 +1765,16 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleDeleteDeal(deal.id); }}
-                              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground transition-colors"
                               title="Delete"
                             >
                               <Trash2 size={13} />
                             </button>
+                            <ArrowRight
+                              size={13}
+                              className="ml-1 text-muted-foreground/50"
+                              strokeWidth={1.75}
+                            />
                           </div>
                         </td>
                       </tr>
@@ -1970,6 +2006,23 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
           </Dialog>
         );
       })()}
+
+      {/* Slide-over deal panel — opens on card click, no navigation. */}
+      <DealQuickPanel
+        deal={
+          panelDealId
+            ? stages.flatMap((s) => s.deals).find((d) => d.id === panelDealId) ?? null
+            : null
+        }
+        slug={slug}
+        stages={stages as DealStage[]}
+        open={!!panelDealId}
+        onOpenChange={(open) => {
+          if (!open) setPanelDealId(null);
+        }}
+        onStatusChange={handleCardStatusChange}
+        onStageChange={handlePanelStageChange}
+      />
     </div>
   );
 }

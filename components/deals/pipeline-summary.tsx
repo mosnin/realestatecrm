@@ -136,10 +136,13 @@ export function PipelineSummary({ slug, pipelineId }: PipelineSummaryProps) {
     // Compose Chippi's one-line narration. Pick the most-pressing fact.
     let narration = '';
     if (stuckCount > 0) {
-      narration =
-        stuckCount === 1
-          ? `1 deal hasn't moved in ${stuckMaxDays || 'weeks'} ${stuckMaxDays ? 'days' : ''}. Take a look.`
-          : `${stuckCount} deals are stuck — they need a nudge.`;
+      if (stuckCount === 1) {
+        narration = stuckMaxDays > 0
+          ? `1 deal hasn't moved in ${stuckMaxDays} days. Take a look.`
+          : "1 deal is stuck. Take a look.";
+      } else {
+        narration = `${stuckCount} deals are stuck — they need a nudge.`;
+      }
     } else if (closingThisWeek > 0) {
       narration =
         closingThisWeek === 1
