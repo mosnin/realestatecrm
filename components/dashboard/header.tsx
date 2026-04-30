@@ -17,10 +17,11 @@ import {
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { secondaryNavItems } from '@/lib/nav-items';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check, Sparkles, CalendarDays, Calendar, Flag, BarChart2, ClipboardList } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, Palette, FileText, ListChecks, CreditCard, Shield, Settings, Check, Sparkles, CalendarDays, Calendar, BarChart2, ClipboardList } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { BrokerHelpGuide } from '@/components/broker/help-guide';
+import { ShareLinksMenu } from './share-links-menu';
 import { getBreadcrumbLabel } from '@/lib/breadcrumb-routes';
 
 const brokerMobileNavItems = [
@@ -258,8 +259,8 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                     { href: '/tours', label: 'Tours', icon: CalendarDays },
                     { href: '/calendar', label: 'Calendar', icon: Calendar },
                     { href: '/notes', label: 'Notes', icon: FileText },
-                    { href: '/reviews', label: 'Reviews', icon: Flag },
                     { href: '/intake', label: 'Intake form', icon: ClipboardList },
+                    { href: '/intake/customize', label: 'Customize form', icon: ClipboardList },
                     { href: '/analytics', label: 'Analytics', icon: BarChart2 },
                   ].map((item) => {
                     const href = `${base}${item.href}`;
@@ -515,6 +516,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
           lives on the sidebar's pill (and ⌘K) so the header doesn't carry a
           duplicate trigger. */}
       <div className="flex items-center gap-0.5">
+        {slug && !isOnBrokerPage && <ShareLinksMenu slug={slug} />}
         {slug && <NotificationCenter slug={slug} />}
         {isBroker && <BrokerHelpGuide />}
         {isBrokerOnly && !slug && <NotificationBell />}

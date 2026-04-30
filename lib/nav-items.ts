@@ -8,7 +8,6 @@ import {
   FileText,
   ClipboardList,
   BarChart2,
-  Flag,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -71,17 +70,27 @@ export const realtorNavItems: NavItem[] = [
 
 /**
  * Secondary realtor nav — visually subordinate "More" section. These are
- * destinations that exist and have users but don't need daily prominence.
- * Tours, Calendar, Notes, Reviews surface inline through the agent in
- * Phase 5; until that's complete they live one glance below the primary
- * sidebar. Routes are unchanged.
+ * destinations that have users but don't need daily prominence. Intake form
+ * and Tours expand inline so their sub-pages (Customize, Share, Booking,
+ * Availability) are reachable in one click instead of buried inside an
+ * overview page. Routes are unchanged.
  */
 export const realtorMoreNavItems: NavItem[] = [
   { href: '/tours', label: 'Tours', icon: CalendarDays },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/notes', label: 'Notes', icon: FileText },
-  { href: '/reviews', label: 'Reviews', icon: Flag },
-  { href: '/intake', label: 'Intake form', icon: ClipboardList },
+  {
+    href: '/intake',
+    label: 'Intake form',
+    icon: ClipboardList,
+    children: [
+      { href: '/intake', label: 'Overview', exact: true },
+      { href: '/intake/customize', label: 'Customize' },
+      { href: '/intake/share', label: 'Share' },
+      { href: '/intake/tracking', label: 'Tracking' },
+      { href: '/intake/analytics', label: 'Submissions' },
+    ],
+  },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
 ];
 
