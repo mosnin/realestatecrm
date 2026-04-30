@@ -87,23 +87,18 @@ export default async function BrokerageInvitesPage({
   const roleLabel = (role: string) => (role === 'broker_admin' ? 'Admin' : 'Member');
 
   return (
-    <div className="space-y-8 max-w-3xl">
+    <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
       <div className="space-y-2">
-        <h2
-          className="text-2xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          Brokerage
-        </h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className={H2}>Brokerage</h2>
+        <p className={BODY_MUTED}>
           Pending brokerage invitations sent to {userEmail}.
         </p>
       </div>
 
       {invitations.length === 0 ? (
         <div className="rounded-md border border-border/70 bg-background px-5 py-12 text-center space-y-1">
-          <p className="text-sm font-medium text-foreground">No pending invitations</p>
-          <p className="text-xs text-muted-foreground">
+          <p className={`${BODY} font-medium`}>No pending invitations</p>
+          <p className={CAPTION}>
             When a brokerage invites you, it will appear here.
           </p>
         </div>
@@ -131,8 +126,8 @@ export default async function BrokerageInvitesPage({
                     <Building2 size={16} className="text-muted-foreground" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{brokerageName ?? 'Unknown brokerage'}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                    <p className={`${BODY} font-medium truncate`}>{brokerageName ?? 'Unknown brokerage'}</p>
+                    <div className={`flex items-center gap-2 ${CAPTION} mt-0.5`}>
                       <span className="inline-flex items-center gap-1">
                         {inv.roleToAssign === 'broker_admin' ? (
                           <ShieldCheck size={11} />
@@ -148,12 +143,9 @@ export default async function BrokerageInvitesPage({
                 </div>
                 <div className="flex-shrink-0">
                   {isExpired ? (
-                    <span className="text-xs text-muted-foreground">Expired</span>
+                    <span className={CAPTION}>Expired</span>
                   ) : (
-                    <a
-                      href={`/invite/${inv.token}`}
-                      className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150"
-                    >
+                    <a href={`/invite/${inv.token}`} className={PRIMARY_PILL}>
                       Accept
                     </a>
                   )}

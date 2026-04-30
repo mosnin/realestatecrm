@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link2, Copy, Check, ExternalLink, ClipboardList, CalendarDays } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { H3 } from '@/lib/typography';
 
 interface ShareLinksMenuProps {
   slug: string;
@@ -109,7 +110,7 @@ export function ShareLinksMenu({ slug }: ShareLinksMenuProps) {
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-80 p-3 space-y-3">
         <div>
-          <p className="text-[13px] font-semibold text-foreground leading-tight">Your links</p>
+          <p className={`${H3} leading-tight`}>Your links</p>
           <p className="text-[11px] text-muted-foreground/80 leading-tight mt-0.5">
             Share these with prospects.
           </p>

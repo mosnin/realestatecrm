@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
 import { realtorNavItems, realtorMoreNavItems } from '@/lib/nav-items';
 import type { NavItem, NavChild } from '@/lib/nav-items';
+import { SECTION_LABEL } from '@/lib/typography';
 import {
   SidebarCollapseProvider,
   CollapsedTooltip,
@@ -397,8 +398,10 @@ function CollapsibleNavItem({
 function SectionLabel({ children }: { children: React.ReactNode }) {
   // Empty labels hide entirely so a "label-less" section renders flush.
   if (!children) return null;
+  // Uses the canonical SECTION_LABEL token + sidebar-specific spacing so every
+  // small-caps grouping label across the app shares one type treatment.
   return (
-    <p className="px-3 pt-6 pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60 select-none">
+    <p className={`${SECTION_LABEL} px-3 pt-6 pb-2 select-none`}>
       {children}
     </p>
   );
@@ -627,7 +630,7 @@ function WorkspaceSwitcher({
           {brokerageMemberships.length > 0 && (
             <>
               <div className="border-t border-border" />
-              <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
+              <p className={`${SECTION_LABEL} px-3 pt-2 pb-1`}>
                 Brokerages
               </p>
               {brokerageMemberships.map((b) => (

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getSupabaseBrowser } from '@/lib/supabase-browser';
+import { H3 } from '@/lib/typography';
 
 interface Notification {
   id: string;
@@ -106,7 +107,7 @@ export function NotificationCenter({ slug }: { slug: string }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <span className="text-sm font-semibold">Notifications</span>
+          <span className={H3}>Notifications</span>
           <button onClick={() => setOpen(false)} className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground">
             <X size={14} />
           </button>

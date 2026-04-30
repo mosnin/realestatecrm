@@ -17,6 +17,7 @@ import {
 import { useTheme } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { secondaryNavItems } from '@/lib/nav-items';
+import { SECTION_LABEL } from '@/lib/typography';
 import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, FileText, ListChecks, CreditCard, Shield, Settings, Check, Sparkles, CalendarDays, Calendar, BarChart2, ClipboardList, Home } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
@@ -186,7 +187,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
               {!isBrokerOnly && !showBrokerMobileNavOnly && (
                 <>
                   {/* AI — single Chippi entry, matches the redesigned sidebar */}
-                  <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60 select-none">AI</p>
+                  <p className={`${SECTION_LABEL} px-3 pb-2 pt-1 select-none`}>AI</p>
                   {[
                     { href: `${base}/chippi`, label: 'Chippi', icon: Sparkles, exact: false },
                   ].map((item) => {
@@ -252,7 +253,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                   })}
 
                   {/* More — secondary destinations, visually subordinate */}
-                  <p className="px-3 pt-6 pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60 select-none">
+                  <p className={`${SECTION_LABEL} px-3 pt-6 pb-2 select-none`}>
                     More
                   </p>
                   {[
@@ -294,7 +295,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                   })}
 
                   {/* Settings section — expanded flat list */}
-                  <p className="px-3 pb-2 pt-5 text-[11px] font-medium text-muted-foreground select-none">Settings</p>
+                  <p className={`${SECTION_LABEL} px-3 pb-2 pt-5 select-none`}>Settings</p>
                   {[
                     { href: '/settings', label: 'Account', exact: true },
                     { href: '/settings/profile', label: 'Profile' },
@@ -328,7 +329,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                 <>
                   {brokerMobileNavSections.map((section) => (
                     <div key={section.title} className="pb-2">
-                      <p className="px-3 pb-1.5 text-[10px] font-medium text-muted-foreground">
+                      <p className={`${SECTION_LABEL} px-3 pb-1.5`}>
                         {section.title}
                       </p>
                       {section.items.map((item) => {
@@ -359,7 +360,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
             </nav>
             {isBroker && !showBrokerMobileNavOnly && (
               <div className="px-3 pb-2 space-y-0.5 border-t border-sidebar-border pt-3">
-                <p className="px-3 pb-1.5 text-[10px] font-medium text-muted-foreground">
+                <p className={`${SECTION_LABEL} px-3 pb-1.5`}>
                   Team
                 </p>
                 {brokerMobileNavItems.map((item) => {
@@ -409,7 +410,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                     ]},
                   ].map((section) => (
                     <div key={section.label}>
-                      <p className="px-3 pb-1 pt-2 text-[10px] font-medium text-muted-foreground">{section.label}</p>
+                      <p className={`${SECTION_LABEL} px-3 pb-1 pt-2`}>{section.label}</p>
                       {section.items.map((item) => {
                         const isActive = item.href === `${base}/settings` ? pathname === item.href : pathname.startsWith(item.href);
                         return (
@@ -427,7 +428,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                 </>
               ) : (
                 <>
-                  <p className="px-3 pb-1.5 text-[10px] font-medium text-muted-foreground">
+                  <p className={`${SECTION_LABEL} px-3 pb-1.5`}>
                     Account
                   </p>
                   {secondaryNavItems.map((item) => {
