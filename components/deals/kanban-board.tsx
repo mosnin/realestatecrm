@@ -92,6 +92,7 @@ interface SortableKanbanColumnProps {
   onStatusChange: (deal: DealWithRelations, status: 'won' | 'lost' | 'on_hold' | 'active') => void;
   nextStage?: DealStage | null;
   onAdvanceStage?: (deal: DealWithRelations, nextStageId: string) => void;
+  onOpenDeal?: (deal: DealWithRelations) => void;
 }
 
 function SortableKanbanColumn({
@@ -105,6 +106,7 @@ function SortableKanbanColumn({
   onStatusChange,
   nextStage,
   onAdvanceStage,
+  onOpenDeal,
 }: SortableKanbanColumnProps) {
   const {
     attributes,
@@ -139,9 +141,9 @@ function SortableKanbanColumn({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'rounded-xl transition-[box-shadow,background-color] duration-150',
-        isDropTarget &&
-          'ring-2 ring-inset ring-primary/70 bg-primary/5',
+        'rounded-lg transition-colors duration-150',
+        // Restrained drop indicator — paper-flat, no bright accent.
+        isDropTarget && 'bg-foreground/[0.04]',
       )}
     >
       <KanbanColumn
@@ -155,6 +157,7 @@ function SortableKanbanColumn({
         onStatusChange={onStatusChange}
         nextStage={nextStage}
         onAdvanceStage={onAdvanceStage}
+        onOpenDeal={onOpenDeal}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
     </div>
@@ -206,6 +209,8 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
   const [view, setView] = useState<'kanban' | 'list'>('list');
   const [searchQuery, setSearchQuery] = useState('');
+  // Slide-over panel state — clicking a card opens the deal here without nav.
+  const [panelDealId, setPanelDealId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<
     Set<'active' | 'won' | 'lost' | 'on_hold'>
   >(new Set(['active']));
