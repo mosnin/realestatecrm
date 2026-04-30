@@ -3,6 +3,15 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { Building2, ShieldCheck, UserCircle } from 'lucide-react';
+import {
+  H2,
+  BODY,
+  BODY_MUTED,
+  CAPTION,
+  PRIMARY_PILL,
+  SECTION_RHYTHM,
+  READING_MAX,
+} from '@/lib/typography';
 
 export default async function BrokerageInvitesPage({
   params,
@@ -30,19 +39,11 @@ export default async function BrokerageInvitesPage({
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center space-y-3 p-8">
-          <h2
-            className="text-2xl tracking-tight text-foreground"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
-            Something went wrong
-          </h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className={H2}>Something went wrong</h2>
+          <p className={BODY_MUTED}>
             We couldn&apos;t load your data. This is usually temporary.
           </p>
-          <a
-            href={`/s/${slug}/settings/brokerage`}
-            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150"
-          >
+          <a href={`/s/${slug}/settings/brokerage`} className={PRIMARY_PILL}>
             Try again
           </a>
         </div>
@@ -52,14 +53,9 @@ export default async function BrokerageInvitesPage({
 
   if (!userEmail) {
     return (
-      <div className="space-y-8 max-w-3xl">
-        <h2
-          className="text-2xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          Brokerage
-        </h2>
-        <p className="text-sm text-muted-foreground">No email address found for your account.</p>
+      <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
+        <h2 className={H2}>Brokerage</h2>
+        <p className={BODY_MUTED}>No email address found for your account.</p>
       </div>
     );
   }
