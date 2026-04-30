@@ -4,21 +4,9 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { buildIntakeUrl } from '@/lib/intake';
-import { Card, CardContent } from '@/components/ui/card';
-import { CopyLinkButton } from '../copy-link-button';
+import { IntakeLinkRow } from './intake-link-row';
 import { timeAgo } from '@/lib/formatting';
-import {
-  ClipboardList,
-  Pencil,
-  Share2,
-  ArrowRight,
-  ExternalLink,
-  PhoneIncoming,
-  TrendingUp,
-  Flame,
-  CheckCircle2,
-  XCircle,
-} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
 
 export async function generateMetadata({
@@ -95,10 +83,10 @@ export default async function IntakeOverviewPage({
       ]);
 
     if (formConfigResult.data) {
-      rentalConfigured = !!(formConfigResult.data as any).rentalFormConfig
-        ?.sections;
-      buyerConfigured = !!(formConfigResult.data as any).buyerFormConfig
-        ?.sections;
+      rentalConfigured = !!(formConfigResult.data as { rentalFormConfig?: { sections?: unknown } })
+        .rentalFormConfig?.sections;
+      buyerConfigured = !!(formConfigResult.data as { buyerFormConfig?: { sections?: unknown } })
+        .buyerFormConfig?.sections;
     }
 
     totalSubmissions = submissionsResult.count ?? 0;
@@ -109,338 +97,199 @@ export default async function IntakeOverviewPage({
   }
 
   const intakeUrl = buildIntakeUrl(space.slug);
+  const intakePath = `/apply/${space.slug}`;
+  const anyCustom = rentalConfigured || buyerConfigured;
 
   return (
     <div className="space-y-8 max-w-[1120px]">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Intake Form
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Manage your intake forms, track submissions, and share your link
-            with prospective clients.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <header className="flex items-end justify-between gap-4">
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Intake Form
+        </h1>
+        {anyCustom && (
           <Link
             href={`/s/${slug}/intake/customize`}
-            className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors duration-150"
           >
-            <Pencil size={14} />
-            Customize Form
+            Customize
+            <ArrowRight size={13} strokeWidth={1.75} />
           </Link>
-          <Link
-            href={`/s/${slug}/intake/share`}
-            className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-md border border-border bg-card hover:bg-muted transition-colors"
-          >
-            <Share2 size={14} />
-            Share
-          </Link>
-        </div>
+        )}
+      </header>
+
+      {/* Stats strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+        <StatCell
+          label="Submissions (30d)"
+          value={String(totalSubmissions)}
+        />
+        <StatCell
+          label="Hot leads"
+          value={String(hotLeadCount)}
+        />
+        <StatCell
+          label="Completion rate"
+          value={totalSubmissions > 0 ? '100%' : '—'}
+        />
       </div>
 
-      {/* Form status cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
-                <ClipboardList
-                  size={18}
-                  className="text-orange-600 dark:text-orange-400"
-                />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold">Rental Form</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  {rentalConfigured ? (
-                    <>
-                      <CheckCircle2
-                        size={13}
-                        className="text-emerald-500 flex-shrink-0"
-                      />
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400">
-                        Custom form configured
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2
-                        size={13}
-                        className="text-blue-500 flex-shrink-0"
-                      />
-                      <span className="text-xs text-blue-600 dark:text-blue-400">
-                        Using default template
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                <ClipboardList
-                  size={18}
-                  className="text-blue-600 dark:text-blue-400"
-                />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold">Buyer Form</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  {buyerConfigured ? (
-                    <>
-                      <CheckCircle2
-                        size={13}
-                        className="text-emerald-500 flex-shrink-0"
-                      />
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400">
-                        Custom form configured
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2
-                        size={13}
-                        className="text-blue-500 flex-shrink-0"
-                      />
-                      <span className="text-xs text-blue-600 dark:text-blue-400">
-                        Using default template
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
-                <PhoneIncoming size={16} className="text-muted-foreground" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold tabular-nums">
-              {totalSubmissions}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Submissions (last 30 days)
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
-                <Flame size={16} className="text-muted-foreground" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold tabular-nums text-red-600 dark:text-red-400">
-              {hotLeadCount}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Hot leads
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
-                <TrendingUp size={16} className="text-muted-foreground" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold tabular-nums">
-              {totalSubmissions > 0 ? `${Math.min(100, Math.round((totalSubmissions / Math.max(totalSubmissions, 1)) * 100))}%` : '--'}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Completion rate
-            </p>
-          </CardContent>
-        </Card>
+      {/* Form templates */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+        <FormStatusRow
+          name="Rental Form"
+          configured={rentalConfigured}
+          href={`/s/${slug}/intake/customize?form=rental`}
+        />
+        <FormStatusRow
+          name="Buyer Form"
+          configured={buyerConfigured}
+          href={`/s/${slug}/intake/customize?form=buyer`}
+        />
       </div>
 
       {/* Your intake link */}
-      <Card>
-        <CardContent className="p-5">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Share2 size={16} className="text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold leading-tight">
-                Your intake link
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Share this with prospective clients
-              </p>
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-full px-2.5 py-1 flex-shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              Live
-            </span>
+      <section className="rounded-xl border border-border/70 bg-background p-5 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-medium text-foreground">Your intake link</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Share this with prospects.
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2 font-mono text-muted-foreground border border-border/60 break-all line-clamp-2 sm:line-clamp-1">
-              {intakeUrl}
-            </code>
-            <CopyLinkButton url={intakeUrl} />
-            <a
-              href={`/apply/${space.slug}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-border bg-card hover:bg-muted transition-colors flex-shrink-0"
-            >
-              <ExternalLink size={13} />
-              <span className="hidden sm:inline">Preview</span>
-            </a>
-          </div>
-        </CardContent>
-      </Card>
+          <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground flex-shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
+            Live
+          </span>
+        </div>
+        <IntakeLinkRow url={intakeUrl} previewHref={intakePath} />
+      </section>
 
       {/* Recent submissions */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-foreground">
-            Recent submissions
-          </h2>
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-medium text-foreground">Recent submissions</h2>
           <Link
             href={`/s/${slug}/leads`}
-            className="text-xs text-primary font-medium hover:underline underline-offset-2 flex items-center gap-1"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 inline-flex items-center gap-1"
           >
-            View all leads <ArrowRight size={12} />
+            View all
+            <ArrowRight size={12} strokeWidth={1.75} />
           </Link>
         </div>
 
         {recentLeads.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
-                <PhoneIncoming
-                  size={20}
-                  className="text-muted-foreground"
-                />
-              </div>
-              <p className="text-sm font-medium text-foreground">
-                No submissions yet
-              </p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-[280px] mx-auto">
-                Share your intake link to start receiving applications from
-                prospective clients.
-              </p>
-              <Link
-                href={`/s/${slug}/intake/share`}
-                className="inline-flex items-center gap-1.5 text-xs text-primary font-medium hover:underline mt-3"
-              >
-                Share your link <ArrowRight size={12} />
-              </Link>
-            </CardContent>
-          </Card>
+          <p className="text-sm text-muted-foreground">
+            No submissions yet — share your link.
+          </p>
         ) : (
-          <Card>
-            <div className="divide-y divide-border">
-              {recentLeads.map((lead) => {
-                const isNew = lead.tags.includes('new-lead');
-                const scoreBadge =
-                  lead.scoreLabel === 'hot'
-                    ? {
-                        label: 'Hot',
-                        cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                      }
-                    : lead.scoreLabel === 'warm'
-                      ? {
-                          label: 'Warm',
-                          cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-                        }
-                      : lead.scoreLabel === 'cold'
-                        ? {
-                            label: 'Cold',
-                            cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-400',
-                          }
-                        : null;
-
-                const typeBadge =
-                  lead.leadType === 'buyer'
-                    ? {
-                        label: 'Buyer',
-                        cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-                      }
-                    : lead.leadType === 'rental'
-                      ? {
-                          label: 'Rental',
-                          cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-                        }
-                      : null;
-
-                return (
-                  <Link
-                    key={lead.id}
-                    href={`/s/${slug}/leads`}
-                    className="block"
-                  >
-                    <div
-                      className={`flex items-center gap-3 px-5 py-3.5 hover:bg-muted/40 transition-colors ${isNew ? 'bg-primary/[0.03]' : ''}`}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-                        {lead.name
-                          ?.split(' ')
-                          ?.map((n: string) => n?.[0])
-                          ?.join('')
-                          ?.toUpperCase()
-                          ?.slice(0, 2) || '??'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold truncate">
-                            {lead.name}
-                          </p>
-                          {isNew && (
-                            <span className="inline-flex text-[10px] font-semibold text-primary bg-primary/10 rounded-md px-1.5 py-0.5 flex-shrink-0">
-                              New
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-muted-foreground">
-                            {timeAgo(new Date(lead.createdAt))}
-                          </span>
-                          {scoreBadge && (
-                            <span
-                              className={`inline-flex text-[10px] font-semibold rounded-md px-1.5 py-0.5 ${scoreBadge.cls}`}
-                            >
-                              {scoreBadge.label}
-                            </span>
-                          )}
-                          {typeBadge && (
-                            <span
-                              className={`inline-flex text-[10px] font-semibold rounded-md px-1.5 py-0.5 ${typeBadge.cls}`}
-                            >
-                              {typeBadge.label}
-                            </span>
-                          )}
-                        </div>
-                      </div>
+          <div className="rounded-xl border border-border/70 bg-background overflow-hidden divide-y divide-border/70">
+            {recentLeads.map((lead) => {
+              const isNew = lead.tags.includes('new-lead');
+              const scoreLabel = lead.scoreLabel
+                ? lead.scoreLabel.charAt(0).toUpperCase() + lead.scoreLabel.slice(1)
+                : null;
+              const typeLabel =
+                lead.leadType === 'buyer'
+                  ? 'Buyer'
+                  : lead.leadType === 'rental'
+                    ? 'Rental'
+                    : null;
+              const initials =
+                lead.name
+                  ?.split(' ')
+                  ?.map((n: string) => n?.[0])
+                  ?.join('')
+                  ?.toUpperCase()
+                  ?.slice(0, 2) || '??';
+              return (
+                <Link
+                  key={lead.id}
+                  href={`/s/${slug}/leads`}
+                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-foreground/[0.04] active:bg-foreground/[0.045] transition-colors duration-150"
+                >
+                  <div className="w-9 h-9 rounded-full bg-foreground/[0.06] text-muted-foreground flex items-center justify-center text-[11px] font-medium flex-shrink-0">
+                    {initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {lead.name}
+                      </p>
+                      {isNew && (
+                        <span className="inline-flex text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5 flex-shrink-0">
+                          New
+                        </span>
+                      )}
                     </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </Card>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-muted-foreground">
+                        {timeAgo(new Date(lead.createdAt))}
+                      </span>
+                      {typeLabel && (
+                        <span className="inline-flex text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5">
+                          {typeLabel}
+                        </span>
+                      )}
+                      {scoreLabel && (
+                        <span className="inline-flex text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5">
+                          {scoreLabel}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         )}
-      </div>
+      </section>
     </div>
+  );
+}
+
+function StatCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-background p-5">
+      <p
+        className="text-3xl tracking-tight text-foreground tabular-nums"
+        style={{ fontFamily: 'var(--font-title)' }}
+      >
+        {value}
+      </p>
+      <p className="text-xs text-muted-foreground mt-1">{label}</p>
+    </div>
+  );
+}
+
+function FormStatusRow({
+  name,
+  configured,
+  href,
+}: {
+  name: string;
+  configured: boolean;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="bg-background flex items-center justify-between gap-3 px-5 py-4 hover:bg-foreground/[0.04] active:bg-foreground/[0.045] transition-colors duration-150"
+    >
+      <div>
+        <p className="text-sm font-medium text-foreground">{name}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {configured ? 'Custom form configured' : 'Using default template'}
+        </p>
+      </div>
+      <ArrowRight
+        size={14}
+        strokeWidth={1.75}
+        className="text-muted-foreground/60 flex-shrink-0"
+      />
+    </Link>
   );
 }
