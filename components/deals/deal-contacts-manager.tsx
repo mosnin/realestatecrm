@@ -76,11 +76,11 @@ export function DealContactsManager({ dealId, slug, initialContacts }: DealConta
       });
       if (!res.ok) {
         setContacts(previous);
-        toast.error('Failed to update contacts');
+        toast.error("Couldn't update the contacts. Try again.");
       }
     } catch {
       setContacts(previous);
-      toast.error('Failed to update contacts');
+      toast.error("Couldn't update the contacts. Try again.");
     }
   }
 
@@ -123,11 +123,11 @@ export function DealContactsManager({ dealId, slug, initialContacts }: DealConta
       });
       if (!res.ok) {
         setContacts(previous);
-        toast.error('Could not save role');
+        toast.error("Couldn't save that role.");
       }
     } catch {
       setContacts(previous);
-      toast.error('Could not save role');
+      toast.error("Couldn't save that role.");
     }
   }
 

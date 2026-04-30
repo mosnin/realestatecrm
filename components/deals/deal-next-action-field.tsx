@@ -38,12 +38,12 @@ export function DealNextActionField({ dealId, initialAction, initialDueAt }: Dea
         }),
       });
       if (!res.ok) {
-        toast.error('Could not save next action');
+        toast.error("Couldn't save the next action.");
         return;
       }
       setSavedAction(action.trim());
       setSavedDueAt(dueAt ? new Date(dueAt).toISOString() : '');
-      toast.success('Next action saved');
+      toast.success('Next action saved.');
     } finally {
       setSaving(false);
     }

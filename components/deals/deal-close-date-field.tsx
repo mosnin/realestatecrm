@@ -24,7 +24,7 @@ export function DealCloseDateField({ dealId, initial }: Props) {
         body: JSON.stringify({ days }),
       });
       if (!res.ok) {
-        toast.error('Could not shift the checklist');
+        toast.error("Couldn't shift the checklist.");
         return;
       }
       const data = await res.json();

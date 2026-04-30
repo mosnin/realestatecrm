@@ -58,11 +58,11 @@ export function DealMilestones({ dealId, initialMilestones }: DealMilestonesProp
         });
         if (!res.ok) {
           setMilestones(baseline);
-          toast.error('Failed to save milestones');
+          toast.error("Couldn't save the milestones. Try again.");
         }
       } catch {
         setMilestones(baseline);
-        toast.error('Failed to save milestones');
+        toast.error("Couldn't save the milestones. Try again.");
       }
     }, 400);
   }, [dealId]);
