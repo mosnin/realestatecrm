@@ -218,10 +218,13 @@ export function PublicPageShell({
 export function PublicPageMinimalShell({
   logoUrl,
   businessName,
+  hidePoweredBy = false,
   children,
 }: {
   logoUrl?: string | null;
   businessName: string;
+  /** Hide the "Powered by Chippi" mark — set on paid tiers (white-label). */
+  hidePoweredBy?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -235,10 +238,12 @@ export function PublicPageMinimalShell({
               <span className="text-sm font-semibold text-foreground truncate">{businessName}</span>
             )}
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0 opacity-30">
-            <span className="text-[10px] text-muted-foreground hidden sm:inline">Powered by</span>
-            <BrandLogo className="h-3.5" />
-          </div>
+          {!hidePoweredBy && (
+            <div className="flex items-center gap-1 flex-shrink-0 opacity-30">
+              <span className="text-[10px] text-muted-foreground hidden sm:inline">Powered by</span>
+              <BrandLogo className="h-3.5" />
+            </div>
+          )}
         </div>
       </header>
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6">

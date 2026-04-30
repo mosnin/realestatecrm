@@ -33,14 +33,14 @@ export function DealFollowUpField({
       });
     } catch {
       setFollowUpAt(previous);
-      toast.error('Network error — check your connection and try again.');
+      toast.error("I lost the connection. Check it and try again.");
       return;
     }
     if (!res.ok) {
       const body = await res.json().catch(() => ({} as { error?: string; message?: string }));
       const detail = body?.error || body?.message || `HTTP ${res.status}`;
       setFollowUpAt(previous);
-      toast.error(`Follow-up update failed: ${detail}`);
+      toast.error(`Couldn't save the follow-up: ${detail}`);
     }
   }
 

@@ -38,6 +38,35 @@ import { PRIMARY_PILL, SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
 
 const STORAGE_KEY_PREFIX = 'chippi_dynamic_';
 
+/**
+ * Per-question-type time estimate in seconds. Calibrated to "realtor reads,
+ * thinks, types/taps a real answer" — not a stopwatch on a robot. Long-form
+ * answers and multi-select dominate; single-tap selectors are cheap.
+ *
+ * If a new question type is added without updating this map, the estimator
+ * falls back to 10s per question — middle of the road.
+ */
+const QUESTION_TIME_SECONDS: Record<string, number> = {
+  text: 12,
+  textarea: 60,
+  email: 8,
+  phone: 8,
+  number: 8,
+  date: 10,
+  select: 5,
+  radio: 5,
+  multi_select: 15,
+  checkbox: 5,
+};
+
+function estimateMinutes(questions: FormQuestion[]): number {
+  const totalSeconds = questions.reduce(
+    (sum, q) => sum + (QUESTION_TIME_SECONDS[q.type] ?? 10),
+    0,
+  );
+  return Math.max(1, Math.ceil(totalSeconds / 60));
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type AnswerMap = Record<string, string | string[]>;
@@ -1150,12 +1179,12 @@ export function DynamicApplicationForm({
   const currentSection = isOnGettingStarted ? null : sortedSections[sectionIndex];
   const isLastStep = currentStep === totalSteps;
 
-  // Estimated time from the visible question count. ~4 questions/min is realistic.
-  const questionCount = sortedSections.reduce(
-    (acc, s) => acc + s.questions.filter((q) => isQuestionVisible(q, answers)).length,
-    0,
+  // Estimated time, weighted by question type. A long-form textarea costs
+  // 60s; a radio costs 5s. Honest expectation > friendly lie.
+  const visibleQuestions = sortedSections.flatMap((s) =>
+    s.questions.filter((q) => isQuestionVisible(q, answers)),
   );
-  const estimatedMinutes = Math.max(1, Math.ceil(questionCount / 4));
+  const estimatedMinutes = estimateMinutes(visibleQuestions);
 
   const primaryTextColor = pickContrastColor(accentColor);
 

@@ -106,20 +106,20 @@ export function KanbanColumn({
         }),
       });
       if (!res.ok) {
-        toast.error('Failed to create deal');
+        toast.error("Couldn't create that deal. Try again.");
         setSubmitting(false);
         submittedRef.current = false;
         focusInput();
         return;
       }
-      toast.success('Deal created');
+      toast.success('Deal added.');
       setQuickAddTitle('');
       setSubmitting(false);
       submittedRef.current = false;
       onDealCreated();
       focusInput();
     } catch {
-      toast.error('Failed to create deal');
+      toast.error("Couldn't create that deal. Try again.");
       setSubmitting(false);
       submittedRef.current = false;
       focusInput();

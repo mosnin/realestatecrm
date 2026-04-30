@@ -371,8 +371,8 @@ export function MorningReplay({ slug }: Props) {
             <span className="text-[12px] text-muted-foreground tabular-nums">{range}</span>
             <button
               type="button"
-              onClick={dismiss}
-              aria-label="Dismiss"
+              onClick={forceFull ? collapseAgain : dismiss}
+              aria-label={forceFull ? 'Collapse' : 'Dismiss'}
               className="ml-auto w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
             >
               <X size={13} />

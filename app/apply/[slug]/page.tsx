@@ -134,6 +134,11 @@ export default async function PublicApplyPage({
     return <FormUnavailable agentName={agentName} />;
   }
 
+  // Hide the Chippi mark on paid tiers — visible only on the free tier as
+  // a value-exchange brand exposure. The realtor pays for white-label when
+  // they're on an active paid plan (or trialing into one).
+  const hidePoweredBy = status === 'active' || status === 'trialing';
+
   // ── Resolve dynamic form configs (dual: rental + buyer) ──────────────────
   type IFC = import('@/lib/types').IntakeFormConfig;
   let resolvedFormConfig: IFC | null = null;
@@ -228,6 +233,7 @@ export default async function PublicApplyPage({
         pageIntro={pageIntro}
         trustLine={`Your information is shared only with ${agentName} and used solely for your inquiry.`}
         agentPresenceLabel="Applying with"
+        hidePoweredBy={hidePoweredBy}
         customization={customization}
       >
         <ApplicationFormLoader slug={slug} spaceId={space.id} businessName={businessName} customization={customization} formConfig={resolvedFormConfig} rentalFormConfig={resolvedRentalFormConfig} buyerFormConfig={resolvedBuyerFormConfig} resumeToken={resumeToken} />

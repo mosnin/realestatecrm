@@ -76,6 +76,11 @@ export default async function PublicBookingPage({
     return <FormUnavailable agentName={agentName} />;
   }
 
+  // Hide the Chippi mark on paid tiers — visible only on the free tier as
+  // a value-exchange brand exposure. The realtor pays for white-label when
+  // they're on an active paid plan (or trialing into one).
+  const hidePoweredBy = subStatus === 'active' || subStatus === 'trialing';
+
   const customization = {
     accentColor: settings?.intakeAccentColor || '#ff964f',
     font: settings?.intakeFont || 'system',
@@ -102,6 +107,7 @@ export default async function PublicBookingPage({
         pageIntro={pageIntro}
         trustLine={`Your information is shared only with ${agentName} and used solely for scheduling.`}
         agentPresenceLabel="Booking with"
+        hidePoweredBy={hidePoweredBy}
         customization={customization}
       >
         <BookingForm slug={slug} duration={duration} businessName={businessName} timezone={timezone} accentColor={customization.accentColor} />

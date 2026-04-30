@@ -43,10 +43,10 @@ export function DealStageSelector({
         body: JSON.stringify({ stageId: newStageId }),
       });
       if (!res.ok) throw new Error('Failed to update stage');
-      toast.success('Stage updated');
+      toast.success('Stage updated.');
     } catch {
       setStageId(previous);
-      toast.error('Failed to update stage');
+      toast.error("Couldn't update the stage. Try again.");
     } finally {
       setSaving(false);
     }

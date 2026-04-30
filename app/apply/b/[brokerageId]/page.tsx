@@ -145,6 +145,11 @@ export default async function BrokerageApplyPage({
     return <FormUnavailable agentName={agentName} />;
   }
 
+  // Hide the Chippi mark on paid tiers — visible only on the free tier as
+  // a value-exchange brand exposure. The brokerage owner pays for white-label
+  // when their linked space is on an active paid plan (or trialing into one).
+  const hidePoweredBy = status === 'active' || status === 'trialing';
+
   const customization = {
     accentColor: settings?.intakeAccentColor || '#ff964f',
     borderRadius: settings?.intakeBorderRadius || 'rounded',
@@ -176,6 +181,8 @@ export default async function BrokerageApplyPage({
       pageTitle={pageTitle}
       pageIntro={pageIntro}
       trustLine={`Your information is shared only with ${agentName} and used solely for your inquiry.`}
+      agentPresenceLabel="Applying to"
+      hidePoweredBy={hidePoweredBy}
       customization={customization}
     >
       <ApplicationFormLoader

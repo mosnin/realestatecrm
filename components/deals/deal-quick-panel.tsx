@@ -104,14 +104,14 @@ export function DealQuickPanel({
         body: JSON.stringify({ type: 'note', content: noteDraft.trim() }),
       });
       if (!res.ok) {
-        toast.error("Couldn't save note");
+        toast.error("Couldn't save that note.");
         return;
       }
       const created = await res.json();
       setActivities((prev) => [created, ...prev]);
       setNoteDraft('');
     } catch {
-      toast.error("Couldn't save note");
+      toast.error("Couldn't save that note.");
     } finally {
       setPosting(false);
     }
@@ -333,10 +333,10 @@ export function DealQuickPanel({
 
             <div className="mt-4 space-y-3">
               {activitiesLoading ? (
-                <p className="text-xs text-muted-foreground">Loading…</p>
+                <p className="text-xs text-muted-foreground">One moment.</p>
               ) : activities.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  No activity yet.
+                  Nothing logged yet.
                 </p>
               ) : (
                 activities.slice(0, 8).map((a) => (
