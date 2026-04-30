@@ -391,6 +391,18 @@ export function ApplicationStatusClient({
         </div>
       )}
 
+      {/* Tour request — quiet CTA above the message thread. Opens an inline
+          form; submit lands as a structured AgentQuestion in the realtor's
+          Chippi focus card and as a message in this thread. Only rendered
+          when the applicant is authenticated via portal token. */}
+      {token && contact.applicationRef && (
+        <TourRequestPanel
+          applicationRef={contact.applicationRef}
+          token={token}
+          onSubmitted={() => { void refreshData(); }}
+        />
+      )}
+
       {/* Messages */}
       <section aria-label="Messages" className="rounded-xl bg-card border border-border/60 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-border/40">
@@ -687,6 +699,211 @@ function SimpleStatusView({
 }
 
 // ── Shared Next Steps Text ────────────────────────────────────────────────────
+
+/**
+ * Tour-request panel — collapsed by default to keep the portal calm.
+ * Click "Request a tour" → inline form opens. Submit hits
+ * /api/applications/portal/tour-request, which logs an ApplicationMessage
+ * (visible immediately in the thread below) and creates an AgentQuestion
+ * scoped to the realtor (visible in their Chippi focus card).
+ *
+ * Single primary CTA + a Cancel link. Sweat-the-detail rules:
+ *   - placeholder text is example-driven, not instructions
+ *   - field labels read as one short sentence, not form-y "Property *"
+ *   - submit button is disabled until the only required field has content
+ *   - on success the form collapses and a small confirmation appears
+ *   - rate-limit / network errors surface inline, not as a toast (the
+ *     applicant may be on a slow connection in a hallway)
+ */
+function TourRequestPanel({
+  applicationRef,
+  token,
+  onSubmitted,
+}: {
+  applicationRef: string;
+  token: string;
+  onSubmitted: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [preferredTimes, setPreferredTimes] = useState('');
+  const [propertyAddress, setPropertyAddress] = useState('');
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+
+  const canSubmit = preferredTimes.trim().length > 0 && !submitting;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch('/api/applications/portal/tour-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationRef,
+          token,
+          preferredTimes,
+          propertyAddress,
+          notes,
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setSubmitError(data?.error ?? 'Could not send your request. Please try again.');
+        return;
+      }
+      // Reset + collapse
+      setPreferredTimes('');
+      setPropertyAddress('');
+      setNotes('');
+      setOpen(false);
+      setConfirmed(true);
+      onSubmitted();
+    } catch {
+      setSubmitError('Network error. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (confirmed && !open) {
+    return (
+      <div
+        role="status"
+        className="rounded-xl bg-emerald-50/60 dark:bg-emerald-500/10 border border-emerald-200/70 dark:border-emerald-500/20 p-4 flex items-center gap-3"
+      >
+        <CalendarCheck size={16} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" aria-hidden="true" />
+        <div className="flex-1 min-w-0 text-sm">
+          <p className="font-medium text-foreground">Tour request sent.</p>
+          <p className="text-muted-foreground">Your realtor will respond shortly.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setConfirmed(false);
+            setOpen(true);
+          }}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Request another
+        </button>
+      </div>
+    );
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full rounded-xl border border-dashed border-border/70 hover:border-border bg-muted/20 hover:bg-muted/40 transition-colors p-4 text-left flex items-center gap-3 group"
+      >
+        <div className="w-8 h-8 rounded-lg bg-foreground/[0.04] flex items-center justify-center flex-shrink-0">
+          <CalendarCheck size={14} className="text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.75} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground">Request a tour</p>
+          <p className="text-xs text-muted-foreground">Tell your realtor when you&apos;re free; they&apos;ll set it up.</p>
+        </div>
+      </button>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-xl bg-card border border-border/60 shadow-sm p-5 space-y-4"
+      aria-label="Request a tour"
+    >
+      <div className="flex items-center gap-2">
+        <CalendarCheck size={14} className="text-muted-foreground" aria-hidden="true" />
+        <h2 className="text-sm font-semibold text-foreground">Request a tour</h2>
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor="tour-times" className="text-xs font-medium text-muted-foreground">
+          When are you free?
+        </label>
+        <textarea
+          id="tour-times"
+          rows={2}
+          value={preferredTimes}
+          onChange={(e) => setPreferredTimes(e.target.value)}
+          disabled={submitting}
+          placeholder="Saturday or Sunday afternoon · weekday evenings after 6"
+          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors duration-150 outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:opacity-50 resize-none"
+          maxLength={500}
+          required
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor="tour-address" className="text-xs font-medium text-muted-foreground">
+          Property (optional)
+        </label>
+        <input
+          id="tour-address"
+          type="text"
+          value={propertyAddress}
+          onChange={(e) => setPropertyAddress(e.target.value)}
+          disabled={submitting}
+          placeholder="25 Park Slope Place, Brooklyn"
+          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors duration-150 outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:opacity-50"
+          maxLength={300}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor="tour-notes" className="text-xs font-medium text-muted-foreground">
+          Anything else? (optional)
+        </label>
+        <textarea
+          id="tour-notes"
+          rows={2}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          disabled={submitting}
+          placeholder="Bringing my partner; we'd love a video walkthrough first if possible."
+          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors duration-150 outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:opacity-50 resize-none"
+          maxLength={1000}
+        />
+      </div>
+
+      {submitError && (
+        <div role="alert" className="flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50/60 dark:border-rose-900 dark:bg-rose-950/40 px-3 py-2 text-sm text-rose-800 dark:text-rose-200">
+          <AlertCircle size={14} className="flex-shrink-0 mt-0.5" aria-hidden="true" />
+          <span>{submitError}</span>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="inline-flex items-center justify-center gap-1.5 rounded-md bg-foreground text-background px-4 py-2 text-sm font-medium transition-opacity duration-150 hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {submitting ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Send size={13} aria-hidden="true" />}
+          Send request
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            setSubmitError(null);
+          }}
+          disabled={submitting}
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
 
 function NextStepsText({ status, businessName }: { status: string; businessName: string }) {
   switch (status) {

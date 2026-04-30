@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import type { Contact, ApplicationData, LeadScoreDetails, IntakeFormConfig } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
+import { CopyApplicantPortalLink } from '@/components/contacts/copy-applicant-portal-link';
 import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-field';
 import { ContactLifecycleFields } from '@/components/contacts/contact-lifecycle-fields';
 import { FollowUpSuggestions } from '@/components/contacts/follow-up-suggestions';
@@ -152,6 +153,27 @@ export default async function ClientDetailPage({
               <Link href={`/s/${slug}/tours?schedule=${contact.id}`} className="inline-flex items-center justify-center gap-1 text-xs rounded-md border border-border py-2 hover:bg-muted transition-colors"><CalendarPlus size={12} /> Task</Link>
               <Link href={`/s/${slug}/deals`} className="inline-flex items-center justify-center gap-1 text-xs rounded-md border border-border py-2 hover:bg-muted transition-colors"><Briefcase size={12} /> Deal</Link>
             </div>
+
+            {/* Applicant portal — quiet share affordance. Only renders when
+                this contact actually has an applicant portal (came in via
+                the intake form), keyed off applicationRef + statusPortalToken.
+                URL points at the existing /apply/[slug]/status portal. */}
+            {contact.applicationRef && contact.statusPortalToken && (
+              <div className="rounded-lg border border-border p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">Applicant portal</p>
+                  <span className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70">
+                    Live
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {contact.name.split(' ')[0]} can see status, message you, and request tours here.
+                </p>
+                <CopyApplicantPortalLink
+                  url={`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com'}/apply/${slug}/status?ref=${encodeURIComponent(contact.applicationRef)}&token=${encodeURIComponent(contact.statusPortalToken)}`}
+                />
+              </div>
+            )}
 
             <div className="space-y-3 rounded-lg border border-border p-3">
               <p className="text-sm font-semibold">Contact details</p>
