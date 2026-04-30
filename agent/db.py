@@ -494,6 +494,16 @@ async def supabase() -> Client:
     return _client
 
 
+async def get_pool() -> asyncpg.Pool:
+    """Public accessor for the asyncpg pool.
+
+    Use this when you need raw SQL — vector similarity search, complex CTEs,
+    anything the QueryBuilder doesn't cover. Most code should keep using the
+    fluent API via `supabase()`.
+    """
+    return await _get_pool()
+
+
 async def close_pool() -> None:
     """Tear down the pool. Useful in tests; Modal functions don't need it."""
     global _pool
