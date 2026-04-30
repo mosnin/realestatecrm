@@ -253,6 +253,17 @@ async def chat_turn(item: dict):
             data = getattr(event, "data", None)
             if data is None:
                 return None
+            # The Responses API streams BOTH response.output_text.delta
+            # (model text) and response.function_call_arguments.delta
+            # (the JSON args being constructed for a tool call). Both
+            # carry a `delta` attribute. Without filtering, the function-
+            # call arg JSON leaks into the chat as "raw" model text right
+            # before each tool card. Only forward genuine output_text
+            # deltas; function-call args land properly via the
+            # RunItemStreamEvent → tool_call_item path below.
+            data_type = getattr(data, "type", "") or ""
+            if data_type and data_type != "response.output_text.delta":
+                return None
             delta = getattr(data, "delta", None)
             if delta:
                 return {"type": "token", "delta": str(delta)}
