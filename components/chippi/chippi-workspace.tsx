@@ -248,8 +248,9 @@ export function ChippiWorkspace({
   );
 
   const handleSend = useCallback(
-    async (text: string, mentions: MentionItem[]) => {
-      if (!text) return;
+    async (text: string, mentions: MentionItem[], attachmentIds?: string[]) => {
+      const hasAttachments = Array.isArray(attachmentIds) && attachmentIds.length > 0;
+      if (!text && !hasAttachments) return;
       let contextPrefix = '';
       if (mentions.length > 0) {
         const labels = mentions.map(
@@ -257,7 +258,7 @@ export function ChippiWorkspace({
         );
         contextPrefix = `(Referencing: ${labels.join(', ')})\n\n`;
       }
-      await send(contextPrefix + text);
+      await send(contextPrefix + text, attachmentIds);
 
       // Bump the sidebar's conversation ordering.
       const cid = activeConversationId;

@@ -53,12 +53,23 @@ def emit(obj: dict) -> None:
 
 
 def _attach_message(message: str, attachments: list[dict[str, Any]] | None) -> str:
-    """Append attachment context to the user message so the model sees it."""
+    """Append non-image attachment context to the user message text.
+
+    Image attachments are NOT inlined here — they're handled separately by
+    `_build_user_input` as structured `input_image` parts so the vision model
+    actually sees the pixels. This function only enriches the text part with
+    extracted document text or a pointer to `read_attachment` for non-image
+    files.
+    """
     if not attachments:
         return message
     parts = [message]
     for att in attachments:
         if not isinstance(att, dict):
+            continue
+        mime = (att.get("mime_type") or "").lower()
+        if mime.startswith("image/"):
+            # Skip — vision path handles images directly.
             continue
         filename = att.get("filename", "attachment")
         extracted = att.get("extracted_text")
@@ -71,6 +82,33 @@ def _attach_message(message: str, attachments: list[dict[str, Any]] | None) -> s
                 "call read_attachment to retrieve if needed]"
             )
     return "".join(parts)
+
+
+def _build_user_input(
+    text: str, attachments: list[dict[str, Any]] | None
+) -> str | list[dict[str, Any]]:
+    """Build the `content` value for the trailing user input item.
+
+    When the turn has at least one image attachment with a `public_url`, the
+    Agents SDK / Responses API needs multi-part content: an `input_text` part
+    plus one `input_image` part per image. Otherwise we keep the simple string
+    form to avoid restructuring the doc-only path.
+    """
+    if not attachments:
+        return text
+    image_atts = [
+        a
+        for a in attachments
+        if isinstance(a, dict)
+        and (a.get("mime_type") or "").lower().startswith("image/")
+        and a.get("public_url")
+    ]
+    if not image_atts:
+        return text
+    content: list[dict[str, Any]] = [{"type": "input_text", "text": text}]
+    for att in image_atts:
+        content.append({"type": "input_image", "image_url": att["public_url"]})
+    return content
 
 
 def _safe_json_loads(value: Any) -> Any:
@@ -223,7 +261,8 @@ async def main() -> int:
     )
     ctx.current_agent_type = "cowork"
 
-    message = _attach_message(payload["message"], payload.get("attachments"))
+    attachments = payload.get("attachments") or []
+    message = _attach_message(payload["message"], attachments)
     history = payload.get("history") or []
 
     # The Agents SDK's Runner.run_streamed accepts `input` as either a string
@@ -237,7 +276,9 @@ async def main() -> int:
         content = turn.get("content")
         if role in ("user", "assistant", "system") and content:
             input_items.append({"role": role, "content": str(content)})
-    input_items.append({"role": "user", "content": message})
+
+    user_content = _build_user_input(message, attachments)
+    input_items.append({"role": "user", "content": user_content})
 
     try:
         agent = make_cowork_agent()

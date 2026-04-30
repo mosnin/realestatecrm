@@ -31,7 +31,7 @@ type Mode = 'search' | 'think' | 'draft' | null;
 
 interface ChippiPromptBoxProps {
   placeholder?: string;
-  onSend?: (message: string, mentions: MentionItem[]) => void;
+  onSend?: (message: string, mentions: MentionItem[], attachmentIds?: string[]) => void;
   onMentionSearch?: (query: string) => Promise<MentionItem[]>;
   onAttach?: (files: File[]) => void;
   onVoiceStart?: () => void;
@@ -41,8 +41,47 @@ interface ChippiPromptBoxProps {
   autoFocus?: boolean;
 }
 
+type UploadedAttachment = {
+  id: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  publicUrl: string;
+  isImage: boolean;
+  extractionStatus: 'pending' | 'skipped' | 'done' | 'failed';
+  // local-only fields
+  localId: string;
+  uploadStatus: 'uploading' | 'ready' | 'error';
+  error?: string;
+  // image preview for the uploading state — once `ready` lands we keep using
+  // it because the public URL works too, but the object URL displays instantly.
+  previewUrl?: string;
+  abort?: AbortController;
+};
+
 const MAX_HEIGHT_PX = 240;
-const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB — matches /api/ai/attachments
+
+const ALLOWED_MIME = new Set<string>([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  'text/csv',
+  'application/json',
+  'text/markdown',
+]);
+
+const ACCEPT_ATTR =
+  'image/png,image/jpeg,image/webp,image/gif,' +
+  'application/pdf,' +
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document,' +
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,' +
+  'text/plain,text/csv,application/json,text/markdown';
 
 const MODE_META: Record<Exclude<Mode, null>, {
   label: string;
@@ -107,8 +146,9 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     const [highlightedIndex, setHighlightedIndex] = useState(0);
 
     const [mode, setMode] = useState<Mode>(null);
-    const [files, setFiles] = useState<File[]>([]);
-    const [filePreviews, setFilePreviews] = useState<string[]>([]);
+    const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
+    const [attachError, setAttachError] = useState<string | null>(null);
+    const localCounterRef = useRef(0);
 
     const [isRecording, setIsRecording] = useState(false);
     const [recordSeconds, setRecordSeconds] = useState(0);
@@ -123,8 +163,11 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
 
     React.useImperativeHandle(ref, () => textareaRef.current as HTMLTextAreaElement, []);
 
-    const hasContent = message.trim().length > 0 || files.length > 0;
-    const sendDisabled = disabled || isLoading || !hasContent;
+    const hasReadyAttachments = attachments.some((a) => a.uploadStatus === 'ready');
+    const hasUploadingAttachments = attachments.some((a) => a.uploadStatus === 'uploading');
+    const hasContent = message.trim().length > 0 || hasReadyAttachments;
+    const sendDisabled =
+      disabled || isLoading || !hasContent || hasUploadingAttachments;
 
     const activePlaceholder =
       isRecording
@@ -177,10 +220,16 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       return () => clearTimeout(t);
     }, [mentionQuery, mentionOpen, searchMentions]);
 
-    // Cleanup file preview object URLs
+    // Cleanup attachment preview object URLs + abort any in-flight uploads on unmount
     useEffect(() => {
       return () => {
-        filePreviews.forEach((url) => URL.revokeObjectURL(url));
+        setAttachments((prev) => {
+          for (const a of prev) {
+            if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
+            a.abort?.abort();
+          }
+          return prev;
+        });
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -210,47 +259,196 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       };
     }, [isRecording]);
 
-    function resetFiles() {
-      filePreviews.forEach((url) => URL.revokeObjectURL(url));
-      setFiles([]);
-      setFilePreviews([]);
+    function resetAttachments() {
+      setAttachments((prev) => {
+        for (const a of prev) {
+          if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
+          a.abort?.abort();
+        }
+        return [];
+      });
     }
 
-    function acceptFiles(incoming: File[]) {
-      if (!onAttach) return;
-      const images = incoming.filter(
-        (f) => f.type.startsWith('image/') && f.size <= MAX_FILE_BYTES,
+    async function uploadFile(file: File) {
+      const mime = (file.type || '').toLowerCase();
+      if (!ALLOWED_MIME.has(mime)) {
+        setAttachError(`Unsupported file type: ${mime || 'unknown'}`);
+        return;
+      }
+      if (file.size <= 0) {
+        setAttachError('Empty file');
+        return;
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        setAttachError(
+          `File exceeds ${Math.floor(MAX_FILE_BYTES / 1024 / 1024)} MB limit`,
+        );
+        return;
+      }
+      setAttachError(null);
+
+      const isImage = mime.startsWith('image/');
+      const localId = `local-${++localCounterRef.current}`;
+      const previewUrl = isImage ? URL.createObjectURL(file) : undefined;
+      const abort = new AbortController();
+
+      const initial: UploadedAttachment = {
+        id: localId,
+        filename: file.name || 'file',
+        mimeType: mime,
+        sizeBytes: file.size,
+        publicUrl: '',
+        isImage,
+        extractionStatus: isImage ? 'skipped' : 'pending',
+        localId,
+        uploadStatus: 'uploading',
+        previewUrl,
+        abort,
+      };
+      setAttachments((prev) => [...prev, initial]);
+
+      // Notify the parent if it cares — this is informational only now,
+      // since the actual upload happens here.
+      try {
+        onAttach?.([file]);
+      } catch {
+        /* parent handler is best-effort */
+      }
+
+      const form = new FormData();
+      form.append('file', file);
+
+      let res: Response;
+      try {
+        res = await fetch('/api/ai/attachments', {
+          method: 'POST',
+          body: form,
+          signal: abort.signal,
+        });
+      } catch (err) {
+        // Aborted = user removed the chip; we already popped it from state.
+        if ((err as { name?: string })?.name === 'AbortError') return;
+        const message = err instanceof Error ? err.message : 'Upload failed';
+        setAttachments((prev) =>
+          prev.map((a) =>
+            a.localId === localId
+              ? { ...a, uploadStatus: 'error', error: message }
+              : a,
+          ),
+        );
+        return;
+      }
+
+      if (!res.ok) {
+        let message = `Upload failed (${res.status})`;
+        try {
+          const json = (await res.json()) as { error?: string };
+          if (json?.error) message = json.error;
+        } catch {
+          /* ignore parse error */
+        }
+        setAttachments((prev) =>
+          prev.map((a) =>
+            a.localId === localId
+              ? { ...a, uploadStatus: 'error', error: message }
+              : a,
+          ),
+        );
+        return;
+      }
+
+      let data: {
+        id: string;
+        filename: string;
+        mimeType: string;
+        sizeBytes: number;
+        publicUrl: string;
+        isImage: boolean;
+        extractionStatus: 'pending' | 'skipped' | 'done' | 'failed';
+      };
+      try {
+        data = await res.json();
+      } catch {
+        setAttachments((prev) =>
+          prev.map((a) =>
+            a.localId === localId
+              ? { ...a, uploadStatus: 'error', error: 'Bad server response' }
+              : a,
+          ),
+        );
+        return;
+      }
+
+      setAttachments((prev) =>
+        prev.map((a) =>
+          a.localId === localId
+            ? {
+                ...a,
+                id: data.id,
+                filename: data.filename,
+                mimeType: data.mimeType,
+                sizeBytes: data.sizeBytes,
+                publicUrl: data.publicUrl,
+                isImage: data.isImage,
+                extractionStatus: data.extractionStatus,
+                uploadStatus: 'ready',
+                abort: undefined,
+              }
+            : a,
+        ),
       );
-      if (images.length === 0) return;
-      // Max one image per send
-      const next = images.slice(0, 1);
-      filePreviews.forEach((url) => URL.revokeObjectURL(url));
-      setFiles(next);
-      setFilePreviews(next.map((f) => URL.createObjectURL(f)));
-      onAttach(next);
     }
 
-    function removeFile(idx: number) {
-      const url = filePreviews[idx];
-      if (url) URL.revokeObjectURL(url);
-      setFiles((prev) => prev.filter((_, i) => i !== idx));
-      setFilePreviews((prev) => prev.filter((_, i) => i !== idx));
+    function uploadFiles(incoming: File[]) {
+      for (const f of incoming) {
+        void uploadFile(f);
+      }
+    }
+
+    function removeAttachment(localId: string) {
+      const target = attachments.find((a) => a.localId === localId);
+      if (!target) return;
+      // Abort upload if still in flight
+      target.abort?.abort();
+      // Best-effort server-side delete if the row exists
+      if (target.uploadStatus === 'ready' && target.id && !target.id.startsWith('local-')) {
+        void fetch(`/api/ai/attachments?id=${encodeURIComponent(target.id)}`, {
+          method: 'DELETE',
+        }).catch(() => {});
+      }
+      if (target.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      setAttachments((prev) => prev.filter((a) => a.localId !== localId));
     }
 
     function handleSubmit() {
       if (sendDisabled) return;
+      // Block submit while uploads are still in flight — readiness is the
+      // entire point of the upload-on-select model.
+      if (hasUploadingAttachments) return;
       const base = message.trim();
-      const fileSuffix = files.map((f) => `[Attached: ${f.name}]`).join(' ');
       const wrapped = mode && base
         ? `[${MODE_META[mode].prefix}: ${base}]`
         : base;
-      const finalText = [wrapped, fileSuffix].filter(Boolean).join(' ').trim();
-      if (!finalText) return;
-      onSend?.(finalText, mentions);
+      const readyAttachmentIds = attachments
+        .filter((a) => a.uploadStatus === 'ready')
+        .map((a) => a.id);
+      const finalText = wrapped;
+      if (!finalText && readyAttachmentIds.length === 0) return;
+      onSend?.(
+        finalText,
+        mentions,
+        readyAttachmentIds.length ? readyAttachmentIds : undefined,
+      );
       setMessage('');
       setMentions([]);
       setMode(null);
-      resetFiles();
+      // Don't DELETE the rows — the server is keeping them as part of the
+      // turn. Just clear local state and revoke object URLs.
+      for (const a of attachments) {
+        if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
+      }
+      setAttachments([]);
+      setAttachError(null);
     }
 
     function selectMention(item: MentionItem) {
@@ -309,10 +507,11 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     }
 
     function handleDrop(e: React.DragEvent) {
-      // Files first if attach is supported
-      if (onAttach && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      // Files first — uploadFile() validates the mime/size, so just hand
+      // everything through.
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
         e.preventDefault();
-        acceptFiles(Array.from(e.dataTransfer.files));
+        uploadFiles(Array.from(e.dataTransfer.files));
         return;
       }
       const text = e.dataTransfer.getData('text/plain');
@@ -324,7 +523,6 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     }
 
     function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
-      if (!onAttach) return;
       const items = e.clipboardData?.items;
       if (!items) return;
       const pastedFiles: File[] = [];
@@ -332,12 +530,12 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
         const item = items[i];
         if (item.kind === 'file') {
           const f = item.getAsFile();
-          if (f && f.type.startsWith('image/')) pastedFiles.push(f);
+          if (f) pastedFiles.push(f);
         }
       }
       if (pastedFiles.length > 0) {
         e.preventDefault();
-        acceptFiles(pastedFiles);
+        uploadFiles(pastedFiles);
       }
     }
 
@@ -488,55 +686,128 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
             onDrop={handleDrop}
           >
             {/* Hidden file input */}
-            {onAttach && (
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple={false}
-                className="hidden"
-                onChange={(e) => {
-                  const list = e.target.files;
-                  if (list && list.length > 0) acceptFiles(Array.from(list));
-                  if (e.target) e.target.value = '';
-                }}
-              />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPT_ATTR}
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const list = e.target.files;
+                if (list && list.length > 0) uploadFiles(Array.from(list));
+                if (e.target) e.target.value = '';
+              }}
+            />
+
+            {/* Attachment chips row */}
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 px-3 pt-3">
+                {attachments.map((a) => {
+                  const isImg = a.isImage || (a.previewUrl != null);
+                  const showSrc = a.previewUrl || (a.publicUrl || '');
+                  const errorTone = a.uploadStatus === 'error';
+                  if (isImg) {
+                    return (
+                      <div
+                        key={a.localId}
+                        className={cn(
+                          'relative w-16 h-16 rounded-lg overflow-hidden border bg-foreground/[0.03]',
+                          'transition-colors duration-150',
+                          errorTone ? 'border-rose-400/70' : 'border-border/60',
+                        )}
+                      >
+                        {showSrc ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={showSrc}
+                            alt={a.filename}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                            <FileText size={18} />
+                          </div>
+                        )}
+                        {a.uploadStatus === 'uploading' && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-background/40">
+                            <Loader2 size={14} className="text-foreground animate-spin" />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(a.localId)}
+                          aria-label={`Remove ${a.filename}`}
+                          className={cn(
+                            'absolute top-0.5 right-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full',
+                            'bg-background/90 border border-border/60 text-foreground',
+                            'hover:bg-background transition-colors duration-150',
+                          )}
+                        >
+                          <X size={9} />
+                        </button>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div
+                      key={a.localId}
+                      className={cn(
+                        'relative inline-flex items-center gap-2 h-12 pl-2 pr-7 rounded-lg border',
+                        'bg-foreground/[0.04] transition-colors duration-150',
+                        errorTone ? 'border-rose-400/70' : 'border-border/60',
+                      )}
+                      title={a.error || a.filename}
+                    >
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-background/70 text-muted-foreground flex-shrink-0">
+                        <FileText size={13} />
+                      </span>
+                      <div className="flex flex-col min-w-0">
+                        <span className="truncate max-w-[180px] text-[12px] font-medium text-foreground leading-tight">
+                          {a.filename.length > 24 ? `${a.filename.slice(0, 24)}…` : a.filename}
+                        </span>
+                        <span
+                          className={cn(
+                            'truncate max-w-[180px] text-[10.5px] leading-tight',
+                            errorTone ? 'text-rose-500' : 'text-muted-foreground',
+                          )}
+                        >
+                          {errorTone
+                            ? a.error || 'Upload failed'
+                            : a.uploadStatus === 'uploading'
+                              ? 'Uploading…'
+                              : a.mimeType || 'file'}
+                        </span>
+                      </div>
+                      {a.uploadStatus === 'uploading' && (
+                        <span
+                          aria-hidden
+                          className="absolute left-0 right-0 bottom-0 h-px overflow-hidden"
+                        >
+                          <span className="block h-full w-1/3 bg-foreground/40 animate-pulse" />
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(a.localId)}
+                        aria-label={`Remove ${a.filename}`}
+                        className={cn(
+                          'absolute top-1 right-1 inline-flex items-center justify-center w-4 h-4 rounded-full',
+                          'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.08]',
+                          'transition-colors duration-150',
+                        )}
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             )}
 
-            {/* File preview row */}
-            {files.length > 0 && (
-              <div className="flex flex-wrap gap-2 px-3 pt-3">
-                {files.map((file, i) => (
-                  <div
-                    key={`${file.name}-${i}`}
-                    className="relative w-16 h-16 rounded-lg overflow-hidden border border-border/60 bg-foreground/[0.03]"
-                  >
-                    {filePreviews[i] ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={filePreviews[i]}
-                        alt={file.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                        <FileText size={18} />
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removeFile(i)}
-                      aria-label={`Remove ${file.name}`}
-                      className={cn(
-                        'absolute top-0.5 right-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full',
-                        'bg-background/90 border border-border/60 text-foreground',
-                        'hover:bg-background transition-colors',
-                      )}
-                    >
-                      <X size={9} />
-                    </button>
-                  </div>
-                ))}
+            {/* Attachment-level error notice (validation, not per-chip) */}
+            {attachError && (
+              <div className="px-3 pt-2 text-[11px] text-rose-500">
+                {attachError}
               </div>
             )}
 
@@ -646,30 +917,28 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                   </TooltipContent>
                 </Tooltip>
 
-                {/* Paperclip — image attach */}
-                {onAttach && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={disabled || isLoading || isRecording}
-                        aria-label="Attach an image"
-                        className={cn(
-                          'inline-flex items-center justify-center w-8 h-8 rounded-full',
-                          'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
-                          'transition-colors duration-150',
-                          'disabled:opacity-40 disabled:cursor-not-allowed',
-                        )}
-                      >
-                        <Paperclip size={15} strokeWidth={1.75} />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" sideOffset={6}>
-                      Attach an image
-                    </TooltipContent>
-                  </Tooltip>
-                )}
+                {/* Paperclip — file attach */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={disabled || isLoading || isRecording}
+                      aria-label="Attach a file"
+                      className={cn(
+                        'inline-flex items-center justify-center w-8 h-8 rounded-full',
+                        'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+                        'transition-colors duration-150',
+                        'disabled:opacity-40 disabled:cursor-not-allowed',
+                      )}
+                    >
+                      <Paperclip size={15} strokeWidth={1.75} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={6}>
+                    Attach a file
+                  </TooltipContent>
+                </Tooltip>
 
                 {/* Divider */}
                 <span aria-hidden className="w-px h-4 bg-border/60 mx-0.5" />

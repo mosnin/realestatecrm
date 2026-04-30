@@ -56,7 +56,7 @@ export interface UseAgentTaskResult {
   pendingApproval: PermissionPromptData | null;
   liveCallIds: Set<string>;
   error: string | null;
-  send: (text: string) => Promise<void>;
+  send: (text: string, attachmentIds?: string[]) => Promise<void>;
   approve: (requestId: string, editedArgs?: Record<string, unknown>) => Promise<void>;
   deny: (requestId: string) => Promise<void>;
   /**
@@ -392,9 +392,12 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   }, [spaceSlug, onConversationCreated]);
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, attachmentIds?: string[]) => {
       const trimmed = text.trim();
-      if (!trimmed || isStreaming) return;
+      const hasAttachments = Array.isArray(attachmentIds) && attachmentIds.length > 0;
+      // Allow attachment-only sends — the user might just want to drop in a
+      // photo with no caption. Block when both text AND attachments are empty.
+      if ((!trimmed && !hasAttachments) || isStreaming) return;
 
       let convId: string;
       try {
@@ -424,6 +427,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         spaceSlug,
         conversationId: convId,
         message: trimmed,
+        ...(hasAttachments ? { attachmentIds } : {}),
       });
     },
     [isStreaming, spaceSlug, ensureConversationId, consumeStream],
