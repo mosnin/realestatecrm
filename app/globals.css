@@ -665,3 +665,18 @@
   .ai-loader { animation: none; }
   .ai-loader-letter { animation: none; opacity: 0.7; }
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Chippi thinking shimmer — used by the chat transcript while the agent is
+ * spinning up or between tool calls. Plays through the muted→foreground→
+ * muted gradient so the word "Thinking" reads as alive but calm.
+ * ────────────────────────────────────────────────────────────────────────── */
+@keyframes chippi-thinking-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Reduced-motion: stop the shimmer, keep the gradient at a static contrast point. */
+  [style*="chippi-thinking-shimmer"] { animation: none !important; background-position: 0 0 !important; }
+}

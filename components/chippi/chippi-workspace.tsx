@@ -11,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { VoiceMode } from '@/components/ai/voice-mode';
 import { Transcript } from '@/components/ai/blocks/transcript';
+import { ThinkingIndicator } from '@/components/ai/blocks/thinking-indicator';
 import { useAgentTask, type UiMessage } from '@/components/ai/hooks/use-agent-task';
 import { blocksFromLegacyContent, type MessageBlock } from '@/lib/ai-tools/blocks';
 import type { Conversation } from '@/lib/types';
@@ -692,11 +693,8 @@ export function ChippiWorkspace({
                       <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
                         <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
                       </div>
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground pt-1.5">
-                        <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse" />
-                        <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:0.2s]" />
-                        <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:0.4s]" />
-                        <span className="ml-1 italic">Chippi is thinking…</span>
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <ThinkingIndicator />
                       </div>
                     </div>
                   )}
