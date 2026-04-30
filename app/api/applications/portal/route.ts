@@ -65,6 +65,15 @@ export async function GET(req: NextRequest) {
     .eq('contactId', contact.id)
     .order('createdAt', { ascending: true });
 
+  // Fetch tours linked to this contact. Filter to active/recent statuses
+  // — applicants don't need to see cancelled tours linger in their portal.
+  const { data: tours } = await supabase
+    .from('Tour')
+    .select('id, startsAt, endsAt, propertyAddress, notes, status')
+    .eq('contactId', contact.id)
+    .in('status', ['scheduled', 'confirmed', 'completed'])
+    .order('startsAt', { ascending: true });
+
   // Mark unread realtor messages as read
   if (messages?.some((m: { senderType: string; readAt: string | null }) => m.senderType === 'realtor' && !m.readAt)) {
     const unreadIds = messages
@@ -94,6 +103,7 @@ export async function GET(req: NextRequest) {
     },
     statusHistory: statusHistory ?? [],
     messages: messages ?? [],
+    tours: tours ?? [],
     businessName: settings?.businessName ?? null,
   });
 }

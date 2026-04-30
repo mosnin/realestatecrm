@@ -38,6 +38,15 @@ interface PortalMessage {
   createdAt: string;
 }
 
+interface PortalTour {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  propertyAddress: string | null;
+  notes: string | null;
+  status: string;
+}
+
 interface ApplicationStatusClientProps {
   contact: {
     name: string;
@@ -52,6 +61,7 @@ interface ApplicationStatusClientProps {
   portalMode: boolean;
   statusHistory: StatusUpdate[];
   messages: PortalMessage[];
+  tours: PortalTour[];
   token: string | null;
   slug: string;
 }
@@ -142,10 +152,12 @@ export function ApplicationStatusClient({
   portalMode,
   statusHistory: initialHistory,
   messages: initialMessages,
+  tours: initialTours,
   token,
 }: ApplicationStatusClientProps) {
   const [messages, setMessages] = useState<PortalMessage[]>(initialMessages);
   const [statusHistory] = useState<StatusUpdate[]>(initialHistory);
+  const [tours, setTours] = useState<PortalTour[]>(initialTours);
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -183,6 +195,7 @@ export function ApplicationStatusClient({
       if (res.ok) {
         const data = await res.json();
         setMessages(data.messages ?? []);
+        if (Array.isArray(data.tours)) setTours(data.tours);
       }
     } catch (err) {
       console.error('[portal] Refresh failed:', err);
@@ -389,6 +402,18 @@ export function ApplicationStatusClient({
             </div>
           )}
         </div>
+      )}
+
+      {/* Your tours — what's scheduled, awaiting confirmation, or completed.
+          Each scheduled tour gets a Confirm / Can't make it action pair so
+          the realtor doesn't have to chase the applicant via SMS. */}
+      {token && contact.applicationRef && tours.length > 0 && (
+        <YourToursPanel
+          applicationRef={contact.applicationRef}
+          token={token}
+          tours={tours}
+          onResponded={() => { void refreshData(); }}
+        />
       )}
 
       {/* Tour request — quiet CTA above the message thread. Opens an inline
@@ -699,6 +724,148 @@ function SimpleStatusView({
 }
 
 // ── Shared Next Steps Text ────────────────────────────────────────────────────
+
+/**
+ * Your-tours panel — surfaces tours linked to this contact. Three states
+ * per tour:
+ *   - scheduled  → applicant sees Confirm / Can't make it actions
+ *   - confirmed  → applicant sees a calm "Confirmed" badge, no actions
+ *   - completed  → quiet receipt; no actions
+ *
+ * Read-only views (no token) skip this panel entirely; the parent gates
+ * rendering on `token && tours.length > 0`. The respond endpoint is
+ * idempotent so double-clicks don't double-message the realtor.
+ */
+function YourToursPanel({
+  applicationRef,
+  token,
+  tours,
+  onResponded,
+}: {
+  applicationRef: string;
+  token: string;
+  tours: PortalTour[];
+  onResponded: () => void;
+}) {
+  const [pending, setPending] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function respond(tourId: string, action: 'confirm' | 'decline') {
+    setPending(`${action}:${tourId}`);
+    setError(null);
+    try {
+      const res = await fetch(`/api/applications/portal/tour/${tourId}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applicationRef, token, action }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setError(data?.error ?? 'Could not send your response. Please try again.');
+        return;
+      }
+      onResponded();
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setPending(null);
+    }
+  }
+
+  return (
+    <section
+      aria-label="Your tours"
+      className="rounded-xl bg-card border border-border/60 shadow-sm overflow-hidden"
+    >
+      <div className="px-5 py-3 border-b border-border/40 flex items-center gap-2">
+        <CalendarCheck size={14} className="text-muted-foreground" aria-hidden="true" />
+        <h2 className="text-sm font-semibold text-foreground">Your tours</h2>
+        <span className="text-xs text-muted-foreground">({tours.length})</span>
+      </div>
+
+      <ul className="divide-y divide-border/40">
+        {tours.map((tour) => {
+          const startsAt = new Date(tour.startsAt);
+          const dateLine = startsAt.toLocaleString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+          });
+          const isScheduled = tour.status === 'scheduled';
+          const isConfirmed = tour.status === 'confirmed';
+          const isCompleted = tour.status === 'completed';
+          const confirming = pending === `confirm:${tour.id}`;
+          const declining = pending === `decline:${tour.id}`;
+
+          return (
+            <li key={tour.id} className="px-5 py-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-sm font-medium text-foreground tabular-nums">
+                    {dateLine}
+                  </p>
+                  {tour.propertyAddress && (
+                    <p className="text-xs text-muted-foreground">{tour.propertyAddress}</p>
+                  )}
+                  {tour.notes && (
+                    <p className="text-xs text-muted-foreground italic leading-relaxed">
+                      {tour.notes}
+                    </p>
+                  )}
+                </div>
+                <div
+                  className={cn(
+                    'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium flex-shrink-0',
+                    isConfirmed && 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
+                    isScheduled && 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+                    isCompleted && 'bg-muted text-muted-foreground',
+                  )}
+                >
+                  {isConfirmed && <CheckCircle2 size={11} aria-hidden="true" />}
+                  {isScheduled && <Clock size={11} aria-hidden="true" />}
+                  {isCompleted && <CalendarCheck size={11} aria-hidden="true" />}
+                  {isConfirmed ? 'Confirmed' : isScheduled ? 'Awaiting your confirmation' : 'Completed'}
+                </div>
+              </div>
+
+              {isScheduled && (
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void respond(tour.id, 'confirm')}
+                    disabled={!!pending}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-md bg-foreground text-background px-3.5 py-1.5 text-sm font-medium transition-opacity duration-150 hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {confirming ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <CheckCircle2 size={12} aria-hidden="true" />}
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void respond(tour.id, 'decline')}
+                    disabled={!!pending}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border bg-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] px-3.5 py-1.5 text-sm transition-colors duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {declining ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <XCircle size={12} aria-hidden="true" />}
+                    Can&apos;t make it
+                  </button>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {error && (
+        <div role="alert" className="px-5 py-3 border-t border-border/40 flex items-start gap-2 text-sm text-rose-700 dark:text-rose-300">
+          <AlertCircle size={14} className="flex-shrink-0 mt-0.5" aria-hidden="true" />
+          <span>{error}</span>
+        </div>
+      )}
+    </section>
+  );
+}
 
 /**
  * Tour-request panel — collapsed by default to keep the portal calm.

@@ -129,9 +129,17 @@ export default async function ApplicationStatusPage({
     readAt: string | null;
     createdAt: string;
   }[] = [];
+  let tours: {
+    id: string;
+    startsAt: string;
+    endsAt: string;
+    propertyAddress: string | null;
+    notes: string | null;
+    status: string;
+  }[] = [];
 
   if (portalMode) {
-    const [historyResult, messageResult] = await Promise.all([
+    const [historyResult, messageResult, tourResult] = await Promise.all([
       supabase
         .from('ApplicationStatusUpdate')
         .select('id, fromStatus, toStatus, note, createdAt')
@@ -142,10 +150,17 @@ export default async function ApplicationStatusPage({
         .select('id, senderType, content, readAt, createdAt')
         .eq('contactId', contact.id)
         .order('createdAt', { ascending: true }),
+      supabase
+        .from('Tour')
+        .select('id, startsAt, endsAt, propertyAddress, notes, status')
+        .eq('contactId', contact.id)
+        .in('status', ['scheduled', 'confirmed', 'completed'])
+        .order('startsAt', { ascending: true }),
     ]);
 
     statusHistory = historyResult.data ?? [];
     messages = messageResult.data ?? [];
+    tours = tourResult.data ?? [];
 
     // Mark unread realtor messages as read
     const unreadRealtorIds = messages
@@ -178,6 +193,7 @@ export default async function ApplicationStatusPage({
         portalMode={portalMode}
         statusHistory={statusHistory}
         messages={messages}
+        tours={tours}
         token={portalMode ? token! : null}
         slug={slug}
       />
