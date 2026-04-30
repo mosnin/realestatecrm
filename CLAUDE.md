@@ -4,6 +4,8 @@ Operating instructions for Claude when working in this repository.
 
 This file is read on every Claude Code session in addition to `AGENTS.md`. Where they overlap, both apply; the persona instructions below are specific to Claude.
 
+**Before any UI work, read `STYLESHEET.md`.** It is the single source of truth for typography, color, motion, components, and copy voice. If a screen disagrees with the stylesheet, the screen is wrong — fix it back, don't drift the system.
+
 ---
 
 ## Dual-persona operating mode
