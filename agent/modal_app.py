@@ -169,6 +169,127 @@ async def run_now_webhook(item: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Web endpoint — Cowork chat turn (POST /chat_turn)
+# ---------------------------------------------------------------------------
+# Spawns a fresh Modal Sandbox per call for OS-level isolation, feeds the
+# user turn to /app/sandbox_runner.py via stdin, and streams the JSONL it
+# emits on stdout back to the caller as Server-Sent Events.
+#
+# Per-call sandboxes (no warm reuse) keep the security boundary clean and
+# the wiring trivial. Reuse-across-messages with idle eviction is a future
+# optimisation; the bottleneck right now is OpenAI inference latency, not
+# sandbox cold-start.
+
+@app.function(secrets=secrets, timeout=600)
+@modal.web_endpoint(method="POST")
+async def chat_turn(item: dict):
+    """HTTP endpoint that runs one Cowork chat turn inside a fresh Sandbox.
+
+    Body shape (JSON):
+      {
+        "secret": "<AGENT_INTERNAL_SECRET>",
+        "space_id": "...",
+        "conversation_id": "...",
+        "message": "user text",
+        "history": [{"role": "user|assistant", "content": "..."}, ...],
+        "attachments": [...]   // optional
+      }
+
+    Streams `text/event-stream` frames back to the caller. Each frame is one
+    JSONL line emitted by sandbox_runner.py wrapped as `data: <json>\\n\\n`.
+    """
+    import sys, os, json, uuid
+    sys.path.insert(0, "/app")
+
+    from fastapi.responses import StreamingResponse
+
+    # ---- auth (matches run_now_webhook: secret comes in the body) ----
+    expected = os.environ.get("AGENT_INTERNAL_SECRET", "")
+    secret = item.get("secret", "") or ""
+    if not expected or secret != expected:
+        return {"error": "Unauthorized"}
+
+    space_id = (item.get("space_id") or "").strip()
+    message = item.get("message") or ""
+    if not space_id or not isinstance(message, str) or not message.strip():
+        return {"error": "space_id and message required"}
+
+    history = item.get("history") or []
+    attachments = item.get("attachments") or []
+    conversation_id = item.get("conversation_id") or ""
+
+    # ---- load Space + AgentSettings to populate runtime context ----
+    # Same query shape used by run_now_webhook / run_space.
+    from db import supabase
+    db = await supabase()
+
+    sr = await db.table("AgentSettings").select("*").eq("spaceId", space_id).single().execute()
+    spr = await db.table("Space").select("id,slug,name").eq("id", space_id).single().execute()
+
+    if not sr.data or not spr.data:
+        return {"error": f"space or agent settings not found: {space_id}"}
+
+    settings_row = sr.data
+    space_row = spr.data
+
+    # Build the JSON payload sandbox_runner.py expects on stdin.
+    payload = {
+        "space_id": space_row["id"],
+        "space_name": space_row.get("name", "") or "",
+        "run_id": conversation_id or f"chat-{uuid.uuid4()}",
+        "message": message,
+        "history": history,
+        "autonomy_level": settings_row.get("autonomyLevel", "draft_required"),
+        "per_agent_autonomy": settings_row.get("perAgentAutonomy", {}) or {},
+        "daily_token_budget": int(settings_row.get("dailyTokenBudget", 100_000) or 100_000),
+        "enabled_agents": settings_row.get("enabledAgents", []) or [],
+        "confidence_threshold": int(settings_row.get("confidenceThreshold", 0) or 0),
+        "attachments": attachments,
+    }
+    stdin_bytes = (json.dumps(payload) + "\n").encode("utf-8")
+
+    async def event_stream():
+        sb = None
+        try:
+            # Reuse the app image so the sandbox already has /app/ and deps.
+            sb = await modal.Sandbox.create.aio(
+                image=image,
+                app=app,
+                secrets=secrets,
+                timeout=600,
+            )
+            proc = await sb.exec.aio("python", "/app/sandbox_runner.py")
+
+            # Push the JSON payload, then close stdin so the runner unblocks.
+            await proc.stdin.write.aio(stdin_bytes)
+            await proc.stdin.drain.aio()
+            await proc.stdin.write_eof.aio()
+
+            # Forward each JSONL line as one SSE frame. The runner flushes
+            # after every emit() so lines arrive in real time.
+            async for line in proc.stdout:
+                if not line:
+                    continue
+                stripped = line.rstrip("\n").rstrip("\r")
+                if not stripped:
+                    continue
+                yield f"data: {stripped}\n\n"
+        except Exception as e:
+            # Surface sandbox/launch failures as an inline error event so the
+            # caller's SSE consumer sees a terminal frame instead of a hang.
+            err = json.dumps({"type": "error", "message": f"sandbox failure: {e}"})
+            yield f"data: {err}\n\n"
+        finally:
+            if sb is not None:
+                try:
+                    await sb.terminate.aio()
+                except Exception:
+                    pass
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# ---------------------------------------------------------------------------
 # Local dev entrypoint
 # ---------------------------------------------------------------------------
 
