@@ -262,47 +262,93 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                     );
                   })}
 
-                  {/* More — secondary destinations, visually subordinate */}
-                  <p className={`${SECTION_LABEL} px-3 pt-6 pb-2 select-none`}>
-                    More
-                  </p>
-                  {[
-                    { href: '/tours', label: 'Tours', icon: CalendarDays },
-                    { href: '/properties', label: 'Properties', icon: Home },
-                    { href: '/calendar', label: 'Calendar', icon: Calendar },
-                    { href: '/intake', label: 'Intake form', icon: ClipboardList },
-                    { href: '/intake/customize', label: 'Customize form', icon: ClipboardList },
-                    { href: '/analytics', label: 'Analytics', icon: BarChart2 },
-                  ].map((item) => {
-                    const href = `${base}${item.href}`;
-                    const isActive = pathname.startsWith(href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={href}
-                        onClick={() => setOpen(false)}
-                        className={cn(
-                          'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
-                          isActive
-                            ? 'bg-foreground/[0.045] text-foreground font-medium'
-                            : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
-                        )}
-                      >
-                        {isActive && (
-                          <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground" />
-                        )}
-                        <item.icon
-                          size={15}
-                          strokeWidth={isActive ? 2.25 : 1.75}
-                          className={cn(
-                            'flex-shrink-0',
-                            isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
+                  {/* Context-aware second section — Chippi conversations on
+                      /chippi, the static "More" pages everywhere else. The
+                      cross-fade reuses PAGE_VARIANTS so the swap reads as a
+                      page-level mode change, not a list refresh. */}
+                  <div className="pt-4">
+                    <AnimatePresence mode="wait" initial={false}>
+                      {isOnChippi && !mobileShowPages ? (
+                        <motion.div
+                          key="chats"
+                          variants={PAGE_VARIANTS}
+                          initial="initial"
+                          animate="enter"
+                          exit="exit"
+                        >
+                          <SidebarConversations
+                            slug={slug}
+                            onSelect={() => setOpen(false)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setMobileShowPages(true)}
+                            className="mt-2 w-full text-left px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            Show pages →
+                          </button>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="pages"
+                          variants={PAGE_VARIANTS}
+                          initial="initial"
+                          animate="enter"
+                          exit="exit"
+                        >
+                          <p className={`${SECTION_LABEL} px-3 pb-2 select-none`}>
+                            More
+                          </p>
+                          {[
+                            { href: '/tours', label: 'Tours', icon: CalendarDays },
+                            { href: '/properties', label: 'Properties', icon: Home },
+                            { href: '/calendar', label: 'Calendar', icon: Calendar },
+                            { href: '/intake', label: 'Intake form', icon: ClipboardList },
+                            { href: '/intake/customize', label: 'Customize form', icon: ClipboardList },
+                            { href: '/analytics', label: 'Analytics', icon: BarChart2 },
+                          ].map((item) => {
+                            const href = `${base}${item.href}`;
+                            const isActive = pathname.startsWith(href);
+                            return (
+                              <Link
+                                key={item.href}
+                                href={href}
+                                onClick={() => setOpen(false)}
+                                className={cn(
+                                  'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
+                                  isActive
+                                    ? 'bg-foreground/[0.045] text-foreground font-medium'
+                                    : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
+                                )}
+                              >
+                                {isActive && (
+                                  <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground" />
+                                )}
+                                <item.icon
+                                  size={15}
+                                  strokeWidth={isActive ? 2.25 : 1.75}
+                                  className={cn(
+                                    'flex-shrink-0',
+                                    isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
+                                  )}
+                                />
+                                {item.label}
+                              </Link>
+                            );
+                          })}
+                          {isOnChippi && (
+                            <button
+                              type="button"
+                              onClick={() => setMobileShowPages(false)}
+                              className="mt-2 w-full text-left px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              ← Back to chats
+                            </button>
                           )}
-                        />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
 
                   {/* Settings section — expanded flat list */}
                   <p className={`${SECTION_LABEL} px-3 pb-2 pt-5 select-none`}>Settings</p>
