@@ -255,12 +255,12 @@ export default function BrokerFormBuilderPage() {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {hasChanges ? (
-              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50 gap-1.5">
+              <Badge variant="outline" className="text-xs text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 gap-1.5">
                 <AlertCircle size={12} />
                 Unsaved changes
               </Badge>
             ) : hasSavedConfig ? (
-              <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-300 bg-emerald-50 gap-1.5">
+              <Badge variant="outline" className="text-xs text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/40 bg-emerald-50 dark:bg-emerald-500/10 gap-1.5">
                 <CheckCircle2 size={12} />
                 Saved
               </Badge>
@@ -285,7 +285,7 @@ export default function BrokerFormBuilderPage() {
             onClick={() => setActiveLeadType('rental')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
               activeLeadType === 'rental'
-                ? 'border-orange-400 bg-orange-50 text-orange-700 shadow-sm'
+                ? 'border-orange-400 dark:border-orange-500/50 bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-300 shadow-sm'
                 : 'border-border text-muted-foreground hover:border-muted-foreground/30'
             }`}
           >
@@ -300,7 +300,7 @@ export default function BrokerFormBuilderPage() {
             onClick={() => setActiveLeadType('buyer')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
               activeLeadType === 'buyer'
-                ? 'border-blue-400 bg-blue-50 text-blue-700 shadow-sm'
+                ? 'border-blue-400 dark:border-blue-500/50 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 shadow-sm'
                 : 'border-border text-muted-foreground hover:border-muted-foreground/30'
             }`}
           >
@@ -331,9 +331,9 @@ export default function BrokerFormBuilderPage() {
           </div>
 
           {!hasSavedConfig && (
-            <div className="px-5 py-2.5 border-t border-border bg-blue-50/50 flex items-start gap-2">
+            <div className="px-5 py-2.5 border-t border-border bg-blue-50/50 dark:bg-blue-500/5 flex items-start gap-2">
               <Info size={14} className="text-blue-500 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-blue-700">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
                 No custom brokerage {activeLeadType === 'rental' ? 'rental' : 'buyer'} form is configured yet. Customize the fields below and save to create your brokerage standard form.
               </p>
             </div>
@@ -375,9 +375,9 @@ export default function BrokerFormBuilderPage() {
           </div>
         )}
         {!eitherHasSavedConfig && !anyHasChanges && (
-          <div className="px-5 py-2 border-t border-border bg-blue-50/50 flex items-start gap-2">
+          <div className="px-5 py-2 border-t border-border bg-blue-50/50 dark:bg-blue-500/5 flex items-start gap-2">
             <Info size={12} className="text-blue-500 flex-shrink-0 mt-0.5" />
-            <p className="text-[11px] text-blue-700">Save a custom brokerage form first before pushing to members.</p>
+            <p className="text-[11px] text-blue-700 dark:text-blue-300">Save a custom brokerage form first before pushing to members.</p>
           </div>
         )}
       </div>

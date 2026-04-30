@@ -251,8 +251,8 @@ export function Globe({
             translate: "-50% 0",
             marginBottom: 8,
             padding: "2px 6px",
-            background: "#1a1a2e",
-            color: "#fff",
+            background: "var(--foreground)",
+            color: "var(--background)",
             fontFamily: "monospace",
             fontSize: "0.6rem",
             letterSpacing: "0.08em",
@@ -272,7 +272,7 @@ export function Globe({
               left: "50%",
               transform: "translate3d(-50%, -1px, 0)",
               border: "5px solid transparent",
-              borderTopColor: "#1a1a2e",
+              borderTopColor: "var(--foreground)",
             }}
           />
         </div>
@@ -291,8 +291,8 @@ export function Globe({
               translate: "-50% 0",
               marginBottom: 8,
               padding: "2px 6px",
-              background: "#fff",
-              color: "#1a1a2e",
+              background: "var(--background)",
+              color: "var(--foreground)",
               fontFamily: "monospace",
               fontSize: "0.6rem",
               letterSpacing: "0.08em",
@@ -313,7 +313,7 @@ export function Globe({
                 left: "50%",
                 transform: "translate3d(-50%, -1px, 0)",
                 border: "5px solid transparent",
-                borderTopColor: "#fff",
+                borderTopColor: "var(--background)",
               }}
             />
           </div>

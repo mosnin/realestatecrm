@@ -174,7 +174,7 @@ export default function AnalyticsPage() {
                     </div>
                     <span
                       className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                        m.up ? 'bg-green-500/10 text-green-600' : 'bg-primary/10 text-primary'
+                        m.up ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-primary/10 text-primary'
                       }`}
                     >
                       {m.trend}

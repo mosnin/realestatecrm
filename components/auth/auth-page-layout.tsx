@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { Globe } from '@/components/ui/cobe-globe';
 import { BODY_MUTED, CAPTION, H1, TITLE_FONT } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT, PAGE_VARIANTS } from '@/lib/motion';
+import { useTheme } from '@/components/theme-provider';
 
 const leadMarkers = [
   { id: "hot-lead", location: [40.7, -74.0] as [number, number], label: "Hot Lead" },
@@ -44,6 +45,8 @@ export interface AuthPageLayoutProps {
 
 export function AuthPageLayout({ children, heading, subheading, variant: _variant }: AuthPageLayoutProps) {
   const pathname = usePathname();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   const isBrokerLogin = pathname.startsWith('/login/broker');
   const isRealtorLogin = pathname.startsWith('/login/realtor');
@@ -158,17 +161,19 @@ export function AuthPageLayout({ children, heading, subheading, variant: _varian
             </p>
           </div>
 
-          {/* Globe — orange markers, premium dimensional flourish */}
+          {/* Globe — orange markers, premium dimensional flourish.
+              Theme-aware: dark mode uses a near-black base + dimmer glow so
+              the white sphere doesn't bloom against the dark backdrop. */}
           <div className="w-full max-w-[480px] mt-2">
             <Globe
               markers={leadMarkers}
               arcs={leadArcs}
               markerColor={[1, 0.59, 0.31]}
-              baseColor={[1, 1, 1]}
+              baseColor={isDark ? [0.09, 0.09, 0.1] : [1, 1, 1]}
               arcColor={[1, 0.59, 0.31]}
-              glowColor={[0.94, 0.93, 0.91]}
-              dark={0}
-              mapBrightness={10}
+              glowColor={isDark ? [0.18, 0.18, 0.2] : [0.94, 0.93, 0.91]}
+              dark={isDark ? 1 : 0}
+              mapBrightness={isDark ? 6 : 10}
               markerSize={0.025}
               markerElevation={0.01}
             />

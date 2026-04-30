@@ -15,7 +15,7 @@ export function AgentGeneratedBadge({ className }: { className?: string }) {
 
 export function AgentGeneratedBorder({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn('border-l-2 border-orange-400 pl-3', className)}>
+    <div className={cn('border-l-2 border-orange-400 dark:border-orange-500/60 pl-3', className)}>
       {children}
     </div>
   );
