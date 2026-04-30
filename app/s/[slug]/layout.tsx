@@ -259,10 +259,11 @@ export default async function DashboardLayout({
         <AgentStatusBar slug={slug} />
         {isChippiRoute ? (
           // Chippi is the chat surface — fills the available height, no
-          // dashboard padding wrapper, no footer. Mobile reserves space at
-          // the bottom for MobileNav (the fixed bar) plus a little visual
-          // gap so the composer doesn't kiss the nav.
-          <main className="flex-1 min-h-0 flex flex-col bg-background text-foreground pb-[calc(env(safe-area-inset-bottom)+76px)] md:pb-0">
+          // dashboard padding wrapper, no footer. The MobileNav is hidden
+          // below (a "Chippi" tab on the page you're already on is redundant
+          // chrome that eats composer space). Only the iOS safe-area inset
+          // is reserved at the bottom.
+          <main className="flex-1 min-h-0 flex flex-col bg-background text-foreground pb-[env(safe-area-inset-bottom)] md:pb-0">
             <LiveNotifications spaceId={space.id} slug={slug} />
             <PageTransition>{children}</PageTransition>
           </main>
@@ -280,7 +281,10 @@ export default async function DashboardLayout({
           </main>
         )}
       </div>
-      <MobileNav slug={slug} isBroker={isBroker} />
+      {/* MobileNav — hidden on the chat surface so the composer can use the
+          full bottom edge. Realtor returns to the rest of the app via the
+          left-edge sidebar trigger or any link in the chat itself. */}
+      {!isChippiRoute && <MobileNav slug={slug} isBroker={isBroker} />}
       {/* Persistent agent presence on every workspace page (hides itself on /chippi). */}
       <ChippiBar slug={slug} />
       {/* ⌘K palette — listens globally, renders a modal when open. */}
