@@ -357,7 +357,7 @@ export async function POST(req: NextRequest) {
   const { allowed } = await checkRateLimit(`ai:task:${ctx.userId}`, 30, 3600);
   if (!allowed) {
     return NextResponse.json(
-      { error: 'Rate limit exceeded (30 tasks/hour). Please wait.' },
+      { error: chippiErrorMessage('rate_limited') },
       { status: 429 },
     );
   }
@@ -369,14 +369,14 @@ export async function POST(req: NextRequest) {
   const ipLimit = await checkRateLimit(`chat:ip:${ip}`, 30, 600);
   if (!ipLimit.allowed) {
     return NextResponse.json(
-      { error: 'Too many requests. Please try again later.' },
+      { error: chippiErrorMessage('rate_limited') },
       { status: 429, headers: { 'Retry-After': '600' } },
     );
   }
   const spaceLimit = await checkRateLimit(`chat:space:${ctx.space.id}`, 60, 600);
   if (!spaceLimit.allowed) {
     return NextResponse.json(
-      { error: 'Too many requests. Please try again later.' },
+      { error: chippiErrorMessage('rate_limited') },
       { status: 429, headers: { 'Retry-After': '600' } },
     );
   }
@@ -386,14 +386,14 @@ export async function POST(req: NextRequest) {
     conversationId = await resolveConversation(ctx.space.id, body.conversationId ?? null, rawMessage);
   } catch (err) {
     logger.error('[ai/task] conversation resolve failed', { spaceSlug }, err);
-    return NextResponse.json({ error: 'Could not start conversation' }, { status: 500 });
+    return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
 
   try {
     await saveUserMessage({ spaceId: ctx.space.id, conversationId, content: rawMessage });
   } catch (err) {
     logger.error('[ai/task] save user message failed', { spaceSlug }, err);
-    return NextResponse.json({ error: 'Could not save message' }, { status: 500 });
+    return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
 
   let history: HistoryRow[];
@@ -418,7 +418,7 @@ export async function POST(req: NextRequest) {
   if (!modalUrl || !sharedSecret) {
     logger.error('[ai/task] missing MODAL_CHAT_URL or AGENT_INTERNAL_SECRET', { spaceSlug });
     return NextResponse.json(
-      { error: 'Agent backend not configured (set MODAL_CHAT_URL and AGENT_INTERNAL_SECRET)' },
+      { error: chippiErrorMessage('internal') },
       { status: 503 },
     );
   }

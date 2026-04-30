@@ -27,6 +27,7 @@ import crypto from 'crypto';
 import type OpenAI from 'openai';
 import { logger } from '@/lib/logger';
 import type { MessageBlock, TextBlock, ToolCallBlock } from './blocks';
+import { chippiErrorMessage } from './chippi-voice';
 import { executeTool, executionToModelMessage } from './execute';
 import type { PushableEvent } from './events';
 import { AGENT_MODEL } from './openai-client';
@@ -178,12 +179,13 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnOutput> {
         }
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const raw = err instanceof Error ? err.message : String(err);
       logger.error('[tools.loop] OpenAI stream failed', { round }, err);
+      const code = raw.toLowerCase().includes('rate') ? 'rate_limited' : 'internal';
       await pushEvent({
         type: 'error',
-        message,
-        code: message.toLowerCase().includes('rate') ? 'rate_limited' : 'internal',
+        message: chippiErrorMessage(code),
+        code,
       });
       return { blocks, reason: 'aborted' };
     }

@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
 import { DEFAULT_RENTAL_FORM_CONFIG, DEFAULT_BUYER_FORM_CONFIG } from '@/lib/form-builder';
 import { cn } from '@/lib/utils';
+import { pickContrastColor } from '@/lib/color';
 import {
   Check,
   CheckCircle2,
@@ -1149,6 +1150,15 @@ export function DynamicApplicationForm({
   const currentSection = isOnGettingStarted ? null : sortedSections[sectionIndex];
   const isLastStep = currentStep === totalSteps;
 
+  // Estimated time from the visible question count. ~4 questions/min is realistic.
+  const questionCount = sortedSections.reduce(
+    (acc, s) => acc + s.questions.filter((q) => isQuestionVisible(q, answers)).length,
+    0,
+  );
+  const estimatedMinutes = Math.max(1, Math.ceil(questionCount / 4));
+
+  const primaryTextColor = pickContrastColor(accentColor);
+
   return (
     <div
       className={cn(fontClass, customization?.darkMode && 'dark')}
@@ -1219,6 +1229,11 @@ export function DynamicApplicationForm({
             </div>
           </div>
         )}
+
+        {/* Time estimate — sets expectations, lifts completion. */}
+        <p className="text-xs text-muted-foreground mb-4 text-center">
+          About {estimatedMinutes} minute{estimatedMinutes !== 1 ? 's' : ''}.
+        </p>
 
         {/* Stepper + save status — quiet header row */}
         <div className="flex items-center justify-between mb-6">

@@ -101,6 +101,7 @@ export default async function PublicBookingPage({
         pageTitle={pageTitle}
         pageIntro={pageIntro}
         trustLine={`Your information is shared only with ${agentName} and used solely for scheduling.`}
+        agentPresenceLabel="Booking with"
         customization={customization}
       >
         <BookingForm slug={slug} duration={duration} businessName={businessName} timezone={timezone} accentColor={customization.accentColor} />
