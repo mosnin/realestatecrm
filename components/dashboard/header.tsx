@@ -88,10 +88,18 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
   return (
     <header className="h-14 border-b border-border/70 flex items-center justify-between px-4 md:px-6 bg-background sticky top-0 z-40">
       <div className="flex items-center gap-3">
-        {/* Mobile menu trigger */}
+        {/* Mobile menu trigger — explicit 44×44 tap target with proper hover
+            state, not a bare SVG. Radix's Trigger wraps whatever child you
+            give it; without dimensions the click area is just the icon. */}
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger className="md:hidden">
-            <MenuToggleIcon open={open} className="size-5 text-muted-foreground" duration={400} />
+          <SheetTrigger asChild>
+            <button
+              type="button"
+              aria-label={open ? 'Close menu' : 'Open menu'}
+              className="md:hidden inline-flex items-center justify-center w-10 h-10 -ml-2 rounded-md text-muted-foreground/80 hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 active:scale-[0.98]"
+            >
+              <MenuToggleIcon open={open} className="size-5" duration={400} />
+            </button>
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0 border-sidebar-border flex flex-col overflow-hidden relative bg-sidebar">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent z-0" />
