@@ -3,12 +3,20 @@
 import { useRealtime } from '@/hooks/use-realtime';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { PhoneIncoming, CalendarDays, Briefcase } from 'lucide-react';
+import { PhoneIncoming, CalendarDays, Briefcase, ArrowRight, CalendarCheck, CalendarX } from 'lucide-react';
+import { getSupabaseBrowser } from '@/lib/supabase-browser';
 
 interface Props {
   spaceId: string;
   slug: string;
 }
+
+const TOUR_STATUS_COPY: Record<string, { label: string; icon: typeof CalendarCheck }> = {
+  confirmed: { label: 'confirmed', icon: CalendarCheck },
+  completed: { label: 'completed', icon: CalendarCheck },
+  cancelled: { label: 'cancelled', icon: CalendarX },
+  no_show:   { label: 'no-show',   icon: CalendarX },
+};
 
 export function LiveNotifications({ spaceId, slug }: Props) {
   const router = useRouter();
@@ -68,6 +76,79 @@ export function LiveNotifications({ spaceId, slug }: Props) {
         description: deal.address || 'Added to your pipeline.',
         icon: <Briefcase size={16} />,
         duration: 6000,
+      });
+      router.refresh();
+    },
+  });
+
+  // Stage moves — fires when a Deal's stageId changes (drag, manual, or
+  // Chippi via advance_deal_stage). Resolves the stage name lazily so the
+  // toast can name the destination instead of just saying "moved".
+  useRealtime({
+    table: 'Deal',
+    event: 'UPDATE',
+    filter: `spaceId=eq.${spaceId}`,
+    onEvent: async (payload) => {
+      const oldDeal = payload.old as any;
+      const newDeal = payload.new as any;
+      if (!newDeal?.title) return;
+      if (oldDeal?.stageId === newDeal?.stageId) return;
+      if (!newDeal?.stageId) return;
+
+      let stageName: string | null = null;
+      try {
+        const sb = getSupabaseBrowser();
+        if (sb) {
+          const { data } = await sb
+            .from('DealStage')
+            .select('name')
+            .eq('id', newDeal.stageId)
+            .maybeSingle();
+          stageName = (data?.name as string | null) ?? null;
+        }
+      } catch {
+        // Stage lookup is best-effort. Toast still fires below.
+      }
+
+      toast.success(`${newDeal.title} → ${stageName ?? 'next stage'}.`, {
+        icon: <ArrowRight size={16} />,
+        duration: 5000,
+        action: {
+          label: 'Open',
+          onClick: () => router.push(`/s/${slug}/deals`),
+        },
+      });
+      router.refresh();
+    },
+  });
+
+  // Tour status changes — confirmed, completed, cancelled, no_show.
+  useRealtime({
+    table: 'Tour',
+    event: 'UPDATE',
+    filter: `spaceId=eq.${spaceId}`,
+    onEvent: (payload) => {
+      const oldTour = payload.old as any;
+      const newTour = payload.new as any;
+      if (!newTour?.guestName) return;
+      if (oldTour?.status === newTour?.status) return;
+
+      const meta = TOUR_STATUS_COPY[newTour.status as string];
+      if (!meta) return;
+
+      const Icon = meta.icon;
+      const fn = meta.label === 'cancelled' || meta.label === 'no-show'
+        ? toast.warning
+        : toast.success;
+
+      fn(`Tour ${meta.label} — ${newTour.guestName}.`, {
+        description: newTour.propertyAddress || undefined,
+        icon: <Icon size={16} />,
+        duration: 6000,
+        action: {
+          label: 'Open',
+          onClick: () => router.push(`/s/${slug}/calendar`),
+        },
       });
       router.refresh();
     },
