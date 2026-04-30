@@ -27,6 +27,7 @@
 
 import crypto from 'crypto';
 import type OpenAI from 'openai';
+import { maybeEmitFirstAction } from '@/lib/telemetry';
 import type { MessageBlock, PermissionBlock, ToolCallBlock } from './blocks';
 import { executeTool, executionToModelMessage } from './execute';
 import type { PushableEvent } from './events';
@@ -226,6 +227,18 @@ async function runCall(
     data: toolCallBlock.result.data,
     error: exec.ok ? undefined : toolCallBlock.result.error,
   });
+
+  // Phase 2 telemetry: gate-emit agent_first_action_completed when an
+  // approved (or read-only remaining) call lands successfully. Fire-and-
+  // forget; the helper handles the side-effecting-tools allowlist and the
+  // first-time-per-space gate internally.
+  if (exec.ok) {
+    void maybeEmitFirstAction({
+      spaceId: ctx.space.id,
+      userId: ctx.userId,
+      toolName: call.name,
+    });
+  }
 
   messages.push({
     role: 'tool',

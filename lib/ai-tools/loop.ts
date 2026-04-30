@@ -26,6 +26,7 @@
 import crypto from 'crypto';
 import type OpenAI from 'openai';
 import { logger } from '@/lib/logger';
+import { maybeEmitFirstAction } from '@/lib/telemetry';
 import type { MessageBlock, TextBlock, ToolCallBlock } from './blocks';
 import { chippiErrorMessage } from './chippi-voice';
 import { executeTool, executionToModelMessage } from './execute';
@@ -339,6 +340,17 @@ export async function runTurn(input: RunTurnInput): Promise<RunTurnOutput> {
           data: toolCallBlock.result.data,
           error: exec.ok ? undefined : toolCallBlock.result.error,
         });
+
+        // Phase 2 telemetry: gate-emit agent_first_action_completed on the
+        // first successful side-effecting tool call ever for this space.
+        // Fire-and-forget; never blocks the tool loop.
+        if (exec.ok) {
+          void maybeEmitFirstAction({
+            spaceId: ctx.space.id,
+            userId: ctx.userId,
+            toolName: buf.name,
+          });
+        }
 
         messages.push({
           role: 'tool',

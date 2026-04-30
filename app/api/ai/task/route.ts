@@ -50,6 +50,7 @@ import {
   hasEmitted as hasEmittedTelemetry,
   getFirstEmittedAt,
   secondsBetween,
+  maybeEmitFirstAction,
 } from '@/lib/telemetry';
 
 interface HistoryRow {
