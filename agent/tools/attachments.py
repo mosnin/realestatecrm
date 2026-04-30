@@ -2,16 +2,16 @@
 
 Realtors drop files into the prompt box. /api/ai/attachments persists each
 upload as an Attachment row. /api/ai/task hydrates the rows the realtor
-referenced in this turn and forwards them to sandbox_runner.py, which
+referenced in this turn and forwards them to the chat_turn endpoint, which
 appends a `[Attached <filename> — id <id>; call read_attachment ...]`
 marker to the user message so the model knows to call this tool.
 
 Extraction rules:
   - Images are skipped on upload — the model already gets them via the
     image_url path. We just return the public_url and a hint.
-  - PDF / DOCX / XLSX / text-ish files are extracted on demand inside the
-    sandbox the first time the agent asks. We persist the extracted text
-    so subsequent reads are cheap.
+  - PDF / DOCX / XLSX / text-ish files are extracted on demand the first
+    time the agent asks. We persist the extracted text so subsequent reads
+    are cheap.
   - Anything else returns a polite error the agent can surface to the user.
 
 Failures NEVER throw out of the tool. The agent gets {"error": "..."} and
@@ -191,12 +191,10 @@ async def read_attachment(
     try:
         result = await (
             db.table("Attachment")
-            .select(
-                'id,filename,"mimeType","publicUrl","extractedText","extractionStatus"'
-            )
+            .select("id,filename,mimeType,publicUrl,extractedText,extractionStatus")
             .eq("id", attachment_id)
             .eq("spaceId", space_id)  # tenant boundary — never skip
-            .single()
+            .maybe_single()
             .execute()
         )
     except Exception as exc:

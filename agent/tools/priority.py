@@ -1,15 +1,14 @@
-"""Priority list tools — generate a ranked daily focus list for the realtor.
+"""Priority list tool — ranked daily focus list for the realtor.
 
-The agent calls generate_priority_list after its main work is done.
-The result is stored as a space memory so the UI can surface it without
-triggering another agent run.
+Called after the main work is done. The result is stored as a space-level
+memory so the UI can surface it without triggering another agent run.
+Re-engagement nudges (the old mark_contact_warm) live on update_contact.
 """
 
 from __future__ import annotations
 
 import json
-import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from agents import RunContextWrapper, function_tool
@@ -173,59 +172,3 @@ async def generate_priority_list(
     return result
 
 
-@function_tool
-async def mark_contact_warm(
-    ctx: RunContextWrapper[AgentContext],
-    contact_id: str,
-    signal: str,
-) -> dict[str, Any]:
-    """Flag a previously cold contact as newly warm — resurfaces them in the priority list.
-
-    signal: brief description of what changed ('replied to SMS', 'viewed listing', etc.)
-    """
-    space_id = ctx.context.space_id
-    db = await supabase()
-
-    check = await (
-        db.table("Contact")
-        .select("id,name,leadScore")
-        .eq("id", contact_id)
-        .eq("spaceId", space_id)
-        .execute()
-    )
-    if not check.data:
-        return {"error": "Contact not found in space"}
-
-    contact = check.data[0]
-    now = datetime.now(timezone.utc).isoformat()
-
-    # Boost lead score on re-engagement signal
-    current_score = contact.get("leadScore") or 40
-    new_score = min(100, current_score + 12)
-
-    await (
-        db.table("Contact")
-        .update({"leadScore": new_score, "updatedAt": now})
-        .eq("id", contact_id)
-        .eq("spaceId", space_id)
-        .execute()
-    )
-
-    await db.table("ContactActivity").insert({
-        "id": str(uuid.uuid4()),
-        "contactId": contact_id,
-        "spaceId": space_id,
-        "type": "note",
-        "content": f"[Agent] Contact re-engaged: {signal}",
-        "metadata": {"source": "agent", "signal": signal, "agentRunId": ctx.context.run_id},
-    }).execute()
-
-    await publish_event(
-        ctx.context,
-        "action",
-        f"{contact['name']} just re-engaged ({signal}) — added to today's priority list",
-        agent_type=ctx.context.current_agent_type,
-        metadata={"contactId": contact_id},
-    )
-
-    return {"flagged": True, "contactId": contact_id, "scoreBoost": new_score - current_score}
