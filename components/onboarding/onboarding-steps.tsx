@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BODY_MUTED, GHOST_PILL, PRIMARY_PILL, SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
 
 /**
  * Shared scaffolding used by every step type: centered heading, optional
@@ -36,17 +37,20 @@ export function StepScaffold({
 }: StepScaffoldProps) {
   return (
     <div className="flex flex-col items-center text-center">
-      <h1 className="text-[28px] font-semibold leading-tight tracking-tight text-neutral-900 sm:text-4xl">
+      <h1
+        className="text-4xl tracking-tight text-foreground"
+        style={TITLE_FONT}
+      >
         {title}
       </h1>
       {subtitle && (
-        <p className="mt-2 max-w-xl text-sm text-neutral-600 sm:text-base">{subtitle}</p>
+        <p className={cn(BODY_MUTED, 'mt-3 max-w-xl text-base')}>{subtitle}</p>
       )}
 
       <div className="mt-8 w-full">{children}</div>
 
       {error && (
-        <p className="mt-4 text-sm text-rose-600" role="alert">
+        <p className="mt-4 text-sm text-destructive" role="alert">
           {error}
         </p>
       )}
@@ -57,7 +61,7 @@ export function StepScaffold({
             <button
               type="button"
               onClick={onSkip}
-              className="text-sm font-medium text-neutral-500 transition-colors hover:text-neutral-900"
+              className={GHOST_PILL}
             >
               Skip
             </button>
@@ -68,9 +72,9 @@ export function StepScaffold({
               onClick={onPrimary}
               disabled={primaryDisabled || primaryBusy}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white transition-all',
-                'hover:-translate-y-px hover:shadow-[0_12px_30px_rgba(234,88,12,0.28)]',
-                'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none',
+                PRIMARY_PILL,
+                'h-10 px-6',
+                'disabled:cursor-not-allowed disabled:opacity-40',
               )}
             >
               {primaryBusy ? <Loader2 size={14} className="animate-spin" /> : null}
@@ -85,11 +89,16 @@ export function StepScaffold({
 }
 
 // ── Shared input styling ────────────────────────────────────────────────────
-// Extracted so Text / Textarea / Multi-field step share the same look.
+// Paper-flat, theme-aware. h-10 to honor the focal "this moment matters" feel.
 const INPUT_CLASS =
-  'w-full rounded-xl border border-neutral-300 bg-white/80 px-4 py-3 text-base text-neutral-900 placeholder:text-neutral-400 outline-none backdrop-blur-sm transition-colors focus:border-neutral-900 focus:bg-white';
-const LABEL_CLASS =
-  'mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500';
+  'w-full h-10 rounded-md border border-border/70 bg-background px-3 text-base text-foreground ' +
+  'placeholder:text-muted-foreground/60 outline-none transition-colors ' +
+  'focus:border-foreground/30';
+const TEXTAREA_CLASS =
+  'w-full rounded-md border border-border/70 bg-background px-3 py-2.5 text-base text-foreground ' +
+  'placeholder:text-muted-foreground/60 outline-none transition-colors resize-none ' +
+  'focus:border-foreground/30';
+const LABEL_CLASS = cn(SECTION_LABEL, 'mb-2 block');
 
 // ── Text step ──────────────────────────────────────────────────────────────
 
@@ -163,7 +172,7 @@ export function TextStep({
           maxLength={maxLength}
           className={INPUT_CLASS}
         />
-        {helper && <p className="mt-2 text-xs text-neutral-500">{helper}</p>}
+        {helper && <p className="mt-2 text-xs text-muted-foreground">{helper}</p>}
       </div>
     </StepScaffold>
   );
@@ -215,7 +224,7 @@ export function TextareaStep({
           placeholder={placeholder}
           maxLength={maxLength}
           rows={rows}
-          className={cn(INPUT_CLASS, 'resize-none')}
+          className={TEXTAREA_CLASS}
         />
       </div>
     </StepScaffold>
@@ -302,7 +311,7 @@ export function MultiFieldStep({
                 placeholder={f.placeholder}
                 maxLength={f.maxLength ?? 500}
                 rows={f.rows ?? 3}
-                className={cn(INPUT_CLASS, 'resize-none')}
+                className={TEXTAREA_CLASS}
               />
             ) : (
               <input
@@ -396,8 +405,8 @@ export function SlugStep({
     >
       <div className="mx-auto max-w-md text-left">
         <label className={LABEL_CLASS}>Your intake link</label>
-        <div className="flex items-stretch overflow-hidden rounded-xl border border-neutral-300 bg-white/80 backdrop-blur-sm transition-colors focus-within:border-neutral-900 focus-within:bg-white">
-          <span className="inline-flex items-center border-r border-neutral-300 bg-neutral-50 px-3 text-sm text-neutral-500">
+        <div className="flex h-10 items-stretch overflow-hidden rounded-md border border-border/70 bg-background transition-colors focus-within:border-foreground/30">
+          <span className="inline-flex items-center border-r border-border/70 bg-foreground/[0.03] px-3 text-sm text-muted-foreground">
             {urlPrefix}
           </span>
           <input
@@ -416,17 +425,17 @@ export function SlugStep({
             }}
             placeholder="your-name"
             maxLength={48}
-            className="flex-1 bg-transparent px-3 py-3 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
+            className="flex-1 bg-transparent px-3 text-base text-foreground placeholder:text-muted-foreground/60 outline-none"
           />
           <span className="inline-flex w-9 items-center justify-center text-sm">
             {checking ? (
-              <Loader2 size={14} className="animate-spin text-neutral-400" />
+              <Loader2 size={14} className="animate-spin text-muted-foreground" />
             ) : available === true ? (
-              <Check size={14} className="text-emerald-600" />
+              <Check size={14} className="text-foreground" />
             ) : null}
           </span>
         </div>
-        <p className="mt-2 text-xs text-neutral-500">
+        <p className="mt-2 text-xs text-muted-foreground">
           Lowercase letters, numbers, and dashes only. This is where leads will land.
         </p>
       </div>
@@ -497,28 +506,27 @@ export function TilesStep<T extends string>({
                   setTimeout(() => onNext(), 140);
                 }
               }}
-              whileHover={{ y: -2 }}
               whileTap={{ scale: 0.98 }}
               transition={{ duration: 0.15 }}
               className={cn(
-                'group relative flex flex-col items-center justify-center gap-2 rounded-2xl border bg-white/70 px-4 py-6 text-center backdrop-blur-sm transition-colors',
+                'group relative flex flex-col items-center justify-center gap-2 rounded-xl border bg-background p-5 text-center transition-colors duration-150',
                 selected
-                  ? 'border-neutral-900 bg-white shadow-[0_8px_24px_rgba(234,88,12,0.18)]'
-                  : 'border-neutral-300 hover:border-neutral-500 hover:bg-white',
+                  ? 'border-foreground/40 bg-foreground/[0.045] ring-2 ring-foreground/10'
+                  : 'border-border/70 hover:bg-foreground/[0.04]',
               )}
             >
               {Icon && (
                 <Icon
-                  size={22}
+                  size={20}
                   className={cn(
                     'transition-colors',
-                    selected ? 'text-neutral-900' : 'text-neutral-600 group-hover:text-neutral-900',
+                    selected ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground',
                   )}
                 />
               )}
-              <span className="text-sm font-semibold text-neutral-900">{opt.label}</span>
+              <span className="text-sm font-medium text-foreground">{opt.label}</span>
               {opt.description && (
-                <span className="text-[11px] text-neutral-500">{opt.description}</span>
+                <span className="text-xs text-muted-foreground">{opt.description}</span>
               )}
             </motion.button>
           );
@@ -594,19 +602,19 @@ export function PhotoStep({
         <div
           onClick={() => fileRef.current?.click()}
           className={cn(
-            'relative flex h-32 w-32 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed transition-colors',
+            'relative flex h-32 w-32 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-colors',
             value
-              ? 'border-neutral-900/40 bg-white'
-              : 'border-neutral-300 bg-white/60 hover:border-neutral-500 hover:bg-white',
+              ? 'border-foreground/30 bg-background'
+              : 'border-border/70 bg-background hover:border-foreground/30 hover:bg-foreground/[0.04]',
           )}
         >
           {value ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={value} alt="" className="h-full w-full object-cover" />
           ) : uploading ? (
-            <Loader2 size={22} className="animate-spin text-neutral-500" />
+            <Loader2 size={22} className="animate-spin text-muted-foreground" />
           ) : (
-            <div className="flex flex-col items-center gap-1 text-neutral-500">
+            <div className="flex flex-col items-center gap-1 text-muted-foreground">
               <span className="text-xs font-medium">Click to upload</span>
               <span className="text-[10px]">PNG · JPG · WebP</span>
             </div>
@@ -627,7 +635,7 @@ export function PhotoStep({
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="text-xs text-neutral-500 hover:text-neutral-900"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Remove
           </button>

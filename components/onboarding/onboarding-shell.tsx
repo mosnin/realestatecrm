@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { OnboardingBrandMark } from './onboarding-brand-mark';
+import { GHOST_PILL } from '@/lib/typography';
 
 interface OnboardingShellProps {
   /** Zero-based index of the active step. */
@@ -20,31 +21,25 @@ interface OnboardingShellProps {
 /**
  * The shared onboarding surface.
  *
- * Background follows the "radial at 50% 10%" pattern: a light canvas with an
- * orange edge glow fading from a near-white core at the top centre. Light
- * theme, so text uses neutral-900 and the primary button is dark.
+ * Theme-aware canvas with a soft brand-warm wash so the moment feels staged
+ * but never saturated. The wash is barely-there in dark mode. Step content
+ * fades in via AnimatePresence; progress dots track placement.
  */
 export function OnboardingShell({ stepIndex, totalSteps, stepKey, children, onBack }: OnboardingShellProps) {
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-white text-neutral-900">
-      {/* Orange glow backdrop — single radial, white core at 50% 10% fading to
-          orange at the edges. This is the "125% 125%" formula scaled to the
-          viewport so the glow reaches every corner regardless of aspect. */}
+    <div className="relative min-h-screen w-full overflow-hidden bg-background text-foreground">
+      {/* Brand-warm wash — premium without saturation. Subtle in dark mode. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          background:
-            'radial-gradient(125% 125% at 50% 10%, #ffffff 40%, #f97316 100%)',
-        }}
+        className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-orange-50/40 via-background to-orange-50/30 dark:from-orange-500/[0.04] dark:via-background dark:to-orange-500/[0.03]"
       />
 
-      {/* Back button — top-left */}
+      {/* Back button — top-left, ghost pill */}
       {onBack && (
         <button
           type="button"
           onClick={onBack}
-          className="absolute left-5 top-5 z-20 inline-flex items-center gap-1.5 rounded-full border border-neutral-900/10 bg-white/60 px-3 py-1.5 text-xs font-medium text-neutral-700 backdrop-blur-sm transition-colors hover:border-neutral-900/30 hover:bg-white/80 hover:text-neutral-900"
+          className={cn(GHOST_PILL, 'absolute left-5 top-5 z-20')}
         >
           ← Back
         </button>
@@ -81,10 +76,10 @@ export function OnboardingShell({ stepIndex, totalSteps, stepKey, children, onBa
                 className={cn(
                   'inline-block h-1.5 rounded-full',
                   active
-                    ? 'bg-neutral-900'
+                    ? 'bg-foreground'
                     : complete
-                      ? 'bg-neutral-900/55'
-                      : 'bg-neutral-900/20',
+                      ? 'bg-foreground/40'
+                      : 'bg-foreground/15',
                 )}
                 animate={{ width: active ? 28 : 6 }}
                 transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
