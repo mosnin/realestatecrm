@@ -4,12 +4,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
 import { DEFAULT_RENTAL_FORM_CONFIG, DEFAULT_BUYER_FORM_CONFIG } from '@/lib/form-builder';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
+  Check,
   CheckCircle2,
   Loader2,
-  ChevronRight,
   ChevronLeft,
   AlertTriangle,
   Home,
@@ -29,10 +28,10 @@ import {
   trackStepView,
   trackStepComplete,
   trackFormSubmit,
-  trackFormAbandon,
   setupAbandonTracking,
 } from '@/lib/form-analytics-client';
 import { fireConversionEvents } from '@/lib/tracking-events';
+import { PRIMARY_PILL, SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -126,100 +125,48 @@ function toEmbedUrl(url: string): string | null {
   }
 }
 
-// ── Progress bar ─────────────────────────────────────────────────────────────
+// ── Dot stepper — quiet, paper-flat ──────────────────────────────────────────
 
-function ProgressBar({
+function DotStepper({
   current,
   total,
-  accentColor,
 }: {
   current: number;
   total: number;
-  accentColor?: string;
 }) {
-  const pct = Math.round((current / total) * 100);
-  const color = accentColor || 'hsl(var(--primary))';
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground font-medium">
-        <span aria-live="polite">
-          Step {current} of {total}
-        </span>
-        <span aria-hidden="true">{pct}%</span>
-      </div>
-      <div
-        className="h-1 bg-muted rounded-full overflow-hidden"
-        role="progressbar"
-        aria-valuenow={current}
-        aria-valuemin={1}
-        aria-valuemax={total}
-        aria-label={`Application progress: step ${current} of ${total}`}
-      >
-        <motion.div
-          className="h-full rounded-full"
-          style={{ backgroundColor: color }}
-          initial={false}
-          animate={{ width: `${pct}%` }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        />
-      </div>
-    </div>
-  );
-}
-
-// ── Step indicator (compact on mobile) ───────────────────────────────────────
-
-function StepIndicator({
-  current,
-  sections,
-  accentColor,
-}: {
-  current: number;
-  sections: FormSection[];
-  accentColor?: string;
-}) {
-  const color = accentColor || 'hsl(var(--primary))';
-  return (
-    <nav aria-label="Form steps" className="flex gap-1 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
-      <AnimatePresence initial={false}>
-        {sections.map((section, idx) => {
-          const stepNum = idx + 1;
-          const isActive = stepNum === current;
-          const isDone = stepNum < current;
-          return (
-            <motion.div
-              key={section.id}
-              layout
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className={cn(
-                'flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors flex-shrink-0',
-                !isActive && !isDone && 'text-muted-foreground/60',
-                isDone && 'text-muted-foreground',
-              )}
-              style={
-                isActive
-                  ? { backgroundColor: color, color: '#fff' }
-                  : isDone
-                    ? { backgroundColor: `${color}15`, color }
-                    : undefined
-              }
-              aria-current={isActive ? 'step' : undefined}
-              role="listitem"
-            >
-              <span className="w-3 text-center">{stepNum}</span>
-              <span className="hidden sm:inline">{section.title}</span>
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
+    <nav
+      aria-label="Form steps"
+      role="progressbar"
+      aria-valuenow={current}
+      aria-valuemin={1}
+      aria-valuemax={total}
+      className="flex items-center gap-1.5"
+    >
+      {Array.from({ length: total }).map((_, idx) => {
+        const stepNum = idx + 1;
+        const isActive = stepNum === current;
+        const isDone = stepNum < current;
+        return (
+          <motion.span
+            key={idx}
+            layout
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className={cn(
+              'h-1.5 rounded-full transition-colors',
+              isActive && 'w-6 bg-foreground',
+              isDone && 'w-1.5 bg-foreground/40',
+              !isActive && !isDone && 'w-1.5 bg-foreground/15',
+            )}
+            aria-current={isActive ? 'step' : undefined}
+          />
+        );
+      })}
     </nav>
   );
 }
 
-// ── Step header ──────────────────────────────────────────────────────────────
+// ── Step header — quiet section label + optional description ─────────────────
 
 function StepHeader({
   title,
@@ -229,8 +176,8 @@ function StepHeader({
   description?: string;
 }) {
   return (
-    <div className="space-y-1.5">
-      <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+    <div className="space-y-2">
+      <p className={SECTION_LABEL}>{title}</p>
       {description && (
         <p className="text-sm text-muted-foreground">{description}</p>
       )}
@@ -257,13 +204,11 @@ function LeadTypeSelector({
   value,
   onChange,
   error,
-  accentColor,
 }: {
   question: FormQuestion;
   value: string;
   onChange: (val: string) => void;
   error?: string;
-  accentColor: string;
 }) {
   const options = question.options ?? [];
   // Map known values to icons, fall back to generic
@@ -274,8 +219,10 @@ function LeadTypeSelector({
   };
 
   return (
-    <div className="space-y-3">
-      {error && <p className="text-xs text-destructive">{error}</p>}
+    <div className="space-y-2">
+      {error && (
+        <p className="text-xs text-rose-600 dark:text-rose-400">{error}</p>
+      )}
       {options.map((option) => {
         const Icon = iconMap[option.value] || Home;
         const selected = value === option.value;
@@ -285,23 +232,14 @@ function LeadTypeSelector({
             type="button"
             onClick={() => onChange(option.value)}
             className={cn(
-              'w-full flex items-center gap-4 px-5 py-5 rounded-xl border-2 transition-all text-left',
+              'w-full flex items-center gap-3 px-4 py-4 rounded-lg border text-left transition-colors',
               selected
-                ? 'shadow-sm font-medium'
-                : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                ? 'border-foreground/40 bg-foreground/[0.045] ring-2 ring-foreground/10'
+                : 'border-border/70 hover:bg-foreground/[0.04]',
             )}
-            style={
-              selected
-                ? { borderColor: accentColor, backgroundColor: `${accentColor}08` }
-                : undefined
-            }
           >
-            <Icon
-              size={24}
-              className="flex-shrink-0"
-              style={selected ? { color: accentColor } : undefined}
-            />
-            <span className="text-sm">{option.label}</span>
+            <Icon size={18} className="flex-shrink-0 text-muted-foreground" />
+            <span className="text-sm text-foreground">{option.label}</span>
           </button>
         );
       })}
@@ -368,7 +306,7 @@ function SaveNotification({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
           transition={{ duration: 0.3 }}
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-lg bg-foreground text-background text-sm font-medium shadow-lg max-w-[90vw]"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-md bg-foreground text-background text-xs font-medium max-w-[90vw]"
         >
           {message}
         </motion.div>
@@ -390,19 +328,19 @@ function SaveStatusIndicator({
     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
       {status === 'saving' && (
         <>
-          <Loader2 size={12} className="animate-spin" />
-          <span>Saving...</span>
+          <Loader2 size={11} className="animate-spin" />
+          <span>Saving</span>
         </>
       )}
       {status === 'saved' && (
         <>
-          <Cloud size={12} className="text-green-500" />
+          <Cloud size={11} className="text-emerald-600 dark:text-emerald-400" />
           <span>Saved</span>
         </>
       )}
       {status === 'error' && (
         <>
-          <CloudOff size={12} className="text-destructive" />
+          <CloudOff size={11} className="text-rose-600 dark:text-rose-400" />
           <span>Save failed</span>
         </>
       )}
@@ -427,23 +365,23 @@ function ResumeBanner({
 }) {
   if (!visible) return null;
   return (
-    <div className="mx-5 mt-4 md:mx-8 flex items-start gap-3 p-3 rounded-lg border border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/30">
+    <div className="flex items-start gap-3 p-3 rounded-md border border-border/70 bg-foreground/[0.025] mb-6">
       <CheckCircle2
-        size={16}
-        className="text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5"
+        size={14}
+        className="text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5"
       />
-      <div className="flex-1">
-        <p className="text-sm font-medium text-green-800 dark:text-green-200">
-          Welcome back! Your progress has been restored.
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-foreground">
+          Welcome back. Your progress has been restored.
         </p>
-        <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">
+        <p className="text-xs text-muted-foreground mt-0.5">
           {answeredCount} {answeredCount === 1 ? 'answer' : 'answers'} restored
-          {totalSteps > 1 && <> &mdash; you&apos;re on step {currentStep} of {totalSteps}</>}
+          {totalSteps > 1 && <> &middot; step {currentStep} of {totalSteps}</>}
         </p>
         <button
           type="button"
           onClick={onDismiss}
-          className="text-xs text-green-600 dark:text-green-400 underline mt-1"
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-1"
         >
           Dismiss
         </button>
@@ -463,19 +401,17 @@ function ResumeErrorBanner({
 }) {
   if (!message) return null;
   return (
-    <div className="mx-5 mt-4 md:mx-8 flex items-start gap-3 p-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30">
+    <div className="flex items-start gap-3 p-3 rounded-md border border-border/70 bg-foreground/[0.025] mb-6">
       <XCircle
-        size={16}
+        size={14}
         className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
       />
-      <div className="flex-1">
-        <p className="text-sm text-amber-800 dark:text-amber-200">
-          {message}
-        </p>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-foreground">{message}</p>
         <button
           type="button"
           onClick={onDismiss}
-          className="text-xs text-amber-600 dark:text-amber-400 underline mt-1"
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-1"
         >
           Dismiss
         </button>
@@ -1136,17 +1072,12 @@ export function DynamicApplicationForm({
         className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
       >
         <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
+          initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="rounded-2xl bg-card border border-border shadow-xl p-8 text-center space-y-3"
+          className="rounded-xl bg-background border border-border/70 p-6 text-center space-y-3"
         >
-          <Loader2 size={28} className="animate-spin text-primary mx-auto" />
-          <p className="text-sm font-medium text-foreground">
-            Processing your application...
-          </p>
-          <p className="text-xs text-muted-foreground">
-            This will only take a moment
-          </p>
+          <Loader2 size={20} className="animate-spin text-muted-foreground mx-auto" />
+          <p className="text-sm text-foreground">Submitting your application</p>
         </motion.div>
       </motion.div>
     );
@@ -1163,40 +1094,38 @@ export function DynamicApplicationForm({
           className="pointer-events-none fixed inset-0 z-[9999] w-full h-full"
         />
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
-          className="rounded-xl bg-card border border-border/60 shadow-sm p-6 md:p-8 text-center space-y-5"
+          className="text-center space-y-4 py-8"
         >
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{
-              delay: 0.2,
+              delay: 0.15,
               type: 'spring',
               stiffness: 200,
               damping: 15,
             }}
-            className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto"
+            className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto"
           >
-            <CheckCircle2
-              size={28}
-              className="text-green-600 dark:text-green-400"
-            />
+            <Check size={20} className="text-emerald-600 dark:text-emerald-400" />
           </motion.div>
-          <div className="space-y-1.5">
-            <h2 className="text-xl font-semibold text-foreground">
-              {customization?.thankYouTitle || 'Application received'}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {customization?.thankYouMessage ||
-                `${businessName} will review your application and follow up shortly.`}
-            </p>
-          </div>
+          <h2
+            className="text-3xl tracking-tight text-foreground"
+            style={TITLE_FONT}
+          >
+            {customization?.thankYouTitle || 'Submitted.'}
+          </h2>
+          <p className="text-base text-muted-foreground max-w-sm mx-auto">
+            {customization?.thankYouMessage ||
+              `${businessName} will review your application and follow up shortly.`}
+          </p>
           {scoreState?.applicationRef && (
             <a
               href={`/apply/${slug}/status?ref=${scoreState.applicationRef}`}
-              className="inline-flex items-center gap-2 text-sm text-primary font-medium hover:underline"
+              className="inline-flex items-center gap-1.5 text-sm text-foreground hover:text-foreground/80 transition-colors underline-offset-4 hover:underline"
             >
               Track your application status &rarr;
             </a>
@@ -1222,12 +1151,7 @@ export function DynamicApplicationForm({
 
   return (
     <div
-      className={cn(
-        'bg-card overflow-hidden',
-        radiusClass,
-        fontClass,
-        customization?.darkMode && 'dark',
-      )}
+      className={cn(fontClass, customization?.darkMode && 'dark')}
       style={{ '--intake-accent': accentColor } as React.CSSProperties}
     >
       {/* Screen reader announcements for dynamic section changes */}
@@ -1237,9 +1161,12 @@ export function DynamicApplicationForm({
           : currentSection && `Now on step ${currentStep} of ${totalSteps}: ${currentSection.title}`}
       </div>
 
-      {/* Video embed */}
+      {/* Video embed — sits above the form card, hairline-separated */}
       {embedUrl && (
-        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+        <div
+          className={cn('relative w-full overflow-hidden mb-6 border border-border/70', radiusClass)}
+          style={{ paddingBottom: '56.25%' }}
+        >
           <iframe
             src={embedUrl}
             title="Introduction video"
@@ -1250,91 +1177,76 @@ export function DynamicApplicationForm({
         </div>
       )}
 
-      {/* Progress */}
-      <div className="px-5 pt-5 pb-3 md:px-7 space-y-3 border-b border-border/30">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <ProgressBar
-              current={currentStep}
-              total={totalSteps}
-              accentColor={accentColor}
+      <div className="rounded-xl bg-background border border-border/70 p-6">
+        {/* Resume banner (shown when user returns via magic link) */}
+        <ResumeBanner
+          visible={showResumeBanner}
+          onDismiss={() => setShowResumeBanner(false)}
+          currentStep={currentStep}
+          totalSteps={totalSteps}
+          answeredCount={Object.keys(answers).filter((k) => {
+            const v = answers[k];
+            return v !== '' && v !== undefined && (typeof v !== 'object' || (v as string[]).length > 0);
+          }).length}
+        />
+
+        {/* Resume error banner (expired/submitted link) */}
+        <ResumeErrorBanner
+          message={resumeError}
+          onDismiss={() => setResumeError('')}
+        />
+
+        {/* Stale draft notice */}
+        {staleDraft && (
+          <div className="flex items-start gap-3 p-3 rounded-md border border-border/70 bg-foreground/[0.025] mb-6">
+            <AlertTriangle
+              size={14}
+              className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
             />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-foreground">
+                The form has been updated since your last visit. Your previous
+                answers have been carried over where possible, but you may need
+                to review them.
+              </p>
+              <button
+                type="button"
+                onClick={dismissStaleNotice}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-1"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
+        )}
+
+        {/* Stepper + save status — quiet header row */}
+        <div className="flex items-center justify-between mb-6">
+          <DotStepper current={currentStep} total={totalSteps} />
           <SaveStatusIndicator status={saveStatus} />
         </div>
-        <StepIndicator
-          current={currentStep}
-          sections={
-            hasDualConfigs
-              ? [{ id: '__getting-started', title: 'Getting Started', position: -1, questions: [] }, ...sortedSections]
-              : sortedSections
-          }
-          accentColor={accentColor}
-        />
-      </div>
 
-      {/* Resume banner (shown when user returns via magic link) */}
-      <ResumeBanner
-        visible={showResumeBanner}
-        onDismiss={() => setShowResumeBanner(false)}
-        currentStep={currentStep}
-        totalSteps={totalSteps}
-        answeredCount={Object.keys(answers).filter((k) => {
-          const v = answers[k];
-          return v !== '' && v !== undefined && (typeof v !== 'object' || (v as string[]).length > 0);
-        }).length}
-      />
-
-      {/* Resume error banner (expired/submitted link) */}
-      <ResumeErrorBanner
-        message={resumeError}
-        onDismiss={() => setResumeError('')}
-      />
-
-      {/* Stale draft notice */}
-      {staleDraft && (
-        <div className="mx-5 mt-4 md:mx-8 flex items-start gap-3 p-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30">
-          <AlertTriangle
-            size={16}
-            className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
-          />
-          <div className="flex-1">
-            <p className="text-sm text-amber-800 dark:text-amber-200">
-              The form has been updated since your last visit. Your previous
-              answers have been carried over where possible, but you may need to
-              review them.
-            </p>
-            <button
-              type="button"
-              onClick={dismissStaleNotice}
-              className="text-xs text-amber-600 dark:text-amber-400 underline mt-1"
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Step content */}
-      <div className="px-5 py-6 md:px-8 md:py-8 overflow-hidden">
+        {/* Step content */}
         <AnimatePresence mode="wait" initial={false} custom={direction}>
           <motion.div
             key={currentStep}
             custom={direction}
-            initial={{ x: direction * 60, opacity: 0 }}
+            initial={{ x: direction * 40, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: direction * -60, opacity: 0 }}
-            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            exit={{ x: direction * -40, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
           >
             {/* ── Getting Started step (dual-config mode only) ── */}
             {isOnGettingStarted && (
-              <div className="space-y-5">
+              <section className="space-y-4">
                 <StepHeader
                   title="Getting Started"
                   description="Let's personalize your experience."
                 />
                 {errors['__leadType'] && (
-                  <p className="text-xs text-destructive">{errors['__leadType']}</p>
+                  <p className="text-xs text-rose-600 dark:text-rose-400">
+                    {errors['__leadType']}
+                  </p>
                 )}
                 <LeadTypeSelector
                   question={{
@@ -1360,165 +1272,159 @@ export function DynamicApplicationForm({
                     setErrors({});
                   }}
                   error={errors['__leadType']}
-                  accentColor={accentColor}
                 />
-              </div>
+              </section>
             )}
 
             {/* ── Config-based section content ── */}
             {currentSection && (
-              <div className="space-y-5">
+              <section className="space-y-4">
                 <StepHeader
                   title={currentSection.title}
                   description={currentSection.description}
                 />
-                {currentSection.questions
-                  .filter((q) => isQuestionVisible(q, answers))
-                  .map((question) =>
-                    isLeadTypeQuestion(question) ? (
-                      <LeadTypeSelector
-                        key={question.id}
-                        question={question}
-                        value={
-                          typeof getAnswer(question.id) === 'string'
-                            ? (getAnswer(question.id) as string)
-                            : ''
-                        }
-                        onChange={(val) => setAnswer(question.id, val)}
-                        error={errors[question.id]}
-                        accentColor={accentColor}
-                      />
-                    ) : (
-                      <QuestionRenderer
-                        key={question.id}
-                        question={question}
-                        value={getAnswer(question.id)}
-                        onChange={(val) => setAnswer(question.id, val)}
-                        error={errors[question.id]}
-                        accentColor={accentColor}
-                      />
-                    ),
-                  )}
+                <div className="space-y-4">
+                  {currentSection.questions
+                    .filter((q) => isQuestionVisible(q, answers))
+                    .map((question) =>
+                      isLeadTypeQuestion(question) ? (
+                        <LeadTypeSelector
+                          key={question.id}
+                          question={question}
+                          value={
+                            typeof getAnswer(question.id) === 'string'
+                              ? (getAnswer(question.id) as string)
+                              : ''
+                          }
+                          onChange={(val) => setAnswer(question.id, val)}
+                          error={errors[question.id]}
+                        />
+                      ) : (
+                        <QuestionRenderer
+                          key={question.id}
+                          question={question}
+                          value={getAnswer(question.id)}
+                          onChange={(val) => setAnswer(question.id, val)}
+                          error={errors[question.id]}
+                          accentColor={accentColor}
+                        />
+                      ),
+                    )}
+                </div>
 
-                {/* Consent checkboxes on the last step */}
+                {/* Consent checkbox on the last step */}
                 {isLastStep && (
-                  <div className="flex items-start gap-3 mt-4 p-3 rounded-lg border border-border bg-muted/30">
-                    <input
-                      type="checkbox"
-                      id="combined-consent-dynamic"
-                      checked={
-                        getAnswer('chippiTosConsent') === 'true'
-                      }
-                      onChange={(e) => {
-                        const v = e.target.checked ? 'true' : 'false';
-                        setAnswer('chippiTosConsent', v);
-                        setAnswer('privacyConsent', v);
-                      }}
-                      className="mt-0.5 rounded border-border cursor-pointer"
-                      required
-                    />
-                    <label
-                      htmlFor="combined-consent-dynamic"
-                      className="text-sm text-muted-foreground leading-snug cursor-pointer"
-                    >
-                      I agree to Chippi&apos;s{' '}
-                      <a
-                        href="/legal/terms"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline hover:text-primary/80"
+                  <>
+                    <div className="border-t border-border/60 my-6" />
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        id="combined-consent-dynamic"
+                        checked={getAnswer('chippiTosConsent') === 'true'}
+                        onChange={(e) => {
+                          const v = e.target.checked ? 'true' : 'false';
+                          setAnswer('chippiTosConsent', v);
+                          setAnswer('privacyConsent', v);
+                        }}
+                        className="mt-0.5 rounded border-border/70 cursor-pointer"
+                        required
+                      />
+                      <label
+                        htmlFor="combined-consent-dynamic"
+                        className="text-xs text-muted-foreground leading-snug cursor-pointer"
                       >
-                        Terms of Service
-                      </a>{' '}
-                      and{' '}
-                      <a
-                        href="/legal/privacy"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline hover:text-primary/80"
-                      >
-                        Privacy Policy
-                      </a>
-                      {customization?.privacyPolicyUrl && (
-                        <>
-                          {' '}
-                          and {businessName}&apos;s{' '}
-                          <a
-                            href={customization.privacyPolicyUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary underline hover:text-primary/80"
-                          >
-                            Privacy Policy
-                          </a>
-                        </>
-                      )}
-                    </label>
-                  </div>
+                        I agree to Chippi&apos;s{' '}
+                        <a
+                          href="/legal/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-foreground underline underline-offset-2 hover:text-foreground/80"
+                        >
+                          Terms of Service
+                        </a>{' '}
+                        and{' '}
+                        <a
+                          href="/legal/privacy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-foreground underline underline-offset-2 hover:text-foreground/80"
+                        >
+                          Privacy Policy
+                        </a>
+                        {customization?.privacyPolicyUrl && (
+                          <>
+                            {' '}
+                            and {businessName}&apos;s{' '}
+                            <a
+                              href={customization.privacyPolicyUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-foreground underline underline-offset-2 hover:text-foreground/80"
+                            >
+                              Privacy Policy
+                            </a>
+                          </>
+                        )}
+                      </label>
+                    </div>
+                    {(errors['chippiTosConsent'] || errors['privacyConsent']) && (
+                      <p className="text-xs text-rose-600 dark:text-rose-400 mt-1">
+                        {errors['chippiTosConsent'] || errors['privacyConsent']}
+                      </p>
+                    )}
+                  </>
                 )}
-                {isLastStep && errors['chippiTosConsent'] && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors['chippiTosConsent']}
-                  </p>
-                )}
-                {isLastStep && errors['privacyConsent'] && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors['privacyConsent']}
-                  </p>
-                )}
-              </div>
+              </section>
             )}
           </motion.div>
         </AnimatePresence>
-      </div>
 
-      {/* Navigation */}
-      <div className="px-5 pb-6 md:px-8 md:pb-8 pt-2">
-        {submitError && (
-          <p className="text-sm text-destructive mb-3">{submitError}</p>
-        )}
-        <div className="flex gap-3">
-          {currentStep > 1 && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={goBack}
-              className="flex-shrink-0 rounded-full px-5"
-            >
-              <ChevronLeft size={15} className="mr-1" />
-              Back
-            </Button>
+        {/* Navigation */}
+        <div className="mt-8">
+          {submitError && (
+            <p className="text-xs text-rose-600 dark:text-rose-400 mb-3">
+              {submitError}
+            </p>
           )}
-          <div className="flex-1" />
-          {!isLastStep ? (
-            <Button
-              type="button"
-              onClick={goNext}
-              className="flex-shrink-0 rounded-full px-6 text-white shadow-md hover:shadow-lg transition-shadow"
-              style={{ backgroundColor: accentColor }}
-            >
-              Continue
-              <ChevronRight size={15} className="ml-1" />
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              onClick={onSubmit}
-              disabled={submitting}
-              size="lg"
-              className="flex-1 sm:flex-none rounded-full px-8 text-white shadow-md hover:shadow-lg transition-shadow"
-              style={{ backgroundColor: accentColor }}
-            >
-              {submitting ? (
-                <>
-                  <Loader2 size={16} className="mr-2 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                'Submit application'
-              )}
-            </Button>
-          )}
+          <div className="flex items-center gap-3">
+            {currentStep > 1 ? (
+              <button
+                type="button"
+                onClick={goBack}
+                className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronLeft size={14} />
+                Back
+              </button>
+            ) : (
+              <span />
+            )}
+            <div className="flex-1" />
+            {!isLastStep ? (
+              <button
+                type="button"
+                onClick={goNext}
+                className={cn(PRIMARY_PILL)}
+                style={{ backgroundColor: accentColor }}
+              >
+                Continue
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onSubmit}
+                disabled={submitting}
+                className={cn(
+                  PRIMARY_PILL,
+                  'disabled:opacity-60 disabled:cursor-not-allowed',
+                )}
+                style={{ backgroundColor: accentColor }}
+              >
+                {submitting && <Loader2 size={14} className="animate-spin" />}
+                {submitting ? 'Submitting' : 'Submit application'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
