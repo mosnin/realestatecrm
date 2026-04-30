@@ -24,6 +24,8 @@ interface PublicPageShellProps {
   trustLine: string;
   /** Phrasing for the in-body "with [agent]" line (e.g. "Applying with", "Booking with"). Defaults to "with". */
   agentPresenceLabel?: string;
+  /** Hide the "Powered by Chippi" mark — set on paid tiers (white-label). */
+  hidePoweredBy?: boolean;
   customization?: ShellCustomization;
   children: React.ReactNode;
 }
@@ -71,6 +73,7 @@ export function PublicPageShell({
   pageIntro,
   trustLine,
   agentPresenceLabel = 'with',
+  hidePoweredBy = false,
   customization,
   children,
 }: PublicPageShellProps) {
@@ -196,11 +199,13 @@ export function PublicPageShell({
             )}
           </div>
 
-          {/* Right: Powered by Chippi */}
-          <div className="flex items-center gap-1 opacity-30">
-            <span className="text-[10px] hidden sm:inline">Powered by</span>
-            <BrandLogo className="h-3" />
-          </div>
+          {/* Right: Powered by Chippi — hidden on paid tiers (white-label) */}
+          {!hidePoweredBy && (
+            <div className="flex items-center gap-1 opacity-30">
+              <span className="text-[10px] hidden sm:inline">Powered by</span>
+              <BrandLogo className="h-3" />
+            </div>
+          )}
         </footer>
       </main>
     </div>

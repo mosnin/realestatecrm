@@ -43,6 +43,7 @@ import {
   chippiErrorMessage,
   classifyError,
   computeConversationTitle,
+  fallbackHeuristic,
 } from '@/lib/ai-tools/chippi-voice';
 
 interface HistoryRow {
@@ -69,23 +70,35 @@ interface PostBody {
 }
 
 /**
- * Fire-and-forget: derive a 4-6 word title from the user's first message and
- * patch the row. We do NOT await this from the request path — a slow Supabase
- * write should never delay the assistant's first token. Logged on failure;
- * the conversation just keeps its prior title.
+ * Fire-and-forget: derive a 3-6 word title from the user's first message via
+ * a one-shot LLM call and patch the row. We do NOT await this from the
+ * request path — the LLM call is ~200ms but should never delay the
+ * assistant's first token. Logged on failure; the conversation just keeps
+ * its prior title.
+ *
+ * The title call is rate-limited per-space at 60/hour. Past that we fall
+ * back to the local heuristic so a busy realtor still gets a title — just a
+ * cruder one — instead of an OpenAI bill spike.
  */
-function autoTitleConversation(conversationId: string, userMessage: string): void {
-  const title = computeConversationTitle(userMessage);
-  if (!title || title === 'New conversation') return;
-  void supabase
-    .from('Conversation')
-    .update({ title, updatedAt: new Date().toISOString() })
-    .eq('id', conversationId)
-    .then(({ error }) => {
+function autoTitleConversation(spaceId: string, conversationId: string, userMessage: string): void {
+  void (async () => {
+    try {
+      const { allowed } = await checkRateLimit(`chat:title:${spaceId}`, 60, 3600);
+      const title = allowed
+        ? await computeConversationTitle(userMessage)
+        : fallbackHeuristic(userMessage);
+      if (!title || title === 'New conversation') return;
+      const { error } = await supabase
+        .from('Conversation')
+        .update({ title, updatedAt: new Date().toISOString() })
+        .eq('id', conversationId);
       if (error) {
         logger.warn('[ai/task] auto-title patch failed', { conversationId }, error);
       }
-    });
+    } catch (err) {
+      logger.warn('[ai/task] auto-title pipeline crashed', { conversationId }, err);
+    }
+  })();
 }
 
 async function resolveConversation(
@@ -101,7 +114,7 @@ async function resolveConversation(
       .maybeSingle();
     if (data && data.spaceId === spaceId) {
       if (!data.title || data.title === 'New conversation') {
-        autoTitleConversation(conversationId, userMessage);
+        autoTitleConversation(spaceId, conversationId, userMessage);
       }
       return conversationId;
     }
@@ -116,7 +129,7 @@ async function resolveConversation(
     title: 'New conversation',
   });
   if (error) throw error;
-  autoTitleConversation(id, userMessage);
+  autoTitleConversation(spaceId, id, userMessage);
   return id;
 }
 

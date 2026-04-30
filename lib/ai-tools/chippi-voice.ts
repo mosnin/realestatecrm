@@ -1,14 +1,18 @@
 /**
  * Chippi-voiced helpers for the chat path.
  *
- *   - computeConversationTitle: a 4-6 word sidebar title from the user's first
- *     message. Pure heuristic, no LLM call. ~90% good, cheap, no surprises.
+ *   - computeConversationTitle: a 3-6 word sidebar title from the user's first
+ *     message. One-shot LLM call (~$0.0001/turn, multilingual). Falls back to
+ *     a local heuristic if the LLM call fails or is rate-limited.
  *
  *   - chippiErrorMessage: maps an error code to a first-person Chippi line so
  *     a tool failure or backend hiccup reads like Chippi talking, not like a
  *     stack trace leaking through.
  *
- * Both are sync, side-effect free, server- and client-safe (used in both).
+ * `chippiErrorMessage` / `classifyError` are sync, side-effect free, and safe
+ * to import on the client. `computeConversationTitle` is async and SERVER-ONLY
+ * (uses the OpenAI SDK). The OpenAI client is lazy-imported inside the
+ * function body so this module stays client-safe for the other exports.
  */
 
 const TITLE_LEADING_FILLER = [
@@ -43,18 +47,76 @@ const TITLE_LEADING_FILLER = [
 ];
 
 /**
- * Generate a 4-6 word title from the user's first message.
+ * System prompt for the title-generation LLM call. Kept as a module constant
+ * so it's easy to audit and tweak in one place.
+ */
+const TITLE_SYSTEM_PROMPT =
+  'You title chat conversations for a sidebar. Given the user\'s first message, output a 3-6 word title that captures the user\'s intent. ' +
+  'Plain text only — no quotes, no punctuation, no leading articles. Sentence case. ' +
+  'If the message is a greeting only, return "New conversation". ' +
+  'Match the language of the user\'s message.';
+
+/**
+ * Generate a 3-6 word title from the user's first message via a one-shot LLM
+ * call. Multilingual, intent-aware. Falls back to the local heuristic if the
+ * LLM call fails (network blip, missing key, rate-limit signaled by caller).
+ *
+ * SERVER-ONLY. Uses the OpenAI SDK via a dynamic import so the rest of this
+ * module stays safe to import from client components.
+ *
+ * Returns "New conversation" for empty / trivially short input — the call
+ * site uses this sentinel to skip the DB patch.
+ */
+export async function computeConversationTitle(userMessage: string): Promise<string> {
+  const trimmed = (userMessage ?? '').toString().trim().slice(0, 1000);
+  if (!trimmed || trimmed.length < 3) return 'New conversation';
+
+  try {
+    const { getOpenAIClient } = await import('./openai-client');
+    const { client } = getOpenAIClient();
+    const result = await client.chat.completions.create({
+      model: 'gpt-4.1-mini',
+      messages: [
+        { role: 'system', content: TITLE_SYSTEM_PROMPT },
+        { role: 'user', content: trimmed },
+      ],
+      max_tokens: 30,
+      temperature: 0.2,
+    });
+    const raw = result.choices[0]?.message?.content?.trim() ?? '';
+    return cleanTitle(raw) || fallbackHeuristic(trimmed);
+  } catch {
+    // Network blip, missing key, OpenAI 5xx — better a rough title than nothing.
+    return fallbackHeuristic(trimmed);
+  }
+}
+
+/**
+ * Strip surrounding quotes / trailing punctuation from the model's reply
+ * and enforce a length cap. Returns '' when the cleaned result is unusable
+ * so the caller can fall through to the heuristic.
+ */
+function cleanTitle(s: string): string {
+  const stripped = s
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/[.!?,;:]+$/g, '')
+    .trim();
+  if (stripped.length === 0 || stripped.length > 60) return '';
+  return stripped;
+}
+
+/**
+ * Local heuristic — the previous implementation, kept as the fallback path
+ * when the LLM call fails. English-biased and easy to fool, but it ships a
+ * non-empty title without an external call.
  *
  * Strategy:
  *   1. Strip HTML, control chars, mention prefix from chippi-workspace.
  *   2. Drop leading conversational filler ("hi", "can you", "please", ...).
  *   3. Take the first 4-6 words; capitalize the first letter; strip trailing
  *      `?` `.` `!`; cap at 50 chars.
- *
- * Returns "New conversation" only as a last-ditch fallback — empty input
- * shouldn't reach here in practice (the route validates), but be defensive.
  */
-export function computeConversationTitle(userMessage: string): string {
+export function fallbackHeuristic(userMessage: string): string {
   let text = (userMessage ?? '').toString();
 
   // Strip the "(Referencing: [Contact: Name], ...)\n\n" prefix the workspace
@@ -78,7 +140,7 @@ export function computeConversationTitle(userMessage: string): string {
     if (lower.startsWith(phrase + ' ') || lower === phrase) {
       text = text.slice(phrase.length).trim();
       // Loop again: "hi can you ..." should drop both.
-      return computeConversationTitle(text);
+      return fallbackHeuristic(text);
     }
   }
 

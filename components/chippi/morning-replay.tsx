@@ -61,7 +61,10 @@ function metaFor(actionType: string): { verb: string; icon: LucideIcon } {
 // ─── Local-state helpers ────────────────────────────────────────────────────
 
 const DISMISS_KEY = 'chippi.morningReplay.lastDismissed';
+const FIRST_SIGN_IN_KEY = 'chippi.firstSignInAt';
 const WINDOW_HOURS = 12;
+/** After this many days, the full replay collapses to a one-liner by default. */
+const FULL_MODE_DAYS = 7;
 
 function todayKey(): string {
   const d = new Date();
@@ -85,6 +88,27 @@ function markDismissedToday() {
   }
 }
 
+/**
+ * Read (or initialize) the first-sign-in epoch ms. First time we see the
+ * realtor on /chippi we stamp now(); afterwards we read the stored value.
+ * Returns null on SSR or if storage is unavailable.
+ */
+function readOrInitFirstSignInAt(): number | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(FIRST_SIGN_IN_KEY);
+    if (raw) {
+      const n = Number(raw);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    const now = Date.now();
+    window.localStorage.setItem(FIRST_SIGN_IN_KEY, String(now));
+    return now;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Format helpers ─────────────────────────────────────────────────────────
 
 function formatTimeRange(entries: ActivityEntry[]): string {
@@ -103,6 +127,42 @@ function buildShareText(entries: ActivityEntry[]): string {
   });
   if (entries.length > 5) lines.push(`…and ${entries.length - 5} more`);
   return `Overnight, Chippi:\n${lines.map((l) => `  • ${l}`).join('\n')}`;
+}
+
+/**
+ * One-line summary in Chippi voice for the collapsed mode. Examples:
+ *   "Since yesterday: 1 draft."
+ *   "Since yesterday: 4 things — 2 drafts, 1 reminder, 1 calendar update."
+ *
+ * The "calendar update" / "reminder" / "draft" / "note" buckets map onto the
+ * same stats the footer summary uses, just relabelled in plain English so the
+ * realtor doesn't have to translate.
+ */
+function buildCollapsedLine(stats: {
+  sent: number;
+  drafted: number;
+  scheduled: number;
+  noted: number;
+}): string | null {
+  const buckets: { count: number; singular: string; plural: string }[] = [
+    { count: stats.drafted, singular: 'draft', plural: 'drafts' },
+    { count: stats.scheduled, singular: 'reminder', plural: 'reminders' },
+    { count: stats.sent, singular: 'message sent', plural: 'messages sent' },
+    { count: stats.noted, singular: 'note', plural: 'notes' },
+  ].filter((b) => b.count > 0);
+
+  const total = buckets.reduce((sum, b) => sum + b.count, 0);
+  if (total === 0) return null;
+
+  if (buckets.length === 1) {
+    const b = buckets[0];
+    const noun = b.count === 1 ? b.singular : b.plural;
+    return `Since yesterday: ${b.count} ${noun}.`;
+  }
+
+  const parts = buckets.map((b) => `${b.count} ${b.count === 1 ? b.singular : b.plural}`);
+  const noun = total === 1 ? 'thing' : 'things';
+  return `Since yesterday: ${total} ${noun} — ${parts.join(', ')}.`;
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -128,11 +188,22 @@ export function MorningReplay({ slug }: Props) {
   const [entries, setEntries] = useState<ActivityEntry[] | null>(null);
   const [hidden, setHidden] = useState(false);
   const [undoing, setUndoing] = useState<string | null>(null);
+  // Days since first /chippi visit. Null until the client-side effect runs.
+  const [daysSinceFirstSignIn, setDaysSinceFirstSignIn] = useState<number | null>(null);
+  // In collapsed mode, the user can click "Show" to expand for the current view.
+  const [forceFull, setForceFull] = useState(false);
 
-  // Check dismiss state up front. SSR returns false; the client effect
-  // re-checks once mounted.
+  // Check dismiss state up front, and stamp/read the first-sign-in epoch so
+  // we know whether the user is still in their first-week wow window.
   useEffect(() => {
     if (isDismissedToday()) setHidden(true);
+    const firstSignInAt = readOrInitFirstSignInAt();
+    if (firstSignInAt != null) {
+      setDaysSinceFirstSignIn((Date.now() - firstSignInAt) / 86400000);
+    } else {
+      // Storage unavailable — default to full mode (safer, more delightful).
+      setDaysSinceFirstSignIn(0);
+    }
   }, []);
 
   // Load activity once. Skip if already dismissed.
@@ -177,6 +248,12 @@ export function MorningReplay({ slug }: Props) {
     setHidden(true);
   }, []);
 
+  // In collapsed mode: collapse the expanded full view back down without
+  // marking the day as dismissed, so the line still shows.
+  const collapseAgain = useCallback(() => {
+    setForceFull(false);
+  }, []);
+
   const share = useCallback(async () => {
     if (!entries) return;
     const text = buildShareText(entries);
@@ -216,8 +293,22 @@ export function MorningReplay({ slug }: Props) {
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
-  // Hide entirely when dismissed, still loading (entries null), or empty
-  if (hidden || entries === null || entries.length === 0) return null;
+  // Hide entirely when dismissed, still loading (entries null/first-sign-in
+  // not yet computed), or empty.
+  if (
+    hidden ||
+    entries === null ||
+    entries.length === 0 ||
+    daysSinceFirstSignIn === null
+  ) {
+    return null;
+  }
+
+  // Mode selection: full for the first week, collapsed afterwards. The user
+  // can override collapsed by clicking "Show", which sets forceFull=true for
+  // the current view only.
+  const inFirstWeek = daysSinceFirstSignIn < FULL_MODE_DAYS;
+  const showFull = inFirstWeek || forceFull;
 
   // Reverse so oldest first reads as a story (chronological)
   const story = [...entries].reverse();
@@ -233,14 +324,42 @@ export function MorningReplay({ slug }: Props) {
     show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] as const } },
   };
 
+  // Collapsed mode — a single muted "Since yesterday" line above the focus
+  // card with a [Show] affordance. Renders nothing if there's nothing to say.
+  if (!showFull) {
+    const line = buildCollapsedLine(stats ?? { sent: 0, drafted: 0, scheduled: 0, noted: 0 });
+    if (!line) return null;
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div
+          key="morning-replay-collapsed"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="max-w-2xl mx-auto flex items-center gap-2 text-[13px] text-muted-foreground"
+        >
+          <span className="flex-1 min-w-0 truncate">{line}</span>
+          <button
+            type="button"
+            onClick={() => setForceFull(true)}
+            className="text-foreground/80 hover:text-foreground underline underline-offset-2 transition-colors"
+          >
+            Show
+          </button>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
+
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       <motion.section
-        key="morning-replay"
-        initial={{ opacity: 0, y: 8 }}
+        key="morning-replay-full"
+        initial={{ opacity: 0, y: inFirstWeek ? 8 : 0 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -4, transition: { duration: 0.2 } }}
-        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] as const }}
+        transition={{ duration: inFirstWeek ? 0.35 : 0.2, ease: [0.16, 1, 0.3, 1] as const }}
         className="max-w-2xl mx-auto"
       >
         <div className="rounded-lg border border-border/70 bg-card overflow-hidden">
