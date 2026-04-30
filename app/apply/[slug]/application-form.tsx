@@ -498,10 +498,10 @@ export function ApplicationForm({
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="rounded-2xl bg-card border border-border shadow-xl p-8 text-center space-y-3"
+          className="p-8 text-center space-y-3"
         >
-          <Loader2 size={28} className="animate-spin text-primary mx-auto" />
-          <p className="text-sm font-medium text-foreground">Processing your application...</p>
+          <Loader2 size={28} className="animate-spin text-foreground/70 mx-auto" />
+          <p className="text-sm font-medium text-foreground">Processing your application</p>
           <p className="text-xs text-muted-foreground">This will only take a moment</p>
         </motion.div>
       </motion.div>
@@ -517,18 +517,21 @@ export function ApplicationForm({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
-          className="rounded-xl bg-card border border-border/60 shadow-sm p-6 md:p-8 text-center space-y-5"
+          className="p-6 md:p-8 text-center space-y-5"
         >
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 15 }}
-            className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto"
+            className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto"
           >
-            <CheckCircle2 size={28} className="text-green-600 dark:text-green-400" />
+            <CheckCircle2 size={24} className="text-emerald-600 dark:text-emerald-400" />
           </motion.div>
           <div className="space-y-1.5">
-            <h2 className="text-xl font-semibold text-foreground">
+            <h2
+              className="text-3xl tracking-tight text-foreground"
+              style={{ fontFamily: 'var(--font-title)' }}
+            >
               {customization?.thankYouTitle || 'Application received'}
             </h2>
             <p className="text-sm text-muted-foreground">
@@ -538,7 +541,7 @@ export function ApplicationForm({
           {scoreState?.applicationRef && (
             <a
               href={`/apply/${slug}/status?ref=${scoreState.applicationRef}`}
-              className="inline-flex items-center gap-2 text-sm text-primary font-medium hover:underline"
+              className="inline-flex items-center gap-2 text-sm text-foreground hover:text-foreground/70 transition-colors"
             >
               Track your application status &rarr;
             </a>
