@@ -14,6 +14,7 @@ import {
   CollapsedTooltip,
   useSidebarCollapsed,
 } from '@/components/dashboard/sidebar-collapse';
+import { SidebarContextSection } from '@/components/dashboard/sidebar-context-section';
 import {
   Building2,
   ChevronLeft,
@@ -797,6 +798,7 @@ function EdgeCollapseHandle() {
 }
 
 function RealtorNav({
+  slug,
   base,
   pathname,
   searchParamsString,
@@ -804,6 +806,7 @@ function RealtorNav({
   overdueFollowUpCount,
   pendingDraftCount,
 }: {
+  slug: string;
   base: string;
   pathname: string;
   searchParamsString: string;
@@ -911,18 +914,26 @@ function RealtorNav({
         </div>
       </div>
 
-      {/* More — visually subordinate, but reachable in one glance. Houses
-          the routes that have existing users (Tours, Calendar, Notes,
-          Reviews, Intake form, Analytics) until they surface inline through
-          the agent in later phases. */}
+      {/* Context-aware second section — on /chippi the realtor sees their
+          conversation list; everywhere else they see the static More nav.
+          The two-tab pill at the top lets them flip without leaving the
+          page. Collapsed (icon-rail) mode skips the toggle entirely and
+          falls back to the static More-icon list — the rail's too narrow
+          to read titles. */}
       {realtorMoreNavItems.length > 0 && (
         <div>
           {collapsed ? (
-            <div className="my-2 mx-2 h-px bg-border/50" aria-hidden />
+            <>
+              <div className="my-2 mx-2 h-px bg-border/50" aria-hidden />
+              <div className="space-y-0.5">{realtorMoreNavItems.map(renderItem)}</div>
+            </>
           ) : (
-            <SectionLabel>More</SectionLabel>
+            <SidebarContextSection
+              slug={slug}
+              pathname={pathname}
+              renderPages={() => <>{realtorMoreNavItems.map(renderItem)}</>}
+            />
           )}
-          <div className="space-y-0.5">{realtorMoreNavItems.map(renderItem)}</div>
         </div>
       )}
 
@@ -1224,6 +1235,7 @@ function RealtorSidebarShell({
 
         {/* Primary nav + More + Settings */}
         <RealtorNav
+          slug={slug}
           base={base}
           pathname={pathname}
           searchParamsString={searchParamsString}

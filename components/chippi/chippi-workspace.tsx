@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { ChippiPromptBox, type MentionItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
@@ -79,8 +80,12 @@ export function ChippiWorkspace({
   initialInput,
 }: ChippiWorkspaceProps) {
   const { user } = useUser();
+  const searchParams = useSearchParams();
+  const urlConversationId = searchParams.get('conversationId');
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(initialConversationId);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(
+    urlConversationId ?? initialConversationId,
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
