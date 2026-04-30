@@ -1,17 +1,19 @@
 /**
  * Theme-aware Clerk appearance config.
- * Most visual overrides are in globals.css (.cl-* selectors).
- * This config handles Clerk's variables and layout options.
+ * Most visual overrides are in globals.css (.cl-* selectors) — that file is
+ * the source of truth for the paper-flat auth chrome. This config only sets
+ * Clerk's variables (so its internal state colors line up) and layout choices.
  */
 export function clerkAuthAppearance(isDark: boolean) {
-  const primary = '#ff964f';
+  // Paper-flat primary — foreground, not orange. Matches PRIMARY_PILL.
+  const primary = isDark ? '#f1f3f5' : '#1c1917';
   const foreground = isDark ? '#f1f3f5' : '#1c1917';
 
   return {
     variables: {
       colorPrimary: primary,
       colorNeutral: foreground,
-      borderRadius: '0.75rem',
+      borderRadius: '0.375rem', // rounded-md
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
       fontSize: '0.875rem',
     },
@@ -28,7 +30,6 @@ export function clerkAuthAppearance(isDark: boolean) {
       headerSubtitle: 'hidden',
       footer: 'hidden',
       footerAction: 'hidden',
-      socialButtonsBlockButton: 'rounded-full border-border',
     },
   } as const;
 }
