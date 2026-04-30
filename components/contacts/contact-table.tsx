@@ -57,6 +57,7 @@ import { CONTACT_STAGES } from '@/lib/constants';
 import { CsvImportModal } from './csv-import-modal';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { motion } from 'framer-motion';
 
 type Client = {
   id: string;
@@ -890,14 +891,19 @@ export function ContactTable({ slug }: ContactTableProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border bg-card">
-                {visibleContacts.map((contact) => {
+                {visibleContacts.map((contact, idx) => {
                   const stage = STAGES.find((s) => s.key === contact.type)!;
                   const isSelected = selectedIds.has(contact.id);
+                  // Cap stagger to first 10 rows — past that, no entrance.
+                  const delay = idx < 10 ? idx * 0.04 : 0;
                   return (
-                    <tr
+                    <motion.tr
                       key={contact.id}
+                      initial={idx < 10 ? { opacity: 0, y: 4 } : false}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1], delay }}
                       className={cn(
-                        'group hover:bg-muted/30 transition-colors',
+                        'group hover:bg-muted/30 hover:scale-[1.005] transition-[colors,transform] duration-150',
                         isSelected && 'bg-primary/5',
                       )}
                     >
@@ -975,7 +981,7 @@ export function ContactTable({ slug }: ContactTableProps) {
                           </button>
                         </div>
                       </td>
-                    </tr>
+                    </motion.tr>
                   );
                 })}
               </tbody>

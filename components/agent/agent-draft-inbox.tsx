@@ -22,6 +22,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
+import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 
 interface DeliveryResult {
   sent: boolean;
@@ -657,11 +658,13 @@ export function AgentDraftInbox({ slug }: Props) {
 
       {/* Draft rows */}
       {!loading && drafts.length > 0 && (
-        <div className="divide-y divide-border/60">
+        <StaggerList className="divide-y divide-border/60">
           {drafts.map((draft) => (
-            <DraftRow key={draft.id} draft={draft} slug={slug} onAction={handleAction} />
+            <StaggerItem key={draft.id}>
+              <DraftRow draft={draft} slug={slug} onAction={handleAction} />
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerList>
       )}
     </section>
   );

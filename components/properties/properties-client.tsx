@@ -10,6 +10,8 @@ import type { Property, PropertyListingStatus } from '@/lib/types';
 import { formatCurrency, formatCompact } from '@/lib/formatting';
 import { formatPropertyAddress, formatPropertyFacts } from '@/lib/properties';
 import { useRowNavigation } from '@/lib/hooks/use-row-navigation';
+import { AnimatedNumber } from '@/components/motion/animated-number';
+import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -180,17 +182,17 @@ export function PropertiesClient({ slug, initial, stats }: Props) {
       {/* Stat strip — paper-flat, hairline-divided */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
         <StatCell
-          value={formatCompact(stats.closedYtd)}
+          value={<AnimatedNumber value={stats.closedYtd} format={formatCompact} />}
           label="Closed YTD"
           sub={`${stats.closedCount} closed deal${stats.closedCount === 1 ? '' : 's'}`}
         />
         <StatCell
-          value={String(stats.liveCount)}
+          value={<AnimatedNumber value={stats.liveCount} />}
           label="Live now"
           sub={stats.liveCount === 1 ? 'live listing' : 'live listings'}
         />
         <StatCell
-          value={formatCompact(stats.pipelineValue)}
+          value={<AnimatedNumber value={stats.pipelineValue} format={formatCompact} />}
           label="Pipeline value"
           sub={`across ${stats.pipelinePropertyCount} active deal${stats.pipelinePropertyCount === 1 ? '' : 's'}`}
         />
@@ -286,16 +288,16 @@ export function PropertiesClient({ slug, initial, stats }: Props) {
             <span />
           </div>
 
-          {filtered.map((p) => {
+          <StaggerList className="divide-y divide-border/70">
+          {filtered.map((p, i) => {
             const isFocused = focusedId === p.id;
-            return (
+            const row = (
               <Link
-                key={p.id}
                 href={`/s/${slug}/properties/${p.id}`}
                 data-row-id={p.id}
                 className={cn(
-                  'group relative block transition-colors duration-150',
-                  'hover:bg-foreground/[0.04]',
+                  'group relative block transition-[colors,transform] duration-150',
+                  'hover:bg-foreground/[0.04] hover:scale-[1.005]',
                   isFocused &&
                     'bg-foreground/[0.045] before:absolute before:left-0 before:top-0 before:h-full before:w-[2px] before:bg-foreground',
                 )}
@@ -366,7 +368,15 @@ export function PropertiesClient({ slug, initial, stats }: Props) {
                 </div>
               </Link>
             );
+            // Cap the stagger to the first 10 rows — past that the cumulative
+            // delay reads as theatrical, so the rest just appear.
+            return i < 10 ? (
+              <StaggerItem key={p.id}>{row}</StaggerItem>
+            ) : (
+              <div key={p.id}>{row}</div>
+            );
           })}
+          </StaggerList>
         </div>
       )}
 
@@ -410,7 +420,7 @@ function StatCell({
   label,
   sub,
 }: {
-  value: string;
+  value: React.ReactNode;
   label: string;
   sub: string;
 }) {

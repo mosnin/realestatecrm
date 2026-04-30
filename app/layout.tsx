@@ -4,6 +4,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AmplitudeProvider } from '@/components/amplitude-provider';
+import { MotionProvider } from '@/components/motion/motion-provider';
 import { Toaster } from 'sonner';
 import './globals.css';
 
@@ -61,7 +62,9 @@ export default async function RootLayout({
       <body className="antialiased bg-background text-foreground">
         <ThemeProvider>
           <AmplitudeProvider>
-            {body}
+            <MotionProvider>
+              {body}
+            </MotionProvider>
           </AmplitudeProvider>
         </ThemeProvider>
         <Toaster

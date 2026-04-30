@@ -14,6 +14,7 @@ import { PlatformBanner } from '@/components/platform-banner';
 import { CommandPalette } from '@/components/command-palette/command-palette';
 import { AgentStatusBar } from '@/components/agent/agent-status-bar';
 import { ChippiBar } from '@/components/chippi/chippi-bar';
+import { PageTransition } from '@/components/motion/page-transition';
 
 
 export default async function DashboardLayout({
@@ -247,7 +248,7 @@ export default async function DashboardLayout({
         <main className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-7 pb-40 md:pb-24 bg-background text-foreground">
           <div className="w-full max-w-[1500px] mx-auto">
           <LiveNotifications spaceId={space.id} slug={slug} />
-          {children}
+          <PageTransition>{children}</PageTransition>
           <DashboardFooter />
           </div>
         </main>

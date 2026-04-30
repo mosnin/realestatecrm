@@ -1,6 +1,7 @@
 'use client';
 
 import { STAT_NUMBER_COMPACT, TITLE_FONT, CAPTION } from '@/lib/typography';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 
 interface TourStats {
   toursThisWeek: number;
@@ -65,10 +66,19 @@ function computeStats(tours: TourStatsStripProps['tours']): TourStats {
 export function TourStatsStrip({ tours }: TourStatsStripProps) {
   const stats = computeStats(tours);
 
-  const items = [
-    { label: 'This Week', value: String(stats.toursThisWeek) },
-    { label: 'Conversion', value: `${stats.conversionRate}%` },
-    { label: 'No-Show', value: `${stats.noShowRate}%` },
+  const items: Array<{ label: string; value: React.ReactNode }> = [
+    {
+      label: 'This Week',
+      value: <AnimatedNumber value={stats.toursThisWeek} />,
+    },
+    {
+      label: 'Conversion',
+      value: <AnimatedNumber value={stats.conversionRate} format={(n) => `${Math.round(n)}%`} />,
+    },
+    {
+      label: 'No-Show',
+      value: <AnimatedNumber value={stats.noShowRate} format={(n) => `${Math.round(n)}%`} />,
+    },
     { label: 'Lead Time', value: stats.avgConfirmTime },
   ];
 

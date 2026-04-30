@@ -2,6 +2,7 @@
 
 import { formatCompact as formatCurrency } from '@/lib/formatting';
 import { STAT_NUMBER, TITLE_FONT, CAPTION, H3 } from '@/lib/typography';
+import { AnimatedNumber } from '@/components/motion/animated-number';
 
 // Re-export shadcn chart primitives
 export {
@@ -38,15 +39,22 @@ export function StatCell({
   label,
   value,
   sub,
+  format,
 }: {
   label: string;
   value: string | number;
   sub?: string;
+  /** When `value` is numeric, an optional formatter (e.g. `formatCompact`). */
+  format?: (n: number) => string;
 }) {
   return (
     <div className="bg-background p-5">
       <p className={STAT_NUMBER} style={TITLE_FONT}>
-        {value}
+        {typeof value === 'number' ? (
+          <AnimatedNumber value={value} format={format} />
+        ) : (
+          value
+        )}
       </p>
       <p className={`${CAPTION} mt-1`}>{label}</p>
       {sub && (

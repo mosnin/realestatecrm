@@ -9,9 +9,10 @@ import {
   H1,
   H3,
   TITLE_FONT,
-  STAT_NUMBER_COMPACT,
   PAGE_RHYTHM,
 } from '@/lib/typography';
+import { AnimatedStatCell } from '@/components/motion/animated-stat-cell';
+import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import type { Metadata } from 'next';
 
 export async function generateMetadata({
@@ -122,10 +123,10 @@ export default async function IntakeAnalyticsPage({
 
       {/* Stats strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
-        <StatCell label="Submissions (30d)" value={String(totalSubmissions)} />
-        <StatCell label="Hot leads" value={String(hotLeadCount)} />
-        <StatCell label="Warm leads" value={String(warmLeadCount)} />
-        <StatCell label="Buyers" value={String(buyerCount)} />
+        <AnimatedStatCell label="Submissions (30d)" value={totalSubmissions} />
+        <AnimatedStatCell label="Hot leads" value={hotLeadCount} />
+        <AnimatedStatCell label="Warm leads" value={warmLeadCount} />
+        <AnimatedStatCell label="Buyers" value={buyerCount} />
       </div>
 
       {/* Submissions list */}
@@ -146,8 +147,8 @@ export default async function IntakeAnalyticsPage({
             No submissions yet — share your link.
           </p>
         ) : (
-          <div className="rounded-xl border border-border/70 bg-background overflow-hidden divide-y divide-border/70">
-            {submissions.map((lead) => {
+          <StaggerList className="rounded-xl border border-border/70 bg-background overflow-hidden divide-y divide-border/70">
+            {submissions.map((lead, i) => {
               const isNew = lead.tags.includes('new-lead');
               const scoreLabel = lead.scoreLabel
                 ? lead.scoreLabel.charAt(0).toUpperCase() + lead.scoreLabel.slice(1)
@@ -165,11 +166,10 @@ export default async function IntakeAnalyticsPage({
                   ?.join('')
                   ?.toUpperCase()
                   ?.slice(0, 2) || '??';
-              return (
+              const row = (
                 <Link
-                  key={lead.id}
                   href={`/s/${slug}/leads`}
-                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-foreground/[0.04] active:bg-foreground/[0.045] transition-colors duration-150"
+                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-foreground/[0.04] hover:scale-[1.005] active:bg-foreground/[0.045] transition-[colors,transform] duration-150"
                 >
                   <div className="w-9 h-9 rounded-full bg-foreground/[0.06] text-muted-foreground flex items-center justify-center text-[11px] font-medium flex-shrink-0">
                     {initials}
@@ -203,21 +203,16 @@ export default async function IntakeAnalyticsPage({
                   </div>
                 </Link>
               );
+              return i < 10 ? (
+                <StaggerItem key={lead.id}>{row}</StaggerItem>
+              ) : (
+                <div key={lead.id}>{row}</div>
+              );
             })}
-          </div>
+          </StaggerList>
         )}
       </section>
     </div>
   );
 }
 
-function StatCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-background p-5">
-      <p className={STAT_NUMBER_COMPACT} style={TITLE_FONT}>
-        {value}
-      </p>
-      <p className="text-xs text-muted-foreground mt-1">{label}</p>
-    </div>
-  );
-}

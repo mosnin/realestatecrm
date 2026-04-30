@@ -14,6 +14,8 @@ import {
   STAT_NUMBER_COMPACT,
   PAGE_RHYTHM,
 } from '@/lib/typography';
+import { AnimatedStatCell } from '@/components/motion/animated-stat-cell';
+import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import type { Metadata } from 'next';
 
 export async function generateMetadata({
@@ -127,13 +129,13 @@ export default async function IntakeOverviewPage({
 
       {/* Stats strip */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
-        <StatCell
+        <AnimatedStatCell
           label="Submissions (30d)"
-          value={String(totalSubmissions)}
+          value={totalSubmissions}
         />
-        <StatCell
+        <AnimatedStatCell
           label="Hot leads"
-          value={String(hotLeadCount)}
+          value={hotLeadCount}
         />
         <StatCell
           label="Completion rate"
@@ -190,7 +192,7 @@ export default async function IntakeOverviewPage({
             No submissions yet — share your link.
           </p>
         ) : (
-          <div className="rounded-xl border border-border/70 bg-background overflow-hidden divide-y divide-border/70">
+          <StaggerList className="rounded-xl border border-border/70 bg-background overflow-hidden divide-y divide-border/70">
             {recentLeads.map((lead) => {
               const isNew = lead.tags.includes('new-lead');
               const scoreLabel = lead.scoreLabel
@@ -210,45 +212,46 @@ export default async function IntakeOverviewPage({
                   ?.toUpperCase()
                   ?.slice(0, 2) || '??';
               return (
-                <Link
-                  key={lead.id}
-                  href={`/s/${slug}/leads`}
-                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-foreground/[0.04] active:bg-foreground/[0.045] transition-colors duration-150"
-                >
-                  <div className="w-9 h-9 rounded-full bg-foreground/[0.06] text-muted-foreground flex items-center justify-center text-[11px] font-medium flex-shrink-0">
-                    {initials}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {lead.name}
-                      </p>
-                      {isNew && (
-                        <span className="inline-flex text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5 flex-shrink-0">
-                          New
-                        </span>
-                      )}
+                <StaggerItem key={lead.id}>
+                  <Link
+                    href={`/s/${slug}/leads`}
+                    className="flex items-center gap-3 px-5 py-3.5 hover:bg-foreground/[0.04] hover:scale-[1.005] active:bg-foreground/[0.045] transition-[colors,transform] duration-150"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-foreground/[0.06] text-muted-foreground flex items-center justify-center text-[11px] font-medium flex-shrink-0">
+                      {initials}
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-muted-foreground">
-                        {timeAgo(new Date(lead.createdAt))}
-                      </span>
-                      {typeLabel && (
-                        <span className="inline-flex text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5">
-                          {typeLabel}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {lead.name}
+                        </p>
+                        {isNew && (
+                          <span className="inline-flex text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5 flex-shrink-0">
+                            New
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-muted-foreground">
+                          {timeAgo(new Date(lead.createdAt))}
                         </span>
-                      )}
-                      {scoreLabel && (
-                        <span className="inline-flex text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5">
-                          {scoreLabel}
-                        </span>
-                      )}
+                        {typeLabel && (
+                          <span className="inline-flex text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5">
+                            {typeLabel}
+                          </span>
+                        )}
+                        {scoreLabel && (
+                          <span className="inline-flex text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5">
+                            {scoreLabel}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </Link>
+                  </Link>
+                </StaggerItem>
               );
             })}
-          </div>
+          </StaggerList>
         )}
       </section>
     </div>
