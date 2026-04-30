@@ -105,6 +105,9 @@ def _build_user_input(
     ]
     if not image_atts:
         return text
+    # Verified against openai-agents 0.14.8 / openai SDK
+    # ResponseInputImageParam: type="input_image" with image_url as a plain
+    # string URL (not the Chat-Completions {"url": ...} nested form).
     content: list[dict[str, Any]] = [{"type": "input_text", "text": text}]
     for att in image_atts:
         content.append({"type": "input_image", "image_url": att["public_url"]})

@@ -32,7 +32,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import type { AgentEvent, PushableEvent } from '@/lib/ai-tools/events';
 import { createSeqCounter, encodeEvent } from '@/lib/ai-tools/events';
 import { saveAssistantMessage, saveUserMessage } from '@/lib/ai-tools/persistence';
@@ -340,6 +340,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: 'Rate limit exceeded (30 tasks/hour). Please wait.' },
       { status: 429 },
+    );
+  }
+
+  // Modal Sandbox cold-starts cost real money — cap chat traffic per-IP and
+  // per-space before we hand the turn off to the sandbox. Starting guardrails
+  // (30/10min IP, 60/10min space); tune after we have real-usage telemetry.
+  const ip = getClientIp(req);
+  const ipLimit = await checkRateLimit(`chat:ip:${ip}`, 30, 600);
+  if (!ipLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': '600' } },
+    );
+  }
+  const spaceLimit = await checkRateLimit(`chat:space:${ctx.space.id}`, 60, 600);
+  if (!spaceLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': '600' } },
     );
   }
 

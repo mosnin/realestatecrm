@@ -1,4 +1,14 @@
 /**
+ * DEPRECATED — the in-process approval-resume flow no longer applies; chat
+ * tools now use AgentDraft for non-autonomous mode. This route stays for the
+ * (currently disabled) legacy in-process loop and may be removed in a
+ * follow-up. The Modal-backed /api/ai/task path runs each turn in an
+ * ephemeral sandbox that is gone before any approval could land, so the
+ * cowork agent drafts to the inbox via create_draft_message instead of
+ * pausing. Do not wire new callers to this endpoint.
+ */
+
+/**
  * POST /api/ai/task/approve/[requestId]
  *
  * Resumes a paused on-demand agent turn. The original POST /api/ai/task
