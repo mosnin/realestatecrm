@@ -12,7 +12,7 @@ export const BREADCRUMB_ROUTES: Array<{ path: string; label: string; exact?: boo
   { path: '/leads', label: 'Leads', exact: true },
   { path: '/leads/', label: 'Leads' },
   { path: '/deals', label: 'Pipeline' },
-  { path: '/tours', label: 'Tours' },
+  { path: '/calendar', label: 'Calendar' },
   { path: '/analytics', label: 'Analytics' },
   { path: '/activity', label: 'Activity' },
   { path: '/settings/notifications', label: 'Notifications' },
