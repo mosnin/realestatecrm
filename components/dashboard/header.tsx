@@ -21,7 +21,7 @@ import { secondaryNavItems } from '@/lib/nav-items';
 import { SECTION_LABEL } from '@/lib/typography';
 import { PAGE_VARIANTS } from '@/lib/motion';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, FileText, ListChecks, CreditCard, Shield, Settings, Check, Sparkles, Calendar, BarChart2, ClipboardList, Home } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, Sparkles, Calendar, BarChart2, ClipboardList, Home } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { BrokerHelpGuide } from '@/components/broker/help-guide';
@@ -354,11 +354,8 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                   {[
                     { href: '/settings', label: 'Account', exact: true },
                     { href: '/settings/profile', label: 'Profile' },
-                    { href: '/settings/notifications', label: 'Notifications' },
-                    { href: '/settings/templates', label: 'Message templates' },
                     { href: '/settings/integrations', label: 'Integrations' },
                     { href: '/billing', label: 'Billing' },
-                    { href: '/settings/legal', label: 'Legal' },
                   ].map((item) => {
                     const href = `${base}${item.href}`;
                     const isActive = item.exact ? pathname === href : pathname.startsWith(href);
@@ -455,10 +452,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                     { label: 'Settings', items: [
                       { href: `${base}/settings`, label: 'General', icon: Settings },
                       { href: `${base}/settings/profile`, label: 'Profile', icon: User },
-                      { href: `${base}/settings/notifications`, label: 'Notifications', icon: Bell },
                       { href: `${base}/settings/integrations`, label: 'Integrations', icon: Plug },
-                      { href: `${base}/settings/templates`, label: 'Templates', icon: FileText },
-                      { href: `${base}/settings/legal`, label: 'Legal', icon: Shield },
                     ]},
                     { label: 'Account', items: [
                       { href: `${base}/billing`, label: 'Billing', icon: CreditCard },

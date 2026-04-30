@@ -23,9 +23,6 @@ export default async function CalendarPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
   // Calendar pulls a wider tour window than the live grid needs so the stat
   // strip above can compute this-week / conversion / no-show across recent
   // history. Status filter widened — past completed/no_show tours feed the

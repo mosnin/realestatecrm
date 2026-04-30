@@ -16,6 +16,7 @@ import {
   SECTION_RHYTHM,
   READING_MAX,
 } from '@/lib/typography';
+import { TemplatesSection } from './templates-section';
 
 type McpKey = {
   id: string;
@@ -371,6 +372,15 @@ export default function IntegrationsSettingsPage() {
             ))}
           </div>
         )}
+      </section>
+
+      {/* Message templates — folded in from the old /settings/templates tab */}
+      <section
+        id="templates"
+        className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+      >
+        <SectionLabel>Message templates</SectionLabel>
+        <TemplatesSection />
       </section>
     </div>
   );
