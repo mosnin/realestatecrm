@@ -137,7 +137,7 @@ async def run_space(space_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 @app.function(secrets=secrets, timeout=270)
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 async def run_now_webhook(item: dict) -> dict:
     """HTTP webhook for triggering runs from the Next.js UI.
 
@@ -185,7 +185,7 @@ async def run_now_webhook(item: dict) -> dict:
 # sandbox cold-start.
 
 @app.function(secrets=secrets, timeout=600)
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 async def chat_turn(item: dict):
     """HTTP endpoint that runs one Cowork chat turn inside a fresh Sandbox.
 
