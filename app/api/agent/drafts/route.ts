@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     .from('AgentDraft')
     .select(`
       id, contactId, dealId, channel, subject, content, reasoning,
-      priority, status, expiresAt, createdAt, updatedAt,
+      priority, status, confidence, expiresAt, createdAt, updatedAt,
       Contact:contactId ( id, name, email, phone )
     `)
     .eq('spaceId', space.id)

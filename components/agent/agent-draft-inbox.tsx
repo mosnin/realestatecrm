@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   CheckCircle2, XCircle, MessageSquare, Mail, StickyNote,
   Loader2, RefreshCw, Pencil, Copy, Check,
-  AlertTriangle, Send, TriangleAlert,
+  AlertTriangle, Send, TriangleAlert, Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -62,6 +62,17 @@ const CHANNEL_META = {
   note:  { label: 'Note',  icon: StickyNote,    charLimit: null },
 } as const;
 
+// Phase D — autonomy default flip. When the agent is highly confident in a
+// draft, default it to auto-send after a short countdown unless the realtor
+// cancels. Gated by the env flag so we can land the code, dogfood internally,
+// and flip on per-deploy without another release. 80% mirrors the existing
+// confidence "green dot" threshold in the row meta line. 30s gives a realtor
+// scanning their inbox time to react without making "auto" feel meaningless.
+const AUTO_SEND_FLAG = process.env.NEXT_PUBLIC_AGENT_AUTO_SEND === 'true';
+const AUTO_SEND_CONFIDENCE_THRESHOLD = 80;
+const AUTO_SEND_DELAY_MS = 30_000;
+const AUTO_SEND_TICK_MS = 250;
+
 // ─── DraftRow ────────────────────────────────────────────────────────────────
 
 function DraftRow({
@@ -78,6 +89,8 @@ function DraftRow({
   const [actioning, setActioning] = useState<'approved' | 'dismissed' | null>(null);
   const [copied, setCopied] = useState(false);
   const [dismissError, setDismissError] = useState<string | null>(null);
+  const [autoSendCancelled, setAutoSendCancelled] = useState(false);
+  const [autoSendRemainingMs, setAutoSendRemainingMs] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
@@ -87,6 +100,15 @@ function DraftRow({
   const isEdited = editedContent.trim() !== draft.content;
   const overLimit = meta.charLimit !== null && editedContent.length > meta.charLimit;
   const nearLimit = meta.charLimit !== null && editedContent.length > meta.charLimit * 0.85;
+  const autoSendEligible =
+    AUTO_SEND_FLAG &&
+    !autoSendCancelled &&
+    !editing &&
+    actioning === null &&
+    !overLimit &&
+    draft.confidence !== null &&
+    draft.confidence !== undefined &&
+    draft.confidence >= AUTO_SEND_CONFIDENCE_THRESHOLD;
 
   function startEdit() {
     setEditing(true);
@@ -125,6 +147,39 @@ function DraftRow({
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
+
+  // Phase D countdown — counts down once per row when eligible. Tick every
+  // 250ms so the displayed seconds feel responsive without thrashing renders.
+  // We start from the moment the row meets all conditions; if the realtor
+  // edits or actions the row mid-flight, the effect re-evaluates and bails.
+  useEffect(() => {
+    if (!autoSendEligible) {
+      setAutoSendRemainingMs(null);
+      return;
+    }
+    const startedAt = Date.now();
+    setAutoSendRemainingMs(AUTO_SEND_DELAY_MS);
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      const remaining = AUTO_SEND_DELAY_MS - elapsed;
+      if (remaining <= 0) {
+        clearInterval(interval);
+        if (mountedRef.current) {
+          setAutoSendRemainingMs(0);
+          // Run after state flushes; handleApprove flips actioning, which
+          // in turn makes autoSendEligible false on the next render so the
+          // countdown effect winds down cleanly.
+          handleApprove();
+        }
+      } else if (mountedRef.current) {
+        setAutoSendRemainingMs(remaining);
+      }
+    }, AUTO_SEND_TICK_MS);
+    return () => clearInterval(interval);
+    // handleApprove is stable enough — it only reads refs/state, and a fresh
+    // closure each tick would restart the timer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSendEligible]);
 
   return (
     <article className="group/row py-5 first:pt-0 last:pb-0">
@@ -255,6 +310,36 @@ function DraftRow({
         <p className="mt-2.5 text-[12px] leading-relaxed text-muted-foreground italic">
           {draft.reasoning}
         </p>
+      )}
+
+      {/* Phase D — auto-send countdown. Visible only when the env flag is on
+          and the draft cleared the confidence bar. Cancel returns the row to
+          the standard approve/dismiss workflow without firing anything. */}
+      {autoSendRemainingMs !== null && autoSendRemainingMs > 0 && (
+        <div className="mt-3 flex items-center gap-2 text-[12px] text-emerald-700 dark:text-emerald-400">
+          <span className="relative inline-flex items-center justify-center w-4 h-4 flex-shrink-0">
+            <span
+              aria-hidden
+              className="absolute inset-0 rounded-full border border-emerald-500/30"
+            />
+            <span
+              aria-hidden
+              className="absolute inset-0 rounded-full border-2 border-emerald-500 border-r-transparent border-b-transparent animate-spin"
+              style={{ animationDuration: '1.2s' }}
+            />
+            <Sparkles size={9} className="text-emerald-600 dark:text-emerald-400" strokeWidth={2.25} />
+          </span>
+          <span className="font-medium">
+            Auto-sending in {Math.ceil(autoSendRemainingMs / 1000)}s
+          </span>
+          <button
+            type="button"
+            onClick={() => setAutoSendCancelled(true)}
+            className="ml-1 text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
       )}
 
       {/* Actions */}
