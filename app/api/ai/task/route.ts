@@ -124,10 +124,11 @@ async function loadHistory(spaceId: string, conversationId: string): Promise<His
 }
 
 /**
- * Best-effort hydration of attachment rows into the shape sandbox_runner.py
- * expects. The Attachment table lands in a separate commit; until then this
- * either returns an empty list (no ids passed) or swallows the
- * relation-does-not-exist error and logs it.
+ * Hydrate the Attachment rows the realtor referenced in this turn into the
+ * shape sandbox_runner.py expects. spaceId-scoped — the table is the trust
+ * boundary, the same way every other agent tool treats spaceId. Wrapped in
+ * try/catch so a transient Supabase blip never crashes the chat turn; the
+ * sandbox is happy with an empty list.
  */
 async function hydrateAttachments(
   spaceId: string,
@@ -137,16 +138,18 @@ async function hydrateAttachments(
   try {
     const { data, error } = await supabase
       .from('Attachment')
-      .select('id, filename, mimeType, extractedText, publicUrl, spaceId')
+      .select('id, filename, "mimeType", "extractedText", "publicUrl", "extractionStatus"')
       .in('id', ids)
       .eq('spaceId', spaceId);
     if (error) throw error;
-    const rows = (data ?? []) as Array<{
+    if (!data) return [];
+    const rows = data as Array<{
       id: string;
       filename: string;
       mimeType: string;
       extractedText: string | null;
       publicUrl: string;
+      extractionStatus: string;
     }>;
     return rows.map((r) => ({
       id: r.id,
@@ -156,7 +159,7 @@ async function hydrateAttachments(
       public_url: r.publicUrl,
     }));
   } catch (err) {
-    logger.warn('[ai/task] attachment hydration skipped (table may not exist yet)', { spaceId }, err);
+    logger.warn('[ai/task] attachment hydration failed', { spaceId }, err);
     return [];
   }
 }

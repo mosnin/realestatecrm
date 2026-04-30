@@ -41,6 +41,10 @@ image = (
         "httpx>=0.28.0",
         "upstash-redis>=1.3.0",
         "structlog>=25.1.0",
+        # Attachment extraction (read_attachment tool inside the sandbox)
+        "pypdf>=5.0.0",
+        "python-docx>=1.1.0",
+        "openpyxl>=3.1.0",
     )
     .add_local_dir(".", remote_path="/app")  # copy agent/ directory into image
 )

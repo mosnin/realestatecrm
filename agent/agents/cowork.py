@@ -23,6 +23,7 @@ from tools.activities import (
     set_contact_follow_up,
     set_deal_follow_up,
 )
+from tools.attachments import read_attachment
 from tools.brief import set_score_explanation, update_contact_brief
 from tools.contacts import (
     get_contact,
@@ -288,6 +289,8 @@ def make_cowork_agent() -> Agent:
             # Drafts
             create_draft_message,
             check_recent_drafts,
+            # Attachments
+            read_attachment,
         ],
         handoffs=handoffs_list,
     )
