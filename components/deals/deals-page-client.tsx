@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Plus } from 'lucide-react';
 import { KanbanBoard } from './kanban-board';
 import { PipelineSummary } from './pipeline-summary';
 import { PipelineTabs } from './pipeline-tabs';
@@ -59,31 +60,31 @@ export function DealsPageClient({ slug }: { slug: string }) {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PageTitle subtitle="Track your rental and buyer pipeline from lead to close.">
-          Pipeline
-        </PageTitle>
+        <PageTitle>Pipeline</PageTitle>
         <div className="h-8 w-64 rounded-lg bg-muted/50 animate-pulse" />
         <div className="h-32 rounded-xl bg-muted/30 animate-pulse" />
       </div>
     );
   }
 
+  const hasPipelines = pipelines.length > 0;
+
   return (
     <div className="space-y-6">
-      <PageTitle subtitle="Track your rental and buyer pipeline from lead to close.">
-        Pipeline
-      </PageTitle>
+      <PageTitle>Pipeline</PageTitle>
 
-      {/* Pipeline tabs (Trello-like board selector) */}
-      <div className="flex items-center gap-2 bg-muted/40 rounded-xl px-3 py-2 border border-border">
-        <PipelineTabs
-          slug={slug}
-          pipelines={pipelines}
-          activePipelineId={activePipelineId}
-          onSelect={handleSelect}
-          onPipelinesChange={setPipelines}
-        />
-      </div>
+      {/* Pipeline tabs (board selector) — paper-flat hairline strip */}
+      {hasPipelines && (
+        <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-background px-3 py-2">
+          <PipelineTabs
+            slug={slug}
+            pipelines={pipelines}
+            activePipelineId={activePipelineId}
+            onSelect={handleSelect}
+            onPipelinesChange={setPipelines}
+          />
+        </div>
+      )}
 
       {activePipelineId && (
         <>
@@ -91,6 +92,55 @@ export function DealsPageClient({ slug }: { slug: string }) {
           <KanbanBoard slug={slug} pipelineId={activePipelineId} />
         </>
       )}
+
+      {/* Empty state — first-run placeholder card */}
+      {!hasPipelines && (
+        <CreateFirstBoardCard
+          slug={slug}
+          onCreated={(p) => {
+            setPipelines([p]);
+            setActivePipelineId(p.id);
+            try { localStorage.setItem(`chippi:deals:pipeline:${slug}`, p.id); } catch {}
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// First-run dashed placeholder. Paper-flat. One click creates a default board.
+function CreateFirstBoardCard({
+  slug,
+  onCreated,
+}: {
+  slug: string;
+  onCreated: (p: Pipeline) => void;
+}) {
+  const [pending, setPending] = useState(false);
+  async function handleCreate() {
+    setPending(true);
+    try {
+      const res = await fetch('/api/pipelines', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, name: 'Pipeline', color: '#6366f1' }),
+      });
+      if (!res.ok) return;
+      const created: Pipeline = await res.json();
+      onCreated(created);
+    } finally {
+      setPending(false);
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleCreate}
+      disabled={pending}
+      className="flex w-full items-center gap-3 rounded-lg border border-dashed border-border/70 bg-background px-4 py-6 text-sm text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground transition-colors duration-150 disabled:opacity-50"
+    >
+      <Plus size={16} />
+      <span>{pending ? 'Creating board…' : 'Create your first board'}</span>
+    </button>
   );
 }

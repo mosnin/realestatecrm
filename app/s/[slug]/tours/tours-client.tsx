@@ -3,12 +3,10 @@
 import { useState, useCallback } from 'react';
 import {
   CalendarDays,
-  Clock,
   MapPin,
   User,
   Mail,
   Phone,
-  ExternalLink,
   Check,
   X,
   Copy,
@@ -90,7 +88,6 @@ type FilterTab = 'upcoming' | 'past' | 'all' | 'availability';
 export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bookingUrl, propertyProfiles: initialProfiles = [], tourSettings: initialTourSettings }: ToursClientProps) {
   const [tours, setTours] = useState<Tour[]>(initialTours);
   const [tab, setTab] = useState<FilterTab>('upcoming');
-  const [copied, setCopied] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -145,15 +142,6 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
     }
     return true;
   });
-
-  const upcomingCount = tours.filter((t) => new Date(t.startsAt) >= now && t.status !== 'cancelled').length;
-
-  function copyLink() {
-    const url = `${window.location.origin}${bookingUrl}`;
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
 
   const updateStatus = useCallback(async (tourId: string, status: TourStatus) => {
     setUpdatingId(tourId);
@@ -240,61 +228,45 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Tours</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {upcomingCount} upcoming tour{upcomingCount !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* View toggle */}
-          <div className="flex rounded-md border border-border overflow-hidden bg-card">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Tours
+        </h1>
+        <div className="flex items-center gap-1">
+          {/* View toggle — small two-icon segmented control */}
+          <div className="flex rounded-md border border-border/70 overflow-hidden bg-background">
             <button
               type="button"
               onClick={() => setView('table')}
               className={cn(
-                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
+                'px-2.5 py-1.5 flex items-center justify-center transition-colors duration-150',
                 view === 'table'
-                  ? 'bg-secondary text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                  ? 'bg-foreground/[0.045] text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
               )}
               title="Table view"
+              aria-label="Table view"
             >
-              <List size={15} />
+              <List size={14} />
             </button>
             <button
               type="button"
               onClick={() => setView('card')}
               className={cn(
-                'px-2.5 py-1.5 flex items-center justify-center transition-colors',
+                'px-2.5 py-1.5 flex items-center justify-center transition-colors duration-150',
                 view === 'card'
-                  ? 'bg-secondary text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                  ? 'bg-foreground/[0.045] text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
               )}
               title="Card view"
+              aria-label="Card view"
             >
-              <LayoutGrid size={15} />
+              <LayoutGrid size={14} />
             </button>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={copyLink}
-            className="gap-2"
-          >
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            {copied ? 'Copied!' : 'Copy Booking Link'}
-          </Button>
-          <a
-            href={bookingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-accent transition-colors"
-          >
-            <ExternalLink size={14} />
-            Preview
-          </a>
         </div>
       </div>
 
@@ -383,10 +355,17 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
 
       {/* Tour list */}
       {tab !== 'availability' && filtered.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground space-y-3">
-          <CalendarDays size={40} className="mx-auto opacity-30" />
-          <p className="text-sm">No {tab === 'all' ? '' : tab + ' '}tours yet</p>
-          <p className="text-xs">Share your booking link to start receiving tour requests.</p>
+        <div className="flex flex-col items-center text-center py-16 space-y-3">
+          <CalendarDays size={28} className="text-muted-foreground/40" />
+          <p
+            className="text-base text-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+          >
+            No {tab === 'all' ? '' : tab + ' '}tours yet
+          </p>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            Share your booking link to start receiving tour requests.
+          </p>
         </div>
       ) : tab !== 'availability' ? (
         view === 'table' ? (

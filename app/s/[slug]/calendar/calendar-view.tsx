@@ -865,7 +865,7 @@ export function CalendarView({
           </h2>
           <button
             onClick={goToday}
-            className="px-2.5 py-1 text-xs font-medium rounded-md border border-border hover:bg-muted transition-colors"
+            className="px-3 h-7 text-xs rounded-md border border-border/70 bg-background hover:bg-foreground/[0.04] transition-colors duration-150"
           >
             Today
           </button>

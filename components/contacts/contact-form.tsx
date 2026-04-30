@@ -6,10 +6,7 @@ import { z } from 'zod';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -22,6 +19,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { CONTACT_STAGES } from '@/lib/constants';
+import { cn } from '@/lib/utils';
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -49,34 +48,33 @@ interface ContactFormProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: SubmitData) => Promise<void>;
   defaultValues?: Partial<FormData>;
+  /** When set, overrides the default "Add a person" / "Edit person" title. */
   title?: string;
+  /** Distinguishes add vs. edit so we can label the submit button correctly. */
+  mode?: 'add' | 'edit';
 }
 
-function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">
-        {label}
-      </p>
-      <div className="space-y-3">{children}</div>
-    </div>
-  );
-}
-
-function Field({
+function FieldRow({
   id,
   label,
+  optional,
   error,
   children,
 }: {
   id?: string;
   label: string;
+  optional?: boolean;
   error?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} className="text-[12.5px] font-medium text-foreground">
+        {label}
+        {optional && (
+          <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">(optional)</span>
+        )}
+      </Label>
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
@@ -88,7 +86,8 @@ export function ContactForm({
   onOpenChange,
   onSubmit,
   defaultValues,
-  title = 'Add Client',
+  title,
+  mode = 'add',
 }: ContactFormProps) {
   const {
     register,
@@ -99,10 +98,11 @@ export function ContactForm({
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { type: 'QUALIFICATION', ...defaultValues },
+    defaultValues: { type: CONTACT_STAGES[0].key, ...defaultValues },
   });
 
   const type = watch('type');
+  const resolvedTitle = title ?? (mode === 'edit' ? 'Edit person' : 'Add a person');
 
   async function handleFormSubmit(data: FormData) {
     const tags = data.tags
@@ -115,9 +115,9 @@ export function ContactForm({
     const { tags: _rawTags, properties: _rawProperties, ...rest } = data;
     try {
       await onSubmit({ ...rest, budget, properties, tags });
-      toast.success('Contact saved');
+      toast.success(mode === 'edit' ? 'Saved' : 'Added');
     } catch {
-      toast.error('Failed to save contact');
+      toast.error('Failed to save');
       return;
     }
     reset();
@@ -126,47 +126,54 @@ export function ContactForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6 mt-2">
-          <FieldGroup label="Identity">
-            <Field id="name" label="Name *" error={errors.name?.message}>
-              <Input id="name" {...register('name')} />
-            </Field>
-            <Field id="type" label="Stage">
+      <DialogContent className="max-w-lg w-full max-h-[90vh] overflow-y-auto p-0 gap-0">
+        {/* Title — serif, sentence case, no subtitle */}
+        <div className="px-6 pt-6 pb-5">
+          <h2
+            className="text-2xl tracking-tight text-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+          >
+            {resolvedTitle}
+          </h2>
+        </div>
+
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="px-6 pb-6">
+          {/* Section 1 — Identity */}
+          <div className="space-y-4">
+            <FieldRow id="name" label="Name" error={errors.name?.message}>
+              <Input id="name" {...register('name')} autoFocus />
+            </FieldRow>
+            <FieldRow id="type" label="Stage">
               <Select
                 value={type}
                 onValueChange={(v) => setValue('type', v as FormData['type'])}
               >
-                <SelectTrigger>
+                <SelectTrigger id="type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="QUALIFICATION">Qualifying</SelectItem>
-                  <SelectItem value="TOUR">Tour</SelectItem>
-                  <SelectItem value="APPLICATION">Applied</SelectItem>
+                  {CONTACT_STAGES.map((s) => (
+                    <SelectItem key={s.key} value={s.key}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-            </Field>
-          </FieldGroup>
-
-          <div className="border-t border-border" />
-
-          <FieldGroup label="Contact">
-            <Field id="email" label="Email" error={errors.email?.message}>
+            </FieldRow>
+            <FieldRow id="email" label="Email" optional error={errors.email?.message}>
               <Input id="email" type="email" {...register('email')} />
-            </Field>
-            <Field id="phone" label="Phone">
+            </FieldRow>
+            <FieldRow id="phone" label="Phone" optional>
               <Input id="phone" {...register('phone')} />
-            </Field>
-          </FieldGroup>
+            </FieldRow>
+          </div>
 
-          <div className="border-t border-border" />
+          {/* Hairline divider — replaces the all-caps section header */}
+          <div className="border-t border-border/60 my-7" />
 
-          <FieldGroup label="Qualification">
-            <Field id="budget" label="Monthly budget">
+          {/* Section 2 — What they're looking for */}
+          <div className="space-y-4">
+            <FieldRow id="budget" label="Monthly budget" optional>
               <Input
                 id="budget"
                 type="number"
@@ -174,46 +181,48 @@ export function ContactForm({
                 placeholder="e.g. 2500"
                 {...register('budget')}
               />
-            </Field>
-            <Field id="preferences" label="Preferences & requirements">
+            </FieldRow>
+            <FieldRow id="preferences" label="Preferences & requirements" optional>
               <Textarea
                 id="preferences"
                 rows={3}
                 placeholder="Neighborhoods, bedrooms, pet-friendly…"
                 {...register('preferences')}
               />
-            </Field>
-            <Field id="properties" label="Properties of interest (comma-separated)">
+            </FieldRow>
+            <FieldRow id="properties" label="Properties of interest" optional>
               <Input
                 id="properties"
                 placeholder="123 Main St, Sunset Villas #12"
                 {...register('properties')}
               />
-            </Field>
-          </FieldGroup>
+            </FieldRow>
+          </div>
 
-          <div className="border-t border-border" />
-
-          <FieldGroup label="Additional">
-            <Field id="address" label="Current address">
-              <Input id="address" {...register('address')} />
-            </Field>
-            <Field id="tags" label="Tags (comma-separated)">
-              <Input
-                id="tags"
-                placeholder="first-time renter, referral, urgent"
-                {...register('tags')}
-              />
-            </Field>
-            <Field id="notes" label="Notes">
-              <Textarea id="notes" rows={3} {...register('notes')} />
-            </Field>
-          </FieldGroup>
-
-          <Button type="submit" disabled={isSubmitting} className="w-full gap-2">
-            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isSubmitting ? 'Saving...' : 'Save Contact'}
-          </Button>
+          {/* Footer — ghost cancel left, paper-flat primary right */}
+          <div className="mt-8 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                reset();
+                onOpenChange(false);
+              }}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-150 px-1 py-1"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={cn(
+                'inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium',
+                'hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed',
+              )}
+            >
+              {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {mode === 'edit' ? 'Save' : 'Add'}
+            </button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
