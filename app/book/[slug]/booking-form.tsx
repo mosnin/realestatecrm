@@ -2,14 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { CalendarDays, Clock, Check, Loader2, ChevronLeft, ChevronRight, MapPin, Globe, Bell } from 'lucide-react';
+import { Check, Loader2, ChevronLeft, MapPin, Globe, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
 import { fireConversionEvents } from '@/lib/tracking-events';
+import { PRIMARY_PILL, QUIET_LINK, SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
 
 interface BookingFormProps {
   slug: string;
@@ -32,6 +30,14 @@ interface PropertyProfile {
 }
 
 type Step = 'property' | 'date' | 'details' | 'confirmed';
+
+// Uniform paper-flat input class. Identical for input + textarea so the eye
+// reads them as one family.
+const FIELD_BASE =
+  'w-full bg-background border border-border/70 rounded-md px-3 text-base focus:border-foreground/30 focus:outline-none transition-colors placeholder:text-muted-foreground/70';
+const INPUT_CLASS = cn(FIELD_BASE, 'h-10');
+const TEXTAREA_CLASS = cn(FIELD_BASE, 'py-2 min-h-[72px]');
+const FIELD_LABEL = 'text-[12.5px] font-medium text-foreground';
 
 export function BookingForm({ slug, duration: defaultDuration, businessName, timezone, accentColor = '#ff964f' }: BookingFormProps) {
   const confettiRef = useRef<ConfettiRef>(null);
@@ -192,330 +198,433 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 size={24} className="animate-spin text-muted-foreground" />
+        <Loader2 size={20} className="animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (step === 'confirmed') {
+    const dateLabel = selectedTime
+      ? new Date(selectedTime).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
+      : '';
+    const timeLabel = selectedTime ? formatTime(selectedTime) : '';
     return (
       <>
         <Confetti ref={confettiRef} manualstart className="pointer-events-none fixed inset-0 z-[9999] w-full h-full" />
         <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-lg p-8 text-center space-y-4"
-      >
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 15 }}
-          className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center mx-auto"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="text-center space-y-4 py-8"
         >
-          <Check size={28} className="text-emerald-600" />
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 15 }}
+            className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto"
+          >
+            <Check size={20} className="text-emerald-600 dark:text-emerald-400" />
+          </motion.div>
+          <h2 className="text-3xl tracking-tight text-foreground" style={TITLE_FONT}>
+            Confirmed.
+          </h2>
+          <p className="text-base text-muted-foreground max-w-sm mx-auto">
+            Your tour is set for <span className="font-medium text-foreground">{dateLabel}</span>{' '}
+            at <span className="font-medium text-foreground">{timeLabel}</span>.
+            {` ${businessName} will reach out if anything changes.`}
+          </p>
         </motion.div>
-        <h2 className="text-xl font-semibold text-foreground">Tour Booked!</h2>
-        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-          Your tour is scheduled for{' '}
-          <span className="font-medium text-foreground">
-            {selectedTime && new Date(selectedTime).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
-          </span>{' '}
-          at{' '}
-          <span className="font-medium text-foreground">
-            {selectedTime && formatTime(selectedTime)}
-          </span>.
-          {businessName} will follow up with a confirmation.
-        </p>
-      </motion.div>
       </>
     );
   }
 
-  // Step order for direction detection
-  const stepOrder: Step[] = ['property', 'date', 'details'];
-  const stepIdx = stepOrder.indexOf(step);
+  // Visual sections render progressively. The state machine is preserved:
+  // - 'property' lock: only the property section is interactive
+  // - 'date' lock: property is summarized + collapsed; date+time is open
+  // - 'details' lock: above are summarized; details form is open
+  const showProperty = properties.length > 0;
+  const propertyChosen = step === 'date' || step === 'details';
+  const showDateSection = step === 'date' || step === 'details';
+  const showDetailsSection = step === 'details';
 
-  function renderCurrentStep() {
-    // Property selection step
-    if (step === 'property' && properties.length > 0) {
-      return (
-        <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-lg p-6 space-y-5">
-          <p className="text-xs font-medium text-muted-foreground">Which property are you interested in?</p>
-          <div className="space-y-2">
-            {properties.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => selectProperty(p.id)}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-border text-left hover:border-primary/40 hover:bg-accent/30 transition-all"
-              >
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <MapPin size={16} className="text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{p.name}</p>
-                  {p.address && <p className="text-xs text-muted-foreground">{p.address}</p>}
-                </div>
-                <ChevronRight size={16} className="ml-auto text-muted-foreground" />
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => selectProperty(null)}
-              className="w-full px-4 py-3 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground hover:border-primary/40 hover:bg-accent/30 transition-all"
-            >
-              Not sure yet / General inquiry
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    if (step === 'details') {
-      return (
-        <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-lg p-6 space-y-5">
-          <button
-            type="button"
-            onClick={() => setStep('date')}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronLeft size={14} />
-            Back to calendar
-          </button>
-
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
-            <CalendarDays size={16} className="text-primary" />
-            <div className="text-sm">
-              <span className="font-medium">{selectedDate && formatDate(selectedDate)}</span>
-              <span className="text-muted-foreground"> at </span>
-              <span className="font-medium">{selectedTime && formatTime(selectedTime)}</span>
-              <span className="text-muted-foreground"> ({effectiveDuration} min)</span>
-            </div>
-          </div>
-
-          {showTzNote && (
-            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300">
-              <Globe size={13} />
-              Times shown in your local timezone ({formatTzShort(guestTz)}).
-              Agent is in {formatTzShort(timezone)}.
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="guestName">Full Name <span className="text-destructive">*</span></Label>
-                <Input id="guestName" type="text" value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Jane Smith" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="guestEmail">Email <span className="text-destructive">*</span></Label>
-                <Input id="guestEmail" type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="jane@example.com" />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="guestPhone">Phone</Label>
-                <Input id="guestPhone" type="tel" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="(555) 123-4567" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="propertyAddress">Property Address</Label>
-                <Input id="propertyAddress" type="text" value={propertyAddress} onChange={(e) => setPropertyAddress(e.target.value)} placeholder="123 Main St, Apt 4B" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Anything we should know?" />
-            </div>
-          </div>
-
-          {error && <p className="text-xs text-destructive">{error}</p>}
-
-          <Button
-            onClick={handleSubmit}
-            disabled={submitting || !guestName.trim() || !guestEmail.trim()}
-            className="w-full"
-            size="lg"
-            style={{ backgroundColor: accentColor, borderColor: accentColor }}
-          >
-            {submitting ? (
-              <><Loader2 size={16} className="mr-2 animate-spin" /> Booking...</>
-            ) : 'Confirm Booking'}
-          </Button>
-        </div>
-      );
-    }
-
-    // Date + time selection step
-    return (
-      <div className="rounded-xl bg-white dark:bg-card border border-border/60 shadow-lg p-6 space-y-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock size={14} />
-            <span>{effectiveDuration}-minute tour</span>
-          </div>
-          {showTzNote && (
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-              <Globe size={10} />
-              {formatTzShort(guestTz)}
-            </div>
-          )}
-        </div>
-
-        {properties.length > 0 && (
-          <button
-            type="button"
-            onClick={() => { setStep('property'); setSelectedPropertyId(null); }}
-            className="flex items-center gap-1 text-xs text-primary hover:underline"
-          >
-            <ChevronLeft size={12} />
-            Change property
-          </button>
-        )}
-
-        {slots.length === 0 ? (
-          <div className="text-center py-6 space-y-4">
-            <p className="text-sm text-muted-foreground">No available time slots right now.</p>
-            {!showWaitlist && !waitlistDone && (
-              <button
-                type="button"
-                onClick={() => setShowWaitlist(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border text-sm hover:bg-accent/30 transition-all"
-              >
-                <Bell size={14} />
-                Join Waitlist
-              </button>
-            )}
-            {showWaitlist && !waitlistDone && (
-              <div className="text-left space-y-3 max-w-sm mx-auto">
-                <p className="text-xs text-muted-foreground">Get notified when a slot opens up.</p>
-                <div className="space-y-1.5">
-                  <Label htmlFor="waitlistDate">Preferred date</Label>
-                  <Input id="waitlistDate" type="date" value={waitlistDate} min={new Date().toISOString().split('T')[0]} onChange={(e) => setWaitlistDate(e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="waitlistName">Your name</Label>
-                  <Input id="waitlistName" type="text" value={waitlistName} onChange={(e) => setWaitlistName(e.target.value)} placeholder="Jane Smith" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="waitlistEmail">Your email</Label>
-                  <Input id="waitlistEmail" type="email" value={waitlistEmail} onChange={(e) => setWaitlistEmail(e.target.value)} placeholder="jane@example.com" />
-                </div>
-                <Button onClick={handleWaitlistSubmit} disabled={waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim() || !waitlistDate} className="w-full" style={{ backgroundColor: accentColor, borderColor: accentColor }}>
-                  {waitlistSubmitting ? 'Joining...' : 'Join Waitlist'}
-                </Button>
-              </div>
-            )}
-            {waitlistDone && (
-              <div className="flex items-center justify-center gap-2 text-sm text-emerald-600">
-                <Check size={16} />
-                You&apos;re on the waitlist! We&apos;ll notify you when a slot opens.
-              </div>
-            )}
-          </div>
-        ) : (
-          <>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">Pick a date</p>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {slots.map((s) => (
-                  <button
-                    key={s.date}
-                    type="button"
-                    onClick={() => { setSelectedDate(s.date); setSelectedTime(null); }}
-                    className={cn(
-                      'flex-shrink-0 px-3 py-2 rounded-xl border text-center transition-all min-w-[80px]',
-                      selectedDate === s.date
-                        ? 'font-semibold'
-                        : 'border-border hover:bg-accent/30'
-                    )}
-                    style={selectedDate === s.date ? { borderColor: accentColor, backgroundColor: `${accentColor}15`, color: accentColor } : {}}
-                  >
-                    <div className="text-[10px] uppercase tracking-wider opacity-70">
-                      {new Date(s.date + 'T12:00:00').toLocaleDateString([], { weekday: 'short' })}
-                    </div>
-                    <div className="text-sm font-medium">
-                      {new Date(s.date + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {selectedDate && selectedDaySlots && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Pick a time</p>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[400px] overflow-y-auto">
-                  {selectedDaySlots.times.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setSelectedTime(t)}
-                      className={cn(
-                        'px-3 py-2 rounded-lg border text-sm transition-all',
-                        selectedTime === t
-                          ? 'text-white font-semibold'
-                          : 'border-border hover:bg-accent/30'
-                      )}
-                      style={selectedTime === t ? { borderColor: accentColor, backgroundColor: accentColor } : {}}
-                    >
-                      {formatTime(t)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {selectedTime && (
-              <Button onClick={() => setStep('details')} className="w-full" size="lg" style={{ backgroundColor: accentColor, borderColor: accentColor }}>
-                Continue
-                <ChevronRight size={16} className="ml-1" />
-              </Button>
-            )}
-          </>
-        )}
-
-        {error && <p className="text-xs text-destructive text-center">{error}</p>}
-      </div>
-    );
-  }
+  const selectedProperty = selectedPropertyId
+    ? properties.find((p) => p.id === selectedPropertyId)
+    : null;
 
   return (
     <>
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={step}
-        initial={{ x: 40, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        exit={{ x: -40, opacity: 0 }}
-        transition={{ duration: 0.25, ease: 'easeInOut' }}
-      >
-        {renderCurrentStep()}
-      </motion.div>
-    </AnimatePresence>
+      <div className="rounded-xl bg-background border border-border/70 p-6">
+        {/* ─── Property section ─────────────────────────────────────────── */}
+        {showProperty && (
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <p className={SECTION_LABEL}>Property</p>
+              {propertyChosen && (
+                <button
+                  type="button"
+                  onClick={() => { setStep('property'); setSelectedPropertyId(null); }}
+                  className={cn(QUIET_LINK, 'text-xs')}
+                >
+                  Change
+                </button>
+              )}
+            </div>
 
-    {/* Processing overlay */}
-    <AnimatePresence>
-      {submitting && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
-        >
+            {step === 'property' ? (
+              <div className="space-y-2">
+                {properties.map((p) => {
+                  const active = selectedPropertyId === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => selectProperty(p.id)}
+                      className={cn(
+                        'w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-colors',
+                        active
+                          ? 'border-foreground/40 bg-foreground/[0.045] ring-2 ring-foreground/10'
+                          : 'border-border/70 hover:bg-foreground/[0.04]',
+                      )}
+                    >
+                      <MapPin size={16} className="text-muted-foreground flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
+                        {p.address && <p className="text-xs text-muted-foreground truncate">{p.address}</p>}
+                      </div>
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => selectProperty(null)}
+                  className="w-full px-4 py-3 rounded-lg border border-dashed border-border/70 text-center text-xs text-muted-foreground hover:bg-foreground/[0.04] transition-colors"
+                >
+                  Not sure yet / general inquiry
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm text-foreground">
+                {selectedProperty ? (
+                  <>
+                    <span className="font-medium">{selectedProperty.name}</span>
+                    {selectedProperty.address && (
+                      <span className="text-muted-foreground"> · {selectedProperty.address}</span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">General inquiry</span>
+                )}
+              </p>
+            )}
+          </section>
+        )}
+
+        {/* Divider only between sections that are both visible */}
+        {showProperty && showDateSection && (
+          <div className="border-t border-border/60 my-8" />
+        )}
+
+        {/* ─── Date + time section ──────────────────────────────────────── */}
+        {showDateSection && (
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <p className={SECTION_LABEL}>Pick a time</p>
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-muted-foreground">{effectiveDuration} min</span>
+                {showTzNote && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <Globe size={11} />
+                    {formatTzShort(guestTz)}
+                  </span>
+                )}
+                {step === 'details' && (
+                  <button
+                    type="button"
+                    onClick={() => setStep('date')}
+                    className={cn(QUIET_LINK, 'text-xs')}
+                  >
+                    Change
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {step === 'details' ? (
+              <p className="text-sm text-foreground">
+                <span className="font-medium">{selectedDate && formatDate(selectedDate)}</span>
+                <span className="text-muted-foreground"> at </span>
+                <span className="font-medium">{selectedTime && formatTime(selectedTime)}</span>
+              </p>
+            ) : slots.length === 0 ? (
+              <div className="text-center py-6 space-y-4">
+                <p className="text-sm text-muted-foreground">No available time slots right now.</p>
+                {!showWaitlist && !waitlistDone && (
+                  <button
+                    type="button"
+                    onClick={() => setShowWaitlist(true)}
+                    className="inline-flex items-center gap-2 px-4 h-9 rounded-md border border-border/70 text-sm text-foreground hover:bg-foreground/[0.04] transition-colors"
+                  >
+                    <Bell size={14} />
+                    Join waitlist
+                  </button>
+                )}
+                {showWaitlist && !waitlistDone && (
+                  <div className="text-left space-y-3 max-w-sm mx-auto">
+                    <p className="text-xs text-muted-foreground">Get notified when a slot opens.</p>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="waitlistDate" className={FIELD_LABEL}>Preferred date</Label>
+                      <input
+                        id="waitlistDate"
+                        type="date"
+                        value={waitlistDate}
+                        min={new Date().toISOString().split('T')[0]}
+                        onChange={(e) => setWaitlistDate(e.target.value)}
+                        className={INPUT_CLASS}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="waitlistName" className={FIELD_LABEL}>Your name</Label>
+                      <input
+                        id="waitlistName"
+                        type="text"
+                        value={waitlistName}
+                        onChange={(e) => setWaitlistName(e.target.value)}
+                        placeholder="Jane Smith"
+                        className={INPUT_CLASS}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="waitlistEmail" className={FIELD_LABEL}>Your email</Label>
+                      <input
+                        id="waitlistEmail"
+                        type="email"
+                        value={waitlistEmail}
+                        onChange={(e) => setWaitlistEmail(e.target.value)}
+                        placeholder="jane@example.com"
+                        className={INPUT_CLASS}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleWaitlistSubmit}
+                      disabled={waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim() || !waitlistDate}
+                      className={cn(PRIMARY_PILL, 'w-full justify-center disabled:opacity-60 disabled:cursor-not-allowed')}
+                      style={{ backgroundColor: accentColor }}
+                    >
+                      {waitlistSubmitting && <Loader2 size={14} className="animate-spin" />}
+                      {waitlistSubmitting ? 'Joining…' : 'Join waitlist'}
+                    </button>
+                  </div>
+                )}
+                {waitlistDone && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+                    <Check size={16} />
+                    You&apos;re on the waitlist. We&apos;ll let you know.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {/* Date strip — paper-flat. Today/active uses foreground tone. */}
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  {slots.map((s) => {
+                    const active = selectedDate === s.date;
+                    return (
+                      <button
+                        key={s.date}
+                        type="button"
+                        onClick={() => { setSelectedDate(s.date); setSelectedTime(null); }}
+                        className={cn(
+                          'flex-shrink-0 px-3 py-2 rounded-md text-center transition-colors min-w-[72px]',
+                          active
+                            ? 'bg-foreground text-background'
+                            : 'bg-foreground/[0.04] hover:bg-foreground/[0.06] text-foreground',
+                        )}
+                      >
+                        <div className="text-[10px] uppercase tracking-wider opacity-70">
+                          {new Date(s.date + 'T12:00:00').toLocaleDateString([], { weekday: 'short' })}
+                        </div>
+                        <div className="text-sm font-medium">
+                          {new Date(s.date + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {selectedDate && selectedDaySlots && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[320px] overflow-y-auto">
+                    {selectedDaySlots.times.map((t) => {
+                      const active = selectedTime === t;
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setSelectedTime(t)}
+                          className={cn(
+                            'h-9 px-3 rounded-md text-sm transition-colors',
+                            active
+                              ? 'text-white font-medium'
+                              : 'bg-foreground/[0.04] hover:bg-foreground/[0.06] text-foreground',
+                          )}
+                          style={active ? { backgroundColor: accentColor } : undefined}
+                        >
+                          {formatTime(t)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {selectedTime && (
+                  <button
+                    type="button"
+                    onClick={() => setStep('details')}
+                    className={cn(PRIMARY_PILL, 'w-full justify-center')}
+                    style={{ backgroundColor: accentColor }}
+                  >
+                    Continue
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ─── Details section ──────────────────────────────────────────── */}
+        {showDetailsSection && (
+          <>
+            <div className="border-t border-border/60 my-8" />
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <p className={SECTION_LABEL}>Your details</p>
+                <button
+                  type="button"
+                  onClick={() => setStep('date')}
+                  className={cn(QUIET_LINK, 'text-xs inline-flex items-center gap-1')}
+                >
+                  <ChevronLeft size={12} />
+                  Back
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="guestName" className={FIELD_LABEL}>
+                      Full name
+                    </Label>
+                    <input
+                      id="guestName"
+                      type="text"
+                      value={guestName}
+                      onChange={(e) => setGuestName(e.target.value)}
+                      placeholder="Jane Smith"
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="guestEmail" className={FIELD_LABEL}>
+                      Email
+                    </Label>
+                    <input
+                      id="guestEmail"
+                      type="email"
+                      value={guestEmail}
+                      onChange={(e) => setGuestEmail(e.target.value)}
+                      placeholder="jane@example.com"
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="guestPhone" className={FIELD_LABEL}>
+                      Phone <span className="ml-1 text-[11px] font-normal text-muted-foreground">(optional)</span>
+                    </Label>
+                    <input
+                      id="guestPhone"
+                      type="tel"
+                      value={guestPhone}
+                      onChange={(e) => setGuestPhone(e.target.value)}
+                      placeholder="(555) 123-4567"
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="propertyAddress" className={FIELD_LABEL}>
+                      Property address <span className="ml-1 text-[11px] font-normal text-muted-foreground">(optional)</span>
+                    </Label>
+                    <input
+                      id="propertyAddress"
+                      type="text"
+                      value={propertyAddress}
+                      onChange={(e) => setPropertyAddress(e.target.value)}
+                      placeholder="123 Main St"
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="notes" className={FIELD_LABEL}>
+                    Notes <span className="ml-1 text-[11px] font-normal text-muted-foreground">(optional)</span>
+                  </Label>
+                  <textarea
+                    id="notes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={2}
+                    placeholder="Anything we should know?"
+                    className={TEXTAREA_CLASS}
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <p className="text-xs text-rose-600 dark:text-rose-400 mt-3">{error}</p>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting || !guestName.trim() || !guestEmail.trim()}
+                className={cn(PRIMARY_PILL, 'w-full justify-center mt-6 disabled:opacity-60 disabled:cursor-not-allowed')}
+                style={{ backgroundColor: accentColor }}
+              >
+                {submitting && <Loader2 size={14} className="animate-spin" />}
+                {submitting ? 'Booking…' : 'Confirm booking'}
+              </button>
+            </section>
+          </>
+        )}
+
+        {/* Surface availability errors at the bottom of the picker step */}
+        {error && step !== 'details' && (
+          <p className="text-xs text-rose-600 dark:text-rose-400 mt-4 text-center">{error}</p>
+        )}
+      </div>
+
+      {/* Processing overlay — kept minimal, paper-flat */}
+      <AnimatePresence>
+        {submitting && (
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="rounded-2xl bg-card border border-border shadow-xl p-8 text-center space-y-3"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
           >
-            <Loader2 size={28} className="animate-spin text-primary mx-auto" />
-            <p className="text-sm font-medium text-foreground">Processing your booking...</p>
-            <p className="text-xs text-muted-foreground">This will only take a moment</p>
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="rounded-xl bg-background border border-border/70 p-6 text-center space-y-3"
+            >
+              <Loader2 size={20} className="animate-spin text-muted-foreground mx-auto" />
+              <p className="text-sm text-foreground">Booking your tour…</p>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
     </>
   );
 }
