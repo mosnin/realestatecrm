@@ -67,7 +67,7 @@ export function OnboardingQuick({ defaultName }: Props) {
         });
         if (seq !== checkSeq.current) return; // stale
         if (!res.ok) {
-          setSlugState({ kind: 'invalid', message: 'Could not check availability — try again.' });
+          setSlugState({ kind: 'invalid', message: "Couldn't check that one. Try again." });
           return;
         }
         const data = await res.json();
@@ -80,7 +80,7 @@ export function OnboardingQuick({ defaultName }: Props) {
         }
       } catch {
         if (seq !== checkSeq.current) return;
-        setSlugState({ kind: 'invalid', message: 'Network error — try again.' });
+        setSlugState({ kind: 'invalid', message: "I lost the connection. Try again." });
       }
     }, 350);
     return () => {

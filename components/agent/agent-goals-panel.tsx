@@ -112,7 +112,7 @@ function NewGoalForm({ onSubmit, onCancel }: { onSubmit: (goalType: string, desc
     try {
       await onSubmit(goalType, description.trim());
     } catch {
-      setError('Failed to create goal. Please try again.');
+      setError("Couldn't create that goal. Try again.");
       setSubmitting(false);
     }
   }
@@ -194,14 +194,14 @@ export function AgentGoalsPanel() {
       });
       if (res.ok) {
         setGoals((prev) => prev.filter((g) => g.id !== id));
-        if (status === 'completed') toast.success('Goal completed');
+        if (status === 'completed') toast.success('Goal done.');
       } else {
-        toast.error('Could not update goal — please try again');
+        toast.error("Couldn't update that goal. Try again.");
         throw new Error('update failed');
       }
     } catch (err) {
       if (!(err instanceof Error && err.message === 'update failed')) {
-        toast.error('Could not reach server');
+        toast.error("I lost the connection. Try again.");
       }
       throw err;
     }

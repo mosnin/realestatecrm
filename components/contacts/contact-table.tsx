@@ -244,19 +244,19 @@ export function ContactTable({ slug }: ContactTableProps) {
   async function handleDelete(id: string) {
     const contact = contacts.find((c) => c.id === id);
     const confirmed = await confirm({
-      title: 'Remove this client?',
-      description: contact ? `"${contact.name}" will be permanently removed from your CRM.` : 'This client will be permanently removed.',
+      title: 'Delete this client?',
+      description: contact ? `"${contact.name}" will be gone. I can't bring them back.` : "This client will be gone. I can't bring them back.",
     });
     if (!confirmed) return;
     try {
       const res = await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        toast.success('Contact deleted');
+        toast.success('Contact deleted.');
       } else {
-        toast.error('Failed to delete contact');
+        toast.error("Couldn't delete that contact. Try again.");
       }
     } catch {
-      toast.error('Failed to delete contact');
+      toast.error("Couldn't delete that contact. Try again.");
     }
     fetchContacts();
   }
@@ -282,22 +282,22 @@ export function ContactTable({ slug }: ContactTableProps) {
     const ids = [...selectedIds];
     const confirmed = await confirm({
       title: `Delete ${ids.length} client${ids.length !== 1 ? 's' : ''}?`,
-      description: 'This will permanently remove the selected clients from your CRM. This cannot be undone.',
+      description: "These will be gone. I can't bring them back.",
     });
     if (!confirmed) return;
     try {
       const results = await Promise.allSettled(ids.map((id) => fetch(`/api/contacts/${id}`, { method: 'DELETE' })));
       const failures = results.filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));
       if (failures.length === 0) {
-        toast.success(`Deleted ${ids.length} contacts`);
+        toast.success(`Deleted ${ids.length} contacts.`);
       } else if (failures.length === ids.length) {
-        toast.error('Failed to delete contacts');
+        toast.error("Couldn't delete those contacts. Try again.");
       } else {
-        toast.success(`Deleted ${ids.length - failures.length} contacts`);
-        toast.error(`${failures.length} failed to delete`);
+        toast.success(`Deleted ${ids.length - failures.length} contacts.`);
+        toast.error(`${failures.length} got stuck. Try those again.`);
       }
     } catch {
-      toast.error('Failed to delete contacts');
+      toast.error("Couldn't delete those contacts. Try again.");
     } finally {
       setSelectedIds(new Set());
       fetchContacts();
@@ -318,10 +318,10 @@ export function ContactTable({ slug }: ContactTableProps) {
       );
       const failures = results.filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));
       if (failures.length > 0) {
-        toast.error(`${failures.length} contact${failures.length !== 1 ? 's' : ''} failed to update`);
+        toast.error(`${failures.length} contact${failures.length !== 1 ? 's' : ''} got stuck. Try those again.`);
       }
     } catch {
-      toast.error('Failed to update contacts');
+      toast.error("Couldn't update those contacts. Try again.");
     } finally {
       setSelectedIds(new Set());
       fetchContacts();
@@ -1080,7 +1080,7 @@ export function ContactTable({ slug }: ContactTableProps) {
           onImported={(count) => {
             setImportOpen(false);
             if (count > 0) {
-              toast.success('Contacts imported successfully');
+              toast.success('Contacts imported.');
               fetchContacts();
             }
           }}

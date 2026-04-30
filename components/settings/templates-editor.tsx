@@ -51,7 +51,7 @@ export function TemplatesEditor({ initial }: Props) {
     const content = (draft.body ?? '').trim();
     const channel = draft.channel ?? 'sms';
     if (!name || !content) {
-      toast.error('Name and body are required');
+      toast.error('Give it a name and a body first.');
       return;
     }
     setSaving(true);
@@ -62,22 +62,22 @@ export function TemplatesEditor({ initial }: Props) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, channel, body: content, subject: draft.subject ?? null }),
         });
-        if (!res.ok) { toast.error('Could not save'); return; }
+        if (!res.ok) { toast.error("Couldn't save that. Try again."); return; }
         const created: MessageTemplate = await res.json();
         setItems((prev) => [created, ...prev]);
         setSelectedId(created.id);
         setCreating(false);
-        toast.success('Template saved');
+        toast.success('Template saved.');
       } else if (selected) {
         const res = await fetch(`/api/message-templates/${selected.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, channel, body: content, subject: draft.subject ?? null }),
         });
-        if (!res.ok) { toast.error('Could not save'); return; }
+        if (!res.ok) { toast.error("Couldn't save that. Try again."); return; }
         const updated: MessageTemplate = await res.json();
         setItems((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-        toast.success('Template saved');
+        toast.success('Template saved.');
       }
     } finally {
       setSaving(false);
@@ -95,7 +95,7 @@ export function TemplatesEditor({ initial }: Props) {
     const res = await fetch(`/api/message-templates/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       setItems(prev);
-      toast.error('Could not delete');
+      toast.error("Couldn't delete that. Try again.");
     }
   }
 
@@ -123,7 +123,7 @@ export function TemplatesEditor({ initial }: Props) {
 
         {items.length === 0 ? (
           <div className="px-4 py-6 text-xs text-muted-foreground text-center">
-            No templates yet. Create one to get started.
+            No templates yet. Add one and I'll keep it close.
           </div>
         ) : (
           <ul className="divide-y divide-border max-h-[60vh] overflow-y-auto">

@@ -188,7 +188,7 @@ async function parseApiError(res: Response): Promise<string> {
   return res.statusText || `Request failed (${res.status})`;
 }
 
-const NETWORK_ERROR_MSG = 'Network error — check your connection';
+const NETWORK_ERROR_MSG = 'lost the connection';
 
 interface KanbanBoardProps {
   slug: string;
@@ -613,7 +613,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         body: JSON.stringify({ dealId: active.id, newStageId: targetStage.id, newPosition }),
       });
       if (res.ok) {
-        toast.success(`Moved "${dealTitle}" → ${targetStage.name}`);
+        toast.success(`Moved "${dealTitle}" → ${targetStage.name}.`);
       } else {
         const detail = await parseApiError(res);
         toast.error(`Couldn't move deal: ${detail}`);
@@ -631,13 +631,13 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
     const deal = stages.flatMap((s) => s.deals).find((d) => d.id === id);
     const confirmed = await confirm({
       title: 'Delete this deal?',
-      description: deal ? `"${deal.title}" will be permanently removed. This cannot be undone.` : 'This deal will be permanently removed.',
+      description: deal ? `"${deal.title}" will be gone. I can't bring it back.` : "This deal will be gone. I can't bring it back.",
     });
     if (!confirmed) return;
     try {
       const res = await fetch(`/api/deals/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        toast.success('Deal deleted');
+        toast.success('Deal deleted.');
       } else {
         const detail = await parseApiError(res);
         toast.error(`Couldn't delete deal: ${detail}`);
@@ -656,14 +656,14 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
     const confirmed = await confirm({
       title: `Delete "${stage.name}"?`,
       description:
-        'This stage will be removed from the pipeline. Deals in this stage will need to be moved first.',
+        "I'll remove this stage from the pipeline. Move any deals out first.",
     });
     if (!confirmed) return;
 
     try {
       const res = await fetch(`/api/stages/${stage.id}`, { method: 'DELETE' });
       if (res.ok) {
-        toast.success('Stage deleted');
+        toast.success('Stage deleted.');
         fetchData();
         return;
       }
@@ -709,7 +709,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         return;
       }
       toast.success(
-        `Moved ${stageDelete.dealCount} deal${stageDelete.dealCount === 1 ? '' : 's'} and deleted stage`,
+        `Moved ${stageDelete.dealCount} deal${stageDelete.dealCount === 1 ? '' : 's'} and deleted the stage.`,
       );
       setStageDelete(null);
       fetchData();
@@ -767,7 +767,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
           on_hold: 'On Hold',
           active: 'Active',
         };
-        toast.success(`Deal marked as ${labelMap[status]}`);
+        toast.success(`Deal marked as ${labelMap[status]}.`);
         fetchData();
       }
     } catch {
@@ -831,7 +831,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         body: JSON.stringify({ dealId, newStageId, newPosition }),
       });
       if (res.ok) {
-        toast.success(`Moved to ${newStage.name}`);
+        toast.success(`Moved to ${newStage.name}.`);
       } else {
         const detail = await parseApiError(res);
         toast.error(`Couldn't move deal: ${detail}`);
@@ -874,7 +874,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         body: JSON.stringify({ dealId: deal.id, newStageId: nextStageId, newPosition }),
       });
       if (res.ok) {
-        toast.success(`Advanced to ${nextStage.name}`);
+        toast.success(`Advanced to ${nextStage.name}.`);
       } else {
         const detail = await parseApiError(res);
         toast.error(`Couldn't advance deal: ${detail}`);
@@ -936,7 +936,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
         return;
       }
       const newDeal = await res.json();
-      toast.success('Deal duplicated');
+      toast.success('Deal duplicated.');
       router.push(`/s/${slug}/deals/${newDeal.id}`);
     } catch {
       toast.error(`Couldn't duplicate deal: ${NETWORK_ERROR_MSG}`);
@@ -964,7 +964,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
     const ids = Array.from(selectedDealIds);
     const confirmed = await confirm({
       title: `Delete ${ids.length} deal${ids.length === 1 ? '' : 's'}?`,
-      description: 'These deals will be permanently removed. This cannot be undone.',
+      description: "These will be gone. I can't bring them back.",
     });
     if (!confirmed) return;
     setBulkPending(true);
@@ -989,7 +989,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
 
       const failed = networkFailures + apiErrors.length;
       if (failed === 0) {
-        toast.success(`Deleted ${ids.length} deal${ids.length === 1 ? '' : 's'}`);
+        toast.success(`Deleted ${ids.length} deal${ids.length === 1 ? '' : 's'}.`);
         setSelectedDealIds(new Set());
       } else if (failed === ids.length) {
         const detail = networkFailures === ids.length
@@ -1043,7 +1043,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
       const stageName = stages.find((s) => s.id === bulkStageTarget)?.name ?? '';
       const failed = networkFailures + apiErrors.length;
       if (failed === 0) {
-        toast.success(`Moved ${ids.length} deal${ids.length === 1 ? '' : 's'} to ${stageName}`);
+        toast.success(`Moved ${ids.length} deal${ids.length === 1 ? '' : 's'} to ${stageName}.`);
         setBulkStagePicker(false);
         setBulkStageTarget('');
         setSelectedDealIds(new Set());
@@ -1436,7 +1436,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
       {statusFilter.size === 0 ? (
         <div className="rounded-xl border border-border/70 bg-background px-4 py-12 text-center">
           <p className="text-sm text-muted-foreground">
-            No status selected — pick at least one status above.
+            Pick at least one status above to see deals.
           </p>
         </div>
       ) : view === 'kanban' ? (
@@ -1451,7 +1451,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
               </div>
               {stage.deals.length === 0 ? (
                 <div className="px-3 py-4 text-center">
-                  <p className="text-xs text-muted-foreground">No deals in this stage</p>
+                  <p className="text-xs text-muted-foreground">Nothing in this stage yet.</p>
                 </div>
               ) : (
                 <div className="divide-y divide-border/70">
@@ -1673,16 +1673,16 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
                       {hasActiveFilter && totalUnfilteredDealCount > 0 ? (
                         <EmptyState
                           icon={Briefcase}
-                          title="No deals match your filters"
-                          description="Try clearing the search or enabling more status chips above."
+                          title="Nothing matches those filters."
+                          description="Clear the search or widen the status above."
                           variant="flush"
                           size="md"
                         />
                       ) : (
                         <EmptyState
                           icon={Briefcase}
-                          title="No deals yet"
-                          description="Add your first deal to start tracking your leasing pipeline."
+                          title="No deals yet."
+                          description="Add the first one and I'll start tracking the pipeline."
                           variant="flush"
                           size="md"
                         />

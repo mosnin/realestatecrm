@@ -132,7 +132,7 @@ export default async function PropertiesCommissionsPage({
         title="Closed this year"
         count={closedYtd.length}
         empty={
-          <EmptyRow text="No won deals yet this year. They'll show here with net-to-you when you close." />
+          <EmptyRow text="Nothing closed yet this year. When you win one, the net lands here." />
         }
       >
         {closedYtd.length > 0 && (
@@ -144,7 +144,7 @@ export default async function PropertiesCommissionsPage({
       <Section
         title="In flight"
         count={inFlight.length}
-        empty={<EmptyRow text="No active deals right now." />}
+        empty={<EmptyRow text="Nothing in flight right now." />}
       >
         {inFlight.length > 0 && (
           <CommissionTable rows={inFlight} splitsByDeal={splitsByDeal} slug={slug} />

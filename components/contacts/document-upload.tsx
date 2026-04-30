@@ -50,10 +50,10 @@ export function DocumentUpload({ contactId, uploadedBy = 'guest', onUploaded }: 
         onUploaded?.();
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || 'Upload failed');
+        setError(data.error || "Upload didn't go through. Try again.");
       }
     } catch {
-      setError('Network error. Please try again.');
+      setError("I lost the connection. Try again.");
     } finally {
       setUploading(false);
     }

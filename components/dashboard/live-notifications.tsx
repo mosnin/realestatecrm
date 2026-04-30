@@ -22,8 +22,8 @@ export function LiveNotifications({ spaceId, slug }: Props) {
       const contact = payload.new as any;
       if (!contact?.name) return;
       if (contact?.brokerageId) return; // Brokerage intake leads are broker-dashboard only
-      toast.success(`New lead: ${contact.name}`, {
-        description: contact.phone || contact.email || 'Just applied',
+      toast.success(`New lead — ${contact.name}.`, {
+        description: contact.phone || contact.email || 'Just applied.',
         icon: <PhoneIncoming size={16} />,
         action: {
           label: 'View',
@@ -43,8 +43,8 @@ export function LiveNotifications({ spaceId, slug }: Props) {
     onEvent: (payload) => {
       const tour = payload.new as any;
       if (!tour?.guestName) return;
-      toast.success(`Tour booked: ${tour.guestName}`, {
-        description: tour.propertyAddress || 'New tour scheduled',
+      toast.success(`Tour booked — ${tour.guestName}.`, {
+        description: tour.propertyAddress || 'New tour on the books.',
         icon: <CalendarDays size={16} />,
         action: {
           label: 'View',
@@ -64,8 +64,8 @@ export function LiveNotifications({ spaceId, slug }: Props) {
     onEvent: (payload) => {
       const deal = payload.new as any;
       if (!deal?.title) return;
-      toast.success(`New deal: ${deal.title}`, {
-        description: deal.address || 'Added to pipeline',
+      toast.success(`New deal — ${deal.title}.`, {
+        description: deal.address || 'Added to your pipeline.',
         icon: <Briefcase size={16} />,
         duration: 6000,
       });
@@ -84,8 +84,8 @@ export function LiveNotifications({ spaceId, slug }: Props) {
       if (newRecord?.brokerageId) return; // Brokerage intake leads are broker-dashboard only
       // Only notify when scoring completes
       if (oldRecord?.scoringStatus === 'pending' && newRecord?.scoringStatus === 'scored' && newRecord?.scoreLabel) {
-        toast.info(`Lead scored: ${newRecord.name || 'Contact'}`, {
-          description: `${newRecord.scoreLabel.toUpperCase()} — Score: ${newRecord.leadScore}/100`,
+        toast.info(`Scored — ${newRecord.name || 'Contact'}.`, {
+          description: `${newRecord.scoreLabel.toUpperCase()} · ${newRecord.leadScore}/100`,
           duration: 6000,
         });
         router.refresh();

@@ -35,7 +35,7 @@ export function ContactLifecycleFields({ contactId, initialReferralSource, initi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ referralSource: source.trim() || null }),
       });
-      if (!res.ok) { toast.error('Could not save referral source'); return; }
+      if (!res.ok) { toast.error("Couldn't save the referral source."); return; }
       setSavedSource(source.trim());
     } finally {
       setSavingSource(false);
@@ -50,10 +50,10 @@ export function ContactLifecycleFields({ contactId, initialReferralSource, initi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ snoozedUntil: date ?? null }),
       });
-      if (!res.ok) { toast.error('Could not save snooze'); return; }
+      if (!res.ok) { toast.error("Couldn't save that snooze."); return; }
       setSnooze(date ?? '');
-      if (date) toast.success('Snoozed until ' + new Date(date).toLocaleDateString());
-      else toast.success('Un-snoozed');
+      if (date) toast.success('Snoozed until ' + new Date(date).toLocaleDateString() + '.');
+      else toast.success('Un-snoozed.');
     } finally {
       setSavingSnooze(false);
     }

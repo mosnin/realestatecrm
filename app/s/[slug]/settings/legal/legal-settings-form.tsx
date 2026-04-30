@@ -69,7 +69,7 @@ export function LegalSettingsForm({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setSaveError(data.error || 'Failed to save settings. Please try again.');
+        setSaveError(data.error || "Couldn't save those settings. Try again.");
         return;
       }
       setSaved(true);

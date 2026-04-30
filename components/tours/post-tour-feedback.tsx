@@ -34,10 +34,10 @@ export function PostTourFeedback({ token, guestName, businessName }: PostTourFee
         setSubmitted(true);
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || 'Failed to submit feedback');
+        setError(data.error || "Couldn't send that feedback. Try again.");
       }
     } catch {
-      setError('Network error. Please try again.');
+      setError("I lost the connection. Try again.");
     } finally {
       setSubmitting(false);
     }

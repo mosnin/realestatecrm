@@ -656,7 +656,7 @@ export function CalendarView({
                     disabled={formSubmitting}
                     className="px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-80 disabled:opacity-50 transition-opacity"
                   >
-                    {formSubmitting ? 'Saving...' : 'Save event'}
+                    {formSubmitting ? 'Saving' : 'Save event'}
                   </button>
                   <button
                     type="button"
@@ -711,7 +711,7 @@ export function CalendarView({
 
         {!hasSelectedEvents && !showAddForm && !showAddNote && (
           <p className="text-sm text-muted-foreground">
-            No events on this day.
+            Nothing on this day.
           </p>
         )}
 

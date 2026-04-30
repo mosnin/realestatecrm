@@ -50,7 +50,7 @@ function QuestionRow({ question, onAnswered }: { question: AgentQuestion; onAnsw
         setTimeout(() => onAnswered(question.id), 300);
       }, 700);
     } catch {
-      setError('Could not submit — please try again.');
+      setError("Couldn't submit that. Try again.");
     } finally {
       setSubmitting(false);
     }

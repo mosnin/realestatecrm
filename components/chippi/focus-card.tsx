@@ -169,7 +169,7 @@ export function FocusCard({
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        toast.error('Could not send — try again.');
+        toast.error("Couldn't send that. Try again.");
         return;
       }
       // Remove from local items so the next one rotates in
@@ -182,12 +182,12 @@ export function FocusCard({
             : 'Sent',
         );
       } else if (data?.deliveryResult?.error === 'not_configured') {
-        toast.success('Copied to clipboard — add an integration to auto-send.');
+        toast.success('Copied. Add an integration and I can auto-send next time.');
       } else {
         toast.success('Approved.');
       }
     } catch {
-      toast.error('Network error — try again.');
+      toast.error("I lost the connection. Try again.");
     } finally {
       setActing(false);
     }
@@ -205,13 +205,13 @@ export function FocusCard({
         body: JSON.stringify({ answer: trimmed }),
       });
       if (!res.ok) {
-        toast.error('Could not send — try again.');
+        toast.error("Couldn't send that. Try again.");
         return;
       }
       setItems((prev) => prev.filter((i) => !(i.kind === 'question' && i.id === current.id)));
       toast.success('Answered.');
     } catch {
-      toast.error('Network error — try again.');
+      toast.error("I lost the connection. Try again.");
     } finally {
       setActing(false);
     }
@@ -361,8 +361,8 @@ export function FocusCard({
                   <AlertDialogTitle>Send this {draft.channel}?</AlertDialogTitle>
                   <AlertDialogDescription>
                     {draft.Contact
-                      ? `Sending to ${draft.Contact.name}. This action cannot be undone.`
-                      : 'This action cannot be undone.'}
+                      ? `I'll send this to ${draft.Contact.name}. Once it's gone, it's gone.`
+                      : "Once it's gone, it's gone."}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -500,10 +500,10 @@ function FocusWelcome({
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      toast.success('Intake link copied');
+      toast.success('Intake link copied.');
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error('Could not copy — try again');
+      toast.error("Couldn't copy that. Try again.");
     }
   }
 

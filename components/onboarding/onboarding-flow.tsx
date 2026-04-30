@@ -336,7 +336,7 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
       const spaceData = await spaceRes.json().catch(() => ({}));
       if (!spaceRes.ok) {
         if (spaceRes.status === 409) {
-          toast.error('That slug was just taken. Please pick a different one.');
+          toast.error('That slug was just taken. Pick a different one.');
           setSubmitting(false);
           const slugIndex = steps.indexOf('slug');
           if (slugIndex >= 0) setStepIndex(slugIndex);
@@ -381,7 +381,7 @@ export function OnboardingFlow({ defaultName, userImageUrl: _userImageUrl }: Onb
         router.push(`/s/${finalSlug}`);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Something went wrong.';
+      const msg = err instanceof Error ? err.message : "That tripped me up. Try again.";
       toast.error(msg);
       setSubmitting(false);
     }

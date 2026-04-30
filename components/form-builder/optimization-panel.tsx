@@ -327,7 +327,7 @@ function friendlyErrorMessage(raw: string): { title: string; detail: string } {
   if (lower.includes('rate limit')) {
     return {
       title: 'You have reached the analysis limit',
-      detail: 'You can refresh suggestions up to 5 times per hour. Please wait a bit and try again.',
+      detail: 'Five refreshes an hour is the cap. Give it a few minutes and try again.',
     };
   }
   if (lower.includes('openai') || lower.includes('ai') || lower.includes('timeout')) {

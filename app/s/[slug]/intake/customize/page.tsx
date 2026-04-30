@@ -210,7 +210,7 @@ export default function IntakeCustomizePage() {
 
       toast.success(`${activeLeadType === 'rental' ? 'Rental' : 'Buyer'} form saved.`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Something went wrong.');
+      toast.error(err instanceof Error ? err.message : "That tripped me up. Try again.");
     } finally {
       setSaving(false);
       setSavingPhase(null);
@@ -249,7 +249,7 @@ export default function IntakeCustomizePage() {
       }
       toast.success(`${activeLeadType === 'rental' ? 'Rental' : 'Buyer'} form reset to default.`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Something went wrong.');
+      toast.error(err instanceof Error ? err.message : "That tripped me up. Try again.");
     }
   }, [slug, activeLeadType]);
 

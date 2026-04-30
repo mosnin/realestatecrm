@@ -111,11 +111,11 @@ export function ApplicationStatusManager({
         router.refresh();
       } else {
         const data = await res.json().catch(() => null);
-        setError(data?.error ?? 'Failed to update status');
+        setError(data?.error ?? "Couldn't update the status. Try again.");
       }
     } catch (err) {
       console.error('[status-manager] Update failed:', err);
-      setError('Failed to update status');
+      setError("Couldn't update the status. Try again.");
     } finally {
       setUpdating(false);
     }
@@ -138,11 +138,11 @@ export function ApplicationStatusManager({
         setMessageText('');
       } else {
         const data = await res.json().catch(() => null);
-        setError(data?.error ?? 'Failed to send message');
+        setError(data?.error ?? "Couldn't send that message. Try again.");
       }
     } catch (err) {
       console.error('[status-manager] Send failed:', err);
-      setError('Failed to send message');
+      setError("Couldn't send that message. Try again.");
     } finally {
       setSendingMessage(false);
     }

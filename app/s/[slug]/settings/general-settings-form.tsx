@@ -30,7 +30,7 @@ export function DangerZone({ space }: { space: Space }) {
   async function handleDelete() {
     if (
       !confirm(
-        `Are you sure you want to delete "${space.name}"? This will permanently delete all clients, deals, and data. This cannot be undone.`,
+        `Delete "${space.name}"? Every client, deal, and note goes with it. I can't bring it back.`,
       )
     )
       return;
@@ -43,12 +43,12 @@ export function DangerZone({ space }: { space: Space }) {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data.error || 'Failed to delete workspace. Please try again.');
+        alert(data.error || "Couldn't delete the workspace. Try again.");
         return;
       }
       router.push('/');
     } catch {
-      alert('Network error. Please check your connection and try again.');
+      alert("I lost the connection. Check it and try again.");
     } finally {
       setDeleting(false);
     }
@@ -57,7 +57,7 @@ export function DangerZone({ space }: { space: Space }) {
   return (
     <div className="space-y-3">
       <p className={BODY_MUTED}>
-        Deleting your space is permanent and will remove all clients, deals, and data. This cannot be undone.
+        Deleting your space is permanent. Every client, deal, and note goes with it. I can't bring it back.
       </p>
       <button
         type="button"
@@ -145,7 +145,7 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
           setSaveError('That slug was just taken. Please pick a different one.');
           return;
         }
-        setSaveError(data.error || 'Failed to save settings. Please try again.');
+        setSaveError(data.error || "Couldn't save those settings. Try again.");
         return;
       }
       const updated = await res.json().catch(() => ({}));

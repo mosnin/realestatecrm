@@ -401,14 +401,14 @@ export function ChippiWorkspace({
       if (res.ok && data?.triggered) {
         toast.success(
           data.method === 'modal'
-            ? 'Chippi is on it — new drafts will appear here'
-            : 'Queued — Chippi will pick this up at the next heartbeat (~15 min)',
+            ? "On it. New drafts will land here."
+            : "Queued. I'll pick it up on the next sweep (~15 min).",
         );
       } else {
-        toast.error("Couldn't kick off Chippi — please try again");
+        toast.error("Couldn't kick myself off. Try again.");
       }
     } catch {
-      toast.error('Could not reach server');
+      toast.error("I lost the connection. Try again.");
     } finally {
       setRunning(false);
     }
@@ -562,7 +562,7 @@ export function ChippiWorkspace({
       {/* ── Today view (no active conversation) ───────────────────── */}
       {loadingMessages ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-          Loading…
+          One moment.
         </div>
       ) : isEmpty ? (
         <>

@@ -136,10 +136,10 @@ export function ContactActivityTab({ contactId, contactCreatedAt }: { contactId:
         }, ...prev]);
         setContent('');
       } else {
-        setPostError('Failed to save. Please try again.');
+        setPostError("Couldn't save that. Try again.");
       }
     } catch {
-      setPostError('Network error. Please try again.');
+      setPostError("I lost the connection. Try again.");
     } finally {
       setPosting(false);
     }

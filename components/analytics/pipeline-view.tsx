@@ -220,7 +220,7 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
       {data.totalDeals === 0 && (
         <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center">
           <p className={BODY_MUTED}>
-            Pipeline analytics will appear here once deals are created.
+            Add a deal and the pipeline charts show up here.
           </p>
         </div>
       )}

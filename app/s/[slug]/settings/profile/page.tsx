@@ -131,7 +131,7 @@ export default function ProfileSettingsPage() {
       toast.success('Profile saved.');
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Something went wrong.');
+      toast.error(err instanceof Error ? err.message : "That tripped me up. Try again.");
     } finally {
       setSaving(false);
     }
@@ -263,7 +263,7 @@ export default function ProfileSettingsPage() {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 if (file.size > 2 * 1024 * 1024) {
-                  toast.error('File must be under 2MB');
+                  toast.error('Keep it under 2MB.');
                   return;
                 }
                 setPhotoUploading(true);
@@ -275,12 +275,12 @@ export default function ProfileSettingsPage() {
                   const data = await res.json();
                   if (res.ok && data.url) {
                     setRealtorPhotoUrl(data.url);
-                    toast.success('Photo uploaded');
+                    toast.success('Photo uploaded.');
                   } else {
-                    toast.error(data.error || 'Upload failed');
+                    toast.error(data.error || "Upload didn't go through. Try again.");
                   }
                 } catch {
-                  toast.error('Upload failed');
+                  toast.error("Upload didn't go through. Try again.");
                 } finally {
                   setPhotoUploading(false);
                 }
@@ -318,7 +318,7 @@ export default function ProfileSettingsPage() {
               onClick={() => {
                 const name = businessName || `${firstName} ${lastName}`.trim() || 'Our Office';
                 setPrivacyPolicyHtml(generatePrivacyPolicy(name, 'realtor'));
-                toast.success('Privacy policy template generated');
+                toast.success('Privacy policy template generated.');
               }}
               className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
             >

@@ -61,14 +61,14 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error(data.error || 'Could not seed checklist');
+        toast.error(data.error || "Couldn't add the checklist.");
         return;
       }
       const data: DealChecklistItem[] = await res.json();
       setItems(data);
-      toast.success('Checklist added — edit any dates that don’t match your contract.');
+      toast.success('Checklist added. Tweak any dates that don’t match your contract.');
     } catch {
-      toast.error('Could not seed checklist');
+      toast.error("Couldn't add the checklist.");
     } finally {
       setSeeding(false);
     }
@@ -86,7 +86,7 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
     });
     if (!res.ok) {
       setItems((prev) => prev.map((i) => i.id === item.id ? item : i));
-      toast.error('Could not update item');
+      toast.error("Couldn't update that item.");
     }
   }
 
@@ -101,7 +101,7 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
     });
     if (!res.ok) {
       setItems((list) => list.map((i) => i.id === item.id ? { ...i, dueAt: prev } : i));
-      toast.error('Could not save due date');
+      toast.error("Couldn't save that due date.");
     }
   }
 
@@ -116,7 +116,7 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
         body: JSON.stringify({ kind: 'custom', label, dueAt: newDueAt || undefined }),
       });
       if (!res.ok) {
-        toast.error('Could not add item');
+        toast.error("Couldn't add that item.");
         return;
       }
       const created: DealChecklistItem = await res.json();
@@ -134,7 +134,7 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
     const res = await fetch(`/api/deals/${dealId}/checklist/${item.id}`, { method: 'DELETE' });
     if (!res.ok) {
       setItems(prev);
-      toast.error('Could not delete item');
+      toast.error("Couldn't delete that item.");
     }
   }
 
@@ -142,7 +142,7 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
   const total = items.length;
 
   if (loading && items.length === 0) {
-    return <div className="text-sm text-muted-foreground py-4">Loading…</div>;
+    return <div className="text-sm text-muted-foreground py-4">One moment.</div>;
   }
 
   // Empty state — offer template choices for the canonical flows.

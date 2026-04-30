@@ -186,11 +186,11 @@ export function TourAvailabilityManager({
         setTimeout(() => setSaved(false), 3000);
       } else {
         const data = await res.json().catch(() => ({}));
-        setSaveError(data.error || 'Failed to save settings');
+        setSaveError(data.error || "Couldn't save those settings. Try again.");
       }
     } catch (err) {
       console.error('[TourSettings] Save failed:', err);
-      setSaveError('Network error. Please try again.');
+      setSaveError("I lost the connection. Try again.");
     } finally {
       setSaving(false);
     }
@@ -459,7 +459,7 @@ export function TourAvailabilityManager({
               ) : (
                 <Check size={14} />
               )}
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? 'Saving' : 'Save Changes'}
             </Button>
           </div>
         </div>

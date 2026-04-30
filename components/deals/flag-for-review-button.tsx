@@ -100,7 +100,7 @@ export function FlagForReviewButton({
       });
 
       if (res.status === 201) {
-        toast.success('Sent to broker');
+        toast.success('Sent to your broker.');
         setOpen(false);
         setReason('');
         setInlineError(null);
@@ -121,7 +121,7 @@ export function FlagForReviewButton({
       } catch {
         // ignore json parse failures — fall through to generic error
       }
-      const errMsg = body.error ?? 'Something went wrong';
+      const errMsg = body.error ?? "That tripped me up. Try again.";
 
       if (res.status === 409) {
         if (errMsg.includes('already has an open review')) {

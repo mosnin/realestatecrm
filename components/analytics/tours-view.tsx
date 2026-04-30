@@ -131,7 +131,7 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
             </ChartContainer>
           ) : (
             <div className="flex items-center justify-center h-[220px] text-sm text-muted-foreground">
-              No tour data yet
+              No tour data yet.
             </div>
           )}
         </ChartSection>

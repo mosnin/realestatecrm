@@ -363,9 +363,9 @@ function DraftRow({
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Send this message?</AlertDialogTitle>
+                <AlertDialogTitle>Send this {draft.channel}?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will send a {draft.channel} to {draft.Contact?.name ?? 'this contact'}. This action cannot be undone.
+                  I'll send this to {draft.Contact?.name ?? 'this contact'}. Once it's gone, it's gone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -553,7 +553,7 @@ export function AgentDraftInbox({ slug }: Props) {
 
       if (!res.ok) {
         if (restored) setDrafts((prev) => [restored, ...prev]);
-        toast.error('Action failed — please try again.');
+        toast.error("That didn't go through. Try again.");
         return null;
       }
 
@@ -565,7 +565,7 @@ export function AgentDraftInbox({ slug }: Props) {
       return null;
     } catch {
       if (restored) setDrafts((prev) => [restored, ...prev]);
-      toast.error('Network error — please try again.');
+      toast.error("I lost the connection. Try again.");
       return null;
     }
   }
@@ -584,9 +584,9 @@ export function AgentDraftInbox({ slug }: Props) {
       const failed = results.filter((r) => r.status === 'rejected').length;
       const succeeded = results.length - failed;
       if (failed > 0) {
-        toast.error(`${succeeded} approved, ${failed} failed — please retry`);
+        toast.error(`${succeeded} approved, ${failed} got stuck. Try those again.`);
       } else {
-        toast.success(`All ${succeeded} drafts approved`);
+        toast.success(`All ${succeeded} drafts approved.`);
       }
       void load();
     } finally {

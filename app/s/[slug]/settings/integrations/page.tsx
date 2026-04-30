@@ -119,17 +119,17 @@ export default function IntegrationsSettingsPage() {
         ]);
         setMcpNewKeyName('');
       } else {
-        alert(data.error ?? 'Failed to create API key.');
+        alert(data.error ?? "Couldn't create that key. Try again.");
       }
     } catch {
-      alert('Network error. Please try again.');
+      alert("I lost the connection. Try again.");
     } finally {
       setMcpCreating(false);
     }
   }
 
   async function handleDeleteMcpKey(id: string) {
-    if (!confirm('Are you sure you want to delete this API key? Any integrations using it will stop working.')) return;
+    if (!confirm("Delete this key? Anything using it stops working right away.")) return;
     setMcpDeletingId(id);
     try {
       const res = await fetch('/api/mcp-keys', {
@@ -141,10 +141,10 @@ export default function IntegrationsSettingsPage() {
         setMcpKeys((prev) => prev.filter((k) => k.id !== id));
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(data.error ?? 'Failed to delete key.');
+        alert(data.error ?? "Couldn't delete that key. Try again.");
       }
     } catch {
-      alert('Network error. Please try again.');
+      alert("I lost the connection. Try again.");
     } finally {
       setMcpDeletingId(null);
     }
@@ -333,7 +333,7 @@ export default function IntegrationsSettingsPage() {
           <div className="h-16 rounded-md bg-foreground/[0.04] animate-pulse" />
         ) : mcpKeys.length === 0 ? (
           <p className={`${BODY_MUTED} italic`}>
-            No API keys yet. Generate one to connect your MCP client.
+            No keys yet. Generate one to connect a client.
           </p>
         ) : (
           <div>

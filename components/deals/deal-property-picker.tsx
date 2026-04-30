@@ -53,11 +53,11 @@ export function DealPropertyPicker({ dealId, slug, initial }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ propertyId: p?.id ?? null }),
       });
-      if (!res.ok) { toast.error('Could not link property'); return; }
+      if (!res.ok) { toast.error("Couldn't link the property."); return; }
       setLinked(p);
       setOpen(false);
       setQuery('');
-      toast.success(p ? 'Property linked' : 'Property unlinked');
+      toast.success(p ? 'Property linked.' : 'Property unlinked.');
     } finally {
       setSaving(false);
     }

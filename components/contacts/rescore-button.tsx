@@ -25,15 +25,15 @@ export function RescoreButton({ contactId, onComplete }: Props) {
       if (res.ok) {
         const data = await res.json();
         setDone(true);
-        toast.success('Lead re-scored');
+        toast.success('Re-scored.');
         onComplete?.(data);
         setTimeout(() => router.refresh(), 800);
       } else {
-        toast.error('Scoring failed — try again');
-        setError('Re-score failed. Please try again.');
+        toast.error("Couldn't score that. Try again.");
+        setError("Couldn't score that. Try again.");
       }
     } catch {
-      setError('Re-score failed. Please try again.');
+      setError("Couldn't score that. Try again.");
     } finally {
       setLoading(false);
     }
@@ -60,7 +60,7 @@ export function RescoreButton({ contactId, onComplete }: Props) {
         ) : (
           <RotateCcw size={11} />
         )}
-        {loading ? 'Scoring…' : done ? 'Scored!' : 'Re-score'}
+        {loading ? 'Scoring' : done ? 'Scored.' : 'Re-score'}
       </button>
       {error && <span className="text-xs text-destructive">{error}</span>}
     </div>

@@ -37,13 +37,13 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error(data.error || 'Could not save');
+        toast.error(data.error || "Couldn't save that. Try again.");
         return;
       }
       const updated: Property = await res.json();
       setProperty(updated);
       setEditing(false);
-      toast.success('Saved');
+      toast.success('Saved.');
     } finally {
       setSubmitting(false);
     }
@@ -52,8 +52,8 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
   async function remove() {
     if (!confirm('Delete this property? Linked deals and tours stay intact.')) return;
     const res = await fetch(`/api/properties/${property.id}`, { method: 'DELETE' });
-    if (!res.ok) { toast.error('Could not delete'); return; }
-    toast.success('Deleted');
+    if (!res.ok) { toast.error("Couldn't delete that property."); return; }
+    toast.success('Deleted.');
     router.push(`/s/${slug}/properties`);
   }
 

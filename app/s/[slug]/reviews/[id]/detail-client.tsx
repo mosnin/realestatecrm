@@ -117,7 +117,7 @@ export function DetailClient({ slug, review, comments: initialComments }: Props)
       setComments((prev) => [...prev, created]);
       setCommentBody('');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to post comment';
+      const msg = err instanceof Error ? err.message : "Couldn't post that comment. Try again.";
       toast.error(msg);
     } finally {
       setPostingComment(false);

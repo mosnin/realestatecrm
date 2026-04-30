@@ -274,9 +274,9 @@ export function ContactForm({
         properties: parsed.properties,
         tags: [],
       });
-      toast.success(`Added ${parsed.name}`);
+      toast.success(`Added ${parsed.name}.`);
     } catch {
-      toast.error('Failed to save');
+      toast.error("Couldn't save that. Try again.");
       return;
     }
     resetAll();
@@ -371,9 +371,9 @@ export function ContactForm({
     const { tags: _rawTags, ...rest } = data;
     try {
       await onSubmit({ ...rest, budget, properties, tags });
-      toast.success(mode === 'edit' ? 'Saved' : 'Added');
+      toast.success(mode === 'edit' ? 'Saved.' : 'Added.');
     } catch {
-      toast.error('Failed to save');
+      toast.error("Couldn't save that. Try again.");
       return;
     }
     resetAll();

@@ -62,7 +62,7 @@ export function DealCommissionSplits({ dealId, dealValue, dealCommissionRate, in
   );
 
   async function addRow() {
-    if (!draft.label.trim()) { toast.error('Label required'); return; }
+    if (!draft.label.trim()) { toast.error('Add a label first.'); return; }
     const body: Record<string, unknown> = {
       party: draft.party,
       label: draft.label.trim(),
@@ -78,7 +78,7 @@ export function DealCommissionSplits({ dealId, dealValue, dealCommissionRate, in
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      toast.error(data.error || 'Could not add split');
+      toast.error(data.error || "Couldn't add that split.");
       return;
     }
     const created: CommissionSplit = await res.json();
@@ -96,14 +96,14 @@ export function DealCommissionSplits({ dealId, dealValue, dealCommissionRate, in
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paidAt: now }),
     });
-    if (!res.ok) { setItems(prev); toast.error('Could not update'); }
+    if (!res.ok) { setItems(prev); toast.error("Couldn't update that."); }
   }
 
   async function remove(s: CommissionSplit) {
     const prev = items;
     setItems((list) => list.filter((x) => x.id !== s.id));
     const res = await fetch(`/api/deals/${dealId}/commission-splits/${s.id}`, { method: 'DELETE' });
-    if (!res.ok) { setItems(prev); toast.error('Could not delete'); }
+    if (!res.ok) { setItems(prev); toast.error("Couldn't delete that."); }
   }
 
   return (
@@ -122,7 +122,7 @@ export function DealCommissionSplits({ dealId, dealValue, dealCommissionRate, in
 
       {/* Rows */}
       {loading && items.length === 0 ? (
-        <div className="px-4 py-5 text-xs text-muted-foreground">Loading…</div>
+        <div className="px-4 py-5 text-xs text-muted-foreground">One moment.</div>
       ) : items.length === 0 ? (
         <div className="px-4 py-5 text-xs text-muted-foreground text-center">
           No splits yet. Net equals GCI until you add them.

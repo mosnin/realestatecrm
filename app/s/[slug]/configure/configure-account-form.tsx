@@ -122,7 +122,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
     const res = await fetch('/api/upload', { method: 'POST', body: formData });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      toast.error(data.error || 'Upload failed');
+      toast.error(data.error || "Upload didn't go through. Try again.");
       return null;
     }
     const { url } = await res.json();
@@ -132,7 +132,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
   async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast.error('File must be under 2MB'); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error('Keep it under 2MB.'); return; }
     setLogoPreview(URL.createObjectURL(file));
     const url = await handleUpload(file, 'logo');
     if (url) { setLogoUrl(url); setLogoPreview(url); }
@@ -142,7 +142,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast.error('File must be under 2MB'); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error('Keep it under 2MB.'); return; }
     setPhotoPreview(URL.createObjectURL(file));
     const url = await handleUpload(file, 'photo');
     if (url) { setRealtorPhotoUrl(url); setPhotoPreview(url); }
@@ -152,7 +152,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
   async function handleFaviconUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast.error('File must be under 2MB'); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error('Keep it under 2MB.'); return; }
     setFaviconPreview(URL.createObjectURL(file));
     const url = await handleUpload(file, 'favicon');
     if (url) { setIntakeFaviconUrl(url); setFaviconPreview(url); }
@@ -251,10 +251,10 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
       });
 
       setSaved(true);
-      toast.success('Account configured successfully.');
+      toast.success('Account configured.');
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Something went wrong.';
+      const msg = err instanceof Error ? err.message : "That tripped me up. Try again.";
       setError(msg);
       toast.error(msg);
     } finally {
@@ -966,7 +966,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
           {saving ? (
             <>
               <Loader2 size={16} className="mr-2 animate-spin" />
-              Saving...
+              Saving
             </>
           ) : saved ? (
             <>

@@ -24,10 +24,10 @@ export function DeleteDealButton({ dealId, slug, dealTitle }: DeleteDealButtonPr
       if (res.ok) {
         router.push(`/s/${slug}/deals`);
       } else {
-        toast.error('Failed to delete deal');
+        toast.error("Couldn't delete that deal. Try again.");
       }
     } catch {
-      toast.error('Failed to delete deal');
+      toast.error("Couldn't delete that deal. Try again.");
     } finally {
       setDeleting(false);
     }

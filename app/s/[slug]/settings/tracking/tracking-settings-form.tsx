@@ -123,7 +123,7 @@ export function TrackingSettingsForm({ slug, trackingPixels }: TrackingSettingsF
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setSaveError(data.error || 'Failed to save settings. Please try again.');
+        setSaveError(data.error || "Couldn't save those settings. Try again.");
         return;
       }
       setSaved(true);
@@ -206,7 +206,7 @@ export function TrackingSettingsForm({ slug, trackingPixels }: TrackingSettingsF
           {saving ? (
             <>
               <Loader2 size={15} className="mr-2 animate-spin" />
-              Saving...
+              Saving
             </>
           ) : (
             'Save'

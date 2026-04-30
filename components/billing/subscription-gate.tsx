@@ -41,7 +41,7 @@ export function SubscriptionGate({
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert(data.error || 'Failed to start checkout');
+        alert(data.error || "Couldn't start checkout. Try again.");
         setLoading(false);
       }
     } catch {

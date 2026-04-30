@@ -407,7 +407,7 @@ export function ScoringTab({
       setHasUnsavedChanges(false);
       toast.success('Saved.');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save');
+      toast.error(err instanceof Error ? err.message : "Couldn't save that. Try again.");
     } finally {
       setSaving(false);
     }

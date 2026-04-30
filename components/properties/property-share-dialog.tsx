@@ -66,7 +66,7 @@ export function PropertyShareDialog({ propertyId, linkedDealIds, origin, onClose
   }
 
   async function create() {
-    if (!name.trim()) { toast.error('Name required'); return; }
+    if (!name.trim()) { toast.error('Give it a name first.'); return; }
     setCreating(true);
     try {
       const res = await fetch(`/api/properties/${propertyId}/packets`, {
@@ -76,27 +76,27 @@ export function PropertyShareDialog({ propertyId, linkedDealIds, origin, onClose
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error(data.error || 'Could not create link');
+        toast.error(data.error || "Couldn't create that link.");
         return;
       }
       const packet: PropertyPacket = await res.json();
       setPackets((prev) => [packet, ...prev]);
       setName('');
       setSelected(new Set());
-      toast.success('Link created — copy it to share.');
+      toast.success('Link created. Copy it to share.');
     } finally {
       setCreating(false);
     }
   }
 
   async function revoke(p: PropertyPacket) {
-    if (!confirm('Revoke this link? Anyone with the URL will lose access immediately.')) return;
+    if (!confirm("Revoke this link? Anyone with the URL loses access right away.")) return;
     const res = await fetch(`/api/properties/${propertyId}/packets/${p.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ revoked: true }),
     });
-    if (!res.ok) { toast.error('Could not revoke'); return; }
+    if (!res.ok) { toast.error("Couldn't revoke that link."); return; }
     setPackets((prev) => prev.map((x) => x.id === p.id ? { ...x, revokedAt: new Date().toISOString() } : x));
   }
 
@@ -107,7 +107,7 @@ export function PropertyShareDialog({ propertyId, linkedDealIds, origin, onClose
       setCopiedId(p.id);
       setTimeout(() => setCopiedId((v) => (v === p.id ? null : v)), 1500);
     } catch {
-      toast.error('Copy failed — select and copy manually from the field.');
+      toast.error("Couldn't copy. Grab it from the field manually.");
     }
   }
 
@@ -183,7 +183,7 @@ export function PropertyShareDialog({ propertyId, linkedDealIds, origin, onClose
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {packets.length === 0 ? 'No links yet' : 'Existing links'}
             </h3>
-            {loading && <p className="text-xs text-muted-foreground">Loading…</p>}
+            {loading && <p className="text-xs text-muted-foreground">One moment.</p>}
             <ul className="space-y-2">
               {packets.map((p) => {
                 const url = `${origin}/packet/${p.token}`;

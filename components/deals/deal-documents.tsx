@@ -59,12 +59,12 @@ export function DealDocuments({ dealId, initial = [] }: DealDocumentsProps) {
       const res = await fetch(`/api/deals/${dealId}/documents`, { method: 'POST', body: fd });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error(data.error || 'Upload failed');
+        toast.error(data.error || "Upload didn't go through. Try again.");
         return;
       }
       const created: DealDocument = await res.json();
       setDocs((prev) => [created, ...prev]);
-      toast.success(`${file.name} uploaded`);
+      toast.success(`${file.name} uploaded.`);
     } finally {
       setUploading(false);
     }
@@ -73,7 +73,7 @@ export function DealDocuments({ dealId, initial = [] }: DealDocumentsProps) {
   async function handleDownload(doc: DealDocument) {
     const res = await fetch(`/api/deals/${dealId}/documents/${doc.id}`);
     if (!res.ok) {
-      toast.error('Could not open download link');
+      toast.error("Couldn't open that download link.");
       return;
     }
     const { url } = await res.json();
@@ -86,7 +86,7 @@ export function DealDocuments({ dealId, initial = [] }: DealDocumentsProps) {
     const res = await fetch(`/api/deals/${dealId}/documents/${doc.id}`, { method: 'DELETE' });
     if (!res.ok) {
       setDocs(prev);
-      toast.error('Could not delete');
+      toast.error("Couldn't delete that.");
     }
   }
 
@@ -164,10 +164,10 @@ export function DealDocuments({ dealId, initial = [] }: DealDocumentsProps) {
 
       {/* Document list */}
       {loading && docs.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-4">Loading…</p>
+        <p className="text-sm text-muted-foreground py-4">One moment.</p>
       ) : docs.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-6">
-          No documents yet. Upload the offer to get started.
+          Nothing here yet. Drop the offer in to start.
         </p>
       ) : (
         <ul className="divide-y divide-border border border-border rounded-lg overflow-hidden bg-card">

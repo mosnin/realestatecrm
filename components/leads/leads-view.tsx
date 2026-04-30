@@ -363,18 +363,18 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
         body: JSON.stringify(patch),
       });
       if (!res.ok) {
-        toast.error('Failed to update lead');
+        toast.error("Couldn't update that lead. Try again.");
         return;
       }
       const updated = await res.json();
       setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...updated } : l)));
       if ('followUpAt' in patch) {
-        toast.success(patch.followUpAt ? 'Follow-up date set' : 'Follow-up date cleared');
+        toast.success(patch.followUpAt ? 'Follow-up set.' : 'Follow-up cleared.');
       } else if ('lastContactedAt' in patch) {
-        toast.success(patch.lastContactedAt ? 'Marked as contacted' : 'Contacted status removed');
+        toast.success(patch.lastContactedAt ? 'Marked as contacted.' : 'Contacted status removed.');
       }
     } catch {
-      toast.error('Failed to update lead');
+      toast.error("Couldn't update that lead. Try again.");
     }
   }, []);
 
@@ -399,7 +399,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
     const ids = [...selectedIds];
     const confirmed = await confirm({
       title: `Delete ${ids.length} lead${ids.length !== 1 ? 's' : ''}?`,
-      description: 'This will permanently remove the selected leads. This cannot be undone.',
+      description: "These will be gone. I can't bring them back.",
     });
     if (!confirmed) return;
     try {
@@ -409,13 +409,13 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
       );
       const failed = ids.length - successIds.length;
       if (failed > 0) {
-        toast.error(`Failed to delete ${failed} of ${ids.length} leads`);
+        toast.error(`Couldn't delete ${failed} of ${ids.length} leads. Try those again.`);
       } else {
-        toast.success(`Deleted ${ids.length} lead${ids.length !== 1 ? 's' : ''}`);
+        toast.success(`Deleted ${ids.length} lead${ids.length !== 1 ? 's' : ''}.`);
       }
       setLeads((prev) => prev.filter((l) => !successIds.includes(l.id)));
     } catch {
-      toast.error('Failed to delete leads');
+      toast.error("Couldn't delete those leads. Try again.");
     }
     setSelectedIds(new Set());
   }
@@ -430,7 +430,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
   }
 
   function exportLeadsCSV(items: Contact[]) {
-    toast.success('Leads exported');
+    toast.success('Exported.');
     // Use dynamic-aware CSV export that handles formConfigSnapshot
     downloadLeadsCSV('leads.csv', items);
   }
@@ -649,16 +649,16 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
             <Search size={20} className="text-muted-foreground" />
           </div>
           <p className="font-semibold text-foreground mb-1">
-            {search ? 'No matching leads' : tierFilter === 'needs-followup' ? 'No overdue follow-ups' : tierFilter !== 'all' ? `No ${tierFilter} leads` : 'No leads'}
+            {search ? 'Nothing matches.' : tierFilter === 'needs-followup' ? "You're caught up." : tierFilter !== 'all' ? `Nothing in ${tierFilter}.` : 'No leads yet.'}
           </p>
           <p className="text-sm text-muted-foreground">
             {search
-              ? `No leads match "${search}". Try a different search term.`
+              ? `Nothing matches "${search}". Try a different word.`
               : tierFilter === 'needs-followup'
-              ? 'All follow-ups are up to date.'
+              ? "Every follow-up is in good shape."
               : tierFilter !== 'all'
               ? 'Try a different filter.'
-              : 'Share your intake link to receive applications.'}
+              : "Share your intake link and they'll show up here."}
           </p>
           {(search || tierFilter !== 'all' || leadTypeFilter !== 'all') && (
             <button

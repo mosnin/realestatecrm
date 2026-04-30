@@ -165,7 +165,7 @@ function CreateFirstBoardCard({
         No pipeline yet.
       </h2>
       <p className={cn(BODY_MUTED, 'max-w-sm mb-6')}>
-        A pipeline is a board of stages. Make one and start tracking deals.
+        A board of stages — make one and I'll start tracking your deals.
       </p>
       <button
         type="button"
@@ -174,7 +174,7 @@ function CreateFirstBoardCard({
         className={cn(PRIMARY_PILL, 'disabled:opacity-50')}
       >
         <Plus size={14} strokeWidth={2.25} />
-        {pending ? 'Creating…' : 'Create your first board'}
+        {pending ? 'One moment.' : 'Create your first board'}
       </button>
     </div>
   );

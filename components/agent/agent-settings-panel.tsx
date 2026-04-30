@@ -189,11 +189,11 @@ export function AgentSettingsPanel({ slug }: Props) {
         setTimeout(() => setSavedField(null), 2000);
       } else {
         setSettings(previous);
-        toast.error('Failed to save setting — please try again');
+        toast.error("Couldn't save that. Try again.");
       }
     } catch {
       setSettings(previous);
-      toast.error('Could not reach server');
+      toast.error("I lost the connection. Try again.");
     } finally {
       setSaving(false);
     }
@@ -229,15 +229,15 @@ export function AgentSettingsPanel({ slug }: Props) {
       if (res.ok) {
         const data = await res.json() as { triggered: boolean; method?: string; note?: string };
         if (data.triggered) {
-          setRunResult(data.method === 'modal' ? 'Run started!' : (data.note ?? 'Queued for next heartbeat'));
+          setRunResult(data.method === 'modal' ? 'On it.' : (data.note ?? 'Queued for the next sweep.'));
           // Refresh status after a moment
           setTimeout(() => void load(), 3000);
         } else {
-          setRunResult('Could not trigger run — check Modal deployment');
+          setRunResult("Couldn't kick myself off — check the Modal deployment.");
         }
       }
     } catch {
-      setRunResult('Network error');
+      setRunResult("I lost the connection.");
     } finally {
       setTriggeringRun(false);
       setTimeout(() => setRunResult(null), 5000);
@@ -581,9 +581,9 @@ export function AgentSettingsPanel({ slug }: Props) {
       <AlertDialog open={showDisableConfirm} onOpenChange={setShowDisableConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Disable agent?</AlertDialogTitle>
+            <AlertDialogTitle>Pause me?</AlertDialogTitle>
             <AlertDialogDescription>
-              Chippi will stop all autonomous actions. You can re-enable at any time.
+              I'll stop everything I'm doing on my own. Turn me back on whenever you want.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

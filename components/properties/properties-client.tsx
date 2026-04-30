@@ -140,13 +140,13 @@ export function PropertiesClient({ slug, initial, stats }: Props) {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error(data.error || 'Could not create property');
+        toast.error(data.error || "Couldn't create that property.");
         return;
       }
       const created: Property = await res.json();
       setItems((prev) => [created, ...prev]);
       setCreating(false);
-      toast.success('Property added');
+      toast.success('Property added.');
     } finally {
       setSubmitting(false);
     }
@@ -452,7 +452,7 @@ function EmptyState({
           Nothing listed yet.
         </h2>
         <p className={cn(BODY_MUTED, 'max-w-sm mb-6')}>
-          Add your first property to start tracking commissions.
+          Add your first property and I'll keep track of the commissions.
         </p>
         <button
           type="button"
@@ -471,10 +471,10 @@ function EmptyState({
         <Search size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
       </div>
       <p className={cn(H2, 'mb-1')} style={TITLE_FONT}>
-        No matches.
+        Nothing matches.
       </p>
       <p className={BODY_MUTED}>
-        Try a shorter query or clear the filter.
+        Shorten the query or drop the filter.
       </p>
     </div>
   );

@@ -138,10 +138,10 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ followUpAt: null, lastContactedAt: new Date().toISOString() }),
       });
-      if (!res.ok) { toast.error('Failed to update'); return; }
+      if (!res.ok) { toast.error("Couldn't update that. Try again."); return; }
       setContacts(prev => prev.filter(c => c.id !== id));
-      toast.success('Follow-up completed');
-    } catch { toast.error('Failed to update'); }
+      toast.success('Follow-up done.');
+    } catch { toast.error("Couldn't update that. Try again."); }
     finally { clearBusy(id); }
   }, []);
 
@@ -156,14 +156,14 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ followUpAt: newDate }),
       });
-      if (!res.ok) { toast.error('Failed to snooze'); return; }
+      if (!res.ok) { toast.error("Couldn't snooze that. Try again."); return; }
       if (isDeal) {
         setDeals(prev => prev.map(d => d.id === id ? { ...d, followUpAt: newDate } : d));
       } else {
         setContacts(prev => prev.map(c => c.id === id ? { ...c, followUpAt: newDate } : c));
       }
-      toast.success('Follow-up snoozed');
-    } catch { toast.error('Failed to snooze'); }
+      toast.success('Snoozed.');
+    } catch { toast.error("Couldn't snooze that. Try again."); }
     finally { clearBusy(id); }
   }, []);
 
@@ -175,10 +175,10 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ followUpAt: null }),
       });
-      if (!res.ok) { toast.error('Failed to update'); return; }
+      if (!res.ok) { toast.error("Couldn't update that. Try again."); return; }
       setDeals(prev => prev.filter(d => d.id !== id));
-      toast.success('Deal follow-up completed');
-    } catch { toast.error('Failed to update'); }
+      toast.success('Follow-up done.');
+    } catch { toast.error("Couldn't update that. Try again."); }
     finally { clearBusy(id); }
   }, []);
 
@@ -192,9 +192,9 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
           <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center mx-auto">
             <CheckCircle2 size={24} className="text-emerald-600 dark:text-emerald-400" />
           </div>
-          <h2 className="text-lg font-semibold">All caught up!</h2>
+          <h2 className="text-lg font-semibold">You're caught up.</h2>
           <p className="text-sm text-muted-foreground">
-            No follow-ups scheduled. Set follow-ups from your contacts or deals to see them here.
+            Nothing to chase. Set a follow-up from a contact or deal and it'll land here.
           </p>
         </div>
       </div>

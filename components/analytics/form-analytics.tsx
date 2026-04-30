@@ -232,7 +232,7 @@ export function FormAnalytics({
       const json = await res.json();
       setData(json);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to load form analytics';
+      const msg = err instanceof Error ? err.message : "Couldn't load the analytics. Try again.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -295,10 +295,10 @@ export function FormAnalytics({
         </div>
         <div className="rounded-xl border border-border/70 bg-background px-6 py-16 text-center">
           <p className={H1} style={TITLE_FONT}>
-            No activity yet
+            Nothing to chart yet.
           </p>
           <p className={`${BODY_MUTED} mt-2 max-w-sm mx-auto`}>
-            Analytics will appear here once applicants start interacting with your intake form.
+            Once applicants start hitting your form, the charts show up here.
           </p>
         </div>
       </div>

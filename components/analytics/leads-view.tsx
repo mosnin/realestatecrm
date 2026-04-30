@@ -375,7 +375,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
       {data.leadStateDistribution.length === 0 && data.employmentBreakdown.length === 0 && (
         <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center">
           <p className={BODY_MUTED}>
-            Qualification data will appear here once leads submit applications with full details.
+            Once leads submit full applications, the qualification breakdown shows up here.
           </p>
         </div>
       )}

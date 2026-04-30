@@ -158,7 +158,7 @@ export function SidebarConversations({
           </div>
         ) : conversations.length === 0 ? (
           <p className={cn(CAPTION, 'px-2.5 py-2 leading-snug')}>
-            No conversations yet. Start one above.
+            Nothing here yet. Start one above.
           </p>
         ) : (
           <motion.ul

@@ -133,7 +133,7 @@ export function EditableField({
       return;
     }
     if (field === 'name' && !trimmed) {
-      toast.error('Name is required');
+      toast.error('Give them a name first.');
       setDraft(value);
       setEditing(false);
       return;
@@ -153,9 +153,9 @@ export function EditableField({
       });
       if (!res.ok) throw new Error(await res.text());
       setValue(trimmed);
-      toast.success('Saved');
+      toast.success('Saved.');
     } catch {
-      toast.error('Could not save. Try again.');
+      toast.error("Couldn't save that. Try again.");
       setDraft(value);
     } finally {
       setSaving(false);

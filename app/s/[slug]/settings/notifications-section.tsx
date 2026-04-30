@@ -108,7 +108,7 @@ export function NotificationsSection({ slug }: NotificationsSectionProps) {
       toast.success('Notification settings saved.');
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Something went wrong.');
+      toast.error(err instanceof Error ? err.message : "That tripped me up. Try again.");
     } finally {
       setSaving(false);
     }
