@@ -1,6 +1,6 @@
 import { BrandLogo } from '@/components/brand-logo';
-import { CheckIcon } from 'lucide-react';
 import { safeHref } from '@/lib/utils';
+import { BODY_MUTED, TITLE_FONT } from '@/lib/typography';
 
 interface ShellCustomization {
   accentColor?: string;
@@ -34,7 +34,7 @@ const FONT_CLASS_MAP: Record<string, string> = {
 };
 
 function SocialIcon({ platform }: { platform: string }) {
-  const size = 14;
+  const size = 13;
   switch (platform.toLowerCase()) {
     case 'linkedin':
       return (
@@ -78,125 +78,113 @@ export function PublicPageShell({
 
   return (
     <div
-      className={`min-h-screen bg-gray-50 dark:bg-gray-900 ${fontClass} ${darkClass}`.trim()}
+      className={`min-h-screen bg-background text-foreground ${fontClass} ${darkClass}`.trim()}
       style={{ '--intake-accent': accentColor } as React.CSSProperties}
     >
-      {/* ── Floating pill header ─────────────────────────────────────────── */}
-      <div className="sticky top-0 z-50 px-3 pt-3 sm:px-4 sm:pt-4">
-        <header className="max-w-2xl mx-auto rounded-full bg-card/95 backdrop-blur-md border border-border shadow-sm px-3 py-1.5 sm:px-4 sm:py-2">
-          <div className="flex items-center justify-between gap-2">
-            {/* Left: agent identity */}
-            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-              {agentPhoto && (
-                <div className="relative flex-shrink-0">
-                  <img
-                    src={agentPhoto}
-                    alt={agentName}
-                    width={32}
-                    height={32}
-                    loading="eager"
-                    decoding="async"
-                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover ring-2 ring-blue-500 ring-offset-1 ring-offset-card"
-                  />
-                  <span className="absolute -right-0.5 -bottom-0.5 inline-flex size-3 items-center justify-center rounded-full bg-blue-500 ring-1 ring-card">
-                    <CheckIcon className="size-1.5 text-white" />
-                  </span>
-                </div>
-              )}
-              <div className="min-w-0">
-                {logoUrl ? (
-                  <img src={logoUrl} alt={businessName} width={100} height={24} loading="eager" decoding="async" className="h-5 sm:h-6 object-contain" />
-                ) : (
-                  <span className="text-sm font-semibold text-foreground truncate block">{businessName}</span>
-                )}
-              </div>
-            </div>
-
-            {/* Center: social icons (desktop only) */}
-            {hasSocial && (
-              <div className="hidden sm:flex items-center gap-1">
-                {Object.entries(customization!.socialLinks!).map(([platform, url]) =>
-                  url ? (
-                    <a
-                      key={platform}
-                      href={safeHref(url as string)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground/50 hover:text-foreground transition-colors"
-                      title={platform}
-                    >
-                      <SocialIcon platform={platform} />
-                    </a>
-                  ) : null
-                )}
-              </div>
+      {/* ── Sticky hairline header ───────────────────────────────────────── */}
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border/70">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+          {/* Left: agent identity */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            {agentPhoto && (
+              <img
+                src={agentPhoto}
+                alt={agentName}
+                width={32}
+                height={32}
+                loading="eager"
+                decoding="async"
+                className="w-8 h-8 rounded-full object-cover ring-1 ring-border/70 flex-shrink-0"
+              />
             )}
-
-            {/* Right: Powered by Chippi */}
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <span className="text-[9px] sm:text-[10px] text-muted-foreground/40 hidden sm:inline">Powered by</span>
-              <BrandLogo className="h-3 sm:h-3.5 opacity-40" />
+            <div className="min-w-0">
+              {logoUrl ? (
+                <img src={logoUrl} alt={businessName} width={100} height={24} loading="eager" decoding="async" className="h-5 sm:h-6 object-contain" />
+              ) : (
+                <span className="text-sm font-semibold text-foreground truncate block">{businessName}</span>
+              )}
             </div>
           </div>
-        </header>
-      </div>
+
+          {/* Right: social icons (if any) */}
+          {hasSocial && (
+            <div className="flex items-center gap-2">
+              {Object.entries(customization!.socialLinks!).map(([platform, url]) =>
+                url ? (
+                  <a
+                    key={platform}
+                    href={safeHref(url as string)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground/40 hover:text-foreground transition-colors"
+                    title={platform}
+                  >
+                    <SocialIcon platform={platform} />
+                  </a>
+                ) : null
+              )}
+            </div>
+          )}
+        </div>
+      </header>
 
       {/* ── Page content ─────────────────────────────────────────────────── */}
-      <main className="max-w-2xl mx-auto px-3 sm:px-4 pt-5 sm:pt-8 pb-28">
+      <main className="max-w-2xl mx-auto px-4 pt-8 sm:pt-10">
         {/* Title + intro */}
-        <div className="mb-5 sm:mb-6">
-          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
+        <div className="mb-8">
+          <h1 className="text-3xl sm:text-4xl tracking-tight text-foreground" style={TITLE_FONT}>
             {pageTitle}
           </h1>
           {pageIntro && (
-            <p className="text-sm text-muted-foreground mt-0.5 max-w-md">{pageIntro}</p>
+            <p className="text-base text-muted-foreground mt-2 max-w-xl">{pageIntro}</p>
           )}
           {customization?.bio && (
-            <p className="text-xs text-muted-foreground/70 mt-1.5 max-w-md italic">{customization.bio}</p>
+            <p className="text-sm text-muted-foreground/80 mt-2 max-w-xl italic">{customization.bio}</p>
           )}
+          {/* Trust line — sits with the intro, not buried in chrome */}
+          <p className={`${BODY_MUTED} mt-3 max-w-xl`}>{trustLine}</p>
         </div>
 
         {/* Main form content */}
         {children}
-      </main>
 
-      {/* ── Floating pill footer ─────────────────────────────────────────── */}
-      <div className="fixed bottom-0 inset-x-0 z-50 px-3 pb-3 sm:px-4 sm:pb-4 pointer-events-none">
-        <footer className="max-w-2xl mx-auto rounded-2xl sm:rounded-full bg-card/95 backdrop-blur-md border border-border shadow-sm px-4 py-2 pointer-events-auto">
-          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[10px] sm:text-[11px] text-muted-foreground/60">
-            {/* Left: legal links */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              <a href="/legal/terms" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Terms</a>
-              <a href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Privacy</a>
-              {agentPhone && (
-                <a href={`tel:${agentPhone}`} className="hover:text-foreground hidden sm:inline">{agentPhone}</a>
-              )}
-            </div>
+        {/* ── In-flow footer ─────────────────────────────────────────────── */}
+        <footer className="border-t border-border/60 mt-12 pt-6 pb-8 flex flex-wrap items-center justify-between gap-4 text-xs text-muted-foreground/70">
+          {/* Left: legal links */}
+          <div className="flex items-center gap-3">
+            <a href="/legal/terms" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Terms</a>
+            <a href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Privacy</a>
+            {agentPhone && (
+              <a href={`tel:${agentPhone}`} className="hover:text-foreground transition-colors">{agentPhone}</a>
+            )}
+          </div>
 
-            {/* Center: trust line — visible on all screens, wraps below on mobile */}
-            <span className="w-full sm:w-auto text-center order-last sm:order-none">{trustLine}</span>
+          {/* Center: realtor footer links or business name */}
+          <div className="flex items-center gap-3">
+            {customization?.footerLinks && customization.footerLinks.length > 0 ? (
+              customization.footerLinks.slice(0, 2).map((link) => (
+                <a
+                  key={link.url}
+                  href={safeHref(link.url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-foreground transition-colors truncate max-w-[120px]"
+                >
+                  {link.label}
+                </a>
+              ))
+            ) : (
+              <span className="truncate">{businessName}</span>
+            )}
+          </div>
 
-            {/* Right: custom footer links or business name */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              {customization?.footerLinks && customization.footerLinks.length > 0 ? (
-                customization.footerLinks.slice(0, 2).map((link) => (
-                  <a
-                    key={link.url}
-                    href={safeHref(link.url)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-foreground transition-colors truncate max-w-[80px]"
-                  >
-                    {link.label}
-                  </a>
-                ))
-              ) : (
-                <span className="truncate">{businessName}</span>
-              )}
-            </div>
+          {/* Right: Powered by Chippi */}
+          <div className="flex items-center gap-1 opacity-30">
+            <span className="text-[10px] hidden sm:inline">Powered by</span>
+            <BrandLogo className="h-3" />
           </div>
         </footer>
-      </div>
+      </main>
     </div>
   );
 }
@@ -214,24 +202,22 @@ export function PublicPageMinimalShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
-      <div className="px-3 pt-3 sm:px-4 sm:pt-4">
-        <header className="max-w-lg mx-auto rounded-full bg-card/95 backdrop-blur-md border border-border shadow-sm px-4 py-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 min-w-0">
-              {logoUrl ? (
-                <img src={logoUrl} alt={businessName} className="h-5 object-contain" />
-              ) : (
-                <span className="text-sm font-semibold text-foreground truncate">{businessName}</span>
-              )}
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0 opacity-40">
-              <span className="text-[10px] text-muted-foreground hidden sm:inline">Powered by</span>
-              <BrandLogo className="h-3.5" />
-            </div>
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border/70">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {logoUrl ? (
+              <img src={logoUrl} alt={businessName} className="h-5 object-contain" />
+            ) : (
+              <span className="text-sm font-semibold text-foreground truncate">{businessName}</span>
+            )}
           </div>
-        </header>
-      </div>
+          <div className="flex items-center gap-1 flex-shrink-0 opacity-30">
+            <span className="text-[10px] text-muted-foreground hidden sm:inline">Powered by</span>
+            <BrandLogo className="h-3.5" />
+          </div>
+        </div>
+      </header>
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
         {children}
       </div>
