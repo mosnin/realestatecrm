@@ -48,7 +48,7 @@ export function LiveNotifications({ spaceId, slug }: Props) {
         icon: <CalendarDays size={16} />,
         action: {
           label: 'View',
-          onClick: () => router.push(`/s/${slug}/tours`),
+          onClick: () => router.push(`/s/${slug}/calendar`),
         },
         duration: 8000,
       });

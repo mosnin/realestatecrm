@@ -218,8 +218,8 @@ export function VoiceMode({ open, onClose, slug, onTranscript }: VoiceModeProps)
             animate={{ opacity: 1, y: 0 }}
             className="text-sm text-muted-foreground mb-8"
           >
-            {state === 'connecting' ? 'Connecting to Chippi...' :
-             state === 'speaking' ? 'Chippi is speaking' :
+            {state === 'connecting' ? 'Connecting…' :
+             state === 'speaking' ? 'Speaking' :
              error ? '' :
              'Listening — just speak naturally'}
           </motion.p>
@@ -309,7 +309,7 @@ export function VoiceMode({ open, onClose, slug, onTranscript }: VoiceModeProps)
                 animate={{ opacity: 1, y: 0 }}
                 className="text-sm text-primary"
               >
-                <span className="text-muted-foreground">Chippi: </span>{assistantText}
+                {assistantText}
               </motion.p>
             )}
           </div>

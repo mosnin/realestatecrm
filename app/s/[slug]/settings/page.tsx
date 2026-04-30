@@ -2,12 +2,15 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
-import { GeneralSettingsForm } from './general-settings-form';
+import { GeneralSettingsForm, DangerZone } from './general-settings-form';
+import { NotificationsSection } from './notifications-section';
+import { LegalSettingsForm } from './legal/legal-settings-form';
 import type { SpaceSetting } from '@/lib/types';
 import {
   H2,
   BODY,
   BODY_MUTED,
+  SECTION_LABEL,
   PRIMARY_PILL,
   SECTION_RHYTHM,
   READING_MAX,
@@ -58,8 +61,6 @@ export default async function GeneralSettingsPage({
 
   return (
     <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
-      <h2 className={H2}>General</h2>
-
       {(isTrialing || isActive) && periodEnd && (
         <div className={`rounded-md border border-border/70 bg-foreground/[0.02] px-4 py-3 ${BODY}`}>
           {isTrialing ? (
@@ -96,7 +97,39 @@ export default async function GeneralSettingsPage({
         </div>
       )}
 
-      <GeneralSettingsForm space={space} settings={settings} />
+      {/* WORKSPACE + CONTACT (shared form, single Save) */}
+      <section className="space-y-5">
+        <p className={SECTION_LABEL}>Workspace</p>
+        <GeneralSettingsForm space={space} settings={settings} />
+      </section>
+
+      {/* NOTIFICATIONS */}
+      <section
+        id="notifications"
+        className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+      >
+        <p className={SECTION_LABEL}>Notifications</p>
+        <NotificationsSection slug={space.slug} />
+      </section>
+
+      {/* LEGAL */}
+      <section
+        id="legal"
+        className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+      >
+        <p className={SECTION_LABEL}>Legal</p>
+        <LegalSettingsForm
+          slug={space.slug}
+          privacyPolicyUrl={settings?.privacyPolicyUrl ?? ''}
+          consentCheckboxLabel={settings?.consentCheckboxLabel ?? ''}
+        />
+      </section>
+
+      {/* DANGER ZONE */}
+      <section className="space-y-5 pt-10 border-t border-border/60">
+        <p className={SECTION_LABEL}>Danger zone</p>
+        <DangerZone space={space} />
+      </section>
     </div>
   );
 }

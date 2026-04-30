@@ -81,7 +81,7 @@ export function OnboardingChecklist({ slug, hasLeads, hasContacts, hasTours, has
       id: 'first-tour',
       label: 'Schedule a tour',
       description: 'Book a property showing with a prospect',
-      href: `${base}/tours`,
+      href: `${base}/calendar`,
       icon: CalendarDays,
       completed: hasTours,
     },

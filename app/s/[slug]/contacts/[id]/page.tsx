@@ -150,7 +150,7 @@ export default async function ClientDetailPage({
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <Link href={`/s/${slug}/tours?schedule=${contact.id}`} className="inline-flex items-center justify-center gap-1 text-xs rounded-md border border-border py-2 hover:bg-muted transition-colors"><CalendarPlus size={12} /> Task</Link>
+              <Link href={`/s/${slug}/calendar`} className="inline-flex items-center justify-center gap-1 text-xs rounded-md border border-border py-2 hover:bg-muted transition-colors"><CalendarPlus size={12} /> Task</Link>
               <Link href={`/s/${slug}/deals`} className="inline-flex items-center justify-center gap-1 text-xs rounded-md border border-border py-2 hover:bg-muted transition-colors"><Briefcase size={12} /> Deal</Link>
             </div>
 
@@ -691,7 +691,7 @@ export default async function ClientDetailPage({
               return (
                 <Link
                   key={tour.id}
-                  href={`/s/${slug}/tours`}
+                  href={`/s/${slug}/calendar`}
                   className="flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">

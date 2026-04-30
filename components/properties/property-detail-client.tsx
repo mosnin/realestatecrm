@@ -191,7 +191,7 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
             const d = new Date(t.startsAt);
             return {
               key: t.id,
-              href: `/s/${slug}/tours`,
+              href: `/s/${slug}/calendar`,
               primary: t.guestName,
               secondary: `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`,
             };

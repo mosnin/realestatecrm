@@ -8,10 +8,7 @@ type Tab = { href: string; label: string; matchPath: string };
 const BASE_TABS: Tab[] = [
   { href: '/settings', label: 'General', matchPath: '/settings' },
   { href: '/settings/profile', label: 'Profile', matchPath: '/settings/profile' },
-  { href: '/settings/notifications', label: 'Notifications', matchPath: '/settings/notifications' },
   { href: '/settings/integrations', label: 'Integrations', matchPath: '/settings/integrations' },
-  { href: '/settings/templates', label: 'Templates', matchPath: '/settings/templates' },
-  { href: '/settings/legal', label: 'Legal', matchPath: '/settings/legal' },
 ];
 
 const BROKERAGE_TAB: Tab = {

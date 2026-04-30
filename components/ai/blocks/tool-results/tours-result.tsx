@@ -53,7 +53,7 @@ export function ToursResult({ data }: { data: ToursResultData }) {
   return (
     <ul className="mt-2 divide-y divide-border/60 rounded-lg border border-border/60 bg-background overflow-hidden">
       {tours.map((t) => {
-        const href = slug ? `/s/${slug}/tours` : '#';
+        const href = slug ? `/s/${slug}/calendar` : '#';
         const statusClass = t.status ? STATUS_TONE[t.status] : undefined;
 
         return (

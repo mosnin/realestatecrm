@@ -105,7 +105,7 @@ export function WhatsComing({ slug }: { slug: string }) {
           {data.toursUpcoming.map((tour) => (
             <Link
               key={tour.id}
-              href={`/s/${slug}/tours`}
+              href={`/s/${slug}/calendar`}
               className="group/row flex items-center gap-3 py-3 first:pt-4 -mx-3 px-3 rounded-lg hover:bg-muted/20 transition-colors"
             >
               <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center flex-shrink-0">

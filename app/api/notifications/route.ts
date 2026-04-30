@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
         type: 'upcoming_tour',
         title: `Tour with ${t.guestName}`,
         description: `${new Date(t.startsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}${t.propertyAddress ? ` — ${t.propertyAddress}` : ''}`,
-        href: `/s/${slug}/tours`,
+        href: `/s/${slug}/calendar`,
         createdAt: t.startsAt,
         priority: 'high',
       });
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
         type: 'waitlist',
         title: `${waitlistCount} on waitlist`,
         description: 'People waiting for tour slots',
-        href: `/s/${slug}/tours`,
+        href: `/s/${slug}/calendar`,
         createdAt: now.toISOString(),
         priority: 'low',
       });
@@ -131,7 +131,7 @@ export async function GET(req: NextRequest) {
           type: 'tour_needs_action',
           title: `${needsAction.length} tour${needsAction.length > 1 ? 's' : ''} need follow-up`,
           description: 'Completed tours without a deal — consider converting',
-          href: `/s/${slug}/tours`,
+          href: `/s/${slug}/calendar`,
           createdAt: now.toISOString(),
           priority: 'medium',
         });
