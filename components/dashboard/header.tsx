@@ -3,7 +3,7 @@
 import { UserButton } from '@clerk/nextjs';
 import { Sun, Moon } from 'lucide-react';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -15,9 +15,12 @@ import {
   SheetTrigger
 } from '@/components/ui/sheet';
 import { useTheme } from '@/components/theme-provider';
+import { AnimatePresence, motion } from 'framer-motion';
 import { BrandLogo } from '@/components/brand-logo';
 import { secondaryNavItems } from '@/lib/nav-items';
 import { SECTION_LABEL } from '@/lib/typography';
+import { PAGE_VARIANTS } from '@/lib/motion';
+import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
 import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, FileText, ListChecks, CreditCard, Shield, Settings, Check, Sparkles, CalendarDays, Calendar, BarChart2, ClipboardList, Home } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
@@ -81,11 +84,18 @@ interface HeaderProps {
 export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const [mobileSwitcherOpen, setMobileSwitcherOpen] = useState(false);
+  const [mobileShowPages, setMobileShowPages] = useState(false);
   const pathname = usePathname();
   const base = `/s/${slug}`;
   const { theme, toggleTheme } = useTheme();
   const isOnBrokerPage = pathname.startsWith('/broker');
   const showBrokerMobileNavOnly = isBroker && isOnBrokerPage;
+  const isOnChippi = pathname.startsWith(`${base}/chippi`);
+  // Reset the "show pages" override whenever the route changes so the sheet
+  // always opens to the right default for the current page.
+  useEffect(() => {
+    setMobileShowPages(false);
+  }, [pathname]);
 
   return (
     <header className="h-14 border-b border-border/70 flex items-center justify-between px-4 md:px-6 bg-background sticky top-0 z-40">

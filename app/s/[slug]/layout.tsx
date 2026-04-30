@@ -245,11 +245,15 @@ export default async function DashboardLayout({
         <AgentStatusBar slug={slug} />
         {/* pb on main reserves space for the persistent ChippiBar.
             Mobile bar sits above MobileNav so we add MobileNav's height. */}
-        <main className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-7 pb-40 md:pb-24 bg-background text-foreground">
-          <div className="w-full max-w-[1500px] mx-auto">
-          <LiveNotifications spaceId={space.id} slug={slug} />
-          <PageTransition>{children}</PageTransition>
-          <DashboardFooter />
+        <main className="flex-1 overflow-y-auto flex flex-col bg-background text-foreground">
+          {/* Page content grows; footer always pins to the visible bottom of
+              <main> regardless of how short the page is. */}
+          <div className="w-full max-w-[1500px] mx-auto flex-1 px-4 py-5 md:px-8 md:py-7 pb-40 md:pb-24">
+            <LiveNotifications spaceId={space.id} slug={slug} />
+            <PageTransition>{children}</PageTransition>
+          </div>
+          <div className="w-full max-w-[1500px] mx-auto px-4 md:px-8 pb-4">
+            <DashboardFooter />
           </div>
         </main>
       </div>

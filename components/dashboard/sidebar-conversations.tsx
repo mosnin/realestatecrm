@@ -30,6 +30,9 @@ interface SidebarConversationsProps {
   slug: string;
   /** Hide entirely when the rail is collapsed. */
   collapsed?: boolean;
+  /** Fired when a conversation row or "New" is activated — useful for closing
+   *  a parent mobile sheet on navigation. */
+  onSelect?: () => void;
 }
 
 function timeAgo(date: Date | string): string {
@@ -48,7 +51,11 @@ function truncateTitle(title: string, max = 24): string {
   return title.slice(0, max - 1).trimEnd() + '…';
 }
 
-export function SidebarConversations({ slug, collapsed = false }: SidebarConversationsProps) {
+export function SidebarConversations({
+  slug,
+  collapsed = false,
+  onSelect,
+}: SidebarConversationsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -88,7 +95,8 @@ export function SidebarConversations({ slug, collapsed = false }: SidebarConvers
     const conv = (await res.json()) as Conversation;
     setConversations((prev) => (prev ? [conv, ...prev] : [conv]));
     router.push(`/s/${slug}/chippi?conversationId=${conv.id}`);
-  }, [router, slug]);
+    onSelect?.();
+  }, [router, slug, onSelect]);
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -202,6 +210,7 @@ export function SidebarConversations({ slug, collapsed = false }: SidebarConvers
                     >
                       <Link
                         href={`/s/${slug}/chippi?conversationId=${conv.id}`}
+                        onClick={() => onSelect?.()}
                         className="flex-1 min-w-0 pl-2.5 pr-1 py-1.5"
                       >
                         <p

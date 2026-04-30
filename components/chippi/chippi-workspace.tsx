@@ -138,6 +138,33 @@ export function ChippiWorkspace({
     }
   }, [initialMessages, setMessages]);
 
+  // React to URL-driven conversation switches (sidebar list links with
+  // `?conversationId=…`). When the URL diverges from local state, sync local
+  // state and load the matching transcript. Skipped on the initial mount —
+  // the server already pre-hydrated us with the right conversation.
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (urlConversationId === activeConversationId) return;
+    if (!urlConversationId) {
+      setActiveConversationId(null);
+      setMessages([]);
+      return;
+    }
+    setActiveConversationId(urlConversationId);
+    void (async () => {
+      setLoadingMessages(true);
+      try {
+        const res = await fetch(`/api/ai/messages?conversationId=${urlConversationId}`);
+        if (res.ok) {
+          const data = (await res.json()) as LegacyMessage[];
+          setMessages(legacyToUi(data));
+        }
+      } finally {
+        setLoadingMessages(false);
+      }
+    })();
+  }, [urlConversationId, activeConversationId, setMessages]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, pendingApproval, isStreaming]);
@@ -445,7 +472,7 @@ export function ChippiWorkspace({
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
+          className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
           title="Conversation history"
           aria-label="Open conversation history"
         >
@@ -524,15 +551,15 @@ export function ChippiWorkspace({
           <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-6 space-y-12">
               {/* Greeting + status */}
-              <header className="space-y-2 text-center">
+              <header className="space-y-1.5 text-center">
                 <h1
-                  className="text-4xl sm:text-5xl tracking-tight text-foreground"
+                  className="text-[2.25rem] sm:text-[2.5rem] tracking-tight text-foreground leading-tight"
                   style={{ fontFamily: 'var(--font-title)' }}
                 >
                   {greeting}
                   {firstName ? `, ${firstName}` : ''}.
                 </h1>
-                <p className="text-base text-muted-foreground">{statusSentence()}</p>
+                <p className="text-sm text-muted-foreground">{statusSentence()}</p>
               </header>
 
               {/* Morning replay — the wow moment. Auto-renders the first
