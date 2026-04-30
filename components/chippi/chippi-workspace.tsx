@@ -546,8 +546,10 @@ export function ChippiWorkspace({
             </div>
           </div>
 
-          {/* Docked composer + quick prompts */}
-          <div className="flex-shrink-0 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-2 pb-4 space-y-2.5">
+          {/* Docked composer + quick prompts — sticky to viewport bottom so
+              the input stays reachable as the realtor scrolls or as content
+              shifts above it. The bg-gradient fades content under the dock. */}
+          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-4 space-y-2.5 bg-gradient-to-t from-background via-background to-background/0">
             {renderInput()}
             <div className="flex flex-wrap gap-1.5">
               {SUGGESTIONS.map((s) => (
@@ -678,8 +680,9 @@ export function ChippiWorkspace({
             </div>
           )}
 
-          {/* Docked input */}
-          <div className="flex-shrink-0 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-2 pb-4">
+          {/* Docked input — sticky to viewport bottom (matches the empty
+              state's composer dock so the input never rides up with messages). */}
+          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-4 bg-gradient-to-t from-background via-background to-background/0">
             {atLimit ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
                 <div className="flex justify-center mb-2">

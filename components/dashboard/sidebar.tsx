@@ -9,6 +9,12 @@ import { BrandLogo } from '@/components/brand-logo';
 import { realtorNavItems, realtorMoreNavItems } from '@/lib/nav-items';
 import type { NavItem, NavChild } from '@/lib/nav-items';
 import {
+  SidebarCollapseProvider,
+  SidebarCollapseToggle,
+  CollapsedTooltip,
+  useSidebarCollapsed,
+} from '@/components/dashboard/sidebar-collapse';
+import {
   Building2,
   ChevronRight,
   Users,
@@ -261,6 +267,8 @@ function CollapsibleNavItem({
   isExpanded,
   onToggle,
   badge,
+  badgeText,
+  collapsed = false,
 }: {
   item: NavItem;
   base: string;
@@ -269,6 +277,9 @@ function CollapsibleNavItem({
   isExpanded: boolean;
   onToggle: () => void;
   badge?: React.ReactNode;
+  /** Plain-text version of the badge for the collapsed-mode tooltip. */
+  badgeText?: string;
+  collapsed?: boolean;
 }) {
   const Icon = item.icon;
   const hasChildren = item.children && item.children.length > 0;
@@ -277,13 +288,18 @@ function CollapsibleNavItem({
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
-      if (hasChildren) {
+      // Collapsed mode: parent navigates to its own href. Children are only
+      // reachable via expanded sidebar or in-page navigation — deliberate
+      // trade so the rail stays a one-tap launcher.
+      if (hasChildren && !collapsed) {
         e.preventDefault();
         onToggle();
       }
     },
-    [hasChildren, onToggle],
+    [hasChildren, onToggle, collapsed],
   );
+
+  const tooltipLabel = badgeText ? `${item.label} · ${badgeText}` : item.label;
 
   return (
     <div>
@@ -291,56 +307,62 @@ function CollapsibleNavItem({
           sidebar (collapsible items with optional children) and the broker
           sidebar (flat items) read as one design. AI items show the chip
           avatar in place of an icon — that's the brand signature. */}
-      <Link
-        href={href}
-        onClick={handleClick}
-        className={cn(
-          'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
-          isParentActive
-            ? 'bg-foreground/[0.045] text-foreground font-medium'
-            : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
-        )}
-      >
-        {isParentActive && (
-          <span
-            aria-hidden
-            className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
-          />
-        )}
-        {item.isAI ? (
-          <img
-            src="/chip-avatar.png"
-            alt=""
-            className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
-          />
-        ) : (
-          <Icon
-            size={15}
-            strokeWidth={isParentActive ? 2.25 : 1.75}
-            className={cn(
-              'flex-shrink-0 transition-colors',
-              isParentActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
-            )}
-          />
-        )}
+      <CollapsedTooltip enabled={collapsed} label={tooltipLabel}>
+        <Link
+          href={href}
+          onClick={handleClick}
+          className={cn(
+            'group relative rounded-md text-[13px] transition-colors duration-150',
+            collapsed
+              ? 'flex items-center justify-center w-10 h-10 mx-auto'
+              : 'flex items-center gap-2.5 h-9 pl-3 pr-2.5',
+            isParentActive
+              ? 'bg-foreground/[0.045] text-foreground font-medium'
+              : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
+          )}
+        >
+          {isParentActive && (
+            <span
+              aria-hidden
+              className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
+            />
+          )}
+          {item.isAI ? (
+            <img
+              src="/chip-avatar.png"
+              alt=""
+              className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
+            />
+          ) : (
+            <Icon
+              size={15}
+              strokeWidth={isParentActive ? 2.25 : 1.75}
+              className={cn(
+                'flex-shrink-0 transition-colors',
+                isParentActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
+              )}
+            />
+          )}
 
-        <span className="flex-1 truncate">{item.label}</span>
+          {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
 
-        {badge}
+          {!collapsed && badge}
 
-        {hasChildren && (
-          <ChevronRight
-            size={11}
-            className={cn(
-              'flex-shrink-0 text-muted-foreground/40 transition-transform duration-150',
-              isExpanded && 'rotate-90',
-            )}
-          />
-        )}
-      </Link>
+          {!collapsed && hasChildren && (
+            <ChevronRight
+              size={11}
+              className={cn(
+                'flex-shrink-0 text-muted-foreground/40 transition-transform duration-150',
+                isExpanded && 'rotate-90',
+              )}
+            />
+          )}
+        </Link>
+      </CollapsedTooltip>
 
-      {/* Children — indented, no icons, slightly smaller. Hairline guide. */}
-      {hasChildren && (
+      {/* Children — indented, no icons, slightly smaller. Hairline guide.
+          Hidden in collapsed mode — there's no room to expand inline. */}
+      {hasChildren && !collapsed && (
         <CollapsibleChildren isOpen={isExpanded}>
           <div className="ml-[14px] pl-3 py-1 space-y-px border-l border-border/50">
             {item.children!.map((child) => {
@@ -444,7 +466,7 @@ function FlatNavItem({
  * pill triggers it via a synthetic KeyboardEvent so we don't need to plumb
  * a context. Detects platform for the kbd hint.
  */
-function SearchPill() {
+function SearchPill({ collapsed = false }: { collapsed?: boolean }) {
   const [isMac, setIsMac] = useState(true);
   useEffect(() => {
     if (typeof navigator === 'undefined') return;
@@ -454,6 +476,21 @@ function SearchPill() {
   function open() {
     document.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: false, bubbles: true }),
+    );
+  }
+
+  if (collapsed) {
+    return (
+      <CollapsedTooltip enabled label="Search">
+        <button
+          type="button"
+          onClick={open}
+          className="mx-auto flex items-center justify-center h-9 w-9 rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.025] transition-colors duration-150"
+          aria-label="Open command palette"
+        >
+          <Search size={15} className="flex-shrink-0" strokeWidth={1.75} />
+        </button>
+      </CollapsedTooltip>
     );
   }
 
@@ -485,6 +522,7 @@ function WorkspaceSwitcher({
   spaceName,
   brokerageMemberships,
   isOnBrokerPage,
+  collapsed = false,
 }: {
   currentName: string;
   currentSubtitle: string;
@@ -493,6 +531,7 @@ function WorkspaceSwitcher({
   spaceName: string;
   brokerageMemberships: { id: string; name: string; role: string }[];
   isOnBrokerPage: boolean;
+  collapsed?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -513,33 +552,58 @@ function WorkspaceSwitcher({
   const hasSwitchTargets = brokerageMemberships.length > 0;
 
   return (
-    <div ref={ref} className="relative mx-3">
-      <button
-        onClick={() => hasSwitchTargets && setOpen(!open)}
-        disabled={!hasSwitchTargets}
-        className={cn(
-          'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-left transition-colors',
-          hasSwitchTargets ? 'hover:bg-foreground/[0.025] cursor-pointer' : 'cursor-default',
-        )}
+    <div ref={ref} className={cn('relative', collapsed ? 'flex justify-center' : 'mx-3')}>
+      <CollapsedTooltip
+        enabled={collapsed && !open}
+        label={hasSwitchTargets ? `${currentName} · Switch workspace` : currentName}
       >
-        <div className="w-6 h-6 rounded-md bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
-          <Icon size={12} className="text-foreground/80" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-medium truncate text-foreground leading-tight">
-            {currentName}
-          </p>
-          <p className="text-[10px] text-muted-foreground/70 uppercase tracking-[0.08em] leading-tight mt-0.5">
-            {currentSubtitle}
-          </p>
-        </div>
-        {hasSwitchTargets && (
-          <ChevronsUpDown size={11} className="text-muted-foreground/40 flex-shrink-0" />
-        )}
-      </button>
+        <button
+          onClick={() => hasSwitchTargets && setOpen(!open)}
+          disabled={!hasSwitchTargets}
+          className={cn(
+            'rounded-md text-left transition-colors',
+            collapsed
+              ? 'flex items-center justify-center w-9 h-9'
+              : 'w-full flex items-center gap-2 px-2.5 py-1.5',
+            hasSwitchTargets ? 'hover:bg-foreground/[0.025] cursor-pointer' : 'cursor-default',
+          )}
+          aria-label={collapsed ? currentName : undefined}
+        >
+          <div
+            className={cn(
+              'rounded-md bg-foreground/[0.06] flex items-center justify-center flex-shrink-0',
+              collapsed ? 'w-6 h-6' : 'w-6 h-6',
+            )}
+          >
+            <Icon size={12} className="text-foreground/80" />
+          </div>
+          {!collapsed && (
+            <>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium truncate text-foreground leading-tight">
+                  {currentName}
+                </p>
+                <p className="text-[10px] text-muted-foreground/70 uppercase tracking-[0.08em] leading-tight mt-0.5">
+                  {currentSubtitle}
+                </p>
+              </div>
+              {hasSwitchTargets && (
+                <ChevronsUpDown size={11} className="text-muted-foreground/40 flex-shrink-0" />
+              )}
+            </>
+          )}
+        </button>
+      </CollapsedTooltip>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border bg-popover shadow-lg overflow-hidden">
+        <div
+          className={cn(
+            'z-50 rounded-lg border bg-popover shadow-lg overflow-hidden',
+            collapsed
+              ? 'absolute left-full top-0 ml-2 w-64'
+              : 'absolute left-0 right-0 top-full mt-1',
+          )}
+        >
           {slug && (
             <Link
               href={base}
@@ -622,14 +686,42 @@ function UserFooter({
   href,
   displayName,
   imageUrl,
+  collapsed = false,
 }: {
   href: string;
   displayName: string;
   imageUrl?: string | null;
+  collapsed?: boolean;
 }) {
   // Quiet user identity pinned to the bottom. Mirrors the sidebar's flat row
   // language (h-9, 13px text, subtle hover, foreground left tint on press)
   // so the chip doesn't read as a different surface.
+  if (collapsed) {
+    return (
+      <div className="p-2 flex justify-center">
+        <CollapsedTooltip enabled label={displayName}>
+          <Link
+            href={href}
+            className="group flex items-center justify-center w-9 h-9 rounded-md hover:bg-foreground/[0.025] transition-colors duration-150"
+            aria-label={displayName}
+          >
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt=""
+                className="w-7 h-7 rounded-full flex-shrink-0 object-cover ring-1 ring-border/50"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-foreground/[0.06] flex items-center justify-center text-foreground/80 font-semibold text-[11px] flex-shrink-0">
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+            )}
+          </Link>
+        </CollapsedTooltip>
+      </div>
+    );
+  }
+
   return (
     <div className="p-2">
       <Link
@@ -680,6 +772,7 @@ function RealtorNav({
   overdueFollowUpCount: number;
   pendingDraftCount: number;
 }) {
+  const { collapsed } = useSidebarCollapsed();
   const settingsItem = realtorNavItems.find((item) => item.href === '/settings')!;
   const isOnSettings = doesItemOwnPath(settingsItem, pathname, base);
   const [settingsExpanded, setSettingsExpanded] = useState(isOnSettings);
@@ -734,6 +827,16 @@ function RealtorNav({
     return undefined;
   };
 
+  const getBadgeText = (item: NavItem): string | undefined => {
+    if (item.badgeKey === 'leads' && unreadLeadCount > 0) {
+      return unreadLeadCount > 99 ? '99+' : String(unreadLeadCount);
+    }
+    if (item.badgeKey === 'pendingDrafts' && pendingDraftCount > 0) {
+      return pendingDraftCount > 99 ? '99+' : String(pendingDraftCount);
+    }
+    return undefined;
+  };
+
   const renderItem = (item: NavItem) => {
     const hasChildren = !!(item.children && item.children.length > 0);
     return (
@@ -746,12 +849,19 @@ function RealtorNav({
         isExpanded={hasChildren ? expandedKey === item.href : false}
         onToggle={hasChildren ? () => setExpandedKey((p) => (p === item.href ? null : item.href)) : () => {}}
         badge={getBadge(item)}
+        badgeText={getBadgeText(item)}
+        collapsed={collapsed}
       />
     );
   };
 
   return (
-    <nav className="flex-1 px-3 py-2 overflow-y-auto space-y-3">
+    <nav
+      className={cn(
+        'flex-1 py-2 overflow-y-auto space-y-3',
+        collapsed ? 'px-1' : 'px-3',
+      )}
+    >
       {/* Primary nav — daily destinations. AI item rides up top via the
           existing renderItem treatment; no section label needed when there
           are only a handful of primaries. */}
@@ -768,7 +878,11 @@ function RealtorNav({
           the agent in later phases. */}
       {realtorMoreNavItems.length > 0 && (
         <div>
-          <SectionLabel>More</SectionLabel>
+          {collapsed ? (
+            <div className="my-2 mx-2 h-px bg-border/50" aria-hidden />
+          ) : (
+            <SectionLabel>More</SectionLabel>
+          )}
           <div className="space-y-0.5">{realtorMoreNavItems.map(renderItem)}</div>
         </div>
       )}
@@ -782,6 +896,7 @@ function RealtorNav({
           searchParams={searchParamsString}
           isExpanded={settingsExpanded}
           onToggle={() => setSettingsExpanded((p) => !p)}
+          collapsed={collapsed}
         />
       </div>
     </nav>
@@ -964,17 +1079,85 @@ export function Sidebar({
 
   // ── Realtor workspace sidebar ────────────────────────────────────────────
   return (
-    <aside className="relative hidden md:flex flex-col w-[240px] h-full bg-sidebar border-r border-border/70 shrink-0 overflow-hidden">
-      {/* Brand-warm tint at top — replaces the stray pink/purple gradient
-          with a quiet orange wash that signals Chippi without shouting. */}
+    <SidebarCollapseProvider>
+      <RealtorSidebarShell
+        slug={slug}
+        spaceName={spaceName}
+        base={base}
+        pathname={pathname}
+        searchParamsString={searchParamsString}
+        unreadLeadCount={unreadLeadCount}
+        overdueFollowUpCount={overdueFollowUpCount}
+        pendingDraftCount={pendingDraftCount}
+        brokerageMemberships={brokerageMemberships}
+        isOnBrokerPage={isOnBrokerPage}
+        displayName={displayName}
+        imageUrl={user?.imageUrl}
+      />
+    </SidebarCollapseProvider>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Realtor sidebar shell — consumes the collapse context so all subcomponents
+// can react to width changes via `useSidebarCollapsed()`. The aside container
+// transitions width only on user-toggle (not on initial hydration).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function RealtorSidebarShell({
+  slug,
+  spaceName,
+  base,
+  pathname,
+  searchParamsString,
+  unreadLeadCount,
+  overdueFollowUpCount,
+  pendingDraftCount,
+  brokerageMemberships,
+  isOnBrokerPage,
+  displayName,
+  imageUrl,
+}: {
+  slug: string;
+  spaceName: string;
+  base: string;
+  pathname: string;
+  searchParamsString: string;
+  unreadLeadCount: number;
+  overdueFollowUpCount: number;
+  pendingDraftCount: number;
+  brokerageMemberships: { id: string; name: string; role: string }[];
+  isOnBrokerPage: boolean;
+  displayName: string;
+  imageUrl?: string | null;
+}) {
+  const { collapsed } = useSidebarCollapsed();
+
+  return (
+    <aside
+      className={cn(
+        'relative hidden md:flex flex-col h-full bg-sidebar border-r border-border/70 shrink-0 overflow-hidden',
+        'transition-[width] duration-200 ease-in-out',
+        collapsed ? 'w-[56px]' : 'w-[240px]',
+      )}
+    >
+      {/* Brand-warm tint at top — clip width follows the rail so the orange
+          wash doesn't hint at content beyond the visible edge. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
       />
 
       <div className="relative z-10 flex flex-col h-full">
-        {/* Brand mark — small, monochrome, sets identity without dominating */}
-        <div className="px-4 pt-5 pb-3">
+        {/* Brand mark — small, monochrome, sets identity without dominating.
+            In collapsed mode the BrandLogo is already an icon-tight mark; we
+            just center it on the rail. */}
+        <div
+          className={cn(
+            'pt-5 pb-3',
+            collapsed ? 'flex justify-center px-2' : 'px-4',
+          )}
+        >
           <BrandLogo className="h-5" alt="Chippi" />
         </div>
 
@@ -987,11 +1170,12 @@ export function Sidebar({
           spaceName={spaceName}
           brokerageMemberships={brokerageMemberships}
           isOnBrokerPage={isOnBrokerPage}
+          collapsed={collapsed}
         />
 
         {/* Search */}
         <div className="mt-3">
-          <SearchPill />
+          <SearchPill collapsed={collapsed} />
         </div>
 
         {/* Primary nav + More + Settings */}
@@ -1004,12 +1188,16 @@ export function Sidebar({
           pendingDraftCount={pendingDraftCount}
         />
 
+        {/* Collapse toggle — pinned just above the user-footer divider. */}
+        <SidebarCollapseToggle />
+
         {/* User footer pinned at bottom, separated by a hairline */}
         <div className="border-t border-border/50" />
         <UserFooter
           href={`${base}/settings/profile`}
           displayName={displayName}
-          imageUrl={user?.imageUrl}
+          imageUrl={imageUrl}
+          collapsed={collapsed}
         />
       </div>
     </aside>

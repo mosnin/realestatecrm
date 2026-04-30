@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import {
   Loader2,
   Sparkles,
@@ -13,9 +11,6 @@ import {
   ChevronRight,
   Minus,
   Plus,
-  Info,
-  CheckCircle2,
-  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -54,18 +49,86 @@ function formatTimeAgo(isoStr: string): string {
   return `${days}d ago`;
 }
 
-function weightBarColor(weight: number): string {
-  if (weight >= 20) return 'bg-emerald-500';
-  if (weight >= 10) return 'bg-amber-500';
-  if (weight >= 5) return 'bg-orange-400';
-  return 'bg-gray-300';
+// Paper-flat bar fill: foreground color, opacity stepped by weight.
+// Higher weight = stronger fill, no hue change.
+function weightFillOpacity(weight: number): string {
+  if (weight >= 20) return 'opacity-100';
+  if (weight >= 10) return 'opacity-80';
+  if (weight >= 5) return 'opacity-60';
+  return 'opacity-40';
 }
 
-function scoreBarColor(score: number): string {
-  if (score >= 75) return 'bg-emerald-500';
-  if (score >= 50) return 'bg-amber-500';
-  if (score >= 25) return 'bg-orange-400';
-  return 'bg-red-400';
+// ── Subtle pill ──────────────────────────────────────────────────────────────
+
+function MutedPill({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center text-muted-foreground bg-foreground/[0.06] rounded px-1.5 py-0.5 text-[10px] font-mono',
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+// ── Primary action button (locked design language) ──────────────────────────
+
+function PrimaryButton({
+  onClick,
+  disabled,
+  children,
+  className,
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium',
+        'hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150',
+        'disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100',
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function GhostButton({
+  onClick,
+  disabled,
+  children,
+  className,
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-sm text-muted-foreground',
+        'hover:bg-foreground/[0.04] hover:text-foreground transition-colors duration-150',
+        'disabled:opacity-40 disabled:cursor-not-allowed',
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
 }
 
 // ── Question Scoring Card ────────────────────────────────────────────────────
@@ -96,15 +159,12 @@ function QuestionCard({
   const hasOptions = question.options && question.options.length > 0;
   const hasRanges = model?.ranges && model.ranges.length > 0;
   const showDetails = hasOptions || hasRanges;
-  const sectionTitle = question.label;
 
   return (
     <div
       className={cn(
-        'rounded-xl border transition-all',
-        enabled
-          ? 'border-border bg-card'
-          : 'border-border/40 bg-muted/30 opacity-60',
+        'rounded-lg border border-border/70 bg-background transition-colors duration-150',
+        !enabled && 'opacity-60',
       )}
     >
       {/* Header row */}
@@ -117,17 +177,11 @@ function QuestionCard({
 
         <div className="flex-1 min-w-0">
           <p className={cn('text-sm font-medium truncate', !enabled && 'text-muted-foreground')}>
-            {sectionTitle}
+            {question.label}
           </p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
-              {question.type}
-            </Badge>
-            {question.required && (
-              <Badge variant="secondary" className="text-[9px] px-1.5 py-0 text-amber-600 border-amber-200 bg-amber-50">
-                Required
-              </Badge>
-            )}
+          <div className="flex items-center gap-1.5 mt-1">
+            <MutedPill>{question.type}</MutedPill>
+            {question.required && <MutedPill>required</MutedPill>}
           </div>
         </div>
 
@@ -138,18 +192,18 @@ function QuestionCard({
               type="button"
               onClick={() => onWeightChange(-5)}
               disabled={weight <= 0}
-              className="w-7 h-7 rounded-md border border-border flex items-center justify-center hover:bg-muted transition-colors disabled:opacity-30"
+              className="w-7 h-7 rounded-md border border-border/70 flex items-center justify-center text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground transition-colors duration-150 disabled:opacity-30"
             >
               <Minus size={12} />
             </button>
-            <span className="text-lg font-bold tabular-nums text-primary min-w-[40px] text-center">
+            <span className="text-sm font-medium tabular-nums text-foreground min-w-[40px] text-center">
               {weight}%
             </span>
             <button
               type="button"
               onClick={() => onWeightChange(5)}
               disabled={weight >= 100}
-              className="w-7 h-7 rounded-md border border-border flex items-center justify-center hover:bg-muted transition-colors disabled:opacity-30"
+              className="w-7 h-7 rounded-md border border-border/70 flex items-center justify-center text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground transition-colors duration-150 disabled:opacity-30"
             >
               <Plus size={12} />
             </button>
@@ -161,19 +215,22 @@ function QuestionCard({
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
           >
             {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
         )}
       </div>
 
-      {/* Weight bar */}
+      {/* Weight bar — paper-flat: foreground fill on muted track */}
       {enabled && (
         <div className="px-4 pb-3">
-          <div className="h-2 rounded-full bg-muted overflow-hidden">
+          <div className="h-1.5 rounded-full bg-foreground/[0.06] overflow-hidden">
             <div
-              className={cn('h-full rounded-full transition-all duration-300', weightBarColor(weight))}
+              className={cn(
+                'h-full rounded-full bg-foreground transition-all duration-150',
+                weightFillOpacity(weight),
+              )}
               style={{ width: `${weight}%` }}
             />
           </div>
@@ -182,7 +239,7 @@ function QuestionCard({
 
       {/* Expanded details */}
       {enabled && expanded && (
-        <div className="border-t border-border px-4 py-3 space-y-3">
+        <div className="border-t border-border/70 px-4 py-3 space-y-3">
           {/* Option scores for radio/select */}
           {hasOptions && model?.optionScores && (
             <div className="space-y-2">
@@ -196,9 +253,12 @@ function QuestionCard({
                     <span className="text-xs text-foreground min-w-0 flex-1 truncate">
                       {opt.label}
                     </span>
-                    <div className="w-24 h-1.5 rounded-full bg-muted overflow-hidden flex-shrink-0">
+                    <div className="w-24 h-1 rounded-full bg-foreground/[0.06] overflow-hidden flex-shrink-0">
                       <div
-                        className={cn('h-full rounded-full transition-all', scoreBarColor(score))}
+                        className={cn(
+                          'h-full rounded-full bg-foreground transition-all duration-150',
+                          weightFillOpacity(score / 5), // map 0-100 score to opacity buckets
+                        )}
                         style={{ width: `${score}%` }}
                       />
                     </div>
@@ -208,7 +268,7 @@ function QuestionCard({
                       max={100}
                       value={score}
                       onChange={(e) => onOptionScoreChange(opt.value, Number(e.target.value) || 0)}
-                      className="w-16 h-7 text-xs text-center"
+                      className="w-16 h-7 text-xs text-center bg-background border-border/70"
                     />
                   </div>
                 );
@@ -229,15 +289,15 @@ function QuestionCard({
                     value={range.min}
                     onChange={(e) => onRangeChange(idx, 'min', Number(e.target.value))}
                     placeholder="Min"
-                    className="w-20 h-7 text-xs"
+                    className="w-20 h-7 text-xs bg-background border-border/70"
                   />
                   <span className="text-xs text-muted-foreground">to</span>
                   <Input
                     type="number"
                     value={range.max ?? ''}
                     onChange={(e) => onRangeChange(idx, 'max', e.target.value ? Number(e.target.value) : null)}
-                    placeholder="Max (∞)"
-                    className="w-20 h-7 text-xs"
+                    placeholder="Max"
+                    className="w-20 h-7 text-xs bg-background border-border/70"
                   />
                   <span className="text-xs text-muted-foreground">=</span>
                   <Input
@@ -246,13 +306,13 @@ function QuestionCard({
                     max={100}
                     value={range.points}
                     onChange={(e) => onRangeChange(idx, 'points', Number(e.target.value) || 0)}
-                    className="w-16 h-7 text-xs"
+                    className="w-16 h-7 text-xs bg-background border-border/70"
                   />
                   <span className="text-[10px] text-muted-foreground">pts</span>
                   <button
                     type="button"
                     onClick={() => onRemoveRange(idx)}
-                    className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-destructive"
+                    className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
                   >
                     <Minus size={12} />
                   </button>
@@ -261,7 +321,7 @@ function QuestionCard({
               <button
                 type="button"
                 onClick={onAddRange}
-                className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1"
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors duration-150"
               >
                 <Plus size={12} /> Add range
               </button>
@@ -376,7 +436,7 @@ export function ScoringTab({
       newWeights[questionId] = { ...newWeights[questionId], weight: newWeight };
 
       if (othersTotal > 0 && diff !== 0) {
-        let remaining = -diff;
+        const remaining = -diff;
         for (const [id, q] of others) {
           const proportion = q.weight / othersTotal;
           const adjustment = Math.round(remaining * proportion);
@@ -525,89 +585,76 @@ export function ScoringTab({
 
   if (!scoringModel) {
     return (
-      <div className="space-y-6">
-        <div className="rounded-xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center">
-          <Sparkles size={32} className="mx-auto text-primary/60 mb-3" />
-          <h3 className="text-sm font-semibold mb-1.5">Teach the assistant what you look for</h3>
-          <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed mb-4">
-            We&apos;ll read your questions and draft a starting point — which
-            answers count as a strong {leadType === 'rental' ? 'rental' : 'buyer'} lead
-            vs. a weak one. You can tune it afterwards.
-          </p>
-          <Button onClick={handleGenerate} disabled={generating}>
-            {generating ? (
-              <><Loader2 size={14} className="mr-1.5 animate-spin" /> Thinking…</>
-            ) : (
-              <><Sparkles size={14} className="mr-1.5" /> Draft it for me</>
-            )}
-          </Button>
-        </div>
+      <div className="bg-background border border-border/70 rounded-lg p-10 text-center max-w-2xl mx-auto">
+        <h3
+          className="text-xl text-foreground mb-2"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Teach the assistant what you look for
+        </h3>
+        <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed mb-5">
+          We&apos;ll read your questions and draft a starting point — which
+          answers count as a strong {leadType === 'rental' ? 'rental' : 'buyer'} lead
+          vs. a weak one. You can tune it afterwards.
+        </p>
+        <PrimaryButton onClick={handleGenerate} disabled={generating} className="mx-auto">
+          {generating ? (
+            <><Loader2 size={14} className="animate-spin" /> Thinking…</>
+          ) : (
+            <><Sparkles size={14} /> Draft it for me</>
+          )}
+        </PrimaryButton>
       </div>
     );
   }
 
   // ── Has model ──────────────────────────────────────────────────────────────
 
+  const totalIsBalanced = totalWeight === 100;
+
   return (
     <div className="space-y-4">
       {/* Header: Total weight + actions */}
-      <div className="rounded-xl border border-border bg-card px-4 py-3">
-        <div className="flex items-center justify-between mb-2">
+      <div className="bg-background border border-border/70 rounded-lg px-4 py-3">
+        <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold">Total Weight</span>
-            <Badge
-              variant={totalWeight === 100 ? 'secondary' : 'destructive'}
-              className="text-[10px]"
-            >
-              {totalWeight === 100 ? (
-                <><CheckCircle2 size={10} className="mr-1" /> {totalWeight}%</>
-              ) : (
-                <><AlertCircle size={10} className="mr-1" /> {totalWeight}%</>
-              )}
-            </Badge>
+            <span className="text-sm font-medium text-foreground">Total weight</span>
+            <MutedPill className={cn(!totalIsBalanced && 'text-foreground')}>
+              {totalWeight}%{!totalIsBalanced && ' · should be 100%'}
+            </MutedPill>
           </div>
           <div className="flex items-center gap-2">
-            {hasUnsavedChanges && (
-              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
-                Unsaved
-              </Badge>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGenerate}
-              disabled={generating}
-            >
+            {hasUnsavedChanges && <MutedPill>unsaved</MutedPill>}
+            <GhostButton onClick={handleGenerate} disabled={generating}>
               {generating ? (
-                <Loader2 size={13} className="mr-1.5 animate-spin" />
+                <Loader2 size={13} className="animate-spin" />
               ) : (
-                <Sparkles size={13} className="mr-1.5" />
+                <Sparkles size={13} />
               )}
               Regenerate
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={saving || !hasUnsavedChanges}
-            >
+            </GhostButton>
+            <PrimaryButton onClick={handleSave} disabled={saving || !hasUnsavedChanges}>
               {saving ? (
-                <Loader2 size={13} className="mr-1.5 animate-spin" />
+                <Loader2 size={13} className="animate-spin" />
               ) : (
-                <Save size={13} className="mr-1.5" />
+                <Save size={13} />
               )}
               Save
-            </Button>
+            </PrimaryButton>
           </div>
         </div>
-        {/* Segmented weight bar */}
-        <div className="h-3 rounded-full bg-muted overflow-hidden flex">
-          {scorableQuestions.map((q) => {
+        {/* Segmented weight bar — paper-flat foreground fill, opacity steps separate segments */}
+        <div className="h-2 rounded-full bg-foreground/[0.06] overflow-hidden flex">
+          {scorableQuestions.map((q, idx) => {
             const w = scoringModel.weights[q.id]?.weight ?? 0;
             if (w <= 0) return null;
+            // Alternate opacity slightly so adjacent segments are visually distinguishable
+            // without introducing hue. 100% / 75% alternation.
+            const alt = idx % 2 === 0 ? 'opacity-100' : 'opacity-70';
             return (
               <div
                 key={q.id}
-                className={cn('h-full transition-all duration-300', weightBarColor(w))}
+                className={cn('h-full bg-foreground transition-all duration-150', alt)}
                 style={{ width: `${w}%` }}
                 title={`${q.label}: ${w}%`}
               />
@@ -618,16 +665,13 @@ export function ScoringTab({
 
       {/* AI reasoning */}
       {scoringModel.reasoning && (
-        <div className="flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/10 px-3 py-2.5">
-          <Info size={14} className="text-primary flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-xs text-foreground/80 leading-relaxed">{scoringModel.reasoning}</p>
-            {scoringModel.generatedAt && (
-              <p className="text-[10px] text-muted-foreground mt-1">
-                Generated {formatTimeAgo(scoringModel.generatedAt)}
-              </p>
-            )}
-          </div>
+        <div className="rounded-lg border border-border/70 bg-background px-4 py-3">
+          <p className="text-xs text-foreground/80 leading-relaxed">{scoringModel.reasoning}</p>
+          {scoringModel.generatedAt && (
+            <p className="text-[10px] text-muted-foreground mt-1.5">
+              Generated {formatTimeAgo(scoringModel.generatedAt)}
+            </p>
+          )}
         </div>
       )}
 
@@ -655,15 +699,13 @@ export function ScoringTab({
 
       {/* Not scored section */}
       {nonScorableQuestions.length > 0 && (
-        <div className="rounded-xl border border-border/40 bg-muted/20 px-4 py-3">
+        <div className="bg-background border border-border/70 rounded-lg px-4 py-3">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Not Scored ({nonScorableQuestions.length})
+            Not scored ({nonScorableQuestions.length})
           </p>
           <div className="flex flex-wrap gap-1.5">
             {nonScorableQuestions.map((q) => (
-              <Badge key={q.id} variant="outline" className="text-[10px] text-muted-foreground">
-                {q.label}
-              </Badge>
+              <MutedPill key={q.id}>{q.label}</MutedPill>
             ))}
           </div>
         </div>

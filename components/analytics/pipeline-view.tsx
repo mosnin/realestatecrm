@@ -12,71 +12,81 @@ import {
   PieChart,
   Pie,
 } from 'recharts';
-import { StatCard, ChartSection, formatCurrency } from './chart-primitives';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
-import type { ChartConfig } from '@/components/ui/chart';
+import {
+  StatCell,
+  ChartSection,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  formatCurrency,
+  PAPER_SERIES,
+  PAPER_GRID,
+} from './chart-primitives';
+import type { ChartConfig } from './chart-primitives';
 import type { PipelineAnalyticsData } from '@/lib/analytics-data';
 
 const dealsByStageCountConfig = {
-  count: { label: 'Deals', color: 'hsl(var(--chart-1))' },
+  count: { label: 'Deals', color: 'hsl(var(--foreground))' },
 } satisfies ChartConfig;
 
 const dealsByStageValueConfig = {
-  value: { label: 'Value', color: 'hsl(var(--chart-2))' },
+  value: { label: 'Value', color: 'hsl(var(--foreground))' },
 } satisfies ChartConfig;
 
 const dealsOverTimeConfig = {
-  count: { label: 'Deals', color: 'hsl(var(--chart-1))' },
+  count: { label: 'Deals', color: 'hsl(var(--foreground))' },
 } satisfies ChartConfig;
 
 const dealsByPriorityConfig = {
-  High: { label: 'High', color: 'hsl(var(--chart-4))' },
-  Medium: { label: 'Medium', color: 'hsl(var(--chart-5))' },
-  Low: { label: 'Low', color: 'hsl(var(--chart-2))' },
-  None: { label: 'None', color: 'hsl(var(--chart-3))' },
+  High: { label: 'High', color: 'hsl(var(--foreground))' },
+  Medium: { label: 'Medium', color: 'hsl(var(--foreground) / 0.7)' },
+  Low: { label: 'Low', color: 'hsl(var(--muted-foreground) / 0.5)' },
+  None: { label: 'None', color: 'hsl(var(--muted-foreground) / 0.25)' },
 } satisfies ChartConfig;
 
-const priorityColors: Record<string, string> = {
-  High: '#ef4444',
-  Medium: '#f59e0b',
-  Low: '#3b82f6',
-  None: '#94a3b8',
+// Priority fills — High darkest, None lightest. Ordered emphasis.
+const PRIORITY_FILLS: Record<string, string> = {
+  High: 'hsl(var(--foreground))',
+  Medium: 'hsl(var(--foreground) / 0.7)',
+  Low: 'hsl(var(--muted-foreground) / 0.5)',
+  None: 'hsl(var(--muted-foreground) / 0.25)',
 };
-const priorityFallback = ['#10b981', '#3b82f6', '#f59e0b', '#94a3b8', '#f87171'];
 
 export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
   return (
-    <div className="space-y-5">
-      {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Total deals" value={data.totalDeals} />
-        <StatCard label="Pipeline value" value={formatCurrency(data.totalPipelineValue)} sub="active deals only" />
-        <StatCard
+    <div className="space-y-6">
+      {/* Summary strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+        <StatCell label="Total deals" value={data.totalDeals} />
+        <StatCell
+          label="Pipeline value"
+          value={formatCurrency(data.totalPipelineValue)}
+          sub="active deals"
+        />
+        <StatCell
           label="Avg deal size"
           value={data.activeDeals > 0 ? formatCurrency(data.avgDealSize) : '--'}
           sub="active deals"
         />
-        <StatCard
+        <StatCell
           label="Win rate"
           value={data.wonDeals + data.lostDeals > 0 ? `${data.dealWinRate}%` : '--'}
           sub={`${data.wonDeals} won / ${data.lostDeals} lost`}
         />
       </div>
 
-      {/* Charts row 1: stage distribution */}
+      {/* Stage distribution */}
       <div className="grid sm:grid-cols-2 gap-4">
         <ChartSection title="Deals per stage" sub="Number of deals in each pipeline stage">
           <ChartContainer config={dealsByStageCountConfig} className="h-[220px] w-full">
             <BarChart data={data.dealsByStage} barSize={22}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
-              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} />
+              <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="count" name="Deals" radius={[4, 4, 0, 0]}>
-                {data.dealsByStage.map((entry) => (
-                  <Cell key={entry.name} fill={entry.color} />
-                ))}
-              </Bar>
+              <Bar dataKey="count" name="Deals" radius={[2, 2, 0, 0]} fill="var(--color-count)" />
             </BarChart>
           </ChartContainer>
         </ChartSection>
@@ -84,40 +94,37 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
         <ChartSection title="Value per stage" sub="Total deal value per pipeline stage">
           <ChartContainer config={dealsByStageValueConfig} className="h-[220px] w-full">
             <BarChart data={data.dealsByStage} barSize={22}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
+              <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
               <YAxis
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
                 width={48}
+                tick={{ fontSize: 11 }}
                 tickFormatter={(v) => formatCurrency(v)}
               />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="value" name="Value" radius={[4, 4, 0, 0]}>
-                {data.dealsByStage.map((entry) => (
-                  <Cell key={entry.name} fill={entry.color} />
-                ))}
-              </Bar>
+              <Bar dataKey="value" name="Value" radius={[2, 2, 0, 0]} fill="var(--color-value)" />
             </BarChart>
           </ChartContainer>
         </ChartSection>
       </div>
 
-      {/* Charts row 2: trends + priority */}
+      {/* Trends + priority */}
       <div className="grid sm:grid-cols-2 gap-4">
         <ChartSection title="Deals over time" sub="New deals created each month">
           <ChartContainer config={dealsOverTimeConfig} className="h-[220px] w-full">
             <AreaChart data={data.dealsOverTime}>
               <defs>
                 <linearGradient id="dealsGradPipeline" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.05} />
+                  <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} />
+              <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Area
                 type="monotone"
@@ -125,8 +132,8 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
                 name="Deals"
                 stroke="var(--color-count)"
                 fill="url(#dealsGradPipeline)"
-                strokeWidth={2}
-                dot={{ r: 3, fill: 'var(--color-count)' }}
+                strokeWidth={1.5}
+                dot={false}
               />
             </AreaChart>
           </ChartContainer>
@@ -145,9 +152,14 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
                   innerRadius={55}
                   outerRadius={85}
                   paddingAngle={3}
+                  stroke="hsl(var(--background))"
+                  strokeWidth={2}
                 >
                   {data.dealsByPriority.map((entry, i) => (
-                    <Cell key={entry.label} fill={priorityColors[entry.label] ?? priorityFallback[i % priorityFallback.length]} />
+                    <Cell
+                      key={entry.label}
+                      fill={PRIORITY_FILLS[entry.label] ?? PAPER_SERIES[i % PAPER_SERIES.length]}
+                    />
                   ))}
                 </Pie>
                 <ChartTooltip content={<ChartTooltipContent nameKey="label" hideLabel />} />
@@ -164,18 +176,34 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
           <div className="flex flex-col items-center justify-center py-4">
             <div className="relative w-32 h-32">
               <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
-                <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" className="text-muted/40" strokeWidth="12" />
                 <circle
-                  cx="60" cy="60" r="52"
+                  cx="60"
+                  cy="60"
+                  r="52"
                   fill="none"
-                  stroke="#10b981"
-                  strokeWidth="12"
+                  stroke="currentColor"
+                  className="text-muted-foreground/20"
+                  strokeWidth="10"
+                />
+                <circle
+                  cx="60"
+                  cy="60"
+                  r="52"
+                  fill="none"
+                  stroke="currentColor"
+                  className="text-foreground"
+                  strokeWidth="10"
                   strokeLinecap="round"
                   strokeDasharray={`${(data.dealWinRate / 100) * 2 * Math.PI * 52} ${2 * Math.PI * 52}`}
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-2xl font-bold tabular-nums">{data.dealWinRate}%</span>
+                <span
+                  className="text-3xl tracking-tight tabular-nums text-foreground"
+                  style={{ fontFamily: 'var(--font-title)' }}
+                >
+                  {data.dealWinRate}%
+                </span>
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-3 text-center">
@@ -186,7 +214,7 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
       )}
 
       {data.totalDeals === 0 && (
-        <div className="rounded-lg border border-border bg-card px-6 py-12 text-center">
+        <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center">
           <p className="text-sm text-muted-foreground">
             Pipeline analytics will appear here once deals are created.
           </p>

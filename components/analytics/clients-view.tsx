@@ -10,33 +10,44 @@ import {
   CartesianGrid,
   Cell,
 } from 'recharts';
-import { StatCard, ChartSection } from './chart-primitives';
 import {
+  StatCell,
+  ChartSection,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from '@/components/ui/chart';
-import type { ChartConfig } from '@/components/ui/chart';
+  PAPER_SERIES,
+  PAPER_GRID,
+} from './chart-primitives';
+import type { ChartConfig } from './chart-primitives';
 import type { ClientsAnalyticsData } from '@/lib/analytics-data';
 
 const contactsOverTimeConfig = {
-  count: { label: 'Contacts', color: 'hsl(var(--chart-1))' },
+  count: { label: 'Contacts', color: 'hsl(var(--foreground))' },
 } satisfies ChartConfig;
 
 const contactsByStageConfig = {
-  count: { label: 'Contacts', color: 'hsl(var(--chart-1))' },
+  count: { label: 'Contacts', color: 'hsl(var(--foreground))' },
 } satisfies ChartConfig;
 
+const STAGE_FILLS: Record<string, string> = {
+  Qualifying: 'hsl(var(--muted-foreground) / 0.5)',
+  Tour: 'hsl(var(--foreground) / 0.7)',
+  Applied: 'hsl(var(--foreground))',
+};
+
 export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
+  // Build a stat strip — total + each stage + conversion. Total cells = 2 + stages.
+  const stageCells = data.contactsByStage.slice(0, 2); // cap to keep the strip tidy at 4 cols
   return (
-    <div className="space-y-5">
-      {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Total contacts" value={data.totalContacts} sub="in CRM" />
-        {data.contactsByStage.map((s) => (
-          <StatCard key={s.label} label={s.label} value={s.count} />
+    <div className="space-y-6">
+      {/* Summary strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+        <StatCell label="Total contacts" value={data.totalContacts} sub="in CRM" />
+        {stageCells.map((s) => (
+          <StatCell key={s.label} label={s.label} value={s.count} />
         ))}
-        <StatCard
+        <StatCell
           label="Lead-to-client"
           value={data.leadToClientRate > 0 ? `${data.leadToClientRate}%` : '--'}
           sub={`from ${data.totalLeads} leads`}
@@ -50,11 +61,11 @@ export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
             <AreaChart data={data.contactsOverTime}>
               <defs>
                 <linearGradient id="contactsGradClients" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.05} />
+                  <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid vertical={false} />
+              <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
               <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
               <ChartTooltip content={<ChartTooltipContent />} />
@@ -63,8 +74,8 @@ export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
                 dataKey="count"
                 stroke="var(--color-count)"
                 fill="url(#contactsGradClients)"
-                strokeWidth={2}
-                dot={{ r: 3, fill: 'var(--color-count)' }}
+                strokeWidth={1.5}
+                dot={false}
               />
             </AreaChart>
           </ChartContainer>
@@ -73,54 +84,47 @@ export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
         <ChartSection title="Contacts by stage" sub="Current distribution across stages">
           <ChartContainer config={contactsByStageConfig} className="h-[220px] w-full">
             <BarChart data={data.contactsByStage} barSize={32}>
-              <CartesianGrid vertical={false} />
+              <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
               <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 12 }} />
               <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                {data.contactsByStage.map((entry) => {
-                  const colorMap: Record<string, string> = {
-                    Qualifying: '#3b82f6', Tour: '#f59e0b', Applied: '#10b981',
-                  };
-                  return <Cell key={entry.label} fill={colorMap[entry.label] ?? '#94a3b8'} />;
-                })}
+              <Bar dataKey="count" radius={[2, 2, 0, 0]}>
+                {data.contactsByStage.map((entry, i) => (
+                  <Cell
+                    key={entry.label}
+                    fill={STAGE_FILLS[entry.label] ?? PAPER_SERIES[i % PAPER_SERIES.length]}
+                  />
+                ))}
               </Bar>
             </BarChart>
           </ChartContainer>
         </ChartSection>
       </div>
 
-      {/* Conversion funnel */}
+      {/* Conversion funnel — paper-flat, hairline boxes with serif numbers */}
       <ChartSection title="Client pipeline funnel" sub="Conversion rates across your renter pipeline">
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center justify-center py-2">
+        <div className="flex flex-col sm:flex-row gap-4 items-stretch py-2">
           {data.contactFunnel.map((stage, i) => {
-            const colors = ['#3b82f6', '#f59e0b', '#10b981'];
-            const color = colors[i] ?? '#94a3b8';
+            const opacity = 1 - i * 0.15;
             return (
-              <div key={stage.label} className="flex sm:flex-col items-center gap-3 sm:gap-2 flex-1">
-                <div
-                  className="rounded-lg flex items-center justify-center text-white font-bold text-lg tabular-nums w-16 h-14 sm:w-full sm:h-16 shrink-0"
-                  style={{ backgroundColor: color }}
+              <div
+                key={stage.label}
+                className="flex-1 rounded-xl border border-border/70 bg-background px-5 py-4 flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1"
+              >
+                <p
+                  className="text-3xl tracking-tight tabular-nums text-foreground"
+                  style={{ fontFamily: 'var(--font-title)', opacity }}
                 >
                   {stage.count}
-                </div>
-                <div className="sm:text-center">
-                  <p className="text-sm font-semibold text-foreground">{stage.label}</p>
+                </p>
+                <div className="flex flex-col">
+                  <p className="text-sm font-medium text-foreground">{stage.label}</p>
                   {i > 0 && (
-                    <p className="text-xs text-muted-foreground">{stage.rate}% conversion</p>
+                    <p className="text-xs text-muted-foreground">
+                      {stage.rate}% conversion
+                    </p>
                   )}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex justify-center gap-4 sm:gap-6 mt-3 text-xs text-muted-foreground flex-wrap">
-          {data.contactFunnel.map((stage, i) => {
-            const colors = ['#3b82f6', '#f59e0b', '#10b981'];
-            return (
-              <div key={stage.label} className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: colors[i] ?? '#94a3b8' }} />
-                {stage.label} ({stage.count})
               </div>
             );
           })}
