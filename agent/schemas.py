@@ -19,10 +19,8 @@ LeadType = Literal["rental", "buyer"]
 DealStatus = Literal["active", "won", "lost", "on_hold"]
 Priority = Literal["LOW", "MEDIUM", "HIGH"]
 ContactType = Literal["QUALIFICATION", "TOUR", "APPLICATION"]
-AutonomyLevel = Literal["autonomous", "draft_required", "suggest_only"]
 DraftChannel = Literal["sms", "email", "note"]
 DraftStatus = Literal["pending", "approved", "dismissed", "sent"]
-AgentType = Literal["lead_nurture", "deal_sentinel", "long_term_nurture", "lead_scorer", "tour_followup", "offer_agent", "coordinator"]
 ActionOutcome = Literal["completed", "queued_for_approval", "suggested", "failed"]
 MemoryType = Literal["fact", "preference", "observation", "reminder"]
 EntityType = Literal["contact", "deal", "space"]
@@ -96,18 +94,21 @@ class Space(BaseModel):
 # ---------------------------------------------------------------------------
 
 class AgentSettings(BaseModel):
+    """Per-space agent configuration.
+
+    Autonomy modes, per-agent overrides, confidence thresholds, and the
+    enabled-agents list have all been retired — Chippi is one agent and
+    every contact-facing action drafts. The DB columns still exist for
+    backwards compat with the UI; we just don't read them. `extra="ignore"`
+    keeps existing rows loadable without a migration.
+    """
+
     id: str
     space_id: str = Field(alias="spaceId")
     enabled: bool = False
-    autonomy_level: AutonomyLevel = Field("suggest_only", alias="autonomyLevel")
     daily_token_budget: int = Field(50_000, alias="dailyTokenBudget")
-    heartbeat_interval_minutes: int = Field(15, alias="heartbeatIntervalMinutes")
-    enabled_agents: list[str] = Field(default_factory=lambda: ["lead_nurture"], alias="enabledAgents")
-    # Per-agent overrides — keys are agent_type strings; missing key → inherits autonomy_level
-    per_agent_autonomy: dict[str, AutonomyLevel] = Field(default_factory=dict, alias="perAgentAutonomy")
-    confidence_threshold: int = Field(0, alias="confidenceThreshold")
 
-    model_config = {"populate_by_name": True}
+    model_config = {"populate_by_name": True, "extra": "ignore"}
 
 
 class AgentDraft(BaseModel):
@@ -179,42 +180,3 @@ class AgentQuestion(BaseModel):
     created_at: datetime = Field(alias="createdAt")
 
     model_config = {"populate_by_name": True}
-
-
-# ---------------------------------------------------------------------------
-# Internal agent types
-# ---------------------------------------------------------------------------
-
-class ActionPlan(BaseModel):
-    """Structured output from the orchestrator reasoning step."""
-    summary: str
-    actions: list[PlannedAction]
-    skip_reason: str | None = None
-
-
-class PlannedAction(BaseModel):
-    agent_type: AgentType
-    action_type: str
-    contact_id: str | None = None
-    deal_id: str | None = None
-    reasoning: str
-    requires_approval: bool = False
-    priority: int = 0
-    params: dict[str, Any] = Field(default_factory=dict)
-
-
-class CoordinatorRunReport(BaseModel):
-    """Structured summary produced by the Coordinator at the end of every run.
-
-    Stored as a high-level space memory so future runs have a typed record of
-    what happened. Ground-truth action counts are in AgentActivityLog; the
-    counts here are the coordinator's best-effort estimates from specialist outputs.
-    """
-
-    workspace_name: str
-    run_date: str                           # ISO date YYYY-MM-DD
-    agents_activated: list[str] = Field(default_factory=list)
-    total_drafts_created: int = 0
-    total_follow_ups_set: int = 0
-    overall_summary: str                    # 1-2 sentence narrative of the run
-    nothing_to_do: bool = False             # True when workspace was healthy and no agents ran

@@ -3,13 +3,16 @@
 spaceId is NEVER taken from LLM tool arguments. It is injected once when the
 agent run starts and flows through every tool call via RunContextWrapper.
 This prevents prompt-injection attacks from crossing tenant boundaries.
+
+Autonomy is fixed: every contact-facing action drafts. There is no per-space
+or per-agent override. Configuration is failure to decide.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from schemas import AgentSettings, AutonomyLevel
+from schemas import AgentSettings
 
 
 @dataclass
@@ -18,44 +21,32 @@ class AgentContext:
 
     space_id: str
     space_name: str
-    autonomy_level: AutonomyLevel
-    per_agent_autonomy: dict[str, AutonomyLevel]
     daily_token_budget: int
-    enabled_agents: list[str]
     run_id: str
 
     # Tokens consumed so far this run (mutable — updated after each LLM call)
     tokens_used: int = field(default=0, compare=False)
-    # Set by on_handoff callback so tools know which specialist is running
-    current_agent_type: str = field(default="coordinator", compare=False)
-    confidence_threshold: int = field(default=0, compare=False)
+    # Audit-log tag — fixed to "chippi" since there is one agent. Tools read
+    # this when stamping AgentActivityLog rows; keep the field so call sites
+    # don't have to special-case the single-agent world.
+    current_agent_type: str = field(default="chippi", compare=False)
 
     @classmethod
     def from_settings(cls, settings: AgentSettings, run_id: str, space_name: str) -> "AgentContext":
         return cls(
             space_id=settings.space_id,
             space_name=space_name,
-            autonomy_level=settings.autonomy_level,
-            per_agent_autonomy=dict(settings.per_agent_autonomy),
             daily_token_budget=settings.daily_token_budget,
-            enabled_agents=settings.enabled_agents,
             run_id=run_id,
-            confidence_threshold=settings.confidence_threshold,
         )
 
-    def effective_autonomy_for(self, agent_type: str) -> AutonomyLevel:
-        """Return the autonomy level for a specific agent, falling back to workspace default."""
-        return self.per_agent_autonomy.get(agent_type, self.autonomy_level)
-
-    def is_autonomous(self) -> bool:
-        return self.effective_autonomy_for(self.current_agent_type) == "autonomous"
-
-    def requires_draft(self) -> bool:
-        return self.effective_autonomy_for(self.current_agent_type) in ("autonomous", "draft_required")
-
     def requires_approval_for(self, action_type: str) -> bool:
-        """Return True when this action needs human approval before execution."""
-        # Actions safe to run autonomously regardless of level
+        """True when this action needs a draft before execution.
+
+        Internal-only writes (scoring, follow-up reminders, observations,
+        memory) run without approval. Anything that touches a contact or
+        sends a message drafts.
+        """
         autonomous_actions = {
             "update_lead_score",
             "update_deal_probability",
@@ -63,13 +54,4 @@ class AgentContext:
             "log_observation",
             "store_memory",
         }
-        if action_type in autonomous_actions:
-            return False
-
-        level = self.effective_autonomy_for(self.current_agent_type)
-        if level == "autonomous":
-            return False
-        if level == "draft_required":
-            return True  # create draft, wait for approval
-        # suggest_only: flag in activity log only
-        return True
+        return action_type not in autonomous_actions
