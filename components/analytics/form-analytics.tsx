@@ -22,6 +22,16 @@ import {
   ChartSection,
   PAPER_GRID,
 } from './chart-primitives';
+import {
+  H1,
+  H2,
+  TITLE_FONT,
+  BODY_MUTED,
+  CAPTION,
+  SECTION_RHYTHM,
+  STAT_NUMBER,
+  PRIMARY_PILL,
+} from '@/lib/typography';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -153,7 +163,7 @@ function ScoreBadge({ label, score }: { label: string | null; score: number | nu
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-6 animate-pulse" aria-busy="true" aria-label="Loading form analytics">
+    <div className={`${SECTION_RHYTHM} animate-pulse`} aria-busy="true" aria-label="Loading form analytics">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="bg-background p-5">
@@ -236,10 +246,7 @@ export function FormAnalytics({
   // Optional standalone header (used when this component is the entire page).
   const StandaloneHeader = standalone ? (
     <header>
-      <h1
-        className="text-3xl tracking-tight text-foreground"
-        style={{ fontFamily: 'var(--font-title)' }}
-      >
+      <h1 className={H1} style={TITLE_FONT}>
         Form analytics
       </h1>
     </header>
@@ -249,7 +256,7 @@ export function FormAnalytics({
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className={SECTION_RHYTHM}>
         {StandaloneHeader}
         <LoadingSkeleton />
       </div>
@@ -260,17 +267,14 @@ export function FormAnalytics({
 
   if (error) {
     return (
-      <div className="space-y-6">
+      <div className={SECTION_RHYTHM}>
         {StandaloneHeader}
         <div
           role="alert"
           className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center space-y-3"
         >
           <p className="text-sm text-foreground font-medium">{error}</p>
-          <button
-            onClick={fetchData}
-            className="bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] rounded-full px-4 h-9 gap-1.5 inline-flex items-center transition-all duration-150 text-sm"
-          >
+          <button onClick={fetchData} className={PRIMARY_PILL}>
             Try again
           </button>
         </div>
@@ -282,21 +286,18 @@ export function FormAnalytics({
 
   if (!data || data.totalStarts === 0) {
     return (
-      <div className="space-y-6">
+      <div className={SECTION_RHYTHM}>
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">
+          <p className={BODY_MUTED}>
             Track how applicants interact with your intake form.
           </p>
           <TimePeriodSelector days={days} onChange={setDays} />
         </div>
         <div className="rounded-xl border border-border/70 bg-background px-6 py-16 text-center">
-          <p
-            className="text-3xl tracking-tight text-foreground"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
+          <p className={H1} style={TITLE_FONT}>
             No activity yet
           </p>
-          <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
+          <p className={`${BODY_MUTED} mt-2 max-w-sm mx-auto`}>
             Analytics will appear here once applicants start interacting with your intake form.
           </p>
         </div>
@@ -348,11 +349,11 @@ export function FormAnalytics({
   };
 
   return (
-    <div className="space-y-6">
+    <div className={SECTION_RHYTHM}>
       {/* Header with time selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         {StandaloneHeader ?? (
-          <p className="text-sm text-muted-foreground">
+          <p className={BODY_MUTED}>
             How applicants interact with your intake form.
           </p>
         )}
@@ -534,15 +535,12 @@ export function FormAnalytics({
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span
-                  className="text-3xl tracking-tight tabular-nums text-foreground"
-                  style={{ fontFamily: 'var(--font-title)' }}
-                >
+                <span className={STAT_NUMBER} style={TITLE_FONT}>
                   {data.completionRate}%
                 </span>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-3 text-center">
+            <p className={`${CAPTION} mt-3 text-center`}>
               {fmtNum(data.totalSubmits)} of {fmtNum(data.totalStarts)} visitors completed the form
             </p>
           </div>
@@ -553,8 +551,8 @@ export function FormAnalytics({
       {(standalone || showRecentLeads) && data.recentLeads && data.recentLeads.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-foreground">Recent leads</h2>
-            <p className="text-xs text-muted-foreground">
+            <h2 className={H2}>Recent leads</h2>
+            <p className={CAPTION}>
               Last {data.recentLeads.length} from form submissions
             </p>
           </div>

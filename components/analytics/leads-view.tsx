@@ -25,6 +25,7 @@ import {
 } from './chart-primitives';
 import type { ChartConfig } from './chart-primitives';
 import type { LeadsAnalyticsData } from '@/lib/analytics-data';
+import { SECTION_RHYTHM, BODY_MUTED } from '@/lib/typography';
 
 const leadsVolumeConfig = {
   count: { label: 'Leads', color: 'hsl(var(--foreground))' },
@@ -101,7 +102,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
       : '--';
 
   return (
-    <div className="space-y-6">
+    <div className={SECTION_RHYTHM}>
       {/* Summary strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
         <StatCell label="Total leads" value={data.totalLeads} sub="all time" />
@@ -373,7 +374,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
 
       {data.leadStateDistribution.length === 0 && data.employmentBreakdown.length === 0 && (
         <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center">
-          <p className="text-sm text-muted-foreground">
+          <p className={BODY_MUTED}>
             Qualification data will appear here once leads submit applications with full details.
           </p>
         </div>

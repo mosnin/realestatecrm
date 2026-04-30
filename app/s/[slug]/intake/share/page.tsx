@@ -5,6 +5,13 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { buildIntakeUrl } from '@/lib/intake';
 import { IntakeLinkRow } from '../intake-link-row';
 import { ArrowLeft } from 'lucide-react';
+import {
+  H1,
+  H3,
+  TITLE_FONT,
+  PAGE_RHYTHM,
+  READING_MAX,
+} from '@/lib/typography';
 import type { Metadata } from 'next';
 
 export async function generateMetadata({
@@ -44,13 +51,10 @@ export default async function IntakeSharePage({
   ];
 
   return (
-    <div className="space-y-8 max-w-3xl">
+    <div className={`${PAGE_RHYTHM} ${READING_MAX}`}>
       {/* Header */}
       <div className="flex items-end justify-between gap-4">
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+        <h1 className={H1} style={TITLE_FONT}>
           Share
         </h1>
         <Link
@@ -65,7 +69,7 @@ export default async function IntakeSharePage({
       {/* Intake link */}
       <section className="rounded-xl border border-border/70 bg-background p-5 space-y-3">
         <div>
-          <h2 className="text-sm font-medium text-foreground">Your intake link</h2>
+          <h2 className={H3}>Your intake link</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             Anyone with this link can submit an application.
           </p>
@@ -76,7 +80,7 @@ export default async function IntakeSharePage({
       {/* Tracking variants */}
       <section className="space-y-3">
         <div>
-          <h2 className="text-sm font-medium text-foreground">Tracking links</h2>
+          <h2 className={H3}>Tracking links</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             UTM-tagged versions for each channel — submissions are attributed in analytics.
           </p>
@@ -100,7 +104,7 @@ export default async function IntakeSharePage({
       {/* Embed */}
       <section className="rounded-xl border border-border/70 bg-background p-5 space-y-3">
         <div>
-          <h2 className="text-sm font-medium text-foreground">Embed on your site</h2>
+          <h2 className={H3}>Embed on your site</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             Drop this iframe into your website to host the form inline.
           </p>
@@ -116,7 +120,7 @@ export default async function IntakeSharePage({
 
       {/* Social */}
       <section className="space-y-3">
-        <h2 className="text-sm font-medium text-foreground">Share on social</h2>
+        <h2 className={H3}>Share on social</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
           <SocialLink
             href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(intakeUrl)}`}

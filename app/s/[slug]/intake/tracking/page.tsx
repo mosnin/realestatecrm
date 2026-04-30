@@ -5,6 +5,14 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { TrackingSettingsForm } from '@/app/s/[slug]/settings/tracking/tracking-settings-form';
 import { ArrowLeft } from 'lucide-react';
+import {
+  H1,
+  TITLE_FONT,
+  BODY_MUTED,
+  PAGE_RHYTHM,
+  READING_MAX,
+  PRIMARY_PILL,
+} from '@/lib/typography';
 import type { TrackingPixels } from '@/lib/types';
 
 export default async function IntakeTrackingPage({
@@ -31,11 +39,8 @@ export default async function IntakeTrackingPage({
   } catch (err) {
     console.error('[intake/tracking] DB query failed', err);
     return (
-      <div className="space-y-6 max-w-3xl">
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+      <div className={`${PAGE_RHYTHM} ${READING_MAX}`}>
+        <h1 className={H1} style={TITLE_FONT}>
           Tracking
         </h1>
         <div className="rounded-xl border border-border/70 bg-background p-6 space-y-3">
@@ -45,7 +50,7 @@ export default async function IntakeTrackingPage({
           </p>
           <Link
             href={`/s/${slug}/intake`}
-            className="inline-flex items-center text-sm font-medium px-4 py-2 rounded-full bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150"
+            className={PRIMARY_PILL}
           >
             Try again
           </Link>
@@ -55,16 +60,13 @@ export default async function IntakeTrackingPage({
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className={`${PAGE_RHYTHM} ${READING_MAX}`}>
       <header className="flex items-end justify-between gap-4">
         <div className="space-y-1.5">
-          <h1
-            className="text-3xl tracking-tight text-foreground"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
+          <h1 className={H1} style={TITLE_FONT}>
             Tracking
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className={BODY_MUTED}>
             Pixels fire when applicants visit and submit your intake form.
           </p>
         </div>

@@ -21,6 +21,13 @@ import {
 } from './chart-primitives';
 import type { ChartConfig } from './chart-primitives';
 import type { ClientsAnalyticsData } from '@/lib/analytics-data';
+import {
+  SECTION_RHYTHM,
+  STAT_NUMBER,
+  TITLE_FONT,
+  CAPTION,
+  H3,
+} from '@/lib/typography';
 
 const contactsOverTimeConfig = {
   count: { label: 'Contacts', color: 'hsl(var(--foreground))' },
@@ -40,7 +47,7 @@ export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
   // Build a stat strip — total + each stage + conversion. Total cells = 2 + stages.
   const stageCells = data.contactsByStage.slice(0, 2); // cap to keep the strip tidy at 4 cols
   return (
-    <div className="space-y-6">
+    <div className={SECTION_RHYTHM}>
       {/* Summary strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
         <StatCell label="Total contacts" value={data.totalContacts} sub="in CRM" />
@@ -112,15 +119,15 @@ export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
                 className="flex-1 rounded-xl border border-border/70 bg-background px-5 py-4 flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1"
               >
                 <p
-                  className="text-3xl tracking-tight tabular-nums text-foreground"
-                  style={{ fontFamily: 'var(--font-title)', opacity }}
+                  className={STAT_NUMBER}
+                  style={{ ...TITLE_FONT, opacity }}
                 >
                   {stage.count}
                 </p>
                 <div className="flex flex-col">
-                  <p className="text-sm font-medium text-foreground">{stage.label}</p>
+                  <p className={H3}>{stage.label}</p>
                   {i > 0 && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={CAPTION}>
                       {stage.rate}% conversion
                     </p>
                   )}

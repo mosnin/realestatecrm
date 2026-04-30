@@ -5,6 +5,15 @@ import { supabase } from '@/lib/supabase';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { computeCommission, type CommissionSplit } from '@/lib/commissions';
 import { formatCurrency, formatCompact } from '@/lib/formatting';
+import {
+  H1,
+  H3,
+  TITLE_FONT,
+  STAT_NUMBER_COMPACT,
+  SECTION_LABEL,
+  PAGE_RHYTHM,
+} from '@/lib/typography';
+import { cn } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,7 +88,7 @@ export default async function PropertiesCommissionsPage({
   }
 
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className={cn(PAGE_RHYTHM, 'max-w-[1500px]')}>
       {/* Header */}
       <header className="space-y-1.5">
         <Link
@@ -89,10 +98,7 @@ export default async function PropertiesCommissionsPage({
           <ArrowLeft size={12} />
           Properties
         </Link>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+        <h1 className={H1} style={TITLE_FONT}>
           Commissions
         </h1>
       </header>
@@ -162,7 +168,7 @@ function Section({
   return (
     <section className="rounded-xl border border-border/70 bg-background overflow-hidden">
       <header className="px-5 py-3 border-b border-border/70 flex items-center gap-2">
-        <h2 className="text-sm font-medium text-foreground">{title}</h2>
+        <h3 className={H3}>{title}</h3>
         <span className="text-[11px] tabular-nums text-muted-foreground">{count}</span>
       </header>
       {count === 0 ? empty : children}
@@ -185,7 +191,7 @@ function CommissionTable({
 }) {
   return (
     <div className="divide-y divide-border/70">
-      <div className="hidden sm:grid grid-cols-[minmax(0,2fr)_100px_70px_100px_110px_28px] px-5 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground bg-foreground/[0.02]">
+      <div className={cn('hidden sm:grid grid-cols-[minmax(0,2fr)_100px_70px_100px_110px_28px] px-5 py-2 bg-foreground/[0.02]', SECTION_LABEL)}>
         <span>Deal</span>
         <span className="text-right">Value</span>
         <span className="text-right">Rate</span>
@@ -246,10 +252,7 @@ function StatCell({
 }) {
   return (
     <div className="bg-background p-5">
-      <p
-        className="text-3xl tracking-tight text-foreground tabular-nums"
-        style={{ fontFamily: 'var(--font-title)' }}
-      >
+      <p className={STAT_NUMBER_COMPACT} style={TITLE_FONT}>
         {value}
       </p>
       <p className="text-sm text-foreground mt-1.5">{label}</p>

@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { SettingsTabs } from './settings-tabs';
+import { H1, TITLE_FONT, SECTION_RHYTHM } from '@/lib/typography';
 
 type Tab = { href: string; label: string; matchPath: string };
 
@@ -65,11 +66,8 @@ export default async function SettingsLayout({
   const tabs: Tab[] = showBrokerage ? [...BASE_TABS, BROKERAGE_TAB] : BASE_TABS;
 
   return (
-    <div className="space-y-8">
-      <h1
-        className="text-3xl tracking-tight text-foreground"
-        style={{ fontFamily: 'var(--font-title)' }}
-      >
+    <div className={SECTION_RHYTHM}>
+      <h1 className={H1} style={TITLE_FONT}>
         Settings
       </h1>
 

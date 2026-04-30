@@ -26,6 +26,13 @@ import {
 } from './chart-primitives';
 import type { ChartConfig } from './chart-primitives';
 import type { PipelineAnalyticsData } from '@/lib/analytics-data';
+import {
+  SECTION_RHYTHM,
+  STAT_NUMBER,
+  TITLE_FONT,
+  CAPTION,
+  BODY_MUTED,
+} from '@/lib/typography';
 
 const dealsByStageCountConfig = {
   count: { label: 'Deals', color: 'hsl(var(--foreground))' },
@@ -56,7 +63,7 @@ const PRIORITY_FILLS: Record<string, string> = {
 
 export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
   return (
-    <div className="space-y-6">
+    <div className={SECTION_RHYTHM}>
       {/* Summary strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
         <StatCell label="Total deals" value={data.totalDeals} />
@@ -198,15 +205,12 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span
-                  className="text-3xl tracking-tight tabular-nums text-foreground"
-                  style={{ fontFamily: 'var(--font-title)' }}
-                >
+                <span className={STAT_NUMBER} style={TITLE_FONT}>
                   {data.dealWinRate}%
                 </span>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-3 text-center">
+            <p className={`${CAPTION} mt-3 text-center`}>
               {data.wonDeals} won, {data.lostDeals} lost out of {data.totalDeals} deals
             </p>
           </div>
@@ -215,7 +219,7 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
 
       {data.totalDeals === 0 && (
         <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center">
-          <p className="text-sm text-muted-foreground">
+          <p className={BODY_MUTED}>
             Pipeline analytics will appear here once deals are created.
           </p>
         </div>

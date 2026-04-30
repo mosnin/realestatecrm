@@ -1,5 +1,7 @@
 'use client';
 
+import { STAT_NUMBER_COMPACT, TITLE_FONT, CAPTION } from '@/lib/typography';
+
 interface TourStats {
   toursThisWeek: number;
   conversionRate: number;
@@ -78,12 +80,12 @@ export function TourStatsStrip({ tours }: TourStatsStripProps) {
           className="rounded-lg border border-border/70 bg-background p-5 flex flex-col items-start gap-1"
         >
           <p
-            className="text-3xl tabular-nums tracking-tight text-foreground leading-none"
-            style={{ fontFamily: 'var(--font-title)' }}
+            className={`${STAT_NUMBER_COMPACT} leading-none`}
+            style={TITLE_FONT}
           >
             {item.value}
           </p>
-          <p className="text-xs text-muted-foreground">{item.label}</p>
+          <p className={CAPTION}>{item.label}</p>
         </div>
       ))}
     </div>

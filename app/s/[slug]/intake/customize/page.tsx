@@ -13,6 +13,13 @@ import { ScoringTab } from '@/components/form-builder/scoring-tab';
 import { TEMPLATES } from '@/components/form-builder/templates';
 import type { IntakeFormConfig } from '@/components/form-builder/types';
 import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
+import {
+  H1,
+  TITLE_FONT,
+  PRIMARY_PILL,
+  QUIET_LINK,
+  SECTION_RHYTHM,
+} from '@/lib/typography';
 
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
@@ -264,20 +271,17 @@ export default function IntakeCustomizePage() {
   }
 
   return (
-    <div className="space-y-6 max-w-[1280px]">
+    <div className={cn(SECTION_RHYTHM, 'max-w-[1280px]')}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+        <h1 className={H1} style={TITLE_FONT}>
           Customize
         </h1>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
             type="button"
             onClick={handleReset}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-150 px-2 h-9 inline-flex items-center"
+            className={cn(QUIET_LINK, 'px-2 h-9 inline-flex items-center')}
           >
             Reset to default
           </button>
@@ -286,8 +290,7 @@ export default function IntakeCustomizePage() {
             onClick={handleSave}
             disabled={saving || !hasChanges}
             className={cn(
-              'inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium',
-              'hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150',
+              PRIMARY_PILL,
               'disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100',
             )}
           >

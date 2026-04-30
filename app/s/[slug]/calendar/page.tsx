@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { CalendarView } from './calendar-view';
+import { H1, TITLE_FONT, PAGE_RHYTHM } from '@/lib/typography';
 import type { Metadata } from 'next';
 
 export async function generateMetadata({
@@ -108,17 +109,11 @@ export default async function CalendarPage({
   }
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-1.5">
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+    <div className={PAGE_RHYTHM}>
+      <header>
+        <h1 className={H1} style={TITLE_FONT}>
           Calendar
         </h1>
-        <p className="text-sm text-muted-foreground">
-          Tours and follow-ups at a glance.
-        </p>
       </header>
       <CalendarView
         slug={slug}

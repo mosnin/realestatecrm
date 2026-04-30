@@ -14,6 +14,7 @@ import {
   StickyNote,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { H2, H3 } from '@/lib/typography';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -533,7 +534,7 @@ export function CalendarView({
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-muted-foreground">
+          <h3 className={H3}>
             {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
               weekday: 'long',
               month: 'long',
@@ -858,7 +859,7 @@ export function CalendarView({
         </button>
 
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold">
+          <h2 className={H2}>
             {view === 'month' && `${MONTH_NAMES[currentMonth]} ${currentYear}`}
             {view === 'week' && weekLabel()}
             {view === 'day' && dayLabel()}

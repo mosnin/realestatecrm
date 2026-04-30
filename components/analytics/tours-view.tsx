@@ -23,6 +23,14 @@ import {
 } from './chart-primitives';
 import type { ChartConfig } from './chart-primitives';
 import type { ToursAnalyticsData } from '@/lib/analytics-data';
+import {
+  SECTION_RHYTHM,
+  STAT_NUMBER,
+  TITLE_FONT,
+  CAPTION,
+  H3,
+  BODY_MUTED,
+} from '@/lib/typography';
 
 const toursOverTimeConfig = {
   count: { label: 'Tours', color: 'hsl(var(--foreground))' },
@@ -49,7 +57,7 @@ const STATUS_FILLS: Record<string, string> = {
 
 export function ToursView({ data }: { data: ToursAnalyticsData }) {
   return (
-    <div className="space-y-6">
+    <div className={SECTION_RHYTHM}>
       {/* Summary strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
         <StatCell label="Total tours" value={data.totalTours} sub="all time" />
@@ -148,15 +156,15 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
                 className="flex-1 rounded-xl border border-border/70 bg-background px-5 py-4 flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1"
               >
                 <p
-                  className="text-3xl tracking-tight tabular-nums text-foreground"
-                  style={{ fontFamily: 'var(--font-title)', opacity }}
+                  className={STAT_NUMBER}
+                  style={{ ...TITLE_FONT, opacity }}
                 >
                   {stage.count}
                 </p>
                 <div className="flex flex-col">
-                  <p className="text-sm font-medium text-foreground">{stage.label}</p>
+                  <p className={H3}>{stage.label}</p>
                   {pct != null && (
-                    <p className="text-xs text-muted-foreground">{pct}% of booked</p>
+                    <p className={CAPTION}>{pct}% of booked</p>
                   )}
                 </div>
               </div>
@@ -167,7 +175,7 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
 
       {data.totalTours === 0 && (
         <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center">
-          <p className="text-sm text-muted-foreground">
+          <p className={BODY_MUTED}>
             Tour analytics will appear here once tours are scheduled and completed.
           </p>
         </div>

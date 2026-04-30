@@ -29,6 +29,16 @@ import { TourPrepCard } from '@/components/tours/tour-prep-card';
 import { TourTimeline } from '@/components/tours/tour-timeline';
 import { TourStatsStrip } from '@/components/tours/tour-stats-strip';
 import { TourFeedbackBadge } from '@/components/tours/tour-feedback-badge';
+import {
+  H1,
+  H2,
+  H3,
+  TITLE_FONT,
+  BODY_MUTED,
+  SECTION_LABEL,
+  PAGE_RHYTHM,
+  SECTION_RHYTHM,
+} from '@/lib/typography';
 
 type TourStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 
@@ -226,13 +236,10 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
   }
 
   return (
-    <div className="space-y-6">
+    <div className={PAGE_RHYTHM}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+        <h1 className={H1} style={TITLE_FONT}>
           Tours
         </h1>
         <div className="flex items-center gap-1">
@@ -314,7 +321,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
 
       {/* Availability tab */}
       {tab === 'availability' && (
-        <div className="space-y-8">
+        <div className={SECTION_RHYTHM}>
           <TourAvailabilityManager
             slug={slug}
             initialSettings={initialTourSettings}
@@ -325,7 +332,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
           {/* Embed Code */}
           <div className="border-t border-border pt-6 space-y-3">
             <div>
-              <h2 className="text-sm font-semibold">Embed Booking Widget</h2>
+              <h3 className={H3}>Embed Booking Widget</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Paste this code into your website or listing page to let visitors book tours directly.
               </p>
@@ -357,13 +364,10 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
       {tab !== 'availability' && filtered.length === 0 ? (
         <div className="flex flex-col items-center text-center py-16 space-y-3">
           <CalendarDays size={28} className="text-muted-foreground/40" />
-          <p
-            className="text-base text-foreground"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
+          <p className={H2} style={TITLE_FONT}>
             No {tab === 'all' ? '' : tab + ' '}tours yet
           </p>
-          <p className="text-sm text-muted-foreground max-w-sm">
+          <p className={`${BODY_MUTED} max-w-sm`}>
             Share your booking link to start receiving tour requests.
           </p>
         </div>
@@ -375,11 +379,11 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Guest</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Date & Time</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Property</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Contact</th>
+                    <th className={cn('text-left px-4 py-3', SECTION_LABEL)}>Guest</th>
+                    <th className={cn('text-left px-4 py-3 hidden sm:table-cell', SECTION_LABEL)}>Date & Time</th>
+                    <th className={cn('text-left px-4 py-3 hidden md:table-cell', SECTION_LABEL)}>Property</th>
+                    <th className={cn('text-left px-4 py-3', SECTION_LABEL)}>Status</th>
+                    <th className={cn('text-left px-4 py-3 hidden lg:table-cell', SECTION_LABEL)}>Contact</th>
                     <th className="px-4 py-3 w-16" />
                   </tr>
                 </thead>

@@ -5,6 +5,13 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { timeAgo } from '@/lib/formatting';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
+import {
+  H1,
+  H3,
+  TITLE_FONT,
+  STAT_NUMBER_COMPACT,
+  PAGE_RHYTHM,
+} from '@/lib/typography';
 import type { Metadata } from 'next';
 
 export async function generateMetadata({
@@ -98,13 +105,10 @@ export default async function IntakeAnalyticsPage({
   }
 
   return (
-    <div className="space-y-8 max-w-[1120px]">
+    <div className={`${PAGE_RHYTHM} max-w-[1120px]`}>
       {/* Header */}
       <header className="flex items-end justify-between gap-4">
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+        <h1 className={H1} style={TITLE_FONT}>
           Submissions
         </h1>
         <Link
@@ -127,7 +131,7 @@ export default async function IntakeAnalyticsPage({
       {/* Submissions list */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-foreground">All submissions</h2>
+          <h2 className={H3}>All submissions</h2>
           <Link
             href={`/s/${slug}/leads`}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 inline-flex items-center gap-1"
@@ -210,10 +214,7 @@ export default async function IntakeAnalyticsPage({
 function StatCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-background p-5">
-      <p
-        className="text-3xl tracking-tight text-foreground tabular-nums"
-        style={{ fontFamily: 'var(--font-title)' }}
-      >
+      <p className={STAT_NUMBER_COMPACT} style={TITLE_FONT}>
         {value}
       </p>
       <p className="text-xs text-muted-foreground mt-1">{label}</p>

@@ -20,6 +20,7 @@ import {
 } from './chart-primitives';
 import type { ChartConfig } from './chart-primitives';
 import type { OverviewData } from '@/lib/analytics-data';
+import { SECTION_RHYTHM } from '@/lib/typography';
 
 const leadsConfig = {
   count: { label: 'Leads', color: 'hsl(var(--foreground))' },
@@ -31,7 +32,7 @@ const dealsConfig = {
 
 export function OverviewView({ data }: { data: OverviewData }) {
   return (
-    <div className="space-y-6">
+    <div className={SECTION_RHYTHM}>
       {/* Stats strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
         <StatCell label="Total leads" value={data.totalLeads} sub="all time" />

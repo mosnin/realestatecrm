@@ -127,12 +127,9 @@ export function ContactForm({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg w-full max-h-[90vh] overflow-y-auto p-0 gap-0">
-        {/* Title — serif, sentence case, no subtitle */}
+        {/* Title — sentence case, no subtitle */}
         <div className="px-6 pt-6 pb-5">
-          <h2
-            className="text-2xl tracking-tight text-foreground"
-            style={{ fontFamily: 'var(--font-title)' }}
-          >
+          <h2 className="text-xl tracking-tight font-semibold text-foreground">
             {resolvedTitle}
           </h2>
         </div>

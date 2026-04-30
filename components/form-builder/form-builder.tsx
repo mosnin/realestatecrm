@@ -46,6 +46,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { QUESTION_TYPES, getQuestionTypeConfig } from './question-types';
+import { H3, SECTION_LABEL } from '@/lib/typography';
 import type { IntakeFormConfig, FormSection, FormQuestion } from './types';
 
 // ── Helpers ──
@@ -374,7 +375,7 @@ function QuestionEditor({
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-foreground">Edit question</h3>
+        <h3 className={H3}>Edit question</h3>
         {isSystem && (
           <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5">
             <Lock size={10} /> System field
@@ -645,7 +646,7 @@ function SectionEditor({
 
   return (
     <div className="space-y-5">
-      <h3 className="text-sm font-medium text-foreground">Edit section</h3>
+      <h3 className={H3}>Edit section</h3>
 
       <div className="space-y-1.5">
         <Label className="text-xs">Title</Label>
@@ -1121,9 +1122,7 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
         {/* Left Panel - Palette */}
         <div className="w-full lg:w-48 flex-shrink-0">
           <div className="sticky top-4 space-y-3">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Field types
-            </p>
+            <p className={SECTION_LABEL}>Field types</p>
             <div className="grid grid-cols-2 gap-2">
               {QUESTION_TYPES.map((qt) => (
                 <PaletteItem
@@ -1182,9 +1181,7 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
         {/* Right Panel - Property Editor */}
         <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
           <div className="sticky top-4 space-y-3">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Properties
-            </p>
+            <p className={SECTION_LABEL}>Properties</p>
             <div
               className="rounded-xl border border-border/70 bg-background overflow-y-auto"
               style={{ maxHeight: 'calc(100vh - 160px)' }}

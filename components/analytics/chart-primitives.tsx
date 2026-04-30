@@ -1,6 +1,7 @@
 'use client';
 
 import { formatCompact as formatCurrency } from '@/lib/formatting';
+import { STAT_NUMBER, TITLE_FONT, CAPTION, H3 } from '@/lib/typography';
 
 // Re-export shadcn chart primitives
 export {
@@ -30,6 +31,9 @@ export const PAPER_GRID = 'hsl(var(--muted-foreground) / 0.25)';
 
 // Stat cell — for use inside the connected stat strip (gap-px, bg-border/70).
 // Wrap in a parent: <div className="grid grid-cols-X gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+//
+// Numbers render in the focal serif (TITLE_FONT) per the typography rules so
+// they read as data, not labels.
 export function StatCell({
   label,
   value,
@@ -41,13 +45,10 @@ export function StatCell({
 }) {
   return (
     <div className="bg-background p-5">
-      <p
-        className="text-3xl tracking-tight text-foreground tabular-nums"
-        style={{ fontFamily: 'var(--font-title)' }}
-      >
+      <p className={STAT_NUMBER} style={TITLE_FONT}>
         {value}
       </p>
-      <p className="text-xs text-muted-foreground mt-1">{label}</p>
+      <p className={`${CAPTION} mt-1`}>{label}</p>
       {sub && (
         <p className="text-[11px] text-muted-foreground/70 mt-0.5">{sub}</p>
       )}
@@ -56,6 +57,8 @@ export function StatCell({
 }
 
 // Chart section — paper-flat surface for charts.
+// Title uses H3 (card heading) and sub uses caption-tone muted text so the
+// type hierarchy is consistent across analytics surfaces.
 export function ChartSection({
   title,
   sub,
@@ -67,8 +70,8 @@ export function ChartSection({
 }) {
   return (
     <div className="rounded-xl border border-border/70 bg-background p-5">
-      <p className="text-sm font-medium text-foreground">{title}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-0.5 mb-4">{sub}</p>}
+      <p className={H3}>{title}</p>
+      {sub && <p className={`${CAPTION} mt-0.5 mb-4`}>{sub}</p>}
       {!sub && <div className="mb-4" />}
       <div className="overflow-x-auto -mx-1 px-1">{children}</div>
     </div>

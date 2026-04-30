@@ -17,6 +17,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { STAT_NUMBER, TITLE_FONT, SECTION_LABEL } from '@/lib/typography';
 import type { IntakeFormConfig, FormQuestion } from './types';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -485,10 +486,7 @@ export function ScoringPreview({ config, slug }: ScoringPreviewProps) {
             {/* Score overview */}
             <div className="flex items-center gap-4">
               <div className="text-center flex-shrink-0">
-                <p
-                  className="text-3xl text-foreground tabular-nums"
-                  style={{ fontFamily: 'var(--font-title)' }}
-                >
+                <p className={STAT_NUMBER} style={TITLE_FONT}>
                   {scoreResult.leadScore}
                 </p>
                 <p className="text-[10px] text-muted-foreground">out of 100</p>

@@ -141,7 +141,7 @@ export default async function ClientDetailPage({
                 {getInitials(contact.name)}
               </div>
               <div className="min-w-0">
-                <h1 className="text-xl font-semibold leading-tight truncate">{contact.name}</h1>
+                <h1 className="text-xl tracking-tight font-semibold text-foreground leading-tight truncate">{contact.name}</h1>
                 <p className="text-sm text-muted-foreground truncate">{contact.sourceLabel ?? 'Intake lead'}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Added {new Date(contact.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -237,7 +237,7 @@ export default async function ClientDetailPage({
           <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-primary" />
-              <h2 className="text-sm font-semibold">AI Lead Score</h2>
+              <h2 className="text-base font-semibold text-foreground">AI Lead Score</h2>
             </div>
             <RescoreButton contactId={contact.id} />
           </div>
@@ -245,7 +245,12 @@ export default async function ClientDetailPage({
             {/* Score + tier + status badges */}
             <div>
               <div className="flex items-center gap-4 flex-wrap">
-                <span className="text-4xl font-bold tabular-nums">{contact.leadScore != null ? Math.round(contact.leadScore) : '—'}</span>
+                <span
+                  className="text-3xl tracking-tight text-foreground tabular-nums"
+                  style={{ fontFamily: 'var(--font-title)' }}
+                >
+                  {contact.leadScore != null ? Math.round(contact.leadScore) : '—'}
+                </span>
                 <span className={`inline-flex text-xs font-semibold rounded-full px-3 py-1.5 uppercase ${tierBadgeClasses(contact.scoreLabel ?? 'cold')}`}>
                   {contact.scoreLabel}
                 </span>
@@ -299,7 +304,7 @@ export default async function ClientDetailPage({
             {/* ── Strengths + Weaknesses ── */}
             {(details?.strengths?.length || details?.weaknesses?.length) && (
               <div className="border-t border-border pt-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Assessment</p>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-3">Assessment</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {details?.strengths && details.strengths.length > 0 && (
                     <div className="space-y-2">
@@ -406,7 +411,7 @@ export default async function ClientDetailPage({
       {activeTab === 'overview' && (app ? (
         <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-emerald-500/40">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold">Application details</h2>
+            <h2 className="text-base font-semibold text-foreground">Application details</h2>
             <div className="flex items-center gap-2 flex-wrap">
               {app.submittedAt && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -547,7 +552,7 @@ export default async function ClientDetailPage({
         /* Legacy application details (no structured data) */
         <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-emerald-500/40">
           <div className="px-4 sm:px-6 py-4 border-b border-border">
-            <h2 className="text-sm font-semibold">Application details</h2>
+            <h2 className="text-base font-semibold text-foreground">Application details</h2>
           </div>
           <div className="px-4 sm:px-6 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             {contact.budget != null && (
@@ -593,7 +598,7 @@ export default async function ClientDetailPage({
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
             <ShieldCheck size={14} className="text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Privacy Consent</h2>
+            <h2 className="text-base font-semibold text-foreground">Privacy Consent</h2>
           </div>
           <div className="px-4 sm:px-6 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -671,7 +676,7 @@ export default async function ClientDetailPage({
         <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-amber-500/40">
           <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
             <CalendarDays size={14} className="text-amber-600 dark:text-amber-400" />
-            <h2 className="text-sm font-semibold">Tour History</h2>
+            <h2 className="text-base font-semibold text-foreground">Tour History</h2>
             <span className="ml-auto text-xs text-muted-foreground">{contact.tours.length} tours</span>
           </div>
           <div className="px-4 sm:px-6 py-3 space-y-2">
@@ -719,7 +724,7 @@ export default async function ClientDetailPage({
       <div className="rounded-lg border border-border bg-card overflow-hidden border-l-4 border-l-indigo-500/40">
         <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center gap-2">
           <Briefcase size={14} className="text-indigo-600 dark:text-indigo-400" />
-          <h2 className="text-sm font-semibold">Linked Deals</h2>
+          <h2 className="text-base font-semibold text-foreground">Linked Deals</h2>
           {contact.dealContacts.length > 0 && (
             <span className="ml-auto text-xs text-muted-foreground">{contact.dealContacts.length} {contact.dealContacts.length === 1 ? 'deal' : 'deals'}</span>
           )}

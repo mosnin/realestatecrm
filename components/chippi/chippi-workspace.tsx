@@ -575,7 +575,7 @@ export function ChippiWorkspace({
               <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-4">
                 {/* Conversation title — quiet, only when we have one */}
                 {activeConversationId && (
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground/60 mb-6 truncate">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-6 truncate">
                     {conversations.find((c) => c.id === activeConversationId)?.title ?? ''}
                   </p>
                 )}

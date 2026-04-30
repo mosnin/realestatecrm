@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AnalyticsTabs } from '@/components/analytics/analytics-tabs';
+import { H1, TITLE_FONT, SECTION_RHYTHM } from '@/lib/typography';
 
 export const metadata: Metadata = {
   title: 'Analytics',
@@ -15,12 +16,9 @@ export default async function AnalyticsLayout({
   const { slug } = await params;
 
   return (
-    <div className="space-y-6 max-w-[1120px]">
+    <div className={`${SECTION_RHYTHM} max-w-[1120px]`}>
       <header>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+        <h1 className={H1} style={TITLE_FONT}>
           Analytics
         </h1>
       </header>
