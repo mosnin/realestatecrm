@@ -161,8 +161,8 @@ BEGIN
     v_agent_rate,
     v_broker_rate,
     0,
-    ROUND(v_deal_value * v_agent_rate  / 100, 2),
-    ROUND(v_deal_value * v_broker_rate / 100, 2),
+    ROUND((v_deal_value * v_agent_rate  / 100)::numeric, 2),
+    ROUND((v_deal_value * v_broker_rate / 100)::numeric, 2),
     0,
     'pending'
   )
@@ -224,8 +224,8 @@ SELECT
   b."defaultAgentRate",
   b."defaultBrokerRate",
   0,
-  ROUND(COALESCE(d.value, 0) * b."defaultAgentRate"  / 100, 2),
-  ROUND(COALESCE(d.value, 0) * b."defaultBrokerRate" / 100, 2),
+  ROUND((COALESCE(d.value, 0) * b."defaultAgentRate"  / 100)::numeric, 2),
+  ROUND((COALESCE(d.value, 0) * b."defaultBrokerRate" / 100)::numeric, 2),
   0,
   'pending'
   FROM "Deal" d
