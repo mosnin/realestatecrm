@@ -41,6 +41,8 @@ image = (
         "httpx>=0.28.0",
         "upstash-redis>=1.3.0",
         "structlog>=25.1.0",
+        # Required by Modal's @fastapi_endpoint as of 2025
+        "fastapi[standard]>=0.115.0",
         # Attachment extraction (read_attachment tool inside the sandbox)
         "pypdf>=5.0.0",
         "python-docx>=1.1.0",
