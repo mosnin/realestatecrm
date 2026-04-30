@@ -191,12 +191,10 @@ async def read_attachment(
     try:
         result = await (
             db.table("Attachment")
-            .select(
-                'id,filename,"mimeType","publicUrl","extractedText","extractionStatus"'
-            )
+            .select("id,filename,mimeType,publicUrl,extractedText,extractionStatus")
             .eq("id", attachment_id)
             .eq("spaceId", space_id)  # tenant boundary — never skip
-            .single()
+            .maybe_single()
             .execute()
         )
     except Exception as exc:

@@ -26,7 +26,6 @@ image = (
     .pip_install(
         "openai-agents>=0.0.15",
         "openai>=1.75.0",
-        "supabase>=2.15.0",
         "asyncpg>=0.30.0",
         "pydantic>=2.11.0",
         "pydantic-settings>=2.9.0",
