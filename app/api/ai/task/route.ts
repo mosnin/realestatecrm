@@ -45,6 +45,12 @@ import {
   computeConversationTitle,
   fallbackHeuristic,
 } from '@/lib/ai-tools/chippi-voice';
+import {
+  emit as emitTelemetry,
+  hasEmitted as hasEmittedTelemetry,
+  getFirstEmittedAt,
+  secondsBetween,
+} from '@/lib/telemetry';
 
 interface HistoryRow {
   role: 'user' | 'assistant';
@@ -409,6 +415,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
 
+  // Phase 2 telemetry: chippi_first_message — fire exactly once per space,
+  // the first time the realtor sends ANY chat message. Detached from the
+  // request path; never blocks the assistant's first token.
+  void (async () => {
+    try {
+      if (await hasEmittedTelemetry(ctx.space.id, 'chippi_first_message')) return;
+      const signupAt = await getFirstEmittedAt(ctx.space.id, 'signup_completed');
+      await emitTelemetry({
+        event: 'chippi_first_message',
+        spaceId: ctx.space.id,
+        userId: ctx.userId,
+        payload: {
+          conversationId,
+          messagePreview: rawMessage.slice(0, 50),
+          secondsFromSignup: secondsBetween(signupAt, new Date()),
+        },
+      });
+    } catch (err) {
+      logger.warn('[ai/task] first-message telemetry failed', { spaceSlug }, err);
+    }
+  })();
+
   let history: HistoryRow[];
   try {
     history = await loadHistory(ctx.space.id, conversationId);
@@ -533,6 +561,19 @@ export async function POST(req: NextRequest) {
           }
           for (const out of translate(sandboxEvent, state)) {
             pushEvent(out);
+          }
+          // Phase 2 telemetry: agent_first_action_completed. The sandbox is
+          // the source of truth for which tool actually ran successfully —
+          // we read the raw sandbox event (which carries the tool name)
+          // rather than the translated PushableEvent (which doesn't). Gated
+          // to side-effecting tools + first-time-per-space inside
+          // maybeEmitFirstAction. Detached from the stream pump.
+          if (sandboxEvent.type === 'tool_call_result' && sandboxEvent.ok) {
+            void maybeEmitFirstAction({
+              spaceId: ctx.space.id,
+              userId: ctx.userId,
+              toolName: sandboxEvent.tool,
+            });
           }
         }
         clearTimeout(coldStartTimer);

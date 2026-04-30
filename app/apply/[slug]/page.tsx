@@ -5,6 +5,7 @@ import { PublicPageShell } from '@/components/public-page-shell';
 import { FormUnavailable } from '@/components/form-unavailable';
 import { TrackingPixels } from '@/components/tracking-pixels';
 import { ApplicationFormLoader } from './application-form-loader';
+import { PreviewBridge } from './preview-bridge';
 import { clerkClient } from '@clerk/nextjs/server';
 import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
 import type { Metadata } from 'next';
@@ -38,10 +39,11 @@ export default async function PublicApplyPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ resume?: string }>;
+  searchParams: Promise<{ resume?: string; preview?: string }>;
 }) {
   const { slug } = await params;
-  const { resume: resumeToken } = await searchParams;
+  const { resume: resumeToken, preview } = await searchParams;
+  const isPreview = preview === '1';
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
@@ -222,6 +224,7 @@ export default async function PublicApplyPage({
 
   return (
     <>
+      {isPreview && <PreviewBridge />}
       <TrackingPixels pixels={trackingPixels} />
       <PublicPageShell
         logoUrl={logoUrl}

@@ -5,6 +5,7 @@ import { isValidSlug, normalizeSlug } from '@/lib/intake';
 import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
 import { sendWelcomeEmail } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { emit as emitTelemetry } from '@/lib/telemetry';
 import type { User, Space, SpaceSetting } from '@/lib/types';
 
 export async function GET() {
@@ -556,6 +557,21 @@ export async function POST(req: NextRequest) {
         .update(updatePayload)
         .eq('id', user.id);
       if (error) throw error;
+
+      // Phase 2 telemetry: fire signup_completed exactly when the user
+      // transitions from non-onboarded to onboarded. The early-return path
+      // above (already-onboarded re-setup) intentionally does NOT emit so
+      // we don't double-count. Fire-and-forget — telemetry never blocks.
+      void emitTelemetry({
+        event: 'signup_completed',
+        spaceId: space?.id ?? null,
+        userId,
+        payload: {
+          slug: space?.slug ?? null,
+          accountType: (updatePayload.accountType as string | undefined) ?? user.accountType ?? 'realtor',
+          isBrokerOnly,
+        },
+      });
 
       // Send welcome email
       try {

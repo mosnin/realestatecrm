@@ -683,3 +683,23 @@ BEGIN
   LIMIT match_count;
 END;
 $$;
+
+-- ============================================================
+-- TelemetryEvent: first-value product analytics
+-- See lib/telemetry.ts and supabase/migrations/20260518000000_telemetry_event.sql
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS "TelemetryEvent" (
+  id          TEXT        PRIMARY KEY,
+  "spaceId"   TEXT,
+  "userId"    TEXT,
+  event       TEXT        NOT NULL,
+  payload     JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS "TelemetryEvent_event_createdAt_idx"
+  ON "TelemetryEvent" (event, "createdAt" DESC);
+
+CREATE INDEX IF NOT EXISTS "TelemetryEvent_spaceId_event_idx"
+  ON "TelemetryEvent" ("spaceId", event);

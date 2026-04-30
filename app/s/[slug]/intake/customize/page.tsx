@@ -61,6 +61,10 @@ export default function IntakeCustomizePage() {
   const [configSource, setConfigSource] = useState<FormConfigSource>('legacy');
   // Bumps after a successful save so the preview iframe remounts and reloads.
   const [previewVersion, setPreviewVersion] = useState(0);
+  // Live preview iframe ref — used to postMessage draft updates so changes
+  // appear on the realtor's keystroke (CSS-driven properties) instead of
+  // waiting for Save.
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Scoring model state (separate from form config)
   const [rentalScoringModel, setRentalScoringModel] = useState<ScoringModel | null>(null);
@@ -128,6 +132,24 @@ export default function IntakeCustomizePage() {
   const hasChanges = activeLeadType === 'rental' ? rentalHasChanges : buyerHasChanges;
   const hasSavedConfig = activeLeadType === 'rental' ? rentalHasSavedConfig : buyerHasSavedConfig;
   const activeScoringModel = activeLeadType === 'rental' ? rentalScoringModel : buyerScoringModel;
+
+  // ── Live preview bridge ────────────────────────────────────────────────────
+  // Post the draft customization to the iframe on every edit so CSS-driven
+  // properties (accent, dark mode, font) update without a full reload.
+  // Debounced 250ms to avoid spamming on every keystroke. Save still drives
+  // the full re-mount via `previewVersion` for semantic edits (copy, etc.).
+  useEffect(() => {
+    if (loading) return;
+    const t = setTimeout(() => {
+      const target = iframeRef.current?.contentWindow;
+      if (!target) return;
+      target.postMessage(
+        { type: 'chippi:preview-update', customization: config },
+        window.location.origin,
+      );
+    }, 250);
+    return () => clearTimeout(t);
+  }, [config, loading]);
 
   const handleScoringModelChange = useCallback((model: ScoringModel) => {
     if (activeLeadType === 'rental') {
@@ -422,6 +444,7 @@ export default function IntakeCustomizePage() {
           </div>
           <iframe
             key={previewVersion}
+            ref={iframeRef}
             src={`/apply/${slug}?preview=1`}
             className="flex-1 w-full bg-background"
             title="Form preview"
