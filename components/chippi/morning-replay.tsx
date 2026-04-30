@@ -5,10 +5,9 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   CheckCircle2, MessageSquare, Mail, StickyNote, Bell, Brain, Activity,
-  Share2, Undo2, X, Loader2, Sparkles,
+  Share2, Undo2, X, Loader2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { toast } from 'sonner';
 
@@ -247,11 +246,7 @@ export function MorningReplay({ slug }: Props) {
         <div className="rounded-lg border border-border/70 bg-card overflow-hidden">
           {/* Header */}
           <div className="px-6 pt-6 pb-2 flex items-baseline gap-3">
-            <Sparkles size={14} className="text-orange-500 flex-shrink-0" />
-            <h2
-              className="text-2xl tracking-tight text-foreground"
-              style={{ fontFamily: 'var(--font-title)' }}
-            >
+            <h2 className="text-xl tracking-tight font-semibold text-foreground">
               Last night
             </h2>
             <span className="text-[12px] text-muted-foreground tabular-nums">{range}</span>
@@ -354,17 +349,15 @@ export function MorningReplay({ slug }: Props) {
             <button
               type="button"
               onClick={() => void share()}
-              className={cn(
-                'inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors',
-              )}
+              className="inline-flex items-center gap-1.5 rounded-full px-4 h-9 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
             >
-              <Share2 size={11} />
+              <Share2 size={12} />
               Share
             </button>
             <button
               type="button"
               onClick={dismiss}
-              className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-md text-[12px] font-medium text-background bg-foreground hover:opacity-90 transition-opacity"
+              className="inline-flex items-center gap-1.5 rounded-full px-4 h-9 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150"
             >
               Looks good
             </button>

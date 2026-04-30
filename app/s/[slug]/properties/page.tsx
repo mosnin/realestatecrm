@@ -66,7 +66,7 @@ export default async function PropertiesPage({
   const pendingPipeCount = deals.filter((d) => d.status === 'active').length;
 
   return (
-    <div className="max-w-[1320px]">
+    <div className="max-w-[1500px]">
       <PropertiesClient
         slug={slug}
         initial={properties}

@@ -517,11 +517,11 @@ export function ChippiWorkspace({
       ) : isEmpty ? (
         <>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-6 space-y-10">
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-6 space-y-12">
               {/* Greeting + status */}
               <header className="space-y-1.5">
                 <h1
-                  className="text-3xl sm:text-4xl tracking-tight text-foreground"
+                  className="text-3xl tracking-tight text-foreground"
                   style={{ fontFamily: 'var(--font-title)' }}
                 >
                   {greeting}

@@ -749,10 +749,7 @@ export function ContactTable({ slug }: ContactTableProps) {
               <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
                 <Users size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
               </div>
-              <h2
-                className="text-2xl tracking-tight text-foreground mb-2"
-                style={{ fontFamily: 'var(--font-title)' }}
-              >
+              <h2 className="text-xl tracking-tight font-semibold text-foreground mb-2">
                 Nobody here yet.
               </h2>
               <p className="text-sm text-muted-foreground max-w-sm mb-6">
@@ -782,10 +779,7 @@ export function ContactTable({ slug }: ContactTableProps) {
               <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
                 <Search size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
               </div>
-              <p
-                className="text-xl tracking-tight text-foreground mb-1"
-                style={{ fontFamily: 'var(--font-title)' }}
-              >
+              <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
                 No matches.
               </p>
               <p className="text-sm text-muted-foreground">
@@ -809,10 +803,7 @@ export function ContactTable({ slug }: ContactTableProps) {
             <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
               <Inbox size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
             </div>
-            <p
-              className="text-xl tracking-tight text-foreground mb-1"
-              style={{ fontFamily: 'var(--font-title)' }}
-            >
+            <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
               Nothing in this view.
             </p>
             <p className="text-sm text-muted-foreground">

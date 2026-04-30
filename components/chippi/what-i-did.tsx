@@ -90,7 +90,7 @@ export function WhatIDid({ slug }: { slug: string }) {
   return (
     <section>
       <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-        <h2 className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
+        <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           What I did
         </h2>
         {!loading && entries.length > 0 && (

@@ -16,6 +16,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  H1,
+  H2,
+  H3,
+  TITLE_FONT,
+  STAT_NUMBER,
+  BODY,
+  BODY_MUTED,
+  SECTION_LABEL,
+  PAGE_RHYTHM,
+  PRIMARY_PILL,
+} from '@/lib/typography';
 import { PropertyForm } from './property-form';
 
 // Subtle status pill palette — matches the locked design language.
@@ -149,19 +161,16 @@ export function PropertiesClient({ slug, initial, stats }: Props) {
   const isFreshWorkspace = items.length === 0;
 
   return (
-    <div className="space-y-6">
+    <div className={PAGE_RHYTHM}>
       {/* Header — title + canonical primary pill */}
       <header className="flex items-end justify-between gap-4">
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+        <h1 className={H1} style={TITLE_FONT}>
           Properties
         </h1>
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="inline-flex items-center gap-1.5 rounded-full px-4 h-9 bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150 text-sm font-medium"
+          className={PRIMARY_PILL}
         >
           <Plus size={14} strokeWidth={2.25} />
           Add property
@@ -203,6 +212,7 @@ export function PropertiesClient({ slug, initial, stats }: Props) {
                     ? 'bg-foreground text-background'
                     : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
                 )}
+                aria-pressed={active}
               >
                 {chip.label}
                 <span
@@ -268,21 +278,11 @@ export function PropertiesClient({ slug, initial, stats }: Props) {
         >
           {/* Table header — md+ only */}
           <div className="hidden md:grid grid-cols-[minmax(0,2.5fr)_90px_120px_140px_70px_28px] items-center gap-3 px-5 py-2.5 bg-foreground/[0.02] border-b border-border/70">
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-              Address
-            </span>
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-              Status
-            </span>
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide text-right">
-              List price
-            </span>
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-              Details
-            </span>
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide text-right">
-              MLS
-            </span>
+            <span className={SECTION_LABEL}>Address</span>
+            <span className={SECTION_LABEL}>Status</span>
+            <span className={cn(SECTION_LABEL, 'text-right')}>List price</span>
+            <span className={SECTION_LABEL}>Details</span>
+            <span className={cn(SECTION_LABEL, 'text-right')}>MLS</span>
             <span />
           </div>
 
@@ -382,7 +382,7 @@ export function PropertiesClient({ slug, initial, stats }: Props) {
           >
             <div className="px-5 py-3.5 border-b border-border/70 flex items-center gap-2">
               <Building2 size={15} className="text-muted-foreground" />
-              <h2 className="text-sm font-medium text-foreground">New property</h2>
+              <h2 className={H3}>New property</h2>
               {submitting && (
                 <Loader2
                   size={13}
@@ -416,13 +416,10 @@ function StatCell({
 }) {
   return (
     <div className="bg-background p-5">
-      <p
-        className="text-3xl tracking-tight text-foreground tabular-nums"
-        style={{ fontFamily: 'var(--font-title)' }}
-      >
+      <p className={STAT_NUMBER} style={TITLE_FONT}>
         {value}
       </p>
-      <p className="text-sm text-foreground mt-1.5">{label}</p>
+      <p className={cn(BODY, 'mt-1.5')}>{label}</p>
       <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
     </div>
   );
@@ -441,19 +438,16 @@ function EmptyState({
         <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
           <HomeIcon size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
         </div>
-        <h2
-          className="text-2xl tracking-tight text-foreground mb-2"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+        <h2 className={cn(H2, 'mb-2')} style={TITLE_FONT}>
           Nothing listed yet.
         </h2>
-        <p className="text-sm text-muted-foreground max-w-sm mb-6">
+        <p className={cn(BODY_MUTED, 'max-w-sm mb-6')}>
           Add your first property to start tracking commissions.
         </p>
         <button
           type="button"
           onClick={onAdd}
-          className="inline-flex items-center gap-1.5 rounded-full px-4 h-9 bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] transition-all duration-150 text-sm font-medium"
+          className={PRIMARY_PILL}
         >
           <Plus size={14} strokeWidth={2.25} />
           Add your first property
@@ -466,13 +460,10 @@ function EmptyState({
       <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
         <Search size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
       </div>
-      <p
-        className="text-xl tracking-tight text-foreground mb-1"
-        style={{ fontFamily: 'var(--font-title)' }}
-      >
+      <p className={cn(H2, 'mb-1')} style={TITLE_FONT}>
         No matches.
       </p>
-      <p className="text-sm text-muted-foreground">
+      <p className={BODY_MUTED}>
         Try a shorter query or clear the filter.
       </p>
     </div>
