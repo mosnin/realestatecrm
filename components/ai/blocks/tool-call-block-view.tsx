@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  Loader2,
   XCircle,
   MinusCircle,
   Lock,
@@ -20,6 +19,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolCallBlock } from '@/lib/ai-tools/blocks';
+import { AgentStatusIcon, iconKindFor } from '@/components/ui/icons/agent-status-icon';
 import { ContactsResult } from './tool-results/contacts-result';
 import { DealsResult } from './tool-results/deals-result';
 import { ToursResult } from './tool-results/tours-result';
@@ -66,7 +66,10 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
       case 'running':
         return {
           label: 'Running',
-          iconEl: <Loader2 size={12} className="animate-spin" />,
+          // Animated state icon — cog by default, connect for routing/inbound,
+          // file-cog for document/packet tools. Picks the right "what is the
+          // agent actually doing" cue at a glance.
+          iconEl: <AgentStatusIcon kind={iconKindFor(block.name)} size={12} />,
           tint: 'text-muted-foreground',
         };
       case 'complete':
