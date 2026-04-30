@@ -55,33 +55,6 @@ export function StatCell({
   );
 }
 
-// Standalone stat card — used outside a strip when needed.
-export function StatCard({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string | number;
-  sub?: string;
-  trend?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-border/70 bg-background p-5">
-      <p
-        className="text-3xl tracking-tight text-foreground tabular-nums"
-        style={{ fontFamily: 'var(--font-title)' }}
-      >
-        {value}
-      </p>
-      <p className="text-xs text-muted-foreground mt-1">{label}</p>
-      {sub && (
-        <p className="text-[11px] text-muted-foreground/70 mt-0.5">{sub}</p>
-      )}
-    </div>
-  );
-}
-
 // Chart section — paper-flat surface for charts.
 export function ChartSection({
   title,
