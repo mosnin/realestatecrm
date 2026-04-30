@@ -1049,7 +1049,7 @@ export function ContactTable({ slug }: ContactTableProps) {
           onClose={() => setShowCompare(false)}
         />
       )}
-      <ContactForm open={addOpen} onOpenChange={setAddOpen} onSubmit={handleAdd} mode="add" />
+      <ContactForm open={addOpen} onOpenChange={setAddOpen} onSubmit={handleAdd} mode="add" slug={slug} />
       <ContactForm
         open={!!editContact}
         onOpenChange={(o) => !o && setEditContact(null)}

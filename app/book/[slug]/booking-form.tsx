@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Check, Loader2, ChevronLeft, MapPin, Globe, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { pickContrastColor } from '@/lib/color';
 import { Confetti, type ConfettiRef } from '@/components/ui/confetti';
 import { Label } from '@/components/ui/label';
 import { fireConversionEvents } from '@/lib/tracking-events';
@@ -40,6 +41,7 @@ const TEXTAREA_CLASS = cn(FIELD_BASE, 'py-2 min-h-[72px]');
 const FIELD_LABEL = 'text-[12.5px] font-medium text-foreground';
 
 export function BookingForm({ slug, duration: defaultDuration, businessName, timezone, accentColor = '#ff964f' }: BookingFormProps) {
+  const primaryTextColor = pickContrastColor(accentColor);
   const confettiRef = useRef<ConfettiRef>(null);
   const [step, setStep] = useState<Step>('date');
   const [slots, setSlots] = useState<DaySlots[]>([]);
@@ -409,7 +411,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                       onClick={handleWaitlistSubmit}
                       disabled={waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim() || !waitlistDate}
                       className={cn(PRIMARY_PILL, 'w-full justify-center disabled:opacity-60 disabled:cursor-not-allowed')}
-                      style={{ backgroundColor: accentColor }}
+                      style={{ backgroundColor: accentColor, color: primaryTextColor }}
                     >
                       {waitlistSubmitting && <Loader2 size={14} className="animate-spin" />}
                       {waitlistSubmitting ? 'Joining…' : 'Join waitlist'}
@@ -464,10 +466,10 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                           className={cn(
                             'h-9 px-3 rounded-md text-sm transition-colors',
                             active
-                              ? 'text-white font-medium'
+                              ? 'font-medium'
                               : 'bg-foreground/[0.04] hover:bg-foreground/[0.06] text-foreground',
                           )}
-                          style={active ? { backgroundColor: accentColor } : undefined}
+                          style={active ? { backgroundColor: accentColor, color: primaryTextColor } : undefined}
                         >
                           {formatTime(t)}
                         </button>
@@ -481,7 +483,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                     type="button"
                     onClick={() => setStep('details')}
                     className={cn(PRIMARY_PILL, 'w-full justify-center')}
-                    style={{ backgroundColor: accentColor }}
+                    style={{ backgroundColor: accentColor, color: primaryTextColor }}
                   >
                     Continue
                   </button>
@@ -589,7 +591,7 @@ export function BookingForm({ slug, duration: defaultDuration, businessName, tim
                 onClick={handleSubmit}
                 disabled={submitting || !guestName.trim() || !guestEmail.trim()}
                 className={cn(PRIMARY_PILL, 'w-full justify-center mt-6 disabled:opacity-60 disabled:cursor-not-allowed')}
-                style={{ backgroundColor: accentColor }}
+                style={{ backgroundColor: accentColor, color: primaryTextColor }}
               >
                 {submitting && <Loader2 size={14} className="animate-spin" />}
                 {submitting ? 'Booking…' : 'Confirm booking'}

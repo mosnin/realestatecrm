@@ -37,6 +37,7 @@ import { consumePendingApproval, savePendingApproval } from '@/lib/ai-tools/pend
 import { saveAssistantMessage } from '@/lib/ai-tools/persistence';
 import { resolveToolContext } from '@/lib/ai-tools/context';
 import type { ToolContext } from '@/lib/ai-tools/types';
+import { chippiErrorMessage, classifyError } from '@/lib/ai-tools/chippi-voice';
 
 interface PostBody {
   decision: 'approved' | 'denied';
@@ -172,9 +173,10 @@ export async function POST(
 
         await pushEvent({ type: 'turn_complete', reason: result.reason });
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const raw = err instanceof Error ? err.message : String(err);
+        const code = classifyError(raw);
         logger.error('[ai/task/approve] continuation crashed', { requestId }, err);
-        await pushEvent({ type: 'error', message, code: 'internal' });
+        await pushEvent({ type: 'error', message: chippiErrorMessage(code), code });
       } finally {
         controller.close();
       }

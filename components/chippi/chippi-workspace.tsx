@@ -97,13 +97,11 @@ export function ChippiWorkspace({
     isStreaming,
     pendingApproval,
     liveCallIds,
-    error,
     send,
     approve,
     deny,
     alwaysAllow,
     abort,
-    clearError,
   } = useAgentTask({
     spaceSlug: slug,
     conversationId: activeConversationId,
@@ -701,20 +699,11 @@ export function ChippiWorkspace({
                     </div>
                   )}
 
-                  {error && (
-                    <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50/70 dark:border-rose-900 dark:bg-rose-950/40 px-3 py-2.5 text-sm text-rose-800 dark:text-rose-200">
-                      <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0">{error}</div>
-                      <button
-                        type="button"
-                        onClick={clearError}
-                        className="text-rose-600/70 dark:text-rose-300/70 hover:text-rose-800 dark:hover:text-rose-100"
-                        aria-label="Dismiss"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  )}
+                  {/* Errors land inline as Chippi assistant messages
+                      (see useAgentTask.landChippiError) so the failure mode
+                      reads like Chippi talking, not a red system banner. The
+                      `error` state is still tracked for telemetry / a11y but
+                      not rendered here. */}
 
                   <div ref={bottomRef} />
                 </div>

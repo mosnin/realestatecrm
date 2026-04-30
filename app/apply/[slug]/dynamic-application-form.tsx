@@ -1420,7 +1420,7 @@ export function DynamicApplicationForm({
                 type="button"
                 onClick={goNext}
                 className={cn(PRIMARY_PILL)}
-                style={{ backgroundColor: accentColor }}
+                style={{ backgroundColor: accentColor, color: primaryTextColor }}
               >
                 Continue
               </button>
@@ -1433,7 +1433,7 @@ export function DynamicApplicationForm({
                   PRIMARY_PILL,
                   'disabled:opacity-60 disabled:cursor-not-allowed',
                 )}
-                style={{ backgroundColor: accentColor }}
+                style={{ backgroundColor: accentColor, color: primaryTextColor }}
               >
                 {submitting && <Loader2 size={14} className="animate-spin" />}
                 {submitting ? 'Submitting' : 'Submit application'}

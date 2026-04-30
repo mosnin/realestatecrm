@@ -113,6 +113,7 @@ export type ChippiErrorCode =
   | 'cold_start'
   | 'tool_failure'
   | 'budget_exhausted'
+  | 'quota'
   | 'guardrail'
   | 'network'
   | 'rate_limited'
@@ -130,6 +131,7 @@ export function chippiErrorMessage(code: ChippiErrorCode): string {
     case 'tool_failure':
       return "That tool's slow today — give me a moment.";
     case 'budget_exhausted':
+    case 'quota':
       return "I burned through my budget on that one. Take a break and ask again — I'll be sharper.";
     case 'guardrail':
       return "That's not something I can help with directly — but if you re-frame it I'll try again.";

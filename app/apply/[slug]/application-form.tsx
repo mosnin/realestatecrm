@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { pickContrastColor } from '@/lib/color';
 import {
   CheckCircle2,
   Loader2,
@@ -554,6 +555,7 @@ export function ApplicationForm({
   const radiusClass = RADIUS_CLASS_MAP[customization?.borderRadius || 'rounded'] || 'rounded-xl';
   const fontClass = FONT_CLASS_MAP[customization?.font || 'system'] || '';
   const accentColor = customization?.accentColor || '#ff964f';
+  const primaryTextColor = pickContrastColor(accentColor);
   const embedUrl = customization?.videoUrl ? toEmbedUrl(customization.videoUrl) : null;
 
   // ── Shared step renderers ──
@@ -1274,8 +1276,8 @@ export function ApplicationForm({
             <Button
               type="button"
               onClick={goNext}
-              className="flex-shrink-0 rounded-full px-6 text-white shadow-md hover:shadow-lg transition-shadow"
-              style={{ backgroundColor: accentColor }}
+              className="flex-shrink-0 rounded-full px-6 shadow-md hover:shadow-lg transition-shadow"
+              style={{ backgroundColor: accentColor, color: primaryTextColor }}
             >
               Continue
               <ChevronRight size={15} className="ml-1" />
@@ -1286,8 +1288,8 @@ export function ApplicationForm({
               onClick={onSubmit}
               disabled={submitting}
               size="lg"
-              className="flex-1 sm:flex-none rounded-full px-8 text-white shadow-md hover:shadow-lg transition-shadow"
-              style={{ backgroundColor: accentColor }}
+              className="flex-1 sm:flex-none rounded-full px-8 shadow-md hover:shadow-lg transition-shadow"
+              style={{ backgroundColor: accentColor, color: primaryTextColor }}
             >
               {submitting ? (
                 <>

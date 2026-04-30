@@ -18,6 +18,7 @@ import {
   TITLE_FONT,
   PRIMARY_PILL,
   QUIET_LINK,
+  SECTION_LABEL,
   SECTION_RHYTHM,
 } from '@/lib/typography';
 
@@ -58,6 +59,8 @@ export default function IntakeCustomizePage() {
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<string>('builder');
   const [configSource, setConfigSource] = useState<FormConfigSource>('legacy');
+  // Bumps after a successful save so the preview iframe remounts and reloads.
+  const [previewVersion, setPreviewVersion] = useState(0);
 
   // Scoring model state (separate from form config)
   const [rentalScoringModel, setRentalScoringModel] = useState<ScoringModel | null>(null);
@@ -202,6 +205,9 @@ export default function IntakeCustomizePage() {
         console.warn('[intake-customize] Scoring model generation failed (non-blocking)');
       }
 
+      // Refresh the live preview iframe to reflect the saved changes.
+      setPreviewVersion((v) => v + 1);
+
       toast.success(`${activeLeadType === 'rental' ? 'Rental' : 'Buyer'} form saved.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong.');
@@ -271,7 +277,8 @@ export default function IntakeCustomizePage() {
   }
 
   return (
-    <div className={cn(SECTION_RHYTHM, 'max-w-[1280px]')}>
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_480px] gap-6 max-w-[1600px]">
+      <div className={cn(SECTION_RHYTHM, 'min-w-0')}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <h1 className={H1} style={TITLE_FONT}>
@@ -397,6 +404,30 @@ export default function IntakeCustomizePage() {
         {activeSubTab === 'optimize' && <OptimizationPanel slug={slug} />}
         {activeSubTab === 'test-scoring' && <ScoringPreview config={config} slug={slug} />}
       </div>
+      </div>
+
+      {/* Live preview — only on wide viewports. Mobile users keep the Preview sub-tab. */}
+      <aside className="hidden lg:block">
+        <div className="sticky top-6 h-[calc(100vh-3rem)] flex flex-col rounded-xl border border-border/70 bg-background overflow-hidden">
+          <div className="px-4 py-2 border-b border-border/70 flex items-center justify-between flex-shrink-0">
+            <p className={SECTION_LABEL}>Live preview</p>
+            <a
+              href={`/apply/${slug}`}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(QUIET_LINK, 'text-xs')}
+            >
+              Open in new tab ↗
+            </a>
+          </div>
+          <iframe
+            key={previewVersion}
+            src={`/apply/${slug}?preview=1`}
+            className="flex-1 w-full bg-background"
+            title="Form preview"
+          />
+        </div>
+      </aside>
     </div>
   );
 }

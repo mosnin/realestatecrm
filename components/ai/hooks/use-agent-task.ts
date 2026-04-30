@@ -28,6 +28,7 @@ import type { AgentEvent } from '@/lib/ai-tools/events';
 import type { MessageBlock, ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { SSEParser } from '@/lib/ai-tools/client/parse-sse';
 import type { PermissionPromptData } from '@/components/ai/blocks/permission-prompt-view';
+import { chippiErrorMessage, classifyError } from '@/lib/ai-tools/chippi-voice';
 
 export interface UiMessage {
   id: string;
@@ -162,6 +163,53 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
   const clearError = useCallback(() => setError(null), []);
 
+  /**
+   * Land a Chippi-voiced error line as an assistant message in the transcript.
+   * If we already have an open assistant bubble (the streaming target), we
+   * drop its empty content and replace it with the error text so the error
+   * looks like Chippi talking, not like a system warning under a phantom
+   * empty bubble.
+   *
+   * Also writes the same string into the `error` state so any banner-style
+   * consumer still has something to render — but the visible affordance is
+   * the inline assistant message.
+   */
+  const landChippiError = useCallback((message: string) => {
+    setError(message);
+    const targetId = streamingMsgIdRef.current;
+    setMessages((prev) => {
+      if (targetId) {
+        const idx = prev.findIndex((m) => m.id === targetId);
+        if (idx !== -1) {
+          const target = prev[idx];
+          if (target.role === 'assistant') {
+            const next = [...prev];
+            next[idx] = {
+              ...target,
+              blocks: [{ type: 'text', content: message }],
+              streaming: false,
+            };
+            return next;
+          }
+        }
+      }
+      // No live assistant bubble — append a fresh one.
+      const id =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : Math.random().toString(36).slice(2);
+      return [
+        ...prev,
+        {
+          id,
+          role: 'assistant',
+          blocks: [{ type: 'text', content: message }],
+          streaming: false,
+        },
+      ];
+    });
+  }, []);
+
   const abort = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -282,11 +330,17 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       }
 
       case 'error': {
-        setError(event.message);
+        // Server hands us a Chippi-voiced line in `message`; if it didn't
+        // (older server, raw fallback), pick one from the code.
+        const text =
+          event.message && event.message.length < 400
+            ? event.message
+            : chippiErrorMessage(event.code ?? 'internal');
+        landChippiError(text);
         return;
       }
     }
-  }, []);
+  }, [landChippiError]);
 
   /**
    * Shared stream consumer. Opens a POST to `url` with `body`, applies every
@@ -310,30 +364,30 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         });
 
         if (!res.ok) {
-          let message = `Request failed (${res.status})`;
+          // Server already speaks Chippi for this route; if not, classify
+          // by HTTP status as a fallback so the user never sees raw text.
+          let message: string | undefined;
           try {
             const parsed = (await res.json()) as { error?: string };
             if (parsed?.error) message = parsed.error;
           } catch {
             /* non-JSON body */
           }
-          setError(message);
-          // Drop the empty trailing assistant bubble we optimistically
-          // appended — leaving it around would show a phantom empty card
-          // under the error banner.
-          const targetId = streamingMsgIdRef.current;
-          if (targetId) {
-            setMessages((prev) =>
-              prev.filter(
-                (m) => !(m.id === targetId && m.role === 'assistant' && m.blocks.length === 0),
-              ),
-            );
+          if (!message || message.length > 400) {
+            const code =
+              res.status === 429
+                ? 'rate_limited'
+                : res.status === 401 || res.status === 403
+                  ? 'auth'
+                  : 'internal';
+            message = chippiErrorMessage(code);
           }
+          landChippiError(message);
           return;
         }
 
         if (!res.body) {
-          setError('Empty response from server');
+          landChippiError(chippiErrorMessage('network'));
           return;
         }
 
@@ -348,19 +402,20 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       } catch (err) {
         const aborted = (err as { name?: string }).name === 'AbortError';
         if (!aborted) {
-          setError(err instanceof Error ? err.message : 'Network error');
-        }
-        // Either path: tidy the trailing assistant bubble so it doesn't
-        // hang around with a caret or phantom empty card.
-        const targetId = streamingMsgIdRef.current;
-        if (targetId) {
-          setMessages((prev) =>
-            prev
-              .filter(
-                (m) => !(m.id === targetId && m.role === 'assistant' && m.blocks.length === 0),
-              )
-              .map((m) => (m.id === targetId ? { ...m, streaming: false } : m)),
-          );
+          const raw = err instanceof Error ? err.message : 'Network error';
+          landChippiError(chippiErrorMessage(classifyError(raw)));
+        } else {
+          // Aborted: just tidy the trailing empty assistant bubble.
+          const targetId = streamingMsgIdRef.current;
+          if (targetId) {
+            setMessages((prev) =>
+              prev
+                .filter(
+                  (m) => !(m.id === targetId && m.role === 'assistant' && m.blocks.length === 0),
+                )
+                .map((m) => (m.id === targetId ? { ...m, streaming: false } : m)),
+            );
+          }
         }
       } finally {
         abortRef.current = null;
@@ -369,7 +424,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         setLiveCallIds(new Set());
       }
     },
-    [abort, applyEvent],
+    [abort, applyEvent, landChippiError],
   );
 
   /**
@@ -403,7 +458,8 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       try {
         convId = await ensureConversationId();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not start conversation');
+        const raw = err instanceof Error ? err.message : '';
+        landChippiError(chippiErrorMessage(classifyError(raw)));
         return;
       }
 
@@ -430,7 +486,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         ...(hasAttachments ? { attachmentIds } : {}),
       });
     },
-    [isStreaming, spaceSlug, ensureConversationId, consumeStream],
+    [isStreaming, spaceSlug, ensureConversationId, consumeStream, landChippiError],
   );
 
   const approve = useCallback(
