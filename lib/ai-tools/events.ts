@@ -116,9 +116,26 @@ export interface TurnCompleteEvent extends BaseEvent {
 /** Unrecoverable turn failure. Different from a tool error (which keeps the turn alive). */
 export interface ErrorEvent extends BaseEvent {
   type: 'error';
+  /**
+   * Human-facing message. The server replaces this with a Chippi-voiced line
+   * (see lib/ai-tools/chippi-voice.ts) before shipping; the client renders
+   * it inline as an assistant message rather than as a system warning.
+   */
   message: string;
-  /** Optional machine-readable code so the UI can special-case quota/rate-limit. */
-  code?: 'rate_limited' | 'quota' | 'internal' | 'auth';
+  /**
+   * Machine-readable code so the client can pick its own Chippi line if the
+   * server-supplied message gets through stale or empty.
+   */
+  code?:
+    | 'rate_limited'
+    | 'quota'
+    | 'internal'
+    | 'auth'
+    | 'cold_start'
+    | 'tool_failure'
+    | 'budget_exhausted'
+    | 'guardrail'
+    | 'network';
 }
 
 // ── Wire format ────────────────────────────────────────────────────────────

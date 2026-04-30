@@ -39,6 +39,11 @@ import { saveAssistantMessage, saveUserMessage } from '@/lib/ai-tools/persistenc
 import { resolveToolContext } from '@/lib/ai-tools/context';
 import type { ToolContext } from '@/lib/ai-tools/types';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
+import {
+  chippiErrorMessage,
+  classifyError,
+  computeConversationTitle,
+} from '@/lib/ai-tools/chippi-voice';
 
 interface HistoryRow {
   role: 'user' | 'assistant';
@@ -63,12 +68,24 @@ interface PostBody {
   attachmentIds?: string[];
 }
 
-function sanitizeTitle(text: string): string {
-  return text
-    .replace(/<[^>]*>/g, '')
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+/**
+ * Fire-and-forget: derive a 4-6 word title from the user's first message and
+ * patch the row. We do NOT await this from the request path — a slow Supabase
+ * write should never delay the assistant's first token. Logged on failure;
+ * the conversation just keeps its prior title.
+ */
+function autoTitleConversation(conversationId: string, userMessage: string): void {
+  const title = computeConversationTitle(userMessage);
+  if (!title || title === 'New conversation') return;
+  void supabase
+    .from('Conversation')
+    .update({ title, updatedAt: new Date().toISOString() })
+    .eq('id', conversationId)
+    .then(({ error }) => {
+      if (error) {
+        logger.warn('[ai/task] auto-title patch failed', { conversationId }, error);
+      }
+    });
 }
 
 async function resolveConversation(
@@ -83,25 +100,23 @@ async function resolveConversation(
       .eq('id', conversationId)
       .maybeSingle();
     if (data && data.spaceId === spaceId) {
-      if (data.title === 'New conversation' || !data.title) {
-        const autoTitle = sanitizeTitle(userMessage).slice(0, 60) || 'Task';
-        await supabase
-          .from('Conversation')
-          .update({ title: autoTitle, updatedAt: new Date().toISOString() })
-          .eq('id', conversationId);
+      if (!data.title || data.title === 'New conversation') {
+        autoTitleConversation(conversationId, userMessage);
       }
       return conversationId;
     }
   }
 
   const id = crypto.randomUUID();
-  const autoTitle = sanitizeTitle(userMessage).slice(0, 60) || 'Task';
+  // Insert with a placeholder so the row exists immediately, then auto-title
+  // out of band — same fire-and-forget treatment as the existing-row path.
   const { error } = await supabase.from('Conversation').insert({
     id,
     spaceId,
-    title: autoTitle,
+    title: 'New conversation',
   });
   if (error) throw error;
+  autoTitleConversation(id, userMessage);
   return id;
 }
 
@@ -244,7 +259,11 @@ function translate(event: SandboxEvent, state: TranslateState): PushableEvent[] 
       return [{ type: 'turn_complete', reason: 'complete' }];
     }
     case 'error': {
-      return [{ type: 'error', message: event.message, code: 'internal' }];
+      // Sandbox errors come from inside the agent loop — could be a tool
+      // crash, a model timeout, a budget hit. Classify the raw message and
+      // hand the user a first-person Chippi line.
+      const code = classifyError(event.message);
+      return [{ type: 'error', message: chippiErrorMessage(code), code }];
     }
     default:
       return [];
@@ -428,6 +447,20 @@ export async function POST(req: NextRequest) {
         }
       };
 
+      // Cold-start fallback — Modal Sandboxes can take 5-15s on a cold spin
+      // up, during which the user sees nothing. Drop a Chippi-voiced status
+      // line as a text_delta if the sandbox hasn't started talking by 8s.
+      // Cleared the moment any real event lands. The line goes via text_delta
+      // (not error) on purpose: the turn isn't broken, it's just slow.
+      let coldStartFired = false;
+      const coldStartTimer = setTimeout(() => {
+        if (state.textBuffer || state.sawDone) return;
+        coldStartFired = true;
+        const line = chippiErrorMessage('cold_start') + '\n\n';
+        state.textBuffer += line;
+        pushEvent({ type: 'text_delta', delta: line });
+      }, 8000);
+
       let modalRes: Response;
       try {
         modalRes = await fetch(modalUrl, {
@@ -437,14 +470,19 @@ export async function POST(req: NextRequest) {
           signal: abortController.signal,
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        clearTimeout(coldStartTimer);
         logger.error('[ai/task] modal fetch failed', { spaceSlug }, err);
-        pushEvent({ type: 'error', message: `Agent backend unreachable: ${message}`, code: 'internal' });
+        pushEvent({
+          type: 'error',
+          message: chippiErrorMessage('network'),
+          code: 'network',
+        });
         controller.close();
         return;
       }
 
       if (!modalRes.ok || !modalRes.body) {
+        clearTimeout(coldStartTimer);
         let detail = `status ${modalRes.status}`;
         try {
           const text = await modalRes.text();
@@ -453,30 +491,51 @@ export async function POST(req: NextRequest) {
           /* ignore */
         }
         logger.error('[ai/task] modal returned non-OK', { spaceSlug, detail });
-        pushEvent({ type: 'error', message: `Agent backend error (${detail})`, code: 'internal' });
+        pushEvent({
+          type: 'error',
+          message: chippiErrorMessage('internal'),
+          code: 'internal',
+        });
         controller.close();
         return;
       }
 
       const reader = modalRes.body.getReader();
+      let firstSandboxEventSeen = false;
 
       try {
         for await (const sandboxEvent of parseModalSSE(reader)) {
+          if (!firstSandboxEventSeen) {
+            firstSandboxEventSeen = true;
+            clearTimeout(coldStartTimer);
+            // If we already shipped the cold-start line, strip it from the
+            // saved transcript so it doesn't get persisted as part of the
+            // assistant's actual reply.
+            if (coldStartFired) {
+              const prefix = chippiErrorMessage('cold_start') + '\n\n';
+              if (state.textBuffer.startsWith(prefix)) {
+                state.textBuffer = state.textBuffer.slice(prefix.length);
+              }
+            }
+          }
           for (const out of translate(sandboxEvent, state)) {
             pushEvent(out);
           }
         }
+        clearTimeout(coldStartTimer);
         // If the stream closed without a `done`, synthesize a turn_complete
         // so the client doesn't sit waiting forever.
         if (!state.sawDone) {
           pushEvent({ type: 'turn_complete', reason: 'complete' });
         }
       } catch (err) {
+        clearTimeout(coldStartTimer);
         const aborted = (err as { name?: string })?.name === 'AbortError';
         if (!aborted) {
-          const message = err instanceof Error ? err.message : String(err);
+          const raw = err instanceof Error ? err.message : String(err);
+          const code = classifyError(raw);
           logger.error('[ai/task] stream pump crashed', { spaceSlug }, err);
-          pushEvent({ type: 'error', message, code: 'internal' });
+          pushEvent({ type: 'error', message: chippiErrorMessage(code), code });
         }
       } finally {
         // Persist the assistant message if anything came back. The legacy

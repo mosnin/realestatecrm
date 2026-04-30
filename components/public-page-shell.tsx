@@ -22,6 +22,8 @@ interface PublicPageShellProps {
   pageTitle: string;
   pageIntro?: string;
   trustLine: string;
+  /** Phrasing for the in-body "with [agent]" line (e.g. "Applying with", "Booking with"). Defaults to "with". */
+  agentPresenceLabel?: string;
   customization?: ShellCustomization;
   children: React.ReactNode;
 }
@@ -68,6 +70,7 @@ export function PublicPageShell({
   pageTitle,
   pageIntro,
   trustLine,
+  agentPresenceLabel = 'with',
   customization,
   children,
 }: PublicPageShellProps) {
@@ -143,6 +146,21 @@ export function PublicPageShell({
           )}
           {/* Trust line — sits with the intro, not buried in chrome */}
           <p className={`${BODY_MUTED} mt-3 max-w-xl`}>{trustLine}</p>
+
+          {/* Agent presence — humanizes the form. Different role from the chrome avatar. */}
+          {agentPhoto && agentName && (
+            <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
+              <img
+                src={agentPhoto}
+                alt={agentName}
+                className="w-6 h-6 rounded-full object-cover ring-1 ring-border/70 flex-shrink-0"
+              />
+              <span>
+                {agentPresenceLabel}{' '}
+                <span className="font-medium text-foreground">{agentName}</span>
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Main form content */}
