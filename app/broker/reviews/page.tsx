@@ -105,16 +105,31 @@ export default async function BrokerReviewsPage() {
     };
   });
 
+  // Headline status — calm, factual. Mirrors the broker overview pattern
+  // (greeting + serif h1 + one-sentence status).
+  const openCount = initialReviews.length;
+  const statusSentence = (() => {
+    if (openCount === 0) {
+      return "Nothing flagged. Quiet day.";
+    }
+    return `${openCount} ${openCount === 1 ? 'deal' : 'deals'} waiting for your sign-off.`;
+  })();
+
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Deal reviews</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Deals your agents have flagged for your sign-off
-        </p>
-      </div>
+    <div className="max-w-4xl mx-auto space-y-8 pb-12">
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Reviews.</p>
+        <h1
+          className="text-3xl tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-title)' }}
+        >
+          Deals flagged for you
+        </h1>
+        <p className="text-sm text-muted-foreground">{statusSentence}</p>
+      </header>
       <ReviewsClient
         initialReviews={initialReviews}
+        initialOpenCount={openCount}
         role={ctx.membership.role}
         brokerageName={ctx.brokerage.name}
       />

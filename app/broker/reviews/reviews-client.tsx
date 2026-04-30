@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Card, CardContent } from '@/components/ui/card';
+import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
+import { DURATION_BASE, DURATION_FAST, EASE_OUT } from '@/lib/motion';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +39,7 @@ type Tab = 'open' | 'approved' | 'closed' | 'all';
 
 interface Props {
   initialReviews: ReviewRow[];
+  initialOpenCount: number;
   role: string;
   brokerageName: string;
 }
@@ -51,9 +55,8 @@ function initialsOf(name: string | null, email: string | null): string {
     .join('') || '?';
 }
 
-// Relative time using Intl.RelativeTimeFormat. Falls back to short date if
-// the event happened more than 7 days ago — the queue cares about recency,
-// absolute dates add noise for anything older than a week.
+// Relative time — short and present-tense for the queue. Past 7 days falls
+// back to a date so the eye doesn't have to do "53 days ago" math.
 export function formatRelative(iso: string): string {
   const then = new Date(iso).getTime();
   const now = Date.now();
@@ -105,11 +108,8 @@ const statusLabel = (status: ReviewStatus): string =>
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function ReviewsClient({ initialReviews, role, brokerageName }: Props) {
-  // Surface-level bookkeeping: `role` + `brokerageName` aren't used directly
-  // on the queue, but the parent passes them for consistency with the detail
-  // page and future header polish. Mark as intentionally read to satisfy the
-  // no-unused-vars lint rule without widening the prop shape.
+export function ReviewsClient({ initialReviews, initialOpenCount, role, brokerageName }: Props) {
+  // Surface-level bookkeeping — preserved for future header polish.
   void role;
   void brokerageName;
 
@@ -120,6 +120,14 @@ export function ReviewsClient({ initialReviews, role, brokerageName }: Props) {
   const [cache, setCache] = useState<Partial<Record<Tab, ReviewRow[]>>>({
     open: initialReviews,
   });
+  // Live open count so the tab badge updates after a resolve happens
+  // somewhere in this brokerage. Best-effort: derived from the cached
+  // open list when present, otherwise the SSR count.
+  const openCount = useMemo(() => {
+    const cached = cache.open;
+    if (cached) return cached.length;
+    return initialOpenCount;
+  }, [cache.open, initialOpenCount]);
 
   useEffect(() => {
     const cached = cache[tab];
@@ -153,112 +161,154 @@ export function ReviewsClient({ initialReviews, role, brokerageName }: Props) {
     };
   }, [tab, cache]);
 
-  const tabs: Array<{ key: Tab; label: string }> = useMemo(
+  const tabs: Array<{ key: Tab; label: string; count?: number }> = useMemo(
     () => [
-      { key: 'open', label: 'Open' },
+      { key: 'open', label: 'Open', count: openCount },
       { key: 'approved', label: 'Approved' },
       { key: 'closed', label: 'Closed' },
       { key: 'all', label: 'All' },
     ],
-    []
+    [openCount],
   );
 
   return (
-    <div className="space-y-4">
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-border pb-0">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`relative px-3 py-2 text-sm font-medium transition-colors rounded-t-md ${
-              tab === t.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {t.label}
-            {tab === t.key && (
-              <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />
-            )}
-          </button>
-        ))}
+    <div className="space-y-5">
+      {/* Tabs — sliding indicator under the active label, the way iOS does it. */}
+      <div role="tablist" aria-label="Review status" className="flex items-center gap-0 border-b border-border/60">
+        {tabs.map((t) => {
+          const isActive = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setTab(t.key)}
+              className={cn(
+                'relative inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors',
+                isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <span>{t.label}</span>
+              {typeof t.count === 'number' && t.count > 0 && (
+                <span
+                  className={cn(
+                    'inline-flex items-center justify-center min-w-[1.25rem] h-[1.125rem] rounded-full px-1.5 text-[10px] font-semibold tabular-nums transition-colors',
+                    isActive
+                      ? 'bg-foreground text-background'
+                      : 'bg-muted text-muted-foreground',
+                  )}
+                  aria-hidden
+                >
+                  {t.count}
+                </span>
+              )}
+              {isActive && (
+                <motion.span
+                  layoutId="reviews-tab-underline"
+                  className="absolute bottom-[-1px] left-2 right-2 h-[2px] rounded-full bg-foreground"
+                  transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+                  aria-hidden
+                />
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {loading ? (
-        <Card>
-          <CardContent className="px-5 py-10 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+      {/* Body — list animates in; tab swap fades through */}
+      <AnimatePresence mode="wait" initial={false}>
+        {loading ? (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { duration: DURATION_FAST } }}
+            exit={{ opacity: 0, transition: { duration: DURATION_FAST } }}
+            className="flex items-center justify-center gap-2 py-14 text-sm text-muted-foreground"
+          >
             <Loader2 size={14} className="animate-spin" />
-            Loading reviews…
-          </CardContent>
-        </Card>
-      ) : reviews.length === 0 ? (
-        <Card>
-          <CardContent className="px-5 py-10 text-center">
-            <p className="text-sm text-muted-foreground">
-              {tab === 'open'
-                ? "You're all caught up. Your agents haven't flagged anything for review."
-                : `No ${tab} reviews yet.`}
+            Loading…
+          </motion.div>
+        ) : reviews.length === 0 ? (
+          <motion.div
+            key={`empty-${tab}`}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0, transition: { duration: DURATION_BASE, ease: EASE_OUT } }}
+            exit={{ opacity: 0, transition: { duration: DURATION_FAST } }}
+            className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center"
+          >
+            <p className="text-sm text-foreground">
+              {tab === 'open' ? "You're all caught up." : `No ${tab} reviews.`}
             </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {reviews.map((r) => {
-            const agentInitials = initialsOf(r.requestingUser.name, r.requestingUser.email);
-            const agentName = r.requestingUser.name ?? r.requestingUser.email ?? 'Unknown agent';
-            const dealTitle = r.deal.title ?? 'Untitled deal';
-            const preview =
-              r.reason.length > 140 ? `${r.reason.slice(0, 137).trimEnd()}…` : r.reason;
+            {tab === 'open' && (
+              <p className="text-xs text-muted-foreground mt-1">
+                When an agent flags a deal for you, it lands here.
+              </p>
+            )}
+          </motion.div>
+        ) : (
+          <StaggerList key={`list-${tab}`} className="space-y-2">
+            {reviews.map((r) => {
+              const agentInitials = initialsOf(r.requestingUser.name, r.requestingUser.email);
+              const agentName = r.requestingUser.name ?? r.requestingUser.email ?? 'Unknown agent';
+              const dealTitle = r.deal.title ?? 'Untitled deal';
+              const preview =
+                r.reason.length > 140 ? `${r.reason.slice(0, 137).trimEnd()}…` : r.reason;
 
-            return (
-              <Link
-                key={r.id}
-                href={`/broker/reviews/${r.id}`}
-                className="block rounded-xl border border-border bg-card px-4 py-3 hover:bg-accent/40 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-                      {agentInitials}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <p className="text-sm font-semibold truncate">{agentName}</p>
-                        <span className="text-muted-foreground text-xs">·</span>
-                        <span className="text-sm font-medium text-primary truncate">
-                          {dealTitle}
-                        </span>
-                        <span className="text-muted-foreground text-xs">·</span>
-                        <span className="text-xs text-muted-foreground">
-                          flagged {formatRelative(r.createdAt)}
+              return (
+                <StaggerItem key={r.id}>
+                  <Link
+                    href={`/broker/reviews/${r.id}`}
+                    className="group/row block rounded-xl border border-border/70 bg-card px-4 py-3 hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-orange-500/10 dark:bg-orange-500/15 flex items-center justify-center text-xs font-semibold text-orange-600 dark:text-orange-400 flex-shrink-0">
+                          {agentInitials}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                            <p className="text-sm font-semibold truncate">{agentName}</p>
+                            <span className="text-muted-foreground text-xs">·</span>
+                            <span className="text-sm text-foreground truncate">
+                              {dealTitle}
+                            </span>
+                            <span className="text-muted-foreground text-xs">·</span>
+                            <span className="text-xs text-muted-foreground">
+                              flagged {formatRelative(r.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {preview}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {r.commentCount > 0 && (
+                          <span
+                            className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5 bg-muted text-muted-foreground"
+                            aria-label={`${r.commentCount} comment${r.commentCount === 1 ? '' : 's'}`}
+                          >
+                            <MessageCircle size={11} />
+                            {r.commentCount}
+                          </span>
+                        )}
+                        <span
+                          className={cn(
+                            'inline-flex text-xs font-medium rounded-full px-2.5 py-0.5',
+                            statusBadgeClass(r.status),
+                          )}
+                        >
+                          {statusLabel(r.status)}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                        {preview}
-                      </p>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {r.commentCount > 0 && (
-                      <span
-                        className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5 bg-muted text-muted-foreground"
-                        aria-label={`${r.commentCount} comment${r.commentCount === 1 ? '' : 's'}`}
-                      >
-                        <MessageCircle size={11} />
-                        {r.commentCount}
-                      </span>
-                    )}
-                    <span
-                      className={`inline-flex text-xs font-medium rounded-full px-2.5 py-0.5 ${statusBadgeClass(r.status)}`}
-                    >
-                      {statusLabel(r.status)}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      )}
+                  </Link>
+                </StaggerItem>
+              );
+            })}
+          </StaggerList>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
