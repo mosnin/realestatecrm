@@ -52,6 +52,8 @@ import {
   secondsBetween,
   maybeEmitFirstAction,
 } from '@/lib/telemetry';
+import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
+import { streamTsChatTurn } from '@/lib/ai-tools/sdk-chat-stream';
 
 interface HistoryRow {
   role: 'user' | 'assistant';
@@ -454,6 +456,23 @@ export async function POST(req: NextRequest) {
   }
 
   const attachments = await hydrateAttachments(ctx.space.id, body.attachmentIds);
+
+  // ── Runtime branch ─────────────────────────────────────────────────────
+  //
+  // CHIPPI_CHAT_RUNTIME=ts routes the turn through the in-process SDK
+  // runtime in lib/ai-tools/sdk-chat.ts. Default ('modal' or any other
+  // value) keeps the existing Modal proxy below untouched. This branch
+  // is intentionally tight — it doesn't share code with the modal path
+  // beyond auth + persistence + history that already happened above.
+  if (chatRuntime() === 'ts') {
+    return streamTsChatTurn({
+      ctx,
+      conversationId,
+      userMessage: rawMessage,
+      history,
+      abortController,
+    });
+  }
 
   const modalUrl = process.env.MODAL_CHAT_URL;
   const sharedSecret = process.env.AGENT_INTERNAL_SECRET;
