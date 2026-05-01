@@ -44,10 +44,10 @@ export default async function PropertyDetailPage({
   return (
     <div className="space-y-4 max-w-[1200px]">
       <Link
-        href={`/s/${slug}/properties`}
+        href={`/s/${slug}/deals`}
         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft size={12} /> All properties
+        <ArrowLeft size={12} /> Deals
       </Link>
 
       <PropertyDetailClient

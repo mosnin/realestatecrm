@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { computeCommission, type CommissionSplit } from '@/lib/commissions';
 import { formatCurrency, formatCompact } from '@/lib/formatting';
 import {
@@ -110,16 +110,11 @@ export default async function PropertiesCommissionsPage({
 
   return (
     <div className={cn(PAGE_RHYTHM, 'max-w-[1500px]')}>
-      {/* Header — back-link, H1, Chippi-voiced subtitle naming the loudest
-          money fact. The stat strip below is the supporting evidence. */}
+      {/* Header — H1 + Chippi-voiced subtitle naming the loudest money fact.
+          The stat strip below is the supporting evidence. Commissions is its
+          own destination now (the standalone Properties list has been cut),
+          so no back-link — the sidebar is the way home. */}
       <header className="space-y-2">
-        <Link
-          href={`/s/${slug}/properties`}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors duration-150"
-        >
-          <ArrowLeft size={12} />
-          Properties
-        </Link>
         <h1 className={H1} style={TITLE_FONT}>
           Commissions
         </h1>

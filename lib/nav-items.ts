@@ -7,7 +7,7 @@ import {
   FileText,
   ClipboardList,
   BarChart2,
-  Home,
+  Wallet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -76,18 +76,16 @@ export const realtorNavItems: NavItem[] = [
  * that earns its place is /customize, reachable inline from the overview.
  * Sub-pages for Share / Tracking / Submissions were configuration disguised
  * as features and have been cut.
+ *
+ * The standalone Properties list is gone. Realtors who use Chippi properties
+ * use them via deals — properties enter the system through /deals/new and are
+ * read from deal-detail. The only standalone properties surface that earns
+ * its place is the YTD commissions roll-up (a revenue view, not a property
+ * catalogue), which lives on its own here.
  */
 export const realtorMoreNavItems: NavItem[] = [
   { href: '/calendar', label: 'Calendar', icon: Calendar },
-  {
-    href: '/properties',
-    label: 'Properties',
-    icon: Home,
-    children: [
-      { href: '/properties', label: 'All', exact: true },
-      { href: '/properties/commissions', label: 'Commissions' },
-    ],
-  },
+  { href: '/properties/commissions', label: 'Commissions', icon: Wallet },
   { href: '/intake', label: 'Intake form', icon: ClipboardList },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
 ];
