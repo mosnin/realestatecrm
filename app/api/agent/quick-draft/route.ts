@@ -106,7 +106,12 @@ function buildVoiceMessage(samples: VoiceSample[]): string {
   return lines.join('\n').trimEnd();
 }
 
-async function composeDraftWithOpenAI(args: {
+/**
+ * Phase 16: exported so on-demand agent tools (`draft_email`, `draft_sms`)
+ * reuse the same OpenAI call instead of duplicating the prompt + JSON parse.
+ * Same shape, same model, same voice rules.
+ */
+export async function composeDraftWithOpenAI(args: {
   intent: Intent;
   channel: Channel;
   subjectLabel: string;
@@ -175,6 +180,50 @@ async function composeDraftWithOpenAI(args: {
   }
 }
 
+/**
+ * Phase 16: one-call compose path for the on-demand agent's `draft_*` tools.
+ *
+ * Pure read — no AgentDraft row, no audit, no delivery. Mirrors the
+ * preview-mode pipeline (enrichContext → optional voice samples → OpenAI),
+ * but exposed as a function so the agent tools don't have to HTTP-call
+ * themselves or duplicate the prompt.
+ *
+ * Returns null if the subject can't be enriched (unknown id) or if the
+ * OpenAI call fails — callers translate that to a user-facing error.
+ */
+export async function composeQuickDraft(args: {
+  kind: Context;
+  id: string;
+  intent: Intent;
+  channel: Channel;
+  spaceId: string;
+}): Promise<{ subject: string | null; body: string; subjectLabel: string } | null> {
+  const enriched: EnrichedContext | null = await enrichContext(
+    { kind: args.kind, id: args.id },
+    args.spaceId,
+  );
+  if (!enriched) return null;
+
+  const voiceSamples =
+    args.channel === 'email' ? await getRecentVoiceSamples(args.spaceId) : [];
+
+  const composed = await composeDraftWithOpenAI({
+    intent: args.intent,
+    channel: args.channel,
+    subjectLabel: enriched.subjectLabel,
+    recentActivity: enriched.lastActivities,
+    daysQuiet: enriched.daysSinceLastTouch,
+    stage: enriched.stage,
+    status: enriched.status,
+    scoreLabel: enriched.scoreLabel,
+    leadScore: enriched.leadScore,
+    voiceSamples,
+  });
+  if (!composed) return null;
+
+  return { ...composed, subjectLabel: enriched.subjectLabel };
+}
+
 export async function POST(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
@@ -237,22 +286,12 @@ export async function POST(req: NextRequest) {
   if (mode === 'preview') {
     const channel = channelForIntent(body.intent);
 
-    // Voice samples are email-only — note voice is different (terse, factual,
-    // past tense). Pull once, in parallel with the rest of the request shape.
-    const voiceSamples =
-      channel === 'email' ? await getRecentVoiceSamples(space.id) : [];
-
-    const composed = await composeDraftWithOpenAI({
+    const composed = await composeQuickDraft({
+      kind: body.context,
+      id: body.id,
       intent: body.intent,
       channel,
-      subjectLabel,
-      recentActivity: enriched.lastActivities,
-      daysQuiet: enriched.daysSinceLastTouch,
-      stage: enriched.stage,
-      status: enriched.status,
-      scoreLabel: enriched.scoreLabel,
-      leadScore: enriched.leadScore,
-      voiceSamples,
+      spaceId: space.id,
     });
 
     if (!composed) {
