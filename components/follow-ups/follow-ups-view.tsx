@@ -6,10 +6,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { H1, TITLE_FONT } from '@/lib/typography';
 import {
-  Clock, CheckCircle2, Phone, Mail, CalendarDays, ChevronDown,
-  AlertCircle, Briefcase, ArrowRight, Timer,
+  CheckCircle2, Phone, Mail, Briefcase, Timer,
 } from 'lucide-react';
-import { composeFollowUpsNarration } from '@/lib/narration/follow-ups';
 
 type ContactFollowUp = {
   id: string;
@@ -209,36 +207,14 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
     { key: 'upcoming', label: 'Upcoming', count: tabCounts.upcoming },
   ];
 
-  // Chippi's one sentence — same brand-voice spine as the deals page.
-  // Returns a tab key so the line is a doorway: clicking the narration
-  // switches the page to the tab the sentence is talking about. Priority:
-  // overdue (loudest) → today's load → upcoming nudge.
-  const narration = composeFollowUpsNarration(tabCounts, totalCount);
-
   return (
     <div className="space-y-6 max-w-[900px]">
-      {/* Header — serif H1 + Chippi narration. The narration is a button
-          when there's a tab to jump to, so clicking the sentence switches
-          the page to the matching slice (overdue/today/upcoming). The
-          line and the page share one decision. */}
-      <header className="space-y-2">
+      {/* Header — H1 only. The voice lives on /chippi home; this surface
+          is utility chrome — tabs, lists, snooze. */}
+      <header>
         <h1 className={H1} style={TITLE_FONT}>
           Follow-ups
         </h1>
-        {narration.targetTab && narration.targetTab !== activeTab ? (
-          <button
-            type="button"
-            onClick={() => setTab(narration.targetTab!)}
-            className="text-lg text-muted-foreground hover:text-foreground transition-colors text-left cursor-pointer"
-            style={TITLE_FONT}
-          >
-            {narration.text}
-          </button>
-        ) : (
-          <p className="text-lg text-muted-foreground" style={TITLE_FONT}>
-            {narration.text}
-          </p>
-        )}
       </header>
 
       {/* Tabs */}

@@ -34,17 +34,22 @@ describe('buildMorningActions', () => {
     expect(actions.map((a) => a.id)).toEqual(['deal-checkin', 'deal-log-call', 'deal-open']);
     expect(actions.map((a) => a.kind)).toEqual(['compose', 'compose', 'navigate']);
 
-    // Check-in prefill carries the title and the days-stuck from the summary,
-    // URL-encoded so the workspace can read it back.
+    // Compose actions carry intent + context for the inline draft endpoint —
+    // no chat-prefill teleporter URL anymore.
     const checkin = actions[0]!;
-    expect(checkin.href).toBe(
-      `/s/demo/chippi?prefill=${encodeURIComponent(
-        "Draft a check-in email for the Chen deal — it hasn't moved in 14 days.",
-      )}`,
-    );
+    if (checkin.kind !== 'compose') throw new Error('expected compose');
+    expect(checkin.intent).toBe('check-in');
+    expect(checkin.context).toEqual({ kind: 'deal', id: 'd_chen', label: 'Chen' });
 
-    // Open the deal goes to the workspace-scoped detail route, not a bare /deals/.
-    expect(actions[2]!.href).toBe('/s/demo/deals/d_chen');
+    const logCall = actions[1]!;
+    if (logCall.kind !== 'compose') throw new Error('expected compose');
+    expect(logCall.intent).toBe('log-call');
+    expect(logCall.context.kind).toBe('deal');
+
+    // Open the deal still goes to the workspace-scoped detail route.
+    const open = actions[2]!;
+    if (open.kind !== 'navigate') throw new Error('expected navigate');
+    expect(open.href).toBe('/s/demo/deals/d_chen');
   });
 
   it('builds two person actions regardless of sub-kind: check-in (compose), open (navigate)', () => {
@@ -58,18 +63,38 @@ describe('buildMorningActions', () => {
 
     expect(actions.map((a) => a.id)).toEqual(['person-checkin', 'person-open']);
     expect(actions.map((a) => a.kind)).toEqual(['compose', 'navigate']);
-    expect(actions[0]!.href).toBe(
-      `/s/demo/chippi?prefill=${encodeURIComponent('Draft a check-in message to Sarah.')}`,
-    );
-    expect(actions[1]!.href).toBe('/s/demo/contacts/p_sarah');
+
+    const checkin = actions[0]!;
+    if (checkin.kind !== 'compose') throw new Error('expected compose');
+    expect(checkin.intent).toBe('reach-out');
+    expect(checkin.context).toEqual({ kind: 'person', id: 'p_sarah', label: 'Sarah' });
+
+    const open = actions[1]!;
+    if (open.kind !== 'navigate') throw new Error('expected navigate');
+    expect(open.href).toBe('/s/demo/contacts/p_sarah');
   });
 
-  it('falls back to a generic subject when the named person is missing from the summary', () => {
+  it('uses welcome intent for new-arrival person doorways', () => {
+    const summary: MorningSummary = {
+      ...empty,
+      newPeopleCount: 1,
+      topNewPerson: { id: 'p_new', name: 'Maya' },
+    };
+    const doorway: MorningDoorway = { kind: 'person', id: 'p_new' };
+    const actions = buildMorningActions(doorway, summary, 'demo');
+
+    const checkin = actions[0]!;
+    if (checkin.kind !== 'compose') throw new Error('expected compose');
+    expect(checkin.intent).toBe('welcome');
+    expect(checkin.context.label).toBe('Maya');
+  });
+
+  it('falls back to a generic label when the named person is missing from the summary', () => {
     // Doorway says "person" but summary has no named person — defensive path.
     const doorway: MorningDoorway = { kind: 'person', id: 'p_unknown' };
     const actions = buildMorningActions(doorway, empty, 'demo');
-    expect(actions[0]!.href).toBe(
-      `/s/demo/chippi?prefill=${encodeURIComponent('Draft a check-in message to them.')}`,
-    );
+    const checkin = actions[0]!;
+    if (checkin.kind !== 'compose') throw new Error('expected compose');
+    expect(checkin.context.label).toBe('them');
   });
 });

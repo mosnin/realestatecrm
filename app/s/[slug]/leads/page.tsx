@@ -9,7 +9,6 @@ import type { Contact } from '@/lib/types';
 import { LeadsView } from '@/components/leads/leads-view';
 import { PeopleTabs } from '@/components/people/people-tabs';
 import { H1, TITLE_FONT } from '@/lib/typography';
-import { composeLeadsNarration } from '@/lib/narration/leads';
 
 export default async function LeadsPage({
   params,
@@ -88,27 +87,14 @@ export default async function LeadsPage({
     unscored: leads.filter((l) => l.scoringStatus !== 'scored' || !l.scoreLabel).length,
   };
 
-  // Chippi's one sentence — same brand-voice spine as the deals + contacts
-  // pages. The narration prioritises what just arrived, then what's hot,
-  // then names the steady state. Empty state has its own copy below.
-  const narration = composeLeadsNarration({
-    unreadCount: unreadLeads.length,
-    hotCount: tierCounts.hot,
-    totalCount: leads.length,
-  });
-
   return (
     <div className="space-y-4 max-w-[1320px]">
-      {/* Page header — serif H1 + Chippi narration. Matches /contacts and
-          the rest of the workspace so the People hub reads as one surface
-          across its tabs. */}
-      <header className="space-y-2">
+      {/* Page header — H1 only. The voice lives on /chippi home; this
+          surface is utility chrome. */}
+      <header>
         <h1 className={H1} style={TITLE_FONT}>
           People
         </h1>
-        <p className="text-lg text-muted-foreground" style={TITLE_FONT}>
-          {narration}
-        </p>
       </header>
 
       <PeopleTabs slug={slug} newCount={unreadLeads.length} />

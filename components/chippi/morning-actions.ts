@@ -5,9 +5,12 @@
  * detail page. That's the home behaving like a chooser. Real workspace
  * surfaces fire a verb: tap the sentence, the work surfaces underneath.
  *
- * This module only knows how to turn (doorway, summary, slug) into a list
- * of {label, kind, href} actions. The component renders them; the prefill
- * lands in the composer via `?prefill=...` on /s/{slug}/chippi.
+ * Phase 7 update — compose actions no longer carry a chat-prefill URL.
+ * They carry an `intent` (and the deal/person context they apply to), so
+ * the home can fire a draft-and-send flow inline instead of teleporting
+ * the realtor into the chat to type the same thing again. The `navigate`
+ * actions still carry an `href`; "Open the deal" / "Open the person" is a
+ * link, full stop.
  *
  * Two actions for people, three for deals. No config; the realtor doesn't
  * pick the menu — the menu picks itself from the sentence.
@@ -17,26 +20,33 @@ import type { MorningDoorway } from '@/lib/morning-story';
 
 export type MorningActionKind = 'compose' | 'navigate';
 
-export interface MorningAction {
-  /** Stable id for keyed render + tests. */
+/** What the inline draft endpoint should compose for a tap. */
+export type MorningActionIntent = 'check-in' | 'log-call' | 'welcome' | 'reach-out';
+
+/** Subject context attached to a compose action so the endpoint has what it needs. */
+export interface MorningActionContext {
+  kind: 'deal' | 'person';
   id: string;
-  /** Verb-led label — "Send a check-in", not "Compose Email". */
+  /** Display name/title for fallback copy in the inline preview header. */
   label: string;
-  /** 'compose' opens the composer with prefill; 'navigate' goes to detail. */
-  kind: MorningActionKind;
-  /** Resolved href (workspace path or /s/{slug}/chippi?prefill=...). */
+}
+
+interface ComposeAction {
+  id: string;
+  label: string;
+  kind: 'compose';
+  intent: MorningActionIntent;
+  context: MorningActionContext;
+}
+
+interface NavigateAction {
+  id: string;
+  label: string;
+  kind: 'navigate';
   href: string;
 }
 
-/**
- * The composer-prefill URL. The workspace listens for `?q=` to *send*; we
- * use `?prefill=` to populate the input but not auto-send — the realtor
- * still gets a beat to read and edit before they fire. A future phase
- * wires the workspace to consume this param.
- */
-function prefillHref(slug: string, text: string): string {
-  return `/s/${slug}/chippi?prefill=${encodeURIComponent(text)}`;
-}
+export type MorningAction = ComposeAction | NavigateAction;
 
 /**
  * Build the inline panel for a given doorway. The summary is needed to
@@ -54,56 +64,27 @@ export function buildMorningActions(
 
   if (doorway.kind === 'deal') {
     const stuck = summary.topStuckDeal;
-    const title = stuck?.title ?? 'this';
-    const days = stuck?.daysStuck ?? 0;
+    const title = stuck?.title ?? 'this deal';
+    const ctx: MorningActionContext = { kind: 'deal', id: doorway.id, label: title };
     return [
-      {
-        id: 'deal-checkin',
-        label: 'Send a check-in',
-        kind: 'compose',
-        href: prefillHref(
-          slug,
-          `Draft a check-in email for the ${title} deal — it hasn't moved in ${days} days.`,
-        ),
-      },
-      {
-        id: 'deal-log-call',
-        label: 'Log a call',
-        kind: 'compose',
-        href: prefillHref(
-          slug,
-          `I just called about the ${title} deal — log it.`,
-        ),
-      },
-      {
-        id: 'deal-open',
-        label: 'Open the deal',
-        kind: 'navigate',
-        href: `/s/${slug}/deals/${doorway.id}`,
-      },
+      { id: 'deal-checkin', label: 'Send a check-in', kind: 'compose', intent: 'check-in', context: ctx },
+      { id: 'deal-log-call', label: 'Log a call', kind: 'compose', intent: 'log-call', context: ctx },
+      { id: 'deal-open', label: 'Open the deal', kind: 'navigate', href: `/s/${slug}/deals/${doorway.id}` },
     ];
   }
 
   // doorway.kind === 'person'. We pick the simpler menu — two buttons, no
   // sub-kind branching. The sentence itself has already named the person;
-  // the verbs apply whether they're new, hot, or overdue.
-  const person =
-    summary.topOverdueFollowUp ??
-    summary.topNewPerson ??
-    summary.topHotPerson;
+  // the verbs apply whether they're new, hot, or overdue. Intent is
+  // 'welcome' for new arrivals, 'reach-out' for hot/overdue — same UI,
+  // tighter draft.
+  const person = summary.topOverdueFollowUp ?? summary.topNewPerson ?? summary.topHotPerson;
   const name = person?.name ?? 'them';
+  const isNew = !summary.topOverdueFollowUp && Boolean(summary.topNewPerson);
+  const intent: MorningActionIntent = isNew ? 'welcome' : 'reach-out';
+  const ctx: MorningActionContext = { kind: 'person', id: doorway.id, label: name };
   return [
-    {
-      id: 'person-checkin',
-      label: 'Send a check-in',
-      kind: 'compose',
-      href: prefillHref(slug, `Draft a check-in message to ${name}.`),
-    },
-    {
-      id: 'person-open',
-      label: 'Open the person',
-      kind: 'navigate',
-      href: `/s/${slug}/contacts/${doorway.id}`,
-    },
+    { id: 'person-checkin', label: 'Send a check-in', kind: 'compose', intent, context: ctx },
+    { id: 'person-open', label: 'Open the person', kind: 'navigate', href: `/s/${slug}/contacts/${doorway.id}` },
   ];
 }

@@ -128,17 +128,17 @@ export function DealsPageClient({ slug }: { slug: string }) {
         </h1>
         {hasPipelines && (
           <div className="flex flex-col items-end gap-1">
-            <button type="button" onClick={handleAddDeal} className={PRIMARY_PILL}>
-              <Plus size={14} strokeWidth={2.25} />
-              Add deal
-            </button>
-            {/* The whisper. The form is fine, but the agent is faster — say
-                it out loud and Chippi files it. Quietly offered, not promoted. */}
+            {/* The conversation is the front door. Saying it out loud is
+                faster than any form, so it gets the primary pill. */}
             <Link
               href={`/s/${slug}/chippi?prefill=${encodeURIComponent("I'm adding a new deal — ")}`}
-              className={QUIET_LINK}
+              className={PRIMARY_PILL}
             >
-              or just tell Chippi →
+              Tell Chippi →
+            </Link>
+            {/* The form still exists for those who want it; offered quietly. */}
+            <Link href={`/s/${slug}/deals/new`} className={QUIET_LINK}>
+              or fill out the form
             </Link>
           </div>
         )}

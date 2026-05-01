@@ -7,7 +7,8 @@ import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import type { MorningResponse, MorningSummary } from '@/app/api/agent/morning/route';
 import { composeMorningStory } from '@/lib/morning-story';
-import { buildMorningActions } from './morning-actions';
+import { buildMorningActions, type MorningAction } from './morning-actions';
+import { MorningActionSheet } from './morning-action-sheet';
 
 interface Props {
   /** Workspace slug — needed to deep-link the inline actions. */
@@ -15,18 +16,16 @@ interface Props {
 }
 
 /**
- * The /chippi home's one sentence. It used to be a teleporter — tap and
- * leave the home. Now it opens *into work*: the sentence stays put and an
- * inline action panel slides down with 2-3 contextual verbs. The realtor
- * acts on the morning without ever leaving the surface.
- *
- * Default-state rendering matches what shipped before: no expansion, no
- * extra chrome. If the realtor never taps, nothing changes.
+ * The /chippi home's one sentence. Phase 5 made it expand into an action
+ * panel; Phase 7 made the panel actually do work — compose actions now
+ * draft, preview, and send inline. The realtor never leaves the home.
  */
 export function MorningStory({ slug }: Props) {
   const [summary, setSummary] = useState<MorningSummary | null>(null);
   const [agentSentence, setAgentSentence] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  /** Which compose action is currently expanded into a draft sheet. */
+  const [activeCompose, setActiveCompose] = useState<MorningAction | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,15 +47,23 @@ export function MorningStory({ slug }: Props) {
 
   // Collapse on outside click + escape. Both matter on desktop; on mobile
   // tapping outside (e.g. on TodayFeed) is the natural close gesture too.
+  // While the action sheet is firing a send, we ignore outside taps so a
+  // stray click can't dismiss the panel mid-send.
   useEffect(() => {
     if (!open) return;
     function handlePointer(e: MouseEvent | TouchEvent) {
       if (!containerRef.current) return;
       const target = e.target as Node | null;
-      if (target && !containerRef.current.contains(target)) setOpen(false);
+      if (target && !containerRef.current.contains(target)) {
+        setOpen(false);
+        setActiveCompose(null);
+      }
     }
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        setActiveCompose(null);
+      }
     }
     document.addEventListener('mousedown', handlePointer);
     document.addEventListener('touchstart', handlePointer);
@@ -85,12 +92,32 @@ export function MorningStory({ slug }: Props) {
   const actions = buildMorningActions(story.doorway, summary, slug);
   const isInteractive = actions.length > 0;
 
+  function handleActionTap(a: MorningAction) {
+    if (a.kind === 'compose') {
+      setActiveCompose(a);
+    }
+    // 'navigate' actions are <Link>s and self-close via onClick below.
+  }
+
+  function handleSent() {
+    // Roll the home back to the un-expanded sentence on success.
+    setActiveCompose(null);
+    setOpen(false);
+  }
+
+  function handleCancel() {
+    setActiveCompose(null);
+  }
+
   return (
     <div ref={containerRef} className="relative">
       {isInteractive ? (
         <motion.button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => {
+            setOpen((v) => !v);
+            setActiveCompose(null);
+          }}
           aria-expanded={open}
           key={story.text}
           initial={{ opacity: 0 }}
@@ -134,24 +161,45 @@ export function MorningStory({ slug }: Props) {
             }}
             className="overflow-hidden"
           >
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              {actions.map((a) => (
-                <Link
-                  key={a.id}
-                  href={a.href}
-                  onClick={() => setOpen(false)}
-                  className={cn(
-                    'inline-flex items-center h-9 rounded-full px-4 text-sm transition-colors',
-                    'border border-border/70',
-                    a.kind === 'compose'
-                      ? 'bg-foreground text-background hover:bg-foreground/90'
-                      : 'bg-background text-foreground hover:bg-muted/40',
-                  )}
-                >
-                  {a.label}
-                </Link>
-              ))}
-            </div>
+            {activeCompose && activeCompose.kind === 'compose' ? (
+              <MorningActionSheet
+                slug={slug}
+                intent={activeCompose.intent}
+                context={activeCompose.context}
+                onSent={handleSent}
+                onCancel={handleCancel}
+              />
+            ) : (
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {actions.map((a) =>
+                  a.kind === 'navigate' ? (
+                    <Link
+                      key={a.id}
+                      href={a.href}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        'inline-flex items-center h-9 rounded-full px-4 text-sm transition-colors',
+                        'border border-border/70 bg-background text-foreground hover:bg-muted/40',
+                      )}
+                    >
+                      {a.label}
+                    </Link>
+                  ) : (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => handleActionTap(a)}
+                      className={cn(
+                        'inline-flex items-center h-9 rounded-full px-4 text-sm transition-colors',
+                        'border border-border/70 bg-foreground text-background hover:bg-foreground/90',
+                      )}
+                    >
+                      {a.label}
+                    </button>
+                  ),
+                )}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

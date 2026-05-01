@@ -18,10 +18,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { H1, H2, H3, TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
 import { TourStatsStrip } from '@/components/tours/tour-stats-strip';
 import { cn } from '@/lib/utils';
-import {
-  composeCalendarNarration,
-  type CalendarNarrationOutput,
-} from '@/lib/narration/calendar';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -232,36 +228,6 @@ export function CalendarView({
   const [formColor, setFormColor] = useState('gray');
 
   // ── Lookup maps ──────────────────────────────────────────────────────────
-
-  // Chippi's one sentence for the calendar — and an action so the line is a
-  // doorway. Click "X today" → switch to day view on today; click "X this
-  // week" → switch to week. Overdue → focus today (the cluster is right
-  // before today's column). The narration describes what's there; clicking
-  // takes you to it.
-  const narration: CalendarNarrationOutput = useMemo(
-    () => composeCalendarNarration({
-      tours: rawTours,
-      contactFollowUps: rawContactFollowUps,
-      dealFollowUps: rawDealFollowUps,
-    }),
-    [rawTours, rawContactFollowUps, rawDealFollowUps],
-  );
-
-  function handleNarrationClick() {
-    if (narration.action === 'goto-day') {
-      setView('day');
-      setSelectedDate(todayKey);
-      setCurrentDate(today);
-      setCurrentMonth(today.getMonth());
-      setCurrentYear(today.getFullYear());
-    } else if (narration.action === 'goto-week') {
-      setView('week');
-      setSelectedDate(todayKey);
-      setCurrentDate(today);
-      setCurrentMonth(today.getMonth());
-      setCurrentYear(today.getFullYear());
-    }
-  }
 
   const toursByDate = useMemo(() => {
     const map = new Map<string, Tour[]>();
@@ -888,12 +854,10 @@ export function CalendarView({
 
   return (
     <div className="space-y-4">
-      {/* Header — title + Chippi's narration + the tour-booking primary
-          action. Calendar absorbed Tours, so the "Schedule tour" pill lives
-          here now. The narration is the same brand-voice spine the deals
-          page uses — propagated here so every workspace surface reads as
-          one piece of paper. */}
-      <header className="space-y-2">
+      {/* Header — title + the tour-booking primary action. Calendar
+          absorbed Tours, so the "Schedule tour" pill lives here now. The
+          voice lives on /chippi home; this surface is utility chrome. */}
+      <header>
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
           <h1 className={H1} style={TITLE_FONT}>
             Calendar
@@ -908,20 +872,6 @@ export function CalendarView({
             Schedule tour
           </Link>
         </div>
-        {narration.action ? (
-          <button
-            type="button"
-            onClick={handleNarrationClick}
-            className="text-lg text-muted-foreground hover:text-foreground transition-colors text-left cursor-pointer"
-            style={TITLE_FONT}
-          >
-            {narration.text}
-          </button>
-        ) : (
-          <p className="text-lg text-muted-foreground" style={TITLE_FONT}>
-            {narration.text}
-          </p>
-        )}
       </header>
 
       {/* Tour stat strip — paper-flat, sits above the grid. */}
