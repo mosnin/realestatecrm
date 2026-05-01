@@ -4,7 +4,9 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { Building2, ShieldCheck, UserCircle } from 'lucide-react';
 import {
+  H1,
   H2,
+  TITLE_FONT,
   BODY,
   BODY_MUTED,
   CAPTION,
@@ -41,7 +43,7 @@ export default async function BrokerageInvitesPage({
         <div className="text-center space-y-3 p-8">
           <h2 className={H2}>Something went wrong</h2>
           <p className={BODY_MUTED}>
-            We couldn&apos;t load your data. This is usually temporary.
+            I couldn&apos;t load your invites. Usually temporary.
           </p>
           <a href={`/s/${slug}/settings/brokerage`} className={PRIMARY_PILL}>
             Try again
@@ -54,8 +56,10 @@ export default async function BrokerageInvitesPage({
   if (!userEmail) {
     return (
       <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
-        <h2 className={H2}>Brokerage</h2>
-        <p className={BODY_MUTED}>No email address found for your account.</p>
+        <h1 className={H1} style={TITLE_FONT}>
+          Brokerage
+        </h1>
+        <p className={BODY_MUTED}>No email found for your account.</p>
       </div>
     );
   }
@@ -86,20 +90,28 @@ export default async function BrokerageInvitesPage({
 
   const roleLabel = (role: string) => (role === 'broker_admin' ? 'Admin' : 'Member');
 
+  // Inline narration ladder.
+  const narration =
+    invitations.length === 0
+      ? 'No pending invitations right now.'
+      : invitations.length === 1
+        ? '1 brokerage invite waiting.'
+        : `${invitations.length} brokerage invites waiting.`;
+
   return (
     <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
       <div className="space-y-2">
-        <h2 className={H2}>Brokerage</h2>
-        <p className={BODY_MUTED}>
-          Pending brokerage invitations sent to {userEmail}.
-        </p>
+        <h1 className={H1} style={TITLE_FONT}>
+          Brokerage
+        </h1>
+        <p className={BODY_MUTED}>{narration}</p>
       </div>
 
       {invitations.length === 0 ? (
         <div className="rounded-md border border-border/70 bg-background px-5 py-12 text-center space-y-1">
-          <p className={`${BODY} font-medium`}>No pending invitations</p>
+          <p className={`${BODY} font-medium`}>Nothing here yet</p>
           <p className={CAPTION}>
-            When a brokerage invites you, it will appear here.
+            When a brokerage invites you, it shows up here.
           </p>
         </div>
       ) : (

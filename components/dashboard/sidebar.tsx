@@ -1253,7 +1253,7 @@ function RealtorSidebarShell({
             (see EdgeCollapseHandle above) — discoverable on hover. */}
         <div className="border-t border-border/50" />
         <UserFooter
-          href={`${base}/settings/profile`}
+          href={`${base}/settings#profile`}
           displayName={displayName}
           imageUrl={imageUrl}
           collapsed={collapsed}

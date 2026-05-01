@@ -21,7 +21,7 @@ import { secondaryNavItems } from '@/lib/nav-items';
 import { SECTION_LABEL } from '@/lib/typography';
 import { PAGE_VARIANTS } from '@/lib/motion';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
-import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, User, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, Sparkles, Calendar, BarChart2, ClipboardList, Home } from 'lucide-react';
+import { Building2, LayoutDashboard, UserCircle, Users, Mail, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Plug, FileText, ListChecks, CreditCard, Settings, Check, Sparkles, Calendar, BarChart2, ClipboardList, Home } from 'lucide-react';
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { BrokerHelpGuide } from '@/components/broker/help-guide';
@@ -354,9 +354,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                   {/* Settings section — expanded flat list */}
                   <p className={`${SECTION_LABEL} px-3 pb-2 pt-5 select-none`}>Settings</p>
                   {[
-                    { href: '/settings', label: 'Account', exact: true },
-                    { href: '/settings/profile', label: 'Profile' },
-                    { href: '/settings/integrations', label: 'Integrations' },
+                    { href: '/settings', label: 'Settings', exact: true },
                     { href: '/billing', label: 'Billing' },
                   ].map((item) => {
                     const href = `${base}${item.href}`;
@@ -452,9 +450,7 @@ export function Header({ slug, spaceName, title, isBroker = false, isBrokerOnly 
                   </Link>
                   {[
                     { label: 'Settings', items: [
-                      { href: `${base}/settings`, label: 'General', icon: Settings },
-                      { href: `${base}/settings/profile`, label: 'Profile', icon: User },
-                      { href: `${base}/settings/integrations`, label: 'Integrations', icon: Plug },
+                      { href: `${base}/settings`, label: 'Settings', icon: Settings },
                     ]},
                     { label: 'Account', items: [
                       { href: `${base}/billing`, label: 'Billing', icon: CreditCard },
