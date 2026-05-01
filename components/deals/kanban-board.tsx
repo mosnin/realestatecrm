@@ -1061,9 +1061,19 @@ export function KanbanBoard({
             <DragOverlay>
               {activeDeal && (
                 <div className="w-72 rounded-md border border-border bg-background px-3 py-3 shadow-md opacity-95">
-                  <div className="flex items-center gap-2">
-                    <GripVertical size={14} className="text-muted-foreground/40 flex-shrink-0" />
-                    <p className="text-sm font-medium truncate text-foreground">{activeDeal.title}</p>
+                  <div className="flex items-start gap-2">
+                    <GripVertical size={14} className="text-muted-foreground/40 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate text-foreground">{activeDeal.title}</p>
+                      {activeDeal.value != null && (
+                        <p
+                          className="text-base tabular-nums text-foreground mt-1 leading-none"
+                          style={TITLE_FONT}
+                        >
+                          {formatCurrency(activeDeal.value)}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

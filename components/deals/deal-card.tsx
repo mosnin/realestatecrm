@@ -82,8 +82,8 @@ export function DealCard({
       <div
         className={cn(
           'group bg-background border border-border/70 rounded-md p-3 cursor-pointer',
-          'transition-[background-color,transform] duration-150',
-          'hover:bg-foreground/[0.04] hover:scale-[1.005]',
+          'transition-colors duration-150',
+          'hover:bg-foreground/[0.04]',
           // Closed deals recede — still scannable, visually quieter.
           deal.status === 'won' && 'opacity-75',
           deal.status === 'lost' && 'opacity-55',
