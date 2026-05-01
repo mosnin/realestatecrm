@@ -281,7 +281,7 @@ export function DealQuickPanel({
           {/* Linked contacts */}
           {deal.dealContacts.length > 0 && (
             <div className="px-6 py-5 border-b border-border/70">
-              <p className={cn(SECTION_LABEL, 'mb-3')}>Contacts</p>
+              <p className={cn(SECTION_LABEL, 'mb-3')}>People</p>
               <div className="space-y-2">
                 {deal.dealContacts.map(({ contact }) => (
                   <Link

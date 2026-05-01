@@ -123,7 +123,7 @@ export default function NewDealPage() {
       {/* Step progress */}
       <div className="mb-8">
         <WizardProgress
-          steps={['Contacts', 'Pipeline', 'Details', 'Notes']}
+          steps={['People', 'Pipeline', 'Details', 'Notes']}
           currentStep={step}
           onStepClick={(s) => { if (s < step) setStep(s as 1 | 2 | 3 | 4); }}
         />

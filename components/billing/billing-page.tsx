@@ -408,7 +408,7 @@ export function BillingPage({
                 </div>
               </div>
               <p className="text-2xl font-bold tabular-nums">{usageStats.contacts.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Contacts</p>
+              <p className="text-xs text-muted-foreground mt-0.5">People</p>
             </div>
             <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-center">
               <div className="flex items-center justify-center mb-2">

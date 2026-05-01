@@ -123,7 +123,7 @@ export function CommandPalette({ slug }: Props) {
           next.push({
             kind: 'search-contact',
             id: `contact-${c.id}`,
-            group: 'Contacts',
+            group: 'People',
             label: c.name,
             sublabel: c.email || c.phone || '',
             href: `${base}/contacts/${c.id}`,

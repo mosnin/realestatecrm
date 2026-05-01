@@ -29,7 +29,7 @@ const TYPE_LABEL: Record<MemoryRow['memoryType'], string> = {
 
 const FILTERS = [
   { entity: null, label: 'All' },
-  { entity: 'contact', label: 'Contacts' },
+  { entity: 'contact', label: 'People' },
   { entity: 'deal', label: 'Deals' },
   { entity: 'space', label: 'Workspace' },
 ] as const;

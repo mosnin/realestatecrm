@@ -35,8 +35,8 @@ export function OverviewView({ data }: { data: OverviewData }) {
     <div className={SECTION_RHYTHM}>
       {/* Stats strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
-        <StatCell label="Total leads" value={data.totalLeads} sub="all time" />
-        <StatCell label="Contacts" value={data.totalContacts} sub="in CRM" />
+        <StatCell label="New people" value={data.totalLeads} sub="all time" />
+        <StatCell label="Total people" value={data.totalContacts} sub="in CRM" />
         <StatCell label="Active deals" value={data.totalDeals} />
         <StatCell
           label="Pipeline value"

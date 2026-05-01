@@ -317,7 +317,7 @@ function buildWeeklyReportHtml(params: {
               <td style="width:8px"></td>
               <td style="padding:12px;text-align:center;background:#eff6ff;border-radius:8px;width:25%">
                 <p style="margin:0;font-size:24px;font-weight:700;color:#2563eb">${totalNewLeads}</p>
-                <p style="margin:2px 0 0;font-size:11px;color:#6b7280;font-weight:500">New Leads</p>
+                <p style="margin:2px 0 0;font-size:11px;color:#6b7280;font-weight:500">New People</p>
               </td>
               <td style="width:8px"></td>
               <td style="padding:12px;text-align:center;background:#fefce8;border-radius:8px;width:25%">
@@ -348,7 +348,7 @@ function buildWeeklyReportHtml(params: {
             <thead>
               <tr style="background:#f8fafc">
                 <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid #e5e7eb">Agent</th>
-                <th style="padding:10px 8px;text-align:center;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid #e5e7eb">Leads</th>
+                <th style="padding:10px 8px;text-align:center;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid #e5e7eb">People</th>
                 <th style="padding:10px 8px;text-align:center;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid #e5e7eb">Contacted</th>
                 <th style="padding:10px 8px;text-align:center;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid #e5e7eb">New Deals</th>
                 <th style="padding:10px 8px;text-align:center;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid #e5e7eb">Closed</th>
