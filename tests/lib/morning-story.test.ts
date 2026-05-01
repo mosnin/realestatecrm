@@ -197,6 +197,75 @@ describe('composeMorningStory', () => {
     expect(out.doorway?.kind).toBe('person');
   });
 
+  // Hot beats new: hot is measured intent that's actively rotting; new is
+  // just an arrival with no signal yet. The realtor's first move should be
+  // on the lead whose interest is cooling, not the freshest face.
+  it('prefers a hot person over a new person', () => {
+    const out = composeMorningStory({
+      ...empty,
+      ...hotPerson('Maya'),
+      ...newPerson('David'),
+    });
+    expect(out.text).toBe("Maya's score is hot. Reach out.");
+    expect(out.doorway).toEqual({ kind: 'person', id: 'contact_hot' });
+  });
+
+  it('falls through to a new person when no hot person is present', () => {
+    const out = composeMorningStory({
+      ...empty,
+      ...newPerson('David'),
+    });
+    expect(out.text).toBe('David just applied. Welcome them.');
+    expect(out.doorway).toEqual({ kind: 'person', id: 'contact_new' });
+  });
+
+  // Tie-break the new combined ordering: stuck > overdue > hot > new.
+  // When all four are present, stuck still wins — but the ordering below it
+  // matters for the more common "no stuck, no overdue" morning.
+  it('walks the full ladder cleanly: stuck > overdue > hot > new', () => {
+    const allFour: MorningSummary = {
+      ...empty,
+      ...stuck('Chen', 14),
+      ...overdue('Sarah', 4),
+      ...hotPerson('Maya'),
+      ...newPerson('David'),
+    };
+    expect(composeMorningStory(allFour).doorway).toEqual({ kind: 'deal', id: 'deal_42' });
+
+    const noStuck: MorningSummary = { ...allFour, stuckDealsCount: 0, topStuckDeal: null };
+    expect(composeMorningStory(noStuck).doorway).toEqual({ kind: 'person', id: 'contact_7' });
+
+    const noStuckNoOverdue: MorningSummary = {
+      ...noStuck,
+      overdueFollowUpsCount: 0,
+      topOverdueFollowUp: null,
+    };
+    expect(composeMorningStory(noStuckNoOverdue).doorway).toEqual({
+      kind: 'person',
+      id: 'contact_hot',
+    });
+
+    const onlyNew: MorningSummary = {
+      ...noStuckNoOverdue,
+      hotPeopleCount: 0,
+      topHotPerson: null,
+    };
+    expect(composeMorningStory(onlyNew).doorway).toEqual({ kind: 'person', id: 'contact_new' });
+  });
+
+  // Null-safety: a null topHotPerson while hotPeopleCount > 0 must not crash
+  // or wrongly skip the new-person branch. The named subject is the gate.
+  it('skips the hot branch cleanly when topHotPerson is null even with a count', () => {
+    const out = composeMorningStory({
+      ...empty,
+      hotPeopleCount: 3,
+      topHotPerson: null,
+      ...newPerson('David'),
+    });
+    expect(out.text).toBe('David just applied. Welcome them.');
+    expect(out.doorway).toEqual({ kind: 'person', id: 'contact_new' });
+  });
+
   // ── Drafts/questions/closing/all-clear branches ─────────────────────────
 
   it('falls through to drafts/questions when no people-side urgencies', () => {

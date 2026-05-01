@@ -38,15 +38,21 @@ function isCleanDealTitle(title: string): boolean {
  * Compose one sentence from the summary. Priority order:
  *   1. Stuck deal — name the longest-stuck one.
  *   2. Overdue follow-up — name the most-overdue person.
- *   3. New person — name the most-recent arrival.
- *   4. Hot person — name the highest-scoring one.
+ *   3. Hot person — name the highest-scoring one.
+ *   4. New person — name the most-recent arrival.
  *   5. Drafts/questions — count only (focus card is right below).
  *   6. Closing this week — count only.
  *   7. All clear.
  *
+ * Hot beats new because hot is *measured* intent (leadScore >= threshold),
+ * and that intent rots if the realtor goes quiet. New is just an arrival —
+ * no signal yet beyond the timestamp. When both are present, the right
+ * morning move is the lead whose interest is actively cooling, not the
+ * freshest face in the inbox.
+ *
  * The doorway always matches the subject of the sentence: the stuck-deal
  * sentence opens to that deal; the overdue-follow-up sentence opens to
- * that person; new + hot sentences open to that person.
+ * that person; hot + new sentences open to that person.
  *
  * `agentSentence` (optional): when the route's OpenAI compose succeeds, the
  * model's sentence overrides the ladder text. The doorway is *still* derived
@@ -84,18 +90,18 @@ export function composeMorningStory(
     return { text, doorway: { kind: 'person', id } };
   }
 
-  if (s.topNewPerson) {
-    const { name, id } = s.topNewPerson;
-    return {
-      text: override ?? `${name} just applied. Welcome them.`,
-      doorway: { kind: 'person', id },
-    };
-  }
-
   if (s.topHotPerson) {
     const { name, id } = s.topHotPerson;
     return {
       text: override ?? `${name}'s score is hot. Reach out.`,
+      doorway: { kind: 'person', id },
+    };
+  }
+
+  if (s.topNewPerson) {
+    const { name, id } = s.topNewPerson;
+    return {
+      text: override ?? `${name} just applied. Welcome them.`,
       doorway: { kind: 'person', id },
     };
   }
