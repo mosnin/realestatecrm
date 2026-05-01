@@ -58,7 +58,7 @@ export const realtorNavItems: NavItem[] = [
   },
   {
     href: '/deals',
-    label: 'Pipeline',
+    label: 'Deals',
     icon: Briefcase,
   },
   {
@@ -111,6 +111,6 @@ export const secondaryNavItems = [
 export const mobileNavItems = [
   { href: '/chippi', label: 'Chippi', icon: Sparkles },
   { href: '/contacts', label: 'People', icon: Users },
-  { href: '/deals', label: 'Pipeline', icon: Briefcase },
+  { href: '/deals', label: 'Deals', icon: Briefcase },
   { href: '/settings', label: 'Settings', icon: Settings },
 ] as const;

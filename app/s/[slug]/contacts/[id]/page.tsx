@@ -96,8 +96,8 @@ export default async function ClientDetailPage({
       <div className="flex min-h-[50vh] items-center justify-center">
         <div className="text-center space-y-4 p-8">
           <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">We couldn&apos;t load this contact. This is usually temporary.</p>
-          <a href={`/s/${slug}/contacts`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Back to clients</a>
+          <p className="text-sm text-muted-foreground">We couldn&apos;t load this person. This is usually temporary.</p>
+          <a href={`/s/${slug}/contacts`} className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">Back to people</a>
         </div>
       </div>
     );
@@ -118,7 +118,7 @@ export default async function ClientDetailPage({
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm">
-            <Link href={`/s/${slug}/contacts`} className="text-muted-foreground hover:text-foreground">Contacts</Link>
+            <Link href={`/s/${slug}/contacts`} className="text-muted-foreground hover:text-foreground">People</Link>
             <span className="text-muted-foreground">/</span>
             <span className="font-semibold">{contact.name}</span>
           </div>
