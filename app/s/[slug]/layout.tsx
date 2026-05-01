@@ -265,7 +265,12 @@ export default async function DashboardLayout({
           // is reserved at the bottom.
           <main className="flex-1 min-h-0 flex flex-col bg-background text-foreground pb-[env(safe-area-inset-bottom)] md:pb-0">
             <LiveNotifications spaceId={space.id} slug={slug} />
-            <PageTransition>{children}</PageTransition>
+            {/* PageTransition gets `flex-1 min-h-0 flex flex-col` so the
+                Chippi page's `h-full` actually has a filled height to
+                resolve against. Without this, the chat workspace collapses
+                to content height and the composer ends up mid-screen
+                instead of pinned to the viewport bottom. */}
+            <PageTransition className="flex-1 min-h-0 flex flex-col">{children}</PageTransition>
           </main>
         ) : (
           <main className="flex-1 overflow-y-auto flex flex-col bg-background text-foreground">

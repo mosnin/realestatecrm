@@ -454,15 +454,12 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       // photo with no caption. Block when both text AND attachments are empty.
       if ((!trimmed && !hasAttachments) || isStreaming) return;
 
-      let convId: string;
-      try {
-        convId = await ensureConversationId();
-      } catch (err) {
-        const raw = err instanceof Error ? err.message : '';
-        landChippiError(chippiErrorMessage(classifyError(raw)));
-        return;
-      }
-
+      // Optimistic UI: push the user message + a streaming assistant
+      // placeholder BEFORE we await conversation creation. This is what
+      // flips the workspace from the empty / "Good evening" view into the
+      // active thread; previously it waited on the POST /api/ai/conversations
+      // round-trip (~200–500ms) and the user perceived a freeze. The thinking
+      // indicator shows immediately because `messages` is non-empty.
       const userMsg: UiMessage = {
         id: newId(),
         role: 'user',
@@ -478,6 +475,23 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       streamingMsgIdRef.current = assistantMsgId;
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setPendingApproval(null);
+
+      let convId: string;
+      try {
+        convId = await ensureConversationId();
+      } catch (err) {
+        // Conversation creation failed — pull the optimistic placeholders
+        // back so the realtor doesn't see a hung user message + empty
+        // assistant bubble. landChippiError surfaces an error message in
+        // its place via a fresh assistant entry.
+        setMessages((prev) =>
+          prev.filter((m) => m.id !== userMsg.id && m.id !== assistantMsgId),
+        );
+        streamingMsgIdRef.current = null;
+        const raw = err instanceof Error ? err.message : '';
+        landChippiError(chippiErrorMessage(classifyError(raw)));
+        return;
+      }
 
       await consumeStream('/api/ai/task', {
         spaceSlug,
