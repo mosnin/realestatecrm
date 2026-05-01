@@ -24,7 +24,6 @@ import {
   Plus,
   GripVertical,
   MapPin,
-  Search,
   X,
   Trophy,
   XCircle,
@@ -184,11 +183,12 @@ interface KanbanBoardProps {
    *  parent so the segmented toggle and the board share state. */
   boardStatus: BoardStatus;
   /** Optional narrow-down focus from the stat strip (At risk / Closing
-   *  this month). When set, the board further filters to only those deals
-   *  and a small chip near the toolbar offers a one-click clear. */
+   *  this month). When set, the board further filters to only those deals.
+   *  The clear chip lives in the page toolbar above. */
   focus: BoardFocus;
-  /** Clear the focus filter (used by the inline chip). */
-  onClearFocus: () => void;
+  /** Search query from the page toolbar. The board does the actual
+   *  filtering. */
+  searchQuery: string;
 }
 
 export function KanbanBoard({
@@ -196,13 +196,12 @@ export function KanbanBoard({
   pipelineId,
   boardStatus,
   focus,
-  onClearFocus,
+  searchQuery,
 }: KanbanBoardProps) {
   const router = useRouter();
   const [stages, setStages] = useState<StageWithDeals[]>([]);
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   // Slide-over panel state — clicking a card opens the deal here without nav.
   const [panelDealId, setPanelDealId] = useState<string | null>(null);
   const { confirm, ConfirmDialog } = useConfirm();
@@ -854,50 +853,8 @@ export function KanbanBoard({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar — two controls. Search and (when set) the focus chip
-          announcing what the page is filtered to. Everything else (status
-          chips, advanced filters, CSV, view toggle) was confession,
-          configuration disguised as a feature. Cut. */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 sm:flex-initial min-w-[140px]">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-          />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search deals…"
-            className="pl-9 pr-7 h-9 w-full sm:w-64 text-sm rounded-md border border-border/70 bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-150"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label="Clear search"
-            >
-              <X size={12} />
-            </button>
-          )}
-        </div>
-
-        {/* Focus chip — only visible when a focus filter is on. Acknowledges
-            the narrowed view and gives one-click escape. The chip lives next
-            to the search so the realtor doesn't have to look elsewhere to
-            understand why fewer cards are showing. */}
-        {focus && (
-          <button
-            type="button"
-            onClick={onClearFocus}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-foreground text-background text-xs font-medium hover:bg-foreground/90 transition-colors duration-150"
-          >
-            <span>{focus === 'at-risk' ? 'At risk' : 'Closing this month'}</span>
-            <X size={12} />
-          </button>
-        )}
-      </div>
+      {/* Toolbar (search + focus chip + status toggle) is now part of the
+          page chrome above. The board renders just the board. */}
 
       {/* Mobile stacked view — paper-flat hairline rows. */}
         <div className="md:hidden space-y-4">

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Plus } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 import { KanbanBoard } from './kanban-board';
 import { PipelineSummary } from './pipeline-summary';
 import { PipelineTabs } from './pipeline-tabs';
@@ -40,6 +40,10 @@ export function DealsPageClient({ slug }: { slug: string }) {
   // one story instead of two.
   const [boardStatus, setBoardStatus] = useState<BoardStatus>('active');
   const [focus, setFocus] = useState<BoardFocus>(null);
+  // Search is part of the page-level toolbar so the status toggle, search,
+  // and focus chip share one row. Used to be in the kanban — but having three
+  // separate rows of chrome was the whole problem.
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Load pipelines (triggers bootstrap if this is the first visit)
   useEffect(() => {
@@ -139,8 +143,12 @@ export function DealsPageClient({ slug }: { slug: string }) {
         />
       )}
 
-      {/* Pipeline tabs — switch between boards (e.g. Sales / Listings) */}
-      {hasPipelines && (
+      {/* Pipeline tabs — only when the realtor actually has more than one
+          board to choose between. Most realtors have a single Sales pipeline;
+          showing "[Sales] [+]" by itself was a row of chrome that paid no
+          rent. The "+ new pipeline" affordance comes back when there are
+          two or more — which is when it stops being a power-user feature. */}
+      {pipelines.length > 1 && (
         <div className="flex items-center gap-2 border-b border-border/70">
           <PipelineTabs
             slug={slug}
@@ -152,38 +160,78 @@ export function DealsPageClient({ slug }: { slug: string }) {
         </div>
       )}
 
-      {/* Status segmented toggle — Active / Closed only. Two states, sliding
-          underline via motion.layoutId so the eye knows the page is changing
-          its mind, not just the cards. Same vocabulary as the contact tab
-          strip and broker reviews. */}
+      {/* One toolbar — the Active/Closed segmented toggle (sliding underline
+          via motion.layoutId), search, and the focus chip when set. Was
+          three separate rows; the audit said collapse, so collapsed. The
+          underline track is the row's own bottom border so the indicator
+          and the chrome ride the same line. */}
       {hasPipelines && (
-        <div role="tablist" aria-label="Deal status" className="flex items-center gap-0">
-          {STATUS_TABS.map((t) => {
-            const isActive = boardStatus === t.key;
-            return (
+        <div className="flex items-center gap-3 flex-wrap border-b border-border/70">
+          <div role="tablist" aria-label="Deal status" className="flex items-center gap-0">
+            {STATUS_TABS.map((t) => {
+              const isActive = boardStatus === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => handleStatusChange(t.key)}
+                  className={cn(
+                    'relative inline-flex items-center px-3 py-2 text-sm font-medium transition-colors',
+                    isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {t.label}
+                  {isActive && (
+                    <motion.span
+                      layoutId="deals-status-underline"
+                      className="absolute bottom-[-1px] left-2 right-2 h-[2px] rounded-full bg-foreground"
+                      transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+                      aria-hidden
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="ml-auto flex items-center gap-2 flex-wrap pb-2 sm:pb-0">
+            <div className="relative min-w-[140px]">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search deals…"
+                className="pl-9 pr-7 h-9 w-full sm:w-64 text-sm rounded-md border border-border/70 bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-150"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            {focus && (
               <button
-                key={t.key}
                 type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => handleStatusChange(t.key)}
-                className={cn(
-                  'relative inline-flex items-center px-3 py-2 text-sm font-medium transition-colors',
-                  isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
-                )}
+                onClick={() => setFocus(null)}
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-foreground text-background text-xs font-medium hover:bg-foreground/90 transition-colors duration-150"
               >
-                {t.label}
-                {isActive && (
-                  <motion.span
-                    layoutId="deals-status-underline"
-                    className="absolute bottom-[-1px] left-2 right-2 h-[2px] rounded-full bg-foreground"
-                    transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-                    aria-hidden
-                  />
-                )}
+                <span>{focus === 'at-risk' ? 'At risk' : 'Closing this month'}</span>
+                <X size={12} />
               </button>
-            );
-          })}
+            )}
+          </div>
         </div>
       )}
 
@@ -193,7 +241,7 @@ export function DealsPageClient({ slug }: { slug: string }) {
           pipelineId={activePipelineId}
           boardStatus={boardStatus}
           focus={focus}
-          onClearFocus={() => setFocus(null)}
+          searchQuery={searchQuery}
         />
       )}
 
