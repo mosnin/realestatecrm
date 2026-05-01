@@ -33,6 +33,7 @@ import { sendDraft, type DeliveryResult } from '@/lib/delivery';
 import { audit } from '@/lib/audit';
 import { logger } from '@/lib/logger';
 import { enrichContext, type EnrichedContext } from '@/lib/ai-tools/context-enrichment';
+import { getRecentVoiceSamples, type VoiceSample } from '@/lib/draft-voice';
 
 const TIMEOUT_MS = 5_000;
 const MODEL = 'gpt-4.1-mini';
@@ -80,6 +81,25 @@ const SYSTEM_PROMPT =
   "Output strict JSON with this shape and nothing else: {\"subject\": string|null, \"body\": string}. " +
   "Subject is a non-empty string for emails, null for notes.";
 
+/**
+ * Build the optional voice-reference system message. Empty string if there
+ * are no samples (caller skips the message entirely in that case). Bodies
+ * arrive already-scrubbed and already-truncated from `getRecentVoiceSamples`;
+ * this just formats them into a numbered block with the don't-copy rule.
+ */
+function buildVoiceMessage(samples: VoiceSample[]): string {
+  if (samples.length === 0) return '';
+  const lines: string[] = [
+    "The realtor's voice — recent emails they've sent (use as style reference, do NOT copy the content; never reuse names, deal details, or specifics from these samples):",
+    '',
+  ];
+  samples.forEach((s, i) => {
+    lines.push(`${i + 1}. ${s.body}`);
+    lines.push('');
+  });
+  return lines.join('\n').trimEnd();
+}
+
 async function composeDraftWithOpenAI(args: {
   intent: Intent;
   channel: Channel;
@@ -90,6 +110,7 @@ async function composeDraftWithOpenAI(args: {
   status?: string;
   scoreLabel?: string | null;
   leadScore?: number | null;
+  voiceSamples: VoiceSample[];
 }): Promise<{ subject: string | null; body: string } | null> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
@@ -110,16 +131,23 @@ async function composeDraftWithOpenAI(args: {
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const client = new OpenAI({ apiKey });
+    // Voice samples ride alongside SYSTEM_PROMPT, never replacing it. Empty
+    // sample list → no second system message (current behavior preserved).
+    const voiceMessage =
+      args.channel === 'email' ? buildVoiceMessage(args.voiceSamples) : '';
+    const messages: Array<{ role: 'system' | 'user'; content: string }> = [
+      { role: 'system', content: SYSTEM_PROMPT },
+    ];
+    if (voiceMessage) messages.push({ role: 'system', content: voiceMessage });
+    messages.push({ role: 'user', content: JSON.stringify(userPayload) });
+
     const response = await client.chat.completions.create(
       {
         model: MODEL,
         temperature: 0.4,
         max_tokens: 220,
         response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: JSON.stringify(userPayload) },
-        ],
+        messages,
       },
       { signal: controller.signal },
     );
@@ -203,6 +231,11 @@ export async function POST(req: NextRequest) {
   if (mode === 'preview') {
     const channel = channelForIntent(body.intent);
 
+    // Voice samples are email-only — note voice is different (terse, factual,
+    // past tense). Pull once, in parallel with the rest of the request shape.
+    const voiceSamples =
+      channel === 'email' ? await getRecentVoiceSamples(space.id) : [];
+
     const composed = await composeDraftWithOpenAI({
       intent: body.intent,
       channel,
@@ -213,6 +246,7 @@ export async function POST(req: NextRequest) {
       status: enriched.status,
       scoreLabel: enriched.scoreLabel,
       leadScore: enriched.leadScore,
+      voiceSamples,
     });
 
     if (!composed) {

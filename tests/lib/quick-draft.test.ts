@@ -96,6 +96,18 @@ const { sendDraftMock } = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/delivery', () => ({ sendDraft: sendDraftMock }));
 
+// ── Voice samples mock ────────────────────────────────────────────────────
+// The compose route now pulls voice samples per request. Mocked at the
+// helper boundary — getRecentVoiceSamples has its own focused tests in
+// draft-voice.test.ts; here we just control what the route sees so we can
+// assert the prompt array shape changes when samples are present.
+const { getRecentVoiceSamplesMock } = vi.hoisted(() => ({
+  getRecentVoiceSamplesMock: vi.fn(async () => [] as Array<{ subject: string | null; body: string }>),
+}));
+vi.mock('@/lib/draft-voice', () => ({
+  getRecentVoiceSamples: getRecentVoiceSamplesMock,
+}));
+
 import { POST } from '@/app/api/agent/quick-draft/route';
 
 function makeReq(body: Record<string, unknown>): Request {
@@ -112,6 +124,8 @@ beforeEach(() => {
   lastDraftStatusUpdate = null;
   openaiCreateMock.mockClear();
   sendDraftMock.mockClear();
+  getRecentVoiceSamplesMock.mockReset();
+  getRecentVoiceSamplesMock.mockResolvedValue([]);
   process.env.OPENAI_API_KEY = 'test-key';
 });
 
@@ -189,6 +203,71 @@ describe('POST /api/agent/quick-draft — preview mode', () => {
     mockByTable.Deal = { single: { id: 'd_x', title: 'X', contactId: null, updatedAt: null } };
     const res = await POST(makeReq({ context: 'deal', id: 'd_x', intent: 'check-in' }) as never);
     expect(res.status).toBe(502);
+  });
+});
+
+describe('POST /api/agent/quick-draft — voice wiring', () => {
+  it('does NOT include a voice block when there are 0 samples (current behavior preserved)', async () => {
+    getRecentVoiceSamplesMock.mockResolvedValueOnce([]);
+    mockByTable.Deal = {
+      single: { id: 'd_chen', title: 'Chen', contactId: 'c_chen', updatedAt: null },
+    };
+    mockByTable.ContactActivity = { rows: [] };
+
+    const res = await POST(makeReq({ context: 'deal', id: 'd_chen', intent: 'check-in' }) as never);
+    expect(res.status).toBe(200);
+    expect(openaiCreateMock).toHaveBeenCalledOnce();
+
+    const args = (openaiCreateMock.mock.calls[0] as unknown as [{ messages: Array<{ role: string; content: string }> }])[0];
+    const systemMessages = args.messages.filter((m) => m.role === 'system');
+    expect(systemMessages).toHaveLength(1);
+    expect(systemMessages[0].content).toContain('You are Chippi');
+    // No reference to the voice block label.
+    expect(args.messages.some((m) => m.content.includes("realtor's voice"))).toBe(false);
+  });
+
+  it('appends a voice block AFTER the SYSTEM_PROMPT when samples exist', async () => {
+    getRecentVoiceSamplesMock.mockResolvedValueOnce([
+      { subject: 's1', body: 'Got your note. Quick yes from me.' },
+      { subject: 's2', body: 'Tuesday at 3 works. See you there.' },
+    ]);
+    mockByTable.Deal = {
+      single: { id: 'd_chen', title: 'Chen', contactId: 'c_chen', updatedAt: null },
+    };
+    mockByTable.ContactActivity = { rows: [] };
+
+    const res = await POST(makeReq({ context: 'deal', id: 'd_chen', intent: 'check-in' }) as never);
+    expect(res.status).toBe(200);
+
+    const args = (openaiCreateMock.mock.calls[0] as unknown as [{ messages: Array<{ role: string; content: string }> }])[0];
+    const systemMessages = args.messages.filter((m) => m.role === 'system');
+    expect(systemMessages).toHaveLength(2);
+    // SYSTEM_PROMPT is first, voice block second — order matters for the model.
+    expect(systemMessages[0].content).toContain('You are Chippi');
+    expect(systemMessages[1].content).toContain("realtor's voice");
+    expect(systemMessages[1].content).toContain('Got your note');
+    expect(systemMessages[1].content).toContain('Tuesday at 3 works');
+    // The "do NOT copy" instruction is the prompt-level PII defense.
+    expect(systemMessages[1].content).toMatch(/do NOT copy/i);
+  });
+
+  it('skips voice samples for note channel (log-call intent)', async () => {
+    // Even if the helper would return samples, the route must not request
+    // them for non-email channels — note voice is different.
+    mockByTable.Deal = {
+      single: { id: 'd_chen', title: 'Chen', contactId: 'c_chen', updatedAt: null },
+    };
+    mockByTable.ContactActivity = { rows: [] };
+    openaiCreateMock.mockResolvedValueOnce({
+      choices: [{ message: { content: JSON.stringify({ subject: null, body: 'Called Chen.' }) } }],
+    } as never);
+
+    const res = await POST(makeReq({ context: 'deal', id: 'd_chen', intent: 'log-call' }) as never);
+    expect(res.status).toBe(200);
+
+    const args = (openaiCreateMock.mock.calls[0] as unknown as [{ messages: Array<{ role: string; content: string }> }])[0];
+    const systemMessages = args.messages.filter((m) => m.role === 'system');
+    expect(systemMessages).toHaveLength(1);
   });
 });
 
