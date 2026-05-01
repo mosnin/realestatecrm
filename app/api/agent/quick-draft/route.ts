@@ -84,13 +84,19 @@ const SYSTEM_PROMPT =
 /**
  * Build the optional voice-reference system message. Empty string if there
  * are no samples (caller skips the message entirely in that case). Bodies
- * arrive already-scrubbed and already-truncated from `getRecentVoiceSamples`;
- * this just formats them into a numbered block with the don't-copy rule.
+ * arrive truncated from `getRecentVoiceSamples`; this formats them and pins
+ * the don't-copy rule that is the actual PII defense.
+ *
+ * The instruction is the load-bearing piece — these samples were written to
+ * other recipients, and the model must treat them as cadence-only. If this
+ * sentence is wrong, names leak; no regex on the input will save us.
  */
 function buildVoiceMessage(samples: VoiceSample[]): string {
   if (samples.length === 0) return '';
   const lines: string[] = [
-    "The realtor's voice — recent emails they've sent (use as style reference, do NOT copy the content; never reuse names, deal details, or specifics from these samples):",
+    "The realtor's voice — recent emails they sent to OTHER people. Match cadence, sentence length, and word choice only.",
+    "Do NOT address the new recipient by any name that appears in these samples. Do NOT mention any deal, property, address, date, or detail from these samples — those belong to other recipients and would be a privacy breach.",
+    "Use only the new recipient's facts from the user message; the samples are tone reference, never content.",
     '',
   ];
   samples.forEach((s, i) => {

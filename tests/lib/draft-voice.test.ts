@@ -9,7 +9,8 @@
  *   - cap at 3, ordered by updatedAt DESC
  *   - cache hit (no second supabase call) and cache reset
  *   - returned shape: only subject + body, no PII columns
- *   - PII scrub: greeting + signature replaced before return
+ *   - voice samples pass through unmodified — recipient-name leak protection
+ *     is the prompt instruction, not a regex on the body
  *   - truncation at sentence boundary or with ellipsis
  */
 
@@ -134,6 +135,8 @@ describe('getRecentVoiceSamples — query shape', () => {
     expect(lastCapture!.table).toBe('AgentDraft');
 
     // SELECT must be subject+content only — no contactId, dealId, reasoning.
+    // This is the structural defense: the helper literally cannot return a
+    // column that ties a sample back to a specific person.
     const select = lastCapture!.selects.join(',');
     expect(select).toContain('subject');
     expect(select).toContain('content');
@@ -204,46 +207,22 @@ describe('getRecentVoiceSamples — return shape and cap', () => {
   });
 });
 
-describe('getRecentVoiceSamples — PII scrub', () => {
-  it('replaces greeting name in body', async () => {
+describe('getRecentVoiceSamples — body is passed through unmodified', () => {
+  it('returns the stored content verbatim — recipient-name leak defense lives in the prompt, not here', async () => {
+    // The helper does not regex-scrub names. A regex catches "Hi Sam," and
+    // misses "Hey Sam!", "Sam—", "Sam, thanks" — that's theater. The real
+    // defense is the system message at the compose call site telling the
+    // model not to reuse names from samples. Pin that behavior: bodies
+    // arrive at the model the same way they were written.
+    const a = 'Hi Sam,\n\nWanted to circle back. Talk soon.\n\n— Maya';
+    const b = 'Hey Jane! Quick check-in. Free Tuesday?\n\nMaya Chen';
     mockRows = [
-      { subject: 'a', content: 'Hi Sam,\n\nWanted to circle back. Call me?' },
-      { subject: 'b', content: 'Hello Jane! Quick check-in. Free Tuesday?' },
+      { subject: 's1', content: a },
+      { subject: 's2', content: b },
     ];
     const out = await getRecentVoiceSamples('s_1', { now: NOW });
-    expect(out[0].body).not.toMatch(/\bSam\b/);
-    expect(out[0].body).toMatch(/\[name\]/);
-    expect(out[1].body).not.toMatch(/\bJane\b/);
-    expect(out[1].body).toMatch(/\[name\]/);
-  });
-
-  it('replaces closing signature on a short last line', async () => {
-    mockRows = [
-      {
-        subject: 'a',
-        content: 'Hi there,\n\nSounds good. Talk soon.\n\n— Maya',
-      },
-      {
-        subject: 'b',
-        content: 'Quick note. All set for Tuesday.\n\nMaya Chen',
-      },
-    ];
-    const out = await getRecentVoiceSamples('s_1', { now: NOW });
-    expect(out[0].body).not.toMatch(/\bMaya\b/);
-    expect(out[0].body).toMatch(/\[realtor\]/);
-    expect(out[1].body).not.toMatch(/Maya Chen/);
-  });
-
-  it('does not scrub the middle of a paragraph (documented limitation)', async () => {
-    // We acknowledge this leaves a residual leak path — the prompt-level
-    // "do not copy" instruction is the second line of defense. The test
-    // pins current behavior so a future change is intentional.
-    mockRows = [
-      { subject: 'a', content: 'Sounds good. Talk soon. Best.' },
-      { subject: 'b', content: 'Confirming Tuesday. See you then. Cheers.' },
-    ];
-    const out = await getRecentVoiceSamples('s_1', { now: NOW });
-    expect(out[0].body).toContain('Sounds good');
+    expect(out[0].body).toBe(a);
+    expect(out[1].body).toBe(b);
   });
 });
 
@@ -277,9 +256,7 @@ describe('getRecentVoiceSamples — truncation', () => {
     expect(out[0].body.endsWith('…')).toBe(true);
   });
 
-  it('leaves short bodies untouched (apart from PII scrub)', async () => {
-    // Use bodies with no greeting and no signature line so neither scrub
-    // path fires; we're checking the truncation path is a no-op.
+  it('leaves short bodies untouched', async () => {
     mockRows = [
       { subject: 'a', content: 'Sounds good. Talk soon, all set.' },
       { subject: 'b', content: 'Confirming Tuesday at 3. Bringing the file.' },

@@ -226,10 +226,14 @@ describe('POST /api/agent/quick-draft — voice wiring', () => {
     expect(args.messages.some((m) => m.content.includes("realtor's voice"))).toBe(false);
   });
 
-  it('appends a voice block AFTER the SYSTEM_PROMPT when samples exist', async () => {
+  it('appends a voice block AFTER the SYSTEM_PROMPT when samples exist, with raw bodies and the recipient-leak instruction', async () => {
+    // The samples here include a name in the body — the helper does NOT
+    // scrub it. The prompt instruction is what stops the model from
+    // re-using "Sam" or "Chen" in the new draft. Pin both: the raw body
+    // arrives in the prompt, and the instruction is present and specific.
     getRecentVoiceSamplesMock.mockResolvedValueOnce([
-      { subject: 's1', body: 'Got your note. Quick yes from me.' },
-      { subject: 's2', body: 'Tuesday at 3 works. See you there.' },
+      { subject: 's1', body: 'Hi Sam, got your note. Quick yes from me.' },
+      { subject: 's2', body: 'Tuesday at 3 works. See you there. — Maya' },
     ]);
     mockByTable.Deal = {
       single: { id: 'd_chen', title: 'Chen', contactId: 'c_chen', updatedAt: null },
@@ -244,11 +248,14 @@ describe('POST /api/agent/quick-draft — voice wiring', () => {
     expect(systemMessages).toHaveLength(2);
     // SYSTEM_PROMPT is first, voice block second — order matters for the model.
     expect(systemMessages[0].content).toContain('You are Chippi');
-    expect(systemMessages[1].content).toContain("realtor's voice");
-    expect(systemMessages[1].content).toContain('Got your note');
-    expect(systemMessages[1].content).toContain('Tuesday at 3 works');
-    // The "do NOT copy" instruction is the prompt-level PII defense.
-    expect(systemMessages[1].content).toMatch(/do NOT copy/i);
+    // Raw bodies pass through verbatim, including the names. The prompt
+    // does the work, not a regex.
+    expect(systemMessages[1].content).toContain('Hi Sam, got your note. Quick yes from me.');
+    expect(systemMessages[1].content).toContain('Tuesday at 3 works. See you there. — Maya');
+    // The instruction is specific to the failure mode (recipient name +
+    // deal/property/date reuse), not generic safety hedging.
+    expect(systemMessages[1].content).toMatch(/do NOT address the new recipient by any name/i);
+    expect(systemMessages[1].content).toMatch(/deal, property, address, date/i);
   });
 
   it('skips voice samples for note channel (log-call intent)', async () => {

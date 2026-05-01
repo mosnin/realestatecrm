@@ -15,21 +15,21 @@
  * --- The PII-leak failure mode ----------------------------------------------
  * Sample bodies contain the names of OTHER subjects ("Hi Sam," "— Jane").
  * Pasted naively into a compose call for a different recipient, the model
- * could splice "Sam" into the new email. That would kill the feature.
+ * could splice "Sam" into the new email.
  *
- * Defense in depth, in order:
- *   1. Server prompt instruction: "use as style reference, do NOT copy the
- *      content." (added by the caller, not this helper).
- *   2. This helper scrubs greeting names ("Hi Sam," → "Hi [name],") and
- *      closing names on a known-signature line ("- Sam" / "— Sam" / "Sam"
- *      on the last short line) before returning.
- *   3. Truncation at 400 chars, sentence-boundary-aware, so we don't return
- *      a half-sentence the model would "complete" with a hallucinated name.
+ * Defense, in order:
+ *   1. Column-scoped query: SELECT subject + content only, never contactId,
+ *      dealId, reasoning, or anything that ties the sample to a specific
+ *      person. Structural — enforced at the DB boundary.
+ *   2. Server prompt instruction at the compose call site: the model is told
+ *      explicitly not to address the new recipient by any name from the
+ *      samples and not to reuse deals/properties/dates from them. That's
+ *      where the actual recipient-name protection lives.
  *
- * The tests assert the scrub on representative shapes. It's not exhaustive
- * — a realtor who writes "Sam, I think you'll love it" mid-paragraph still
- * leaks "Sam" — but the dominant failure modes (greeting + sign-off) are
- * covered, and the prompt instruction handles the residual.
+ * We do NOT try to regex-scrub names out of the body. A regex catches "Hi
+ * Sam," and misses "Hey Sam!", "Sam—", "Sam, thanks" — it's theater that
+ * looks like defense in depth without being it. The prompt does the work
+ * end-to-end or it doesn't; either way the regex didn't help.
  */
 
 import { supabase } from '@/lib/supabase';
@@ -85,47 +85,6 @@ const cache = new Map<string, CacheEntry>();
 /** Test-only: drop every memoized entry. Production code must not call this. */
 export function __resetDraftVoiceCacheForTests(): void {
   cache.clear();
-}
-
-// ── PII scrub ───────────────────────────────────────────────────────────────
-//
-// Replace the greeting name and the closing signature name with a generic
-// placeholder. These two slots are where >90% of recipient-specific PII
-// lives in a short email. We don't try to NER the middle of the body — that
-// requires a model and would defeat the point of a thin helper.
-function scrubBody(raw: string): string {
-  let s = raw;
-
-  // Greeting: "Hi Sam," / "Hello Sam," / "Hey Sam," / "Hi Sam." at the
-  // start (optionally after whitespace). Capture the punctuation so we put
-  // it back. \p{L} for any Unicode letter; cap at 30 chars to avoid eating
-  // a sentence.
-  s = s.replace(
-    /^(\s*(?:Hi|Hello|Hey|Dear)\s+)([\p{L}][\p{L}\p{M}'’\-]{0,29})(\s*[,.!])/u,
-    '$1[name]$3',
-  );
-
-  // Closing signature: a short line at the end that's just a name (and
-  // optional leading dash/em-dash). We treat the LAST non-empty line as
-  // the candidate; if it's < 30 chars, has at most 3 words, and contains
-  // no terminal punctuation, replace it.
-  const lines = s.split('\n');
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const trimmed = lines[i].trim();
-    if (trimmed.length === 0) continue;
-    const stripped = trimmed.replace(/^[-—–\s]+/, '').trim();
-    const looksLikeName =
-      stripped.length > 0 &&
-      stripped.length <= 30 &&
-      stripped.split(/\s+/).length <= 3 &&
-      !/[.!?:;,]/.test(stripped) &&
-      /^[\p{L}][\p{L}\p{M}'’\-\s]*$/u.test(stripped);
-    if (looksLikeName) {
-      lines[i] = lines[i].replace(stripped, '[realtor]');
-    }
-    break;
-  }
-  return lines.join('\n');
 }
 
 // ── Truncation ──────────────────────────────────────────────────────────────
@@ -197,7 +156,7 @@ export async function getRecentVoiceSamples(
 
   const samples: VoiceSample[] = rows.map((r) => ({
     subject: r.subject,
-    body: truncateSample(scrubBody(r.content ?? '')),
+    body: truncateSample(r.content ?? ''),
   }));
 
   cache.set(spaceId, { samples, expiresAt: Date.now() + TTL_MS });
