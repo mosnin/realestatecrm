@@ -9,6 +9,7 @@ import type { Contact } from '@/lib/types';
 import { LeadsView } from '@/components/leads/leads-view';
 import { PeopleTabs } from '@/components/people/people-tabs';
 import { H1, TITLE_FONT } from '@/lib/typography';
+import { composeLeadsNarration } from '@/lib/narration/leads';
 
 export default async function LeadsPage({
   params,
@@ -90,24 +91,11 @@ export default async function LeadsPage({
   // Chippi's one sentence — same brand-voice spine as the deals + contacts
   // pages. The narration prioritises what just arrived, then what's hot,
   // then names the steady state. Empty state has its own copy below.
-  const narration = (() => {
-    if (unreadLeads.length > 0) {
-      return unreadLeads.length === 1
-        ? '1 new application since you last looked. Open it.'
-        : `${unreadLeads.length} new applications since you last looked. Open them.`;
-    }
-    if (tierCounts.hot > 0) {
-      return tierCounts.hot === 1
-        ? '1 hot application waiting. Reach out.'
-        : `${tierCounts.hot} hot applications waiting. Reach out.`;
-    }
-    if (leads.length > 0) {
-      return leads.length === 1
-        ? 'Caught up. 1 application on the list.'
-        : `Caught up. ${leads.length} applications on the list.`;
-    }
-    return 'No applications yet. Drop your intake link and start collecting.';
-  })();
+  const narration = composeLeadsNarration({
+    unreadCount: unreadLeads.length,
+    hotCount: tierCounts.hot,
+    totalCount: leads.length,
+  });
 
   return (
     <div className="space-y-4 max-w-[1320px]">

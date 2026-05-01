@@ -9,6 +9,7 @@ import {
   Clock, CheckCircle2, Phone, Mail, CalendarDays, ChevronDown,
   AlertCircle, Briefcase, ArrowRight, Timer,
 } from 'lucide-react';
+import { composeFollowUpsNarration } from '@/lib/narration/follow-ups';
 
 type ContactFollowUp = {
   id: string;
@@ -212,33 +213,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
   // Returns a tab key so the line is a doorway: clicking the narration
   // switches the page to the tab the sentence is talking about. Priority:
   // overdue (loudest) → today's load → upcoming nudge.
-  const narration: { text: string; targetTab: Tab | null } = (() => {
-    if (tabCounts.overdue > 0) {
-      return {
-        text: tabCounts.overdue === 1
-          ? '1 follow-up slipped past its date. Start there.'
-          : `${tabCounts.overdue} follow-ups slipped past. Start with the oldest.`,
-        targetTab: 'overdue',
-      };
-    }
-    if (tabCounts.today > 0) {
-      return {
-        text: tabCounts.today === 1
-          ? '1 follow-up due today.'
-          : `${tabCounts.today} follow-ups due today.`,
-        targetTab: 'today',
-      };
-    }
-    if (tabCounts.upcoming > 0) {
-      return {
-        text: tabCounts.upcoming === 1
-          ? '1 follow-up coming up. Quiet otherwise.'
-          : `${tabCounts.upcoming} follow-ups coming up. Quiet otherwise.`,
-        targetTab: 'upcoming',
-      };
-    }
-    return { text: `${totalCount} on your list.`, targetTab: null };
-  })();
+  const narration = composeFollowUpsNarration(tabCounts, totalCount);
 
   return (
     <div className="space-y-6 max-w-[900px]">

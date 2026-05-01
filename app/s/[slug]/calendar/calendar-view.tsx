@@ -18,6 +18,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { H1, H2, H3, TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
 import { TourStatsStrip } from '@/components/tours/tour-stats-strip';
 import { cn } from '@/lib/utils';
+import {
+  composeCalendarNarration,
+  type CalendarNarrationOutput,
+} from '@/lib/narration/calendar';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -234,63 +238,14 @@ export function CalendarView({
   // week" → switch to week. Overdue → focus today (the cluster is right
   // before today's column). The narration describes what's there; clicking
   // takes you to it.
-  const narration: { text: string; action: 'goto-day' | 'goto-week' | null } = useMemo(() => {
-    const now = new Date();
-    const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const tomorrow0 = new Date(today0);
-    tomorrow0.setDate(tomorrow0.getDate() + 1);
-    const weekEnd = new Date(today0);
-    weekEnd.setDate(weekEnd.getDate() + 7);
-
-    const allFollowUps = [...rawContactFollowUps, ...rawDealFollowUps];
-
-    let overdueCount = 0;
-    let todayTours = 0;
-    let todayFollowUps = 0;
-    let weekTours = 0;
-
-    for (const t of rawTours) {
-      const d = new Date(t.startsAt);
-      if (d >= today0 && d < tomorrow0) todayTours += 1;
-      if (d >= today0 && d < weekEnd) weekTours += 1;
-    }
-    for (const f of allFollowUps) {
-      const d = new Date(f.followUpAt);
-      if (d < today0) overdueCount += 1;
-      if (d >= today0 && d < tomorrow0) todayFollowUps += 1;
-    }
-
-    const todayTotal = todayTours + todayFollowUps;
-
-    if (overdueCount > 0) {
-      return {
-        text: overdueCount === 1
-          ? '1 follow-up slipped past its date. Catch up.'
-          : `${overdueCount} follow-ups slipped past their date. Catch up.`,
-        action: 'goto-day',
-      };
-    }
-    if (todayTotal > 0) {
-      return {
-        text: todayTotal === 1
-          ? '1 thing on your calendar today.'
-          : `${todayTotal} things on your calendar today.`,
-        action: 'goto-day',
-      };
-    }
-    if (weekTours > 0) {
-      return {
-        text: weekTours === 1
-          ? '1 tour scheduled this week.'
-          : `${weekTours} tours scheduled this week.`,
-        action: 'goto-week',
-      };
-    }
-    return {
-      text: 'Calendar’s quiet this week. Schedule a tour to fill it in.',
-      action: null,
-    };
-  }, [rawTours, rawContactFollowUps, rawDealFollowUps]);
+  const narration: CalendarNarrationOutput = useMemo(
+    () => composeCalendarNarration({
+      tours: rawTours,
+      contactFollowUps: rawContactFollowUps,
+      dealFollowUps: rawDealFollowUps,
+    }),
+    [rawTours, rawContactFollowUps, rawDealFollowUps],
+  );
 
   function handleNarrationClick() {
     if (narration.action === 'goto-day') {

@@ -17,7 +17,6 @@ import { blocksFromLegacyContent, type MessageBlock } from '@/lib/ai-tools/block
 import type { Conversation } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { TodayFeed } from './today-feed';
-import { MorningReplay } from './morning-replay';
 import { MorningStory } from './morning-story';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { toast } from 'sonner';
@@ -45,14 +44,6 @@ interface ChippiWorkspaceProps {
 }
 
 const MESSAGE_LIMIT = 50;
-
-function timeBasedGreeting(): string {
-  const h = new Date().getHours();
-  if (h < 5) return 'Working late';
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
-}
 
 function legacyToUi(messages: LegacyMessage[]): UiMessage[] {
   return messages.map((m, i) => ({
@@ -315,7 +306,6 @@ export function ChippiWorkspace({
   const atLimit = messages.length >= MESSAGE_LIMIT;
   const isEmpty = messages.length === 0 && !loadingMessages;
   const firstName = user?.firstName ?? '';
-  const greeting = useMemo(timeBasedGreeting, []);
 
   // Composer prefill — bumped by the day-one welcome's "Tell me about a lead"
   // action. Nonce so identical text twice in a row still re-applies.
@@ -547,39 +537,20 @@ export function ChippiWorkspace({
         <>
           <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 pt-8 sm:pt-14 pb-40 sm:pb-32 space-y-10 sm:space-y-12">
-              {/* Greeting + Chippi's composed morning story. The story
-                  pulls stuck deals, overdue follow-ups, new arrivals, hot
-                  contacts, drafts, and questions in one shot — names the
-                  loudest single fact and (when there's a top pick) becomes
-                  a doorway to that person's page. Replaces the old "X
-                  drafts · Y questions" inventory line, which only saw two
-                  of the seven things actually pressing on the realtor's
-                  desk. The fallback is the brand-positioning line so the
-                  load skeleton never reads as empty. */}
-              <header className="space-y-1.5 text-center">
-                <h1
-                  className="text-[2.25rem] sm:text-[2.5rem] tracking-tight text-foreground leading-tight"
-                  style={{ fontFamily: 'var(--font-title)' }}
-                >
-                  {greeting}
-                  {firstName ? `, ${firstName}` : ''}.
-                </h1>
-                <MorningStory slug={slug} />
-              </header>
+              {/* The home is one sentence — Chippi's composed morning story
+                  promoted to h1. Pulls stuck deals, overdue follow-ups, new
+                  arrivals, hot people, drafts, questions in one shot; names
+                  the loudest single fact and (when there's a top subject)
+                  becomes a doorway to that deal or person.
 
-              {/* Morning replay — the wow moment. Auto-renders the first
-                  visit each day when there's overnight activity to show.
-                  Self-dismisses for the rest of the day on "Looks good".
-                  Renders nothing when there's no overnight activity. */}
-              <MorningReplay slug={slug} />
+                  The audit cut the "Good morning, Sarah" greeting (wallpaper —
+                  every productivity app ships it; nobody notices) and the
+                  MorningReplay recap card (the agent talking about itself
+                  instead of about the deals). The home now answers one
+                  question: what should I do next? */}
+              <MorningStory slug={slug} />
 
-              {/* HowChippiWorksTip removed — documentation in the product is
-                  product failure. The empty-state status sentence ("I keep
-                  your day moving so you don't have to.") and the brand voice
-                  on every interaction now carry the meaning the tip card
-                  used to spell out. */}
-
-              {/* Today's work */}
+              {/* Today's work — one focal item with Send / Edit / Hold. */}
               <TodayFeed
                 slug={slug}
                 isFresh={isFresh}
