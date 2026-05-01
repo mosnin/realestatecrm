@@ -25,7 +25,7 @@ import { Mic, Square, Pencil, X, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { TITLE_FONT, PRIMARY_PILL, GHOST_PILL, BODY_MUTED } from '@/lib/typography';
+import { TITLE_FONT, PRIMARY_PILL, GHOST_PILL } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 
 type State =
@@ -42,6 +42,9 @@ interface Proposal {
   tool: string;
   args: Record<string, unknown>;
   summary: string;
+  /** Server-resolved Chippi-voice line that uses real names instead of IDs.
+   *  Preferred over `summary` whenever present. Absent only on rare misses. */
+  humanSummary?: string;
   mutates: boolean;
 }
 
@@ -287,11 +290,6 @@ export function PostTourRecorder({ slug }: Props) {
               onStart={handleStart}
               onStop={handleStop}
             />
-            {state === 'idle' && (
-              <p className={cn(BODY_MUTED, 'text-center')}>
-                Hit record. I&apos;ll handle the rest.
-              </p>
-            )}
             {state === 'error' && (
               <div className="text-center space-y-3">
                 <p className="text-sm text-foreground">{errorMsg}</p>
@@ -481,12 +479,14 @@ function ProposalStack({
 
   return (
     <ul className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card overflow-hidden">
-      {proposals.map((p) => (
+      {proposals.map((p) => {
+        const label = p.humanSummary ?? p.summary;
+        return (
         <li key={p.uid} className="px-4 py-3">
           <div className="flex items-center gap-3">
             <input
               type="checkbox"
-              aria-label={p.summary}
+              aria-label={label}
               checked={p.enabled}
               onChange={(e) => update(p.uid, { enabled: e.target.checked })}
               className="h-4 w-4 accent-foreground cursor-pointer"
@@ -498,7 +498,7 @@ function ProposalStack({
                   p.enabled ? 'text-foreground' : 'text-muted-foreground line-through',
                 )}
               >
-                {p.summary}
+                {label}
               </p>
             </div>
             <button
@@ -517,10 +517,17 @@ function ProposalStack({
             />
           )}
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }
+
+/** Keys we never expose to the realtor in the args editor — they're
+ *  workspace UUIDs, not editable copy. The proposal stack already uses
+ *  `humanSummary` to render the resolved name; surfacing the raw id here
+ *  reintroduces the same robot-speak we just removed. */
+const HIDDEN_ARG_KEYS = new Set(['personId', 'dealId', 'contactId', 'propertyId', 'tourId']);
 
 function ArgsEditor({
   args,
@@ -534,11 +541,11 @@ function ArgsEditor({
   // values only. Numeric inputs get number coercion; everything else is a
   // string. Good enough for the 90% case (followup dates, summaries,
   // sentiment). Power editing happens in the chat surface.
-  const keys = Object.keys(args);
+  const keys = Object.keys(args).filter((k) => !HIDDEN_ARG_KEYS.has(k));
   return (
     <div className="mt-3 space-y-2 rounded-md bg-muted/30 px-3 py-3">
       {keys.length === 0 && (
-        <p className="text-xs text-muted-foreground">No editable fields.</p>
+        <p className="text-xs text-muted-foreground">Nothing to edit here.</p>
       )}
       {keys.map((k) => {
         const v = args[k];
@@ -611,27 +618,26 @@ function coerce(prev: unknown, next: string): unknown {
   return next;
 }
 
-/** ONE sentence, calm, references at least one concrete fact when possible.
+/** ONE sentence, calm, names a person whenever we can.
  *  Examples:
- *   - "Done. Three things logged."
- *   - "Done. Sam's set up — followup Friday, email queued."
- *  We grab a name from a tool result summary if any landed. */
-function buildDoneSentence(results: ExecResult[], proposals: UiProposal[]): string {
+ *   - "Done. Sam's call logged, follow-up set for Friday."
+ *   - "Done. Three things landed."
+ *   - "Done — but two steps need a hand." */
+export function buildDoneSentence(results: ExecResult[], proposals: UiProposal[]): string {
   const ok = results.filter((r) => r.ok);
   const failed = results.filter((r) => !r.ok);
 
   if (ok.length === 0) return "Nothing landed. I'll let you take it from here.";
 
-  // Try to surface a concrete fact: first OK summary, trimmed.
   const fact = pickFact(ok, proposals);
   const verbCount =
-    ok.length === 1 ? 'one thing' : ok.length === 2 ? 'two things' : `${ok.length} things`;
+    ok.length === 1 ? 'One thing' : ok.length === 2 ? 'Two things' : `${ok.length} things`;
 
   let line: string;
   if (fact) {
     line = `Done. ${fact}.`;
   } else {
-    line = `Done. ${verbCount} logged.`;
+    line = `Done. ${verbCount} landed.`;
   }
   if (failed.length > 0) {
     line += ` ${failed.length === 1 ? 'One step' : `${failed.length} steps`} need a hand.`;
@@ -639,26 +645,44 @@ function buildDoneSentence(results: ExecResult[], proposals: UiProposal[]): stri
   return line;
 }
 
+/** Pull a clean fact out of the matched proposal/result pair. We prefer the
+ *  first-name from `humanSummary` (server-resolved) because it never lies. */
 function pickFact(ok: ExecResult[], proposals: UiProposal[]): string | null {
-  // Prefer a result with a name in it.
+  // Try: first OK proposal with a humanSummary → "Sam's call logged"
   for (const r of ok) {
-    const m = r.summary.match(/with (\w[\w\s'.-]{1,30})/i);
-    if (m) {
-      const name = m[1].replace(/\.$/, '');
-      const verb = describe(r.tool);
-      if (verb) return `${name}'s set — ${verb}`;
-    }
+    const matched = proposals.find((p) => p.tool === r.tool);
+    const verb = describe(r.tool);
+    if (!verb) continue;
+    const first = matched?.humanSummary ? firstNameFrom(matched.humanSummary) : null;
+    if (first) return `${first}'s ${verb}`;
   }
-  // Fall back to one verb summary.
-  if (proposals.length > 0) {
-    const verbs = ok
-      .map((r) => describe(r.tool))
-      .filter((v): v is string => Boolean(v));
-    if (verbs.length === 1) return verbs[0][0].toUpperCase() + verbs[0].slice(1);
-    if (verbs.length === 2) return `${verbs[0]}, ${verbs[1]}`;
-    if (verbs.length >= 3) return `${verbs[0]}, ${verbs[1]}, ${verbs[2]}`;
+  // Fall back to a verb stack.
+  const verbs = ok.map((r) => describe(r.tool)).filter((v): v is string => Boolean(v));
+  if (verbs.length === 1) return verbs[0][0].toUpperCase() + verbs[0].slice(1);
+  if (verbs.length === 2) return `${cap(verbs[0])}, ${verbs[1]}`;
+  if (verbs.length >= 3) return `${cap(verbs[0])}, ${verbs[1]}, ${verbs[2]}`;
+  return null;
+}
+
+function firstNameFrom(humanSummary: string): string | null {
+  // "Log Sam Chen's call: ...", "Mark Sam Chen hot — ...", "Follow up with Sam Chen on Friday",
+  // "Note on 412 Elm: ...", "Draft a check-in email to Sam Chen"
+  const patterns = [
+    /^Log ([\w'.-]+)/,            // log_call / log_meeting → "Log Sam Chen's call"
+    /^Mark ([\w'.-]+)/,           // mark_*_hot/cold → "Mark Sam Chen hot"
+    /^Follow up with ([\w'.-]+)/, // set_followup
+    /to ([\w'.-]+)$/,             // draft_email/sms → "Draft a check-in email to Sam Chen"
+    /^Note on ([\w'.-]+)/,        // note_on_*
+  ];
+  for (const re of patterns) {
+    const m = humanSummary.match(re);
+    if (m && m[1]) return m[1];
   }
   return null;
+}
+
+function cap(s: string): string {
+  return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1);
 }
 
 function describe(tool: string): string | null {
@@ -679,7 +703,7 @@ function describe(tool: string): string | null {
     case 'draft_email':
       return 'email drafted';
     case 'draft_sms':
-      return 'SMS drafted';
+      return 'text drafted';
     default:
       return null;
   }

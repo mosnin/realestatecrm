@@ -24,6 +24,7 @@
 
 import { z } from 'zod';
 import type OpenAI from 'openai';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ToolDefinition } from '@/lib/ai-tools/types';
 import { getTool } from '@/lib/ai-tools/registry';
 
@@ -64,6 +65,11 @@ export interface ProposedAction {
   args: Record<string, unknown>;
   /** Human-readable line — the row label in the approval stack. */
   summary: string;
+  /** Chippi-voice line that uses the resolved Contact/Deal name instead of
+   *  an ID slug. Set server-side after a batched lookup. The UI prefers
+   *  this over `summary` whenever it's present. Absent only on the rare
+   *  miss (id outside the workspace, or model returned no id). */
+  humanSummary?: string;
   /** Whether this verb mutates state (i.e. needs the realtor's yes). */
   mutates: boolean;
 }
@@ -73,28 +79,23 @@ export interface ContextHint {
   dealId?: string;
 }
 
-/** System prompt fed to the orchestrator. Short on purpose — the model
- *  has the tool list as structured input; we don't pad with examples. */
+/** System prompt fed to the orchestrator. Tight contract, no manifesto. */
 export function buildSystemPrompt(allowedTools: readonly ToolDefinition[]): string {
   const catalog = allowedTools
     .map((t) => `- ${t.name}: ${t.description}`)
     .join('\n');
   return [
-    "You are Chippi's post-tour orchestrator.",
-    'A realtor just finished a property tour and dictated a debrief.',
-    'Propose 2-5 actions they would otherwise do manually.',
+    'Turn a realtor\'s post-tour debrief into 2-5 proposed actions. Return intent only — never execute.',
     '',
-    'Rules:',
-    '- Do NOT execute anything. Return intent only.',
-    '- Use only tools from this list:',
+    'Allowed tools:',
     catalog,
     '',
-    '- Each proposal must be one tool name plus the args you would call it with.',
-    '- If the realtor mentions a name (e.g. "Sam") and you have a personId from context, use it. If not, leave personId as the realtor\'s phrasing — the route will resolve it.',
-    '- Prefer concrete dates ("Friday") over vague ones ("soon"). Use ISO 8601 when set_followup needs a date.',
-    '- Skip any action you can\'t justify from the transcript.',
+    'Rules:',
+    '- Use a personId/dealId only when the user payload contains one. If not, drop the action.',
+    '- Use ISO 8601 for set_followup.when. Concrete weekday phrases ("friday", "next tuesday") are also accepted.',
+    '- Skip any action the transcript doesn\'t justify.',
     '',
-    'Output JSON: { "proposals": [ { "tool": "<name>", "args": { ... } }, ... ] }',
+    'Output JSON: { "proposals": [ { "tool": "<name>", "args": { ... } } ] }',
   ].join('\n');
 }
 
@@ -197,4 +198,183 @@ export async function proposeActions(
     return [];
   }
   return shapeProposals(raw);
+}
+
+// ── humanSummary resolution ───────────────────────────────────────────────
+
+/**
+ * Walk proposals, batch-read the Contacts and Deals they reference, and
+ * write a Chippi-voice `humanSummary` onto each one. Names replace ID
+ * slugs. At most ONE Contact query and ONE Deal query per request — the
+ * orchestrator stack is capped at 5 actions, the lookups are tiny.
+ *
+ * The post-tour ceremony is the bid-for-10 surface; chat-side approval
+ * prompts and the draft inbox have a different bar and continue to use
+ * each tool's `summariseCall`. That's why this helper lives here, not
+ * on the tool definitions — it's a per-surface elevation.
+ */
+export async function attachHumanSummaries(
+  supabase: SupabaseClient,
+  spaceId: string,
+  proposals: ProposedAction[],
+): Promise<ProposedAction[]> {
+  if (proposals.length === 0) return proposals;
+
+  const personIds = collectStringIds(proposals, 'personId');
+  const dealIds = collectStringIds(proposals, 'dealId');
+
+  const [personMap, dealMap] = await Promise.all([
+    personIds.size > 0 ? readNames(supabase, 'Contact', 'name', spaceId, personIds) : Promise.resolve(new Map<string, string>()),
+    dealIds.size > 0 ? readNames(supabase, 'Deal', 'title', spaceId, dealIds) : Promise.resolve(new Map<string, string>()),
+  ]);
+
+  return proposals.map((p) => {
+    const human = formatHumanSummary(p, personMap, dealMap);
+    return human ? { ...p, humanSummary: human } : p;
+  });
+}
+
+function collectStringIds(proposals: ProposedAction[], key: 'personId' | 'dealId'): Set<string> {
+  const out = new Set<string>();
+  for (const p of proposals) {
+    const v = p.args[key];
+    if (typeof v === 'string' && v.length > 0) out.add(v);
+  }
+  return out;
+}
+
+async function readNames(
+  supabase: SupabaseClient,
+  table: 'Contact' | 'Deal',
+  nameCol: 'name' | 'title',
+  spaceId: string,
+  ids: Set<string>,
+): Promise<Map<string, string>> {
+  const { data } = await supabase
+    .from(table)
+    .select(`id, ${nameCol}`)
+    .eq('spaceId', spaceId)
+    .in('id', Array.from(ids));
+  const map = new Map<string, string>();
+  for (const row of (data as Array<Record<string, unknown>> | null) ?? []) {
+    const id = row.id;
+    const name = row[nameCol];
+    if (typeof id === 'string' && typeof name === 'string' && name.trim()) {
+      map.set(id, name.trim());
+    }
+  }
+  return map;
+}
+
+/** Per-verb format. Returns null when we can't do better than the fallback
+ *  (no resolved name for the id the action references). */
+export function formatHumanSummary(
+  proposal: ProposedAction,
+  people: Map<string, string>,
+  deals: Map<string, string>,
+): string | null {
+  const a = proposal.args as Record<string, unknown>;
+  const personName = typeof a.personId === 'string' ? people.get(a.personId) : undefined;
+  const dealName = typeof a.dealId === 'string' ? deals.get(a.dealId) : undefined;
+
+  switch (proposal.tool) {
+    case 'log_call': {
+      if (!personName) return null;
+      const note = trimQuote(a.summary);
+      return note ? `Log ${personName}'s call: "${note}"` : `Log ${personName}'s call`;
+    }
+    case 'log_meeting': {
+      if (!personName) return null;
+      const note = trimQuote(a.summary);
+      const where = typeof a.location === 'string' && a.location.trim() ? ` at ${a.location.trim()}` : '';
+      return note ? `Log ${personName}'s meeting${where}: "${note}"` : `Log ${personName}'s meeting${where}`;
+    }
+    case 'note_on_person': {
+      if (!personName) return null;
+      const content = trimQuote(a.content);
+      return content ? `Note on ${personName}: "${content}"` : `Note on ${personName}`;
+    }
+    case 'note_on_deal': {
+      if (!dealName) return null;
+      const content = trimQuote(a.content);
+      return content ? `Note on ${dealName}: "${content}"` : `Note on ${dealName}`;
+    }
+    case 'mark_person_hot': {
+      if (!personName) return null;
+      const why = trimReason(a.why);
+      return why ? `Mark ${personName} hot — ${why}` : `Mark ${personName} hot`;
+    }
+    case 'mark_person_cold': {
+      if (!personName) return null;
+      const why = trimReason(a.why);
+      return why ? `Mark ${personName} cold — ${why}` : `Mark ${personName} cold`;
+    }
+    case 'set_followup': {
+      if (!personName) return null;
+      const when = typeof a.when === 'string' ? prettifyWhen(a.when) : '';
+      return when ? `Follow up with ${personName} on ${when}` : `Follow up with ${personName}`;
+    }
+    case 'draft_email': {
+      if (!personName) return null;
+      const intent = describeIntent(a.intent);
+      return `Draft a ${intent} email to ${personName}`;
+    }
+    case 'draft_sms': {
+      if (!personName) return null;
+      const intent = describeIntent(a.intent);
+      return `Draft a ${intent} text to ${personName}`;
+    }
+    default:
+      return null;
+  }
+}
+
+function trimQuote(v: unknown, max = 80): string | null {
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  if (!t) return null;
+  return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
+}
+
+function trimReason(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const t = v.trim().replace(/\.+$/, '');
+  if (!t) return null;
+  return t.length > 60 ? `${t.slice(0, 59).trimEnd()}…` : t;
+}
+
+function describeIntent(v: unknown): string {
+  if (typeof v !== 'string') return 'check-in';
+  switch (v) {
+    case 'check-in': return 'check-in';
+    case 'log-call': return 'follow-up';
+    case 'welcome': return 'welcome';
+    case 'reach-out': return 'reach-out';
+    default: return 'check-in';
+  }
+}
+
+/** Render an ISO date or weekday phrase as a clean human string ("Friday",
+ *  "May 8"). Falls back to the raw string. Pure — no Date.now leakage. */
+export function prettifyWhen(when: string, now: Date = new Date()): string {
+  const raw = when.trim();
+  if (!raw) return '';
+
+  // ISO date
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    const d = new Date(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00Z`);
+    if (Number.isNaN(d.getTime())) return raw;
+    const sameYear = d.getUTCFullYear() === now.getUTCFullYear();
+    const opts: Intl.DateTimeFormatOptions = sameYear
+      ? { month: 'short', day: 'numeric', timeZone: 'UTC' }
+      : { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' };
+    return new Intl.DateTimeFormat('en-US', opts).format(d);
+  }
+
+  // weekday phrase — capitalise first letter of each word
+  return raw
+    .split(/\s+/)
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w))
+    .join(' ');
 }

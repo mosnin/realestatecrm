@@ -16,7 +16,8 @@ import { getSpaceForUser } from '@/lib/space';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { listTools } from '@/lib/ai-tools/registry';
 import { getOpenAIClient, MissingOpenAIKeyError } from '@/lib/ai-tools/openai-client';
-import { proposeActions } from '@/lib/chippi/post-tour';
+import { attachHumanSummaries, proposeActions } from '@/lib/chippi/post-tour';
+import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -75,7 +76,8 @@ export async function POST(req: NextRequest) {
       contextHint,
       tools: listTools(),
     });
-    return NextResponse.json({ proposals });
+    const enriched = await attachHumanSummaries(supabase, space.id, proposals);
+    return NextResponse.json({ proposals: enriched });
   } catch (err) {
     logger.error('[chippi/post-tour] orchestrator failed', { userId, spaceId: space.id }, err);
     return NextResponse.json({ error: 'Orchestrator failed' }, { status: 500 });

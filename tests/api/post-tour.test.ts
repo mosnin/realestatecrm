@@ -19,15 +19,21 @@ vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: vi.fn(async () => ({ allowed: true })),
 }));
 
-const { proposeActionsMock } = vi.hoisted(() => ({ proposeActionsMock: vi.fn() }));
+const { proposeActionsMock, attachHumanSummariesMock } = vi.hoisted(() => ({
+  proposeActionsMock: vi.fn(),
+  attachHumanSummariesMock: vi.fn(),
+}));
 vi.mock('@/lib/chippi/post-tour', async () => {
   const actual =
     await vi.importActual<typeof import('@/lib/chippi/post-tour')>('@/lib/chippi/post-tour');
   return {
     ...actual,
     proposeActions: proposeActionsMock,
+    attachHumanSummaries: attachHumanSummariesMock,
   };
 });
+
+vi.mock('@/lib/supabase', () => ({ supabase: {} }));
 
 vi.mock('@/lib/ai-tools/openai-client', () => ({
   getOpenAIClient: () => ({ client: {} }),
@@ -100,11 +106,17 @@ describe('POST /api/chippi/post-tour', () => {
       { tool: 'log_call', args: { personId: 'p1', summary: 'Tour' }, summary: 'Log call', mutates: true },
       { tool: 'set_followup', args: { personId: 'p1', when: '2026-05-08' }, summary: 'Set follow-up', mutates: true },
     ]);
+    attachHumanSummariesMock.mockImplementation(async (_supabase, _spaceId, proposals) =>
+      proposals.map((p: { args: Record<string, unknown> }) => ({ ...p, humanSummary: 'Sam Chen — done' })),
+    );
 
     const res = await POST(makeReq({ transcript: 'Sam loved it. Follow up Friday.' }));
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { proposals: unknown[] };
+    const json = (await res.json()) as { proposals: Array<{ humanSummary?: string }> };
     expect(json.proposals).toHaveLength(2);
+    expect(json.proposals[0].humanSummary).toBe('Sam Chen — done');
     expect(proposeActionsMock).toHaveBeenCalledOnce();
+    expect(attachHumanSummariesMock).toHaveBeenCalledOnce();
+    expect(attachHumanSummariesMock).toHaveBeenCalledWith(expect.anything(), 'space_1', expect.any(Array));
   });
 });
