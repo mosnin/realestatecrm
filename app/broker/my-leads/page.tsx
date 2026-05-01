@@ -2,6 +2,7 @@ import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
+import { HOT_LEAD_THRESHOLD, WARM_LEAD_THRESHOLD } from '@/lib/constants';
 import {
   PhoneIncoming,
   ArrowRight,
@@ -71,9 +72,9 @@ export default async function MyLeadsPage() {
     if (!scoreLabel && leadScore == null) return null;
     const label = scoreLabel ?? `${leadScore}`;
     const color =
-      scoreLabel === 'Hot' || (leadScore && leadScore >= 80)
+      scoreLabel === 'Hot' || (leadScore && leadScore >= HOT_LEAD_THRESHOLD)
         ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15'
-        : scoreLabel === 'Warm' || (leadScore && leadScore >= 50)
+        : scoreLabel === 'Warm' || (leadScore && leadScore >= WARM_LEAD_THRESHOLD)
           ? 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
           : 'text-muted-foreground bg-muted';
     return (

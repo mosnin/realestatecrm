@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
+import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
 
 interface PriorityItem {
   contactId: string;
@@ -179,7 +180,7 @@ export function ChippiBriefing({ slug }: { slug: string }) {
                       {item.leadScore > 0 && (
                         <span className={cn(
                           'text-[10px] font-semibold px-1 py-0.5 rounded flex-shrink-0',
-                          item.leadScore >= 70
+                          item.leadScore >= HOT_LEAD_THRESHOLD
                             ? 'text-orange-600 dark:text-orange-400'
                             : 'text-muted-foreground',
                         )}>

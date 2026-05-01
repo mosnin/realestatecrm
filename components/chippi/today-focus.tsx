@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Phone, Mail, ChevronRight, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
+import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
 
 interface PriorityItem {
   contactId: string;
@@ -98,7 +99,7 @@ export function TodayFocus({ slug }: { slug: string }) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-foreground truncate">{item.name}</span>
-                  {item.leadScore >= 70 && (
+                  {item.leadScore >= HOT_LEAD_THRESHOLD && (
                     <span className="inline-flex items-center gap-1 text-[11px] text-orange-600 dark:text-orange-400">
                       <Sparkles size={10} />
                       hot
