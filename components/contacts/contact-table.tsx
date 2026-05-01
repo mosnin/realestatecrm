@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -398,6 +398,44 @@ export function ContactTable({ slug }: ContactTableProps) {
     { key: 'buyer', label: 'Buyer', count: contacts.filter((c) => c.leadType === 'buyer').length },
   ];
 
+  // Chippi's one sentence for this surface. Same pattern as the deals page —
+  // pick the most-pressing fact and name it. The page tells one story; the
+  // narration is the spine. The contact list's "morning question" is "who do
+  // I owe a reply to?" — answered in priority order: new arrivals first,
+  // then overdue follow-ups, then a hot-lead nudge, then a quiet steady
+  // line. Empty state reads like an invitation, not a void.
+  const narration = useMemo(() => {
+    const newCount = contacts.filter((c) => c.tags.includes('new-lead')).length;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const overdueCount = contacts.filter(
+      (c) => c.followUpAt && new Date(c.followUpAt) < today,
+    ).length;
+    const hotCount = contacts.filter((c) => (c.leadScore ?? 0) >= 75).length;
+
+    if (newCount > 0) {
+      return newCount === 1
+        ? '1 new person came in. Welcome them.'
+        : `${newCount} new people came in. Welcome them.`;
+    }
+    if (overdueCount > 0) {
+      return overdueCount === 1
+        ? '1 follow-up is overdue. Catch up.'
+        : `${overdueCount} follow-ups are overdue. Catch up.`;
+    }
+    if (hotCount > 0) {
+      return hotCount === 1
+        ? '1 hot lead waiting. Reach out.'
+        : `${hotCount} hot leads waiting. Reach out.`;
+    }
+    if (contacts.length === 0) {
+      return 'No people yet. Drop your intake link and start collecting.';
+    }
+    return contacts.length === 1
+      ? '1 person on your roster. Quietly active.'
+      : `${contacts.length} people on your roster. Quietly active.`;
+  }, [contacts]);
+
   const sortLabels: Record<typeof sortBy, string> = {
     'agent-priority': 'Smart',
     newest: 'Recently added',
@@ -418,22 +456,36 @@ export function ContactTable({ slug }: ContactTableProps) {
 
   return (
     <div className="space-y-4">
-      {/* Page header */}
-      <div className="flex items-end justify-between mb-6">
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
+      {/* Page header — serif H1 + Chippi narration. The narration line
+          carries the brand voice; it's the same pattern the deals page
+          uses, propagated here so the product reads as one piece of paper
+          across surfaces. */}
+      <header className="mb-6 space-y-2">
+        <div className="flex items-end justify-between gap-4">
+          <h1
+            className="text-3xl tracking-tight text-foreground"
+            style={{ fontFamily: 'var(--font-title)' }}
+          >
+            People
+          </h1>
+          <Button
+            onClick={() => setAddOpen(true)}
+            className="h-9 gap-1.5 rounded-full px-4 bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] transition-all"
+          >
+            <Plus size={14} strokeWidth={2.25} />
+            Add a person
+          </Button>
+        </div>
+        <p
+          className={cn(
+            'text-lg text-muted-foreground',
+            loading && 'opacity-60',
+          )}
+          style={TITLE_FONT}
         >
-          People
-        </h1>
-        <Button
-          onClick={() => setAddOpen(true)}
-          className="h-9 gap-1.5 rounded-full px-4 bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] transition-all"
-        >
-          <Plus size={14} strokeWidth={2.25} />
-          Add a person
-        </Button>
-      </div>
+          {loading ? ' ' : narration}
+        </p>
+      </header>
 
       {/* Filter chip row + toolbar */}
       <div className="flex flex-wrap items-center gap-2">

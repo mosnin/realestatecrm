@@ -229,6 +229,59 @@ export function CalendarView({
 
   // ── Lookup maps ──────────────────────────────────────────────────────────
 
+  // Chippi's one sentence for the calendar. Same pattern as the deals page —
+  // pick the most-pressing fact and name it. Calendar's "morning question"
+  // is "what am I doing today?" — answered in priority order: overdue
+  // follow-ups (red flag) → today's volume → this-week's outlook → quiet
+  // calendar invitation. Uses raw data (rawTours / rawContactFollowUps) so
+  // the sentence isn't affected by the layer chip filter — the narration
+  // describes what's actually on the calendar, not what's currently visible.
+  const narration = useMemo(() => {
+    const now = new Date();
+    const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow0 = new Date(today0);
+    tomorrow0.setDate(tomorrow0.getDate() + 1);
+    const weekEnd = new Date(today0);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
+    const allFollowUps = [...rawContactFollowUps, ...rawDealFollowUps];
+
+    let overdueCount = 0;
+    let todayTours = 0;
+    let todayFollowUps = 0;
+    let weekTours = 0;
+
+    for (const t of rawTours) {
+      const d = new Date(t.startsAt);
+      if (d >= today0 && d < tomorrow0) todayTours += 1;
+      if (d >= today0 && d < weekEnd) weekTours += 1;
+    }
+    for (const f of allFollowUps) {
+      const d = new Date(f.followUpAt);
+      if (d < today0) overdueCount += 1;
+      if (d >= today0 && d < tomorrow0) todayFollowUps += 1;
+    }
+
+    const todayTotal = todayTours + todayFollowUps;
+
+    if (overdueCount > 0) {
+      return overdueCount === 1
+        ? '1 follow-up slipped past its date. Catch up.'
+        : `${overdueCount} follow-ups slipped past their date. Catch up.`;
+    }
+    if (todayTotal > 0) {
+      return todayTotal === 1
+        ? '1 thing on your calendar today.'
+        : `${todayTotal} things on your calendar today.`;
+    }
+    if (weekTours > 0) {
+      return weekTours === 1
+        ? '1 tour scheduled this week.'
+        : `${weekTours} tours scheduled this week.`;
+    }
+    return 'Calendar’s quiet this week. Schedule a tour to fill it in.';
+  }, [rawTours, rawContactFollowUps, rawDealFollowUps]);
+
   const toursByDate = useMemo(() => {
     const map = new Map<string, Tour[]>();
     for (const t of tours) {
@@ -854,21 +907,29 @@ export function CalendarView({
 
   return (
     <div className="space-y-4">
-      {/* Header — title + the tour-booking primary action. Calendar absorbed
-          Tours, so the "Schedule tour" pill lives here now. */}
-      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-        <h1 className={H1} style={TITLE_FONT}>
-          Calendar
-        </h1>
-        <Link
-          href={`/book/${slug}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={PRIMARY_PILL}
-        >
-          <CalendarPlus className="h-4 w-4" />
-          Schedule tour
-        </Link>
+      {/* Header — title + Chippi's narration + the tour-booking primary
+          action. Calendar absorbed Tours, so the "Schedule tour" pill lives
+          here now. The narration is the same brand-voice spine the deals
+          page uses — propagated here so every workspace surface reads as
+          one piece of paper. */}
+      <header className="space-y-2">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <h1 className={H1} style={TITLE_FONT}>
+            Calendar
+          </h1>
+          <Link
+            href={`/book/${slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={PRIMARY_PILL}
+          >
+            <CalendarPlus className="h-4 w-4" />
+            Schedule tour
+          </Link>
+        </div>
+        <p className="text-lg text-muted-foreground" style={TITLE_FONT}>
+          {narration}
+        </p>
       </header>
 
       {/* Tour stat strip — paper-flat, sits above the grid. */}

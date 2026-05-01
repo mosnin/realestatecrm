@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { H1, TITLE_FONT } from '@/lib/typography';
 import {
   Clock, CheckCircle2, Phone, Mail, CalendarDays, ChevronDown,
   AlertCircle, Briefcase, ArrowRight, Timer,
@@ -207,17 +208,43 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
     { key: 'upcoming', label: 'Upcoming', count: tabCounts.upcoming },
   ];
 
+  // Chippi's one sentence — same brand-voice spine as the deals page.
+  // Priority: overdue (the loudest call) → today's load → upcoming nudge.
+  // The empty state has its own celebratory copy above; we never reach
+  // here when totalCount is zero.
+  const narration = (() => {
+    if (tabCounts.overdue > 0) {
+      return tabCounts.overdue === 1
+        ? '1 follow-up slipped past its date. Start there.'
+        : `${tabCounts.overdue} follow-ups slipped past. Start with the oldest.`;
+    }
+    if (tabCounts.today > 0) {
+      return tabCounts.today === 1
+        ? '1 follow-up due today.'
+        : `${tabCounts.today} follow-ups due today.`;
+    }
+    if (tabCounts.upcoming > 0) {
+      return tabCounts.upcoming === 1
+        ? '1 follow-up coming up. Quiet otherwise.'
+        : `${tabCounts.upcoming} follow-ups coming up. Quiet otherwise.`;
+    }
+    return `${totalCount} on your list.`;
+  })();
+
   return (
     <div className="space-y-6 max-w-[900px]">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Follow-ups</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {overdueCount > 0 ? `${overdueCount} overdue · ` : ''}{totalCount} total
-          </p>
-        </div>
-      </div>
+      {/* Header — serif H1 + Chippi narration. Matches the deals + contacts
+          pattern so the workspace reads as one piece of paper. The
+          previous "X overdue · Y total" was utility chrome; the
+          narration is the brand voice. */}
+      <header className="space-y-2">
+        <h1 className={H1} style={TITLE_FONT}>
+          Follow-ups
+        </h1>
+        <p className="text-lg text-muted-foreground" style={TITLE_FONT}>
+          {narration}
+        </p>
+      </header>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-muted/50 rounded-lg p-1 w-fit">
