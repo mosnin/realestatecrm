@@ -341,3 +341,66 @@ describe('GET /api/agent/draft-stats', () => {
     expect(body.editedAndApproved).toBe(3);
   });
 });
+
+// ── Helper unit tests ────────────────────────────────────────────────────────
+// `aggregateDraftStats` is the pure-math contract both the route and the
+// broker dashboard's "Draft impact" card bind to. Test it directly so the
+// brokerage-wide consumer doesn't need the full request mock.
+
+import { aggregateDraftStats, type DraftStatsRow } from '@/lib/draft-stats';
+
+describe('aggregateDraftStats (helper)', () => {
+  it('empty input → all zeros, null medians, windowDays = 30', () => {
+    const stats = aggregateDraftStats([]);
+    expect(stats).toEqual({
+      windowDays: 30,
+      total: 0,
+      approved: 0,
+      editedAndApproved: 0,
+      rejected: 0,
+      held: 0,
+      approvalRate: 0,
+      editedRate: 0,
+      medianEditDistance: null,
+      medianDecisionMs: null,
+      outcomeCheckedCount: 0,
+      outcomeAdvancedRate: 0,
+    });
+  });
+
+  it('mixed input rolls up identically across realtor and brokerage scopes', () => {
+    // The card is brokerage-wide — it concatenates rows from every space in
+    // the brokerage and feeds them in. Same shape, same numbers.
+    const rows: DraftStatsRow[] = [
+      { feedback_action: 'approved', edit_distance: 0, decision_ms: 5000, outcome_signal: 'deal_advanced' },
+      { feedback_action: 'approved', edit_distance: 0, decision_ms: 7000, outcome_signal: 'none' },
+      { feedback_action: 'edited_and_approved', edit_distance: 6, decision_ms: 9000, outcome_signal: 'deal_advanced' },
+      { feedback_action: 'rejected', edit_distance: null, decision_ms: 4000, outcome_signal: null },
+    ];
+    const stats = aggregateDraftStats(rows);
+    expect(stats.total).toBe(4);
+    expect(stats.approved).toBe(2);
+    expect(stats.editedAndApproved).toBe(1);
+    expect(stats.rejected).toBe(1);
+    // 3 of 4 went out → 0.75.
+    expect(stats.approvalRate).toBe(0.75);
+    expect(stats.outcomeCheckedCount).toBe(3);
+    // 2 of 3 advanced → 0.67.
+    expect(stats.outcomeAdvancedRate).toBe(0.67);
+  });
+
+  it('outcome-rate denominator is checked-count, never total', () => {
+    // Critical for the card's secondary line: a sent draft the cron hasn't
+    // labelled yet must not drag the rate toward zero.
+    const rows: DraftStatsRow[] = [
+      { feedback_action: 'approved', edit_distance: 0, decision_ms: 1000, outcome_signal: 'deal_advanced' },
+      { feedback_action: 'approved', edit_distance: 0, decision_ms: 1000, outcome_signal: null },
+      { feedback_action: 'approved', edit_distance: 0, decision_ms: 1000, outcome_signal: null },
+    ];
+    const stats = aggregateDraftStats(rows);
+    expect(stats.total).toBe(3);
+    expect(stats.outcomeCheckedCount).toBe(1);
+    // 1 of 1 checked advanced → 1, not 1/3.
+    expect(stats.outcomeAdvancedRate).toBe(1);
+  });
+});
