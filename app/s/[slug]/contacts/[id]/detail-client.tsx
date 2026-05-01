@@ -39,7 +39,7 @@ export function ContactTabStrip({
   return (
     <nav
       className="flex items-center gap-1 border-b border-border/60 -mx-2 px-2 overflow-x-auto"
-      aria-label="Contact sections"
+      aria-label="Person sections"
     >
       {TABS.map((t) => {
         const isActive = active === t.key;

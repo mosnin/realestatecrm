@@ -1165,7 +1165,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                       selectMention(mentionResults[highlightedIndex]);
                     }
                   }}
-                  placeholder="Search contacts and deals…"
+                  placeholder="Search people and deals…"
                   className="flex-1 text-[12px] bg-transparent border-0 outline-none placeholder:text-muted-foreground/60 text-foreground"
                 />
                 {mentionLoading && (

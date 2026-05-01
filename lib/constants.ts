@@ -98,6 +98,18 @@ export const LEAD_TIERS = {
 
 export type TierKey = keyof typeof LEAD_TIERS;
 
+// ── Lead-score thresholds ───────────────────────────────────────────────────
+// Single source of truth for "what hot means." Five different files used to
+// define this on their own (70, 75, 80, depending on who got there first);
+// the brand voice can't say "X hot leads waiting" if every page has a
+// different cutoff. One number, one definition.
+
+/** Score at or above this = "hot". Matches the system-prompt convention
+ *  the agent uses when it talks about hot leads in chat. */
+export const HOT_LEAD_THRESHOLD = 70;
+/** Score at or above this = "warm" (and below = cold / unscored). */
+export const WARM_LEAD_THRESHOLD = 40;
+
 // ── Activity type metadata ──────────────────────────────────────────────────
 // Covers all 7 types used across deal-panel + contact-activity-tab.
 // Contact UI only exposes the first 5 (no stage_change / status_change).

@@ -42,11 +42,11 @@ type ViewMode = 'cards' | 'table';
 
 const SORT_LABELS: Record<SortKey, string> = {
   name: 'Name',
-  leads: 'Leads',
-  contacts: 'Contacts',
+  leads: 'New people',
+  contacts: 'Total people',
   deals: 'Deals',
   pipeline: 'Pipeline',
-  hotLeads: 'Hot leads',
+  hotLeads: 'Hot people',
   joined: 'Joined',
 };
 
@@ -257,10 +257,10 @@ function RealtorCard({ row, rank, sortKey }: { row: RealtorRow; rank: number; so
   });
 
   const stats: { key: SortKey; label: string; value: string | number }[] = [
-    { key: 'leads',    label: 'Leads',     value: row.leads },
-    { key: 'hotLeads', label: 'Hot leads', value: row.hotLeads },
-    { key: 'contacts', label: 'Contacts',  value: row.contacts },
-    { key: 'deals',    label: 'Deals',     value: row.deals },
+    { key: 'leads',    label: 'New people',   value: row.leads },
+    { key: 'hotLeads', label: 'Hot people',   value: row.hotLeads },
+    { key: 'contacts', label: 'Total people', value: row.contacts },
+    { key: 'deals',    label: 'Deals',        value: row.deals },
     { key: 'pipeline', label: 'Pipeline',  value: formatCompact(row.pipeline) },
   ];
 
@@ -381,9 +381,9 @@ function TableView({
               <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground hidden sm:table-cell">
                 Role
               </th>
-              <Th col="leads" label="Leads" className="text-right [&>span]:justify-end" />
+              <Th col="leads" label="New" className="text-right [&>span]:justify-end" />
               <Th col="hotLeads" label="Hot" className="text-right [&>span]:justify-end hidden md:table-cell" />
-              <Th col="contacts" label="Contacts" className="text-right [&>span]:justify-end hidden lg:table-cell" />
+              <Th col="contacts" label="People" className="text-right [&>span]:justify-end hidden lg:table-cell" />
               <Th col="deals" label="Deals" className="text-right [&>span]:justify-end" />
               <Th col="pipeline" label="Pipeline" className="text-right [&>span]:justify-end hidden sm:table-cell" />
               <Th col="joined" label="Joined" className="hidden lg:table-cell" />
