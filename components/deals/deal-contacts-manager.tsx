@@ -218,7 +218,7 @@ export function DealContactsManager({ dealId, slug, initialContacts }: DealConta
       {isAddOpen && (
         <div className="space-y-2">
           <Input
-            placeholder="Search contacts…"
+            placeholder="Search people…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoFocus

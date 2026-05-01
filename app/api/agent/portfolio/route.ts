@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
 
 interface ContactRow {
   leadScore: number | null;
@@ -63,7 +64,7 @@ export async function GET() {
   // --- Contact metrics -------------------------------------------------------
   const contactCount = contacts.length;
 
-  const highScoreCount = contacts.filter(c => (c.leadScore ?? 0) >= 70).length;
+  const highScoreCount = contacts.filter(c => (c.leadScore ?? 0) >= HOT_LEAD_THRESHOLD).length;
 
   function isOverdue(c: ContactRow): boolean {
     if (c.followUpAt) {
@@ -118,7 +119,7 @@ export async function GET() {
 
   if (highScoreCount > 5) {
     insights.push(
-      `${highScoreCount} hot leads (score ≥ 70) are in the pipeline` +
+      `${highScoreCount} hot people (score ≥ ${HOT_LEAD_THRESHOLD}) are in the pipeline` +
         ' — prioritize these for personal outreach.',
     );
   }

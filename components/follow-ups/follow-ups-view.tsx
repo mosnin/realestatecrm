@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { H1, TITLE_FONT } from '@/lib/typography';
 import {
   Clock, CheckCircle2, Phone, Mail, CalendarDays, ChevronDown,
   AlertCircle, Briefcase, ArrowRight, Timer,
@@ -194,7 +195,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
           </div>
           <h2 className="text-lg font-semibold">You&apos;re caught up.</h2>
           <p className="text-sm text-muted-foreground">
-            Nothing to chase. Set a follow-up from a contact or deal and it&apos;ll land here.
+            Nothing to chase. Set a follow-up from a person or deal and it&apos;ll land here.
           </p>
         </div>
       </div>
@@ -207,17 +208,63 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
     { key: 'upcoming', label: 'Upcoming', count: tabCounts.upcoming },
   ];
 
+  // Chippi's one sentence — same brand-voice spine as the deals page.
+  // Returns a tab key so the line is a doorway: clicking the narration
+  // switches the page to the tab the sentence is talking about. Priority:
+  // overdue (loudest) → today's load → upcoming nudge.
+  const narration: { text: string; targetTab: Tab | null } = (() => {
+    if (tabCounts.overdue > 0) {
+      return {
+        text: tabCounts.overdue === 1
+          ? '1 follow-up slipped past its date. Start there.'
+          : `${tabCounts.overdue} follow-ups slipped past. Start with the oldest.`,
+        targetTab: 'overdue',
+      };
+    }
+    if (tabCounts.today > 0) {
+      return {
+        text: tabCounts.today === 1
+          ? '1 follow-up due today.'
+          : `${tabCounts.today} follow-ups due today.`,
+        targetTab: 'today',
+      };
+    }
+    if (tabCounts.upcoming > 0) {
+      return {
+        text: tabCounts.upcoming === 1
+          ? '1 follow-up coming up. Quiet otherwise.'
+          : `${tabCounts.upcoming} follow-ups coming up. Quiet otherwise.`,
+        targetTab: 'upcoming',
+      };
+    }
+    return { text: `${totalCount} on your list.`, targetTab: null };
+  })();
+
   return (
     <div className="space-y-6 max-w-[900px]">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Follow-ups</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {overdueCount > 0 ? `${overdueCount} overdue · ` : ''}{totalCount} total
+      {/* Header — serif H1 + Chippi narration. The narration is a button
+          when there's a tab to jump to, so clicking the sentence switches
+          the page to the matching slice (overdue/today/upcoming). The
+          line and the page share one decision. */}
+      <header className="space-y-2">
+        <h1 className={H1} style={TITLE_FONT}>
+          Follow-ups
+        </h1>
+        {narration.targetTab && narration.targetTab !== activeTab ? (
+          <button
+            type="button"
+            onClick={() => setTab(narration.targetTab!)}
+            className="text-lg text-muted-foreground hover:text-foreground transition-colors text-left cursor-pointer"
+            style={TITLE_FONT}
+          >
+            {narration.text}
+          </button>
+        ) : (
+          <p className="text-lg text-muted-foreground" style={TITLE_FONT}>
+            {narration.text}
           </p>
-        </div>
-      </div>
+        )}
+      </header>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-muted/50 rounded-lg p-1 w-fit">

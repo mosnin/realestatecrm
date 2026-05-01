@@ -45,7 +45,7 @@ interface ContactDetail {
 export const getContactTool = defineTool<typeof parameters, { contact: ContactDetail | null }>({
   name: 'get_contact',
   description:
-    'Fetch detailed info for one contact by id: score, follow-up state, linked deals, recent tours. Use before drafting outreach.',
+    'Fetch detailed info for one person by id: score, follow-up state, linked deals, recent tours. Use before drafting outreach.',
   parameters,
   requiresApproval: false,
 

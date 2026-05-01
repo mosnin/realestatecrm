@@ -292,9 +292,9 @@ export default async function DealDetailPage({
             {/* Property link */}
             <DealPropertyPicker dealId={id} slug={slug} initial={linkedProperty} />
 
-            {/* Contacts */}
+            {/* People */}
             <div>
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Contacts</p>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">People</p>
               <DealContactsManager dealId={id} slug={slug} initialContacts={linkedContacts} />
             </div>
 

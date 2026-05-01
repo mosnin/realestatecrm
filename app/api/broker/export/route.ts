@@ -70,7 +70,7 @@ export async function GET() {
   );
 
   // Build CSV
-  const headers = ['Name', 'Email', 'Role', 'Status', 'Joined', 'Workspace', 'Leads', 'Contacts', 'Deals', 'Pipeline Value', 'Won Deals', 'Won Value'];
+  const headers = ['Name', 'Email', 'Role', 'Status', 'Joined', 'Workspace', 'New people', 'Total people', 'Deals', 'Pipeline value', 'Won deals', 'Won value'];
   const rows = members.map((m) => {
     const sid = m.Space?.id;
     const role = m.role === 'broker_owner' ? 'Owner' : m.role === 'broker_admin' ? 'Admin' : 'Realtor';

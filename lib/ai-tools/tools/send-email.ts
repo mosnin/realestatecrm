@@ -68,7 +68,7 @@ interface SendEmailResult {
 export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
   name: 'send_email',
   description:
-    'Send an email to a contact. Always prompts the user before sending. Use for follow-ups, tour confirmations, and check-ins.',
+    'Send an email to a person. Always prompts the user before sending. Use for follow-ups, tour confirmations, and check-ins.',
   parameters,
   requiresApproval: true,
   // 50 sends/hour/user caps accidental mass-blasts without throttling

@@ -62,7 +62,7 @@ interface UpdateContactResult {
 export const updateContactTool = defineTool<typeof parameters, UpdateContactResult>({
   name: 'update_contact',
   description:
-    "Update a contact's editable fields (name, email, phone, address, notes, tags, type, budget, follow-up, etc.). Prompts for approval first.",
+    "Update a person's editable fields (name, email, phone, address, notes, tags, type, budget, follow-up, etc.). Prompts for approval first.",
   parameters,
   requiresApproval: true,
   rateLimit: { max: 100, windowSeconds: 3600 },
