@@ -75,22 +75,44 @@ export default async function PropertiesCommissionsPage({
   let expectedNet = 0;
   let stillOwedOut = 0;
   let closedGci = 0;
+  let topClosed: { deal: DealRow; net: number } | null = null;
 
   for (const d of closedYtd) {
     const r = computeCommission(d.value, d.commissionRate, splitsByDeal.get(d.id) ?? []);
     closedNet += r.net;
     closedGci += r.gci;
     stillOwedOut += r.outgoingUnpaid;
+    if (!topClosed || r.net > topClosed.net) {
+      topClosed = { deal: d, net: r.net };
+    }
   }
   for (const d of inFlight) {
     const r = computeCommission(d.value, d.commissionRate, splitsByDeal.get(d.id) ?? []);
     expectedNet += r.net;
   }
 
+  // Narration ladder — pick the loudest fact about money. Hand-coded, inline.
+  const subtitle = (() => {
+    if (closedYtd.length === 0 && inFlight.length === 0) {
+      return 'Quiet quarter. Nothing closed, nothing in flight.';
+    }
+    if (closedYtd.length === 0) {
+      return `Nothing closed yet this year. ${formatCompact(expectedNet)} in flight.`;
+    }
+    if (topClosed && closedYtd.length > 1) {
+      return `${formatCompact(closedNet)} earned year-to-date. Top: the ${topClosed.deal.title} closing — ${formatCompact(topClosed.net)}.`;
+    }
+    if (topClosed) {
+      return `${formatCompact(closedNet)} earned year-to-date — the ${topClosed.deal.title} closing.`;
+    }
+    return `${formatCompact(closedNet)} earned year-to-date.`;
+  })();
+
   return (
     <div className={cn(PAGE_RHYTHM, 'max-w-[1500px]')}>
-      {/* Header */}
-      <header className="space-y-1.5">
+      {/* Header — back-link, H1, Chippi-voiced subtitle naming the loudest
+          money fact. The stat strip below is the supporting evidence. */}
+      <header className="space-y-2">
         <Link
           href={`/s/${slug}/properties`}
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors duration-150"
@@ -101,6 +123,9 @@ export default async function PropertiesCommissionsPage({
         <h1 className={H1} style={TITLE_FONT}>
           Commissions
         </h1>
+        <p className="text-lg text-muted-foreground" style={TITLE_FONT}>
+          {subtitle}
+        </p>
       </header>
 
       {/* Stat strip — paper-flat, hairline-divided */}
@@ -132,7 +157,7 @@ export default async function PropertiesCommissionsPage({
         title="Closed this year"
         count={closedYtd.length}
         empty={
-          <EmptyRow text="Nothing closed yet this year. When you win one, the net lands here." />
+          <EmptyRow text="Nothing closed yet this year. The first win lands here." />
         }
       >
         {closedYtd.length > 0 && (
@@ -144,7 +169,7 @@ export default async function PropertiesCommissionsPage({
       <Section
         title="In flight"
         count={inFlight.length}
-        empty={<EmptyRow text="Nothing in flight right now." />}
+        empty={<EmptyRow text="Nothing in flight. Quiet pipeline." />}
       >
         {inFlight.length > 0 && (
           <CommissionTable rows={inFlight} splitsByDeal={splitsByDeal} slug={slug} />

@@ -7,8 +7,6 @@ import { PropertiesClient } from '@/components/properties/properties-client';
 export const dynamic = 'force-dynamic';
 
 interface DealRow {
-  value: number | null;
-  commissionRate: number | null;
   status: 'active' | 'won' | 'lost' | 'on_hold';
   closeDate: string | null;
 }
@@ -22,10 +20,13 @@ export default async function PropertiesPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  // Pull properties + deals in parallel — deals power the commission roll-ups
-  // shown in the header strip. Cap properties at 200 to match the existing
-  // single-page table; the stats query is unbounded by intent.
-  const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
+  // Pull listings + deals in parallel. Deals only need close-date + status —
+  // enough to count what closed this week and what's closing today. The old
+  // commission roll-up has its own page; the landing doesn't carry it.
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+  const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const [propsResult, dealsResult] = await Promise.all([
     supabase
@@ -36,48 +37,53 @@ export default async function PropertiesPage({
       .limit(200),
     supabase
       .from('Deal')
-      .select('value, commissionRate, status, closeDate')
+      .select('status, closeDate')
       .eq('spaceId', space.id),
   ]);
 
   const properties = (propsResult.data ?? []) as Property[];
   const deals = (dealsResult.data ?? []) as DealRow[];
 
-  // Closed YTD: GCI on deals won this calendar year.
-  // Pipeline value: GCI implied by deals still active.
-  // Live now: count of active listings.
-  let closedYtd = 0;
-  let pipelineValue = 0;
-  for (const d of deals) {
-    const gci =
-      d.value != null && d.commissionRate != null
-        ? (d.value * d.commissionRate) / 100
-        : 0;
-    if (d.status === 'won' && d.closeDate && d.closeDate >= yearStart) {
-      closedYtd += gci;
-    } else if (d.status === 'active') {
-      pipelineValue += gci;
-    }
-  }
-  const closedCount = deals.filter(
-    (d) => d.status === 'won' && d.closeDate && d.closeDate >= yearStart,
-  ).length;
+  // Narration ladder — pick the loudest fact. Hand-coded, inline, no agent
+  // call. Mirrors the broker/realtors page pattern.
   const liveCount = properties.filter((p) => p.listingStatus === 'active').length;
-  const pendingPipeCount = deals.filter((d) => d.status === 'active').length;
+  const pendingCount = properties.filter((p) => p.listingStatus === 'pending').length;
+  const closedThisWeek = deals.filter(
+    (d) => d.status === 'won' && d.closeDate && d.closeDate >= weekStart,
+  ).length;
+  const closingToday = properties.find(
+    (p) =>
+      p.listingStatus === 'pending' &&
+      // We don't have a close-date on property directly, but pending + recent
+      // update is the closest signal. The deal-level closing-today story is
+      // owned by /deals; this page tells the listing-level story.
+      p.updatedAt >= todayStart &&
+      p.updatedAt < todayEnd,
+  );
+
+  const subtitle = (() => {
+    if (properties.length === 0) {
+      return 'No listings yet. Drop the first address.';
+    }
+    if (closingToday) {
+      const short = closingToday.address.split(',')[0];
+      return `1 listing closing today — ${short}.`;
+    }
+    if (closedThisWeek > 0) {
+      return `${closedThisWeek} ${closedThisWeek === 1 ? 'listing' : 'listings'} closed this week. Pipeline alive.`;
+    }
+    if (pendingCount > 0) {
+      return `${liveCount} live, ${pendingCount} pending. Steady week.`;
+    }
+    if (liveCount > 0) {
+      return `${liveCount} ${liveCount === 1 ? 'listing' : 'listings'} active. Quiet week.`;
+    }
+    return `${properties.length} on the books. Nothing live right now.`;
+  })();
 
   return (
     <div className="max-w-[1500px]">
-      <PropertiesClient
-        slug={slug}
-        initial={properties}
-        stats={{
-          closedYtd,
-          closedCount,
-          liveCount,
-          pipelineValue,
-          pipelinePropertyCount: pendingPipeCount,
-        }}
-      />
+      <PropertiesClient slug={slug} initial={properties} subtitle={subtitle} />
     </div>
   );
 }

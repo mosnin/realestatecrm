@@ -15,6 +15,7 @@ import {
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
 import { TeamActivityFeed } from '@/components/broker/team-activity-feed';
+import { BrokerMorningStory } from '@/components/broker/broker-morning-story';
 import { MemberDashboard } from './member-dashboard';
 
 function getGreeting() {
@@ -209,16 +210,15 @@ export default async function BrokerOverviewPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-12 pb-12">
-      {/* Header — calm, brand-quiet, narrative status */}
+      {/* Header — Chippi's morning sentence is the lead. The brokerage name
+          and status counts step down into the supporting role they actually
+          deserve: context, not headline. */}
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">{getGreeting()}.</p>
-        <h1
-          className="text-3xl tracking-tight text-foreground truncate"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          {brokerage.name}
-        </h1>
-        <p className="text-sm text-muted-foreground">{statusSentence}</p>
+        <BrokerMorningStory />
+        <p className="text-sm text-muted-foreground">
+          {brokerage.name} &middot; {statusSentence}
+        </p>
       </header>
 
       {/* First-run nudge — only when the brokerage hasn't been set up yet */}

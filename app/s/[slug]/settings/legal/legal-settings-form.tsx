@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-  SECTION_LABEL,
   BODY_MUTED,
   CAPTION,
   PRIMARY_PILL,
@@ -15,11 +14,6 @@ import {
 interface LegalSettingsFormProps {
   slug: string;
   privacyPolicyUrl: string;
-  consentCheckboxLabel: string;
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <p className={SECTION_LABEL}>{children}</p>;
 }
 
 function isValidHttpsUrl(value: string): boolean {
@@ -32,13 +26,17 @@ function isValidHttpsUrl(value: string): boolean {
   }
 }
 
+/**
+ * Privacy policy URL — the one legal field that has to exist for the intake
+ * form to legally collect submissions. The "custom consent label" knob was
+ * dropped: the default ("I agree to [Business Name]'s Privacy Policy") is
+ * the right copy 99% of the time, and the 1% can edit their hosted policy.
+ */
 export function LegalSettingsForm({
   slug,
   privacyPolicyUrl: initialUrl,
-  consentCheckboxLabel: initialLabel,
 }: LegalSettingsFormProps) {
   const [privacyPolicyUrl, setPrivacyPolicyUrl] = useState(initialUrl);
-  const [consentCheckboxLabel, setConsentCheckboxLabel] = useState(initialLabel);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -51,7 +49,7 @@ export function LegalSettingsForm({
 
     const trimmedUrl = privacyPolicyUrl.trim();
     if (trimmedUrl && !isValidHttpsUrl(trimmedUrl)) {
-      setUrlError('URL must start with https:// and be a valid URL');
+      setUrlError('URL must start with https:// and be valid.');
       return;
     }
 
@@ -62,74 +60,51 @@ export function LegalSettingsForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug,
-          name: undefined,
           privacyPolicyUrl: trimmedUrl || null,
-          consentCheckboxLabel: consentCheckboxLabel.trim() || null,
         }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setSaveError(data.error || "Couldn't save those settings. Try again.");
+        setSaveError(data.error || "Couldn't save. Try again.");
         return;
       }
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch {
-      setSaveError('Network error. Please try again.');
+      setSaveError('Network hiccup. Try again.');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-10">
-      <section className="space-y-5">
-        <SectionLabel>Intake compliance</SectionLabel>
-        <p className={BODY_MUTED}>
-          Privacy policy and consent text shown on your intake form.
-        </p>
+    <form onSubmit={handleSave} className="space-y-6">
+      <p className={BODY_MUTED}>
+        Required before your intake form can collect submissions.
+      </p>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="privacyPolicyUrl" className="text-[12.5px] font-medium text-foreground">
-            Privacy policy URL
-          </Label>
-          <Input
-            id="privacyPolicyUrl"
-            type="url"
-            placeholder="https://yourdomain.com/privacy"
-            value={privacyPolicyUrl}
-            onChange={(e) => {
-              setPrivacyPolicyUrl(e.target.value);
-              setUrlError('');
-            }}
-            className={urlError ? 'border-destructive' : ''}
-          />
-          {urlError && <p className="text-xs text-destructive">{urlError}</p>}
-          <p className={CAPTION}>
-            Required before your intake form can collect submissions.
-          </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="consentCheckboxLabel" className="text-[12.5px] font-medium text-foreground">
-            Custom consent checkbox label
-          </Label>
-          <Input
-            id="consentCheckboxLabel"
-            type="text"
-            placeholder="I agree to the Privacy Policy"
-            value={consentCheckboxLabel}
-            onChange={(e) => setConsentCheckboxLabel(e.target.value)}
-          />
-          <p className={CAPTION}>
-            If blank, defaults to: I agree to [Business Name]&apos;s Privacy Policy
-          </p>
-        </div>
-      </section>
+      <div className="space-y-1.5">
+        <Label htmlFor="privacyPolicyUrl" className="text-[12.5px] font-medium text-foreground">
+          Privacy policy URL
+        </Label>
+        <Input
+          id="privacyPolicyUrl"
+          type="url"
+          placeholder="https://yourdomain.com/privacy"
+          value={privacyPolicyUrl}
+          onChange={(e) => {
+            setPrivacyPolicyUrl(e.target.value);
+            setUrlError('');
+          }}
+          className={urlError ? 'border-destructive' : ''}
+        />
+        {urlError && <p className="text-xs text-destructive">{urlError}</p>}
+        <p className={CAPTION}>Linked from the consent checkbox on your intake form.</p>
+      </div>
 
       {saveError && <p className="text-sm text-destructive">{saveError}</p>}
 
-      <div className="flex items-center gap-3 pt-2">
+      <div className="flex items-center gap-3 pt-1">
         <button
           type="submit"
           disabled={saving}

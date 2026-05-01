@@ -11,10 +11,9 @@ import {
   H1,
   H3,
   TITLE_FONT,
-  STAT_NUMBER_COMPACT,
+  BODY_MUTED,
   PAGE_RHYTHM,
 } from '@/lib/typography';
-import { AnimatedStatCell } from '@/components/motion/animated-stat-cell';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import type { Metadata } from 'next';
 
@@ -24,7 +23,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  return { title: `Intake Form -- ${slug} -- Chippi` };
+  return { title: `Intake -- ${slug} -- Chippi` };
 }
 
 export default async function IntakeOverviewPage({
@@ -39,9 +38,6 @@ export default async function IntakeOverviewPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  // Fetch form config status and recent submissions
-  let rentalConfigured = false;
-  let buyerConfigured = false;
   let totalSubmissions = 0;
   let hotLeadCount = 0;
   let recentLeads: {
@@ -55,48 +51,34 @@ export default async function IntakeOverviewPage({
   }[] = [];
 
   try {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const [formConfigResult, submissionsResult, hotLeadsResult, recentResult] =
-      await Promise.all([
-        supabase
-          .from('SpaceSetting')
-          .select('rentalFormConfig, buyerFormConfig')
-          .eq('spaceId', space.id)
-          .maybeSingle(),
-        supabase
-          .from('Contact')
-          .select('*', { count: 'exact', head: true })
-          .eq('spaceId', space.id)
-          .is('brokerageId', null)
-          .contains('tags', ['application-link'])
-          .gte('createdAt', thirtyDaysAgo.toISOString()),
-        supabase
-          .from('Contact')
-          .select('*', { count: 'exact', head: true })
-          .eq('spaceId', space.id)
-          .is('brokerageId', null)
-          .contains('tags', ['application-link'])
-          .eq('scoreLabel', 'hot'),
-        supabase
-          .from('Contact')
-          .select(
-            'id, name, createdAt, tags, leadScore, scoreLabel, leadType'
-          )
-          .eq('spaceId', space.id)
-          .is('brokerageId', null)
-          .contains('tags', ['application-link'])
-          .order('createdAt', { ascending: false })
-          .limit(5),
-      ]);
-
-    if (formConfigResult.data) {
-      rentalConfigured = !!(formConfigResult.data as { rentalFormConfig?: { sections?: unknown } })
-        .rentalFormConfig?.sections;
-      buyerConfigured = !!(formConfigResult.data as { buyerFormConfig?: { sections?: unknown } })
-        .buyerFormConfig?.sections;
-    }
+    const [submissionsResult, hotLeadsResult, recentResult] = await Promise.all([
+      supabase
+        .from('Contact')
+        .select('*', { count: 'exact', head: true })
+        .eq('spaceId', space.id)
+        .is('brokerageId', null)
+        .contains('tags', ['application-link'])
+        .gte('createdAt', sevenDaysAgo.toISOString()),
+      supabase
+        .from('Contact')
+        .select('*', { count: 'exact', head: true })
+        .eq('spaceId', space.id)
+        .is('brokerageId', null)
+        .contains('tags', ['application-link'])
+        .gte('createdAt', sevenDaysAgo.toISOString())
+        .eq('scoreLabel', 'hot'),
+      supabase
+        .from('Contact')
+        .select('id, name, createdAt, tags, leadScore, scoreLabel, leadType')
+        .eq('spaceId', space.id)
+        .is('brokerageId', null)
+        .contains('tags', ['application-link'])
+        .order('createdAt', { ascending: false })
+        .limit(5),
+    ]);
 
     totalSubmissions = submissionsResult.count ?? 0;
     hotLeadCount = hotLeadsResult.count ?? 0;
@@ -107,16 +89,46 @@ export default async function IntakeOverviewPage({
 
   const intakeUrl = buildIntakeUrl(space.slug);
   const intakePath = `/apply/${space.slug}`;
-  const anyCustom = rentalConfigured || buyerConfigured;
+
+  // Chippi narration ladder — one sentence describing the state of intake
+  // right now. No counts in stat tiles; the count lives in the sentence so
+  // the realtor reads it like a thought, not a dashboard.
+  const subtitle = (() => {
+    if (totalSubmissions === 0) {
+      return 'No submissions yet. Share the link.';
+    }
+    if (hotLeadCount > 0) {
+      const hot = hotLeadCount === 1 ? '1 was hot' : `${hotLeadCount} were hot`;
+      const subs =
+        totalSubmissions === 1
+          ? '1 submission this week.'
+          : `${totalSubmissions} submissions this week.`;
+      return `${subs} ${hot}.`;
+    }
+    return totalSubmissions === 1
+      ? '1 submission this week.'
+      : `${totalSubmissions} submissions this week.`;
+  })();
 
   return (
-    <div className={`${PAGE_RHYTHM} max-w-[1120px]`}>
-      {/* Header */}
-      <header className="flex items-end justify-between gap-4">
+    <div className={`${PAGE_RHYTHM} max-w-[880px]`}>
+      {/* Header — H1 + Chippi narration */}
+      <header className="space-y-1.5">
         <h1 className={H1} style={TITLE_FONT}>
-          Intake Form
+          Intake
         </h1>
-        {anyCustom && (
+        <p className={BODY_MUTED}>{subtitle}</p>
+      </header>
+
+      {/* Your link — the one thing every realtor comes here for */}
+      <section className="space-y-3">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <h2 className={H3}>Your link</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Share it. Submissions land in People.
+            </p>
+          </div>
           <Link
             href={`/s/${slug}/intake/customize`}
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors duration-150"
@@ -124,81 +136,28 @@ export default async function IntakeOverviewPage({
             Customize
             <ArrowRight size={13} strokeWidth={1.75} />
           </Link>
-        )}
-      </header>
-
-      {/* Stats strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
-        <AnimatedStatCell
-          label="Submissions (30d)"
-          value={totalSubmissions}
-        />
-        <AnimatedStatCell
-          label="Hot leads"
-          value={hotLeadCount}
-        />
-        <StatCell
-          label="Completion rate"
-          value={totalSubmissions > 0 ? '100%' : '—'}
-        />
-      </div>
-
-      {/* Form templates */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
-        <FormStatusRow
-          name="Rental Form"
-          configured={rentalConfigured}
-          href={`/s/${slug}/intake/customize?form=rental`}
-        />
-        <FormStatusRow
-          name="Buyer Form"
-          configured={buyerConfigured}
-          href={`/s/${slug}/intake/customize?form=buyer`}
-        />
-      </div>
-
-      {/* Your intake link */}
-      <section className="rounded-xl border border-border/70 bg-background p-5 space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className={H3}>Your intake link</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Share this with prospects.
-            </p>
-          </div>
-          <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground flex-shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
-            Live
-          </span>
         </div>
         <IntakeLinkRow url={intakeUrl} previewHref={intakePath} />
       </section>
 
-      {/* Recent submissions */}
+      {/* Recent submissions — the second thing they come here for */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className={H3}>Recent submissions</h2>
-          <div className="flex items-center gap-4">
-            <Link
-              href={`/s/${slug}/intake/analytics`}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 inline-flex items-center gap-1"
-            >
-              View all submissions
-              <ArrowRight size={12} strokeWidth={1.75} />
-            </Link>
+          <h2 className={H3}>Recent</h2>
+          {recentLeads.length > 0 && (
             <Link
               href={`/s/${slug}/contacts`}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 inline-flex items-center gap-1"
             >
-              View as people
+              All in People
               <ArrowRight size={12} strokeWidth={1.75} />
             </Link>
-          </div>
+          )}
         </div>
 
         {recentLeads.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No submissions yet. Share your link and they&apos;ll show up here.
+            They&apos;ll show up here the moment someone fills it out.
           </p>
         ) : (
           <StaggerList className="rounded-xl border border-border/70 bg-background overflow-hidden divide-y divide-border/70">
@@ -223,7 +182,7 @@ export default async function IntakeOverviewPage({
               return (
                 <StaggerItem key={lead.id}>
                   <Link
-                    href={`/s/${slug}/leads`}
+                    href={`/s/${slug}/contacts`}
                     className="flex items-center gap-3 px-5 py-3.5 hover:bg-foreground/[0.04] hover:scale-[1.005] active:bg-foreground/[0.045] transition-[colors,transform] duration-150"
                   >
                     <div className="w-9 h-9 rounded-full bg-foreground/[0.06] text-muted-foreground flex items-center justify-center text-[11px] font-medium flex-shrink-0">
@@ -264,45 +223,5 @@ export default async function IntakeOverviewPage({
         )}
       </section>
     </div>
-  );
-}
-
-function StatCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-background p-5">
-      <p className={STAT_NUMBER_COMPACT} style={TITLE_FONT}>
-        {value}
-      </p>
-      <p className="text-xs text-muted-foreground mt-1">{label}</p>
-    </div>
-  );
-}
-
-function FormStatusRow({
-  name,
-  configured,
-  href,
-}: {
-  name: string;
-  configured: boolean;
-  href: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="bg-background flex items-center justify-between gap-3 px-5 py-4 hover:bg-foreground/[0.04] active:bg-foreground/[0.045] transition-colors duration-150"
-    >
-      <div>
-        <p className="text-sm font-medium text-foreground">{name}</p>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {configured ? 'Custom form configured' : 'Using default template'}
-        </p>
-      </div>
-      <ArrowRight
-        size={14}
-        strokeWidth={1.75}
-        className="text-muted-foreground/60 flex-shrink-0"
-      />
-    </Link>
   );
 }

@@ -71,9 +71,11 @@ export const realtorNavItems: NavItem[] = [
 /**
  * Secondary realtor nav — visually subordinate "More" section. Calendar
  * absorbs Tours (a tour is just a calendar event with a property + contact
- * attached), so there is no separate Tours destination. Intake form expands
- * inline so its sub-pages (Customize, Share, Booking, Availability) are
- * reachable in one click instead of buried inside an overview page.
+ * attached). Intake collapses to a single destination: the overview is the
+ * home of the form (link + recent submissions) and the only other surface
+ * that earns its place is /customize, reachable inline from the overview.
+ * Sub-pages for Share / Tracking / Submissions were configuration disguised
+ * as features and have been cut.
  */
 export const realtorMoreNavItems: NavItem[] = [
   { href: '/calendar', label: 'Calendar', icon: Calendar },
@@ -86,18 +88,7 @@ export const realtorMoreNavItems: NavItem[] = [
       { href: '/properties/commissions', label: 'Commissions' },
     ],
   },
-  {
-    href: '/intake',
-    label: 'Intake form',
-    icon: ClipboardList,
-    children: [
-      { href: '/intake', label: 'Overview', exact: true },
-      { href: '/intake/customize', label: 'Customize' },
-      { href: '/intake/share', label: 'Share' },
-      { href: '/intake/tracking', label: 'Tracking' },
-      { href: '/intake/analytics', label: 'Submissions' },
-    ],
-  },
+  { href: '/intake', label: 'Intake form', icon: ClipboardList },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
 ];
 

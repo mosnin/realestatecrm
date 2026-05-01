@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -14,7 +14,6 @@ import { ContactForm } from './contact-form';
 import { LeadScoreBar } from '@/components/agent/lead-score-bar';
 import { ContactAgentContext } from '@/components/agent/contact-agent-context';
 import {
-  Plus,
   Search,
   Trash2,
   Pencil,
@@ -39,7 +38,8 @@ import {
   Check,
   ExternalLink,
 } from 'lucide-react';
-import { BODY_MUTED, TITLE_FONT, QUIET_LINK } from '@/lib/typography';
+import { BODY_MUTED, TITLE_FONT, QUIET_LINK, PRIMARY_PILL } from '@/lib/typography';
+
 import { buildIntakeUrl } from '@/lib/intake';
 import Link from 'next/link';
 import { ApplicationCompare } from './application-compare';
@@ -56,10 +56,6 @@ import { downloadCSV } from '@/lib/csv';
 import type { SavedView } from '@/lib/types';
 import { formatCurrency as _formatCurrency, getInitials } from '@/lib/formatting';
 import { CONTACT_STAGES } from '@/lib/constants';
-import {
-  composeContactsNarration,
-  type ContactsNarrationOutput,
-} from '@/lib/narration/contacts';
 import { CsvImportModal } from './csv-import-modal';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -402,23 +398,6 @@ export function ContactTable({ slug }: ContactTableProps) {
     { key: 'buyer', label: 'Buyer', count: contacts.filter((c) => c.leadType === 'buyer').length },
   ];
 
-  // Chippi's one sentence for this surface. The narration also returns an
-  // optional action so the line becomes a doorway: clicking the sentence
-  // does what the sentence describes — switch to the New filter, sort by
-  // hot, etc. The page's voice and the page's filter are one thing.
-  const narration: ContactsNarrationOutput = useMemo(
-    () => composeContactsNarration(contacts),
-    [contacts],
-  );
-
-  function handleNarrationClick() {
-    if (narration.action === 'filter-new') {
-      setLeadTypeFilter('new');
-    } else if (narration.action === 'sort-priority') {
-      setSortBy('agent-priority');
-    }
-  }
-
   const sortLabels: Record<typeof sortBy, string> = {
     'agent-priority': 'Smart',
     newest: 'Recently added',
@@ -439,10 +418,8 @@ export function ContactTable({ slug }: ContactTableProps) {
 
   return (
     <div className="space-y-4">
-      {/* Page header — serif H1 + Chippi narration. The narration line
-          carries the brand voice; it's the same pattern the deals page
-          uses, propagated here so the product reads as one piece of paper
-          across surfaces. */}
+      {/* Page header — H1 + primary CTA cluster. The voice lives on /chippi
+          home; this surface is utility chrome — search, filters, list. */}
       <header className="mb-6 space-y-2">
         <div className="flex items-end justify-between gap-4">
           <h1
@@ -451,34 +428,25 @@ export function ContactTable({ slug }: ContactTableProps) {
           >
             People
           </h1>
-          <Button
-            onClick={() => setAddOpen(true)}
-            className="h-9 gap-1.5 rounded-full px-4 bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] transition-all"
-          >
-            <Plus size={14} strokeWidth={2.25} />
-            Add a person
-          </Button>
+          <div className="flex flex-col items-end gap-1">
+            {/* The conversation is the front door. Saying it out loud is
+                faster than any form, so it gets the primary pill. */}
+            <Link
+              href={`/s/${slug}/chippi?prefill=${encodeURIComponent("I'm adding a new person — ")}`}
+              className={PRIMARY_PILL}
+            >
+              Tell Chippi →
+            </Link>
+            {/* The form still exists for those who want it; offered quietly. */}
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className={QUIET_LINK}
+            >
+              or fill out the form
+            </button>
+          </div>
         </div>
-        {narration.action && !loading ? (
-          <button
-            type="button"
-            onClick={handleNarrationClick}
-            className="text-lg text-muted-foreground hover:text-foreground transition-colors text-left cursor-pointer"
-            style={TITLE_FONT}
-          >
-            {narration.text}
-          </button>
-        ) : (
-          <p
-            className={cn(
-              'text-lg text-muted-foreground',
-              loading && 'opacity-60',
-            )}
-            style={TITLE_FONT}
-          >
-            {loading ? ' ' : narration.text}
-          </p>
-        )}
       </header>
 
       {/* Filter chip row + toolbar */}
