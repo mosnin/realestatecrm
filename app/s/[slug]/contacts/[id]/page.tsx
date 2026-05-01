@@ -27,6 +27,8 @@ import { ApplicationStatusManager } from '@/components/contacts/application-stat
 import { PdfExportButton } from '@/components/contacts/pdf-export-button';
 import { CollapsibleSection } from '@/components/contacts/collapsible-section';
 import { DynamicApplicationDisplay } from '@/components/contacts/dynamic-application-display';
+import { ContactTabStrip } from '@/components/contacts/contact-tab-strip';
+import { WhyThisScore } from '@/components/contacts/why-this-score';
 import { formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug } from '@/lib/space';
 import { AgentContactPanel } from '@/components/agent/agent-contact-panel';
@@ -168,17 +170,17 @@ export default async function ClientDetailPage({
 
       {/* What's next — focal action card. Lead with the answer, hide the
           taxonomy. The audit said "the realtor came here to know what to
-          do next" — this card is the answer. */}
-      {details?.recommendedNextAction && (
-        <section className="rounded-xl border border-border/70 bg-card px-5 py-4 space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            What&apos;s next
-          </p>
-          <p className="text-base text-foreground leading-relaxed">
-            {details.recommendedNextAction}
-          </p>
-        </section>
-      )}
+          do next" — this card is the answer. Always renders something:
+          when the AI hasn't produced a recommended action, fall back to
+          a heuristic so the slot is never empty. */}
+      <section className="rounded-xl border border-border/70 bg-card px-5 py-4 space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          What&apos;s next
+        </p>
+        <p className="text-base text-foreground leading-relaxed">
+          {nextStepFor(contact, app, details)}
+        </p>
+      </section>
 
       {/* Quick contact bar — email/phone/address inline, applicant portal
           tucked in. No bordered boxes — just a row. */}
@@ -216,34 +218,11 @@ export default async function ClientDetailPage({
         </section>
       )}
 
-      {/* Tab strip — sliding underline pattern, 2 tabs only. Intelligence
-          and Deals folded into Overview's flow. */}
-      <div role="tablist" aria-label="Contact view" className="flex items-center gap-0 border-b border-border/60">
-        {(['overview', 'activity'] as const).map((key) => {
-          const isActive = activeTab === key || (key === 'overview' && activeTab !== 'activity');
-          const label = key === 'overview' ? 'Overview' : 'Activity';
-          return (
-            <Link
-              key={key}
-              href={tabHref(key)}
-              role="tab"
-              aria-selected={isActive}
-              className={cn(
-                'relative inline-flex items-center px-3 py-2 text-sm font-medium transition-colors',
-                isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {label}
-              {isActive && (
-                <span
-                  aria-hidden
-                  className="absolute bottom-[-1px] left-2 right-2 h-[2px] rounded-full bg-foreground"
-                />
-              )}
-            </Link>
-          );
-        })}
-      </div>
+      {/* Tab strip — sliding underline via motion.layoutId (matches the
+          broker reviews + agent-activity surfaces). Old `?tab=intelligence`
+          and `?tab=deals` URLs render as Overview because those views
+          folded into Overview's flow. */}
+      <ContactTabStrip active={activeTab} hrefFor={(k) => tabHref(k)} />
 
       {/* Overview — single column flow. Cards uniform: rounded-xl
           border-border/70 bg-card. */}
@@ -301,65 +280,11 @@ export default async function ClientDetailPage({
                   <p className="text-sm text-muted-foreground leading-relaxed">{contact.scoreSummary}</p>
                 )}
 
-                {Boolean(
-                  details?.strengths?.length ||
-                  details?.weaknesses?.length ||
-                  details?.riskFlags?.length ||
-                  details?.missingInformation?.length ||
-                  details?.explanationTags?.length,
-                ) && (
-                  <details className="group/details">
-                    <summary className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground transition-colors list-none inline-flex items-center gap-1.5 select-none">
-                      <span>Why this score?</span>
-                      <span className="text-muted-foreground/60 group-open/details:rotate-90 transition-transform">›</span>
-                    </summary>
-                    <div className="mt-3 space-y-3 text-xs">
-                      {details?.explanationTags && details.explanationTags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {details.explanationTags.map((tag) => (
-                            <span key={tag} className="inline-flex items-center text-xs rounded-full px-2 py-0.5 bg-muted text-muted-foreground">{tag}</span>
-                          ))}
-                        </div>
-                      )}
-                      {details?.strengths && details.strengths.length > 0 && (
-                        <div>
-                          <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 mb-1.5 inline-flex items-center gap-1.5"><CheckCircle2 size={11} /> Strengths</p>
-                          <ul className="space-y-1 ml-4 list-disc text-muted-foreground leading-relaxed marker:text-emerald-500/70">
-                            {details.strengths.map((s) => <li key={s}>{s}</li>)}
-                          </ul>
-                        </div>
-                      )}
-                      {details?.weaknesses && details.weaknesses.length > 0 && (
-                        <div>
-                          <p className="text-[11px] font-medium text-amber-700 dark:text-amber-400 mb-1.5 inline-flex items-center gap-1.5"><XCircle size={11} /> Weaknesses</p>
-                          <ul className="space-y-1 ml-4 list-disc text-muted-foreground leading-relaxed marker:text-amber-500/70">
-                            {details.weaknesses.map((w) => <li key={w}>{w}</li>)}
-                          </ul>
-                        </div>
-                      )}
-                      {details?.riskFlags && details.riskFlags.length > 0 && details.riskFlags[0] !== 'none' && (
-                        <div>
-                          <p className="text-[11px] font-medium text-destructive mb-1.5 inline-flex items-center gap-1.5"><AlertTriangle size={11} /> Risk flags</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {details.riskFlags.map((flag) => (
-                              <span key={flag} className="inline-flex items-center text-xs rounded-full px-2 py-0.5 bg-destructive/10 text-destructive">{flag}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {details?.missingInformation && details.missingInformation.length > 0 && (
-                        <div>
-                          <p className="text-[11px] font-medium text-muted-foreground mb-1.5 inline-flex items-center gap-1.5"><Info size={11} /> Missing information</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {details.missingInformation.map((item) => (
-                              <span key={item} className="inline-flex items-center text-xs rounded-full px-2 py-0.5 bg-muted text-muted-foreground">{item}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </details>
-                )}
+                {/* Animated expander — replaces the native <details> so the
+                    motion vocabulary stays consistent with the rest of the
+                    app (chat thinking indicator, StaggerList, AnimatePresence
+                    in reviews). Renders nothing when there's no taxonomy. */}
+                <WhyThisScore details={details} />
               </div>
             </section>
           )}
@@ -542,6 +467,33 @@ function stageLabel(type: string): string {
   if (type === 'TOUR') return 'Tour';
   if (type === 'APPLICATION') return 'Applied';
   return type;
+}
+
+/**
+ * Decide the one sentence to put in the "What's next" card. Prefers the
+ * AI-recommended action when it exists, otherwise picks the most pressing
+ * gap from the contact record. The card never renders empty — the realtor
+ * came here to know what to do next, and the answer is always something.
+ */
+function nextStepFor(
+  contact: {
+    email: string | null;
+    phone: string | null;
+    followUpAt: string | Date | null;
+    applicationStatus: string | null;
+    scoringStatus: string | null;
+  },
+  app: ApplicationData | null,
+  details: LeadScoreDetails | null,
+): string {
+  if (details?.recommendedNextAction) return details.recommendedNextAction;
+  if (!contact.email && !contact.phone) return 'Add a way to reach them — email or phone.';
+  if (app && (contact.applicationStatus === 'received' || contact.applicationStatus == null)) {
+    return 'Review their application and respond.';
+  }
+  if (!contact.followUpAt) return 'Set a follow-up date so they don’t go cold.';
+  if (contact.scoringStatus !== 'scored') return 'Run an AI score to see what to lean on.';
+  return 'Reach out and keep the momentum going.';
 }
 function DetailGrid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">{children}</div>;
