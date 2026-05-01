@@ -32,6 +32,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { sendDraft, type DeliveryResult } from '@/lib/delivery';
 import { audit } from '@/lib/audit';
 import { logger } from '@/lib/logger';
+import { enrichContext, type EnrichedContext } from '@/lib/ai-tools/context-enrichment';
 
 const TIMEOUT_MS = 5_000;
 const MODEL = 'gpt-4.1-mini';
@@ -85,6 +86,10 @@ async function composeDraftWithOpenAI(args: {
   subjectLabel: string;
   recentActivity: string[];
   daysQuiet: number | null;
+  stage?: string;
+  status?: string;
+  scoreLabel?: string | null;
+  leadScore?: number | null;
 }): Promise<{ subject: string | null; body: string } | null> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
@@ -95,6 +100,10 @@ async function composeDraftWithOpenAI(args: {
     subject: args.subjectLabel,
     daysSinceLastTouch: args.daysQuiet,
     recentActivity: args.recentActivity.slice(0, 6),
+    stage: args.stage,
+    status: args.status,
+    scoreLabel: args.scoreLabel,
+    leadScore: args.leadScore,
   };
 
   const controller = new AbortController();
