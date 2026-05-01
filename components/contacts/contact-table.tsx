@@ -402,7 +402,8 @@ export function ContactTable({ slug }: ContactTableProps) {
   // optional action so the line becomes a doorway: clicking the sentence
   // does what the sentence describes — switch to the New filter, sort by
   // hot, etc. The page's voice and the page's filter are one thing.
-  const narration = useMemo(() => {
+  type NarrationAction = 'filter-new' | 'sort-priority' | null;
+  const narration: { text: string; action: NarrationAction } = useMemo(() => {
     const newCount = contacts.filter((c) => c.tags.includes('new-lead')).length;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -416,7 +417,7 @@ export function ContactTable({ slug }: ContactTableProps) {
         text: newCount === 1
           ? '1 new person came in. Welcome them.'
           : `${newCount} new people came in. Welcome them.`,
-        action: 'filter-new' as const,
+        action: 'filter-new',
       };
     }
     if (overdueCount > 0) {
@@ -424,7 +425,7 @@ export function ContactTable({ slug }: ContactTableProps) {
         text: overdueCount === 1
           ? '1 follow-up is overdue. Catch up.'
           : `${overdueCount} follow-ups are overdue. Catch up.`,
-        action: 'sort-priority' as const,
+        action: 'sort-priority',
       };
     }
     if (hotCount > 0) {
@@ -432,20 +433,20 @@ export function ContactTable({ slug }: ContactTableProps) {
         text: hotCount === 1
           ? '1 hot lead waiting. Reach out.'
           : `${hotCount} hot leads waiting. Reach out.`,
-        action: 'sort-priority' as const,
+        action: 'sort-priority',
       };
     }
     if (contacts.length === 0) {
       return {
         text: 'No people yet. Drop your intake link and start collecting.',
-        action: null as const,
+        action: null,
       };
     }
     return {
       text: contacts.length === 1
         ? '1 person on your roster. Quietly active.'
         : `${contacts.length} people on your roster. Quietly active.`,
-      action: null as const,
+      action: null,
     };
   }, [contacts]);
 
