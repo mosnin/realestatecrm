@@ -79,12 +79,61 @@ async function fetchActivities(
   });
 }
 
+// ── In-process cache ─────────────────────────────────────────────────────────
+//
+// Same subject-context query rerunning every 30s costs us four supabase round
+// trips and ~150ms per draft. Memoize for 5 minutes per (spaceId, kind, id) —
+// short enough that a stage change or a new activity becomes visible quickly,
+// long enough to absorb the burst pattern (dashboard refresh, action sheet
+// open, draft compose, retry).
+//
+// Per-key map, not a global var — a deal's data must never bleed into a
+// different deal's response. Keyed on spaceId too so multi-tenant safety is
+// enforced at the cache layer, not just at the query layer.
+//
+// In-process means cold lambdas miss; that's acceptable for v1. The same
+// caveat applies to morning-story-agent's caches.
+interface CacheEntry {
+  data: EnrichedContext;
+  expiresAt: number;
+}
+
+const TTL_MS = 5 * 60 * 1000;
+const cache = new Map<string, CacheEntry>();
+
+function cacheKey(spaceId: string, subject: SubjectContext): string {
+  return `${spaceId}:${subject.kind}:${subject.id}`;
+}
+
+/** Test-only: drop every memoized entry. Production code must not call this. */
+export function __resetEnrichContextCacheForTests(): void {
+  cache.clear();
+}
+
 export async function enrichContext(
   subject: SubjectContext,
   spaceId: string,
   opts: { now?: Date } = {},
 ): Promise<EnrichedContext | null> {
   const now = opts.now ?? new Date();
+
+  // Cache check uses real wall-clock time. The `opts.now` override is for the
+  // shape of the activity output (date math), not for cache expiry — bending
+  // both at once would let tests trivially break the eviction invariant.
+  const key = cacheKey(spaceId, subject);
+  const hit = cache.get(key);
+  if (hit && hit.expiresAt > Date.now()) {
+    return hit.data;
+  }
+
+  // Helper used by both branches — write through to the cache only on
+  // successful resolves. Misses (deletes, wrong-space lookups) intentionally
+  // bypass the cache so a freshly-created subject lands fresh data on the
+  // next call instead of waiting out the TTL.
+  const remember = (data: EnrichedContext): EnrichedContext => {
+    cache.set(key, { data, expiresAt: Date.now() + TTL_MS });
+    return data;
+  };
 
   if (subject.kind === 'deal') {
     const { data: deal } = await supabase
@@ -123,13 +172,13 @@ export async function enrichContext(
       ? daysBetween(new Date(d.updatedAt), now)
       : null;
 
-    return {
+    return remember({
       subjectLabel: d.title ?? 'this deal',
       stage,
       status: d.status ?? undefined,
       lastActivities,
       daysSinceLastTouch,
-    };
+    });
   }
 
   // person
@@ -155,13 +204,13 @@ export async function enrichContext(
     ? daysBetween(new Date(c.lastContactedAt), now)
     : null;
 
-  return {
+  return remember({
     subjectLabel: c.name ?? 'this person',
     scoreLabel: c.scoreLabel,
     leadScore: c.leadScore,
     lastActivities,
     daysSinceLastTouch,
-  };
+  });
 }
 
 /**
@@ -193,4 +242,41 @@ export function renderEnrichedContext(ctx: EnrichedContext): string {
     lines.push('Recent activity: none recorded');
   }
   return lines.join('\n');
+}
+
+/**
+ * Render the labeled-block form the system prompt promises: opens with
+ * `[SUBJECT CONTEXT]`, closes with `[/SUBJECT CONTEXT]`, and is intended to
+ * be prepended to the user's first message. The model treats labeled blocks
+ * as ground truth more reliably than free-form preambles — the close tag is
+ * what makes it visually unambiguous where the chat resumes.
+ *
+ * Body shape is identical to renderEnrichedContext (same fields, same order)
+ * so we don't carry two divergent renderers; callers that want the bare
+ * version still use renderEnrichedContext.
+ */
+export function renderEnrichedContextBlock(ctx: EnrichedContext): string {
+  // Body uses the same field order as renderEnrichedContext but without the
+  // leading "SUBJECT CONTEXT" header line — the [SUBJECT CONTEXT] tag plays
+  // that role here.
+  const lines: string[] = [`Subject: ${ctx.subjectLabel}`];
+  if (ctx.stage) lines.push(`Stage: ${ctx.stage}`);
+  if (ctx.status) lines.push(`Status: ${ctx.status}`);
+  if (ctx.scoreLabel || ctx.leadScore != null) {
+    const label = ctx.scoreLabel ?? 'unscored';
+    const score = ctx.leadScore != null ? ` (${Math.round(ctx.leadScore)})` : '';
+    lines.push(`Score: ${label}${score}`);
+  }
+  if (ctx.daysSinceLastTouch != null) {
+    lines.push(`Days since last touch: ${ctx.daysSinceLastTouch}`);
+  } else {
+    lines.push(`Days since last touch: unknown`);
+  }
+  if (ctx.lastActivities.length > 0) {
+    lines.push('Recent activity:');
+    for (const a of ctx.lastActivities) lines.push(`- ${a}`);
+  } else {
+    lines.push('Recent activity: none recorded');
+  }
+  return ['[SUBJECT CONTEXT]', ...lines, '[/SUBJECT CONTEXT]'].join('\n');
 }

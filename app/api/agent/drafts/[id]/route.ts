@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { audit } from '@/lib/audit';
 import { sendDraft, type DeliveryResult } from '@/lib/delivery';
-import { LEVENSHTEIN_CAP } from '@/lib/draft-feedback';
+import { LEVENSHTEIN_CAP, normalizedLevenshtein } from '@/lib/draft-feedback';
 
 /**
  * Pulls feedback fields from the PATCH body and validates them server-side.
@@ -158,10 +158,15 @@ export async function PATCH(
   // bad client can't claim 'approved' on text it actually rewrote. We trust
   // the server's own content comparison for the boolean, and the client's
   // editDistance number for the magnitude.
-  const contentChanged = finalContent !== existing.content;
+  //
+  // Whitespace-normalized comparison: a stray trailing space or a double
+  // newline collapsed to a single one is NOT an edit. Otherwise we'd record
+  // 'edited_and_approved' on rows where the realtor literally just hit Approve.
+  const serverEditDistance = normalizedLevenshtein(existing.content, finalContent);
+  const contentChanged = serverEditDistance > 0;
   patch.feedback_action = contentChanged ? 'edited_and_approved' : 'approved';
   patch.edit_distance = contentChanged
-    ? (editDistance ?? Math.min(Math.abs(finalContent.length - existing.content.length), LEVENSHTEIN_CAP))
+    ? (editDistance ?? serverEditDistance)
     : 0;
   if (decisionMs !== null) patch.decision_ms = decisionMs;
 

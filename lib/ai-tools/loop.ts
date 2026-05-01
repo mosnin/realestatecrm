@@ -29,6 +29,11 @@ import { logger } from '@/lib/logger';
 import { maybeEmitFirstAction } from '@/lib/telemetry';
 import type { MessageBlock, TextBlock, ToolCallBlock } from './blocks';
 import { chippiErrorMessage } from './chippi-voice';
+import {
+  enrichContext,
+  renderEnrichedContextBlock,
+  type SubjectContext,
+} from './context-enrichment';
 import { executeTool, executionToModelMessage } from './execute';
 import type { PushableEvent } from './events';
 import { AGENT_MODEL } from './openai-client';
@@ -80,6 +85,16 @@ export interface RunTurnInput {
   messages: ChatMsg[];
   /** Called for every AgentEvent the loop emits. Callee owns the wire. */
   pushEvent: (event: PushableEvent) => Promise<void>;
+  /**
+   * Optional pointer to the deal or person the conversation is about. When
+   * supplied, the loop fetches an EnrichedContext via `enrichContext` and
+   * prepends a `[SUBJECT CONTEXT] ... [/SUBJECT CONTEXT]` labeled block to
+   * the trailing user message before the first OpenAI round. The agent
+   * therefore doesn't burn a tool turn on `get_contact`/`get_deal` for a
+   * subject the platform already knows. Cached 5 minutes per
+   * `${spaceId}:${kind}:${id}` key inside enrichContext.
+   */
+  subjectHint?: SubjectContext;
 }
 
 export interface RunTurnOutput {
@@ -113,15 +128,71 @@ function summarisePendingCall(name: string, args: Record<string, unknown>): stri
 export { summarisePendingCall };
 
 /**
+ * Mutate the trailing user message in-place to prepend the SUBJECT CONTEXT
+ * block. No-op if:
+ *  - There's no trailing user message (e.g. system-only — defensive guard).
+ *  - The trailing user message already contains the opening tag (avoid
+ *    double-injection across approval-resume rounds).
+ *  - `enrichContext` returns null (subject was deleted, cross-space lookup
+ *    failed, etc.). Failing closed is correct here — we'd rather let the
+ *    model run a tool call than feed it stale or wrong context.
+ */
+async function injectSubjectContextBlock(
+  messages: ChatMsg[],
+  subjectHint: SubjectContext,
+  spaceId: string,
+): Promise<void> {
+  // Find the LAST user message — that's the realtor's most recent question
+  // and the right place for ground-truth ground-up.
+  let userIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') {
+      userIdx = i;
+      break;
+    }
+  }
+  if (userIdx === -1) return;
+
+  const target = messages[userIdx];
+  const existing = typeof target.content === 'string' ? target.content : '';
+  if (existing.includes('[SUBJECT CONTEXT]')) return;
+
+  let enriched;
+  try {
+    enriched = await enrichContext(subjectHint, spaceId);
+  } catch (err) {
+    logger.warn('[loop] enrichContext threw; skipping subject injection', { spaceId }, err);
+    return;
+  }
+  if (!enriched) return;
+
+  const block = renderEnrichedContextBlock(enriched);
+  messages[userIdx] = {
+    ...target,
+    content: existing ? `${block}\n\n${existing}` : block,
+  };
+}
+
+/**
  * Execute one full turn. Pushes events as side effects; returns the
  * assembled block list plus — when a mutating tool surfaces — pending-
  * approval state for the caller to persist.
  */
 export async function runTurn(input: RunTurnInput): Promise<RunTurnOutput> {
-  const { openai, ctx, pushEvent } = input;
+  const { openai, ctx, pushEvent, subjectHint } = input;
   const messages: ChatMsg[] = [...input.messages];
   const blocks: MessageBlock[] = [];
   const tools = allToolsForOpenAI(listTools());
+
+  // Auto-include the SUBJECT CONTEXT block when the caller knows what the
+  // conversation is about. Done once at turn start — re-runs benefit from
+  // the enrichContext cache, so a follow-up turn on the same subject costs
+  // ~zero. Skipped silently if the subject can't be resolved (deleted,
+  // wrong space) or if the user message already carries the block from a
+  // previous round.
+  if (subjectHint) {
+    await injectSubjectContextBlock(messages, subjectHint, ctx.space.id);
+  }
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     if (ctx.signal.aborted) return { blocks, reason: 'aborted' };

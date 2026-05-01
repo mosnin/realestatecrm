@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { levenshtein, LEVENSHTEIN_CAP } from '@/lib/draft-feedback';
+import { levenshtein, normalizedLevenshtein, LEVENSHTEIN_CAP } from '@/lib/draft-feedback';
 
 describe('levenshtein', () => {
   it('returns 0 for identical strings', () => {
@@ -81,5 +81,42 @@ describe('levenshtein', () => {
     // Same words, different separator characters. Each substitution = 1.
     expect(levenshtein('a b', 'a b')).toBe(1); // non-breaking space -> space
     expect(levenshtein('a…', 'a...')).toBe(3); // ellipsis -> three dots
+  });
+});
+
+describe('normalizedLevenshtein', () => {
+  it('treats trailing whitespace as no edit', () => {
+    expect(normalizedLevenshtein('Hi Maya,', 'Hi Maya, ')).toBe(0);
+    expect(normalizedLevenshtein('Hi Maya,\n', 'Hi Maya,')).toBe(0);
+  });
+
+  it('treats leading whitespace as no edit', () => {
+    expect(normalizedLevenshtein(' Hi Maya,', 'Hi Maya,')).toBe(0);
+    expect(normalizedLevenshtein('\nHi Maya,', 'Hi Maya,')).toBe(0);
+  });
+
+  it('treats internal double-spaces as no edit', () => {
+    expect(normalizedLevenshtein('Hi  Maya,', 'Hi Maya,')).toBe(0);
+    expect(normalizedLevenshtein('one   two   three', 'one two three')).toBe(0);
+  });
+
+  it('collapses newline runs: Hi\\n\\nMaya vs Hi\\nMaya is 0', () => {
+    expect(normalizedLevenshtein('Hi\n\nMaya', 'Hi\nMaya')).toBe(0);
+    // Mixed whitespace runs (tab + spaces + newline) all collapse to one space.
+    expect(normalizedLevenshtein('Hi\t \n Maya', 'Hi Maya')).toBe(0);
+  });
+
+  it('counts only the real edit, not surrounding whitespace noise', () => {
+    // Real content edit, surrounded by whitespace noise that normalizes away.
+    // Compare to the raw distance of the cleaned strings — that's the truth.
+    const noisy = '  Hey   Maya,\n\n';
+    const clean = 'Hi Maya,';
+    const real = levenshtein('Hey Maya,', 'Hi Maya,');
+    expect(normalizedLevenshtein(noisy, clean)).toBe(real);
+  });
+
+  it('still reports a real single-character substitution as 1', () => {
+    // Whitespace collapses, but the actual content swap (cat -> bat) is one edit.
+    expect(normalizedLevenshtein('cat ', ' bat')).toBe(1);
   });
 });

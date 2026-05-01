@@ -17,8 +17,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-const MODAL_WEBHOOK_URL = process.env.MODAL_WEBHOOK_URL ?? '';
-const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
+// Env vars read at request time, not module load. Otherwise tests (and
+// serverless cold-start ordering) lock these to whatever was set when the
+// module was first imported, which makes the route untestable and slightly
+// wrong when secrets are rotated.
+function modalWebhookUrl(): string {
+  return process.env.MODAL_WEBHOOK_URL ?? '';
+}
+function agentInternalSecret(): string {
+  return process.env.AGENT_INTERNAL_SECRET ?? '';
+}
 
 // How long to wait between sweeps for the same space (idempotency guard).
 const MIN_INTERVAL_MS = 3 * 60 * 60 * 1000; // 3 hours
@@ -57,7 +65,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ status: 'disabled' });
   }
 
-  if (!MODAL_WEBHOOK_URL || !AGENT_INTERNAL_SECRET) {
+  if (!modalWebhookUrl() || !agentInternalSecret()) {
     console.error('[cron/agent-sweep] MODAL_WEBHOOK_URL or AGENT_INTERNAL_SECRET missing — cannot sweep');
     return NextResponse.json({ status: 'misconfigured', reason: 'Modal webhook not configured' }, { status: 500 });
   }
@@ -166,13 +174,14 @@ async function sweepOne(spaceId: string, pendingCount: number): Promise<SweepOut
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), MODAL_TIMEOUT_MS);
   try {
-    const res = await fetch(MODAL_WEBHOOK_URL, {
+    const internalSecret = agentInternalSecret();
+    const res = await fetch(modalWebhookUrl(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${AGENT_INTERNAL_SECRET}`,
+        Authorization: `Bearer ${internalSecret}`,
       },
-      body: JSON.stringify({ space_id: spaceId, secret: AGENT_INTERNAL_SECRET }),
+      body: JSON.stringify({ space_id: spaceId, secret: internalSecret }),
       signal: controller.signal,
     });
     if (!res.ok) {

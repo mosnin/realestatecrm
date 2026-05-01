@@ -66,3 +66,29 @@ export function levenshtein(a: string, b: string): number {
 
   return Math.min(prev[short.length], LEVENSHTEIN_CAP);
 }
+
+/**
+ * Collapse all whitespace runs to a single space and trim ends.
+ *
+ * The point: "Hi Maya," vs "Hi Maya, " (trailing space) is not a real edit;
+ * neither is "Hi\n\nMaya" vs "Hi\nMaya". We measure how much the realtor
+ * changed the *content*, not whether they hit return one extra time. Trimming
+ * and collapsing strips that noise without altering any actual character.
+ *
+ * `\s` covers spaces, tabs, newlines, carriage returns, and Unicode
+ * whitespace — exactly the surface we want to normalize away.
+ */
+function normalizeWhitespace(s: string): string {
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Levenshtein distance after whitespace normalization.
+ *
+ * Use this on the server-side comparison path. The raw {@link levenshtein}
+ * is kept for cases where whitespace IS the signal (it shouldn't be — but the
+ * low-level helper stays honest about what it does).
+ */
+export function normalizedLevenshtein(a: string, b: string): number {
+  return levenshtein(normalizeWhitespace(a), normalizeWhitespace(b));
+}

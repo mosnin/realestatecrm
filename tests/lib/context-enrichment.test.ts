@@ -52,10 +52,18 @@ vi.mock('@/lib/supabase', () => {
   };
 });
 
-import { enrichContext, renderEnrichedContext } from '@/lib/ai-tools/context-enrichment';
+import {
+  enrichContext,
+  renderEnrichedContext,
+  renderEnrichedContextBlock,
+  __resetEnrichContextCacheForTests,
+} from '@/lib/ai-tools/context-enrichment';
+import { supabase } from '@/lib/supabase';
 
 beforeEach(() => {
   fixtures = {};
+  __resetEnrichContextCacheForTests();
+  vi.clearAllMocks();
 });
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -220,6 +228,155 @@ describe('enrichContext — person subject', () => {
     ]);
     const ctx = await enrichContext({ kind: 'person', id: 'c_4' }, 'space_1', { now: NOW });
     expect(ctx!.lastActivities[0]).toBe('2026-04-29 — system');
+  });
+});
+
+describe('enrichContext — cache', () => {
+  // The cache lives in lib/ai-tools/context-enrichment.ts. TTL is 5 minutes.
+  // We can't fast-forward the cache's internal Date.now() (it intentionally
+  // ignores opts.now for eviction) without mocking the global clock, which
+  // is what these tests do. Each test resets via the public helper.
+
+  function setMayaFixtures() {
+    setContact({
+      id: 'c_42',
+      name: 'Maya Chen',
+      scoreLabel: 'hot',
+      leadScore: 88,
+      lastContactedAt: '2026-04-28T08:00:00Z',
+    });
+    setActivities([]);
+  }
+
+  it('serves the second call from cache (no second supabase round-trip)', async () => {
+    setMayaFixtures();
+    const fromSpy = supabase.from as unknown as ReturnType<typeof vi.fn>;
+
+    const a = await enrichContext({ kind: 'person', id: 'c_42' }, 'space_1', { now: NOW });
+    const callsAfterFirst = fromSpy.mock.calls.length;
+    expect(callsAfterFirst).toBeGreaterThan(0);
+
+    const b = await enrichContext({ kind: 'person', id: 'c_42' }, 'space_1', { now: NOW });
+    expect(fromSpy.mock.calls.length).toBe(callsAfterFirst);
+    expect(b).toEqual(a);
+  });
+
+  it('re-queries after the 5-minute TTL elapses', async () => {
+    setMayaFixtures();
+    const fromSpy = supabase.from as unknown as ReturnType<typeof vi.fn>;
+    const realNow = Date.now;
+
+    try {
+      const T0 = Date.parse('2026-05-01T12:00:00Z');
+      Date.now = () => T0;
+
+      await enrichContext({ kind: 'person', id: 'c_42' }, 'space_1', { now: NOW });
+      const callsAfterFirst = fromSpy.mock.calls.length;
+
+      // Hop forward 5 minutes + 1 second — strictly past TTL_MS.
+      Date.now = () => T0 + 5 * 60 * 1000 + 1000;
+
+      await enrichContext({ kind: 'person', id: 'c_42' }, 'space_1', { now: NOW });
+      expect(fromSpy.mock.calls.length).toBeGreaterThan(callsAfterFirst);
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
+  it('keys cache by spaceId, kind, and id — different keys do not collide', async () => {
+    // First call: a person under space_1.
+    setMayaFixtures();
+    const a = await enrichContext({ kind: 'person', id: 'c_42' }, 'space_1', { now: NOW });
+    expect(a!.subjectLabel).toBe('Maya Chen');
+
+    // Different id under the same space — must NOT return Maya.
+    setContact({
+      id: 'c_99',
+      name: 'Jordan Park',
+      scoreLabel: 'warm',
+      leadScore: 60,
+      lastContactedAt: '2026-04-30T08:00:00Z',
+    });
+    setActivities([]);
+    const b = await enrichContext({ kind: 'person', id: 'c_99' }, 'space_1', { now: NOW });
+    expect(b!.subjectLabel).toBe('Jordan Park');
+
+    // Different space, same id — must NOT return Maya either.
+    setContact({
+      id: 'c_42',
+      name: 'Different-tenant Maya',
+      scoreLabel: 'cold',
+      leadScore: 20,
+      lastContactedAt: null,
+    });
+    setActivities([]);
+    const c = await enrichContext({ kind: 'person', id: 'c_42' }, 'space_2', { now: NOW });
+    expect(c!.subjectLabel).toBe('Different-tenant Maya');
+
+    // Same kind, different kind on same id — must NOT collide.
+    setDeal({
+      id: 'c_42',
+      title: 'Deal-shaped c_42',
+      contactId: null,
+      status: 'active',
+      stageId: null,
+      updatedAt: '2026-04-30T00:00:00Z',
+    });
+    const d = await enrichContext({ kind: 'deal', id: 'c_42' }, 'space_1', { now: NOW });
+    expect(d!.subjectLabel).toBe('Deal-shaped c_42');
+  });
+
+  it('does not cache misses (null results) — a later create-then-query lands fresh data', async () => {
+    setContact(null);
+    setActivities([]);
+    const first = await enrichContext({ kind: 'person', id: 'c_late' }, 'space_1', { now: NOW });
+    expect(first).toBeNull();
+
+    // Now the row exists.
+    setContact({
+      id: 'c_late',
+      name: 'Late Larry',
+      scoreLabel: 'warm',
+      leadScore: 55,
+      lastContactedAt: '2026-04-30T00:00:00Z',
+    });
+    setActivities([]);
+    const second = await enrichContext({ kind: 'person', id: 'c_late' }, 'space_1', { now: NOW });
+    expect(second).not.toBeNull();
+    expect(second!.subjectLabel).toBe('Late Larry');
+  });
+
+  it('__resetEnrichContextCacheForTests forces the next call to re-query', async () => {
+    setMayaFixtures();
+    const fromSpy = supabase.from as unknown as ReturnType<typeof vi.fn>;
+
+    await enrichContext({ kind: 'person', id: 'c_42' }, 'space_1', { now: NOW });
+    const callsAfterFirst = fromSpy.mock.calls.length;
+
+    // Without reset: cached, no new calls.
+    await enrichContext({ kind: 'person', id: 'c_42' }, 'space_1', { now: NOW });
+    expect(fromSpy.mock.calls.length).toBe(callsAfterFirst);
+
+    __resetEnrichContextCacheForTests();
+    await enrichContext({ kind: 'person', id: 'c_42' }, 'space_1', { now: NOW });
+    expect(fromSpy.mock.calls.length).toBeGreaterThan(callsAfterFirst);
+  });
+});
+
+describe('renderEnrichedContextBlock', () => {
+  it('wraps the body in [SUBJECT CONTEXT] / [/SUBJECT CONTEXT] tags', () => {
+    const text = renderEnrichedContextBlock({
+      subjectLabel: 'Maya Chen',
+      scoreLabel: 'hot',
+      leadScore: 88,
+      lastActivities: ['2026-04-29 — email: tour confirmation'],
+      daysSinceLastTouch: 3,
+    });
+    expect(text.startsWith('[SUBJECT CONTEXT]')).toBe(true);
+    expect(text.endsWith('[/SUBJECT CONTEXT]')).toBe(true);
+    expect(text).toContain('Subject: Maya Chen');
+    expect(text).toContain('Score: hot (88)');
+    expect(text).toContain('- 2026-04-29 — email: tour confirmation');
   });
 });
 
