@@ -229,14 +229,12 @@ export function CalendarView({
 
   // ── Lookup maps ──────────────────────────────────────────────────────────
 
-  // Chippi's one sentence for the calendar. Same pattern as the deals page —
-  // pick the most-pressing fact and name it. Calendar's "morning question"
-  // is "what am I doing today?" — answered in priority order: overdue
-  // follow-ups (red flag) → today's volume → this-week's outlook → quiet
-  // calendar invitation. Uses raw data (rawTours / rawContactFollowUps) so
-  // the sentence isn't affected by the layer chip filter — the narration
-  // describes what's actually on the calendar, not what's currently visible.
-  const narration = useMemo(() => {
+  // Chippi's one sentence for the calendar — and an action so the line is a
+  // doorway. Click "X today" → switch to day view on today; click "X this
+  // week" → switch to week. Overdue → focus today (the cluster is right
+  // before today's column). The narration describes what's there; clicking
+  // takes you to it.
+  const narration: { text: string; action: 'goto-day' | 'goto-week' | null } = useMemo(() => {
     const now = new Date();
     const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow0 = new Date(today0);
@@ -265,22 +263,50 @@ export function CalendarView({
     const todayTotal = todayTours + todayFollowUps;
 
     if (overdueCount > 0) {
-      return overdueCount === 1
-        ? '1 follow-up slipped past its date. Catch up.'
-        : `${overdueCount} follow-ups slipped past their date. Catch up.`;
+      return {
+        text: overdueCount === 1
+          ? '1 follow-up slipped past its date. Catch up.'
+          : `${overdueCount} follow-ups slipped past their date. Catch up.`,
+        action: 'goto-day',
+      };
     }
     if (todayTotal > 0) {
-      return todayTotal === 1
-        ? '1 thing on your calendar today.'
-        : `${todayTotal} things on your calendar today.`;
+      return {
+        text: todayTotal === 1
+          ? '1 thing on your calendar today.'
+          : `${todayTotal} things on your calendar today.`,
+        action: 'goto-day',
+      };
     }
     if (weekTours > 0) {
-      return weekTours === 1
-        ? '1 tour scheduled this week.'
-        : `${weekTours} tours scheduled this week.`;
+      return {
+        text: weekTours === 1
+          ? '1 tour scheduled this week.'
+          : `${weekTours} tours scheduled this week.`,
+        action: 'goto-week',
+      };
     }
-    return 'Calendar’s quiet this week. Schedule a tour to fill it in.';
+    return {
+      text: 'Calendar’s quiet this week. Schedule a tour to fill it in.',
+      action: null,
+    };
   }, [rawTours, rawContactFollowUps, rawDealFollowUps]);
+
+  function handleNarrationClick() {
+    if (narration.action === 'goto-day') {
+      setView('day');
+      setSelectedDate(todayKey);
+      setCurrentDate(today);
+      setCurrentMonth(today.getMonth());
+      setCurrentYear(today.getFullYear());
+    } else if (narration.action === 'goto-week') {
+      setView('week');
+      setSelectedDate(todayKey);
+      setCurrentDate(today);
+      setCurrentMonth(today.getMonth());
+      setCurrentYear(today.getFullYear());
+    }
+  }
 
   const toursByDate = useMemo(() => {
     const map = new Map<string, Tour[]>();
@@ -927,9 +953,20 @@ export function CalendarView({
             Schedule tour
           </Link>
         </div>
-        <p className="text-lg text-muted-foreground" style={TITLE_FONT}>
-          {narration}
-        </p>
+        {narration.action ? (
+          <button
+            type="button"
+            onClick={handleNarrationClick}
+            className="text-lg text-muted-foreground hover:text-foreground transition-colors text-left cursor-pointer"
+            style={TITLE_FONT}
+          >
+            {narration.text}
+          </button>
+        ) : (
+          <p className="text-lg text-muted-foreground" style={TITLE_FONT}>
+            {narration.text}
+          </p>
+        )}
       </header>
 
       {/* Tour stat strip — paper-flat, sits above the grid. */}

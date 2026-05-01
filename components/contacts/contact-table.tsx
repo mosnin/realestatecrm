@@ -55,7 +55,7 @@ import { cn } from '@/lib/utils';
 import { downloadCSV } from '@/lib/csv';
 import type { SavedView } from '@/lib/types';
 import { formatCurrency as _formatCurrency, getInitials } from '@/lib/formatting';
-import { CONTACT_STAGES } from '@/lib/constants';
+import { CONTACT_STAGES, HOT_LEAD_THRESHOLD } from '@/lib/constants';
 import { CsvImportModal } from './csv-import-modal';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -398,12 +398,10 @@ export function ContactTable({ slug }: ContactTableProps) {
     { key: 'buyer', label: 'Buyer', count: contacts.filter((c) => c.leadType === 'buyer').length },
   ];
 
-  // Chippi's one sentence for this surface. Same pattern as the deals page —
-  // pick the most-pressing fact and name it. The page tells one story; the
-  // narration is the spine. The contact list's "morning question" is "who do
-  // I owe a reply to?" — answered in priority order: new arrivals first,
-  // then overdue follow-ups, then a hot-lead nudge, then a quiet steady
-  // line. Empty state reads like an invitation, not a void.
+  // Chippi's one sentence for this surface. The narration also returns an
+  // optional action so the line becomes a doorway: clicking the sentence
+  // does what the sentence describes — switch to the New filter, sort by
+  // hot, etc. The page's voice and the page's filter are one thing.
   const narration = useMemo(() => {
     const newCount = contacts.filter((c) => c.tags.includes('new-lead')).length;
     const today = new Date();
@@ -411,30 +409,53 @@ export function ContactTable({ slug }: ContactTableProps) {
     const overdueCount = contacts.filter(
       (c) => c.followUpAt && new Date(c.followUpAt) < today,
     ).length;
-    const hotCount = contacts.filter((c) => (c.leadScore ?? 0) >= 75).length;
+    const hotCount = contacts.filter((c) => (c.leadScore ?? 0) >= HOT_LEAD_THRESHOLD).length;
 
     if (newCount > 0) {
-      return newCount === 1
-        ? '1 new person came in. Welcome them.'
-        : `${newCount} new people came in. Welcome them.`;
+      return {
+        text: newCount === 1
+          ? '1 new person came in. Welcome them.'
+          : `${newCount} new people came in. Welcome them.`,
+        action: 'filter-new' as const,
+      };
     }
     if (overdueCount > 0) {
-      return overdueCount === 1
-        ? '1 follow-up is overdue. Catch up.'
-        : `${overdueCount} follow-ups are overdue. Catch up.`;
+      return {
+        text: overdueCount === 1
+          ? '1 follow-up is overdue. Catch up.'
+          : `${overdueCount} follow-ups are overdue. Catch up.`,
+        action: 'sort-priority' as const,
+      };
     }
     if (hotCount > 0) {
-      return hotCount === 1
-        ? '1 hot lead waiting. Reach out.'
-        : `${hotCount} hot leads waiting. Reach out.`;
+      return {
+        text: hotCount === 1
+          ? '1 hot lead waiting. Reach out.'
+          : `${hotCount} hot leads waiting. Reach out.`,
+        action: 'sort-priority' as const,
+      };
     }
     if (contacts.length === 0) {
-      return 'No people yet. Drop your intake link and start collecting.';
+      return {
+        text: 'No people yet. Drop your intake link and start collecting.',
+        action: null as const,
+      };
     }
-    return contacts.length === 1
-      ? '1 person on your roster. Quietly active.'
-      : `${contacts.length} people on your roster. Quietly active.`;
+    return {
+      text: contacts.length === 1
+        ? '1 person on your roster. Quietly active.'
+        : `${contacts.length} people on your roster. Quietly active.`,
+      action: null as const,
+    };
   }, [contacts]);
+
+  function handleNarrationClick() {
+    if (narration.action === 'filter-new') {
+      setLeadTypeFilter('new');
+    } else if (narration.action === 'sort-priority') {
+      setSortBy('agent-priority');
+    }
+  }
 
   const sortLabels: Record<typeof sortBy, string> = {
     'agent-priority': 'Smart',
@@ -476,15 +497,26 @@ export function ContactTable({ slug }: ContactTableProps) {
             Add a person
           </Button>
         </div>
-        <p
-          className={cn(
-            'text-lg text-muted-foreground',
-            loading && 'opacity-60',
-          )}
-          style={TITLE_FONT}
-        >
-          {loading ? ' ' : narration}
-        </p>
+        {narration.action && !loading ? (
+          <button
+            type="button"
+            onClick={handleNarrationClick}
+            className="text-lg text-muted-foreground hover:text-foreground transition-colors text-left cursor-pointer"
+            style={TITLE_FONT}
+          >
+            {narration.text}
+          </button>
+        ) : (
+          <p
+            className={cn(
+              'text-lg text-muted-foreground',
+              loading && 'opacity-60',
+            )}
+            style={TITLE_FONT}
+          >
+            {loading ? ' ' : narration.text}
+          </p>
+        )}
       </header>
 
       {/* Filter chip row + toolbar */}
