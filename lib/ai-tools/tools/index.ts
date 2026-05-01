@@ -1,20 +1,18 @@
 /**
- * All tools known to the registry. New tools get added to this array in
- * their own Phase 2 / Phase 3 / Phase 5 commits.
+ * All tools known to the registry. Other teams append their tools to this
+ * array as they ship.
  */
 
 import type { ToolDefinition } from '../types';
 import { addChecklistItemTool } from './add-checklist-item';
-import { advanceDealStageTool } from './advance-deal-stage';
 import { createDealTool } from './create-deal';
-import { getContactTool } from './get-contact';
+import { findDealTool } from './find-deal';
+import { findPersonTool } from './find-person';
+import { moveDealStageTool } from './move-deal-stage';
 import { pipelineSummaryTool } from './pipeline-summary';
 import { scheduleTourTool } from './schedule-tour';
-import { searchContactsTool } from './search-contacts';
-import { searchDealsTool } from './search-deals';
 import { sendEmailTool } from './send-email';
 import { sendSmsTool } from './send-sms';
-import { updateContactTool } from './update-contact';
 
 /**
  * Domain tools only. The orchestrator's `delegate_to_subagent` tool is
@@ -26,15 +24,13 @@ import { updateContactTool } from './update-contact';
  */
 export const ALL_TOOLS: ToolDefinition[] = [
   // Read-only
-  searchContactsTool as ToolDefinition,
-  searchDealsTool as ToolDefinition,
-  getContactTool as ToolDefinition,
+  findPersonTool as ToolDefinition,
+  findDealTool as ToolDefinition,
   pipelineSummaryTool as ToolDefinition,
   // Mutating — require approval
   sendEmailTool as ToolDefinition,
   sendSmsTool as ToolDefinition,
-  updateContactTool as ToolDefinition,
-  advanceDealStageTool as ToolDefinition,
+  moveDealStageTool as ToolDefinition,
   createDealTool as ToolDefinition,
   scheduleTourTool as ToolDefinition,
   addChecklistItemTool as ToolDefinition,

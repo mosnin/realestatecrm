@@ -1,12 +1,12 @@
 /**
- * `advance_deal_stage` — move a Deal to a new DealStage.
+ * `move_deal_stage` — move a Deal to a new DealStage.
  *
  * Approval-gated: stage moves are high-signal in the pipeline view
  * (the kanban card physically jumps), so the realtor wants a clear
  * "yes that's the move I meant" confirmation.
  *
  * Intentionally narrow in scope. This tool does NOT:
- *   - change the deal's status (active/won/lost) — use update_deal for that
+ *   - change the deal's status (active/won/lost)
  *   - reseed the closing checklist — that's an explicit user action
  *   - reassign contacts — unrelated concern
  *
@@ -31,7 +31,7 @@ const parameters = z
   })
   .describe('Move a deal to a different stage in its pipeline.');
 
-interface AdvanceDealStageResult {
+interface MoveDealStageResult {
   dealId: string;
   fromStageId: string;
   toStageId: string;
@@ -39,10 +39,10 @@ interface AdvanceDealStageResult {
   toStageName: string;
 }
 
-export const advanceDealStageTool = defineTool<typeof parameters, AdvanceDealStageResult>({
-  name: 'advance_deal_stage',
+export const moveDealStageTool = defineTool<typeof parameters, MoveDealStageResult>({
+  name: 'move_deal_stage',
   description:
-    "Move a deal to a different stage (column on the pipeline board). Prompts for approval first.",
+    'Move a deal to a different pipeline stage. Prompts for approval first.',
   parameters,
   requiresApproval: true,
   rateLimit: { max: 60, windowSeconds: 3600 },
@@ -107,7 +107,7 @@ export const advanceDealStageTool = defineTool<typeof parameters, AdvanceDealSta
       .eq('id', args.dealId)
       .eq('spaceId', ctx.space.id);
     if (updateErr) {
-      logger.error('[tools.advance_deal_stage] update failed', { dealId: args.dealId }, updateErr);
+      logger.error('[tools.move_deal_stage] update failed', { dealId: args.dealId }, updateErr);
       return { summary: `Stage update failed: ${updateErr.message}`, display: 'error' };
     }
 
@@ -123,7 +123,7 @@ export const advanceDealStageTool = defineTool<typeof parameters, AdvanceDealSta
     });
     if (activityErr) {
       logger.warn(
-        '[tools.advance_deal_stage] activity insert failed',
+        '[tools.move_deal_stage] activity insert failed',
         { dealId: args.dealId },
         activityErr,
       );
@@ -137,7 +137,7 @@ export const advanceDealStageTool = defineTool<typeof parameters, AdvanceDealSta
       .maybeSingle();
     if (refreshed) {
       syncDeal({ ...refreshed, stage: { name: newStage.name } }).catch((err) =>
-        logger.warn('[tools.advance_deal_stage] vector sync failed', { dealId: args.dealId }, err),
+        logger.warn('[tools.move_deal_stage] vector sync failed', { dealId: args.dealId }, err),
       );
     }
 

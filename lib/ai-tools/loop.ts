@@ -90,7 +90,7 @@ export interface RunTurnInput {
    * supplied, the loop fetches an EnrichedContext via `enrichContext` and
    * prepends a `[SUBJECT CONTEXT] ... [/SUBJECT CONTEXT]` labeled block to
    * the trailing user message before the first OpenAI round. The agent
-   * therefore doesn't burn a tool turn on `get_contact`/`get_deal` for a
+   * therefore doesn't burn a tool turn on `find_person`/`find_deal` for a
    * subject the platform already knows. Cached 5 minutes per
    * `${spaceId}:${kind}:${id}` key inside enrichContext.
    */

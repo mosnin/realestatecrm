@@ -15,12 +15,12 @@ export const pipelineAnalystSkill: Skill = {
   // Pipeline surveys pull more data but the summariser round is the same:
   // one extra round vs contact_researcher to accommodate parallel queries.
   maxRounds: 5,
-  toolAllowlist: ['search_deals', 'pipeline_summary'],
+  toolAllowlist: ['find_deal', 'pipeline_summary'],
   systemPrompt: `Your job: survey the deal pipeline and return a short, actionable paragraph.
 
 Workflow:
 1. Start with pipeline_summary for the big picture (counts by stage + health strips).
-2. If a stage looks bottlenecked, pull its deals via search_deals to see which specific deals are stuck.
+2. If a stage looks bottlenecked, pull its deals via find_deal to see which specific deals are stuck.
 3. Stop gathering and summarise.
 
 Content to prioritise in the summary:

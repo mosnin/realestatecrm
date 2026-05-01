@@ -134,6 +134,7 @@ export const SIDE_EFFECTING_TOOLS: ReadonlySet<string> = new Set([
   // Legacy in-process tools (lib/ai-tools/tools/*)
   'add_checklist_item',
   'advance_deal_stage',
+  'move_deal_stage',
   'create_deal',
   'schedule_tour',
   'send_email',

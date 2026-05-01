@@ -2,24 +2,24 @@ import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import { defineTool } from '@/lib/ai-tools/types';
 import { toolToOpenAIFormat, allToolsForOpenAI } from '@/lib/ai-tools/openai-format';
-import { searchContactsTool } from '@/lib/ai-tools/tools/search-contacts';
+import { findPersonTool } from '@/lib/ai-tools/tools/find-person';
 
 describe('toolToOpenAIFormat', () => {
   it('wraps a tool in the {type: "function", function: {...}} envelope', () => {
-    const out = toolToOpenAIFormat(searchContactsTool);
+    const out = toolToOpenAIFormat(findPersonTool);
     expect(out.type).toBe('function');
-    expect(out.function.name).toBe('search_contacts');
+    expect(out.function.name).toBe('find_person');
     expect(out.function.description).toBeTruthy();
   });
 
   it('emits a JSON-schema object for parameters', () => {
-    const out = toolToOpenAIFormat(searchContactsTool);
+    const out = toolToOpenAIFormat(findPersonTool);
     expect(out.function.parameters.type).toBe('object');
     expect(typeof out.function.parameters.properties).toBe('object');
   });
 
   it('strips the $schema key — OpenAI rejects it', () => {
-    const out = toolToOpenAIFormat(searchContactsTool);
+    const out = toolToOpenAIFormat(findPersonTool);
     expect(out.function.parameters.$schema).toBeUndefined();
   });
 
@@ -63,8 +63,8 @@ describe('toolToOpenAIFormat', () => {
 
 describe('allToolsForOpenAI', () => {
   it('maps every tool through the converter', () => {
-    const list = allToolsForOpenAI([searchContactsTool]);
+    const list = allToolsForOpenAI([findPersonTool]);
     expect(list).toHaveLength(1);
-    expect(list[0].function.name).toBe('search_contacts');
+    expect(list[0].function.name).toBe('find_person');
   });
 });
