@@ -11,11 +11,15 @@ export default async function ChippiPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ q?: string; tab?: string }>;
+  searchParams: Promise<{ q?: string; tab?: string; prefill?: string }>;
 }) {
   const { slug } = await params;
-  const { q, tab } = await searchParams;
+  const { q, tab, prefill } = await searchParams;
   const initialInput = typeof q === 'string' && q.trim() ? q.trim() : undefined;
+  // `prefill` populates the composer but does NOT auto-send — the realtor
+  // finishes the sentence themselves. Used by "or just tell Chippi →" shortcuts
+  // on /contacts and /deals (and by morning-actions). Distinct from `q`.
+  const initialPrefill = typeof prefill === 'string' && prefill.length > 0 ? prefill : undefined;
   const view = tab === 'settings' ? 'settings' : 'workspace';
 
   const { userId } = await auth();
@@ -77,6 +81,7 @@ export default async function ChippiPage({
         initialConversations={conversations}
         initialConversationId={initialConversationId}
         initialInput={initialInput}
+        initialPrefill={initialPrefill}
       />
     </div>
   );

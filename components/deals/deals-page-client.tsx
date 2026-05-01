@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Plus, Search, X } from 'lucide-react';
 import { KanbanBoard } from './kanban-board';
 import { PipelineSummary } from './pipeline-summary';
 import { PipelineTabs } from './pipeline-tabs';
-import { H1, TITLE_FONT, PRIMARY_PILL, BODY_MUTED } from '@/lib/typography';
+import { H1, TITLE_FONT, PRIMARY_PILL, BODY_MUTED, QUIET_LINK } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import type { Pipeline } from '@/lib/types';
@@ -126,10 +127,20 @@ export function DealsPageClient({ slug }: { slug: string }) {
           Deals
         </h1>
         {hasPipelines && (
-          <button type="button" onClick={handleAddDeal} className={PRIMARY_PILL}>
-            <Plus size={14} strokeWidth={2.25} />
-            Add deal
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button type="button" onClick={handleAddDeal} className={PRIMARY_PILL}>
+              <Plus size={14} strokeWidth={2.25} />
+              Add deal
+            </button>
+            {/* The whisper. The form is fine, but the agent is faster — say
+                it out loud and Chippi files it. Quietly offered, not promoted. */}
+            <Link
+              href={`/s/${slug}/chippi?prefill=${encodeURIComponent("I'm adding a new deal — ")}`}
+              className={QUIET_LINK}
+            >
+              or just tell Chippi →
+            </Link>
+          </div>
         )}
       </header>
 

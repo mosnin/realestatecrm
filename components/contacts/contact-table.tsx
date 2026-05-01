@@ -451,13 +451,23 @@ export function ContactTable({ slug }: ContactTableProps) {
           >
             People
           </h1>
-          <Button
-            onClick={() => setAddOpen(true)}
-            className="h-9 gap-1.5 rounded-full px-4 bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] transition-all"
-          >
-            <Plus size={14} strokeWidth={2.25} />
-            Add a person
-          </Button>
+          <div className="flex flex-col items-end gap-1">
+            <Button
+              onClick={() => setAddOpen(true)}
+              className="h-9 gap-1.5 rounded-full px-4 bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] transition-all"
+            >
+              <Plus size={14} strokeWidth={2.25} />
+              Add a person
+            </Button>
+            {/* The whisper. The form is fine, but the agent is faster — say
+                it out loud and Chippi files it. Quietly offered, not promoted. */}
+            <Link
+              href={`/s/${slug}/chippi?prefill=${encodeURIComponent("I'm adding a new person — ")}`}
+              className={QUIET_LINK}
+            >
+              or just tell Chippi →
+            </Link>
+          </div>
         </div>
         {narration.action && !loading ? (
           <button

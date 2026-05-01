@@ -41,6 +41,11 @@ interface ChippiWorkspaceProps {
   initialConversationId: string | null;
   /** Pre-send this message on mount (used when arriving from the command palette). */
   initialInput?: string;
+  /** Pre-populate the composer on mount but do NOT auto-send — the realtor
+   *  finishes the sentence themselves. Used by "or just tell Chippi →"
+   *  shortcuts on /contacts and /deals, and by morning-actions. Distinct
+   *  from `initialInput` which auto-sends. */
+  initialPrefill?: string;
 }
 
 const MESSAGE_LIMIT = 50;
@@ -63,6 +68,7 @@ export function ChippiWorkspace({
   initialConversations,
   initialConversationId,
   initialInput,
+  initialPrefill,
 }: ChippiWorkspaceProps) {
   const { user } = useUser();
   const searchParams = useSearchParams();
@@ -308,8 +314,12 @@ export function ChippiWorkspace({
   const firstName = user?.firstName ?? '';
 
   // Composer prefill — bumped by the day-one welcome's "Tell me about a lead"
-  // action. Nonce so identical text twice in a row still re-applies.
-  const [prefill, setPrefill] = useState<{ text: string; nonce: number } | null>(null);
+  // action, and seeded on mount when arriving from `?prefill=` (the
+  // "or just tell Chippi →" shortcuts on /contacts and /deals, and
+  // morning-actions). Nonce so identical text twice in a row still re-applies.
+  const [prefill, setPrefill] = useState<{ text: string; nonce: number } | null>(
+    initialPrefill ? { text: initialPrefill, nonce: Date.now() } : null,
+  );
   const handleTellMeAboutLead = useCallback((text: string) => {
     setPrefill({ text, nonce: Date.now() });
   }, []);
