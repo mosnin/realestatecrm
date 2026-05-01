@@ -23,33 +23,17 @@ import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import {
   Plus,
   GripVertical,
-  LayoutGrid,
-  List,
-  Trash2,
   MapPin,
-  Search,
   X,
-  Briefcase,
   Trophy,
   XCircle,
-  SlidersHorizontal,
-  Download,
-  Copy,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  ChevronDown,
   Check,
   Palette,
   ArrowRight,
 } from 'lucide-react';
-import {
-  SECTION_LABEL,
-  TITLE_FONT,
-} from '@/lib/typography';
+import { TITLE_FONT } from '@/lib/typography';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
-import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
 import { formatCurrency as _formatCurrency } from '@/lib/formatting';
@@ -72,6 +56,8 @@ import {
 } from '@/components/ui/select';
 import { useRealtime } from '@/hooks/use-realtime';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { dealHealth } from '@/lib/deals/health';
+import type { BoardStatus, BoardFocus } from './deals-page-client';
 
 type DealWithRelations = Deal & {
   stage: DealStage;
@@ -193,107 +179,32 @@ const NETWORK_ERROR_MSG = 'lost the connection';
 interface KanbanBoardProps {
   slug: string;
   pipelineId: string;
+  /** What slice the page is showing — Active or Closed. Lifted to the
+   *  parent so the segmented toggle and the board share state. */
+  boardStatus: BoardStatus;
+  /** Optional narrow-down focus from the stat strip (At risk / Closing
+   *  this month). When set, the board further filters to only those deals.
+   *  The clear chip lives in the page toolbar above. */
+  focus: BoardFocus;
+  /** Search query from the page toolbar. The board does the actual
+   *  filtering. */
+  searchQuery: string;
 }
 
-export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
+export function KanbanBoard({
+  slug,
+  pipelineId,
+  boardStatus,
+  focus,
+  searchQuery,
+}: KanbanBoardProps) {
   const router = useRouter();
   const [stages, setStages] = useState<StageWithDeals[]>([]);
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
-  const [view, setView] = useState<'kanban' | 'list'>('list');
-  // Force list view on mobile (< md). Stored preference is preserved so
-  // desktop kanban resumes when the viewport widens.
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mq = window.matchMedia('(max-width: 767px)');
-    const update = () => setIsMobile(mq.matches);
-    update();
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
-  }, []);
-  const effectiveView: 'kanban' | 'list' = isMobile ? 'list' : view;
-  const [searchQuery, setSearchQuery] = useState('');
   // Slide-over panel state — clicking a card opens the deal here without nav.
   const [panelDealId, setPanelDealId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<
-    Set<'active' | 'won' | 'lost' | 'on_hold'>
-  >(new Set(['active']));
   const { confirm, ConfirmDialog } = useConfirm();
-
-  const [prefsHydrated, setPrefsHydrated] = useState(false);
-
-  // Hydrate status filter from localStorage (SSR-safe).
-  useEffect(() => {
-    if (typeof window === 'undefined' || !slug) {
-      setPrefsHydrated(true);
-      return;
-    }
-    try {
-      const raw = localStorage.getItem(`chippi:deals:statusFilter:${slug}`);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          const valid: Array<'active' | 'won' | 'lost' | 'on_hold'> = [
-            'active',
-            'won',
-            'lost',
-            'on_hold',
-          ];
-          const filtered = parsed.filter((v): v is 'active' | 'won' | 'lost' | 'on_hold' =>
-            typeof v === 'string' && (valid as string[]).includes(v),
-          );
-          setStatusFilter(new Set(filtered));
-        }
-      }
-    } catch {
-      // ignore malformed value or storage access errors
-    }
-    setPrefsHydrated(true);
-  }, [slug]);
-
-  // Persist status filter.
-  useEffect(() => {
-    if (typeof window === 'undefined' || !slug || !prefsHydrated) return;
-    try {
-      localStorage.setItem(
-        `chippi:deals:statusFilter:${slug}`,
-        JSON.stringify(Array.from(statusFilter)),
-      );
-    } catch {
-      // quota / storage disabled — ignore.
-    }
-  }, [slug, statusFilter, prefsHydrated]);
-
-  function toggleStatus(status: 'active' | 'won' | 'lost' | 'on_hold') {
-    setStatusFilter((prev) => {
-      const next = new Set(prev);
-      if (next.has(status)) next.delete(status);
-      else next.add(status);
-      return next;
-    });
-  }
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !slug) return;
-    try {
-      const stored = localStorage.getItem(`chippi:deals:view:${slug}`);
-      if (stored === 'kanban' || stored === 'list') setView(stored);
-    } catch {
-      // localStorage unavailable — ignore.
-    }
-  }, [slug]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !slug || !prefsHydrated) return;
-    try {
-      localStorage.setItem(`chippi:deals:view:${slug}`, view);
-    } catch {
-      // quota / storage disabled — ignore.
-    }
-    // Clear bulk selection when switching views
-    setSelectedDealIds(new Set());
-  }, [slug, view, prefsHydrated]);
 
   // Won / Lost reason dialog (triggered from card quick-action buttons)
   const WON_REASONS = ['Full price offer', 'Great negotiation', 'Client referral', 'Other'] as const;
@@ -306,27 +217,6 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [reasonNote, setReasonNote] = useState('');
   const [statusChangePending, setStatusChangePending] = useState(false);
-
-  // Advanced filters
-  const [filterPriority, setFilterPriority] = useState<Set<'LOW' | 'MEDIUM' | 'HIGH'>>(
-    new Set(['LOW', 'MEDIUM', 'HIGH']),
-  );
-  const [filterValueMin, setFilterValueMin] = useState('');
-  const [filterValueMax, setFilterValueMax] = useState('');
-  const [filterProbMin, setFilterProbMin] = useState('');
-  const [filterProbMax, setFilterProbMax] = useState('');
-
-  // Sort state (list view)
-  const [sortField, setSortField] = useState<
-    'title' | 'value' | 'priority' | 'probability' | 'closeDate' | 'stage' | null
-  >(null);
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-
-  // Bulk selection (list view)
-  const [selectedDealIds, setSelectedDealIds] = useState<Set<string>>(new Set());
-  const [bulkStagePicker, setBulkStagePicker] = useState(false);
-  const [bulkStageTarget, setBulkStageTarget] = useState('');
-  const [bulkPending, setBulkPending] = useState(false);
 
   // Inline "Add Stage" state for the kanban view
   const [addingStage, setAddingStage] = useState(false);
@@ -899,208 +789,6 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
     }
   }
 
-  // CSV export
-  function exportCSV() {
-    const headers = ['Title', 'Stage', 'Status', 'Value', 'Commission Rate', 'Probability', 'Priority', 'Address', 'People', 'Close Date', 'Follow Up', 'Created'];
-    const rows = allDeals.map((deal) => {
-      const stage = stages.find((s) => s.id === deal.stageId);
-      const contacts = deal.dealContacts.map((dc) => dc.contact.name).join('; ');
-      const closeDate = deal.closeDate ? new Date(deal.closeDate as unknown as string).toLocaleDateString() : '';
-      const followUp = deal.followUpAt ? new Date(deal.followUpAt as unknown as string).toLocaleDateString() : '';
-      const created = new Date(deal.createdAt as unknown as string).toLocaleDateString();
-      return [deal.title, stage?.name ?? '', deal.status, deal.value != null ? String(deal.value) : '', deal.commissionRate != null ? `${deal.commissionRate}%` : '', deal.probability != null ? `${deal.probability}%` : '', deal.priority, deal.address ?? '', contacts, closeDate, followUp, created]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-        .join(',');
-    });
-    const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `deals-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  // Duplicate deal
-  async function handleDuplicateDeal(deal: DealWithRelations) {
-    try {
-      const res = await fetch('/api/deals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slug,
-          title: `${deal.title} (copy)`,
-          description: deal.description,
-          value: deal.value,
-          commissionRate: deal.commissionRate,
-          probability: deal.probability,
-          address: deal.address,
-          priority: deal.priority,
-          closeDate: deal.closeDate,
-          stageId: deal.stageId,
-          contactIds: deal.dealContacts.map((dc) => dc.contactId),
-        }),
-      });
-      if (!res.ok) {
-        const detail = await parseApiError(res);
-        toast.error(`Couldn't duplicate deal: ${detail}`);
-        return;
-      }
-      const newDeal = await res.json();
-      toast.success('Deal duplicated.');
-      router.push(`/s/${slug}/deals/${newDeal.id}`);
-    } catch {
-      toast.error(`Couldn't duplicate deal: ${NETWORK_ERROR_MSG}`);
-    }
-  }
-
-  // Bulk selection helpers
-  function toggleDealSelect(id: string) {
-    setSelectedDealIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleSelectAll() {
-    if (selectedDealIds.size === allDeals.length && allDeals.length > 0) {
-      setSelectedDealIds(new Set());
-    } else {
-      setSelectedDealIds(new Set(allDeals.map((d) => d.id)));
-    }
-  }
-
-  async function bulkDelete() {
-    const ids = Array.from(selectedDealIds);
-    const confirmed = await confirm({
-      title: `Delete ${ids.length} deal${ids.length === 1 ? '' : 's'}?`,
-      description: "These will be gone. I can't bring them back.",
-    });
-    if (!confirmed) return;
-    setBulkPending(true);
-    try {
-      const results = await Promise.allSettled(
-        ids.map((id) => fetch(`/api/deals/${id}`, { method: 'DELETE' })),
-      );
-
-      // Count network-level rejections separately from API-level failures so
-      // we can surface a useful detail in the error toast.
-      let networkFailures = 0;
-      const apiErrors: string[] = [];
-      for (const r of results) {
-        if (r.status === 'rejected') {
-          networkFailures += 1;
-          continue;
-        }
-        if (!r.value.ok) {
-          apiErrors.push(await parseApiError(r.value));
-        }
-      }
-
-      const failed = networkFailures + apiErrors.length;
-      if (failed === 0) {
-        toast.success(`Deleted ${ids.length} deal${ids.length === 1 ? '' : 's'}.`);
-        setSelectedDealIds(new Set());
-      } else if (failed === ids.length) {
-        const detail = networkFailures === ids.length
-          ? NETWORK_ERROR_MSG
-          : apiErrors[0] ?? 'Unknown error';
-        toast.error(`Couldn't delete deals: ${detail}`);
-      } else {
-        const succeeded = ids.length - failed;
-        const detail = apiErrors[0] ?? NETWORK_ERROR_MSG;
-        toast.error(
-          `Deleted ${succeeded} of ${ids.length}; ${failed} failed: ${detail}`,
-        );
-      }
-      fetchData();
-    } catch {
-      toast.error(`Couldn't delete deals: ${NETWORK_ERROR_MSG}`);
-    } finally {
-      setBulkPending(false);
-    }
-  }
-
-  async function bulkMoveToStage() {
-    if (!bulkStageTarget) return;
-    const ids = Array.from(selectedDealIds);
-    setBulkPending(true);
-    try {
-      const results = await Promise.allSettled(
-        ids.map((id) =>
-          fetch(`/api/deals/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ slug, stageId: bulkStageTarget }),
-          }),
-        ),
-      );
-
-      // Distinguish network-level rejections from API-level failures so the
-      // error toast can point the realtor at an actionable cause.
-      let networkFailures = 0;
-      const apiErrors: string[] = [];
-      for (const r of results) {
-        if (r.status === 'rejected') {
-          networkFailures += 1;
-          continue;
-        }
-        if (!r.value.ok) {
-          apiErrors.push(await parseApiError(r.value));
-        }
-      }
-
-      const stageName = stages.find((s) => s.id === bulkStageTarget)?.name ?? '';
-      const failed = networkFailures + apiErrors.length;
-      if (failed === 0) {
-        toast.success(`Moved ${ids.length} deal${ids.length === 1 ? '' : 's'} to ${stageName}.`);
-        setBulkStagePicker(false);
-        setBulkStageTarget('');
-        setSelectedDealIds(new Set());
-      } else if (failed === ids.length) {
-        const detail = networkFailures === ids.length
-          ? NETWORK_ERROR_MSG
-          : apiErrors[0] ?? 'Unknown error';
-        toast.error(`Couldn't move deals: ${detail}`);
-      } else {
-        const succeeded = ids.length - failed;
-        const detail = apiErrors[0] ?? NETWORK_ERROR_MSG;
-        toast.error(
-          `Moved ${succeeded} of ${ids.length} to ${stageName}; ${failed} failed: ${detail}`,
-        );
-      }
-      fetchData();
-    } catch {
-      toast.error(`Couldn't move deals: ${NETWORK_ERROR_MSG}`);
-    } finally {
-      setBulkPending(false);
-    }
-  }
-
-  // Sortable column header
-  function SortHeader({ field, label, className }: { field: NonNullable<typeof sortField>; label: string; className?: string }) {
-    const isActive = sortField === field;
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          if (isActive) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-          else { setSortField(field); setSortDir('asc'); }
-        }}
-        className={cn('flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors group', className)}
-      >
-        {label}
-        {isActive ? (
-          sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />
-        ) : (
-          <ArrowUpDown size={11} className="opacity-0 group-hover:opacity-50 transition-opacity" />
-        )}
-      </button>
-    );
-  }
-
   const allStages = stages as DealStage[];
   const activeDeal = stages.flatMap((s) => s.deals).find((d) => d.id === activeDealId);
   const activeStage = activeStageId ? stages.find((s) => s.id === activeStageId) : null;
@@ -1117,343 +805,58 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
     );
   }
 
+  // Status mapping: 'active' shows just active deals; 'closed' shows the
+  // whole life-after — won, lost, on hold — together. Three closed buckets
+  // wedged into one tab keeps the toolbar to two states.
+  const statusMatches = useMemo(() => {
+    if (boardStatus === 'active') return (s: string) => s === 'active';
+    return (s: string) => s === 'won' || s === 'lost' || s === 'on_hold';
+  }, [boardStatus]);
+
+  // Closing-this-month bounds, computed once per render so the focus
+  // filter doesn't hit Date constructors per deal.
+  const monthBounds = useMemo(() => {
+    const now = new Date();
+    return {
+      start: new Date(now.getFullYear(), now.getMonth(), 1),
+      end: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+    };
+  }, []);
+
+  function focusMatches(deal: DealWithRelations): boolean {
+    if (focus === null) return true;
+    if (focus === 'at-risk') {
+      return dealHealth(deal).state !== 'on-track';
+    }
+    if (focus === 'closing-month') {
+      if (!deal.closeDate) return false;
+      const close = new Date(deal.closeDate as unknown as string);
+      return !isNaN(close.getTime())
+        && close >= monthBounds.start
+        && close < monthBounds.end;
+    }
+    return true;
+  }
+
   const filteredStages = useMemo(() => {
-    const valueMinN = filterValueMin !== '' ? parseFloat(filterValueMin) : null;
-    const valueMaxN = filterValueMax !== '' ? parseFloat(filterValueMax) : null;
-    const probMinN = filterProbMin !== '' ? parseInt(filterProbMin, 10) : null;
-    const probMaxN = filterProbMax !== '' ? parseInt(filterProbMax, 10) : null;
     return stages.map((s) => ({
       ...s,
       deals: s.deals.filter((deal) => {
-        if (!statusFilter.has(deal.status as 'active' | 'won' | 'lost' | 'on_hold')) return false;
+        if (!statusMatches(deal.status as string)) return false;
         if (!dealMatchesSearch(deal)) return false;
-        if (!filterPriority.has(deal.priority as 'LOW' | 'MEDIUM' | 'HIGH')) return false;
-        if (valueMinN !== null && (deal.value == null || deal.value < valueMinN)) return false;
-        if (valueMaxN !== null && (deal.value == null || deal.value > valueMaxN)) return false;
-        if (probMinN !== null && (deal.probability == null || deal.probability < probMinN)) return false;
-        if (probMaxN !== null && (deal.probability == null || deal.probability > probMaxN)) return false;
+        if (!focusMatches(deal)) return false;
         return true;
       }),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stages, searchLower, statusFilter, filterPriority, filterValueMin, filterValueMax, filterProbMin, filterProbMax]);
-
-  const PRIORITY_ORDER: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
-
-  const allDeals = useMemo(() => {
-    const deals = filteredStages.flatMap((s) => s.deals);
-    if (!sortField) return deals;
-    return [...deals].sort((a, b) => {
-      let cmp = 0;
-      if (sortField === 'title') {
-        cmp = a.title.localeCompare(b.title);
-      } else if (sortField === 'value') {
-        cmp = (a.value ?? -1) - (b.value ?? -1);
-      } else if (sortField === 'priority') {
-        cmp = (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1);
-      } else if (sortField === 'probability') {
-        cmp = (a.probability ?? -1) - (b.probability ?? -1);
-      } else if (sortField === 'closeDate') {
-        const aD = a.closeDate ? new Date(a.closeDate as unknown as string).getTime() : Infinity;
-        const bD = b.closeDate ? new Date(b.closeDate as unknown as string).getTime() : Infinity;
-        cmp = aD - bD;
-      } else if (sortField === 'stage') {
-        const aStage = stages.find((s) => s.id === a.stageId);
-        const bStage = stages.find((s) => s.id === b.stageId);
-        cmp = (aStage?.position ?? 0) - (bStage?.position ?? 0);
-      }
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-  }, [filteredStages, sortField, sortDir, stages]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const totalUnfilteredDealCount = stages.reduce((acc, s) => acc + s.deals.length, 0);
-
-  const advancedFilterCount =
-    (filterPriority.size < 3 ? 1 : 0) +
-    (filterValueMin !== '' || filterValueMax !== '' ? 1 : 0) +
-    (filterProbMin !== '' || filterProbMax !== '' ? 1 : 0);
-
-  const hasActiveFilter = !!searchLower || statusFilter.size < 4 || advancedFilterCount > 0;
+  }, [stages, searchLower, statusMatches, focus, monthBounds]);
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Status filter chips — Active / Won / Lost / On Hold */}
-          <div className="flex items-center gap-1 flex-wrap">
-            {(
-              [
-                { value: 'active', label: 'Active' },
-                { value: 'won', label: 'Won' },
-                { value: 'lost', label: 'Lost' },
-                { value: 'on_hold', label: 'On Hold' },
-              ] as const
-            ).map((opt) => {
-              const selected = statusFilter.has(opt.value);
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => toggleStatus(opt.value)}
-                  aria-pressed={selected}
-                  className={cn(
-                    'inline-flex items-center rounded-full px-3 h-8 sm:h-7 text-xs font-medium transition-colors duration-150',
-                    selected
-                      ? 'bg-foreground text-background'
-                      : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
-                  )}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
+      {/* Toolbar (search + focus chip + status toggle) is now part of the
+          page chrome above. The board renders just the board. */}
 
-          {/* Search */}
-          <div className="relative ml-auto flex-1 sm:flex-initial min-w-[140px]">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search deals…"
-              className="pl-9 pr-7 h-9 w-full sm:w-56 text-sm rounded-md border border-border/70 bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-150"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-
-          {/* Advanced filter popover */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className={cn(
-                  'inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium transition-colors duration-150',
-                  advancedFilterCount > 0
-                    ? 'text-foreground bg-foreground/[0.045]'
-                    : 'text-foreground hover:bg-foreground/[0.04]',
-                )}
-              >
-                <SlidersHorizontal size={13} />
-                Filters
-                {advancedFilterCount > 0 && (
-                  <span className="ml-0.5 bg-foreground/[0.08] rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-semibold tabular-nums">
-                    {advancedFilterCount}
-                  </span>
-                )}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-72 p-4 space-y-4">
-              {/* Priority filter */}
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Priority</p>
-                <div className="flex gap-2">
-                  {(['LOW', 'MEDIUM', 'HIGH'] as const).map((p) => {
-                    const on = filterPriority.has(p);
-                    return (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() =>
-                          setFilterPriority((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(p)) next.delete(p); else next.add(p);
-                            return next;
-                          })
-                        }
-                        className={cn(
-                          'flex-1 h-8 sm:h-7 text-xs font-medium rounded-md border transition-colors',
-                          on
-                            ? p === 'LOW'
-                              ? 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-500/20 dark:text-slate-300 dark:border-slate-500/40'
-                              : p === 'MEDIUM'
-                              ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40'
-                              : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-300 dark:border-red-500/40'
-                            : 'bg-transparent text-muted-foreground border-border hover:bg-muted',
-                        )}
-                      >
-                        {p === 'LOW' ? 'Low' : p === 'MEDIUM' ? 'Medium' : 'High'}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Value range */}
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Deal Value</p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    value={filterValueMin}
-                    onChange={(e) => setFilterValueMin(e.target.value)}
-                    placeholder="Min"
-                    className="h-8 sm:h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
-                  />
-                  <span className="text-muted-foreground text-xs flex-shrink-0">to</span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={filterValueMax}
-                    onChange={(e) => setFilterValueMax(e.target.value)}
-                    placeholder="Max"
-                    className="h-8 sm:h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-              </div>
-
-              {/* Probability range */}
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Win Probability (%)</p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={filterProbMin}
-                    onChange={(e) => setFilterProbMin(e.target.value)}
-                    placeholder="Min"
-                    className="h-8 sm:h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
-                  />
-                  <span className="text-muted-foreground text-xs flex-shrink-0">to</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={filterProbMax}
-                    onChange={(e) => setFilterProbMax(e.target.value)}
-                    placeholder="Max"
-                    className="h-8 sm:h-7 w-full rounded-md border border-border bg-muted/50 px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-              </div>
-
-              {/* Reset */}
-              {advancedFilterCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFilterPriority(new Set(['LOW', 'MEDIUM', 'HIGH']));
-                    setFilterValueMin('');
-                    setFilterValueMax('');
-                    setFilterProbMin('');
-                    setFilterProbMax('');
-                  }}
-                  className="w-full h-8 sm:h-7 text-xs font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted transition-colors"
-                >
-                  Reset filters
-                </button>
-              )}
-            </PopoverContent>
-          </Popover>
-
-          {/* Export CSV — hidden on mobile to keep toolbar from wrapping */}
-          <button
-            type="button"
-            onClick={exportCSV}
-            disabled={allDeals.length === 0}
-            className="hidden sm:inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Export to CSV"
-          >
-            <Download size={13} />
-            Export
-          </button>
-
-          {/* View toggle — segmented control */}
-          <div className="flex items-center gap-0.5 rounded-md border border-border/70 bg-background p-0.5">
-            <button
-              type="button"
-              onClick={() => setView('list')}
-              className={cn(
-                'h-8 sm:h-7 w-8 flex items-center justify-center rounded transition-colors duration-150',
-                view === 'list'
-                  ? 'bg-foreground/[0.045] text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-              title="List view"
-              aria-label="List view"
-            >
-              <List size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('kanban')}
-              className={cn(
-                'h-8 sm:h-7 w-8 flex items-center justify-center rounded transition-colors duration-150',
-                view === 'kanban'
-                  ? 'bg-foreground/[0.045] text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-              title="Board view"
-              aria-label="Board view"
-            >
-              <LayoutGrid size={14} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Bulk action bar */}
-      {selectedDealIds.size > 0 && effectiveView === 'list' && (
-        <div className="flex items-center gap-3 flex-wrap rounded-md border border-border/70 bg-foreground/[0.02] px-4 py-2.5">
-          <span className="text-sm text-foreground tabular-nums">
-            {selectedDealIds.size} selected
-          </span>
-          <div className="flex items-center gap-2 ml-auto flex-wrap">
-            <button
-              type="button"
-              onClick={() => {
-                setBulkStageTarget(stages[0]?.id ?? '');
-                setBulkStagePicker(true);
-              }}
-              disabled={bulkPending}
-              className="h-7 px-3 flex items-center gap-1.5 text-xs font-medium rounded-md border border-border/70 bg-background hover:bg-foreground/[0.04] transition-colors duration-150 disabled:opacity-50"
-            >
-              Move to stage
-              <ChevronDown size={11} />
-            </button>
-            <button
-              type="button"
-              onClick={bulkDelete}
-              disabled={bulkPending}
-              className="h-7 px-3 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 disabled:opacity-50"
-            >
-              {bulkPending ? 'Working…' : 'Delete'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedDealIds(new Set())}
-              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground transition-colors duration-150"
-              aria-label="Clear selection"
-            >
-              <X size={13} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {statusFilter.size === 0 ? (
-        <div className="rounded-xl border border-border/70 bg-background px-4 py-12 text-center">
-          <p className="text-sm text-muted-foreground">
-            Pick at least one status above to see deals.
-          </p>
-        </div>
-      ) : effectiveView === 'kanban' ? (
-        <>
-        {/* Mobile stacked view — paper-flat hairline rows. */}
+      {/* Mobile stacked view — paper-flat hairline rows. */}
         <div className="md:hidden space-y-4">
           {filteredStages.map((stage) => (
             <div key={stage.id} className="rounded-xl border border-border/70 bg-background overflow-hidden">
@@ -1615,9 +1018,19 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
             <DragOverlay>
               {activeDeal && (
                 <div className="w-72 rounded-md border border-border bg-background px-3 py-3 shadow-md opacity-95">
-                  <div className="flex items-center gap-2">
-                    <GripVertical size={14} className="text-muted-foreground/40 flex-shrink-0" />
-                    <p className="text-sm font-medium truncate text-foreground">{activeDeal.title}</p>
+                  <div className="flex items-start gap-2">
+                    <GripVertical size={14} className="text-muted-foreground/40 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate text-foreground">{activeDeal.title}</p>
+                      {activeDeal.value != null && (
+                        <p
+                          className="text-base tabular-nums text-foreground mt-1 leading-none"
+                          style={TITLE_FONT}
+                        >
+                          {formatCurrency(activeDeal.value)}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1640,197 +1053,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
             </DragOverlay>
           </DndContext>
         </div>
-        </>
-      ) : (
-        /* ── List / table view ── */
-        <div className="rounded-xl border border-border/70 bg-background overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/70 bg-foreground/[0.02]">
-                  <th className="px-3 py-2.5 w-10">
-                    <input
-                      type="checkbox"
-                      checked={allDeals.length > 0 && selectedDealIds.size === allDeals.length}
-                      ref={(el) => {
-                        if (el) el.indeterminate = selectedDealIds.size > 0 && selectedDealIds.size < allDeals.length;
-                      }}
-                      onChange={toggleSelectAll}
-                      className="h-3.5 w-3.5 rounded border-border cursor-pointer accent-foreground"
-                      aria-label="Select all"
-                    />
-                  </th>
-                  <th className="text-left px-4 py-2.5">
-                    <SortHeader field="title" label="Deal" />
-                  </th>
-                  <th className="text-left px-4 py-2.5 hidden sm:table-cell">
-                    <SortHeader field="stage" label="Stage" />
-                  </th>
-                  <th className="text-right px-4 py-2.5 hidden md:table-cell">
-                    <SortHeader field="value" label="Value" className="ml-auto" />
-                  </th>
-                  <th className="text-left px-4 py-2.5 hidden md:table-cell">
-                    <SortHeader field="closeDate" label="Close" />
-                  </th>
-                  <th className="text-left px-4 py-2.5 hidden lg:table-cell">
-                    <span className={SECTION_LABEL}>Last activity</span>
-                  </th>
-                  <th className="px-4 py-2.5 w-20" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/70">
-                {allDeals.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-4">
-                      {hasActiveFilter && totalUnfilteredDealCount > 0 ? (
-                        <EmptyState
-                          icon={Briefcase}
-                          title="Nothing matches those filters."
-                          description="Clear the search or widen the status above."
-                          variant="flush"
-                          size="md"
-                        />
-                      ) : (
-                        <EmptyState
-                          icon={Briefcase}
-                          title="No deals yet."
-                          description="Add the first one and I'll start tracking the pipeline."
-                          variant="flush"
-                          size="md"
-                        />
-                      )}
-                    </td>
-                  </tr>
-                ) : (
-                  allDeals.map((deal) => {
-                    const stage = stages.find((s) => s.id === deal.stageId);
-                    const isSelected = selectedDealIds.has(deal.id);
-                    const lastActivity = deal.updatedAt
-                      ? (() => {
-                          const d = new Date(deal.updatedAt as unknown as string);
-                          const diffDays = Math.floor((Date.now() - d.getTime()) / 86_400_000);
-                          if (diffDays === 0) return 'today';
-                          if (diffDays < 30) return `${diffDays}d ago`;
-                          return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-                        })()
-                      : '—';
-                    const closeLabel = deal.closeDate
-                      ? new Date(deal.closeDate as unknown as string).toLocaleDateString(
-                          undefined,
-                          { month: 'short', day: 'numeric' },
-                        )
-                      : '—';
-                    return (
-                      <tr
-                        key={deal.id}
-                        className={cn(
-                          'group transition-colors duration-150 cursor-pointer hover:bg-foreground/[0.04]',
-                          isSelected && 'bg-foreground/[0.045]',
-                        )}
-                        onClick={() => setPanelDealId(deal.id)}
-                      >
-                        <td className="px-3 py-3 w-10">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => { e.stopPropagation(); toggleDealSelect(deal.id); }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-3.5 w-3.5 rounded border-border cursor-pointer accent-foreground"
-                            aria-label={`Select ${deal.title}`}
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="text-sm font-medium text-foreground truncate">{deal.title}</p>
-                          {deal.address && (
-                            <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
-                              <MapPin size={10} />
-                              {deal.address}
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 hidden sm:table-cell">
-                          {stage && (
-                            <span className="text-xs text-muted-foreground">
-                              {stage.name}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 hidden md:table-cell text-sm tabular-nums text-foreground text-right">
-                          {deal.value != null ? formatCurrency(deal.value) : '—'}
-                        </td>
-                        <td className="px-4 py-3 hidden md:table-cell text-xs tabular-nums text-muted-foreground">
-                          {closeLabel}
-                        </td>
-                        <td className="px-4 py-3 hidden lg:table-cell text-xs tabular-nums text-muted-foreground">
-                          {lastActivity}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); handleDuplicateDeal(deal); }}
-                              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground transition-colors"
-                              title="Duplicate"
-                            >
-                              <Copy size={13} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); handleDeleteDeal(deal.id); }}
-                              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                            <ArrowRight
-                              size={13}
-                              className="ml-1 text-muted-foreground/50"
-                              strokeWidth={1.75}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
       {ConfirmDialog}
-
-      {/* Bulk move to stage dialog */}
-      <Dialog open={bulkStagePicker} onOpenChange={(open) => { if (!open && !bulkPending) setBulkStagePicker(false); }}>
-        <DialogContent className="sm:max-w-sm" onPointerDownOutside={(e) => { if (bulkPending) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (bulkPending) e.preventDefault(); }}>
-          <DialogHeader>
-            <DialogTitle>Move {selectedDealIds.size} deal{selectedDealIds.size === 1 ? '' : 's'} to stage</DialogTitle>
-            <DialogDescription>Select the stage to move the selected deals into.</DialogDescription>
-          </DialogHeader>
-          <Select value={bulkStageTarget} onValueChange={setBulkStageTarget} disabled={bulkPending}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a stage" />
-            </SelectTrigger>
-            <SelectContent>
-              {stages.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
-                    {s.name}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setBulkStagePicker(false)} disabled={bulkPending}>Cancel</Button>
-            <Button onClick={bulkMoveToStage} disabled={!bulkStageTarget || bulkPending}>
-              {bulkPending ? 'Moving…' : 'Move deals'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Won / Lost reason dialog */}
       {wonLostDialog && (() => {
