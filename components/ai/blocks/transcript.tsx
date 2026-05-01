@@ -6,6 +6,7 @@ import { TextBlockView } from './text-block-view';
 import { ToolCallBlockView } from './tool-call-block-view';
 import { PermissionBlockView } from './permission-block-view';
 import { PermissionPromptView, type PermissionPromptData } from './permission-prompt-view';
+import { ApprovalCelebration, type ApprovalKind } from '@/components/chippi/approval-celebration';
 
 interface TranscriptProps {
   blocks: MessageBlock[];
@@ -35,6 +36,18 @@ interface TranscriptProps {
     onAlwaysAllow?: (requestId: string, editedArgs?: Record<string, unknown>) => Promise<void>;
     busy?: boolean;
   };
+  /**
+   * When present, the surface the approval prompt occupied is replaced by
+   * one calm Chippi-voiced sentence for ~2.5s. The parent owns the dwell —
+   * the celebration calls `onDone` when its time is up so the parent can
+   * clear this state and let the next streamed blocks (or whatever's next)
+   * take the floor.
+   */
+  approvalCelebration?: {
+    kind: ApprovalKind;
+    subject?: string;
+    onDone: () => void;
+  };
   className?: string;
 }
 
@@ -50,6 +63,7 @@ export function Transcript({
   streaming,
   liveCallIds,
   pendingApproval,
+  approvalCelebration,
   className,
 }: TranscriptProps) {
   // Find the last text block so we can scope the streaming caret to it.
@@ -89,14 +103,26 @@ export function Transcript({
         }
       })}
 
-      {pendingApproval && (
-        <PermissionPromptView
-          prompt={pendingApproval.prompt}
-          onApprove={pendingApproval.onApprove}
-          onDeny={pendingApproval.onDeny}
-          onAlwaysAllow={pendingApproval.onAlwaysAllow}
-          busy={pendingApproval.busy}
+      {/* Celebration takes precedence over the approval prompt — the moment
+          the realtor approves a celebrate-able tool, the parent flips
+          `approvalCelebration` and the prompt is swapped for the win line on
+          the same surface. */}
+      {approvalCelebration ? (
+        <ApprovalCelebration
+          kind={approvalCelebration.kind}
+          subject={approvalCelebration.subject}
+          onDone={approvalCelebration.onDone}
         />
+      ) : (
+        pendingApproval && (
+          <PermissionPromptView
+            prompt={pendingApproval.prompt}
+            onApprove={pendingApproval.onApprove}
+            onDeny={pendingApproval.onDeny}
+            onAlwaysAllow={pendingApproval.onAlwaysAllow}
+            busy={pendingApproval.busy}
+          />
+        )
       )}
     </div>
   );

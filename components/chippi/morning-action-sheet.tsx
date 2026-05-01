@@ -13,11 +13,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import type { MorningActionContext, MorningActionIntent } from './morning-actions';
+import { ApprovalCelebration, type ApprovalKind } from './approval-celebration';
 
 interface DraftPreview {
   channel: 'email' | 'sms' | 'note';
@@ -26,7 +27,7 @@ interface DraftPreview {
   contactName?: string;
 }
 
-type Phase = 'loading' | 'preview' | 'error' | 'sending';
+type Phase = 'loading' | 'preview' | 'error' | 'sending' | 'celebrating';
 
 interface Props {
   slug: string;
@@ -42,6 +43,7 @@ export function MorningActionSheet({ slug, intent, context, onSent, onCancel }: 
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>('loading');
   const [draft, setDraft] = useState<DraftPreview | null>(null);
+  const [celebrationKind, setCelebrationKind] = useState<ApprovalKind | null>(null);
 
   // Fetch the draft on mount. Each mount = one fresh compose; closing and
   // reopening the panel re-drafts (the realtor can re-roll by re-tapping).
@@ -102,16 +104,20 @@ export function MorningActionSheet({ slug, intent, context, onSent, onCancel }: 
         deliveryResult?: { sent: boolean; error?: string };
       };
       const name = data.contactName ?? context.label;
-      if (data.deliveryResult?.sent) {
-        toast.success(`Sent to ${name}.`);
-      } else if (data.deliveryResult?.error === 'not_configured') {
-        toast.success('Saved. Add an integration and I can auto-send next time.');
-      } else if (draft.channel === 'note') {
-        toast.success('Logged.');
-      } else {
-        toast.success('Approved.');
+      // The "not_configured" path is a half-win — the realtor's intent was
+      // sound but delivery isn't wired; the toast nudges them at integrations
+      // instead of pretending the message went out. The other paths swap the
+      // sheet for the inline celebration; the parent collapses only after
+      // the dwell so the moment lands on the same surface that fired it.
+      if (data.deliveryResult?.error === 'not_configured') {
+        toast.success(`Saved for ${name}. Add an integration and I can auto-send next time.`);
+        onSent();
+        return;
       }
-      onSent();
+      const kind: ApprovalKind =
+        draft.channel === 'note' ? 'note' : draft.channel === 'email' ? 'email' : 'sms';
+      setCelebrationKind(kind);
+      setPhase('celebrating');
     } catch {
       toast.error('I lost the connection. Try again.');
       setPhase('preview');
@@ -247,6 +253,19 @@ export function MorningActionSheet({ slug, intent, context, onSent, onCancel }: 
           </div>
         </div>
       )}
+
+      {/* The win moment — the same surface that fired the send transforms in
+          place into one calm sentence in Chippi's voice. The component owns
+          the dwell + dissolve and tells us when to collapse the parent. */}
+      <AnimatePresence>
+        {phase === 'celebrating' && celebrationKind && (
+          <ApprovalCelebration
+            key="celebration"
+            kind={celebrationKind}
+            onDone={onSent}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

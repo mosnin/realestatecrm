@@ -20,6 +20,7 @@ import { TodayFeed } from './today-feed';
 import { MorningStory } from './morning-story';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { toast } from 'sonner';
+import { approvalKindForTool, approvalSubjectFromArgs, type ApprovalKind } from './approval-celebration';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -80,6 +81,14 @@ export function ChippiWorkspace({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  // The single sentence the realtor sees when they approve a celebrate-able
+  // tool from the chat permission prompt. Set the moment the wrapped
+  // approve/alwaysAllow callback fires; cleared by the celebration's own
+  // onDone after the dwell. Anchored to the assistant message id whose
+  // permission prompt was approved so a later turn's prompt can't inherit it.
+  const [chatCelebration, setChatCelebration] = useState<
+    { messageId: string; kind: ApprovalKind; subject?: string } | null
+  >(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -116,6 +125,38 @@ export function ChippiWorkspace({
       );
     },
   });
+
+  // Wrap approve / alwaysAllow so the moment the realtor approves a
+  // celebrate-able tool, the prompt's surface flips into the win sentence.
+  // The wrapped callbacks fire-and-forget the underlying action (the hook
+  // already kicks off the continuation stream synchronously) and stamp
+  // `chatCelebration` with the *current* tail assistant message id so the
+  // line lands on the same bubble that asked for approval.
+  function celebrateThen<
+    F extends (requestId: string, editedArgs?: Record<string, unknown>) => Promise<void>,
+  >(fn: F): F {
+    return ((requestId, editedArgs) => {
+      // Snapshot before the hook clears pendingApproval.
+      const prompt = pendingApproval;
+      if (prompt) {
+        const kind = approvalKindForTool(prompt.name);
+        if (kind) {
+          // Find the assistant message the prompt sits under — it's the tail.
+          const tail = [...messages].reverse().find((m) => m.role === 'assistant');
+          if (tail) {
+            setChatCelebration({
+              messageId: tail.id,
+              kind,
+              subject: approvalSubjectFromArgs(prompt.name, prompt.args),
+            });
+          }
+        }
+      }
+      return fn(requestId, editedArgs);
+    }) as F;
+  }
+  const approveCelebrating = celebrateThen(approve);
+  const alwaysAllowCelebrating = celebrateThen(alwaysAllow);
 
   // Hydrate the transcript from initial server data on first render.
   const hydratedRef = useRef(false);
@@ -620,10 +661,19 @@ export function ChippiWorkspace({
                                 isTail && pendingApproval && !isStreaming
                                   ? {
                                       prompt: pendingApproval,
-                                      onApprove: approve,
+                                      onApprove: approveCelebrating,
                                       onDeny: deny,
-                                      onAlwaysAllow: alwaysAllow,
+                                      onAlwaysAllow: alwaysAllowCelebrating,
                                       busy: isStreaming,
+                                    }
+                                  : undefined
+                              }
+                              approvalCelebration={
+                                chatCelebration && chatCelebration.messageId === msg.id
+                                  ? {
+                                      kind: chatCelebration.kind,
+                                      subject: chatCelebration.subject,
+                                      onDone: () => setChatCelebration(null),
                                     }
                                   : undefined
                               }
