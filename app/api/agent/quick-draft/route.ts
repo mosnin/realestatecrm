@@ -165,70 +165,54 @@ export async function POST(req: NextRequest) {
 
   const mode = body.mode ?? 'preview';
 
-  // ── Resolve subject (deal title / contact name) + the contactId we'll
-  //    eventually attach the draft to. Deals carry a primary contact in
-  //    `contactId`; person-doorways are the contact themselves.
-  let subjectLabel = body.context === 'deal' ? 'this deal' : 'them';
+  // ── Resolve subject via the shared enrichContext helper. Phase 13:
+  //    one query path, one shape — the same SUBJECT CONTEXT the agent loop
+  //    sees. We also need contactId/dealId for the SEND branch, which the
+  //    helper doesn't expose, so we keep one targeted lookup for the IDs.
+  const enriched: EnrichedContext | null = await enrichContext(
+    { kind: body.context, id: body.id },
+    space.id,
+  );
+  if (!enriched) {
+    return NextResponse.json(
+      { error: body.context === 'deal' ? 'Deal not found' : 'Contact not found' },
+      { status: 404 },
+    );
+  }
+
   let contactId: string | null = null;
   let dealId: string | null = null;
-  let lastTouchAt: Date | null = null;
 
   if (body.context === 'deal') {
     const { data: deal } = await supabase
       .from('Deal')
-      .select('id, title, contactId, updatedAt')
+      .select('id, contactId')
       .eq('id', body.id)
       .eq('spaceId', space.id)
       .maybeSingle();
     if (!deal) return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
-    subjectLabel = (deal as { title?: string }).title ?? 'this deal';
     dealId = (deal as { id: string }).id;
     contactId = ((deal as { contactId?: string | null }).contactId) ?? null;
-    const upd = (deal as { updatedAt?: string }).updatedAt;
-    if (upd) lastTouchAt = new Date(upd);
   } else {
-    const { data: contact } = await supabase
-      .from('Contact')
-      .select('id, name, lastContactedAt')
-      .eq('id', body.id)
-      .eq('spaceId', space.id)
-      .maybeSingle();
-    if (!contact) return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
-    subjectLabel = (contact as { name?: string }).name ?? 'them';
-    contactId = (contact as { id: string }).id;
-    const last = (contact as { lastContactedAt?: string | null }).lastContactedAt;
-    if (last) lastTouchAt = new Date(last);
+    contactId = body.id;
   }
+
+  const subjectLabel = enriched.subjectLabel;
 
   // ── PREVIEW ──────────────────────────────────────────────────────────────
   if (mode === 'preview') {
     const channel = channelForIntent(body.intent);
 
-    // Recent activity — short slice keeps the prompt tight. Filter by
-    // contactId when we have one; otherwise no activity is fine.
-    let recent: string[] = [];
-    if (contactId) {
-      const { data: acts } = await supabase
-        .from('ContactActivity')
-        .select('type, content, createdAt')
-        .eq('contactId', contactId)
-        .eq('spaceId', space.id)
-        .order('createdAt', { ascending: false })
-        .limit(6);
-      recent = ((acts ?? []) as Array<{ type: string; content: string | null; createdAt: string }>)
-        .map((a) => `${a.type}: ${(a.content ?? '').slice(0, 140)}`);
-    }
-
-    const daysQuiet = lastTouchAt
-      ? Math.max(0, Math.floor((Date.now() - lastTouchAt.getTime()) / (1000 * 60 * 60 * 24)))
-      : null;
-
     const composed = await composeDraftWithOpenAI({
       intent: body.intent,
       channel,
       subjectLabel,
-      recentActivity: recent,
-      daysQuiet,
+      recentActivity: enriched.lastActivities,
+      daysQuiet: enriched.daysSinceLastTouch,
+      stage: enriched.stage,
+      status: enriched.status,
+      scoreLabel: enriched.scoreLabel,
+      leadScore: enriched.leadScore,
     });
 
     if (!composed) {
