@@ -109,6 +109,8 @@ describe('continueTurn — denial', () => {
         description: 'send',
         parameters: z.object({ to: z.string() }),
         requiresApproval: true,
+        summariseCall: () => 'test mutator',
+        rateLimit: { max: 999, windowSeconds: 3600 },
         handler: sendSpy,
       }) as ToolDefinition,
     ];
@@ -169,6 +171,8 @@ describe('continueTurn — approval', () => {
         description: 'send',
         parameters: z.object({ to: z.string() }),
         requiresApproval: true,
+        summariseCall: () => 'test mutator',
+        rateLimit: { max: 999, windowSeconds: 3600 },
         handler: sendSpy,
       }) as ToolDefinition,
     ];
@@ -223,6 +227,8 @@ describe('continueTurn — approval', () => {
         description: 'send',
         parameters: z.object({ to: z.string() }),
         requiresApproval: true,
+        summariseCall: () => 'test mutator',
+        rateLimit: { max: 999, windowSeconds: 3600 },
         handler: sendSpy,
       }) as ToolDefinition,
     ];
@@ -269,6 +275,8 @@ describe('continueTurn — approval', () => {
         description: 'send',
         parameters: z.object({ to: z.string() }),
         requiresApproval: true,
+        summariseCall: () => 'test mutator',
+        rateLimit: { max: 999, windowSeconds: 3600 },
         handler: sendSpy,
       }) as ToolDefinition,
     ];

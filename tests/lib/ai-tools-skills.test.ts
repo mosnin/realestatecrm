@@ -101,6 +101,8 @@ describe('validateSkill', () => {
       description: 'mutation',
       parameters: z.object({}),
       requiresApproval: true,
+        summariseCall: () => 'test mutator',
+        rateLimit: { max: 999, windowSeconds: 3600 },
       handler: async () => ({ summary: '' }),
     });
     expect(() =>
@@ -333,6 +335,8 @@ describe('runSubAgent', () => {
       description: 't',
       parameters: z.object({}),
       requiresApproval: true,
+        summariseCall: () => 'test mutator',
+        rateLimit: { max: 999, windowSeconds: 3600 },
       handler: async () => ({ summary: '' }),
     });
     currentTools = [nowMutating as ToolDefinition];

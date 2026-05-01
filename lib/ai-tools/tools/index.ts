@@ -2,6 +2,29 @@
  * All tools known to the registry. New tools get appended here when they
  * ship. The list is grouped by category and within each category by
  * read-only first, then mutating (approval-gated) — keep that order.
+ *
+ * ─── Important: dual-runtime split ────────────────────────────────────────
+ *
+ * These TypeScript tools run in the Next.js loop (`lib/ai-tools/loop.ts`)
+ * — the deprecated approval-resume path and the in-process sub-agent
+ * skills. **The realtor's chat agent runs in Modal/Python** and has its
+ * OWN tool catalog at `agent/tools/*.py`.
+ *
+ * Adding a tool here does NOT add it to the chat the realtor uses. The
+ * two lists are hand-maintained today. If you need a new verb available
+ * to the chat agent, you also need a Python equivalent in `agent/tools/`.
+ *
+ * The right fix is to consolidate runtimes (one source of truth) or
+ * generate the Python catalog from this list at deploy time. Until that
+ * lands, this comment exists to keep us honest about the gap.
+ *
+ * ─── Contract ─────────────────────────────────────────────────────────────
+ *
+ * Every tool is enforced at compile time via the discriminated union in
+ * `lib/ai-tools/types.ts`: mutating tools must have `summariseCall` and
+ * `rateLimit`. Drift the types can't catch (snake_case names, uniqueness,
+ * description shape) is enforced by `tests/lib/ai-tools-registry-contract.test.ts`,
+ * which walks this list at test time. The test is the spec.
  */
 
 import type { ToolDefinition } from '../types';

@@ -241,6 +241,8 @@ describe('runTurn — tool execution failures surface to the model', () => {
           subject: z.string().optional(),
         }),
         requiresApproval: true,
+        summariseCall: (args) => `Email ${args.to ?? 'unknown'}`,
+        rateLimit: { max: 999, windowSeconds: 3600 },
         handler,
       }) as ToolDefinition,
     ];
@@ -304,6 +306,8 @@ describe('runTurn — tool execution failures surface to the model', () => {
         description: 'mutating send',
         parameters: z.object({ to: z.string() }),
         requiresApproval: true,
+        summariseCall: () => 'test mutator',
+        rateLimit: { max: 999, windowSeconds: 3600 },
         handler: sendHandler,
       }) as ToolDefinition,
     ];
