@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { composeMorningStory } from '@/lib/morning-story';
+import { composeMorningStory, countMorningCandidates } from '@/lib/morning-story';
 import type { MorningSummary } from '@/app/api/agent/morning/route';
 
 const empty: MorningSummary = {
@@ -392,5 +392,187 @@ describe('composeMorningStory', () => {
   it('ignores the agent sentence on the all-clear branch', () => {
     const out = composeMorningStory(empty, 'Nothing to worry about today.');
     expect(out.text).toBe("All clear. I'll surface anything that needs you.");
+  });
+
+  // ── Skip / cycle: the "Next" pill on the home ────────────────────────────
+  // With 47 hot leads the realtor sees the same face every morning until they
+  // touch it — the single decision becomes nagging. The home cycles through
+  // named subjects in priority order. skip=0 is unchanged default behavior;
+  // skip=1 picks the second candidate; skip>=N falls through to the count
+  // tail. Default callers (no opts) get exactly today's behavior.
+
+  it('skip=0 (default unchanged) picks the top of the ladder', () => {
+    const all: MorningSummary = {
+      ...empty,
+      ...stuck('Chen', 14),
+      ...overdue('Sarah', 4),
+      ...hotPerson('Maya'),
+      ...newPerson('David'),
+    };
+    const a = composeMorningStory(all);
+    const b = composeMorningStory(all, null, { skip: 0 });
+    expect(a).toEqual(b);
+    expect(a.doorway).toEqual({ kind: 'deal', id: 'deal_42' });
+  });
+
+  it('skip=1 picks the second candidate (overdue, when stuck is at 0)', () => {
+    const all: MorningSummary = {
+      ...empty,
+      ...stuck('Chen', 14),
+      ...overdue('Sarah', 4),
+      ...hotPerson('Maya'),
+      ...newPerson('David'),
+    };
+    const out = composeMorningStory(all, null, { skip: 1 });
+    expect(out.text).toBe("Sarah's follow-up is 4 days overdue.");
+    expect(out.doorway).toEqual({ kind: 'person', id: 'contact_7' });
+  });
+
+  it('skip=2 picks the hot person when stuck + overdue + hot + new are all present', () => {
+    const all: MorningSummary = {
+      ...empty,
+      ...stuck('Chen', 14),
+      ...overdue('Sarah', 4),
+      ...hotPerson('Maya'),
+      ...newPerson('David'),
+    };
+    const out = composeMorningStory(all, null, { skip: 2 });
+    expect(out.text).toBe("Maya's score is hot. Reach out.");
+    expect(out.doorway).toEqual({ kind: 'person', id: 'contact_hot' });
+  });
+
+  it('skip=3 picks the new person when all four candidates are present', () => {
+    const all: MorningSummary = {
+      ...empty,
+      ...stuck('Chen', 14),
+      ...overdue('Sarah', 4),
+      ...hotPerson('Maya'),
+      ...newPerson('David'),
+    };
+    const out = composeMorningStory(all, null, { skip: 3 });
+    expect(out.text).toBe('David just applied. Welcome them.');
+    expect(out.doorway).toEqual({ kind: 'person', id: 'contact_new' });
+  });
+
+  it('skip indexes only the present candidates (no gaps)', () => {
+    // Only stuck + new present: skip=1 should land on new, not silently fall
+    // through past empty hot/overdue tiers.
+    const summary: MorningSummary = {
+      ...empty,
+      ...stuck('Chen', 14),
+      ...newPerson('David'),
+    };
+    const out = composeMorningStory(summary, null, { skip: 1 });
+    expect(out.text).toBe('David just applied. Welcome them.');
+    expect(out.doorway).toEqual({ kind: 'person', id: 'contact_new' });
+  });
+
+  it('skip >= candidates.length falls through to drafts/questions tail', () => {
+    const summary: MorningSummary = {
+      ...empty,
+      ...stuck('Chen', 14),
+      ...overdue('Sarah', 4),
+      draftsCount: 3,
+    };
+    // 2 named candidates: stuck, overdue. skip=2 falls through.
+    const out = composeMorningStory(summary, null, { skip: 2 });
+    expect(out.text).toBe('3 drafts waiting for you.');
+    expect(out.doorway).toBeNull();
+  });
+
+  it('skip >= candidates.length falls through to closing-this-week when no drafts', () => {
+    const summary: MorningSummary = {
+      ...empty,
+      ...hotPerson('Maya'),
+      closingThisWeekCount: 2,
+    };
+    const out = composeMorningStory(summary, null, { skip: 5 });
+    expect(out.text).toBe('2 deals closing this week. Keep them on track.');
+    expect(out.doorway).toBeNull();
+  });
+
+  it('skip >= candidates.length falls through to all-clear when nothing else', () => {
+    const summary: MorningSummary = {
+      ...empty,
+      ...hotPerson('Maya'),
+    };
+    const out = composeMorningStory(summary, null, { skip: 1 });
+    expect(out.text).toBe("All clear. I'll surface anything that needs you.");
+    expect(out.doorway).toBeNull();
+  });
+
+  it('skip with no candidates at all goes straight to the count tail', () => {
+    const out = composeMorningStory({ ...empty, draftsCount: 1 }, null, { skip: 0 });
+    expect(out.text).toBe('1 draft waiting for you.');
+  });
+
+  it('agent sentence override applies only at skip=0; cycling reverts to deterministic copy', () => {
+    // The agent composes a sentence for the *top* subject. When the realtor
+    // taps Next, the subject changes — the model's line for the original
+    // subject would be wrong. Fall back to the deterministic copy.
+    const summary: MorningSummary = {
+      ...empty,
+      ...stuck('Chen', 14),
+      ...overdue('Sarah', 4),
+    };
+    const top = composeMorningStory(summary, "Chen's been parked — nudge it.", { skip: 0 });
+    expect(top.text).toBe("Chen's been parked — nudge it.");
+
+    const next = composeMorningStory(summary, "Chen's been parked — nudge it.", { skip: 1 });
+    expect(next.text).toBe("Sarah's follow-up is 4 days overdue.");
+    expect(next.doorway).toEqual({ kind: 'person', id: 'contact_7' });
+  });
+
+  it('negative or fractional skip is treated as 0', () => {
+    const summary: MorningSummary = { ...empty, ...stuck('Chen', 14) };
+    expect(composeMorningStory(summary, null, { skip: -3 }).text).toBe(
+      "The Chen deal hasn't moved in 14 days.",
+    );
+    expect(composeMorningStory(summary, null, { skip: 0.7 }).text).toBe(
+      "The Chen deal hasn't moved in 14 days.",
+    );
+  });
+});
+
+describe('countMorningCandidates', () => {
+  it('returns 0 when no named subjects are present', () => {
+    expect(countMorningCandidates(empty)).toBe(0);
+    expect(countMorningCandidates({ ...empty, draftsCount: 5 })).toBe(0);
+    expect(countMorningCandidates({ ...empty, closingThisWeekCount: 2 })).toBe(0);
+  });
+
+  it('counts each named subject (stuck/overdue/hot/new) independently', () => {
+    expect(countMorningCandidates({ ...empty, ...stuck('Chen', 14) })).toBe(1);
+    expect(countMorningCandidates({
+      ...empty,
+      ...stuck('Chen', 14),
+      ...overdue('Sarah', 4),
+    })).toBe(2);
+    expect(countMorningCandidates({
+      ...empty,
+      ...stuck('Chen', 14),
+      ...overdue('Sarah', 4),
+      ...hotPerson('Maya'),
+    })).toBe(3);
+    expect(countMorningCandidates({
+      ...empty,
+      ...stuck('Chen', 14),
+      ...overdue('Sarah', 4),
+      ...hotPerson('Maya'),
+      ...newPerson('David'),
+    })).toBe(4);
+  });
+
+  it('caps at 4 — that is the entire ladder', () => {
+    // The route only carries one of each (topStuckDeal, topOverdue,
+    // topHot, topNew). Four is the ceiling. v1 cycles between those.
+    const all: MorningSummary = {
+      ...empty,
+      ...stuck('Chen', 14),
+      ...overdue('Sarah', 4),
+      ...hotPerson('Maya'),
+      ...newPerson('David'),
+    };
+    expect(countMorningCandidates(all)).toBe(4);
   });
 });

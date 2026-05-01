@@ -35,6 +35,61 @@ function isCleanDealTitle(title: string): boolean {
 }
 
 /**
+ * Internal: build the ordered list of named-subject candidates from the
+ * summary. The "Next" pill on the home cycles through these — they're the
+ * tiers that name a person or deal. Count-only tiers (drafts, closing,
+ * all-clear) live in the tail and aren't cycled — there's no subject to
+ * cycle to.
+ *
+ * Order matches the priority ladder: stuck > overdue > hot > new.
+ */
+type NamedCandidate = { text: string; doorway: MorningDoorway };
+
+function namedCandidates(s: MorningSummary): NamedCandidate[] {
+  const out: NamedCandidate[] = [];
+
+  if (s.topStuckDeal) {
+    const { title, daysStuck, id } = s.topStuckDeal;
+    const subject = isCleanDealTitle(title) ? `The ${title} deal` : 'A deal';
+    const text = daysStuck > 0
+      ? `${subject} hasn't moved in ${daysStuck} day${daysStuck === 1 ? '' : 's'}.`
+      : `${subject} is stuck.`;
+    out.push({ text, doorway: { kind: 'deal', id } });
+  }
+
+  if (s.topOverdueFollowUp) {
+    const { name, daysOverdue, id } = s.topOverdueFollowUp;
+    const text = daysOverdue === 0
+      ? `${name}'s follow-up is due today.`
+      : daysOverdue === 1
+        ? `${name}'s follow-up is 1 day overdue.`
+        : `${name}'s follow-up is ${daysOverdue} days overdue.`;
+    out.push({ text, doorway: { kind: 'person', id } });
+  }
+
+  if (s.topHotPerson) {
+    const { name, id } = s.topHotPerson;
+    out.push({ text: `${name}'s score is hot. Reach out.`, doorway: { kind: 'person', id } });
+  }
+
+  if (s.topNewPerson) {
+    const { name, id } = s.topNewPerson;
+    out.push({ text: `${name} just applied. Welcome them.`, doorway: { kind: 'person', id } });
+  }
+
+  return out;
+}
+
+/**
+ * How many named subjects this summary can speak to. The home uses this to
+ * decide whether the "Next" pill should render at all — pill is invisible
+ * unless there's actually a next subject to cycle to.
+ */
+export function countMorningCandidates(s: MorningSummary): number {
+  return namedCandidates(s).length;
+}
+
+/**
  * Compose one sentence from the summary. Priority order:
  *   1. Stuck deal — name the longest-stuck one.
  *   2. Overdue follow-up — name the most-overdue person.
@@ -59,51 +114,38 @@ function isCleanDealTitle(title: string): boolean {
  * deterministically from the summary's named subjects — we don't trust the
  * model with navigation. Empty/whitespace strings are ignored (treated as
  * "agent didn't produce anything").
+ *
+ * `opts.skip` (default 0): with 47 hot leads, the realtor would see the same
+ * face every morning until they touch it — the single decision becomes
+ * nagging. The home renders a "Next" pill that increments skip in-memory so
+ * the realtor can cycle to the next-best subject in one tap. skip=0 picks
+ * the top of the ladder (default behavior — non-interactive callers stay
+ * unchanged). skip=1 picks the second-highest named subject. When skip
+ * exceeds the available named candidates we fall through to the count-only
+ * tail tiers (drafts/closing/all-clear), which have no subject to cycle.
  */
 export function composeMorningStory(
   s: MorningSummary,
   agentSentence?: string | null,
+  opts?: { skip?: number },
 ): MorningStoryOutput {
   const override =
     typeof agentSentence === 'string' && agentSentence.trim().length > 0
       ? agentSentence.trim()
       : null;
 
-  if (s.topStuckDeal) {
-    const { title, daysStuck, id } = s.topStuckDeal;
-    const subject = isCleanDealTitle(title) ? `The ${title} deal` : 'A deal';
-    const text = override
-      ?? (daysStuck > 0
-        ? `${subject} hasn't moved in ${daysStuck} day${daysStuck === 1 ? '' : 's'}.`
-        : `${subject} is stuck.`);
-    return { text, doorway: { kind: 'deal', id } };
-  }
+  const skip = Math.max(0, Math.floor(opts?.skip ?? 0));
+  const candidates = namedCandidates(s);
 
-  if (s.topOverdueFollowUp) {
-    const { name, daysOverdue, id } = s.topOverdueFollowUp;
-    const text = override
-      ?? (daysOverdue === 0
-        ? `${name}'s follow-up is due today.`
-        : daysOverdue === 1
-          ? `${name}'s follow-up is 1 day overdue.`
-          : `${name}'s follow-up is ${daysOverdue} days overdue.`);
-    return { text, doorway: { kind: 'person', id } };
-  }
-
-  if (s.topHotPerson) {
-    const { name, id } = s.topHotPerson;
-    return {
-      text: override ?? `${name}'s score is hot. Reach out.`,
-      doorway: { kind: 'person', id },
-    };
-  }
-
-  if (s.topNewPerson) {
-    const { name, id } = s.topNewPerson;
-    return {
-      text: override ?? `${name} just applied. Welcome them.`,
-      doorway: { kind: 'person', id },
-    };
+  // skip=0 is the unchanged default. The agent sentence override only applies
+  // to the head of the ladder — it was composed for that specific subject.
+  // Cycling past skip=0 means we're showing a different subject; the model's
+  // line for the original subject would be wrong, so fall back to the
+  // deterministic copy.
+  if (skip < candidates.length) {
+    const pick = candidates[skip]!;
+    const text = skip === 0 && override ? override : pick.text;
+    return { text, doorway: pick.doorway };
   }
 
   // Drafts + questions live in the FocusCard right below — sentence names

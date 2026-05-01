@@ -97,4 +97,65 @@ describe('buildMorningActions', () => {
     if (checkin.kind !== 'compose') throw new Error('expected compose');
     expect(checkin.context.label).toBe('them');
   });
+
+  // ── Tier-agnostic doorway resolution ────────────────────────────────────
+  // The "Next" pill on the home cycles the doorway through the named-subject
+  // ladder. The actions panel must label whichever subject the doorway lands
+  // on — not assume the highest-priority tier wins. Otherwise cycling to
+  // "Maya (hot)" while Sarah (overdue) is also present would label the panel
+  // with Sarah's name.
+
+  it('labels the hot person when the doorway lands on the hot id, even if overdue is present', () => {
+    const summary: MorningSummary = {
+      ...empty,
+      overdueFollowUpsCount: 1,
+      topOverdueFollowUp: { id: 'p_sarah', name: 'Sarah', daysOverdue: 4 },
+      hotPeopleCount: 1,
+      topHotPerson: { id: 'p_maya', name: 'Maya' },
+    };
+    const doorway: MorningDoorway = { kind: 'person', id: 'p_maya' };
+    const actions = buildMorningActions(doorway, summary, 'demo');
+    const checkin = actions[0]!;
+    if (checkin.kind !== 'compose') throw new Error('expected compose');
+    expect(checkin.context.label).toBe('Maya');
+    expect(checkin.intent).toBe('reach-out');
+    const open = actions[1]!;
+    if (open.kind !== 'navigate') throw new Error('expected navigate');
+    expect(open.href).toBe('/s/demo/contacts/p_maya');
+  });
+
+  it('labels the new person when the doorway lands on the new id, even with hot present', () => {
+    const summary: MorningSummary = {
+      ...empty,
+      hotPeopleCount: 1,
+      topHotPerson: { id: 'p_maya', name: 'Maya' },
+      newPeopleCount: 1,
+      topNewPerson: { id: 'p_david', name: 'David' },
+    };
+    const doorway: MorningDoorway = { kind: 'person', id: 'p_david' };
+    const actions = buildMorningActions(doorway, summary, 'demo');
+    const checkin = actions[0]!;
+    if (checkin.kind !== 'compose') throw new Error('expected compose');
+    expect(checkin.context.label).toBe('David');
+    // 'welcome' only when the doorway specifically lands on the new arrival.
+    expect(checkin.intent).toBe('welcome');
+  });
+
+  it('labels the overdue person when the doorway lands on the overdue id with all tiers present', () => {
+    const summary: MorningSummary = {
+      ...empty,
+      overdueFollowUpsCount: 1,
+      topOverdueFollowUp: { id: 'p_sarah', name: 'Sarah', daysOverdue: 4 },
+      hotPeopleCount: 1,
+      topHotPerson: { id: 'p_maya', name: 'Maya' },
+      newPeopleCount: 1,
+      topNewPerson: { id: 'p_david', name: 'David' },
+    };
+    const doorway: MorningDoorway = { kind: 'person', id: 'p_sarah' };
+    const actions = buildMorningActions(doorway, summary, 'demo');
+    const checkin = actions[0]!;
+    if (checkin.kind !== 'compose') throw new Error('expected compose');
+    expect(checkin.context.label).toBe('Sarah');
+    expect(checkin.intent).toBe('reach-out');
+  });
 });

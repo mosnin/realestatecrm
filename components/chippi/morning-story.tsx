@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import type { MorningResponse, MorningSummary } from '@/app/api/agent/morning/route';
-import { composeMorningStory } from '@/lib/morning-story';
+import { composeMorningStory, countMorningCandidates } from '@/lib/morning-story';
 import { buildMorningActions, type MorningAction } from './morning-actions';
 import { MorningActionSheet } from './morning-action-sheet';
 
@@ -26,6 +26,12 @@ export function MorningStory({ slug }: Props) {
   const [open, setOpen] = useState(false);
   /** Which compose action is currently expanded into a draft sheet. */
   const [activeCompose, setActiveCompose] = useState<MorningAction | null>(null);
+  /**
+   * In-memory cycle index for the "Next" pill. Resets on page load — tomorrow
+   * morning is a new morning, no persistence. The pill increments this; the
+   * ladder picks the Nth named subject down.
+   */
+  const [skip, setSkip] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -88,9 +94,21 @@ export function MorningStory({ slug }: Props) {
     );
   }
 
-  const story = composeMorningStory(summary, agentSentence);
+  const candidateCount = countMorningCandidates(summary);
+  const effectiveSkip = Math.min(skip, Math.max(0, candidateCount - 1));
+  const story = composeMorningStory(summary, agentSentence, { skip: effectiveSkip });
   const actions = buildMorningActions(story.doorway, summary, slug);
   const isInteractive = actions.length > 0;
+  // Pill renders only when there's actually a next subject to cycle to. Once
+  // we've reached the last candidate, the pill disappears — no greyed-out,
+  // no "no more" copy, headline stays where it is.
+  const hasNext = candidateCount > effectiveSkip + 1;
+
+  function handleNext() {
+    setSkip((n) => n + 1);
+    setOpen(false);
+    setActiveCompose(null);
+  }
 
   function handleActionTap(a: MorningAction) {
     if (a.kind === 'compose') {
@@ -111,6 +129,29 @@ export function MorningStory({ slug }: Props) {
 
   return (
     <div ref={containerRef} className="relative">
+      {/*
+        "Next" pill — cycles to the next-best subject so a queue of 47 hot
+        leads doesn't show the same face every morning. Right-aligned,
+        tertiary text style (matches the kbd hints in the command palette).
+        Only renders when there's actually a next subject; once exhausted,
+        the pill disappears — no greyed-out, no "no more" copy. Resets on
+        page load, no persistence — tomorrow morning is a new morning.
+      */}
+      {hasNext && (
+        <button
+          type="button"
+          onClick={handleNext}
+          className={cn(
+            'absolute top-0 right-0 inline-flex items-center h-7 px-2 rounded-full',
+            'text-[11px] text-muted-foreground hover:text-foreground transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+          )}
+          aria-label="Show next subject"
+        >
+          Next →
+        </button>
+      )}
+
       {isInteractive ? (
         <motion.button
           type="button"
