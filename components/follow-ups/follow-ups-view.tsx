@@ -195,7 +195,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
           </div>
           <h2 className="text-lg font-semibold">You&apos;re caught up.</h2>
           <p className="text-sm text-muted-foreground">
-            Nothing to chase. Set a follow-up from a contact or deal and it&apos;ll land here.
+            Nothing to chase. Set a follow-up from a person or deal and it&apos;ll land here.
           </p>
         </div>
       </div>

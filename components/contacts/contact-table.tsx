@@ -431,8 +431,8 @@ export function ContactTable({ slug }: ContactTableProps) {
     if (hotCount > 0) {
       return {
         text: hotCount === 1
-          ? '1 hot lead waiting. Reach out.'
-          : `${hotCount} hot leads waiting. Reach out.`,
+          ? '1 person is hot. Reach out.'
+          : `${hotCount} people are hot. Reach out.`,
         action: 'sort-priority',
       };
     }

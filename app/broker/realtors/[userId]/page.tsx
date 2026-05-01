@@ -174,9 +174,9 @@ export default async function RealtorDrilldownPage({ params }: Params) {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
         {[
-          { label: 'Contacts', value: totalContacts, icon: Users },
-          { label: 'New leads', value: newLeads, icon: PhoneIncoming },
-          { label: 'Hot leads', value: hotLeads, icon: Flame },
+          { label: 'People', value: totalContacts, icon: Users },
+          { label: 'New people', value: newLeads, icon: PhoneIncoming },
+          { label: 'Hot people', value: hotLeads, icon: Flame },
           { label: 'Active deals', value: activeDeals, icon: Briefcase },
           { label: 'Pipeline', value: formatCompact(pipelineValue), icon: TrendingUp },
           { label: 'Won', value: `${wonDeals} (${formatCompact(wonValue)})`, icon: CheckCircle2 },

@@ -16,8 +16,8 @@ interface WeekData {
 type Metric = 'leads' | 'contacts' | 'deals' | 'dealValue';
 
 const METRIC_LABELS: Record<Metric, string> = {
-  leads: 'New Leads',
-  contacts: 'Contacts',
+  leads: 'New people',
+  contacts: 'Total people',
   deals: 'Deals',
   dealValue: 'Deal Value',
 };

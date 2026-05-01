@@ -901,7 +901,7 @@ export function KanbanBoard({ slug, pipelineId }: KanbanBoardProps) {
 
   // CSV export
   function exportCSV() {
-    const headers = ['Title', 'Stage', 'Status', 'Value', 'Commission Rate', 'Probability', 'Priority', 'Address', 'Contacts', 'Close Date', 'Follow Up', 'Created'];
+    const headers = ['Title', 'Stage', 'Status', 'Value', 'Commission Rate', 'Probability', 'Priority', 'Address', 'People', 'Close Date', 'Follow Up', 'Created'];
     const rows = allDeals.map((deal) => {
       const stage = stages.find((s) => s.id === deal.stageId);
       const contacts = deal.dealContacts.map((dc) => dc.contact.name).join('; ');
