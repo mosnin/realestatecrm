@@ -10,46 +10,148 @@ const empty: MorningSummary = {
   closingThisWeekCount: 0,
   draftsCount: 0,
   questionsCount: 0,
-  topPersonName: null,
-  topPersonId: null,
+  topStuckDeal: null,
+  topOverdueFollowUp: null,
+  topNewPerson: null,
+  topHotPerson: null,
 };
 
-const withTopPerson = {
-  topPersonName: 'David Chen',
-  topPersonId: 'contact_123',
-};
+const stuck = (title: string, daysStuck: number, count = 1) => ({
+  stuckDealsCount: count,
+  topStuckDeal: { id: 'deal_42', title, daysStuck },
+});
+
+const overdue = (name: string, daysOverdue: number, count = 1) => ({
+  overdueFollowUpsCount: count,
+  topOverdueFollowUp: { id: 'contact_7', name, daysOverdue },
+});
+
+const newPerson = (name: string, count = 1) => ({
+  newPeopleCount: count,
+  topNewPerson: { id: 'contact_new', name },
+});
+
+const hotPerson = (name: string, count = 1) => ({
+  hotPeopleCount: count,
+  topHotPerson: { id: 'contact_hot', name },
+});
 
 describe('composeMorningStory', () => {
-  // ── Priority order ────────────────────────────────────────────────────────
+  // ── Names over counts (the depth move) ──────────────────────────────────
+
+  it('names the longest-stuck deal, not just a count', () => {
+    const out = composeMorningStory({
+      ...empty,
+      ...stuck('Chen', 14),
+    });
+    expect(out.text).toBe("The Chen deal hasn't moved in 14 days.");
+    expect(out.doorway).toEqual({ kind: 'deal', id: 'deal_42' });
+  });
+
+  it('names the most-overdue follow-up by person', () => {
+    const out = composeMorningStory({
+      ...empty,
+      ...overdue('Sarah', 4),
+    });
+    expect(out.text).toBe("Sarah's follow-up is 4 days overdue.");
+    expect(out.doorway).toEqual({ kind: 'person', id: 'contact_7' });
+  });
+
+  it('names the most-recent new arrival', () => {
+    const out = composeMorningStory({
+      ...empty,
+      ...newPerson('David'),
+    });
+    expect(out.text).toBe('David just applied. Welcome them.');
+    expect(out.doorway).toEqual({ kind: 'person', id: 'contact_new' });
+  });
+
+  it('names the hottest unworked person', () => {
+    const out = composeMorningStory({
+      ...empty,
+      ...hotPerson('Maya'),
+    });
+    expect(out.text).toBe("Maya's looking hot. Reach out.");
+    expect(out.doorway).toEqual({ kind: 'person', id: 'contact_hot' });
+  });
+
+  // ── Singular vs plural day handling ─────────────────────────────────────
+
+  it('handles 1 day vs N days for stuck deals', () => {
+    expect(
+      composeMorningStory({ ...empty, ...stuck('Lee', 1) }).text,
+    ).toBe("The Lee deal hasn't moved in 1 day.");
+    expect(
+      composeMorningStory({ ...empty, ...stuck('Lee', 0) }).text,
+    ).toBe('The Lee deal is stuck.');
+  });
+
+  it('handles "due today" / "1 day overdue" / "N days overdue"', () => {
+    expect(
+      composeMorningStory({ ...empty, ...overdue('Sam', 0) }).text,
+    ).toBe("Sam's follow-up is due today.");
+    expect(
+      composeMorningStory({ ...empty, ...overdue('Sam', 1) }).text,
+    ).toBe("Sam's follow-up is 1 day overdue.");
+    expect(
+      composeMorningStory({ ...empty, ...overdue('Sam', 9) }).text,
+    ).toBe("Sam's follow-up is 9 days overdue.");
+  });
+
+  // ── Multiple-of-the-same-thing tail ─────────────────────────────────────
+
+  it('appends a quiet count when more of the same kind are pending', () => {
+    expect(
+      composeMorningStory({ ...empty, ...stuck('Chen', 14, 3) }).text,
+    ).toBe("The Chen deal hasn't moved in 14 days. (2 more stuck.)");
+    expect(
+      composeMorningStory({ ...empty, ...overdue('Sarah', 4, 5) }).text,
+    ).toBe("Sarah's follow-up is 4 days overdue. (4 more overdue.)");
+    expect(
+      composeMorningStory({ ...empty, ...newPerson('David', 2) }).text,
+    ).toBe('David just applied. Welcome them. (1 more new.)');
+    expect(
+      composeMorningStory({ ...empty, ...hotPerson('Maya', 3) }).text,
+    ).toBe("Maya's looking hot. Reach out. (2 more hot.)");
+  });
+
+  // ── Priority order ──────────────────────────────────────────────────────
 
   it('prefers stuck deals over everything else', () => {
     const out = composeMorningStory({
       ...empty,
-      stuckDealsCount: 1,
-      overdueFollowUpsCount: 5,
-      newPeopleCount: 3,
-      hotPeopleCount: 7,
+      ...stuck('Chen', 14),
+      ...overdue('Sarah', 4),
+      ...newPerson('David'),
+      ...hotPerson('Maya'),
+      draftsCount: 5,
     });
-    expect(out.text).toContain('1 deal is stuck');
+    expect(out.text).toContain('Chen');
+    expect(out.doorway?.kind).toBe('deal');
   });
 
   it('prefers overdue follow-ups when no deals are stuck', () => {
     const out = composeMorningStory({
       ...empty,
-      overdueFollowUpsCount: 2,
-      newPeopleCount: 1,
-      hotPeopleCount: 4,
+      ...overdue('Sarah', 4),
+      ...newPerson('David'),
     });
-    expect(out.text).toContain('2 follow-ups are overdue');
+    expect(out.text).toContain("Sarah's follow-up");
+    expect(out.doorway?.kind).toBe('person');
   });
 
-  it('falls through to drafts/questions when there are no people-side urgencies', () => {
-    const out = composeMorningStory({
-      ...empty,
-      draftsCount: 3,
-      questionsCount: 1,
-    });
-    expect(out.text).toBe('3 drafts · 1 question waiting for you.');
+  // ── Drafts/questions/closing/all-clear branches ─────────────────────────
+
+  it('falls through to drafts/questions when no people-side urgencies', () => {
+    expect(
+      composeMorningStory({ ...empty, draftsCount: 3, questionsCount: 1 }).text,
+    ).toBe('3 drafts · 1 question waiting for you.');
+  });
+
+  it('shows closing-this-week when nothing else is loud', () => {
+    expect(
+      composeMorningStory({ ...empty, closingThisWeekCount: 2 }).text,
+    ).toBe('2 deals closing this week. Keep them on track.');
   });
 
   it('lands on "all clear" when nothing is pressing', () => {
@@ -58,78 +160,15 @@ describe('composeMorningStory', () => {
     );
   });
 
-  // ── Composition ──────────────────────────────────────────────────────────
+  // ── Doorway integrity ───────────────────────────────────────────────────
 
-  it('composes stuck + overdue + new into one sentence', () => {
-    const out = composeMorningStory({
-      ...empty,
-      stuckDealsCount: 2,
-      overdueFollowUpsCount: 1,
-      newPeopleCount: 3,
-    });
-    expect(out.text).toBe('2 deals are stuck, 1 follow-up overdue, 3 new people.');
-  });
-
-  it('keeps singular and plural agreement', () => {
+  it('drafts/closing/all-clear branches never carry a doorway', () => {
     expect(
-      composeMorningStory({ ...empty, stuckDealsCount: 1, overdueFollowUpsCount: 1, newPeopleCount: 1 }).text,
-    ).toBe('1 deal is stuck, 1 follow-up overdue, 1 new person.');
-  });
-
-  // ── Doorway ──────────────────────────────────────────────────────────────
-
-  it('attaches "Start with X" when a top person is provided', () => {
-    const out = composeMorningStory({
-      ...empty,
-      stuckDealsCount: 1,
-      ...withTopPerson,
-    });
-    expect(out.text).toBe('1 deal is stuck. Start with David Chen.');
-    expect(out.doorway).toEqual({ kind: 'person', id: 'contact_123' });
-  });
-
-  it('omits "Start with X" when only the name is set (no id)', () => {
-    const out = composeMorningStory({
-      ...empty,
-      stuckDealsCount: 1,
-      topPersonName: 'David Chen',
-      topPersonId: null,
-    });
-    expect(out.text).toBe('1 deal is stuck.');
-    expect(out.doorway).toBeNull();
-  });
-
-  it('does not attach a doorway to drafts/questions/closing/all-clear', () => {
-    expect(composeMorningStory({ ...empty, draftsCount: 1, ...withTopPerson }).doorway).toBeNull();
-    expect(composeMorningStory({ ...empty, closingThisWeekCount: 1, ...withTopPerson }).doorway).toBeNull();
-    expect(composeMorningStory({ ...empty, ...withTopPerson }).doorway).toBeNull();
-  });
-
-  // ── Hot people fallback action ──────────────────────────────────────────
-
-  it('says "Reach out." when hot people exist and there is no top person', () => {
-    expect(composeMorningStory({ ...empty, hotPeopleCount: 3 }).text).toBe(
-      '3 people are hot. Reach out.',
-    );
-  });
-
-  it('says "Start with X" when hot people exist and a top person resolves', () => {
+      composeMorningStory({ ...empty, draftsCount: 3 }).doorway,
+    ).toBeNull();
     expect(
-      composeMorningStory({ ...empty, hotPeopleCount: 3, ...withTopPerson }).text,
-    ).toBe('3 people are hot. Start with David Chen.');
-  });
-
-  // ── Brand-voice anchor (snapshot-style) ─────────────────────────────────
-  // These are the canonical sentences. If a future contributor changes them,
-  // they should be doing it with intent — and updating these expectations.
-
-  it('matches canonical sentences for each priority branch', () => {
-    expect(composeMorningStory({ ...empty, stuckDealsCount: 1 }).text).toBe('1 deal is stuck.');
-    expect(composeMorningStory({ ...empty, overdueFollowUpsCount: 1 }).text).toBe('1 follow-up is overdue.');
-    expect(composeMorningStory({ ...empty, newPeopleCount: 1 }).text).toBe('1 new person came in. Welcome them.');
-    expect(composeMorningStory({ ...empty, hotPeopleCount: 1 }).text).toBe('1 person is hot. Reach out.');
-    expect(composeMorningStory({ ...empty, closingThisWeekCount: 1 }).text).toBe(
-      '1 deal closing this week. Keep it on track.',
-    );
+      composeMorningStory({ ...empty, closingThisWeekCount: 1 }).doorway,
+    ).toBeNull();
+    expect(composeMorningStory(empty).doorway).toBeNull();
   });
 });

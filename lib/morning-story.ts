@@ -2,17 +2,20 @@
  * Pure composition logic for the /chippi home story.
  *
  * Lives separately from <MorningStory /> so the brand voice can be
- * snapshot-tested without spinning up React. Five hand-coded narration
- * ladders ship to users; this is the one we put under test first because
- * it composes ACROSS the realtor's whole desk and is therefore the
- * loudest single thing Chippi says.
+ * snapshot-tested without spinning up React. The home is the deepest
+ * surface in the app — its sentence names a *subject*, not just a count.
+ * "The Chen deal hasn't moved in 14 days" beats "1 deal is stuck"; same
+ * data, real information.
+ *
+ * Doorway is multi-target: a stuck-deal sentence opens to that deal, an
+ * overdue-follow-up sentence opens to that person. The doorway always
+ * matches the subject of the sentence — no more single-target naive logic.
  */
 import type { MorningSummary } from '@/app/api/agent/morning/route';
 
-export interface MorningDoorway {
-  kind: 'person';
-  id: string;
-}
+export type MorningDoorway =
+  | { kind: 'person'; id: string }
+  | { kind: 'deal'; id: string };
 
 export interface MorningStoryOutput {
   text: string;
@@ -20,77 +23,68 @@ export interface MorningStoryOutput {
 }
 
 /**
- * Compose the loudest single sentence from the summary. Priority order:
- *   1. Stuck deals (the ones that won't fix themselves)
- *   2. Overdue follow-ups (the realtor said they'd do something)
- *   3. New people (just-arrived applications)
- *   4. Hot people (warmest of the warm)
- *   5. Drafts/questions waiting in the focus queue
- *   6. Closing this week
- *   7. All clear
+ * Compose one sentence from the summary. Priority order:
+ *   1. Stuck deal — name the longest-stuck one.
+ *   2. Overdue follow-up — name the most-overdue person.
+ *   3. New person — name the most-recent arrival.
+ *   4. Hot person — name the highest-scoring one.
+ *   5. Drafts/questions — count only (focus card is right below).
+ *   6. Closing this week — count only.
+ *   7. All clear.
  *
- * When a topPerson is available we attach it as "Start with X." — the
- * narration becomes a doorway to that specific person.
+ * The doorway always matches the subject of the sentence: the stuck-deal
+ * sentence opens to that deal; the overdue-follow-up sentence opens to
+ * that person; new + hot sentences open to that person.
  */
 export function composeMorningStory(s: MorningSummary): MorningStoryOutput {
-  const startWith = s.topPersonName && s.topPersonId
-    ? ` Start with ${s.topPersonName}.`
-    : '';
-  const doorway: MorningDoorway | null = s.topPersonId
-    ? { kind: 'person', id: s.topPersonId }
-    : null;
-
-  if (s.stuckDealsCount > 0) {
-    const lead = s.stuckDealsCount === 1
-      ? '1 deal is stuck'
-      : `${s.stuckDealsCount} deals are stuck`;
-    if (s.overdueFollowUpsCount > 0 || s.newPeopleCount > 0) {
-      const extras: string[] = [];
-      if (s.overdueFollowUpsCount > 0) {
-        extras.push(`${s.overdueFollowUpsCount} follow-up${s.overdueFollowUpsCount === 1 ? '' : 's'} overdue`);
-      }
-      if (s.newPeopleCount > 0) {
-        extras.push(
-          s.newPeopleCount === 1
-            ? '1 new person'
-            : `${s.newPeopleCount} new people`,
-        );
-      }
-      return { text: `${lead}, ${extras.join(', ')}.${startWith}`, doorway };
-    }
-    return { text: `${lead}.${startWith}`, doorway };
+  if (s.topStuckDeal) {
+    const { title, daysStuck, id } = s.topStuckDeal;
+    const others = s.stuckDealsCount > 1
+      ? ` (${s.stuckDealsCount - 1} more stuck.)`
+      : '';
+    const text = daysStuck > 0
+      ? `The ${title} deal hasn't moved in ${daysStuck} day${daysStuck === 1 ? '' : 's'}.${others}`
+      : `The ${title} deal is stuck.${others}`;
+    return { text, doorway: { kind: 'deal', id } };
   }
 
-  if (s.overdueFollowUpsCount > 0) {
-    const lead = s.overdueFollowUpsCount === 1
-      ? '1 follow-up is overdue'
-      : `${s.overdueFollowUpsCount} follow-ups are overdue`;
-    if (s.newPeopleCount > 0) {
-      const np = s.newPeopleCount === 1
-        ? '1 new person came in'
-        : `${s.newPeopleCount} new people came in`;
-      return { text: `${lead}, ${np}.${startWith}`, doorway };
-    }
-    return { text: `${lead}.${startWith}`, doorway };
+  if (s.topOverdueFollowUp) {
+    const { name, daysOverdue, id } = s.topOverdueFollowUp;
+    const others = s.overdueFollowUpsCount > 1
+      ? ` (${s.overdueFollowUpsCount - 1} more overdue.)`
+      : '';
+    const text = daysOverdue === 0
+      ? `${name}'s follow-up is due today.${others}`
+      : daysOverdue === 1
+        ? `${name}'s follow-up is 1 day overdue.${others}`
+        : `${name}'s follow-up is ${daysOverdue} days overdue.${others}`;
+    return { text, doorway: { kind: 'person', id } };
   }
 
-  if (s.newPeopleCount > 0) {
-    const lead = s.newPeopleCount === 1
-      ? '1 new person came in. Welcome them.'
-      : `${s.newPeopleCount} new people came in. Welcome them.`;
-    return { text: lead, doorway };
+  if (s.topNewPerson) {
+    const { name, id } = s.topNewPerson;
+    const others = s.newPeopleCount > 1
+      ? ` (${s.newPeopleCount - 1} more new.)`
+      : '';
+    return {
+      text: `${name} just applied. Welcome them.${others}`,
+      doorway: { kind: 'person', id },
+    };
   }
 
-  if (s.hotPeopleCount > 0) {
-    const lead = s.hotPeopleCount === 1
-      ? '1 person is hot.'
-      : `${s.hotPeopleCount} people are hot.`;
-    return { text: `${lead}${startWith || ' Reach out.'}`, doorway };
+  if (s.topHotPerson) {
+    const { name, id } = s.topHotPerson;
+    const others = s.hotPeopleCount > 1
+      ? ` (${s.hotPeopleCount - 1} more hot.)`
+      : '';
+    return {
+      text: `${name}'s looking hot. Reach out.${others}`,
+      doorway: { kind: 'person', id },
+    };
   }
 
-  // Drafts + questions live as a focus card below — the sentence names them
-  // but doesn't carry a doorway, since the card is right there on the same
-  // screen.
+  // Drafts + questions live in the FocusCard right below — sentence names
+  // them, no doorway needed (the card is on the same screen).
   if (s.draftsCount > 0 || s.questionsCount > 0) {
     const parts: string[] = [];
     if (s.draftsCount > 0) parts.push(`${s.draftsCount} draft${s.draftsCount === 1 ? '' : 's'}`);

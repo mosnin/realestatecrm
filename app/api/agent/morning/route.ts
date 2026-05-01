@@ -1,9 +1,11 @@
 /**
  * GET /api/agent/morning
  *
- * The composed morning story for the /chippi home. Returns the counts that
- * matter for the realtor's "what's pressing today" sentence — the inputs the
- * client picks the loudest fact from.
+ * The composed morning story for the /chippi home. Returns counts AND named
+ * subjects so the brand voice can say "The Chen deal hasn't moved in 14
+ * days" instead of just "1 deal is stuck." Specific over generic. Names
+ * over counts. The home's job is to be the deepest surface, not the
+ * shallowest.
  *
  * Different from /api/agent/today (which lists items for the dispatch
  * console) and /api/agent/priority (which returns curated PRIORITY_LIST
@@ -21,6 +23,26 @@ import { getSpaceForUser } from '@/lib/space';
 import { dealHealth } from '@/lib/deals/health';
 import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
 
+/** A deal that's gone quiet long enough to have a name on the home. */
+export interface StuckDealSubject {
+  id: string;
+  title: string;
+  daysStuck: number;
+}
+
+/** A person whose follow-up date has slipped. */
+export interface OverduePersonSubject {
+  id: string;
+  name: string;
+  daysOverdue: number;
+}
+
+/** A person with a name attached — used for new arrivals + hot picks. */
+export interface NamedPerson {
+  id: string;
+  name: string;
+}
+
 export interface MorningSummary {
   /** Contacts tagged 'new-lead' (haven't been viewed yet). */
   newPeopleCount: number;
@@ -36,11 +58,21 @@ export interface MorningSummary {
   draftsCount: number;
   /** Pending agent questions. */
   questionsCount: number;
-  /** Name of the top-priority contact, if any — drives "Start with X." */
-  topPersonName: string | null;
-  /** Their id so the narration can deep-link to the person's page. */
-  topPersonId: string | null;
+
+  // Named subjects — these are what the brand voice actually says out loud.
+  // The compose function leads with the loudest one and names it specifically.
+
+  /** The deal that's been stuck the longest, if any. */
+  topStuckDeal: StuckDealSubject | null;
+  /** The person whose follow-up has slipped the furthest, if any. */
+  topOverdueFollowUp: OverduePersonSubject | null;
+  /** The most-recently-arrived new applicant, if any. */
+  topNewPerson: NamedPerson | null;
+  /** The hottest unworked person (highest leadScore at or above HOT), if any. */
+  topHotPerson: NamedPerson | null;
 }
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 export async function GET() {
   const authResult = await requireAuth();
@@ -63,23 +95,23 @@ export async function GET() {
     activeDealsRes,
     draftsRes,
     questionsRes,
-    priorityRes,
+    topNewPersonRes,
+    topHotPersonRes,
+    topOverdueRes,
   ] = await Promise.all([
-    // New-lead tagged contacts (haven't been opened)
+    // ── Counts ─────────────────────────────────────────────────────────────
     supabase
       .from('Contact')
       .select('id', { count: 'exact', head: true })
       .eq('spaceId', space.id)
       .is('brokerageId', null)
       .contains('tags', ['new-lead']),
-    // Hot contacts
     supabase
       .from('Contact')
       .select('id', { count: 'exact', head: true })
       .eq('spaceId', space.id)
       .is('brokerageId', null)
       .gte('leadScore', HOT_LEAD_THRESHOLD),
-    // Contact follow-ups overdue
     supabase
       .from('Contact')
       .select('id', { count: 'exact', head: true })
@@ -87,42 +119,66 @@ export async function GET() {
       .is('brokerageId', null)
       .not('followUpAt', 'is', null)
       .lt('followUpAt', nowIso),
-    // Active deals — pulled in full so we can classify health client-side
-    // here; cheaper than another round trip and the count is bounded.
+
+    // ── Active deals (full read so we can classify health AND pick the
+    //    longest-stuck one) ──────────────────────────────────────────────
     supabase
       .from('Deal')
-      .select('id, status, updatedAt, closeDate, followUpAt, nextAction, nextActionDueAt')
+      .select('id, title, status, updatedAt, closeDate, followUpAt, nextAction, nextActionDueAt')
       .eq('spaceId', space.id)
       .eq('status', 'active')
       .limit(500),
-    // Pending agent drafts
+
+    // ── Counts continued ──────────────────────────────────────────────────
     supabase
       .from('AgentDraft')
       .select('id', { count: 'exact', head: true })
       .eq('spaceId', space.id)
       .eq('status', 'pending'),
-    // Pending agent questions
     supabase
       .from('AgentQuestion')
       .select('id', { count: 'exact', head: true })
       .eq('spaceId', space.id)
       .eq('status', 'pending'),
-    // Latest PRIORITY_LIST memory entry — the agent's last-known top pick.
-    // Source of truth for "Start with X." Falls back to a hot contact if
-    // no priority list has been written yet.
+
+    // ── Named subjects (1 row each — light reads) ─────────────────────────
+    // Most-recent new applicant.
     supabase
-      .from('AgentMemory')
-      .select('content, createdAt')
+      .from('Contact')
+      .select('id, name')
       .eq('spaceId', space.id)
-      .eq('kind', 'PRIORITY_LIST')
+      .is('brokerageId', null)
+      .contains('tags', ['new-lead'])
       .order('createdAt', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    // Hottest contact (highest score above threshold).
+    supabase
+      .from('Contact')
+      .select('id, name')
+      .eq('spaceId', space.id)
+      .is('brokerageId', null)
+      .gte('leadScore', HOT_LEAD_THRESHOLD)
+      .order('leadScore', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    // Person with the most-overdue follow-up.
+    supabase
+      .from('Contact')
+      .select('id, name, followUpAt')
+      .eq('spaceId', space.id)
+      .is('brokerageId', null)
+      .not('followUpAt', 'is', null)
+      .lt('followUpAt', nowIso)
+      .order('followUpAt', { ascending: true })
       .limit(1)
       .maybeSingle(),
   ]);
 
-  // Classify deal health — only count those flagged 'stuck' for the headline.
+  // Classify deal health — both for the count and to find the longest-stuck.
   const activeDeals = (activeDealsRes.data ?? []) as Array<{
     id: string;
+    title: string;
     status: string;
     updatedAt: string | null;
     closeDate: string | null;
@@ -132,21 +188,25 @@ export async function GET() {
   }>;
   let stuckDealsCount = 0;
   let closingThisWeekCount = 0;
+  let topStuckDeal: StuckDealSubject | null = null;
   const nowDate = new Date();
   for (const d of activeDeals) {
-    // dealHealth expects a Deal-shaped object; the DB query returns date-as-
-    // string. Cast through unknown to satisfy the Pick<Deal, ...> contract;
-    // updatedAt is non-null in the schema so we fall back to "now" only as a
-    // belt-and-suspenders guard against a corrupt row.
+    const updated = d.updatedAt ? new Date(d.updatedAt) : nowDate;
     const health = dealHealth({
       status: 'active',
-      updatedAt: (d.updatedAt ? new Date(d.updatedAt) : nowDate) as unknown as Date,
+      updatedAt: updated as unknown as Date,
       closeDate: d.closeDate as unknown as Date | null,
       followUpAt: d.followUpAt as unknown as Date | null,
       nextAction: d.nextAction,
       nextActionDueAt: d.nextActionDueAt as unknown as Date | null,
     });
-    if (health.state === 'stuck') stuckDealsCount += 1;
+    if (health.state === 'stuck') {
+      stuckDealsCount += 1;
+      const days = Math.max(0, Math.floor((nowDate.getTime() - updated.getTime()) / MS_PER_DAY));
+      if (!topStuckDeal || days > topStuckDeal.daysStuck) {
+        topStuckDeal = { id: d.id, title: d.title, daysStuck: days };
+      }
+    }
     if (d.closeDate) {
       const close = new Date(d.closeDate);
       if (!isNaN(close.getTime()) && close >= today && close <= weekOut) {
@@ -155,36 +215,23 @@ export async function GET() {
     }
   }
 
-  // Resolve the top-priority person from the latest PRIORITY_LIST memory.
-  // Schema: content is { items: [{ contactId, name, reason, leadScore, ... }] }
-  let topPersonName: string | null = null;
-  let topPersonId: string | null = null;
-  const priorityMemo = priorityRes.data as { content?: unknown } | null;
-  if (priorityMemo?.content && typeof priorityMemo.content === 'object') {
-    const items = (priorityMemo.content as { items?: unknown }).items;
-    if (Array.isArray(items) && items.length > 0) {
-      const top = items[0] as { name?: unknown; contactId?: unknown };
-      if (typeof top?.name === 'string') topPersonName = top.name;
-      if (typeof top?.contactId === 'string') topPersonId = top.contactId;
-    }
+  // Named-subject extraction from the maybeSingle reads.
+  function namedFrom(row: unknown): NamedPerson | null {
+    if (!row || typeof row !== 'object') return null;
+    const r = row as { id?: unknown; name?: unknown };
+    if (typeof r.id !== 'string' || typeof r.name !== 'string') return null;
+    return { id: r.id, name: r.name };
   }
+  const topNewPerson = namedFrom(topNewPersonRes.data);
+  const topHotPerson = namedFrom(topHotPersonRes.data);
 
-  // Fallback when no priority list exists yet: pick the hottest contact by
-  // score. Single read, light query — only fires when the agent hasn't
-  // produced a priority list yet (new spaces, pre-first-run, etc.).
-  if (!topPersonName) {
-    const { data } = await supabase
-      .from('Contact')
-      .select('id, name')
-      .eq('spaceId', space.id)
-      .is('brokerageId', null)
-      .gte('leadScore', HOT_LEAD_THRESHOLD)
-      .order('leadScore', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (data) {
-      topPersonName = (data as { name?: string }).name ?? null;
-      topPersonId = (data as { id?: string }).id ?? null;
+  let topOverdueFollowUp: OverduePersonSubject | null = null;
+  if (topOverdueRes.data) {
+    const r = topOverdueRes.data as { id?: unknown; name?: unknown; followUpAt?: unknown };
+    if (typeof r.id === 'string' && typeof r.name === 'string' && typeof r.followUpAt === 'string') {
+      const due = new Date(r.followUpAt);
+      const days = Math.max(0, Math.floor((nowDate.getTime() - due.getTime()) / MS_PER_DAY));
+      topOverdueFollowUp = { id: r.id, name: r.name, daysOverdue: days };
     }
   }
 
@@ -196,8 +243,10 @@ export async function GET() {
     closingThisWeekCount,
     draftsCount: draftsRes.count ?? 0,
     questionsCount: questionsRes.count ?? 0,
-    topPersonName,
-    topPersonId,
+    topStuckDeal,
+    topOverdueFollowUp,
+    topNewPerson,
+    topHotPerson,
   };
 
   return NextResponse.json(summary);

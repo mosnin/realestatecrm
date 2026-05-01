@@ -15,21 +15,14 @@ interface Props {
 
 /**
  * The /chippi home's one sentence — composed across the realtor's whole
- * desk. Replaces the old "X drafts · Y questions waiting" inventory line
- * (which only saw two of the seven things actually pressing). Now pulls
- * stuck deals, overdue follow-ups, new people, hot people, drafts, and
- * questions, then names the loudest single fact and (when there's a
- * priority person) suggests where to start.
+ * desk and named with a SUBJECT, not just a count. "The Chen deal hasn't
+ * moved in 14 days" beats "1 deal is stuck"; same data, real information.
  *
- * The sentence becomes a button when there's a doorway attached:
- * - "Start with David Chen." → opens that person's page
- * - inventory-only ("3 drafts waiting") → opens the focus card below it,
- *   which is right there on the same screen, so no navigation needed —
- *   stays a paragraph.
- *
- * Same brand-voice spine as the deals/contacts/follow-ups landing
- * narrations — the home now shares the vocabulary instead of having its
- * own utility line.
+ * The sentence becomes a button when there's a doorway attached, and the
+ * doorway always matches the subject:
+ *   - stuck-deal sentence → opens that deal
+ *   - overdue-follow-up / new / hot sentences → open that person
+ *   - drafts/questions sentence → no doorway (the focus card is right there)
  */
 export function MorningStory({ slug }: Props) {
   const router = useRouter();
@@ -49,9 +42,8 @@ export function MorningStory({ slug }: Props) {
   }, []);
 
   // While loading we render a non-breaking space so the layout doesn't
-  // jump but no placeholder copy. The previous fallback ("I keep your day
-  // moving so you don't have to.") was positioning copy in a status slot —
-  // the realtor knows it's loading; we don't fill the void with a tagline.
+  // jump but no placeholder copy. The realtor knows it's loading; we don't
+  // fill the void with a tagline.
   if (!summary) {
     return <p className="text-sm text-muted-foreground text-center">&nbsp;</p>;
   }
@@ -59,8 +51,11 @@ export function MorningStory({ slug }: Props) {
   const story = composeMorningStory(summary);
 
   function handleClick() {
-    if (story.doorway?.kind === 'person') {
+    if (!story.doorway) return;
+    if (story.doorway.kind === 'person') {
       router.push(`/s/${slug}/contacts/${story.doorway.id}`);
+    } else if (story.doorway.kind === 'deal') {
+      router.push(`/s/${slug}/deals/${story.doorway.id}`);
     }
   }
 
