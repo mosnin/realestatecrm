@@ -63,6 +63,15 @@ vi.mock('@/app/api/agent/quick-draft/route', () => ({
   composeQuickDraft: composeQuickDraftMock,
 }));
 
+// recall_history now goes through agent-memory's recallMemory (semantic).
+const { recallMemoryMock } = vi.hoisted(() => ({
+  recallMemoryMock: vi.fn(),
+}));
+vi.mock('@/lib/agent-memory/store', () => ({
+  recallMemory: recallMemoryMock,
+  storeMemory: vi.fn(),
+}));
+
 import { findComparablePropertiesTool } from '@/lib/ai-tools/tools/find-comparable-properties';
 import { recallHistoryTool } from '@/lib/ai-tools/tools/recall-history';
 import { checkAvailabilityTool } from '@/lib/ai-tools/tools/check-availability';
@@ -89,6 +98,7 @@ function makeCtx(): ToolContext {
 beforeEach(() => {
   mockByTable = {};
   composeQuickDraftMock.mockReset();
+  recallMemoryMock.mockReset();
 });
 
 // ── find_comparable_properties ─────────────────────────────────────────────
@@ -131,18 +141,45 @@ describe('recallHistoryTool', () => {
     expect(recallHistoryTool.requiresApproval).toBe(false);
   });
 
-  it('declares searchKind="keyword" — does not pretend to be semantic', async () => {
-    mockByTable = {
-      ContactActivity: {
-        rows: [
-          { id: 'a1', contactId: 'c1', type: 'note', content: 'They want a fixer-upper', createdAt: '2026-04-01' },
-        ],
+  it('declares searchKind="semantic" and forwards results from recallMemory', async () => {
+    recallMemoryMock.mockResolvedValueOnce([
+      {
+        id: 'm1',
+        content: 'They want a fixer-upper in Berkeley',
+        kind: 'fact',
+        createdAt: '2026-04-01T00:00:00.000Z',
+        similarity: 0.83,
+        importance: 0.6,
+        entityType: 'contact',
+        entityId: 'c1',
       },
-      DealActivity: { rows: [] },
-    };
-    const result = await recallHistoryTool.handler({ query: 'fixer' }, makeCtx());
-    expect((result.data as { searchKind: string }).searchKind).toBe('keyword');
-    expect(result.summary).toMatch(/keyword search/);
+    ]);
+    const result = await recallHistoryTool.handler({ query: 'fixer-upper' }, makeCtx());
+    expect((result.data as { searchKind: string }).searchKind).toBe('semantic');
+    expect(result.summary).toMatch(/semantic search/);
+    const hits = (result.data as { hits: { excerpt: string; similarity: number }[] }).hits;
+    expect(hits).toHaveLength(1);
+    expect(hits[0].excerpt).toMatch(/fixer-upper/);
+    expect(hits[0].similarity).toBe(0.83);
+  });
+
+  it('forwards personId and dealId to recallMemory as filters', async () => {
+    recallMemoryMock.mockResolvedValueOnce([]);
+    await recallHistoryTool.handler({ query: 'school district', personId: 'c_sam' }, makeCtx());
+    expect(recallMemoryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spaceId: 'space_1',
+        query: 'school district',
+        contactId: 'c_sam',
+      }),
+    );
+  });
+
+  it('returns an error display when the semantic recall throws', async () => {
+    recallMemoryMock.mockRejectedValueOnce(new Error('embedding service unavailable'));
+    const result = await recallHistoryTool.handler({ query: 'pre-approval' }, makeCtx());
+    expect(result.display).toBe('error');
+    expect(result.summary).toMatch(/Recall failed/);
   });
 });
 

@@ -1,44 +1,55 @@
 /**
- * `recall_history` — search ContactActivity / DealActivity for matching content.
+ * `recall_history` — semantic recall over the AgentMemory store.
  *
- * Read-only. Honest about HOW it searches: we set `searchKind: 'keyword'`
- * because there is no activity-content vector index in `lib/vectorize.ts` —
- * that file vectorises Contacts and Deals, not activity entries. ILIKE is the
- * right tool until that index exists; pretending otherwise would mislead the
- * model.
+ * Was: keyword ILIKE over ContactActivity / DealActivity rows. That searched
+ * EVENT logs (calls, notes, emails), not what was actually said in
+ * conversations, and produced miss rates that the model couldn't predict.
  *
- * Filters: optional personId / dealId scope the lookup. With neither set, both
- * tables are searched workspace-wide.
+ * Is now: vector cosine similarity over the same `AgentMemory` table the
+ * Python runtime writes to. The model can ask "what did Sam say about the
+ * school district last month?" and get back ranked memories regardless of
+ * exact word choice.
+ *
+ * Tool name + parameter shape are preserved so existing call sites and the
+ * system prompt don't need to change. Only the implementation and the
+ * `searchKind` field on the result change.
+ *
+ * Filters:
+ *   - personId → narrow to one contact
+ *   - dealId   → narrow to one deal
+ *   - both unset → workspace-wide
+ *
+ * Read-only. Auth-scoped via `ctx.space.id`.
  */
 
 import { z } from 'zod';
-import { supabase } from '@/lib/supabase';
 import { defineTool } from '../types';
+import { recallMemory } from '@/lib/agent-memory/store';
 
 const parameters = z
   .object({
     personId: z.string().min(1).optional().describe('Restrict to one Contact.'),
     dealId: z.string().min(1).optional().describe('Restrict to one Deal.'),
-    query: z.string().trim().min(1).max(200).describe('Text to match in activity content.'),
+    query: z.string().trim().min(1).max(200).describe('What to look for. Phrased as natural language.'),
   })
-  .describe('Search activity feeds (notes, calls, emails, meetings) for a phrase.');
+  .describe('Recall what was said in past conversations using semantic search.');
 
-interface ActivityHit {
-  source: 'contact' | 'deal';
+interface MemoryHit {
   id: string;
-  type: string;
-  date: string; // ISO
   excerpt: string;
+  date: string;
+  similarity: number;
+  kind: string;
 }
 
 interface RecallResult {
-  searchKind: 'semantic' | 'keyword';
-  hits: ActivityHit[];
+  searchKind: 'semantic';
+  hits: MemoryHit[];
 }
 
-const EXCERPT_MAX = 120;
+const EXCERPT_MAX = 200;
 
-function makeExcerpt(content: string | null): string {
+function makeExcerpt(content: string): string {
   const v = (content ?? '').trim().replace(/\s+/g, ' ');
   if (v.length <= EXCERPT_MAX) return v;
   return v.slice(0, EXCERPT_MAX - 1) + '…';
@@ -47,84 +58,43 @@ function makeExcerpt(content: string | null): string {
 export const recallHistoryTool = defineTool<typeof parameters, RecallResult>({
   name: 'recall_history',
   description:
-    'Search activity history (notes, calls, emails, meetings) for a phrase. Keyword search only.',
+    'Recall what was said in past conversations using semantic search. Returns ranked memories about a person or deal.',
   parameters,
   requiresApproval: false,
 
   async handler(args, ctx) {
-    const escaped = args.query
-      .replace(/\\/g, '\\\\')
-      .replace(/%/g, '\\%')
-      .replace(/_/g, '\\_')
-      .replace(/[,()]/g, '');
-    const pat = `%${escaped}%`;
+    let entries;
+    try {
+      entries = await recallMemory({
+        spaceId: ctx.space.id,
+        query: args.query,
+        k: 8,
+        contactId: args.personId,
+        dealId: args.dealId,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'unknown error';
+      return {
+        summary: `Recall failed: ${message}`,
+        data: { searchKind: 'semantic' as const, hits: [] },
+        display: 'error',
+      };
+    }
 
-    // Contact activities
-    let contactQ = supabase
-      .from('ContactActivity')
-      .select('id, contactId, type, content, createdAt')
-      .eq('spaceId', ctx.space.id)
-      .ilike('content', pat)
-      .order('createdAt', { ascending: false })
-      .limit(10);
-    if (args.personId) contactQ = contactQ.eq('contactId', args.personId);
-
-    // Deal activities
-    let dealQ = supabase
-      .from('DealActivity')
-      .select('id, dealId, type, content, createdAt')
-      .eq('spaceId', ctx.space.id)
-      .ilike('content', pat)
-      .order('createdAt', { ascending: false })
-      .limit(10);
-    if (args.dealId) dealQ = dealQ.eq('dealId', args.dealId);
-
-    // If personId is set, deal search is irrelevant; same for dealId.
-    const [cRes, dRes] = await Promise.all([
-      args.dealId ? Promise.resolve({ data: [], error: null }) : contactQ.abortSignal(ctx.signal),
-      args.personId ? Promise.resolve({ data: [], error: null }) : dealQ.abortSignal(ctx.signal),
-    ]);
-
-    const cRows = (cRes.data ?? []) as Array<{
-      id: string;
-      contactId: string;
-      type: string;
-      content: string | null;
-      createdAt: string;
-    }>;
-    const dRows = (dRes.data ?? []) as Array<{
-      id: string;
-      dealId: string;
-      type: string;
-      content: string | null;
-      createdAt: string;
-    }>;
-
-    const hits: ActivityHit[] = [
-      ...cRows.map((r) => ({
-        source: 'contact' as const,
-        id: r.id,
-        type: r.type,
-        date: r.createdAt,
-        excerpt: makeExcerpt(r.content),
-      })),
-      ...dRows.map((r) => ({
-        source: 'deal' as const,
-        id: r.id,
-        type: r.type,
-        date: r.createdAt,
-        excerpt: makeExcerpt(r.content),
-      })),
-    ]
-      .sort((a, b) => (a.date < b.date ? 1 : -1))
-      .slice(0, 10);
+    const hits: MemoryHit[] = entries.map((e) => ({
+      id: e.id,
+      excerpt: makeExcerpt(e.content),
+      date: e.createdAt,
+      similarity: typeof e.similarity === 'number' ? Math.round(e.similarity * 1000) / 1000 : 0,
+      kind: e.kind,
+    }));
 
     return {
       summary:
         hits.length === 0
-          ? `No activity matched "${args.query}" (keyword search).`
-          : `${hits.length} activit${hits.length === 1 ? 'y' : 'ies'} matched "${args.query}" (keyword search).`,
-      data: { searchKind: 'keyword' as const, hits },
+          ? `No memories matched "${args.query}".`
+          : `${hits.length} memor${hits.length === 1 ? 'y' : 'ies'} matched "${args.query}" (semantic search).`,
+      data: { searchKind: 'semantic' as const, hits },
       display: 'plain',
     };
   },
