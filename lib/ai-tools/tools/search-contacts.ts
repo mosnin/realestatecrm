@@ -26,11 +26,11 @@ const parameters = z
     leadType: z
       .enum(['rental', 'buyer'])
       .optional()
-      .describe('Filter by lead type.'),
+      .describe('Filter by buyer vs rental.'),
     hasOverdueFollowUp: z
       .boolean()
       .optional()
-      .describe('Restrict to contacts with a follow-up date in the past.'),
+      .describe('Restrict to people with a follow-up date in the past.'),
     limit: z
       .number()
       .int()
@@ -38,10 +38,10 @@ const parameters = z
       .max(25)
       .optional()
       .default(10)
-      .describe('Maximum contacts to return. Hard cap 25 regardless of input.'),
+      .describe('Maximum people to return. Hard cap 25 regardless of input.'),
   })
   .describe(
-    'Search the caller\'s contacts. At least one of `query` / `scoreLabel` / `leadType` / `hasOverdueFollowUp` should be provided.',
+    'Search the caller\'s people. At least one of `query` / `scoreLabel` / `leadType` / `hasOverdueFollowUp` should be provided.',
   );
 
 interface ContactSummary {
@@ -58,7 +58,7 @@ interface ContactSummary {
 export const searchContactsTool = defineTool<typeof parameters, { contacts: ContactSummary[] }>({
   name: 'search_contacts',
   description:
-    'Find contacts (leads / clients) in the current workspace. Use for questions like "who are my hot leads" or "which contacts haven\'t been contacted in 2 weeks".',
+    'Find people in the current workspace. Use for questions like "who are my hot people" or "which people haven\'t been reached out to in 2 weeks".',
   parameters,
   requiresApproval: false,
 

@@ -55,7 +55,7 @@ interface SendSMSResult {
 export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
   name: 'send_sms',
   description:
-    'Send an SMS to a contact (or free-form phone number). Always prompts for approval. Use for tour confirmations, quick check-ins.',
+    'Send an SMS to a person (or free-form phone number). Always prompts for approval. Use for tour confirmations, quick check-ins.',
   parameters,
   requiresApproval: true,
   // SMS is billed per-segment; 30/hour keeps bills sane without blocking

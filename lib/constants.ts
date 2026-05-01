@@ -99,13 +99,12 @@ export const LEAD_TIERS = {
 export type TierKey = keyof typeof LEAD_TIERS;
 
 // ── Lead-score thresholds ───────────────────────────────────────────────────
-// Single source of truth for "what hot means." Five different files used to
-// define this on their own (70, 75, 80, depending on who got there first);
-// the brand voice can't say "X hot leads waiting" if every page has a
-// different cutoff. One number, one definition.
+// Single source of truth for "what hot means." Different surfaces used to
+// hard-code 70, 75, or 80 — three definitions of the same word. Centralise
+// so the brand voice can say "X hot people" with one cutoff everywhere.
 
 /** Score at or above this = "hot". Matches the system-prompt convention
- *  the agent uses when it talks about hot leads in chat. */
+ *  the agent uses when it talks about hot people in chat. */
 export const HOT_LEAD_THRESHOLD = 70;
 /** Score at or above this = "warm" (and below = cold / unscored). */
 export const WARM_LEAD_THRESHOLD = 40;
