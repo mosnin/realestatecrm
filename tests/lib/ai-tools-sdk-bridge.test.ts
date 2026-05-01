@@ -11,10 +11,17 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
-import { RunContext } from '@openai/agents';
+import { Agent, RunContext, RunState } from '@openai/agents';
 import { defineTool } from '@/lib/ai-tools/types';
 import type { ToolContext } from '@/lib/ai-tools/types';
-import { toSdkTool, summariseInterruption } from '@/lib/ai-tools/sdk-bridge';
+import {
+  toSdkTool,
+  summariseInterruption,
+  extractApprovals,
+  serializeRunState,
+  restoreRunState,
+  applyApprovalDecision,
+} from '@/lib/ai-tools/sdk-bridge';
 
 function makeCtx(): ToolContext {
   return {
@@ -123,6 +130,154 @@ describe('toSdkTool', () => {
     const out = await sdk.invoke(new RunContext(), JSON.stringify({}));
 
     expect(out).toBe('Error: something snapped');
+  });
+});
+
+describe('extractApprovals', () => {
+  const registry = [
+    defineTool({
+      name: 'send_email',
+      description: 'send',
+      parameters: z.object({ to: z.string() }),
+      requiresApproval: true,
+      summariseCall: (args) => `Email ${args.to}`,
+      rateLimit: { max: 60, windowSeconds: 3600 },
+      handler: async () => ({ summary: 'sent' }),
+    }),
+  ];
+
+  it('parses interruption arguments and renders summary via summariseCall', () => {
+    const fakeResult = {
+      interruptions: [
+        {
+          name: 'send_email',
+          arguments: JSON.stringify({ to: 'jane@x.com' }),
+          rawItem: { callId: 'call_123' },
+        },
+      ],
+    };
+
+    const out = extractApprovals(fakeResult, registry);
+
+    expect(out).toHaveLength(1);
+    expect(out[0]).toEqual({
+      callId: 'call_123',
+      toolName: 'send_email',
+      arguments: { to: 'jane@x.com' },
+      summary: 'Email jane@x.com',
+    });
+  });
+
+  it('falls back to rawItem.id when callId is absent (hosted-tool variants)', () => {
+    const fakeResult = {
+      interruptions: [
+        {
+          name: 'send_email',
+          arguments: JSON.stringify({ to: 'a@b.c' }),
+          rawItem: { id: 'tool_456' },
+        },
+      ],
+    };
+
+    const out = extractApprovals(fakeResult, registry);
+    expect(out[0].callId).toBe('tool_456');
+  });
+
+  it('survives malformed JSON args by exposing the raw string', () => {
+    const fakeResult = {
+      interruptions: [
+        { name: 'send_email', arguments: '{bad', rawItem: { callId: 'c' } },
+      ],
+    };
+
+    const out = extractApprovals(fakeResult, registry);
+    expect(out[0].arguments).toEqual({ raw: '{bad' });
+  });
+
+  it('returns empty array when there are no interruptions', () => {
+    expect(extractApprovals({}, registry)).toEqual([]);
+    expect(extractApprovals({ interruptions: [] }, registry)).toEqual([]);
+  });
+});
+
+describe('serializeRunState / restoreRunState round-trip', () => {
+  // We can't trigger a real interruption without a model call, but we CAN
+  // verify the serialise/restore primitives the SDK exposes — that's what
+  // closes the chat-cutover risk: any state we save can be reloaded.
+  it('serializes a RunState to a string', () => {
+    const state = { toString: () => 'fake-serialized-state' };
+    expect(serializeRunState(state)).toBe('fake-serialized-state');
+  });
+
+  it('round-trips through RunState.fromString for an equivalent agent', async () => {
+    // The shortest path that produces a real RunState we can persist:
+    // build an Agent, construct an empty RunState (its constructor is
+    // public for testing/resume), serialize, restore.
+    const agent = new Agent({
+      name: 'Probe',
+      instructions: 'Probe',
+      tools: [],
+    });
+
+    // RunState exposes a static `fromString`. The cheapest test that
+    // proves the round-trip is to call the SDK's own probe — its types
+    // and the SerializedRunState schema validate the format.
+    const initial = new RunState(new RunContext(), 'hello', agent, 5);
+    const serialized = serializeRunState(initial);
+    expect(typeof serialized).toBe('string');
+    expect(serialized.length).toBeGreaterThan(0);
+
+    const restored = await restoreRunState(agent, serialized);
+    // The restored state is a RunState instance. Its identity differs
+    // (new object) but its serialised form matches.
+    expect(serializeRunState(restored)).toBe(serialized);
+  });
+});
+
+describe('applyApprovalDecision', () => {
+  // We mock the state's approve/reject methods because constructing a
+  // real RunState with a pending interruption requires a model round-trip.
+  // The contract we're testing is OUR routing — not the SDK's mutation.
+  function makeFakeState() {
+    return {
+      approve: vi.fn(),
+      reject: vi.fn(),
+    };
+  }
+
+  it('routes to approve() when the decision is approved', () => {
+    const state = makeFakeState();
+    const item = { rawItem: { callId: 'c1' }, name: 'send_email' };
+    applyApprovalDecision(
+      state as unknown as RunState<unknown, Agent<unknown, 'text'>>,
+      item as unknown as Parameters<RunState<unknown, Agent<unknown, 'text'>>['approve']>[0],
+      { approved: true },
+    );
+    expect(state.approve).toHaveBeenCalledWith(item);
+    expect(state.reject).not.toHaveBeenCalled();
+  });
+
+  it('routes to reject() with no message when not provided', () => {
+    const state = makeFakeState();
+    const item = { rawItem: { callId: 'c1' } };
+    applyApprovalDecision(
+      state as unknown as RunState<unknown, Agent<unknown, 'text'>>,
+      item as unknown as Parameters<RunState<unknown, Agent<unknown, 'text'>>['approve']>[0],
+      { approved: false },
+    );
+    expect(state.reject).toHaveBeenCalledWith(item, undefined);
+    expect(state.approve).not.toHaveBeenCalled();
+  });
+
+  it('passes a rejection message when provided', () => {
+    const state = makeFakeState();
+    const item = { rawItem: { callId: 'c1' } };
+    applyApprovalDecision(
+      state as unknown as RunState<unknown, Agent<unknown, 'text'>>,
+      item as unknown as Parameters<RunState<unknown, Agent<unknown, 'text'>>['approve']>[0],
+      { approved: false, message: 'wrong recipient' },
+    );
+    expect(state.reject).toHaveBeenCalledWith(item, { message: 'wrong recipient' });
   });
 });
 

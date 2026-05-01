@@ -35,7 +35,7 @@
  * `summariseInterruption()` below.
  */
 
-import { Agent, run, tool, type RunContext } from '@openai/agents';
+import { Agent, run, tool, RunState, type RunContext, type RunResult } from '@openai/agents';
 import type { z } from 'zod';
 import type { ToolContext, ToolDefinition, ToolResult } from './types';
 
@@ -143,4 +143,134 @@ export function summariseInterruption(
     return `Run ${toolName}`;
   }
   return def.summariseCall(args as never);
+}
+
+// ── Approval / state lifecycle ─────────────────────────────────────────────
+//
+// The chat-cutover risk I named earlier was: "the SDK's interrupt-resume
+// state machine doesn't 1:1 match our pendingState." After actually reading
+// the SDK source, that risk closes itself. The SDK exposes:
+//
+//   - `result.interruptions: RunToolApprovalItem[]` — the pending approvals.
+//   - `result.state.toString()` — serialise the resumable run.
+//   - `RunState.fromString(agent, str)` — rehydrate it.
+//   - `state.approve(item)` / `state.reject(item, { message })` — record
+//     the decision before resuming.
+//   - Re-running with `run(agent, state)` continues from where it paused.
+//
+// That matches our PendingState lifecycle exactly: serialize → store →
+// realtor decides → reload → apply decision → resume. The helpers below
+// wrap those primitives so consumers (the chat route, the persistence
+// layer) talk in our vocabulary instead of fishing through the SDK API.
+
+/**
+ * Realtor-facing approval prompt extracted from one SDK interruption.
+ * The chat route serialises this and emits it as our existing
+ * `permission_required` SSE event so the UI stays unchanged.
+ */
+export interface ApprovalPrompt {
+  /** Stable identifier for the interruption — survives resume rounds. */
+  callId: string;
+  /** Tool name the model is asking to run (e.g. "send_email"). */
+  toolName: string;
+  /** Parsed arguments. We parse the SDK's JSON-string `arguments` here
+   *  so consumers don't have to duplicate the JSON.parse + try/catch. */
+  arguments: unknown;
+  /** What the realtor reads in the prompt — domain-specific via summariseCall. */
+  summary: string;
+}
+
+/**
+ * Turn an SDK result's `interruptions` array into ApprovalPrompts the UI
+ * already knows how to render. Tools that aren't in our registry surface
+ * with a generic "Run <name>" — that should be impossible in practice
+ * (every interrupt comes from a tool we registered), but defending against
+ * it costs nothing.
+ */
+/**
+ * Loose shape of an interruption — we only touch a handful of fields and
+ * the SDK's full type is a wide discriminated union (function calls,
+ * hosted tools, shell, computer use, apply-patch). The function-call
+ * variant carries `callId`; others carry `id`. We try `callId` first,
+ * fall back to `id`, fall back to empty string.
+ */
+type InterruptionLike = {
+  rawItem: { callId?: string; id?: string };
+  name?: string;
+  arguments?: string;
+};
+
+export function extractApprovals(
+  result: { interruptions?: readonly InterruptionLike[] },
+  registry: readonly SummariseSource[],
+): ApprovalPrompt[] {
+  const interruptions = result.interruptions ?? [];
+  return interruptions.map((item) => {
+    const toolName = item.name ?? '';
+    const argsStr = item.arguments ?? '';
+    const callId = item.rawItem.callId ?? item.rawItem.id ?? '';
+    let parsedArgs: unknown = {};
+    try {
+      parsedArgs = argsStr ? JSON.parse(argsStr) : {};
+    } catch {
+      // Malformed JSON from the model is rare but real — fall back to the
+      // raw string so the realtor at least sees what was attempted.
+      parsedArgs = { raw: argsStr };
+    }
+    return {
+      callId,
+      toolName,
+      arguments: parsedArgs,
+      summary: summariseInterruption(toolName, parsedArgs, registry),
+    };
+  });
+}
+
+/**
+ * Persist a paused run as an opaque string. Stored on AgentDraft.metadata
+ * (or AgentQuestion) and rehydrated when the realtor decides.
+ */
+export function serializeRunState(state: { toString(): string }): string {
+  return state.toString();
+}
+
+/**
+ * Rehydrate a persisted run. Schema version is captured inside the string;
+ * the SDK throws if it's incompatible — we let that bubble so a stale
+ * pending state from before an SDK upgrade fails loudly instead of running
+ * with mismatched assumptions.
+ */
+// We accept any Agent<...> shape because the consumer (the chat route)
+// holds the agent reference; the bridge is generic to the model's output
+// type. Casting through `unknown` here keeps the rest of the bridge
+// strictly typed.
+type AnyAgent = Agent<unknown, 'text'>;
+
+export async function restoreRunState(
+  agent: AnyAgent,
+  serialized: string,
+): Promise<RunState<unknown, AnyAgent>> {
+  return RunState.fromString(agent, serialized);
+}
+
+/** What the realtor's PATCH /api/agent/drafts/[id] resolves to. */
+export type ApprovalDecision = { approved: true } | { approved: false; message?: string };
+
+/**
+ * Apply the realtor's approve/reject decision to a rehydrated state.
+ * The SDK mutates the state in place; we return it for clarity at the
+ * call site. After this, pass the state back to `run(agent, state)` to
+ * continue from where it paused.
+ */
+export function applyApprovalDecision(
+  state: RunState<unknown, AnyAgent>,
+  item: Parameters<RunState<unknown, AnyAgent>['approve']>[0],
+  decision: ApprovalDecision,
+): RunState<unknown, AnyAgent> {
+  if (decision.approved) {
+    state.approve(item);
+  } else {
+    state.reject(item, decision.message ? { message: decision.message } : undefined);
+  }
+  return state;
 }
