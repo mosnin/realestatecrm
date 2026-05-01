@@ -17,9 +17,8 @@ interface Props {
 
 /**
  * Compact property picker for the deal sidebar. Live search against
- * /api/properties, debounced. "Create new" escape-hatch routes the user to
- * the properties page — we keep deal detail non-modal to avoid nesting
- * forms.
+ * /api/properties, debounced. Properties are created via the deal-create
+ * wizard — no inline-create here, no escape-hatch link to a deleted index.
  */
 export function DealPropertyPicker({ dealId, slug, initial }: Props) {
   const [linked, setLinked] = useState<Property | null>(initial);
@@ -136,7 +135,9 @@ export function DealPropertyPicker({ dealId, slug, initial }: Props) {
 
           {results.length === 0 && !searching && (
             <p className="text-[11px] text-muted-foreground">
-              No matches.
+              {query.trim().length > 0
+                ? 'No matches. Properties get added when you create a deal.'
+                : 'Type to search. Properties get added when you create a deal.'}
             </p>
           )}
 

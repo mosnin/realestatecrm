@@ -42,16 +42,20 @@ describe('getApprovalSentence', () => {
     );
   });
 
-  it('weaves a name into the person-tier line when given one', () => {
-    expect(getApprovalSentence('person-tier', 'Sarah')).toBe(
-      "Got it. Sarah's where they should be.",
-    );
+  it('names the hot direction with a name when given one', () => {
+    expect(getApprovalSentence('person-hot', 'Sarah')).toBe("Got it. Sarah's hot now.");
   });
 
-  it('keeps the person-tier line natural when no name is available', () => {
-    expect(getApprovalSentence('person-tier')).toBe(
-      "Got it. They're where they should be.",
-    );
+  it('names the cold direction with a name when given one', () => {
+    expect(getApprovalSentence('person-cold', 'Sarah')).toBe("Got it. Sarah's cold now.");
+  });
+
+  it('keeps the hot line natural when no name is available', () => {
+    expect(getApprovalSentence('person-hot')).toBe("Got it. They're hot now.");
+  });
+
+  it('keeps the cold line natural when no name is available', () => {
+    expect(getApprovalSentence('person-cold')).toBe("Got it. They're cold now.");
   });
 
   it('weaves a date phrase into the followup line', () => {
@@ -68,12 +72,11 @@ describe('getApprovalSentence', () => {
     expect(getApprovalSentence('unknown' as ApprovalKind)).toBe('Done.');
   });
 
-  it('trims whitespace-only subjects so we do not render "Got it. Hot."', () => {
+  it('trims whitespace-only subjects so we do not render an awkward sentence', () => {
     // A bad caller passing '   ' shouldn't produce an awkward sentence with
     // a stray space wedged in. The component falls back to the no-name form.
-    expect(getApprovalSentence('person-tier', '   ')).toBe(
-      "Got it. They're where they should be.",
-    );
+    expect(getApprovalSentence('person-hot', '   ')).toBe("Got it. They're hot now.");
+    expect(getApprovalSentence('person-cold', '   ')).toBe("Got it. They're cold now.");
   });
 });
 
@@ -91,8 +94,8 @@ describe('approvalKindForTool', () => {
     ['move_deal_stage', 'stage'],
     ['schedule_tour', 'tour'],
     ['reschedule_tour', 'tour'],
-    ['mark_person_hot', 'person-tier'],
-    ['mark_person_cold', 'person-tier'],
+    ['mark_person_hot', 'person-hot'],
+    ['mark_person_cold', 'person-cold'],
     ['set_followup', 'followup'],
   ] as Array<[string, ApprovalKind]>)('maps %s → %s', (tool, kind) => {
     expect(approvalKindForTool(tool)).toBe(kind);

@@ -138,7 +138,8 @@ export function notificationForNewTour(
 
 /**
  * Bell-feed entry for an upcoming tour in the next 24h. The time is the
- * lead fact; address fills the description if we have it.
+ * lead fact; address fills the description if we have it. No filler when
+ * the address is missing — the title already plants the calendar fact.
  */
 export function notificationForUpcomingTour(
   guestName: string,
@@ -150,7 +151,7 @@ export function notificationForUpcomingTour(
   const time = formatClockTime(startsAt);
   return {
     title: `Tour with ${guestName} ${day} at ${time}.`,
-    description: property ?? 'On the calendar.',
+    description: property ?? '',
   };
 }
 

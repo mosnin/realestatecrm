@@ -83,6 +83,15 @@ describe('notification-voice — tours', () => {
     });
   });
 
+  it('drops the description filler when the property is missing', () => {
+    const now = new Date('2026-05-01T08:00:00');
+    const tomorrowAt2 = new Date('2026-05-02T14:00:00');
+    expect(notificationForUpcomingTour('Jane Chen', tomorrowAt2, null, now)).toEqual({
+      title: 'Tour with Jane Chen tomorrow at 2pm.',
+      description: '',
+    });
+  });
+
   it('past-tenses tour status changes with the right verb per status', () => {
     expect(notificationForTourStatus('Sam Chen', 'confirmed', '412 Elm')).toEqual({
       title: "Sam Chen's tour is confirmed.",

@@ -29,12 +29,13 @@ export type ApprovalKind =
   | 'note'
   | 'stage'
   | 'tour'
-  | 'person-tier'
+  | 'person-hot'
+  | 'person-cold'
   | 'followup';
 
 export interface ApprovalCelebrationProps {
   kind: ApprovalKind;
-  /** Person name for `person-tier`, formatted date for `followup`. Ignored otherwise. */
+  /** Person name for `person-hot`/`person-cold`, formatted date for `followup`. Ignored otherwise. */
   subject?: string;
   /** Fired when the dwell + fade have completed and the parent should remove the surface. */
   onDone?: () => void;
@@ -59,7 +60,7 @@ export function approvalSubjectFromArgs(
     return typeof w === 'string' && w.trim().length > 0 ? w.trim() : undefined;
   }
   // For mark_person_hot/cold the args only carry an id — no name. Leave it
-  // empty; the celebration falls back to "They're where they should be."
+  // empty; the celebration falls back to the subject-less direction line.
   return undefined;
 }
 
@@ -92,8 +93,9 @@ export function approvalKindForTool(toolName: string): ApprovalKind | null {
     case 'reschedule_tour':
       return 'tour';
     case 'mark_person_hot':
+      return 'person-hot';
     case 'mark_person_cold':
-      return 'person-tier';
+      return 'person-cold';
     case 'set_followup':
       return 'followup';
     default:
@@ -108,9 +110,10 @@ export function approvalKindForTool(toolName: string): ApprovalKind | null {
  * - The two-thought rhythm ("Sent. I'll watch for a reply.") — the first
  *   word names what just happened; the second sentence names what Chippi
  *   does next. Two short thoughts, one continuous breath.
- * - `person-tier` is intentionally direction-agnostic ("where they should
- *   be"). The same kind covers both mark-hot and mark-cold; the realtor
- *   already knows which way they pushed it.
+ * - `person-hot` / `person-cold` name the direction the realtor just fired.
+ *   The realtor already knows which verb they tapped; the celebration
+ *   echoes it back so they're sure it landed. "Got it. Sam's hot now." is
+ *   confidence; "where they should be" is friendly-vague.
  * - `stage` says "the board" not "the pipeline" — the realtor's word for
  *   the kanban surface they actually look at.
  *
@@ -130,11 +133,13 @@ export function getApprovalSentence(kind: ApprovalKind, subject?: string): strin
       return 'Moved. The board reflects it.';
     case 'tour':
       return "On the calendar. I'll prep them the day before.";
-    case 'person-tier': {
+    case 'person-hot': {
       const name = subject?.trim();
-      return name
-        ? `Got it. ${name}'s where they should be.`
-        : "Got it. They're where they should be.";
+      return name ? `Got it. ${name}'s hot now.` : "Got it. They're hot now.";
+    }
+    case 'person-cold': {
+      const name = subject?.trim();
+      return name ? `Got it. ${name}'s cold now.` : "Got it. They're cold now.";
     }
     case 'followup': {
       const when = subject?.trim();

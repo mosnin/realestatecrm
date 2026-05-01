@@ -201,7 +201,7 @@ export default async function ClientDetailPage({
 
       <details className="group border-t border-border/60 pt-4">
         <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
-          <span>History</span>
+          <span>Activity timeline</span>
           <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
           <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
         </summary>
@@ -455,7 +455,13 @@ function formatDate(when: string | Date): string {
 }
 
 function derivePersonState(
-  contact: { scoreLabel: string | null; lastContactedAt: string | Date | null; followUpAt: string | Date | null; createdAt: string | Date },
+  contact: {
+    scoreLabel: string | null;
+    lastContactedAt: string | Date | null;
+    followUpAt: string | Date | null;
+    createdAt: string | Date;
+    snoozedUntil: string | Date | null;
+  },
   lastActivity: { createdAt: string } | null,
 ): PersonStateForActions {
   const recency = lastActivity?.createdAt ?? contact.lastContactedAt ?? null;
@@ -465,12 +471,17 @@ function derivePersonState(
     contact.scoreLabel === 'hot' || contact.scoreLabel === 'warm' || contact.scoreLabel === 'cold'
       ? contact.scoreLabel
       : null;
+  // `archive_person` sets snoozedUntil to the far future (year 9999). Anything
+  // past today reads as "archived for action-pill purposes" — the realtor
+  // hasn't unsnoozed yet, so the page should stay actionless.
+  const snoozeT = contact.snoozedUntil ? new Date(contact.snoozedUntil).getTime() : null;
+  const isArchived = snoozeT !== null && !Number.isNaN(snoozeT) && snoozeT > Date.now();
   return {
     scoreLabel,
     daysQuiet,
     followUpAt: contact.followUpAt ? new Date(contact.followUpAt).toISOString() : null,
     isNew: ageDays <= 14,
-    archivedAt: null,
+    archivedAt: isArchived ? new Date(snoozeT!).toISOString() : null,
   };
 }
 
@@ -573,15 +584,15 @@ function buildNextMove(
   }
 
   if (state.scoreLabel === 'cold' && (state.daysQuiet ?? 0) >= 7) {
-    return `Cold and quiet for ${state.daysQuiet} days — schedule a check-in.`;
+    return `Cold and quiet for ${state.daysQuiet} days — send a check-in.`;
   }
 
   if (state.daysQuiet !== null && state.daysQuiet >= 7) {
-    return `Quiet for ${state.daysQuiet} days — schedule a check-in.`;
+    return `Quiet for ${state.daysQuiet} days — send a check-in.`;
   }
 
   if (contact.scoringStatus !== 'scored') {
-    return 'Run an AI score to see what to lean on.';
+    return 'Run an AI score to see what stands out.';
   }
 
   return 'No follow-up set — pick a date so they don’t go cold.';
