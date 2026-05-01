@@ -228,4 +228,100 @@ describe('composeMorningStory', () => {
     ).toBeNull();
     expect(composeMorningStory(empty).doorway).toBeNull();
   });
+
+  // ── Agent sentence override ─────────────────────────────────────────────
+  // The route's OpenAI compose, when it succeeds, hands a sentence back here.
+  // We use the model's text but keep the doorway deterministic — we don't
+  // trust the model with navigation.
+
+  it('uses the agent sentence when provided, but keeps the deal doorway', () => {
+    const out = composeMorningStory(
+      { ...empty, ...stuck('Chen', 14) },
+      "Chen's been parked for two weeks — nudge it.",
+    );
+    expect(out.text).toBe("Chen's been parked for two weeks — nudge it.");
+    expect(out.doorway).toEqual({ kind: 'deal', id: 'deal_42' });
+  });
+
+  it('uses the agent sentence when provided, but keeps the person doorway (overdue)', () => {
+    const out = composeMorningStory(
+      { ...empty, ...overdue('Sarah', 4) },
+      "Sarah's been waiting four days. Call her.",
+    );
+    expect(out.text).toBe("Sarah's been waiting four days. Call her.");
+    expect(out.doorway).toEqual({ kind: 'person', id: 'contact_7' });
+  });
+
+  it('uses the agent sentence for new-person branch with the right doorway', () => {
+    const out = composeMorningStory(
+      { ...empty, ...newPerson('David') },
+      'David just walked in — say hi.',
+    );
+    expect(out.text).toBe('David just walked in — say hi.');
+    expect(out.doorway).toEqual({ kind: 'person', id: 'contact_new' });
+  });
+
+  it('uses the agent sentence for hot-person branch with the right doorway', () => {
+    const out = composeMorningStory(
+      { ...empty, ...hotPerson('Maya') },
+      'Maya is heating up. Move now.',
+    );
+    expect(out.text).toBe('Maya is heating up. Move now.');
+    expect(out.doorway).toEqual({ kind: 'person', id: 'contact_hot' });
+  });
+
+  it('falls back to the ladder when the agent sentence is null', () => {
+    const out = composeMorningStory(
+      { ...empty, ...stuck('Chen', 14) },
+      null,
+    );
+    expect(out.text).toBe("The Chen deal hasn't moved in 14 days.");
+  });
+
+  it('falls back to the ladder when the agent sentence is undefined', () => {
+    const out = composeMorningStory(
+      { ...empty, ...stuck('Chen', 14) },
+      undefined,
+    );
+    expect(out.text).toBe("The Chen deal hasn't moved in 14 days.");
+  });
+
+  it('falls back to the ladder when the agent sentence is an empty string', () => {
+    const out = composeMorningStory(
+      { ...empty, ...stuck('Chen', 14) },
+      '',
+    );
+    expect(out.text).toBe("The Chen deal hasn't moved in 14 days.");
+  });
+
+  it('falls back to the ladder when the agent sentence is whitespace only', () => {
+    const out = composeMorningStory(
+      { ...empty, ...stuck('Chen', 14) },
+      '   \n\t  ',
+    );
+    expect(out.text).toBe("The Chen deal hasn't moved in 14 days.");
+  });
+
+  it('trims whitespace around an agent sentence', () => {
+    const out = composeMorningStory(
+      { ...empty, ...overdue('Sarah', 4) },
+      '   Sarah is overdue. Reach out today.   ',
+    );
+    expect(out.text).toBe('Sarah is overdue. Reach out today.');
+  });
+
+  it('ignores the agent sentence on branches with no named subject (drafts)', () => {
+    // The agent should not be called when there's no named subject — but if a
+    // sentence somehow leaks through, the count-only branches stay canonical.
+    const out = composeMorningStory(
+      { ...empty, draftsCount: 3 },
+      'You have a few things waiting.',
+    );
+    expect(out.text).toBe('3 drafts waiting for you.');
+  });
+
+  it('ignores the agent sentence on the all-clear branch', () => {
+    const out = composeMorningStory(empty, 'Nothing to worry about today.');
+    expect(out.text).toBe("All clear. I'll surface anything that needs you.");
+  });
 });

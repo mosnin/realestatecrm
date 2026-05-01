@@ -47,31 +47,47 @@ function isCleanDealTitle(title: string): boolean {
  * The doorway always matches the subject of the sentence: the stuck-deal
  * sentence opens to that deal; the overdue-follow-up sentence opens to
  * that person; new + hot sentences open to that person.
+ *
+ * `agentSentence` (optional): when the route's OpenAI compose succeeds, the
+ * model's sentence overrides the ladder text. The doorway is *still* derived
+ * deterministically from the summary's named subjects — we don't trust the
+ * model with navigation. Empty/whitespace strings are ignored (treated as
+ * "agent didn't produce anything").
  */
-export function composeMorningStory(s: MorningSummary): MorningStoryOutput {
+export function composeMorningStory(
+  s: MorningSummary,
+  agentSentence?: string | null,
+): MorningStoryOutput {
+  const override =
+    typeof agentSentence === 'string' && agentSentence.trim().length > 0
+      ? agentSentence.trim()
+      : null;
+
   if (s.topStuckDeal) {
     const { title, daysStuck, id } = s.topStuckDeal;
     const subject = isCleanDealTitle(title) ? `The ${title} deal` : 'A deal';
-    const text = daysStuck > 0
-      ? `${subject} hasn't moved in ${daysStuck} day${daysStuck === 1 ? '' : 's'}.`
-      : `${subject} is stuck.`;
+    const text = override
+      ?? (daysStuck > 0
+        ? `${subject} hasn't moved in ${daysStuck} day${daysStuck === 1 ? '' : 's'}.`
+        : `${subject} is stuck.`);
     return { text, doorway: { kind: 'deal', id } };
   }
 
   if (s.topOverdueFollowUp) {
     const { name, daysOverdue, id } = s.topOverdueFollowUp;
-    const text = daysOverdue === 0
-      ? `${name}'s follow-up is due today.`
-      : daysOverdue === 1
-        ? `${name}'s follow-up is 1 day overdue.`
-        : `${name}'s follow-up is ${daysOverdue} days overdue.`;
+    const text = override
+      ?? (daysOverdue === 0
+        ? `${name}'s follow-up is due today.`
+        : daysOverdue === 1
+          ? `${name}'s follow-up is 1 day overdue.`
+          : `${name}'s follow-up is ${daysOverdue} days overdue.`);
     return { text, doorway: { kind: 'person', id } };
   }
 
   if (s.topNewPerson) {
     const { name, id } = s.topNewPerson;
     return {
-      text: `${name} just applied. Welcome them.`,
+      text: override ?? `${name} just applied. Welcome them.`,
       doorway: { kind: 'person', id },
     };
   }
@@ -79,7 +95,7 @@ export function composeMorningStory(s: MorningSummary): MorningStoryOutput {
   if (s.topHotPerson) {
     const { name, id } = s.topHotPerson;
     return {
-      text: `${name}'s score is hot. Reach out.`,
+      text: override ?? `${name}'s score is hot. Reach out.`,
       doorway: { kind: 'person', id },
     };
   }

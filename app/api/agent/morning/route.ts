@@ -22,6 +22,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { dealHealth } from '@/lib/deals/health';
 import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
+import { composeAgentSentence } from '@/lib/morning-story-agent';
 
 /** A deal that's gone quiet long enough to have a name on the home. */
 export interface StuckDealSubject {
@@ -41,6 +42,15 @@ export interface OverduePersonSubject {
 export interface NamedPerson {
   id: string;
   name: string;
+}
+
+export interface MorningResponse extends MorningSummary {
+  /**
+   * One-sentence override produced by the agent. Null when the agent is
+   * disabled, fails, times out, or there's no named subject — the client
+   * falls back to the deterministic ladder in `lib/morning-story.ts`.
+   */
+  composedSentence: string | null;
 }
 
 export interface MorningSummary {
@@ -249,5 +259,11 @@ export async function GET() {
     topHotPerson,
   };
 
-  return NextResponse.json(summary);
+  // Agent compose runs on top of the deterministic summary. If it returns
+  // null (no key, no named subject, timeout, error), the client falls back
+  // to the hand-coded ladder. The home never blocks on it.
+  const composedSentence = await composeAgentSentence(space.id, summary);
+
+  const response: MorningResponse = { ...summary, composedSentence };
+  return NextResponse.json(response);
 }
