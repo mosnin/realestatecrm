@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import type { Metadata } from 'next';
+import { H1, TITLE_FONT } from '@/lib/typography';
 import { BrokerLeadsClient, type LeadRow, type RealtorOption, type AssignedLeadProgress } from './broker-leads-client';
 
 export const metadata: Metadata = { title: 'Leads — Broker Dashboard' };
@@ -241,14 +242,36 @@ export default async function BrokerLeadsPage() {
     assignedLeadProgress[id] = progress;
   }
 
+  // ── Page-scoped narration. Pick the loudest fact for THIS page: routing
+  // load, hot pipeline waiting on someone, or "caught up." Hand-coded ladder.
+  const subtitle = (() => {
+    const unassignedCount = unassignedLeads.length;
+    if (unassignedCount > 0) {
+      return `${unassignedCount} ${unassignedCount === 1 ? 'lead' : 'leads'} landed unassigned. Route ${unassignedCount === 1 ? 'it' : 'them'}.`;
+    }
+    const hotAssigned = assignedLeads.filter(
+      (l) => l.scoreLabel?.toLowerCase() === 'hot',
+    ).length;
+    if (hotAssigned > 0) {
+      return `${hotAssigned} hot ${hotAssigned === 1 ? 'lead' : 'leads'} on a realtor's plate. Check in.`;
+    }
+    const total = unassignedCount + assignedLeads.length;
+    if (total === 0) {
+      return 'No leads yet. The intake form is waiting.';
+    }
+    return `Caught up. ${total} ${total === 1 ? 'lead' : 'leads'} in the brokerage.`;
+  })();
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Leads</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {unassignedLeads.length} unassigned &middot; {assignedLeads.length} assigned &middot; {brokerage.name}
+      <header className="space-y-2">
+        <h1 className={H1} style={TITLE_FONT}>
+          Leads
+        </h1>
+        <p className="text-lg text-muted-foreground" style={TITLE_FONT}>
+          {subtitle}
         </p>
-      </div>
+      </header>
 
       <BrokerLeadsClient
         unassignedLeads={unassignedLeads}

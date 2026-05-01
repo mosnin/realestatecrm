@@ -33,7 +33,7 @@ export default function CombinedFeaturedSection() {
 
           <div className="relative mt-4">
             <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 px-3 py-1 bg-card text-foreground rounded-md text-xs font-medium shadow flex items-center gap-2 border border-border">
-              📍 Most recent form from Midtown
+              <MapPin className="w-3 h-3" aria-hidden /> Most recent form from Midtown
             </div>
             <Map />
           </div>

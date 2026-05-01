@@ -7,14 +7,18 @@ import { cn } from '@/lib/utils';
 import type { DealChecklistItem, ChecklistKind, TemplateId } from '@/lib/deals/checklist';
 import { TEMPLATES } from '@/lib/deals/checklist';
 
+// Plain bullet for every kind. The label next to the bullet already names
+// the step ("Earnest money", "Inspection"); a decorative emoji on top of
+// that adds nothing the user can't already read, and breaks the brand
+// voice (no emoji except the curly arrow). Keep the column for alignment.
 const KIND_ICON: Record<ChecklistKind, string> = {
-  earnest_money: '💰',
-  inspection: '🔍',
-  appraisal: '📋',
-  loan_commitment: '🏦',
-  clear_to_close: '✅',
-  final_walkthrough: '🚶',
-  closing: '🔑',
+  earnest_money: '•',
+  inspection: '•',
+  appraisal: '•',
+  loan_commitment: '•',
+  clear_to_close: '•',
+  final_walkthrough: '•',
+  closing: '•',
   custom: '•',
 };
 

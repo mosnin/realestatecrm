@@ -13,51 +13,40 @@
  * than nothing.
  *
  * What this file IS:
- *   - A scan of a fixed list of user-facing source files for forbidden
+ *   - A scan of every user-facing source file (auto-discovered) for forbidden
  *     phrases, anti-patterns, emoji, and structural copy mistakes.
  *   - A length cap on the home story sentence (the h1 wraps ugly past 80).
  *   - A check that the canonical CTA verbs we ship actually appear.
  *
- * What this file is NOT:
- *   - A whole-codebase scan. We list files explicitly. Wider scans are slow,
- *     noisy, and produce false positives in tests, comments, and fixtures.
- *   - A "lint" of the AI agent's outputs. Agent SYSTEM_PROMPTs INSTRUCT the
- *     model — we still check they don't themselves contain forbidden phrases
- *     (so the model isn't being told to use them by accident), but we do not
- *     interpret prompt body text as user copy.
+ * Discovery is automatic, not hand-curated. See `editorial-voice-utils.ts`
+ * for the rule (one rule, with a small EXCLUDES list — that's it).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { composeMorningStory } from '@/lib/morning-story';
 import type { MorningSummary } from '@/app/api/agent/morning/route';
+import { discoverEditorialFiles } from './editorial-voice-utils';
 
 // ── File set under audit ────────────────────────────────────────────────────
-// The scope is deliberately small. These are the surfaces where Chippi's
-// voice is loudest: the home, the focus card, the table headers, the
-// follow-ups view, the calendar, the leads page, and the AI prompts that
-// shape what Chippi says back. If a tone problem ships from outside this
-// set, we add the file here — we don't widen the scan to all of `app/`.
+// Auto-discovered from the filesystem. Every `.ts`/`.tsx` under `app/`,
+// `components/`, plus the prompt files in `lib/`, MINUS test code, auth,
+// admin, API routes, type declarations, and >50KB files. The list of
+// excludes is the only knob; the rest is enforced by default.
+//
+// Hand-curated lists drift. New surfaces ship; the list doesn't get updated;
+// the rules silently stop applying. Auto-discovery makes that impossible.
 const ROOT = resolve(__dirname, '..', '..');
-const FILES_UNDER_AUDIT = [
-  'lib/morning-story.ts',
-  'lib/morning-story-agent.ts',
-  'lib/ai-tools/system-prompt.ts',
-  'app/api/agent/quick-draft/route.ts',
-  'components/chippi/morning-story.tsx',
-  'components/chippi/morning-actions.ts',
-  'components/chippi/morning-action-sheet.tsx',
-  'components/chippi/focus-card.tsx',
-  'components/contacts/contact-table.tsx',
-  'components/deals/deals-page-client.tsx',
-  'components/follow-ups/follow-ups-view.tsx',
-  'app/s/[slug]/leads/page.tsx',
-  'app/s/[slug]/calendar/calendar-view.tsx',
-] as const;
+const FILES_UNDER_AUDIT = discoverEditorialFiles(ROOT);
+
+// Stats log up front — if the count drifts unexpectedly (a new top-level
+// directory appears, or excludes accidentally swallow real surfaces), this
+// is the first thing you'll see.
+console.log(`[editorial-voice] auditing ${FILES_UNDER_AUDIT.length} files`);
 
 /** Read each audited file once. Failing to read is a hard error — the test
- * file is the canonical reference; if the path moves, this test must be
- * updated, not the audit silently weakened. */
+ * file is the canonical reference; if discovery hands us a path that won't
+ * read, that's a real problem worth surfacing. */
 function readAudited(): Array<{ path: string; text: string }> {
   return FILES_UNDER_AUDIT.map((rel) => ({
     path: rel,
@@ -205,10 +194,7 @@ describe('editorial voice — morning sentence length', () => {
 //
 // We assert presence by string-matching across the audited file set. The
 // match is intentionally loose (a substring is enough); copy can live in
-// JSX, an object literal, or a `>Text<` body. The `Add a person` and
-// `Add deal` pills live in files outside the audit set (contact-form,
-// kanban) — we don't assert those here; widening the scope just to keep
-// the assertion green would be process for its own sake.
+// JSX, an object literal, or a `>Text<` body.
 describe('editorial voice — canonical CTA verbs', () => {
   const audited = readAudited();
   const allText = audited.map((f) => f.text).join('\n');

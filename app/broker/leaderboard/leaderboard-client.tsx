@@ -59,21 +59,21 @@ function RankBadge({ rank }: { rank: number }) {
   if (rank === 1) {
     return (
       <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5 text-xs font-semibold dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700">
-        🏆 1st
+        <Trophy size={12} aria-hidden /> 1st
       </span>
     );
   }
   if (rank === 2) {
     return (
       <span className="inline-flex items-center gap-1 bg-gray-50 text-gray-600 border border-gray-200 rounded-full px-2.5 py-0.5 text-xs font-semibold dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600">
-        🥈 2nd
+        <Medal size={12} aria-hidden /> 2nd
       </span>
     );
   }
   if (rank === 3) {
     return (
       <span className="inline-flex items-center gap-1 bg-orange-50 text-orange-700 border border-orange-200 rounded-full px-2.5 py-0.5 text-xs font-semibold dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700">
-        🥉 3rd
+        <Medal size={12} aria-hidden /> 3rd
       </span>
     );
   }
@@ -119,7 +119,7 @@ export function LeaderboardClient({ initialStats }: { initialStats: RealtorStats
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
-            🏆 Team Leaderboard
+            <Trophy size={20} aria-hidden /> Team Leaderboard
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             Top performers for {getCurrentMonthYear()}
