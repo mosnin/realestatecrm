@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { ChippiPromptBox, type MentionItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Mic, Square, Settings, ArrowLeft, Play, Loader2, NotebookText } from 'lucide-react';
+import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { VoiceMode } from '@/components/ai/voice-mode';
@@ -17,7 +17,6 @@ import { blocksFromLegacyContent, type MessageBlock } from '@/lib/ai-tools/block
 import type { Conversation } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { TodayFeed } from './today-feed';
-import { HowChippiWorksTip } from './how-chippi-works-tip';
 import { MorningReplay } from './morning-replay';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { toast } from 'sonner';
@@ -45,13 +44,6 @@ interface ChippiWorkspaceProps {
 }
 
 const MESSAGE_LIMIT = 50;
-
-const SUGGESTIONS: { emoji: string; text: string }[] = [
-  { emoji: '✍️', text: 'Draft a follow-up for my hottest lead' },
-  { emoji: '📋', text: 'Who needs a check-in today?' },
-  { emoji: '🏠', text: 'Help me prep for my next tour' },
-  { emoji: '📊', text: "Summarize what changed this week" },
-];
 
 function timeBasedGreeting(): string {
   const h = new Date().getHours();
@@ -430,6 +422,7 @@ export function ChippiWorkspace({
       onSend={handleSend}
       onMentionSearch={handleMentionSearch}
       onVoiceStart={() => setVoiceOpen(true)}
+      onAbort={abort}
       disabled={isStreaming || pendingApproval !== null}
       isLoading={isStreaming}
       prefill={prefill ?? undefined}
@@ -568,7 +561,7 @@ export function ChippiWorkspace({
       ) : isEmpty ? (
         <>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 sm:pt-14 pb-40 sm:pb-32 space-y-10 sm:space-y-12">
+            <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 pt-8 sm:pt-14 pb-40 sm:pb-32 space-y-10 sm:space-y-12">
               {/* Greeting + status */}
               <header className="space-y-1.5 text-center">
                 <h1
@@ -587,10 +580,11 @@ export function ChippiWorkspace({
                   Renders nothing when there's no overnight activity. */}
               <MorningReplay slug={slug} />
 
-              {/* How Chippi works — explains the autonomous loop. Dismissed
-                  forever once acknowledged so it doesn't add noise on return
-                  visits. localStorage key is workspace-local. */}
-              <HowChippiWorksTip />
+              {/* HowChippiWorksTip removed — documentation in the product is
+                  product failure. The empty-state status sentence ("I keep
+                  your day moving so you don't have to.") and the brand voice
+                  on every interaction now carry the meaning the tip card
+                  used to spell out. */}
 
               {/* Today's work */}
               <TodayFeed
@@ -602,26 +596,13 @@ export function ChippiWorkspace({
             </div>
           </div>
 
-          {/* Docked composer + quick prompts — sticky to viewport bottom so
-              the input stays reachable as the realtor scrolls. Suggestions
-              sit ABOVE the composer so the input is the bottom-most element
-              (no detached chips below the box). The bg-gradient fades
-              content under the dock. */}
-          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-2.5 bg-gradient-to-t from-background via-background to-background/0">
-            <div className="flex flex-wrap gap-1.5 justify-center sm:justify-start">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s.text}
-                  type="button"
-                  onClick={() => handleSend(s.text, [])}
-                  disabled={isStreaming || pendingApproval !== null}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background hover:bg-accent/40 hover:border-border px-3 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span aria-hidden>{s.emoji}</span>
-                  <span>{s.text}</span>
-                </button>
-              ))}
-            </div>
+          {/* Docked composer — sticky to viewport bottom so the input stays
+              reachable as the realtor scrolls. The four suggestion chips
+              that used to sit above were a crutch (and ChatGPT removed
+              theirs for a reason). The composer's placeholder already
+              cues the verbs: "draft a follow-up, prep a tour, summarize
+              your day…" — trust the user to type. */}
+          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0">
             {renderInput()}
           </div>
         </>
@@ -630,7 +611,7 @@ export function ChippiWorkspace({
           {/* Active thread */}
           <div className="flex-1 min-h-0 overflow-hidden">
             <ScrollArea className="h-full">
-              <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-4">
+              <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-4">
                 {/* Conversation title — quiet, only when we have one */}
                 {activeConversationId && (
                   <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-6 truncate">
@@ -711,20 +692,9 @@ export function ChippiWorkspace({
             </ScrollArea>
           </div>
 
-          {/* Stop button — quiet, above the input while streaming */}
-          {isStreaming && !atLimit && (
-            <div className="flex-shrink-0 w-full max-w-3xl mx-auto px-4 sm:px-6 flex justify-center pb-1">
-              <button
-                type="button"
-                onClick={abort}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background hover:bg-muted px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                title="Stop generating"
-              >
-                <Square size={10} className="fill-current" />
-                Stop
-              </button>
-            </div>
-          )}
+          {/* The standalone Stop button used to live here — moved into the
+              composer's right-slot (Send → Stop swap) so the abort affordance
+              sits exactly where the user's eye is. ChatGPT / Claude pattern. */}
 
           {/* Docked input — sticky to viewport bottom (matches the empty
               state's composer dock so the input never rides up with messages). */}
