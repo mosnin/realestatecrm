@@ -564,10 +564,7 @@ export function ChippiWorkspace({
                   {greeting}
                   {firstName ? `, ${firstName}` : ''}.
                 </h1>
-                <MorningStory
-                  slug={slug}
-                  fallback="I keep your day moving so you don't have to."
-                />
+                <MorningStory slug={slug} />
               </header>
 
               {/* Morning replay — the wow moment. Auto-renders the first
