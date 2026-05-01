@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -285,18 +285,12 @@ export default function IntakeCustomizePage() {
   const isCustom = configSource === 'custom' && hasSavedConfig;
   const isBrokerage = configSource === 'brokerage';
 
-  // Chippi narration: one sentence describing what the realtor is editing
-  // and what's pending. Kept tight — the screen explains itself; no banner
-  // hand-holding about "Save to create your own version."
-  const subtitle = useMemo(() => {
-    const base = isCustom
-      ? `Your ${formLabel}.`
-      : isBrokerage
-        ? `Brokerage ${formLabel}.`
-        : `Default ${formLabel}.`;
-    if (hasChanges) return `${base} Unsaved changes.`;
-    return base;
-  }, [isCustom, isBrokerage, formLabel, hasChanges]);
+  const subtitleBase = isCustom
+    ? `Your ${formLabel}.`
+    : isBrokerage
+      ? `Brokerage ${formLabel}.`
+      : `Default ${formLabel}.`;
+  const subtitle = hasChanges ? `${subtitleBase} Unsaved changes.` : subtitleBase;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_480px] gap-6 max-w-[1600px]">
