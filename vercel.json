@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/agent-sweep",
       "schedule": "0 */4 * * *"
+    },
+    {
+      "path": "/api/cron/draft-outcomes",
+      "schedule": "0 3 * * *"
     }
   ],
   "headers": [

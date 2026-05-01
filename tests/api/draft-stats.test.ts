@@ -135,6 +135,8 @@ describe('GET /api/agent/draft-stats', () => {
       editedRate: 0,
       medianEditDistance: null,
       medianDecisionMs: null,
+      outcomeCheckedCount: 0,
+      outcomeAdvancedRate: 0,
     });
   });
 
@@ -172,6 +174,9 @@ describe('GET /api/agent/draft-stats', () => {
       medianEditDistance: 4,
       // Decision ms: [3000, 5000, 7000, 9000, 11000, 13000, 15000, 17000, 19000], middle = 11000.
       medianDecisionMs: 11000,
+      // No rows had an outcome_signal in this fixture → both fields zero.
+      outcomeCheckedCount: 0,
+      outcomeAdvancedRate: 0,
     });
   });
 
@@ -253,6 +258,67 @@ describe('GET /api/agent/draft-stats', () => {
     // Within a few seconds of "now - 30 days" — clock drift across the boundary
     // shouldn't fail the test.
     expect(Math.abs(since - expected)).toBeLessThan(5000);
+  });
+
+  it('selects outcome_signal alongside the feedback columns', async () => {
+    // The route has to actually pull outcome_signal off AgentDraft, otherwise
+    // the entire phase-13 metric is zero forever.
+    supabaseTerminal = { data: [] };
+    await GET();
+
+    const draftCall = supabaseCalls[0];
+    const selectCalls = draftCall.chain.filter(([m]) => m === 'select');
+    expect(selectCalls).toHaveLength(1);
+    const selectArg = selectCalls[0][1][0] as string;
+    expect(selectArg).toContain('outcome_signal');
+    expect(selectArg).toContain('feedback_action');
+  });
+
+  it('outcome attribution: 2 advanced + 3 none + 1 unchecked → rate over checked only', async () => {
+    // The unchecked row contributes to feedback totals but not to the outcome
+    // rate, so the cron's day-1 delay doesn't poison "this draft just sent
+    // and hasn't had time to land yet."
+    supabaseTerminal = {
+      data: [
+        { feedback_action: 'approved', edit_distance: 0, decision_ms: 5000, outcome_signal: 'deal_advanced' },
+        { feedback_action: 'approved', edit_distance: 0, decision_ms: 6000, outcome_signal: 'deal_advanced' },
+        { feedback_action: 'approved', edit_distance: 0, decision_ms: 7000, outcome_signal: 'none' },
+        { feedback_action: 'edited_and_approved', edit_distance: 4, decision_ms: 8000, outcome_signal: 'none' },
+        { feedback_action: 'approved', edit_distance: 0, decision_ms: 9000, outcome_signal: 'none' },
+        // One sent draft the cron hasn't checked yet.
+        { feedback_action: 'approved', edit_distance: 0, decision_ms: 10000, outcome_signal: null },
+      ],
+    };
+
+    const res = await GET();
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    // 5 of 6 had a checked outcome.
+    expect(body.outcomeCheckedCount).toBe(5);
+    // 2 of those 5 advanced → 0.4 exactly.
+    expect(body.outcomeAdvancedRate).toBe(0.4);
+
+    // Feedback totals are unchanged in shape: 6 total because all 6 had a
+    // feedback_action. The unchecked row is counted in `total` but not in
+    // outcomeCheckedCount.
+    expect(body.total).toBe(6);
+  });
+
+  it('outcome attribution: zero checked drafts → rate is 0 (not NaN, not null)', async () => {
+    // A workspace where everything is fresh shouldn't render NaN in the UI.
+    supabaseTerminal = {
+      data: [
+        { feedback_action: 'approved', edit_distance: 0, decision_ms: 5000, outcome_signal: null },
+        { feedback_action: 'rejected', edit_distance: null, decision_ms: 1500, outcome_signal: null },
+      ],
+    };
+
+    const res = await GET();
+    const body = await res.json();
+
+    expect(body.outcomeCheckedCount).toBe(0);
+    expect(body.outcomeAdvancedRate).toBe(0);
   });
 
   it('ignores rows with edit_distance 0 when computing median (only true edits)', async () => {
