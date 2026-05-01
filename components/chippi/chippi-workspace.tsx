@@ -18,6 +18,7 @@ import type { Conversation } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { TodayFeed } from './today-feed';
 import { MorningReplay } from './morning-replay';
+import { MorningStory } from './morning-story';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { toast } from 'sonner';
 
@@ -368,22 +369,6 @@ export function ChippiWorkspace({
     counts.questions === 0 &&
     conversations.length === 0;
 
-  // The empty case is the moment to remind the realtor what Chippi is FOR.
-  // Operational status sentence appears only when there's actually work
-  // pending. The promise line carries the rest of the time. Same pattern
-  // Apple keynotes used: positioning in the quiet moments, status in the
-  // busy ones.
-  function statusSentence(): string {
-    if (!countsLoaded) return "I keep your day moving so you don't have to.";
-    const parts: string[] = [];
-    if (counts.drafts > 0) parts.push(`${counts.drafts} draft${counts.drafts === 1 ? '' : 's'}`);
-    if (counts.questions > 0) parts.push(`${counts.questions} question${counts.questions === 1 ? '' : 's'}`);
-    if (parts.length === 0) {
-      return "I keep your day moving so you don't have to.";
-    }
-    return `${parts.join(' · ')} waiting for you.`;
-  }
-
   // Run Now — kicks off a background sweep and tells the user via toast.
   const [running, setRunning] = useState(false);
   async function handleRunNow() {
@@ -562,7 +547,15 @@ export function ChippiWorkspace({
         <>
           <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 pt-8 sm:pt-14 pb-40 sm:pb-32 space-y-10 sm:space-y-12">
-              {/* Greeting + status */}
+              {/* Greeting + Chippi's composed morning story. The story
+                  pulls stuck deals, overdue follow-ups, new arrivals, hot
+                  contacts, drafts, and questions in one shot — names the
+                  loudest single fact and (when there's a top pick) becomes
+                  a doorway to that person's page. Replaces the old "X
+                  drafts · Y questions" inventory line, which only saw two
+                  of the seven things actually pressing on the realtor's
+                  desk. The fallback is the brand-positioning line so the
+                  load skeleton never reads as empty. */}
               <header className="space-y-1.5 text-center">
                 <h1
                   className="text-[2.25rem] sm:text-[2.5rem] tracking-tight text-foreground leading-tight"
@@ -571,7 +564,7 @@ export function ChippiWorkspace({
                   {greeting}
                   {firstName ? `, ${firstName}` : ''}.
                 </h1>
-                <p className="text-sm text-muted-foreground">{statusSentence()}</p>
+                <MorningStory slug={slug} />
               </header>
 
               {/* Morning replay — the wow moment. Auto-renders the first
