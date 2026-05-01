@@ -282,7 +282,7 @@ describe('composeMorningStory', () => {
 
   it('lands on "all clear" when nothing is pressing', () => {
     expect(composeMorningStory(empty).text).toBe(
-      "All clear. I'll surface anything that needs you.",
+      "Nothing pressing. I'm watching the pipeline.",
     );
   });
 
@@ -391,7 +391,7 @@ describe('composeMorningStory', () => {
 
   it('ignores the agent sentence on the all-clear branch', () => {
     const out = composeMorningStory(empty, 'Nothing to worry about today.');
-    expect(out.text).toBe("All clear. I'll surface anything that needs you.");
+    expect(out.text).toBe("Nothing pressing. I'm watching the pipeline.");
   });
 
   // ── Skip / cycle: the "Next" pill on the home ────────────────────────────
@@ -497,7 +497,7 @@ describe('composeMorningStory', () => {
       ...hotPerson('Maya'),
     };
     const out = composeMorningStory(summary, null, { skip: 1 });
-    expect(out.text).toBe("All clear. I'll surface anything that needs you.");
+    expect(out.text).toBe("Nothing pressing. I'm watching the pipeline.");
     expect(out.doorway).toBeNull();
   });
 

@@ -3,6 +3,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import { notifyBroker } from '@/lib/broker-notify';
+import { notificationForMemberJoined } from '@/lib/notification-voice';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 /**
@@ -200,11 +201,16 @@ export async function POST(_req: Request, { params }: Params) {
 
   void audit({ actorClerkId: clerkId, action: 'CREATE', resource: 'BrokerageMembership', metadata: { brokerageId: inv.brokerageId, role: inv.roleToAssign, method: 'email_invitation', invitationId: inv.id } });
 
+  const inviteCopy = notificationForMemberJoined(
+    user.email,
+    inv.roleToAssign === 'broker_admin' ? 'broker_admin' : 'realtor_member',
+    'email_invitation',
+  );
   void notifyBroker({
     brokerageId: inv.brokerageId,
     type: 'member_joined',
-    title: `${user.email} joined via invitation`,
-    body: `Assigned role: ${inv.roleToAssign === 'broker_admin' ? 'Admin' : 'Realtor'}`,
+    title: inviteCopy.title,
+    body: inviteCopy.description,
     metadata: { userId: user.id, method: 'email_invitation' },
   });
 

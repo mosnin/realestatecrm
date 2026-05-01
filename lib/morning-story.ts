@@ -97,7 +97,7 @@ export function countMorningCandidates(s: MorningSummary): number {
  *   4. New person — name the most-recent arrival.
  *   5. Drafts/questions — count only (focus card is right below).
  *   6. Closing this week — count only.
- *   7. All clear.
+ *   7. Nothing pressing — calm, present-tense, declarative.
  *
  * Hot beats new because hot is *measured* intent (leadScore >= threshold),
  * and that intent rots if the realtor goes quiet. New is just an arrival —
@@ -167,7 +167,7 @@ export function composeMorningStory(
   }
 
   return {
-    text: "All clear. I'll surface anything that needs you.",
+    text: "Nothing pressing. I'm watching the pipeline.",
     doorway: null,
   };
 }

@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { audit } from '@/lib/audit';
 import { notifyBroker } from '@/lib/broker-notify';
+import { notificationForMemberJoined } from '@/lib/notification-voice';
 
 /**
  * POST /api/broker/join
@@ -90,11 +91,16 @@ export async function POST(req: Request) {
 
   // Resolve user email for notification
   const { data: userData } = await supabase.from('User').select('email').eq('id', user.id).maybeSingle();
+  const joinCopy = notificationForMemberJoined(
+    userData?.email ?? 'A new member',
+    'realtor_member',
+    'join_code',
+  );
   void notifyBroker({
     brokerageId: brokerage.id,
     type: 'member_joined',
-    title: `${userData?.email ?? 'A new member'} joined via invite code`,
-    body: 'Assigned role: Realtor',
+    title: joinCopy.title,
+    body: joinCopy.description,
     metadata: { userId: user.id, method: 'join_code' },
   });
 

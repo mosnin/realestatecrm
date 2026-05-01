@@ -12,6 +12,7 @@ import {
   publicApplicationSchema,
 } from '@/lib/public-application';
 import { notifyBroker } from '@/lib/broker-notify';
+import { notificationForNewBrokerageLead } from '@/lib/notification-voice';
 import { sendApplicationConfirmation } from '@/lib/email';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { z } from 'zod';
@@ -723,11 +724,15 @@ export async function POST(req: NextRequest) {
     // Send brokerage dashboard notification + applicant confirmation email in parallel
     const businessName = spaceBusinessName || brokerage.name || space.name;
 
+    const brokerLeadCopy = notificationForNewBrokerageLead(contactName, {
+      phone: contactPhone,
+      email: contactEmail,
+    });
     const brokerNotification = notifyBroker({
       brokerageId: brokerage.id,
       type: 'lead_hot',
-      title: `New brokerage lead: ${contactName}`,
-      body: contactPhone ?? contactEmail ?? 'New application submitted',
+      title: brokerLeadCopy.title,
+      body: brokerLeadCopy.description,
       metadata: {
         contactId: contact.id,
         leadScore: scoring.leadScore,
