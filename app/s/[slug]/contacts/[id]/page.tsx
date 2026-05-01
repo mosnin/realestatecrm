@@ -8,11 +8,7 @@ import {
   Phone,
   MapPin,
   ExternalLink,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
   Sparkles,
-  Info,
   Calendar,
 } from 'lucide-react';
 import type { Contact, ApplicationData, LeadScoreDetails, IntakeFormConfig } from '@/lib/types';
@@ -27,33 +23,34 @@ import { ApplicationStatusManager } from '@/components/contacts/application-stat
 import { PdfExportButton } from '@/components/contacts/pdf-export-button';
 import { CollapsibleSection } from '@/components/contacts/collapsible-section';
 import { DynamicApplicationDisplay } from '@/components/contacts/dynamic-application-display';
-import { ContactTabStrip } from '@/components/contacts/contact-tab-strip';
 import { WhyThisScore } from '@/components/contacts/why-this-score';
 import { formatCurrency } from '@/lib/formatting';
 import { getSpaceFromSlug } from '@/lib/space';
 import { AgentContactPanel } from '@/components/agent/agent-contact-panel';
-
+import {
+  buildPeopleDetailActions,
+  type PeopleDetailAction,
+  type PersonStateForActions,
+} from '@/lib/people-detail-actions';
 
 function tierBadgeClasses(label: string) {
-  if (label === 'hot') return 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400';
-  if (label === 'warm') return 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400';
-  return 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400';
+  if (label === 'hot') return 'text-red-700 dark:text-red-400';
+  if (label === 'warm') return 'text-amber-700 dark:text-amber-400';
+  return 'text-muted-foreground';
 }
 
 export default async function ClientDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ slug: string; id: string }>;
-  searchParams: Promise<{ tab?: string }>;
 }) {
   const { slug, id } = await params;
-  const { tab } = await searchParams;
 
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
   let contact: (Contact & { dealContacts: { deal: { id: string; title: string; address: string | null; value: number | null; status: string; priority: string; stage: { name: string; color: string } } }[]; tours: { id: string; startsAt: string; endsAt: string; status: string; propertyAddress: string | null }[] }) | null = null;
+  let lastActivity: { type: string; content: string | null; createdAt: string } | null = null;
   try {
     const { data: contactData, error: contactError } = await supabase.from('Contact').select('*').eq('id', id).single();
     if (contactError && contactError.code === 'PGRST116') {
@@ -67,6 +64,15 @@ export default async function ClientDetailPage({
       const { data: dealRows, error: dealError } = await supabase.from('DealContact').select('Deal(id, title, address, value, status, priority, DealStage(name, color))').eq('contactId', id);
       if (dealError) throw dealError;
       const { data: tourRows } = await supabase.from('Tour').select('id, guestName, startsAt, endsAt, status, propertyAddress').eq('contactId', id).order('startsAt', { ascending: false }).limit(10);
+      const { data: latest } = await supabase
+        .from('ContactActivity')
+        .select('type, content, createdAt')
+        .eq('contactId', id)
+        .eq('spaceId', space.id)
+        .order('createdAt', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latest) lastActivity = latest as { type: string; content: string | null; createdAt: string };
       contact = {
         ...c,
         dealContacts: ((dealRows ?? []) as unknown as { Deal: { id: string; title: string; address: string | null; value: number | null; status: string; priority: string; DealStage: { name: string; color: string } | null } }[]).map((row) => ({
@@ -104,16 +110,19 @@ export default async function ClientDetailPage({
   const app = contact.applicationData as ApplicationData | null;
   const details = contact.scoreDetails as LeadScoreDetails | null;
   const formSnapshot = contact.formConfigSnapshot as IntakeFormConfig | null;
-  const activeTab = (tab === 'overview' || tab === 'activity' || tab === 'intelligence' || tab === 'deals')
-    ? tab
-    : 'overview';
-  const tabHref = (key: string) => `/s/${slug}/contacts/${contact.id}?tab=${key}`;
+
+  const personState = derivePersonState(contact, lastActivity);
+  const actions = buildPeopleDetailActions(personState);
+
+  const hasOpenApp = !!app && (contact.applicationStatus === 'received' || contact.applicationStatus == null);
+  const hasOpenDeals = contact.dealContacts.length > 0;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
-      {/* Header — broker-overview pattern: muted breadcrumb, serif h1,
-          one-line status sentence. The contact's name IS the page. */}
-      <header className="space-y-1.5">
+      {/* Headline — name is the page. The next four lines tell the realtor
+          everything they need to know in three seconds: who, how warm, how
+          quiet, what just happened, what to do next. */}
+      <header className="space-y-2">
         <Link
           href={`/s/${slug}/contacts`}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -126,66 +135,33 @@ export default async function ClientDetailPage({
         >
           {contact.name}
         </h1>
-        <p className="text-sm text-muted-foreground">
-          {buildStatusSentence(contact, app)}
+        <p className="text-sm text-muted-foreground tabular-nums">
+          {buildStatusLine(contact, personState)}
+        </p>
+        {lastActivity && (
+          <p className="text-sm text-muted-foreground">
+            {buildLastActivityLine(lastActivity)}
+          </p>
+        )}
+        <p className="text-base text-foreground leading-relaxed">
+          {buildNextMove(contact, personState, details)}
         </p>
       </header>
 
-      {/* Stat strip — 4-cell hairline grid (broker-overview vocabulary).
-          Stage / Score / Follow-up / Budget — the four numbers a realtor
-          glances at before doing anything else. */}
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
-        <div className="bg-background px-4 py-3.5">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Stage</p>
-          <p className="text-sm font-medium mt-1 text-foreground">{stageLabel(contact.type)}</p>
+      {/* Action pills — same vocabulary as the morning home's compose
+          actions. State picks them; the realtor doesn't. */}
+      {actions.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {actions.map((a, i) => (
+            <ActionPill key={a.id} action={a} primary={i === 0} />
+          ))}
         </div>
-        <div className="bg-background px-4 py-3.5">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Score</p>
-          <p className="text-sm font-medium mt-1 text-foreground tabular-nums">
-            {contact.leadScore != null ? (
-              <>
-                {Math.round(contact.leadScore)}
-                {contact.scoreLabel && (
-                  <span className="ml-1 text-xs text-muted-foreground">{contact.scoreLabel}</span>
-                )}
-              </>
-            ) : '—'}
-          </p>
-        </div>
-        <div className="bg-background px-4 py-3.5">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Follow-up</p>
-          <p className="text-sm font-medium mt-1 text-foreground">
-            {contact.followUpAt
-              ? new Date(String(contact.followUpAt)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-              : '—'}
-          </p>
-        </div>
-        <div className="bg-background px-4 py-3.5">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Budget</p>
-          <p className="text-sm font-medium mt-1 text-foreground tabular-nums">
-            {contact.budget != null ? formatCurrency(contact.budget) : '—'}
-          </p>
-        </div>
-      </section>
-
-      {/* What's next — focal action card. Lead with the answer, hide the
-          taxonomy. The audit said "the realtor came here to know what to
-          do next" — this card is the answer. Always renders something:
-          when the AI hasn't produced a recommended action, fall back to
-          a heuristic so the slot is never empty. */}
-      <section className="rounded-xl border border-border/70 bg-card px-5 py-4 space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          What&apos;s next
-        </p>
-        <p className="text-base text-foreground leading-relaxed">
-          {nextStepFor(contact, app, details)}
-        </p>
-      </section>
+      )}
 
       {/* Quick contact bar — email/phone/address inline, applicant portal
-          tucked in. No bordered boxes — just a row. */}
+          tucked in. Hairline on the page, not a card. */}
       {(contact.email || contact.phone || contact.address || (contact.applicationRef && contact.statusPortalToken)) && (
-        <section className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+        <section className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm border-t border-border/60 pt-4">
           {contact.email && (
             <a
               href={`mailto:${contact.email}`}
@@ -218,264 +194,346 @@ export default async function ClientDetailPage({
         </section>
       )}
 
-      {/* Tab strip — sliding underline via motion.layoutId (matches the
-          broker reviews + agent-activity surfaces). Old `?tab=intelligence`
-          and `?tab=deals` URLs render as Overview because those views
-          folded into Overview's flow. */}
-      <ContactTabStrip active={activeTab} hrefFor={(k) => tabHref(k)} />
+      {/* Below the fold — every section is a <details>. The default-open
+          rule is "open when there's something to act on." A finished
+          application is collapsed; a received one is open. A deal in flight
+          is open; no deals means the section doesn't render. */}
 
-      {/* Overview — single column flow. Cards uniform: rounded-xl
-          border-border/70 bg-card. */}
-      {activeTab !== 'activity' && (
-        <div className="space-y-6">
-          <AgentContactPanel contactId={contact.id} slug={slug} contactName={contact.name} />
+      <details className="group border-t border-border/60 pt-4">
+        <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
+          <span>History</span>
+          <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+          <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+        </summary>
+        <div className="mt-4">
+          <ContactActivityTab contactId={contact.id} contactCreatedAt={String(contact.createdAt)} />
+        </div>
+      </details>
 
-          {/* Pipeline stage progression */}
-          <section className="rounded-xl border border-border/70 bg-card p-4 space-y-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Pipeline
-            </p>
-            <div className="overflow-x-auto pb-1">
-              <div className="min-w-max">
-                <StageProgression contactId={contact.id} currentType={contact.type} />
-              </div>
-            </div>
-          </section>
+      <AgentContactPanel contactId={contact.id} slug={slug} contactName={contact.name} />
 
-          {/* Score block — answer first, taxonomy hidden behind a "Why?"
-              expander. The big number + tier badge + recommended action
-              already lived above; this is the supporting detail. */}
-          {contact.scoringStatus === 'scored' && (
-            <section className="rounded-xl border border-border/70 bg-card overflow-hidden">
-              <div className="px-5 py-4 border-b border-border/60 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Sparkles size={14} className="text-orange-500 dark:text-orange-400" />
-                  <h2 className="text-sm font-semibold text-foreground">Lead score</h2>
-                </div>
+      {/* Score — open when scored, since "why is this person hot" is often
+          the realtor's next question. Closed when no score yet. */}
+      {contact.scoringStatus === 'scored' && (
+        <details open className="group border-t border-border/60 pt-4">
+          <summary className="cursor-pointer list-none flex items-center justify-between gap-2 text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
+            <span className="inline-flex items-center gap-2">
+              <Sparkles size={13} className="text-orange-500 dark:text-orange-400" />
+              Lead score
+            </span>
+            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+          </summary>
+          <div className="mt-4 space-y-4">
+            <div className="flex items-baseline gap-3 flex-wrap">
+              <span
+                className="text-3xl tracking-tight text-foreground tabular-nums"
+                style={{ fontFamily: 'var(--font-title)' }}
+              >
+                {contact.leadScore != null ? Math.round(contact.leadScore) : '—'}
+              </span>
+              {contact.scoreLabel && (
+                <span className={cn('text-xs font-medium', tierBadgeClasses(contact.scoreLabel))}>
+                  {contact.scoreLabel}
+                </span>
+              )}
+              {details?.confidence != null && (
+                <span className="text-xs text-muted-foreground">
+                  {Math.round(details.confidence * 100)}% confidence
+                </span>
+              )}
+              <div className="ml-auto">
                 <RescoreButton contactId={contact.id} />
               </div>
-              <div className="px-5 py-5 space-y-4">
-                <div className="flex items-baseline gap-3 flex-wrap">
-                  <span
-                    className="text-3xl tracking-tight text-foreground tabular-nums"
-                    style={{ fontFamily: 'var(--font-title)' }}
-                  >
-                    {contact.leadScore != null ? Math.round(contact.leadScore) : '—'}
-                  </span>
-                  {contact.scoreLabel && (
-                    <span className={cn(
-                      'inline-flex text-xs font-medium rounded-full px-2.5 py-0.5',
-                      tierBadgeClasses(contact.scoreLabel),
-                    )}>
-                      {contact.scoreLabel}
-                    </span>
-                  )}
-                  {details?.confidence != null && (
-                    <span className="text-xs text-muted-foreground">
-                      {Math.round(details.confidence * 100)}% confidence
-                    </span>
-                  )}
-                </div>
-                {contact.scoreSummary && (
-                  <p className="text-sm text-muted-foreground leading-relaxed">{contact.scoreSummary}</p>
-                )}
+            </div>
+            {contact.scoreSummary && (
+              <p className="text-sm text-muted-foreground leading-relaxed">{contact.scoreSummary}</p>
+            )}
+            <WhyThisScore details={details} />
+          </div>
+        </details>
+      )}
 
-                {/* Animated expander — replaces the native <details> so the
-                    motion vocabulary stays consistent with the rest of the
-                    app (chat thinking indicator, StaggerList, AnimatePresence
-                    in reviews). Renders nothing when there's no taxonomy. */}
-                <WhyThisScore details={details} />
-              </div>
-            </section>
-          )}
-
-          {/* Score-not-yet states */}
-          {contact.scoringStatus === 'pending' && (
-            <section className="rounded-xl border border-border/70 bg-card px-5 py-4 flex items-center gap-3">
-              <Sparkles size={14} className="text-orange-500 dark:text-orange-400 animate-pulse" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Scoring in progress.</p>
-                <p className="text-xs text-muted-foreground">Refresh in a moment.</p>
-              </div>
-            </section>
-          )}
-          {(contact.scoringStatus === 'failed' ||
-            contact.scoringStatus === 'unscored' ||
-            (contact.scoringStatus !== 'scored' && contact.scoringStatus !== 'pending')) && (
-            <section className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-4 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-foreground">Not yet scored</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {contact.scoringStatus === 'failed' ? 'Last scoring attempt failed.' : 'Run an AI score to surface insights.'}
-                </p>
-              </div>
-              <RescoreButton contactId={contact.id} />
-            </section>
-          )}
-
-          {/* Active deals — folded into Overview, no separate tab */}
-          {contact.dealContacts.length > 0 && (
-            <section className="rounded-xl border border-border/70 bg-card overflow-hidden">
-              <div className="px-5 py-4 border-b border-border/60">
-                <h2 className="text-sm font-semibold text-foreground">Active deals</h2>
-              </div>
-              <ul className="divide-y divide-border/60">
-                {contact.dealContacts.map(({ deal }) => (
-                  <li key={deal.id}>
-                    <Link
-                      href={`/s/${slug}/deals/${deal.id}`}
-                      className="flex items-center gap-3 px-5 py-3 hover:bg-muted/30 transition-colors"
-                    >
-                      <span
-                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: deal.stage.color }}
-                        aria-hidden
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{deal.title}</p>
-                        {deal.address && (
-                          <p className="text-xs text-muted-foreground truncate">{deal.address}</p>
-                        )}
-                      </div>
-                      <span className="text-xs text-muted-foreground hidden sm:inline">{deal.stage.name}</span>
-                      {deal.value != null && (
-                        <span className="text-xs font-medium text-foreground tabular-nums">{formatCurrency(deal.value)}</span>
-                      )}
-                      <ExternalLink size={12} className="text-muted-foreground flex-shrink-0" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {/* Application — when this contact came in via intake */}
-          {app && (
-            <section className="rounded-xl border border-border/70 bg-card overflow-hidden">
-              <div className="px-5 py-4 border-b border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold text-foreground">Application</h2>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {app.submittedAt && (
-                    <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                      <Calendar size={11} />
-                      {new Date(app.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </span>
-                  )}
-                  <PdfExportButton contactId={contact.id} />
-                </div>
-              </div>
-              <div className="px-5 py-3 border-b border-border/60">
-                <ApplicationStatusManager
-                  contactId={contact.id}
-                  currentStatus={contact.applicationStatus ?? 'received'}
-                  statusNote={contact.applicationStatusNote ?? null}
-                />
-              </div>
-              {formSnapshot ? (
-                <div className="px-5 py-3">
-                  <DynamicApplicationDisplay
-                    applicationData={app as Record<string, any>}
-                    formConfigSnapshot={formSnapshot}
-                    defaultOpen
-                  />
-                </div>
-              ) : (
-                <div className="px-5 py-3 divide-y divide-border/40">
-                  {(app.propertyAddress || app.unitType || app.targetMoveInDate || app.monthlyRent != null || app.leaseTermPreference || app.numberOfOccupants != null) && (
-                    <CollapsibleSection title="Property" defaultOpen>
-                      <DetailGrid>
-                        {app.propertyAddress && <Detail label="Address" value={app.propertyAddress} />}
-                        {app.unitType && <Detail label="Unit type" value={app.unitType} />}
-                        {app.targetMoveInDate && <Detail label="Move-in date" value={app.targetMoveInDate} />}
-                        {app.monthlyRent != null && <Detail label="Monthly rent" value={typeof app.monthlyRent === 'number' ? formatCurrency(app.monthlyRent) : String(app.monthlyRent)} />}
-                        {app.leaseTermPreference && <Detail label="Lease term" value={app.leaseTermPreference} />}
-                        {app.numberOfOccupants != null && <Detail label="Occupants" value={String(app.numberOfOccupants)} />}
-                      </DetailGrid>
-                    </CollapsibleSection>
-                  )}
-                </div>
-              )}
-            </section>
-          )}
-
-          {/* Follow-up + lifecycle controls — at the bottom because they're
-              edits-on-this-record, not the realtor's daily task. */}
-          <section className="rounded-xl border border-border/70 bg-card p-5 space-y-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Follow-up
+      {(contact.scoringStatus === 'pending' ||
+        contact.scoringStatus === 'failed' ||
+        contact.scoringStatus === 'unscored' ||
+        (contact.scoringStatus !== 'scored' && contact.scoringStatus !== 'pending')) && (
+        <section className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {contact.scoringStatus === 'pending' ? 'Scoring in progress.' : 'Not yet scored'}
             </p>
-            <ContactFollowUpField
-              contactId={contact.id}
-              followUpAt={contact.followUpAt ? String(contact.followUpAt) : null}
-              lastContactedAt={contact.lastContactedAt ? String(contact.lastContactedAt) : null}
-            />
-            <ContactLifecycleFields
-              contactId={contact.id}
-              initialReferralSource={contact.referralSource ?? null}
-              initialSnoozedUntil={contact.snoozedUntil ? String(contact.snoozedUntil) : null}
-            />
-          </section>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {contact.scoringStatus === 'pending'
+                ? 'Refresh in a moment.'
+                : contact.scoringStatus === 'failed'
+                  ? 'Last scoring attempt failed.'
+                  : 'Run an AI score to surface insights.'}
+            </p>
+          </div>
+          {contact.scoringStatus !== 'pending' && <RescoreButton contactId={contact.id} />}
+        </section>
+      )}
 
-          {/* Suggestions — quiet at the bottom for the realtor who wants
-              extra prompts. Shown last because the recommended action up
-              top is usually the right next move. */}
+      {/* Active deals — only renders when there are any. Open by default
+          because if there's a deal in flight, that's relevant context. */}
+      {hasOpenDeals && (
+        <details open className="group border-t border-border/60 pt-4">
+          <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
+            <span>Active deals ({contact.dealContacts.length})</span>
+            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+          </summary>
+          <ul className="mt-4 divide-y divide-border/60">
+            {contact.dealContacts.map(({ deal }) => (
+              <li key={deal.id}>
+                <Link
+                  href={`/s/${slug}/deals/${deal.id}`}
+                  className="flex items-center gap-3 py-3 hover:bg-muted/30 transition-colors -mx-2 px-2 rounded-md"
+                >
+                  <span
+                    className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: deal.stage.color }}
+                    aria-hidden
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{deal.title}</p>
+                    {deal.address && (
+                      <p className="text-xs text-muted-foreground truncate">{deal.address}</p>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">{deal.stage.name}</span>
+                  {deal.value != null && (
+                    <span className="text-xs font-medium text-foreground tabular-nums">{formatCurrency(deal.value)}</span>
+                  )}
+                  <ExternalLink size={12} className="text-muted-foreground flex-shrink-0" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {/* Application — open when received/null (needs review), closed once
+          processed. The realtor's eye goes where the work is. */}
+      {app && (
+        <details {...(hasOpenApp ? { open: true } : {})} className="group border-t border-border/60 pt-4">
+          <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
+            <span className="inline-flex items-center gap-2">
+              Application
+              {app.submittedAt && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-normal text-muted-foreground">
+                  <Calendar size={11} />
+                  {new Date(app.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              )}
+            </span>
+            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+            <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+          </summary>
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center justify-end">
+              <PdfExportButton contactId={contact.id} />
+            </div>
+            <ApplicationStatusManager
+              contactId={contact.id}
+              currentStatus={contact.applicationStatus ?? 'received'}
+              statusNote={contact.applicationStatusNote ?? null}
+            />
+            {formSnapshot ? (
+              <DynamicApplicationDisplay
+                applicationData={app as Record<string, any>}
+                formConfigSnapshot={formSnapshot}
+                defaultOpen
+              />
+            ) : (
+              <div className="divide-y divide-border/40">
+                {(app.propertyAddress || app.unitType || app.targetMoveInDate || app.monthlyRent != null || app.leaseTermPreference || app.numberOfOccupants != null) && (
+                  <CollapsibleSection title="Property" defaultOpen>
+                    <DetailGrid>
+                      {app.propertyAddress && <Detail label="Address" value={app.propertyAddress} />}
+                      {app.unitType && <Detail label="Unit type" value={app.unitType} />}
+                      {app.targetMoveInDate && <Detail label="Move-in date" value={app.targetMoveInDate} />}
+                      {app.monthlyRent != null && <Detail label="Monthly rent" value={typeof app.monthlyRent === 'number' ? formatCurrency(app.monthlyRent) : String(app.monthlyRent)} />}
+                      {app.leaseTermPreference && <Detail label="Lease term" value={app.leaseTermPreference} />}
+                      {app.numberOfOccupants != null && <Detail label="Occupants" value={String(app.numberOfOccupants)} />}
+                    </DetailGrid>
+                  </CollapsibleSection>
+                )}
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+
+      {/* Pipeline — closed by default; not where the realtor's eye goes. */}
+      <details className="group border-t border-border/60 pt-4">
+        <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
+          <span>Pipeline stage</span>
+          <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+          <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+        </summary>
+        <div className="mt-4 overflow-x-auto pb-1">
+          <div className="min-w-max">
+            <StageProgression contactId={contact.id} currentType={contact.type} />
+          </div>
+        </div>
+      </details>
+
+      {/* Follow-up + lifecycle — at the bottom because they're edits-on-this-
+          record, not the realtor's daily task. */}
+      <details className="group border-t border-border/60 pt-4">
+        <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
+          <span>Follow-up &amp; lifecycle</span>
+          <span className="text-xs font-normal text-muted-foreground group-open:hidden">Show</span>
+          <span className="text-xs font-normal text-muted-foreground hidden group-open:inline">Hide</span>
+        </summary>
+        <div className="mt-4 space-y-4">
+          <ContactFollowUpField
+            contactId={contact.id}
+            followUpAt={contact.followUpAt ? String(contact.followUpAt) : null}
+            lastContactedAt={contact.lastContactedAt ? String(contact.lastContactedAt) : null}
+          />
+          <ContactLifecycleFields
+            contactId={contact.id}
+            initialReferralSource={contact.referralSource ?? null}
+            initialSnoozedUntil={contact.snoozedUntil ? String(contact.snoozedUntil) : null}
+          />
           <FollowUpSuggestions
             contactId={contact.id}
             scoreLabel={contact.scoreLabel}
             contactType={contact.type}
             hasTours={contact.tours.length > 0}
-            hasDeals={contact.dealContacts.length > 0}
+            hasDeals={hasOpenDeals}
             hasFollowUp={!!contact.followUpAt}
           />
         </div>
-      )}
-
-      {/* Activity tab — the timeline */}
-      {activeTab === 'activity' && (
-        <ContactActivityTab contactId={contact.id} />
-      )}
+      </details>
     </div>
+  );
+}
+
+// ── Action pills ────────────────────────────────────────────────────
+
+function ActionPill({ action, primary }: { action: PeopleDetailAction; primary: boolean }) {
+  // The first pill is the primary verb (foreground bg), the rest are
+  // outlined. Matches the morning home's compose-vs-navigate vocabulary.
+  return (
+    <button
+      type="button"
+      className={cn(
+        'inline-flex items-center h-9 rounded-full px-4 text-sm transition-colors',
+        primary
+          ? 'border border-border/70 bg-foreground text-background hover:bg-foreground/90'
+          : 'border border-border/70 bg-background text-foreground hover:bg-muted/40',
+      )}
+      data-intent={action.intent}
+    >
+      {action.label}
+    </button>
   );
 }
 
 // ── Helpers ──
 
-function buildStatusSentence(
-  contact: { type: string; leadType: string | null; budget: number | null; sourceLabel: string | null; createdAt: string | Date },
-  app: ApplicationData | null,
-): string {
-  const parts: string[] = [];
-  parts.push(
-    contact.leadType === 'buyer' ? 'Buyer' :
-    contact.leadType === 'rental' ? 'Renter' :
-    contact.sourceLabel ?? 'Lead',
-  );
-  if (contact.budget != null) {
-    parts.push(`budget ${formatCurrency(contact.budget)}${contact.leadType === 'rental' ? '/mo' : ''}`);
-  }
-  if (app?.targetMoveInDate) {
-    parts.push(`move-in ${app.targetMoveInDate}`);
-  }
-  parts.push(
-    `added ${new Date(contact.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
-  );
-  return parts.join(' · ') + '.';
+/** Compute days since a given timestamp. Returns null when the input is null. */
+function daysSince(when: string | Date | null): number | null {
+  if (!when) return null;
+  const t = new Date(when).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
 }
 
-function stageLabel(type: string): string {
-  if (type === 'QUALIFICATION') return 'Qualifying';
-  if (type === 'TOUR') return 'Tour';
-  if (type === 'APPLICATION') return 'Applied';
-  return type;
+/** Format a date relative for ≤7 days, absolute for older. One format. */
+function formatDate(when: string | Date): string {
+  const d = new Date(when);
+  const days = Math.floor((Date.now() - d.getTime()) / 86_400_000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days <= 7) return `${days} days ago`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function derivePersonState(
+  contact: { scoreLabel: string | null; lastContactedAt: string | Date | null; followUpAt: string | Date | null; createdAt: string | Date },
+  lastActivity: { createdAt: string } | null,
+): PersonStateForActions {
+  const recency = lastActivity?.createdAt ?? contact.lastContactedAt ?? null;
+  const daysQuiet = daysSince(recency);
+  const ageDays = daysSince(contact.createdAt) ?? 0;
+  const scoreLabel: PersonStateForActions['scoreLabel'] =
+    contact.scoreLabel === 'hot' || contact.scoreLabel === 'warm' || contact.scoreLabel === 'cold'
+      ? contact.scoreLabel
+      : null;
+  return {
+    scoreLabel,
+    daysQuiet,
+    followUpAt: contact.followUpAt ? new Date(contact.followUpAt).toISOString() : null,
+    isNew: ageDays <= 14,
+    archivedAt: null,
+  };
 }
 
 /**
- * Decide the one sentence to put in the "What's next" card. Prefers the
- * AI-recommended action when it exists, otherwise picks the most pressing
- * gap from the contact record. The card never renders empty — the realtor
- * came here to know what to do next, and the answer is always something.
+ * Status line under the headline: tier + score + recency. Tabular nums.
+ * One sentence, calm, no exclamation. "Hot · 78 · 9 days quiet."
  */
-function nextStepFor(
+function buildStatusLine(
+  contact: { leadScore: number | null; scoreLabel: string | null; createdAt: string | Date },
+  state: PersonStateForActions,
+): string {
+  const parts: string[] = [];
+  if (state.scoreLabel) {
+    const tier = state.scoreLabel.charAt(0).toUpperCase() + state.scoreLabel.slice(1);
+    parts.push(contact.leadScore != null ? `${tier} · ${Math.round(contact.leadScore)}` : tier);
+  } else {
+    parts.push('Unscored');
+  }
+  if (state.daysQuiet === null) {
+    parts.push('not yet contacted');
+  } else if (state.daysQuiet === 0) {
+    parts.push('touched today');
+  } else if (state.daysQuiet === 1) {
+    parts.push('1 day quiet');
+  } else {
+    parts.push(`${state.daysQuiet} days quiet`);
+  }
+  parts.push(`added ${formatDate(contact.createdAt)}`);
+  return parts.join(' · ') + '.';
+}
+
+/**
+ * Most-recent-activity sentence. One line, prefix the date only when it's
+ * not today/yesterday. Uses ContactActivity (the manual-log table) — the
+ * thing the realtor already cared enough to write down.
+ */
+function buildLastActivityLine(latest: { type: string; content: string | null; createdAt: string }): string {
+  const verb = verbForActivity(latest.type);
+  const when = formatDate(latest.createdAt);
+  const snippet = latest.content?.trim().split(/\r?\n/)[0]?.slice(0, 80) ?? '';
+  const tail = snippet ? ` — "${snippet}${snippet.length === 80 ? '…' : ''}"` : '';
+  return `Last: ${verb} ${when}${tail}.`;
+}
+
+function verbForActivity(type: string): string {
+  switch (type) {
+    case 'note': return 'logged a note';
+    case 'call': return 'logged a call';
+    case 'email': return 'sent an email';
+    case 'meeting': return 'met';
+    case 'follow_up': return 'followed up';
+    default: return 'activity';
+  }
+}
+
+/**
+ * The next-move sentence. This is the most important line on the page.
+ * Prefer the AI-recommended action when it exists — it's already shaped
+ * with concrete context. Otherwise infer from state.
+ *
+ * Never vague. "Reach out" alone is bad; pair it with the reason.
+ */
+function buildNextMove(
   contact: {
     email: string | null;
     phone: string | null;
@@ -483,18 +541,52 @@ function nextStepFor(
     applicationStatus: string | null;
     scoringStatus: string | null;
   },
-  app: ApplicationData | null,
+  state: PersonStateForActions,
   details: LeadScoreDetails | null,
 ): string {
+  // AI's recommendation wins when it exists. It already has the context.
   if (details?.recommendedNextAction) return details.recommendedNextAction;
-  if (!contact.email && !contact.phone) return 'Add a way to reach them — email or phone.';
-  if (app && (contact.applicationStatus === 'received' || contact.applicationStatus == null)) {
-    return 'Review their application and respond.';
+
+  if (!contact.email && !contact.phone) {
+    return 'Add a way to reach them — no email or phone on file.';
   }
-  if (!contact.followUpAt) return 'Set a follow-up date so they don’t go cold.';
-  if (contact.scoringStatus !== 'scored') return 'Run an AI score to see what to lean on.';
-  return 'Reach out and keep the momentum going.';
+
+  const overdue = state.followUpAt && Date.parse(state.followUpAt) < Date.now();
+  if (overdue) {
+    const days = daysSince(state.followUpAt) ?? 0;
+    return days > 0
+      ? `Follow-up was due ${days === 1 ? '1 day' : `${days} days`} ago — send a check-in.`
+      : 'Follow-up is due — send a check-in.';
+  }
+
+  if (state.followUpAt) {
+    const due = new Date(state.followUpAt);
+    return `Follow-up due ${formatDate(due)}.`;
+  }
+
+  if (state.isNew && state.daysQuiet === null) {
+    return 'New arrival — welcome them.';
+  }
+
+  if (state.scoreLabel === 'hot' && (state.daysQuiet ?? 0) >= 3) {
+    return `Hot lead, quiet for ${state.daysQuiet} ${state.daysQuiet === 1 ? 'day' : 'days'} — send a check-in.`;
+  }
+
+  if (state.scoreLabel === 'cold' && (state.daysQuiet ?? 0) >= 7) {
+    return `Cold and quiet for ${state.daysQuiet} days — schedule a check-in.`;
+  }
+
+  if (state.daysQuiet !== null && state.daysQuiet >= 7) {
+    return `Quiet for ${state.daysQuiet} days — schedule a check-in.`;
+  }
+
+  if (contact.scoringStatus !== 'scored') {
+    return 'Run an AI score to see what to lean on.';
+  }
+
+  return 'No follow-up set — pick a date so they don’t go cold.';
 }
+
 function DetailGrid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">{children}</div>;
 }
