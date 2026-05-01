@@ -1,0 +1,110 @@
+/**
+ * Route-level test for POST /api/chippi/post-tour.
+ *
+ * Covers: auth-fail (401), no-space (403), empty transcript (400),
+ * happy-path returns proposals (OpenAI mocked).
+ */
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { NextRequest, NextResponse } from 'next/server';
+
+vi.mock('@/lib/api-auth', () => ({
+  requireAuth: vi.fn(),
+}));
+
+vi.mock('@/lib/space', () => ({
+  getSpaceForUser: vi.fn(),
+}));
+
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: vi.fn(async () => ({ allowed: true })),
+}));
+
+const { proposeActionsMock } = vi.hoisted(() => ({ proposeActionsMock: vi.fn() }));
+vi.mock('@/lib/chippi/post-tour', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/chippi/post-tour')>('@/lib/chippi/post-tour');
+  return {
+    ...actual,
+    proposeActions: proposeActionsMock,
+  };
+});
+
+vi.mock('@/lib/ai-tools/openai-client', () => ({
+  getOpenAIClient: () => ({ client: {} }),
+  MissingOpenAIKeyError: class MissingOpenAIKeyError extends Error {},
+}));
+
+vi.mock('@/lib/ai-tools/registry', () => ({
+  listTools: () => [],
+}));
+
+vi.mock('@/lib/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}));
+
+import { POST } from '@/app/api/chippi/post-tour/route';
+import { requireAuth } from '@/lib/api-auth';
+import { getSpaceForUser } from '@/lib/space';
+
+const mockRequireAuth = vi.mocked(requireAuth);
+const mockGetSpaceForUser = vi.mocked(getSpaceForUser);
+
+function makeReq(body: unknown): NextRequest {
+  return new NextRequest('http://localhost/api/chippi/post-tour', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+describe('POST /api/chippi/post-tour', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.OPENAI_API_KEY = 'sk-test';
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    mockRequireAuth.mockResolvedValue(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
+    const res = await POST(makeReq({ transcript: 'hi' }));
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 403 when user has no space', async () => {
+    mockRequireAuth.mockResolvedValue({ userId: 'user_1' });
+    mockGetSpaceForUser.mockResolvedValue(null);
+    const res = await POST(makeReq({ transcript: 'hi' }));
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 400 when transcript is empty', async () => {
+    mockRequireAuth.mockResolvedValue({ userId: 'user_1' });
+    mockGetSpaceForUser.mockResolvedValue({
+      id: 'space_1',
+      slug: 's',
+      name: 'Test',
+      ownerId: 'owner_1',
+    } as never);
+    const res = await POST(makeReq({ transcript: '   ' }));
+    expect(res.status).toBe(400);
+  });
+
+  it('returns proposals on happy path', async () => {
+    mockRequireAuth.mockResolvedValue({ userId: 'user_1' });
+    mockGetSpaceForUser.mockResolvedValue({
+      id: 'space_1',
+      slug: 's',
+      name: 'Test',
+      ownerId: 'owner_1',
+    } as never);
+    proposeActionsMock.mockResolvedValue([
+      { tool: 'log_call', args: { personId: 'p1', summary: 'Tour' }, summary: 'Log call', mutates: true },
+      { tool: 'set_followup', args: { personId: 'p1', when: '2026-05-08' }, summary: 'Set follow-up', mutates: true },
+    ]);
+
+    const res = await POST(makeReq({ transcript: 'Sam loved it. Follow up Friday.' }));
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { proposals: unknown[] };
+    expect(json.proposals).toHaveLength(2);
+    expect(proposeActionsMock).toHaveBeenCalledOnce();
+  });
+});
