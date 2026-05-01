@@ -568,7 +568,7 @@ export function ChippiWorkspace({
       ) : isEmpty ? (
         <>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 sm:pt-14 pb-40 sm:pb-32 space-y-10 sm:space-y-12">
+            <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 pt-8 sm:pt-14 pb-40 sm:pb-32 space-y-10 sm:space-y-12">
               {/* Greeting + status */}
               <header className="space-y-1.5 text-center">
                 <h1
@@ -630,7 +630,7 @@ export function ChippiWorkspace({
           {/* Active thread */}
           <div className="flex-1 min-h-0 overflow-hidden">
             <ScrollArea className="h-full">
-              <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-4">
+              <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-4">
                 {/* Conversation title — quiet, only when we have one */}
                 {activeConversationId && (
                   <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-6 truncate">
