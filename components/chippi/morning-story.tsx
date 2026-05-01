@@ -45,7 +45,14 @@ export function MorningStory({ slug }: Props) {
   // jump but no placeholder copy. The realtor knows it's loading; we don't
   // fill the void with a tagline.
   if (!summary) {
-    return <p className="text-sm text-muted-foreground text-center">&nbsp;</p>;
+    return (
+      <h1
+        className="text-[2.25rem] sm:text-[2.5rem] tracking-tight text-foreground leading-tight text-center"
+        style={{ fontFamily: 'var(--font-title)' }}
+      >
+        &nbsp;
+      </h1>
+    );
   }
 
   const story = composeMorningStory(summary);
@@ -60,8 +67,11 @@ export function MorningStory({ slug }: Props) {
   }
 
   const isClickable = !!story.doorway;
-  const Component = isClickable ? motion.button : motion.p;
+  const Component = isClickable ? motion.button : motion.h1;
 
+  // The home's only sentence — promoted to h1 weight after the audit cut
+  // the "Good morning, X." greeting that used to live above. The whole
+  // page now answers one question: what should I do next?
   return (
     <Component
       type={isClickable ? 'button' : undefined}
@@ -71,9 +81,12 @@ export function MorningStory({ slug }: Props) {
       animate={{ opacity: 1 }}
       transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
       className={cn(
-        'text-sm text-muted-foreground text-center mx-auto block',
-        isClickable && 'hover:text-foreground transition-colors cursor-pointer',
+        'text-[2.25rem] sm:text-[2.5rem] tracking-tight leading-tight text-center block mx-auto',
+        isClickable
+          ? 'text-foreground hover:opacity-80 transition-opacity cursor-pointer'
+          : 'text-foreground',
       )}
+      style={{ fontFamily: 'var(--font-title)' }}
     >
       {story.text}
     </Component>

@@ -55,7 +55,11 @@ import { cn } from '@/lib/utils';
 import { downloadCSV } from '@/lib/csv';
 import type { SavedView } from '@/lib/types';
 import { formatCurrency as _formatCurrency, getInitials } from '@/lib/formatting';
-import { CONTACT_STAGES, HOT_LEAD_THRESHOLD } from '@/lib/constants';
+import { CONTACT_STAGES } from '@/lib/constants';
+import {
+  composeContactsNarration,
+  type ContactsNarrationOutput,
+} from '@/lib/narration/contacts';
 import { CsvImportModal } from './csv-import-modal';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -402,53 +406,10 @@ export function ContactTable({ slug }: ContactTableProps) {
   // optional action so the line becomes a doorway: clicking the sentence
   // does what the sentence describes — switch to the New filter, sort by
   // hot, etc. The page's voice and the page's filter are one thing.
-  type NarrationAction = 'filter-new' | 'sort-priority' | null;
-  const narration: { text: string; action: NarrationAction } = useMemo(() => {
-    const newCount = contacts.filter((c) => c.tags.includes('new-lead')).length;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const overdueCount = contacts.filter(
-      (c) => c.followUpAt && new Date(c.followUpAt) < today,
-    ).length;
-    const hotCount = contacts.filter((c) => (c.leadScore ?? 0) >= HOT_LEAD_THRESHOLD).length;
-
-    if (newCount > 0) {
-      return {
-        text: newCount === 1
-          ? '1 new person came in. Welcome them.'
-          : `${newCount} new people came in. Welcome them.`,
-        action: 'filter-new',
-      };
-    }
-    if (overdueCount > 0) {
-      return {
-        text: overdueCount === 1
-          ? '1 follow-up is overdue. Catch up.'
-          : `${overdueCount} follow-ups are overdue. Catch up.`,
-        action: 'sort-priority',
-      };
-    }
-    if (hotCount > 0) {
-      return {
-        text: hotCount === 1
-          ? '1 person is hot. Reach out.'
-          : `${hotCount} people are hot. Reach out.`,
-        action: 'sort-priority',
-      };
-    }
-    if (contacts.length === 0) {
-      return {
-        text: 'No people yet. Drop your intake link and start collecting.',
-        action: null,
-      };
-    }
-    return {
-      text: contacts.length === 1
-        ? '1 person on your roster. Quietly active.'
-        : `${contacts.length} people on your roster. Quietly active.`,
-      action: null,
-    };
-  }, [contacts]);
+  const narration: ContactsNarrationOutput = useMemo(
+    () => composeContactsNarration(contacts),
+    [contacts],
+  );
 
   function handleNarrationClick() {
     if (narration.action === 'filter-new') {

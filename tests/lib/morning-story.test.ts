@@ -66,12 +66,12 @@ describe('composeMorningStory', () => {
     expect(out.doorway).toEqual({ kind: 'person', id: 'contact_new' });
   });
 
-  it('names the hottest unworked person', () => {
+  it('names the hottest unworked person without ambiguity', () => {
     const out = composeMorningStory({
       ...empty,
       ...hotPerson('Maya'),
     });
-    expect(out.text).toBe("Maya's looking hot. Reach out.");
+    expect(out.text).toBe("Maya's score is hot. Reach out.");
     expect(out.doorway).toEqual({ kind: 'person', id: 'contact_hot' });
   });
 
@@ -98,21 +98,78 @@ describe('composeMorningStory', () => {
     ).toBe("Sam's follow-up is 9 days overdue.");
   });
 
-  // ── Multiple-of-the-same-thing tail ─────────────────────────────────────
+  // ── Queue tail: the sentence stays clean, no parenthetical ──────────────
+  // The realtor sees the rest of the queue on click-through. A trailing
+  // "(N more stuck.)" reads like programmer copy, not a thoughtful friend.
 
-  it('appends a quiet count when more of the same kind are pending', () => {
-    expect(
-      composeMorningStory({ ...empty, ...stuck('Chen', 14, 3) }).text,
-    ).toBe("The Chen deal hasn't moved in 14 days. (2 more stuck.)");
-    expect(
-      composeMorningStory({ ...empty, ...overdue('Sarah', 4, 5) }).text,
-    ).toBe("Sarah's follow-up is 4 days overdue. (4 more overdue.)");
-    expect(
-      composeMorningStory({ ...empty, ...newPerson('David', 2) }).text,
-    ).toBe('David just applied. Welcome them. (1 more new.)');
-    expect(
-      composeMorningStory({ ...empty, ...hotPerson('Maya', 3) }).text,
-    ).toBe("Maya's looking hot. Reach out. (2 more hot.)");
+  it('does not append a queue-tail parenthetical for stuck deals', () => {
+    const out = composeMorningStory({ ...empty, ...stuck('Chen', 14, 3) });
+    expect(out.text).toBe("The Chen deal hasn't moved in 14 days.");
+    expect(out.text).not.toMatch(/\(/);
+    expect(out.text).not.toMatch(/more/);
+  });
+
+  it('does not append a queue-tail parenthetical for overdue follow-ups', () => {
+    const out = composeMorningStory({ ...empty, ...overdue('Sarah', 4, 5) });
+    expect(out.text).toBe("Sarah's follow-up is 4 days overdue.");
+    expect(out.text).not.toMatch(/\(/);
+  });
+
+  it('does not append a queue-tail parenthetical for new people', () => {
+    const out = composeMorningStory({ ...empty, ...newPerson('David', 2) });
+    expect(out.text).toBe('David just applied. Welcome them.');
+    expect(out.text).not.toMatch(/\(/);
+  });
+
+  it('does not append a queue-tail parenthetical for hot people', () => {
+    const out = composeMorningStory({ ...empty, ...hotPerson('Maya', 3) });
+    expect(out.text).toBe("Maya's score is hot. Reach out.");
+    expect(out.text).not.toMatch(/\(/);
+  });
+
+  // ── Long / messy deal titles: fall back to a generic subject ────────────
+  // Titles like "Smith — buyer, $700k Sunset Strip" wreck the sentence
+  // cadence. Drop to "A deal hasn't moved in 14 days." — doorway is intact.
+
+  it('falls back to a generic subject when the title contains an em-dash', () => {
+    const out = composeMorningStory({
+      ...empty,
+      ...stuck('Smith — buyer, $700k Sunset Strip', 14),
+    });
+    expect(out.text).toBe("A deal hasn't moved in 14 days.");
+    expect(out.doorway).toEqual({ kind: 'deal', id: 'deal_42' });
+  });
+
+  it('falls back to a generic subject when the title contains a comma', () => {
+    const out = composeMorningStory({
+      ...empty,
+      ...stuck('Park, downtown', 7),
+    });
+    expect(out.text).toBe("A deal hasn't moved in 7 days.");
+  });
+
+  it('falls back to a generic subject when the title contains parentheses', () => {
+    const out = composeMorningStory({
+      ...empty,
+      ...stuck('Nguyen (referral)', 3),
+    });
+    expect(out.text).toBe("A deal hasn't moved in 3 days.");
+  });
+
+  it('falls back to a generic subject when the title is overly long', () => {
+    const out = composeMorningStory({
+      ...empty,
+      ...stuck('A really very extremely long deal name here', 5),
+    });
+    expect(out.text).toBe("A deal hasn't moved in 5 days.");
+  });
+
+  it('uses the generic subject for a 0-day stuck deal with a messy title', () => {
+    const out = composeMorningStory({
+      ...empty,
+      ...stuck('Smith — buyer, $700k', 0),
+    });
+    expect(out.text).toBe('A deal is stuck.');
   });
 
   // ── Priority order ──────────────────────────────────────────────────────

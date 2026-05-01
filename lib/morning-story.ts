@@ -23,6 +23,18 @@ export interface MorningStoryOutput {
 }
 
 /**
+ * Deal titles in the wild can be messy: "Smith — buyer, $700k Sunset Strip"
+ * breaks the cadence of "The {title} deal hasn't moved...". When the title
+ * has internal punctuation or runs long, fall back to a clean generic
+ * subject. The doorway still opens the right deal.
+ */
+function isCleanDealTitle(title: string): boolean {
+  if (title.length > 32) return false;
+  if (/[—–\-,()|:;]/.test(title)) return false;
+  return true;
+}
+
+/**
  * Compose one sentence from the summary. Priority order:
  *   1. Stuck deal — name the longest-stuck one.
  *   2. Overdue follow-up — name the most-overdue person.
@@ -39,46 +51,35 @@ export interface MorningStoryOutput {
 export function composeMorningStory(s: MorningSummary): MorningStoryOutput {
   if (s.topStuckDeal) {
     const { title, daysStuck, id } = s.topStuckDeal;
-    const others = s.stuckDealsCount > 1
-      ? ` (${s.stuckDealsCount - 1} more stuck.)`
-      : '';
+    const subject = isCleanDealTitle(title) ? `The ${title} deal` : 'A deal';
     const text = daysStuck > 0
-      ? `The ${title} deal hasn't moved in ${daysStuck} day${daysStuck === 1 ? '' : 's'}.${others}`
-      : `The ${title} deal is stuck.${others}`;
+      ? `${subject} hasn't moved in ${daysStuck} day${daysStuck === 1 ? '' : 's'}.`
+      : `${subject} is stuck.`;
     return { text, doorway: { kind: 'deal', id } };
   }
 
   if (s.topOverdueFollowUp) {
     const { name, daysOverdue, id } = s.topOverdueFollowUp;
-    const others = s.overdueFollowUpsCount > 1
-      ? ` (${s.overdueFollowUpsCount - 1} more overdue.)`
-      : '';
     const text = daysOverdue === 0
-      ? `${name}'s follow-up is due today.${others}`
+      ? `${name}'s follow-up is due today.`
       : daysOverdue === 1
-        ? `${name}'s follow-up is 1 day overdue.${others}`
-        : `${name}'s follow-up is ${daysOverdue} days overdue.${others}`;
+        ? `${name}'s follow-up is 1 day overdue.`
+        : `${name}'s follow-up is ${daysOverdue} days overdue.`;
     return { text, doorway: { kind: 'person', id } };
   }
 
   if (s.topNewPerson) {
     const { name, id } = s.topNewPerson;
-    const others = s.newPeopleCount > 1
-      ? ` (${s.newPeopleCount - 1} more new.)`
-      : '';
     return {
-      text: `${name} just applied. Welcome them.${others}`,
+      text: `${name} just applied. Welcome them.`,
       doorway: { kind: 'person', id },
     };
   }
 
   if (s.topHotPerson) {
     const { name, id } = s.topHotPerson;
-    const others = s.hotPeopleCount > 1
-      ? ` (${s.hotPeopleCount - 1} more hot.)`
-      : '';
     return {
-      text: `${name}'s looking hot. Reach out.${others}`,
+      text: `${name}'s score is hot. Reach out.`,
       doorway: { kind: 'person', id },
     };
   }
