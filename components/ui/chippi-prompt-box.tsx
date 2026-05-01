@@ -13,6 +13,9 @@ import {
   Mic,
   Square,
   StopCircle,
+  Plus,
+  ImagePlus,
+  Search,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -32,6 +35,11 @@ interface ChippiPromptBoxProps {
   onMentionSearch?: (query: string) => Promise<MentionItem[]>;
   onAttach?: (files: File[]) => void;
   onVoiceStart?: () => void;
+  /** Called when the Send button has transformed into Stop (i.e. the
+   *  parent is streaming). The parent is expected to abort the active
+   *  stream. When omitted, the Send button stays disabled while loading
+   *  instead of swapping to Stop. */
+  onAbort?: () => void;
   disabled?: boolean;
   isLoading?: boolean;
   className?: string;
@@ -118,6 +126,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       onMentionSearch,
       onAttach,
       onVoiceStart,
+      onAbort,
       disabled = false,
       isLoading = false,
       className,
@@ -147,6 +156,13 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const mentionRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    // Separate ref for image-only picking — sets accept="image/*" so the
+    // OS file picker pre-filters. Re-uses uploadFiles for handling.
+    const imageInputRef = useRef<HTMLInputElement>(null);
+    // Plus-menu (the "+" button to the left of the textarea that opens
+    // contact-mention / file / image / draft-mode / search options).
+    const plusMenuRef = useRef<HTMLDivElement>(null);
+    const [plusMenuOpen, setPlusMenuOpen] = useState(false);
     const recordTimerRef = useRef<number | null>(null);
     const visualizerRafRef = useRef<number | null>(null);
 
@@ -210,6 +226,23 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       document.addEventListener('mousedown', onDown);
       return () => document.removeEventListener('mousedown', onDown);
     }, [mentionOpen]);
+
+    // Close Plus menu on outside click + Escape
+    useEffect(() => {
+      if (!plusMenuOpen) return;
+      const onDown = (e: MouseEvent) => {
+        if (!plusMenuRef.current?.contains(e.target as Node)) setPlusMenuOpen(false);
+      };
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setPlusMenuOpen(false);
+      };
+      document.addEventListener('mousedown', onDown);
+      document.addEventListener('keydown', onKey);
+      return () => {
+        document.removeEventListener('mousedown', onDown);
+        document.removeEventListener('keydown', onKey);
+      };
+    }, [plusMenuOpen]);
 
     // Debounced mention search
     const searchMentions = useCallback(
@@ -574,9 +607,37 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       }
     }
 
-    // Right-slot button: Send / Stop (loading) / Mic / StopCircle (recording)
+    // Right-slot button. Priority order:
+    //   streaming + onAbort  → live Stop (matches ChatGPT / Claude)
+    //   streaming, no onAbort → disabled Stop placeholder
+    //   has content          → Send (ArrowUp)
+    //   has voice mode       → Mic that opens voice mode (NOT dictation)
+    //   else                 → inert Send slot for layout consistency
     function renderRightButton() {
       if (isLoading) {
+        if (onAbort) {
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={onAbort}
+                  aria-label="Stop generating"
+                  className={cn(
+                    'inline-flex items-center justify-center w-8 h-8 rounded-full',
+                    'bg-foreground text-background hover:bg-foreground/90',
+                    'transition-all duration-150 active:scale-[0.96]',
+                  )}
+                >
+                  <Square size={12} strokeWidth={2.25} className="fill-current" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={6}>
+                Stop
+              </TooltipContent>
+            </Tooltip>
+          );
+        }
         return (
           <button
             type="button"
@@ -588,32 +649,8 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
               'transition-all duration-150',
             )}
           >
-            <Square size={13} strokeWidth={2} />
+            <Square size={12} strokeWidth={2.25} className="fill-current" />
           </button>
-        );
-      }
-
-      if (isRecording) {
-        return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={stopRecording}
-                aria-label="Stop recording"
-                className={cn(
-                  'inline-flex items-center justify-center w-8 h-8 rounded-full',
-                  'bg-rose-500/10 text-rose-600 dark:text-rose-400',
-                  'hover:bg-rose-500/15 transition-all duration-150 active:scale-[0.96]',
-                )}
-              >
-                <StopCircle size={16} strokeWidth={2} />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={6}>
-              Stop recording
-            </TooltipContent>
-          </Tooltip>
         );
       }
 
@@ -649,9 +686,9 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
             <TooltipTrigger asChild>
               <button
                 type="button"
-                onClick={startRecording}
+                onClick={() => onVoiceStart()}
                 disabled={disabled}
-                aria-label="Start voice message"
+                aria-label="Start voice mode"
                 className={cn(
                   'inline-flex items-center justify-center w-8 h-8 rounded-full',
                   'bg-foreground/[0.06] text-muted-foreground/70 hover:text-foreground',
@@ -663,7 +700,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
               </button>
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={6}>
-              Voice message
+              Voice mode
             </TooltipContent>
           </Tooltip>
         );
@@ -698,11 +735,24 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
           >
-            {/* Hidden file input */}
+            {/* Hidden file input — full mime list */}
             <input
               ref={fileInputRef}
               type="file"
               accept={ACCEPT_ATTR}
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const list = e.target.files;
+                if (list && list.length > 0) uploadFiles(Array.from(list));
+                if (e.target) e.target.value = '';
+              }}
+            />
+            {/* Hidden image-only input — same upload handler, narrower picker */}
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
               multiple
               className="hidden"
               onChange={(e) => {
@@ -903,84 +953,173 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
               />
             )}
 
-            {/* Action row */}
+            {/* Action row — Plus menu on the left, send/stop/voice on the
+                right. The previous trio of @ / paperclip / draft was visually
+                loud for daily use; the Plus pattern matches Slack / iMessage /
+                ChatGPT and lets us add affordances later without crowding. */}
             <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-1">
-              <div className="flex items-center gap-0.5">
-                {/* @-mention */}
+              <div className="relative" ref={plusMenuRef}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
                       type="button"
-                      onClick={openMention}
+                      onClick={() => setPlusMenuOpen((v) => !v)}
                       disabled={disabled || isLoading || isRecording}
-                      aria-label="Mention a contact or deal"
+                      aria-label="More actions"
+                      aria-expanded={plusMenuOpen}
+                      aria-haspopup="menu"
                       className={cn(
                         'inline-flex items-center justify-center w-8 h-8 rounded-full',
                         'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
-                        'transition-colors duration-150',
+                        'transition-all duration-150 active:scale-[0.96]',
                         'disabled:opacity-40 disabled:cursor-not-allowed',
-                        mentionOpen && 'bg-foreground/[0.045] text-foreground',
+                        plusMenuOpen && 'bg-foreground/[0.045] text-foreground rotate-45',
                       )}
                     >
-                      <AtSign size={15} strokeWidth={1.75} />
+                      <Plus size={16} strokeWidth={2} />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="top" sideOffset={6}>
-                    Mention a contact or deal
+                    Add — contacts, files, modes
                   </TooltipContent>
                 </Tooltip>
 
-                {/* Paperclip — file attach */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
+                {plusMenuOpen && (
+                  <div
+                    role="menu"
+                    aria-label="Composer actions"
+                    className={cn(
+                      'absolute left-0 bottom-full mb-2 z-30 w-[244px]',
+                      'rounded-xl border border-border/70 bg-popover shadow-lg shadow-foreground/5',
+                      'overflow-hidden py-1',
+                    )}
+                  >
+                    {/* Reference contact / deal */}
                     <button
                       type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={disabled || isLoading || isRecording}
-                      aria-label="Attach a file"
+                      role="menuitem"
+                      onClick={() => {
+                        setPlusMenuOpen(false);
+                        openMention();
+                      }}
                       className={cn(
-                        'inline-flex items-center justify-center w-8 h-8 rounded-full',
-                        'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
-                        'transition-colors duration-150',
-                        'disabled:opacity-40 disabled:cursor-not-allowed',
+                        'w-full flex items-center gap-2.5 px-3 py-2 text-left',
+                        'text-[13px] text-foreground hover:bg-foreground/[0.04]',
+                        'transition-colors duration-100',
                       )}
                     >
-                      <Paperclip size={15} strokeWidth={1.75} />
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-foreground/[0.05] text-muted-foreground">
+                        <AtSign size={13} strokeWidth={1.85} />
+                      </span>
+                      <span className="flex-1">Reference a contact or deal</span>
+                      <span className="text-[10px] tabular-nums text-muted-foreground/70">@</span>
                     </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" sideOffset={6}>
-                    Attach a file
-                  </TooltipContent>
-                </Tooltip>
 
-                {/* Draft mode — inline ghost icon-button alongside the other
-                    left-side actions. No segmented strip, no divider. Active
-                    state tints amber. The agent reads the [Draft: …] prefix
-                    as a hint; this is a nudge, not a separate route. */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
+                    {/* Attach file */}
                     <button
                       type="button"
-                      onClick={() => toggleMode('draft')}
-                      disabled={disabled || isLoading || isRecording}
-                      aria-pressed={mode === 'draft'}
-                      aria-label="Draft mode"
+                      role="menuitem"
+                      onClick={() => {
+                        setPlusMenuOpen(false);
+                        fileInputRef.current?.click();
+                      }}
                       className={cn(
-                        'inline-flex items-center justify-center w-8 h-8 rounded-full border',
-                        'transition-colors duration-150',
-                        'disabled:opacity-40 disabled:cursor-not-allowed',
-                        mode === 'draft'
-                          ? MODE_META.draft.activeClasses
-                          : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+                        'w-full flex items-center gap-2.5 px-3 py-2 text-left',
+                        'text-[13px] text-foreground hover:bg-foreground/[0.04]',
+                        'transition-colors duration-100',
                       )}
                     >
-                      <FileText size={14} strokeWidth={1.85} />
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-foreground/[0.05] text-muted-foreground">
+                        <Paperclip size={13} strokeWidth={1.85} />
+                      </span>
+                      <span className="flex-1">Attach a file</span>
                     </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" sideOffset={6}>
-                    Draft mode — long-form composition.
-                  </TooltipContent>
-                </Tooltip>
+
+                    {/* Attach image */}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setPlusMenuOpen(false);
+                        imageInputRef.current?.click();
+                      }}
+                      className={cn(
+                        'w-full flex items-center gap-2.5 px-3 py-2 text-left',
+                        'text-[13px] text-foreground hover:bg-foreground/[0.04]',
+                        'transition-colors duration-100',
+                      )}
+                    >
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-foreground/[0.05] text-muted-foreground">
+                        <ImagePlus size={13} strokeWidth={1.85} />
+                      </span>
+                      <span className="flex-1">Attach an image</span>
+                    </button>
+
+                    {/* Search hint */}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setPlusMenuOpen(false);
+                        // The agent treats `[Search: …]` as an instruction
+                        // to lead with semantic recall. Insert at the cursor
+                        // and focus.
+                        setMessage((prev) => (prev ? `[Search: ] ${prev}` : '[Search: ] '));
+                        setTimeout(() => {
+                          const el = textareaRef.current;
+                          if (!el) return;
+                          el.focus();
+                          // Place cursor between the colon and ]
+                          const idx = el.value.indexOf(': ]');
+                          if (idx >= 0) el.setSelectionRange(idx + 2, idx + 2);
+                        }, 0);
+                      }}
+                      className={cn(
+                        'w-full flex items-center gap-2.5 px-3 py-2 text-left',
+                        'text-[13px] text-foreground hover:bg-foreground/[0.04]',
+                        'transition-colors duration-100',
+                      )}
+                    >
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-foreground/[0.05] text-muted-foreground">
+                        <Search size={13} strokeWidth={1.85} />
+                      </span>
+                      <span className="flex-1">Search</span>
+                    </button>
+
+                    {/* Draft mode toggle — keeps the existing prefix-hint
+                        contract with the agent. Active state stays
+                        accessible from the menu so the user can flip it
+                        without remembering the keystroke. */}
+                    <button
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked={mode === 'draft'}
+                      onClick={() => {
+                        setPlusMenuOpen(false);
+                        toggleMode('draft');
+                      }}
+                      className={cn(
+                        'w-full flex items-center gap-2.5 px-3 py-2 text-left',
+                        'text-[13px] text-foreground hover:bg-foreground/[0.04]',
+                        'transition-colors duration-100',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'inline-flex items-center justify-center w-7 h-7 rounded-md',
+                          mode === 'draft'
+                            ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                            : 'bg-foreground/[0.05] text-muted-foreground',
+                        )}
+                      >
+                        <FileText size={13} strokeWidth={1.85} />
+                      </span>
+                      <span className="flex-1">
+                        {mode === 'draft' ? 'Draft mode — on' : 'Draft mode'}
+                      </span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {renderRightButton()}

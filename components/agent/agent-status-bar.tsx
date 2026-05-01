@@ -110,8 +110,8 @@ export function AgentStatusBar({ slug }: { slug: string }) {
           {!hasActivity && (
             <span className="text-[11px] text-muted-foreground">
               {status.lastRunAt
-                ? `Watching your pipeline · last sweep ${timeAgo(status.lastRunAt)}`
-                : 'Standing by — first sweep coming up'}
+                ? `Watching your pipeline · last check ${timeAgo(status.lastRunAt)}`
+                : 'Standing by.'}
             </span>
           )}
 
