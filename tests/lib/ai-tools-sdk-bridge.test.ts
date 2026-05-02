@@ -131,6 +131,44 @@ describe('toSdkTool', () => {
 
     expect(out).toBe('Error: something snapped');
   });
+
+  it('catches a throwing handler so a stack trace never reaches the model context', async () => {
+    const def = defineTool({
+      name: 'flaky_op',
+      description: 'flaky',
+      parameters: z.object({}),
+      requiresApproval: false,
+      handler: async () => {
+        // The kind of exception a real DB / network call might throw —
+        // we'd rather see "Error: flaky_op failed — Connection refused"
+        // than a multi-line stack ending up in the chat transcript.
+        throw new Error('Connection refused');
+      },
+    });
+
+    const sdk = toSdkTool(def, makeCtx());
+    const out = await sdk.invoke(new RunContext(), JSON.stringify({}));
+
+    expect(out).toBe('Error: flaky_op failed — Connection refused');
+  });
+
+  it('catches non-Error throws (e.g. a plain string) without crashing the run', async () => {
+    const def = defineTool({
+      name: 'rude_op',
+      description: 'rude',
+      parameters: z.object({}),
+      requiresApproval: false,
+      handler: async () => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        throw 'something exploded';
+      },
+    });
+
+    const sdk = toSdkTool(def, makeCtx());
+    const out = await sdk.invoke(new RunContext(), JSON.stringify({}));
+
+    expect(out).toBe('Error: rude_op failed — something exploded');
+  });
 });
 
 describe('extractApprovals', () => {

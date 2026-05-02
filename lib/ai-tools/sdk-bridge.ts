@@ -68,8 +68,23 @@ export function toSdkTool<TArgs, TData>(def: ToolDefinition<TArgs, TData>, ctx: 
     strict: true,
     needsApproval,
     async execute(input) {
-      const result: ToolResult = await def.handler(input as never, ctx);
-      return serialiseResult(result);
+      try {
+        const result: ToolResult = await def.handler(input as never, ctx);
+        return serialiseResult(result);
+      } catch (err) {
+        // A tool handler threw instead of returning { display: 'error' }.
+        // Without this catch, the raw exception (or stack trace shape)
+        // would land in the model's context — and from there, in the
+        // realtor's chat. Reformat to the same `Error: ` prefix the
+        // success/error paths use so the model continues normally and
+        // can paraphrase to the realtor in Chippi voice.
+        //
+        // We log the original at warn — the actual stack stays in our
+        // server logs for debugging; only the friendly summary reaches
+        // the model.
+        const message = err instanceof Error ? err.message : String(err);
+        return `Error: ${def.name} failed — ${message}`;
+      }
     },
   });
 }

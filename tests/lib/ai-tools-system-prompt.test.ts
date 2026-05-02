@@ -47,6 +47,15 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toMatch(/WHO you're acting on and WHY/);
   });
 
+  it('pins the subject-disambiguation guard — the agent must not pick when there are multiple candidates', () => {
+    const prompt = buildSystemPrompt(makeCtx());
+    expect(prompt).toMatch(/subject must be unambiguous/);
+    expect(prompt).toMatch(/do NOT pick/);
+    // The "approval covers the verb, not the subject" reasoning is the load-bearing
+    // sentence — pin its presence so a future edit can't quietly soften the contract.
+    expect(prompt).toMatch(/approval covers the verb, not the subject/);
+  });
+
   it('stays compact — enough for tone guidance, not a manifesto', () => {
     const prompt = buildSystemPrompt(makeCtx());
     // Sanity upper bound: if we ever exceed 3000 chars we should revisit.

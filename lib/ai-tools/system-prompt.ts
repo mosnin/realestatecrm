@@ -96,6 +96,10 @@ function composePrompt(ctx: ToolContext, opts: BuildOptions, snapshotBlock: stri
     // Verb-shaped contract so the model picks the right channel without us naming tools that drift.
     `- Sending verbs ("send", "email", "schedule", "post") prefer the connected-app tool — it acts through the realtor's account. Drafting verbs ("draft", "compose", "write me") use the native draft tools. When the verb is ambiguous, draft.`,
     `- Mutating tools (send_email, create_deal, etc.) always prompt the user for approval; trust that the platform will handle the approval flow and keep going after the user decides.`,
+    // Subject-disambiguation guard — the approval prompt protects against approved-wrong-action,
+    // not against picked-wrong-subject-from-three-matches. If find_person / find_deal returns
+    // multiple candidates and the realtor's words don't decide, ASK before acting.
+    `- Before firing a mutation against a person, deal, or property, the subject must be unambiguous. If \`find_person\` or \`find_deal\` returns multiple candidates and the realtor's words don't pick one (e.g. they said "Sam" and there are three), surface the candidates by full name and ask which one — do NOT pick. Reasoning: approval covers the verb, not the subject. The realtor scanning a one-line approval prompt won't notice you sent to the wrong Sam.`,
     // The reasoning bullet — the model must EXPLAIN before it acts on a mutation. The realtor sees the
     // reasoning in the streamed text BEFORE the approval prompt lands. This is the difference between
     // "the agent fired send_email" and "the agent says: I'll email Sam at sam@x.com because they
