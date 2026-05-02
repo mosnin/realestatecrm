@@ -191,8 +191,10 @@ export function ChippiWorkspace({
   // We track the last `initialConversationId` we adopted so a streaming
   // mid-send (which mutates `messages` locally) doesn't get clobbered by
   // a no-op prop arrival. We only re-sync when the server hands us a
-  // genuinely different conversation.
-  const lastSyncedConvIdRef = useRef<string | null>(initialConversationId);
+  // genuinely different conversation. The ref starts as a sentinel
+  // (`undefined`) — distinct from any real value including `null` — so
+  // the very first effect run always hydrates from props.
+  const lastSyncedConvIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     if (initialConversationId === lastSyncedConvIdRef.current) return;
     lastSyncedConvIdRef.current = initialConversationId;
