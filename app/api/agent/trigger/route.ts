@@ -29,9 +29,10 @@ type TriggerEvent = typeof VALID_EVENTS[number];
 const RATE_LIMIT = 20;
 const RATE_WINDOW_S = 60;
 
-// Time-critical events that should fire Modal immediately, not just queue.
-// These have specialist agents that need to act within minutes.
-const IMMEDIATE_EVENTS = new Set<TriggerEvent>(['tour_completed', 'application_submitted']);
+// Fire Modal immediately for every accepted CRM event so the background
+// agent reacts continuously as new information arrives. Redis remains the
+// durable queue fallback if the immediate webhook call fails.
+const IMMEDIATE_EVENTS = new Set<TriggerEvent>(VALID_EVENTS);
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 const MODAL_WEBHOOK_URL = process.env.MODAL_WEBHOOK_URL ?? '';
