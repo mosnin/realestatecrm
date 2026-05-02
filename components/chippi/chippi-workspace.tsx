@@ -587,7 +587,7 @@ export function ChippiWorkspace({
       ) : isEmpty ? (
         <>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 pt-8 sm:pt-14 pb-40 sm:pb-32 space-y-10 sm:space-y-12">
+            <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-8 sm:pt-14 pb-40 sm:pb-32 space-y-10 sm:space-y-12">
               {/* The home is one sentence — Chippi's composed morning story
                   promoted to h1. Pulls stuck deals, overdue follow-ups, new
                   arrivals, hot people, drafts, questions in one shot; names
@@ -633,7 +633,7 @@ export function ChippiWorkspace({
               theirs for a reason). The composer's placeholder already
               cues the verbs: "draft a follow-up, prep a tour, summarize
               your day…" — trust the user to type. */}
-          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0">
+          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0">
             {renderInput()}
           </div>
         </>
@@ -642,7 +642,7 @@ export function ChippiWorkspace({
           {/* Active thread */}
           <div className="flex-1 min-h-0 overflow-hidden">
             <ScrollArea className="h-full">
-              <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-4">
+              <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-12 sm:pt-14 pb-4">
                 {/* Conversation title — quiet, only when we have one */}
                 {activeConversationId && (
                   <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-6 truncate">
@@ -738,7 +738,7 @@ export function ChippiWorkspace({
 
           {/* Docked input — sticky to viewport bottom (matches the empty
               state's composer dock so the input never rides up with messages). */}
-          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0">
+          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0">
             {atLimit ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
                 <div className="flex justify-center mb-2">
