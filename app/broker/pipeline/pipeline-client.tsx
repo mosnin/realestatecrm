@@ -8,6 +8,7 @@ import {
   Briefcase,
   Trophy,
   XCircle,
+  Check,
   ChevronDown,
   ChevronRight,
   Filter,
@@ -236,7 +237,7 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
         <Card className="border-emerald-500/20 bg-emerald-500/5">
           <CardContent className="px-5 py-3 flex items-center gap-3">
             <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center flex-shrink-0 text-emerald-700 dark:text-emerald-400">
-              <span role="img" aria-label="healthy">✓</span>
+              <Check size={14} aria-label="healthy" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium">All pipelines healthy</p>

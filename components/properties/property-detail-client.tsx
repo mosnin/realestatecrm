@@ -54,7 +54,7 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
     const res = await fetch(`/api/properties/${property.id}`, { method: 'DELETE' });
     if (!res.ok) { toast.error("Couldn't delete that property."); return; }
     toast.success('Deleted.');
-    router.push(`/s/${slug}/properties`);
+    router.push(`/s/${slug}/properties/commissions`);
   }
 
   const statusLabel = PROPERTY_LISTING_STATUS_OPTIONS.find((o) => o.value === property.listingStatus)?.label

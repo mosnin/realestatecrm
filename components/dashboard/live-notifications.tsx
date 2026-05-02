@@ -5,17 +5,26 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { PhoneIncoming, CalendarDays, Briefcase, ArrowRight, CalendarCheck, CalendarX } from 'lucide-react';
 import { getSupabaseBrowser } from '@/lib/supabase-browser';
+import {
+  notificationForNewLead,
+  notificationForNewTour,
+  notificationForNewDeal,
+  notificationForDealStageMove,
+  notificationForTourStatus,
+  notificationForLeadScored,
+  notificationForLeadScoredHot,
+} from '@/lib/notification-voice';
 
 interface Props {
   spaceId: string;
   slug: string;
 }
 
-const TOUR_STATUS_COPY: Record<string, { label: string; icon: typeof CalendarCheck }> = {
-  confirmed: { label: 'confirmed', icon: CalendarCheck },
-  completed: { label: 'completed', icon: CalendarCheck },
-  cancelled: { label: 'cancelled', icon: CalendarX },
-  no_show:   { label: 'no-show',   icon: CalendarX },
+const TOUR_STATUS_ICONS: Record<string, typeof CalendarCheck> = {
+  confirmed: CalendarCheck,
+  completed: CalendarCheck,
+  cancelled: CalendarX,
+  no_show:   CalendarX,
 };
 
 export function LiveNotifications({ spaceId, slug }: Props) {
@@ -30,8 +39,8 @@ export function LiveNotifications({ spaceId, slug }: Props) {
       const contact = payload.new as any;
       if (!contact?.name) return;
       if (contact?.brokerageId) return; // Brokerage intake leads are broker-dashboard only
-      toast.success(`New lead — ${contact.name}.`, {
-        description: contact.phone || contact.email || 'Just applied.',
+      toast.success(notificationForNewLead(contact.name), {
+        description: contact.phone || contact.email || undefined,
         icon: <PhoneIncoming size={16} />,
         action: {
           label: 'View',
@@ -51,8 +60,7 @@ export function LiveNotifications({ spaceId, slug }: Props) {
     onEvent: (payload) => {
       const tour = payload.new as any;
       if (!tour?.guestName) return;
-      toast.success(`Tour booked — ${tour.guestName}.`, {
-        description: tour.propertyAddress || 'New tour on the books.',
+      toast.success(notificationForNewTour(tour.guestName, tour.propertyAddress), {
         icon: <CalendarDays size={16} />,
         action: {
           label: 'View',
@@ -72,8 +80,7 @@ export function LiveNotifications({ spaceId, slug }: Props) {
     onEvent: (payload) => {
       const deal = payload.new as any;
       if (!deal?.title) return;
-      toast.success(`New deal — ${deal.title}.`, {
-        description: deal.address || 'Added to your pipeline.',
+      toast.success(notificationForNewDeal(deal.title, deal.address), {
         icon: <Briefcase size={16} />,
         duration: 6000,
       });
@@ -110,14 +117,17 @@ export function LiveNotifications({ spaceId, slug }: Props) {
         // Stage lookup is best-effort. Toast still fires below.
       }
 
-      toast.success(`${newDeal.title} → ${stageName ?? 'next stage'}.`, {
-        icon: <ArrowRight size={16} />,
-        duration: 5000,
-        action: {
-          label: 'Open',
-          onClick: () => router.push(`/s/${slug}/deals`),
+      toast.success(
+        notificationForDealStageMove(newDeal.title, stageName ?? 'the next stage'),
+        {
+          icon: <ArrowRight size={16} />,
+          duration: 5000,
+          action: {
+            label: 'Open',
+            onClick: () => router.push(`/s/${slug}/deals`),
+          },
         },
-      });
+      );
       router.refresh();
     },
   });
@@ -133,16 +143,17 @@ export function LiveNotifications({ spaceId, slug }: Props) {
       if (!newTour?.guestName) return;
       if (oldTour?.status === newTour?.status) return;
 
-      const meta = TOUR_STATUS_COPY[newTour.status as string];
-      if (!meta) return;
+      const status = newTour.status as 'confirmed' | 'completed' | 'cancelled' | 'no_show';
+      const Icon = TOUR_STATUS_ICONS[status];
+      if (!Icon) return;
 
-      const Icon = meta.icon;
-      const fn = meta.label === 'cancelled' || meta.label === 'no-show'
+      const fn = status === 'cancelled' || status === 'no_show'
         ? toast.warning
         : toast.success;
 
-      fn(`Tour ${meta.label} — ${newTour.guestName}.`, {
-        description: newTour.propertyAddress || undefined,
+      const copy = notificationForTourStatus(newTour.guestName, status, newTour.propertyAddress);
+      fn(copy.title, {
+        description: copy.description || undefined,
         icon: <Icon size={16} />,
         duration: 6000,
         action: {
@@ -165,10 +176,15 @@ export function LiveNotifications({ spaceId, slug }: Props) {
       if (newRecord?.brokerageId) return; // Brokerage intake leads are broker-dashboard only
       // Only notify when scoring completes
       if (oldRecord?.scoringStatus === 'pending' && newRecord?.scoringStatus === 'scored' && newRecord?.scoreLabel) {
-        toast.info(`Scored — ${newRecord.name || 'Contact'}.`, {
-          description: `${newRecord.scoreLabel.toUpperCase()} · ${newRecord.leadScore}/100`,
-          duration: 6000,
-        });
+        const name = newRecord.name || 'A new contact';
+        const label = String(newRecord.scoreLabel).toLowerCase();
+        // Hot crossings get the urgency line; the rest just state the tier.
+        if (label === 'hot') {
+          toast.info(notificationForLeadScoredHot(name), { duration: 6000 });
+        } else {
+          const copy = notificationForLeadScored(name, newRecord.scoreLabel, newRecord.leadScore);
+          toast.info(copy.title, { description: copy.description, duration: 6000 });
+        }
         router.refresh();
       }
     },

@@ -8,7 +8,6 @@ import { CheckCircle2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Space } from '@/lib/types';
 import {
-  SECTION_LABEL,
   BODY_MUTED,
   CAPTION,
   FIELD_RHYTHM,
@@ -19,7 +18,6 @@ interface GeneralSettingsFormProps {
   space: Space;
   settings: {
     phoneNumber?: string | null;
-    myConnections?: string | null;
   } | null;
 }
 
@@ -83,7 +81,6 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [checkingSlug, setCheckingSlug] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState(settings?.phoneNumber ?? '');
-  const [myConnections, setMyConnections] = useState(settings?.myConnections ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -135,14 +132,13 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
           newSlug: slugChanged ? newSlug : undefined,
           name,
           phoneNumber,
-          myConnections,
         }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         if (res.status === 409) {
           setSlugAvailable(false);
-          setSaveError('That slug was just taken. Please pick a different one.');
+          setSaveError('That slug was just taken. Pick a different one.');
           return;
         }
         setSaveError(data.error || "Couldn't save those settings. Try again.");
@@ -157,15 +153,14 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
         router.refresh();
       }
     } catch {
-      setSaveError('Network error. Please check your connection and try again.');
+      setSaveError('Network hiccup. Check your connection and try again.');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-10">
-      {/* Workspace fields — section label provided by parent page */}
+    <form onSubmit={handleSave} className="space-y-8">
       <div className={FIELD_RHYTHM}>
         <div className="space-y-1.5">
           <Label htmlFor="name" className="text-[12.5px] font-medium text-foreground">
@@ -196,49 +191,23 @@ export function GeneralSettingsForm({ space, settings }: GeneralSettingsFormProp
               </div>
             )}
           </div>
-          <p className={CAPTION}>
-            Your intake link: chippi.com/apply/{newSlug}
-          </p>
+          <p className={CAPTION}>Your intake link: chippi.com/apply/{newSlug}</p>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="number" className="text-[12.5px] font-medium text-foreground">
+            Phone number
+          </Label>
+          <Input
+            id="number"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            placeholder="(555) 123-4567"
+          />
+          <p className={CAPTION}>Used for SMS notifications and shown on tour booking pages.</p>
         </div>
       </div>
 
-      {/* Contact fields — separator + label rendered as a sub-section header */}
-      <div className="pt-8 border-t border-border/60 space-y-5">
-        <p className={SECTION_LABEL}>Contact</p>
-        <div className={FIELD_RHYTHM}>
-          <div className="space-y-1.5">
-            <Label htmlFor="number" className="text-[12.5px] font-medium text-foreground">
-              Phone number
-            </Label>
-            <Input
-              id="number"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              placeholder="(555) 123-4567"
-            />
-            <p className={CAPTION}>
-              Used for SMS notifications and shown on tour booking pages.
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="connections" className="text-[12.5px] font-medium text-foreground">
-              My connections
-            </Label>
-            <Input
-              id="connections"
-              value={myConnections}
-              onChange={(e) => setMyConnections(e.target.value)}
-              placeholder="Brokerages, lenders, partners"
-            />
-            <p className={CAPTION}>
-              Visible to AI context for follow-up suggestions.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Save bar */}
-      <div className="space-y-2 pt-2">
+      <div className="space-y-2 pt-1">
         <div className="flex items-center gap-3">
           <button
             type="submit"

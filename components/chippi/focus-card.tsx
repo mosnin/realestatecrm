@@ -24,6 +24,7 @@ import { timeAgo } from '@/lib/formatting';
 import { toast } from 'sonner';
 import { BODY_MUTED, QUIET_LINK, TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
 import { buildIntakeUrl } from '@/lib/intake';
+import { levenshtein } from '@/lib/draft-feedback';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -112,6 +113,12 @@ export function FocusCard({
   const [answer, setAnswer] = useState('');
   const [acting, setActing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // First-view timestamp for the currently focused item. Reset whenever the
+  // realtor rotates to a new card. Used to compute time-to-decision (an
+  // important feedback signal — fast send = trust the model, slow send = the
+  // model is making the realtor think too hard). Per-card so a held card
+  // resuming later doesn't get credited a 4-hour decisionMs.
+  const viewedAtRef = useRef<number>(Date.now());
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -142,17 +149,42 @@ export function FocusCard({
   // Find the next item that hasn't been held in this session
   const current = items.find((i) => !skipped.has(`${i.kind}:${i.id}`)) ?? null;
 
-  // Reset edit state when current item changes (rotated to next)
+  // Reset edit state when current item changes (rotated to next).
+  // Also reset the view timestamp — the realtor is "first seeing" this item
+  // now, even if it was queued an hour ago server-side. Decision latency is
+  // the time the *realtor* spent looking at the card, not the time the draft
+  // sat in the queue.
   useEffect(() => {
     if (current?.kind === 'draft') setEditContent(current.data.content);
     setEditing(false);
     setAnswer('');
+    viewedAtRef.current = Date.now();
   }, [current?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Actions ─────────────────────────────────────────────────────────────
 
   function hold() {
     if (!current) return;
+    // Fire-and-forget feedback ping for drafts. Holding is signal too: "you
+    // showed me this and I wasn't ready to act on it yet." We don't await —
+    // hold has to feel instant, and a failed feedback write must not block
+    // the realtor from rotating. Questions don't get this ping (different
+    // table, different table column).
+    if (current.kind === 'draft') {
+      const decisionMs = Math.max(0, Date.now() - viewedAtRef.current);
+      const editDistance = levenshtein(current.data.content, editContent.trim());
+      void fetch('/api/agent/drafts/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          draftId: current.id,
+          action: 'held',
+          decisionMs,
+          editDistance,
+        }),
+        keepalive: true,
+      }).catch(() => {/* swallow — signal is best-effort */});
+    }
     setSkipped((prev) => new Set([...prev, `${current.kind}:${current.id}`]));
   }
 
@@ -160,8 +192,19 @@ export function FocusCard({
     if (!current || current.kind !== 'draft') return;
     setActing(true);
     try {
-      const isEdited = editContent.trim() !== current.data.content;
-      const body: Record<string, unknown> = { status: 'approved' };
+      const original = current.data.content;
+      const finalText = editContent.trim();
+      const isEdited = finalText !== original;
+      // Distance is computed against the original content (not the trimmed
+      // edit buffer's prior state) — what we want is "how far from what the
+      // model gave us". Cheap on the client; the server clamps and validates.
+      const editDistance = isEdited ? levenshtein(original, finalText) : 0;
+      const decisionMs = Math.max(0, Date.now() - viewedAtRef.current);
+      const body: Record<string, unknown> = {
+        status: 'approved',
+        editDistance,
+        decisionMs,
+      };
       if (isEdited) body.content = editContent;
       const res = await fetch(`/api/agent/drafts/${current.id}`, {
         method: 'PATCH',

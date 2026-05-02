@@ -3,10 +3,9 @@ import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { Card, CardContent } from '@/components/ui/card';
-import { PhoneIncoming, Users, Briefcase, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { formatCompact } from '@/lib/formatting';
+import { H1, TITLE_FONT } from '@/lib/typography';
 import { RealtorsClient, type RealtorRow } from './realtors-client';
 
 export const metadata: Metadata = { title: 'Realtors — Broker Dashboard' };
@@ -21,16 +20,9 @@ export default async function BrokerRealtorsPage() {
 
   const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
 
-  const [leadRows, contactRows, dealRows, hotLeadRows] = await Promise.all([
-    spaceIds.length > 0
-      ? supabase
-          .from('Contact')
-          .select('spaceId')
-          .in('spaceId', spaceIds)
-          .contains('tags', ['application-link'])
-          .limit(10000)
-          .then((r) => r.data ?? [])
-      : Promise.resolve([]),
+  // Pull only what the table actually shows: people on file + deals (count + value).
+  // The old 4-stat summary cards and lead/hot-lead columns were chrome — cut.
+  const [contactRows, dealRows] = await Promise.all([
     spaceIds.length > 0
       ? supabase
           .from('Contact')
@@ -48,23 +40,9 @@ export default async function BrokerRealtorsPage() {
           .limit(10000)
           .then((r) => r.data ?? [])
       : Promise.resolve([]),
-    // Hot leads: scoreLabel = 'hot'
-    spaceIds.length > 0
-      ? supabase
-          .from('Contact')
-          .select('spaceId')
-          .in('spaceId', spaceIds)
-          .eq('scoreLabel', 'hot')
-          .limit(10000)
-          .then((r) => r.data ?? [])
-      : Promise.resolve([]),
   ]);
 
-  const leadsBySpace = (leadRows as { spaceId: string }[]).reduce<Record<string, number>>(
-    (acc, r) => { acc[r.spaceId] = (acc[r.spaceId] ?? 0) + 1; return acc; },
-    {}
-  );
-  const contactsBySpace = (contactRows as { spaceId: string }[]).reduce<Record<string, number>>(
+  const peopleBySpace = (contactRows as { spaceId: string }[]).reduce<Record<string, number>>(
     (acc, r) => { acc[r.spaceId] = (acc[r.spaceId] ?? 0) + 1; return acc; },
     {}
   );
@@ -79,18 +57,7 @@ export default async function BrokerRealtorsPage() {
     },
     {}
   );
-  const hotLeadsBySpace = (hotLeadRows as { spaceId: string }[]).reduce<Record<string, number>>(
-    (acc, r) => { acc[r.spaceId] = (acc[r.spaceId] ?? 0) + 1; return acc; },
-    {}
-  );
 
-  // Brokerage-wide totals for summary bar
-  const totalLeads = Object.values(leadsBySpace).reduce((a, b) => a + b, 0);
-  const totalContacts = Object.values(contactsBySpace).reduce((a, b) => a + b, 0);
-  const totalDeals = Object.values(dealsBySpace).reduce((a, b) => a + b.count, 0);
-  const totalPipeline = Object.values(dealsBySpace).reduce((a, b) => a + b.value, 0);
-
-  // Shape data for client component
   const realtors: RealtorRow[] = members.map((m) => {
     const sid = m.Space?.id ?? null;
     return {
@@ -100,57 +67,54 @@ export default async function BrokerRealtorsPage() {
       email: m.User?.email ?? '',
       onboard: m.User?.onboard ?? false,
       role: m.role,
-      joinedAt: m.createdAt,
-      spaceId: sid,
       spaceSlug: m.Space?.slug ?? null,
-      leads:    sid ? (leadsBySpace[sid]     ?? 0) : 0,
-      contacts: sid ? (contactsBySpace[sid]  ?? 0) : 0,
+      people:   sid ? (peopleBySpace[sid] ?? 0) : 0,
       deals:    sid ? (dealsBySpace[sid]?.count ?? 0) : 0,
       pipeline: sid ? (dealsBySpace[sid]?.value ?? 0) : 0,
-      hotLeads: sid ? (hotLeadsBySpace[sid]  ?? 0) : 0,
     };
   });
 
+  // ── Page-scoped narration. Pick the loudest fact: top performer by deals,
+  // a quiet-week call-out, or a "nobody onboard" flag. Hand-coded ladder, no
+  // agent call — this is the deals-page-cuts pattern.
+  const subtitle = (() => {
+    if (realtors.length === 0) {
+      return 'No realtors yet. Send the first invite.';
+    }
+    const active = realtors.filter((r) => r.onboard);
+    if (active.length === 0) {
+      return `${realtors.length} invited. Nobody onboard yet.`;
+    }
+    const ranked = [...realtors].sort((a, b) => b.deals - a.deals);
+    const top = ranked[0];
+    if (top.deals > 0) {
+      const firstName = (top.name ?? top.email).split(/\s+/)[0];
+      return `${firstName} leads the team — ${top.deals} ${top.deals === 1 ? 'deal' : 'deals'} in flight.`;
+    }
+    const quiet = realtors.filter((r) => r.onboard && r.people === 0).length;
+    if (quiet > 0) {
+      return `${active.length} active. ${quiet} ${quiet === 1 ? 'is' : 'are'} sitting quiet.`;
+    }
+    return `${active.length} active. Pipeline empty — nudge the team.`;
+  })();
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Realtors</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {members.length} {members.length === 1 ? 'member' : 'members'} · {brokerage.name}
+      <header className="space-y-2">
+        <h1 className={H1} style={TITLE_FONT}>
+          Realtors
+        </h1>
+        <p className="text-lg text-muted-foreground" style={TITLE_FONT}>
+          {subtitle}
         </p>
-      </div>
-
-      {/* Brokerage-wide summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Total leads',    value: totalLeads,                  icon: PhoneIncoming },
-          { label: 'Total contacts', value: totalContacts,               icon: Users },
-          { label: 'Active deals',   value: totalDeals,                  icon: Briefcase },
-          { label: 'Pipeline value', value: formatCompact(totalPipeline), icon: TrendingUp },
-        ].map(({ label, value, icon: Icon }) => (
-          <Card key={label}>
-            <CardContent className="px-4 py-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                  <p className="text-2xl font-bold mt-0.5 tabular-nums">{value}</p>
-                </div>
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                  <Icon size={15} className="text-muted-foreground" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      </header>
 
       {members.length === 0 ? (
         <Card>
-          <CardContent className="px-5 py-10 text-center space-y-2">
-            <p className="text-sm text-muted-foreground">No realtors yet.</p>
+          <CardContent className="px-5 py-10 text-center">
             <Link
               href="/broker/invitations"
-              className="text-xs text-primary font-medium hover:underline underline-offset-2 inline-block"
+              className="text-sm text-primary font-medium hover:underline underline-offset-2 inline-block"
             >
               Invite realtors →
             </Link>

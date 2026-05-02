@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import { logger } from '@/lib/logger';
 import { notifyBroker } from '@/lib/broker-notify';
+import { notificationForReviewRequested } from '@/lib/notification-voice';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -155,11 +156,16 @@ export async function POST(req: NextRequest, { params }: Params) {
     metadata: { dealId, brokerageId: dealRow.Space.brokerageId },
   });
 
+  const reviewCopy = notificationForReviewRequested(
+    userRow.name ?? 'An agent',
+    dealRow.title ?? 'Untitled deal',
+    reason,
+  );
   void notifyBroker({
     brokerageId: dealRow.Space.brokerageId,
     type: 'review_requested',
-    title: `${userRow.name ?? 'An agent'} flagged "${dealRow.title ?? 'Untitled deal'}"`,
-    body: reason.slice(0, 280),
+    title: reviewCopy.title,
+    body: reviewCopy.description,
     // Include the requesting agent's name so downstream renderers (the
     // in-app bell, any future email/Slack bridge) don't need a second
     // User lookup to render "Alice flagged ...".

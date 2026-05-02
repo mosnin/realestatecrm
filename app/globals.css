@@ -270,6 +270,78 @@
   }
 }
 
+/* ── Dashboard content padding ──────────────────────────────────────────
+   Defensive horizontal padding on every dashboard page wrapper. The layout
+   sets `px-4 sm:px-6 md:px-10 lg:px-12` via Tailwind classes, but a recent
+   regression had pages rendering edge-to-edge on mobile — the padding
+   utility wasn't reaching the rendered DOM. This class duplicates the
+   intent in raw CSS so the build can't drop it. Apply via the
+   `dashboard-content` class on the wrapper that holds page children. */
+.dashboard-content {
+  padding-left: 1rem;
+  padding-right: 1rem;
+  padding-top: 1.25rem;
+  padding-bottom: 10rem;
+}
+@media (min-width: 640px) {
+  .dashboard-content {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+@media (min-width: 768px) {
+  .dashboard-content {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+    padding-top: 1.75rem;
+    padding-bottom: 6rem;
+  }
+}
+@media (min-width: 1024px) {
+  .dashboard-content {
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+}
+
+.dashboard-footer-wrap {
+  padding-left: 1rem;
+  padding-right: 1rem;
+  padding-bottom: 1rem;
+}
+@media (min-width: 640px) {
+  .dashboard-footer-wrap {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+@media (min-width: 768px) {
+  .dashboard-footer-wrap {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .dashboard-footer-wrap {
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+}
+
+/* Chippi chat surface — same defensive pattern. The chat workspace's
+   inner content wrappers have `px-4 sm:px-6` but production showed the
+   composer overflowing the right edge on mobile. Explicit raw CSS class. */
+.chat-content-wrap {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+@media (min-width: 640px) {
+  .chat-content-wrap {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
 /* ── Clerk component overrides ──────────────────────
    Paper-flat: rounded-md, h-9, foreground primary (no orange),
    border-border/70, no shadows, no chunky borders. Drives the

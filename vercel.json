@@ -7,6 +7,18 @@
     {
       "path": "/api/cron/broker-weekly-report",
       "schedule": "0 9 * * 1"
+    },
+    {
+      "path": "/api/cron/agent-sweep",
+      "schedule": "0 */4 * * *"
+    },
+    {
+      "path": "/api/cron/draft-outcomes",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/sweep-paused-runs",
+      "schedule": "0 4 * * *"
     }
   ],
   "headers": [

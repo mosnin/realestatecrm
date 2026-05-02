@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
+import { ApprovalCelebration, type ApprovalKind } from '@/components/chippi/approval-celebration';
 
 interface DeliveryResult {
   sent: boolean;
@@ -80,10 +81,13 @@ function DraftRow({
   draft,
   slug,
   onAction,
+  onCelebrationDone,
 }: {
   draft: AgentDraft;
   slug: string;
   onAction: (id: string, status: 'approved' | 'dismissed', content?: string) => Promise<DeliveryResult | null>;
+  /** Called once the row's celebration dwell has finished — parent removes the row then. */
+  onCelebrationDone: (id: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(draft.content);
@@ -92,6 +96,8 @@ function DraftRow({
   const [dismissError, setDismissError] = useState<string | null>(null);
   const [autoSendCancelled, setAutoSendCancelled] = useState(false);
   const [autoSendRemainingMs, setAutoSendRemainingMs] = useState<number | null>(null);
+  /** When set, the row replaces its own content with the celebration line. */
+  const [celebrationKind, setCelebrationKind] = useState<ApprovalKind | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
@@ -132,7 +138,18 @@ function DraftRow({
     if (result !== null && !result?.sent) {
       try { await navigator.clipboard.writeText(editedContent); } catch { /* ignore */ }
     }
-    if (mountedRef.current) setActioning(null);
+    if (!mountedRef.current) return;
+    // Sent successfully → celebrate in place. The parent left the row mounted
+    // for us; once the celebration dwell ends we tell it to remove the row.
+    // Failed delivery / not-configured paths fall through to the existing
+    // banner so the realtor sees the actionable nudge instead of a win line.
+    if (result?.sent) {
+      const kind: ApprovalKind =
+        draft.channel === 'note' ? 'note' : draft.channel === 'email' ? 'email' : 'sms';
+      setCelebrationKind(kind);
+    } else {
+      setActioning(null);
+    }
   }
 
   async function handleDismiss() {
@@ -186,6 +203,27 @@ function DraftRow({
     // closure each tick would restart the timer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSendEligible]);
+
+  // When the row is celebrating, the body collapses to one calm sentence —
+  // contact name still anchors the moment so the realtor knows whose row
+  // they just resolved as the others stagger up to fill the space.
+  if (celebrationKind) {
+    return (
+      <article className="group/row py-5 first:pt-0 last:pb-0">
+        <div className="flex items-baseline gap-2 text-sm">
+          {draft.Contact && (
+            <span className="font-medium text-muted-foreground truncate">
+              {draft.Contact.name}
+            </span>
+          )}
+          <ApprovalCelebration
+            kind={celebrationKind}
+            onDone={() => onCelebrationDone(draft.id)}
+          />
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article className="group/row py-5 first:pt-0 last:pb-0">
@@ -554,7 +592,13 @@ export function AgentDraftInbox({ slug }: Props) {
     const restored = drafts.find((d) => d.id === draftId) ?? null;
     const contactName = restored?.Contact?.name ?? null;
 
-    setDrafts((prev) => prev.filter((d) => d.id !== draftId));
+    // Dismiss path: collapse the row immediately. There's no win to celebrate.
+    // Approve path: the row stays mounted so it can transform into the
+    // celebration sentence in place; removal is driven by handleCelebrationDone
+    // once the dwell ends.
+    if (status === 'dismissed') {
+      setDrafts((prev) => prev.filter((d) => d.id !== draftId));
+    }
 
     const body: Record<string, unknown> = { status };
     if (content !== undefined) body.content = content;
@@ -567,22 +611,35 @@ export function AgentDraftInbox({ slug }: Props) {
       });
 
       if (!res.ok) {
-        if (restored) setDrafts((prev) => [restored, ...prev]);
+        if (status === 'dismissed' && restored) {
+          setDrafts((prev) => [restored, ...prev]);
+        }
         toast.error("That didn't go through. Try again.");
         return null;
       }
 
       const data = await res.json();
       if (status === 'approved' && data.deliveryResult) {
-        showFeedback(contactName, data.deliveryResult as DeliveryResult);
-        return data.deliveryResult as DeliveryResult;
+        const result = data.deliveryResult as DeliveryResult;
+        // Only fall back to the legacy delivery banner when delivery DIDN'T
+        // succeed — a successful send is celebrated inline by the row itself.
+        if (!result.sent) {
+          showFeedback(contactName, result);
+        }
+        return result;
       }
       return null;
     } catch {
-      if (restored) setDrafts((prev) => [restored, ...prev]);
+      if (status === 'dismissed' && restored) {
+        setDrafts((prev) => [restored, ...prev]);
+      }
       toast.error("I lost the connection. Try again.");
       return null;
     }
+  }
+
+  function handleCelebrationDone(draftId: string) {
+    setDrafts((prev) => prev.filter((d) => d.id !== draftId));
   }
 
   async function approveAll() {
@@ -676,7 +733,12 @@ export function AgentDraftInbox({ slug }: Props) {
         <StaggerList className="divide-y divide-border/60">
           {drafts.map((draft) => (
             <StaggerItem key={draft.id}>
-              <DraftRow draft={draft} slug={slug} onAction={handleAction} />
+              <DraftRow
+                draft={draft}
+                slug={slug}
+                onAction={handleAction}
+                onCelebrationDone={handleCelebrationDone}
+              />
             </StaggerItem>
           ))}
         </StaggerList>

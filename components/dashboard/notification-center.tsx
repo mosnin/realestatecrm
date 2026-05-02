@@ -117,8 +117,8 @@ export function NotificationCenter({ slug }: { slug: string }) {
           {notifications.length === 0 ? (
             <div className="py-10 text-center text-muted-foreground">
               <Bell size={24} className="mx-auto mb-2 opacity-30" />
-              <p className="text-sm">All caught up!</p>
-              <p className="text-xs mt-0.5">No pending items right now.</p>
+              <p className="text-sm">Nothing pressing.</p>
+              <p className="text-xs mt-0.5">I&apos;m watching the pipeline.</p>
             </div>
           ) : (
             <div className="py-1">

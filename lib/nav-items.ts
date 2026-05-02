@@ -7,7 +7,8 @@ import {
   FileText,
   ClipboardList,
   BarChart2,
-  Home,
+  Wallet,
+  Plug,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -71,33 +72,23 @@ export const realtorNavItems: NavItem[] = [
 /**
  * Secondary realtor nav — visually subordinate "More" section. Calendar
  * absorbs Tours (a tour is just a calendar event with a property + contact
- * attached), so there is no separate Tours destination. Intake form expands
- * inline so its sub-pages (Customize, Share, Booking, Availability) are
- * reachable in one click instead of buried inside an overview page.
+ * attached). Intake collapses to a single destination: the overview is the
+ * home of the form (link + recent submissions) and the only other surface
+ * that earns its place is /customize, reachable inline from the overview.
+ * Sub-pages for Share / Tracking / Submissions were configuration disguised
+ * as features and have been cut.
+ *
+ * The standalone Properties list is gone. Realtors who use Chippi properties
+ * use them via deals — properties enter the system through /deals/new and are
+ * read from deal-detail. The only standalone properties surface that earns
+ * its place is the YTD commissions roll-up (a revenue view, not a property
+ * catalogue), which lives on its own here.
  */
 export const realtorMoreNavItems: NavItem[] = [
   { href: '/calendar', label: 'Calendar', icon: Calendar },
-  {
-    href: '/properties',
-    label: 'Properties',
-    icon: Home,
-    children: [
-      { href: '/properties', label: 'All', exact: true },
-      { href: '/properties/commissions', label: 'Commissions' },
-    ],
-  },
-  {
-    href: '/intake',
-    label: 'Intake form',
-    icon: ClipboardList,
-    children: [
-      { href: '/intake', label: 'Overview', exact: true },
-      { href: '/intake/customize', label: 'Customize' },
-      { href: '/intake/share', label: 'Share' },
-      { href: '/intake/tracking', label: 'Tracking' },
-      { href: '/intake/analytics', label: 'Submissions' },
-    ],
-  },
+  { href: '/properties/commissions', label: 'Commissions', icon: Wallet },
+  { href: '/integrations', label: 'Integrations', icon: Plug },
+  { href: '/intake', label: 'Intake form', icon: ClipboardList },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
 ];
 

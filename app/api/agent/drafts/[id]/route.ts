@@ -4,6 +4,33 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { audit } from '@/lib/audit';
 import { sendDraft, type DeliveryResult } from '@/lib/delivery';
+import { LEVENSHTEIN_CAP, normalizedLevenshtein } from '@/lib/draft-feedback';
+
+/**
+ * Pulls feedback fields from the PATCH body and validates them server-side.
+ *
+ * The client sends raw measurements (Levenshtein distance, decision time).
+ * The server is the one that decides what `feedback_action` to record — the
+ * client can't lie about whether a draft was edited because we recompute it
+ * from the editDistance value the client provides AND from the server-side
+ * comparison of original vs. final content. Defense in depth.
+ */
+function readFeedbackFields(body: Record<string, unknown>): {
+  editDistance: number | null;
+  decisionMs: number | null;
+} {
+  const ed = body.editDistance;
+  const dm = body.decisionMs;
+  const editDistance =
+    typeof ed === 'number' && Number.isFinite(ed) && ed >= 0
+      ? Math.min(Math.floor(ed), LEVENSHTEIN_CAP)
+      : null;
+  const decisionMs =
+    typeof dm === 'number' && Number.isFinite(dm) && dm >= 0
+      ? Math.floor(dm)
+      : null;
+  return { editDistance, decisionMs };
+}
 
 export async function PATCH(
   req: NextRequest,
@@ -61,12 +88,16 @@ export async function PATCH(
     finalContent = body.content.trim();
   }
 
+  const { editDistance, decisionMs } = readFeedbackFields(body);
+
   // ── Dismissed: simple status update ──────────────────────────────────────
   if (newStatus === 'dismissed') {
     const dismissPatch: Record<string, unknown> = {
       status: 'dismissed',
       updatedAt: new Date().toISOString(),
+      feedback_action: 'rejected',
     };
+    if (decisionMs !== null) dismissPatch.decision_ms = decisionMs;
     if (!existing.outcome) {
       dismissPatch.outcome = 'no_response';
       dismissPatch.outcomeDetectedAt = new Date().toISOString();
@@ -122,6 +153,23 @@ export async function PATCH(
   };
   if (finalContent !== existing.content) patch.content = finalContent;
 
+  // Server-side feedback labelling. The client can pass editDistance, but the
+  // action label ('approved' vs. 'edited_and_approved') is decided here so a
+  // bad client can't claim 'approved' on text it actually rewrote. We trust
+  // the server's own content comparison for the boolean, and the client's
+  // editDistance number for the magnitude.
+  //
+  // Whitespace-normalized comparison: a stray trailing space or a double
+  // newline collapsed to a single one is NOT an edit. Otherwise we'd record
+  // 'edited_and_approved' on rows where the realtor literally just hit Approve.
+  const serverEditDistance = normalizedLevenshtein(existing.content, finalContent);
+  const contentChanged = serverEditDistance > 0;
+  patch.feedback_action = contentChanged ? 'edited_and_approved' : 'approved';
+  patch.edit_distance = contentChanged
+    ? (editDistance ?? serverEditDistance)
+    : 0;
+  if (decisionMs !== null) patch.decision_ms = decisionMs;
+
   const { data: updated, error: updateError } = await supabase
     .from('AgentDraft')
     .update(patch)
@@ -142,9 +190,12 @@ export async function PATCH(
       newStatus: finalStatus,
       contactId: existing.contactId,
       channel: existing.channel,
-      contentEdited: finalContent !== existing.content,
+      contentEdited: contentChanged,
       deliverySent: deliveryResult.sent,
       deliveryError: deliveryResult.error,
+      feedbackAction: patch.feedback_action,
+      editDistance: patch.edit_distance,
+      decisionMs: decisionMs ?? undefined,
     },
   });
 

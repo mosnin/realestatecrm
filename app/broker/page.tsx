@@ -15,6 +15,13 @@ import {
 import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
 import { TeamActivityFeed } from '@/components/broker/team-activity-feed';
+import { BrokerMorningStory } from '@/components/broker/broker-morning-story';
+import { DraftImpactCard } from '@/components/broker/draft-impact-card';
+import {
+  aggregateDraftStats,
+  draftStatsWindowStart,
+  type DraftStatsRow,
+} from '@/lib/draft-stats';
 import { MemberDashboard } from './member-dashboard';
 
 function getGreeting() {
@@ -54,8 +61,15 @@ export default async function BrokerOverviewPage() {
 
   // Aggregate the swarm in one parallel volley. Each query is scoped to the
   // brokerage's set of spaces.
-  const [applicationCountRes, leadCountRes, dealRows, wonDealRows, invitationsRes, draftRows] =
-    await Promise.all([
+  const [
+    applicationCountRes,
+    leadCountRes,
+    dealRows,
+    wonDealRows,
+    invitationsRes,
+    draftRows,
+    draftStatsRows,
+  ] = await Promise.all([
       spaceIds.length > 0
         ? supabase
             .from('Contact')
@@ -101,7 +115,20 @@ export default async function BrokerOverviewPage() {
             .eq('status', 'pending')
             .then((r) => r.data ?? [])
         : Promise.resolve([]),
+      // Decided drafts in the 30-day window — feeds the Draft impact card.
+      // Same shape `aggregateDraftStats` expects; brokerage-wide rollup.
+      spaceIds.length > 0
+        ? supabase
+            .from('AgentDraft')
+            .select('feedback_action, edit_distance, decision_ms, outcome_signal')
+            .in('spaceId', spaceIds)
+            .not('feedback_action', 'is', null)
+            .gte('createdAt', draftStatsWindowStart())
+            .then((r) => r.data ?? [])
+        : Promise.resolve([]),
     ]);
+
+  const draftStats = aggregateDraftStats((draftStatsRows ?? []) as DraftStatsRow[]);
 
   const [applicationRows, leadRows] = await Promise.all([
     spaceIds.length > 0
@@ -209,16 +236,15 @@ export default async function BrokerOverviewPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-12 pb-12">
-      {/* Header — calm, brand-quiet, narrative status */}
+      {/* Header — Chippi's morning sentence is the lead. The brokerage name
+          and status counts step down into the supporting role they actually
+          deserve: context, not headline. */}
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">{getGreeting()}.</p>
-        <h1
-          className="text-3xl tracking-tight text-foreground truncate"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          {brokerage.name}
-        </h1>
-        <p className="text-sm text-muted-foreground">{statusSentence}</p>
+        <BrokerMorningStory />
+        <p className="text-sm text-muted-foreground">
+          {brokerage.name} &middot; {statusSentence}
+        </p>
       </header>
 
       {/* First-run nudge — only when the brokerage hasn't been set up yet */}
@@ -403,6 +429,11 @@ export default async function BrokerOverviewPage() {
           </ul>
         )}
       </section>
+
+      {/* Draft impact — how Chippi's drafts have actually been landing across
+          the brokerage over the last 30 days. Sits below the team list so the
+          realtor row remains the focal element of the page. */}
+      <DraftImpactCard stats={draftStats} />
 
       {/* What the team did — proof of work across the swarm */}
       <section>

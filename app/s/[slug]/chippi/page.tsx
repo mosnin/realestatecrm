@@ -5,17 +5,22 @@ import { supabase } from '@/lib/supabase';
 import { ChippiWorkspace } from '@/components/chippi/chippi-workspace';
 import type { Conversation } from '@/lib/types';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
+import { composioConfigured } from '@/lib/integrations/composio';
 
 export default async function ChippiPage({
   params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ q?: string; tab?: string }>;
+  searchParams: Promise<{ q?: string; tab?: string; prefill?: string }>;
 }) {
   const { slug } = await params;
-  const { q, tab } = await searchParams;
+  const { q, tab, prefill } = await searchParams;
   const initialInput = typeof q === 'string' && q.trim() ? q.trim() : undefined;
+  // `prefill` populates the composer but does NOT auto-send — the realtor
+  // finishes the sentence themselves. Used by "or just tell Chippi →" shortcuts
+  // on /contacts and /deals (and by morning-actions). Distinct from `q`.
+  const initialPrefill = typeof prefill === 'string' && prefill.length > 0 ? prefill : undefined;
   const view = tab === 'settings' ? 'settings' : 'workspace';
 
   const { userId } = await auth();
@@ -68,6 +73,23 @@ export default async function ChippiPage({
     // fall back to empty state
   }
 
+  // Discovery banner: show "Connect Gmail to send your drafts →" under the
+  // morning when the realtor has zero active integrations AND Composio is
+  // configured. Snapshot at page load — connecting an integration triggers
+  // an OAuth navigation that reloads the page, so the banner self-clears.
+  let hasIntegrations = false;
+  if (composioConfigured()) {
+    const { count } = await supabase
+      .from('IntegrationConnection')
+      .select('id', { count: 'exact', head: true })
+      .eq('spaceId', space.id)
+      .eq('status', 'active');
+    hasIntegrations = (count ?? 0) > 0;
+  }
+  // If Composio isn't configured at all, treat as "has integrations" so the
+  // banner stays hidden — there's nothing to connect to.
+  const showConnectBanner = composioConfigured() && !hasIntegrations;
+
   return (
     <div className="flex h-full flex-col">
       <ChippiWorkspace
@@ -77,6 +99,8 @@ export default async function ChippiPage({
         initialConversations={conversations}
         initialConversationId={initialConversationId}
         initialInput={initialInput}
+        initialPrefill={initialPrefill}
+        showConnectBanner={showConnectBanner}
       />
     </div>
   );

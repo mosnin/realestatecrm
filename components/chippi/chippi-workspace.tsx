@@ -20,6 +20,7 @@ import { TodayFeed } from './today-feed';
 import { MorningStory } from './morning-story';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { toast } from 'sonner';
+import { approvalKindForTool, approvalSubjectFromArgs, type ApprovalKind } from './approval-celebration';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -41,6 +42,16 @@ interface ChippiWorkspaceProps {
   initialConversationId: string | null;
   /** Pre-send this message on mount (used when arriving from the command palette). */
   initialInput?: string;
+  /** Pre-populate the composer on mount but do NOT auto-send — the realtor
+   *  finishes the sentence themselves. Used by "or just tell Chippi →"
+   *  shortcuts on /contacts and /deals, and by morning-actions. Distinct
+   *  from `initialInput` which auto-sends. */
+  initialPrefill?: string;
+  /** When true, render the "Connect Gmail to send your drafts →" tertiary
+   *  line under the post-tour affordance. Snapshot at page load: the realtor
+   *  has zero active integrations AND Composio is configured. Once they
+   *  connect, the OAuth round-trip reloads the page and this flips false. */
+  showConnectBanner?: boolean;
 }
 
 const MESSAGE_LIMIT = 50;
@@ -63,6 +74,8 @@ export function ChippiWorkspace({
   initialConversations,
   initialConversationId,
   initialInput,
+  initialPrefill,
+  showConnectBanner = false,
 }: ChippiWorkspaceProps) {
   const { user } = useUser();
   const searchParams = useSearchParams();
@@ -74,6 +87,14 @@ export function ChippiWorkspace({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  // The single sentence the realtor sees when they approve a celebrate-able
+  // tool from the chat permission prompt. Set the moment the wrapped
+  // approve/alwaysAllow callback fires; cleared by the celebration's own
+  // onDone after the dwell. Anchored to the assistant message id whose
+  // permission prompt was approved so a later turn's prompt can't inherit it.
+  const [chatCelebration, setChatCelebration] = useState<
+    { messageId: string; kind: ApprovalKind; subject?: string } | null
+  >(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -110,6 +131,38 @@ export function ChippiWorkspace({
       );
     },
   });
+
+  // Wrap approve / alwaysAllow so the moment the realtor approves a
+  // celebrate-able tool, the prompt's surface flips into the win sentence.
+  // The wrapped callbacks fire-and-forget the underlying action (the hook
+  // already kicks off the continuation stream synchronously) and stamp
+  // `chatCelebration` with the *current* tail assistant message id so the
+  // line lands on the same bubble that asked for approval.
+  function celebrateThen<
+    F extends (requestId: string, editedArgs?: Record<string, unknown>) => Promise<void>,
+  >(fn: F): F {
+    return ((requestId, editedArgs) => {
+      // Snapshot before the hook clears pendingApproval.
+      const prompt = pendingApproval;
+      if (prompt) {
+        const kind = approvalKindForTool(prompt.name);
+        if (kind) {
+          // Find the assistant message the prompt sits under — it's the tail.
+          const tail = [...messages].reverse().find((m) => m.role === 'assistant');
+          if (tail) {
+            setChatCelebration({
+              messageId: tail.id,
+              kind,
+              subject: approvalSubjectFromArgs(prompt.name, prompt.args),
+            });
+          }
+        }
+      }
+      return fn(requestId, editedArgs);
+    }) as F;
+  }
+  const approveCelebrating = celebrateThen(approve);
+  const alwaysAllowCelebrating = celebrateThen(alwaysAllow);
 
   // Hydrate the transcript from initial server data on first render.
   const hydratedRef = useRef(false);
@@ -308,8 +361,12 @@ export function ChippiWorkspace({
   const firstName = user?.firstName ?? '';
 
   // Composer prefill — bumped by the day-one welcome's "Tell me about a lead"
-  // action. Nonce so identical text twice in a row still re-applies.
-  const [prefill, setPrefill] = useState<{ text: string; nonce: number } | null>(null);
+  // action, and seeded on mount when arriving from `?prefill=` (the
+  // "or just tell Chippi →" shortcuts on /contacts and /deals, and
+  // morning-actions). Nonce so identical text twice in a row still re-applies.
+  const [prefill, setPrefill] = useState<{ text: string; nonce: number } | null>(
+    initialPrefill ? { text: initialPrefill, nonce: Date.now() } : null,
+  );
   const handleTellMeAboutLead = useCallback((text: string) => {
     setPrefill({ text, nonce: Date.now() });
   }, []);
@@ -536,7 +593,7 @@ export function ChippiWorkspace({
       ) : isEmpty ? (
         <>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 pt-8 sm:pt-14 pb-40 sm:pb-32 space-y-10 sm:space-y-12">
+            <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-8 sm:pt-14 pb-40 sm:pb-32 space-y-10 sm:space-y-12">
               {/* The home is one sentence — Chippi's composed morning story
                   promoted to h1. Pulls stuck deals, overdue follow-ups, new
                   arrivals, hot people, drafts, questions in one shot; names
@@ -548,7 +605,33 @@ export function ChippiWorkspace({
                   MorningReplay recap card (the agent talking about itself
                   instead of about the deals). The home now answers one
                   question: what should I do next? */}
-              <MorningStory slug={slug} />
+              {/* Morning sentence + post-tour affordance — wrapped together so
+                  the tertiary "Just toured? Log it →" line sits tight under the
+                  headline (mt-3) instead of joining the page's space-y-12
+                  rhythm. The affordance is muted, single-line, centered — it
+                  has to be *findable* the second time a realtor uses Chippi
+                  without competing with the morning's primary action. */}
+              <div>
+                <MorningStory slug={slug} />
+                <div className="mt-3 text-center">
+                  <Link
+                    href={`/s/${slug}/chippi/log`}
+                    className="inline-flex items-center text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Just toured? Log it &rarr;
+                  </Link>
+                </div>
+                {showConnectBanner && (
+                  <div className="mt-1.5 text-center">
+                    <Link
+                      href={`/s/${slug}/integrations`}
+                      className="inline-flex items-center text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Connect Gmail to send your drafts &rarr;
+                    </Link>
+                  </div>
+                )}
+              </div>
 
               {/* Today's work — one focal item with Send / Edit / Hold. */}
               <TodayFeed
@@ -566,7 +649,7 @@ export function ChippiWorkspace({
               theirs for a reason). The composer's placeholder already
               cues the verbs: "draft a follow-up, prep a tour, summarize
               your day…" — trust the user to type. */}
-          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0">
+          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0">
             {renderInput()}
           </div>
         </>
@@ -575,7 +658,7 @@ export function ChippiWorkspace({
           {/* Active thread */}
           <div className="flex-1 min-h-0 overflow-hidden">
             <ScrollArea className="h-full">
-              <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-14 pb-4">
+              <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-12 sm:pt-14 pb-4">
                 {/* Conversation title — quiet, only when we have one */}
                 {activeConversationId && (
                   <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-6 truncate">
@@ -610,10 +693,19 @@ export function ChippiWorkspace({
                                 isTail && pendingApproval && !isStreaming
                                   ? {
                                       prompt: pendingApproval,
-                                      onApprove: approve,
+                                      onApprove: approveCelebrating,
                                       onDeny: deny,
-                                      onAlwaysAllow: alwaysAllow,
+                                      onAlwaysAllow: alwaysAllowCelebrating,
                                       busy: isStreaming,
+                                    }
+                                  : undefined
+                              }
+                              approvalCelebration={
+                                chatCelebration && chatCelebration.messageId === msg.id
+                                  ? {
+                                      kind: chatCelebration.kind,
+                                      subject: chatCelebration.subject,
+                                      onDone: () => setChatCelebration(null),
                                     }
                                   : undefined
                               }
@@ -662,7 +754,7 @@ export function ChippiWorkspace({
 
           {/* Docked input — sticky to viewport bottom (matches the empty
               state's composer dock so the input never rides up with messages). */}
-          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0">
+          <div className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0">
             {atLimit ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 text-center">
                 <div className="flex justify-center mb-2">

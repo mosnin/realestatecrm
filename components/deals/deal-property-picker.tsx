@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { Building2, X, Search, ExternalLink, Loader2, Plus } from 'lucide-react';
+import { Building2, X, Search, ExternalLink, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Property } from '@/lib/types';
 import { formatPropertyAddress, formatPropertyFacts } from '@/lib/properties';
@@ -17,9 +17,8 @@ interface Props {
 
 /**
  * Compact property picker for the deal sidebar. Live search against
- * /api/properties, debounced. "Create new" escape-hatch routes the user to
- * the properties page — we keep deal detail non-modal to avoid nesting
- * forms.
+ * /api/properties, debounced. Properties are created via the deal-create
+ * wizard — no inline-create here, no escape-hatch link to a deleted index.
  */
 export function DealPropertyPicker({ dealId, slug, initial }: Props) {
   const [linked, setLinked] = useState<Property | null>(initial);
@@ -106,7 +105,7 @@ export function DealPropertyPicker({ dealId, slug, initial }: Props) {
           </button>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">No property linked — link one to share a packet or see it on the /properties page.</p>
+        <p className="text-xs text-muted-foreground">No property linked — link one to share a packet.</p>
       )}
 
       {/* Picker toggle */}
@@ -136,8 +135,9 @@ export function DealPropertyPicker({ dealId, slug, initial }: Props) {
 
           {results.length === 0 && !searching && (
             <p className="text-[11px] text-muted-foreground">
-              No matches.{' '}
-              <Link href={`/s/${slug}/properties`} className="underline">Create one →</Link>
+              {query.trim().length > 0
+                ? 'No matches. Properties get added when you create a deal.'
+                : 'Type to search. Properties get added when you create a deal.'}
             </p>
           )}
 
@@ -165,12 +165,6 @@ export function DealPropertyPicker({ dealId, slug, initial }: Props) {
             </ul>
           )}
 
-          <Link
-            href={`/s/${slug}/properties`}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Plus size={10} /> New property
-          </Link>
         </div>
       )}
     </div>

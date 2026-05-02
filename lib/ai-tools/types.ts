@@ -12,10 +12,17 @@
  * `permission_required` SSE event and pause until the user approves — see
  * lib/ai-tools/events.ts and phase 3.
  *
- * Tools return a `ToolResult` — a content payload plus optional metadata the
- * UI can render (a contact card, a deal preview, etc.). The content is what
- * goes back into the model's context; the metadata is a hint for the
- * block-renderer so we don't have to re-query to show something.
+ * The contract is enforced at the type level, not by markdown:
+ *   - `requiresApproval: true | 'maybe'` REQUIRES `summariseCall` and
+ *     `rateLimit`. The realtor sees that summary in the prompt; without it
+ *     they're approving an opaque verb. The rate limit is the blast-radius
+ *     cap. Both are non-optional for any tool that mutates state.
+ *   - `requiresApproval: false` makes both optional — read tools are cheap.
+ *
+ * Drift the types can't catch (snake_case, name uniqueness, description
+ * length) is caught by `tests/lib/ai-tools-registry-contract.test.ts`,
+ * which walks ALL_TOOLS at test time and asserts invariants. The test is
+ * the spec.
  */
 
 import type { z } from 'zod';
@@ -57,12 +64,9 @@ export interface ToolResult<TData = unknown> {
    *
    * - `success`  → green: the mutation landed cleanly.
    * - `error`    → red:   the handler failed (but turn is still alive).
-   * - `warning`  → amber: the tool finished but with an important caveat
-   *                       (e.g. a sub-agent hit its tool budget and only
-   *                       returned a partial summary — the orchestrator
-   *                       shouldn't silently act on it).
-   * - `contacts` / `deals` / `tours` / `notes` / `plain` — future-facing
-   *   hints for rich inline cards. Currently unstyled beyond neutral.
+   * - `warning`  → amber: the tool finished but with an important caveat.
+   * - `contacts` / `deals` / `tours` / `notes` / `plain` — neutral hints
+   *   for rich inline cards.
    */
   display?: 'contacts' | 'deals' | 'tours' | 'notes' | 'plain' | 'success' | 'error' | 'warning';
 }
@@ -74,64 +78,73 @@ export type ToolHandler<TArgs = unknown, TData = unknown> = (
   ctx: ToolContext,
 ) => Promise<ToolResult<TData>>;
 
-export interface ToolDefinition<
-  // We'd love `TSchema extends z.ZodTypeAny` + inferred arg types, but the
-  // registry stores tools as a heterogeneous Record<string, ToolDefinition>
-  // and narrowing per-entry is not worth the type gymnastics. Callers cast
-  // args inside their handlers.
-  TArgs = unknown,
-  TData = unknown,
-> {
+interface BaseToolFields<TArgs, TData> {
   /** Snake_case; exposed to the model. Must be unique across the registry. */
   name: string;
   /** One-sentence description for the model. */
   description: string;
   /** Zod schema for the arguments object. Runtime-validated before the handler runs. */
   parameters: z.ZodType<TArgs>;
-  /**
-   * `false` → auto-run (read-only).
-   * `true`  → pause and prompt the user before executing.
-   * `'maybe'` → inspect args before deciding (e.g. a batch tool where >10
-   *             recipients should prompt but 1 can auto-run).
-   */
-  requiresApproval: boolean | 'maybe';
-  /** Optional finer-grained approval resolver for the 'maybe' case. */
-  shouldApprove?: (args: TArgs, ctx: ToolContext) => boolean;
-  /**
-   * One-line "what will happen if you approve?" summary. Rendered in the
-   * PermissionPromptView. Per-tool override so each tool can speak in
-   * domain-specific terms ("Email jane@x — subject: Tour Friday") instead
-   * of a generic fallback ("Run send_email"). Called with the validated
-   * args — it's safe to read any schema field here.
-   */
-  summariseCall?: (args: TArgs) => string;
-  /**
-   * Per-user rate limit for this tool. Checked by executeTool BEFORE the
-   * handler runs. Enforces a tighter blast-radius cap than the
-   * per-conversation limit on the /api/ai/task route — that route bounds
-   * turns/hour, this bounds specific tool firings.
-   */
-  rateLimit?: { max: number; windowSeconds: number };
   /** The actual work. Must respect ctx.signal for cancellation. */
   handler: ToolHandler<TArgs, TData>;
 }
+
+/**
+ * Read-only tool — runs without prompting. `summariseCall` and `rateLimit`
+ * are optional because reads don't need a "what will happen if you approve?"
+ * line and don't need a blast-radius cap (reads can't damage data).
+ */
+export interface ReadOnlyToolDefinition<TArgs = unknown, TData = unknown>
+  extends BaseToolFields<TArgs, TData> {
+  requiresApproval: false;
+  summariseCall?: (args: TArgs) => string;
+  rateLimit?: { max: number; windowSeconds: number };
+}
+
+/**
+ * Mutating tool — pauses for user approval. `summariseCall` is REQUIRED so
+ * the realtor sees what they're saying yes to. `rateLimit` is REQUIRED so
+ * we cap blast radius even if the model goes wild.
+ */
+export interface MutatingToolDefinition<TArgs = unknown, TData = unknown>
+  extends BaseToolFields<TArgs, TData> {
+  requiresApproval: true | 'maybe';
+  /** Resolver for `'maybe'` — inspect args and decide approval inline. */
+  shouldApprove?: (args: TArgs, ctx: ToolContext) => boolean;
+  /**
+   * "What will happen if you approve?" Required because the realtor reads
+   * this line in the PermissionPromptView. A generic "Run mark_person_hot"
+   * is not acceptable — the contract is domain-specific.
+   */
+  summariseCall: (args: TArgs) => string;
+  /**
+   * Per-user rate limit. Required for mutators because the model can fire
+   * tools in a loop and we cap the damage. `executeTool` checks this BEFORE
+   * the handler runs.
+   */
+  rateLimit: { max: number; windowSeconds: number };
+}
+
+export type ToolDefinition<TArgs = unknown, TData = unknown> =
+  | ReadOnlyToolDefinition<TArgs, TData>
+  | MutatingToolDefinition<TArgs, TData>;
 
 // ── Convenience builders ───────────────────────────────────────────────────
 
 /**
  * Factory that preserves argument typing inside the handler so callers don't
- * have to annotate `args` themselves. Each tool file calls `defineTool` and
- * exports the returned definition.
+ * have to annotate `args` themselves. The discriminated union enforces the
+ * mutation/read split: TypeScript will refuse to compile a `requiresApproval:
+ * true` tool that omits `summariseCall` or `rateLimit`.
  */
-export function defineTool<TSchema extends z.ZodType, TData = unknown>(def: {
-  name: string;
-  description: string;
-  parameters: TSchema;
-  requiresApproval: boolean | 'maybe';
-  shouldApprove?: (args: z.infer<TSchema>, ctx: ToolContext) => boolean;
-  summariseCall?: (args: z.infer<TSchema>) => string;
-  rateLimit?: { max: number; windowSeconds: number };
-  handler: (args: z.infer<TSchema>, ctx: ToolContext) => Promise<ToolResult<TData>>;
-}): ToolDefinition<z.infer<TSchema>, TData> {
+export function defineTool<TSchema extends z.ZodType, TData = unknown>(
+  def:
+    | (Omit<ReadOnlyToolDefinition<z.infer<TSchema>, TData>, 'parameters'> & {
+        parameters: TSchema;
+      })
+    | (Omit<MutatingToolDefinition<z.infer<TSchema>, TData>, 'parameters'> & {
+        parameters: TSchema;
+      }),
+): ToolDefinition<z.infer<TSchema>, TData> {
   return def as ToolDefinition<z.infer<TSchema>, TData>;
 }

@@ -1,34 +1,27 @@
 /**
  * Central registry of tools available to the on-demand agent loop.
  *
- * Tools register themselves via the array in `tools/index.ts`. Keeping the
- * list explicit (rather than dynamic file-system scanning) means the full
- * catalog is obvious at a glance — helpful when debugging what the model
- * has access to during a given turn.
+ * Post-cutover the only remaining surface that uses this registry is the
+ * post-tour proposal-execute path (`app/api/chippi/post-tour/execute/route.ts`)
+ * — it looks up tools by name and runs them imperatively without a model
+ * in the loop. The chat itself goes through the SDK's own registry built
+ * inside `lib/ai-tools/sdk-chat.ts`.
+ *
+ * Keeping the explicit Map (rather than dynamic file-system scanning)
+ * means the full catalog is obvious at a glance.
  */
 
 import { ALL_TOOLS } from './tools';
-import { delegateToSubagentTool } from './tools/delegate-to-subagent';
 import type { ToolDefinition } from './types';
 
-// The orchestrator-facing tool set = domain tools + the meta delegation
-// tool. Keeping delegateToSubagentTool outside ./tools/index.ts breaks a
-// latent cycle: delegate → skills/registry → tools (for skill-allowlist
-// validation). Adding it here means validateSkill still sees a clean
-// domain-only pool and can't accidentally permit sub-agent recursion.
-const COMBINED: ToolDefinition<any, any>[] = [
-  ...ALL_TOOLS,
-  delegateToSubagentTool as ToolDefinition<any, any>,
-];
-
-const REGISTRY: Map<string, ToolDefinition<any, any>> = new Map(
-  COMBINED.map((t) => [t.name, t as ToolDefinition<any, any>]),
+const REGISTRY: Map<string, ToolDefinition<unknown, unknown>> = new Map(
+  ALL_TOOLS.map((t) => [t.name, t as ToolDefinition<unknown, unknown>]),
 );
 
 // Guardrail: duplicate names would silently lose a tool on Map insertion.
-if (REGISTRY.size !== COMBINED.length) {
+if (REGISTRY.size !== ALL_TOOLS.length) {
   const seen = new Set<string>();
-  for (const t of COMBINED) {
+  for (const t of ALL_TOOLS) {
     if (seen.has(t.name)) {
       throw new Error(`Duplicate tool name in registry: ${t.name}`);
     }
@@ -37,12 +30,12 @@ if (REGISTRY.size !== COMBINED.length) {
 }
 
 /** Look up a tool by name. Returns `undefined` for unknown names. */
-export function getTool(name: string): ToolDefinition<any, any> | undefined {
+export function getTool(name: string): ToolDefinition<unknown, unknown> | undefined {
   return REGISTRY.get(name);
 }
 
-/** Full list of tools. Used to build the OpenAI `tools` array on each turn. */
-export function listTools(): ToolDefinition<any, any>[] {
+/** Full list of tools. */
+export function listTools(): ToolDefinition<unknown, unknown>[] {
   return Array.from(REGISTRY.values());
 }
 

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import {
+  notificationForNewLeadsCount,
+  notificationForUpcomingTour,
+  notificationForFollowUpDue,
+  notificationForWaitlist,
+  notificationForToursNeedingFollowUp,
+} from '@/lib/notification-voice';
 
 /**
  * GET — Returns a list of actionable notifications for the dashboard.
@@ -34,11 +41,12 @@ export async function GET(req: NextRequest) {
       .is('brokerageId', null)
       .contains('tags', ['new-lead']);
     if (newLeads && newLeads > 0) {
+      const copy = notificationForNewLeadsCount(newLeads);
       notifications.push({
         id: 'new-leads',
         type: 'new_lead',
-        title: `${newLeads} new lead${newLeads > 1 ? 's' : ''}`,
-        description: 'Unread applications waiting for review',
+        title: copy.title,
+        description: copy.description,
         href: `/s/${slug}/leads`,
         createdAt: now.toISOString(),
         priority: 'high',
@@ -57,11 +65,17 @@ export async function GET(req: NextRequest) {
       .order('startsAt', { ascending: true })
       .limit(5);
     for (const t of upcomingTours ?? []) {
+      const copy = notificationForUpcomingTour(
+        t.guestName,
+        new Date(t.startsAt),
+        t.propertyAddress,
+        now,
+      );
       notifications.push({
         id: `tour-${t.id}`,
         type: 'upcoming_tour',
-        title: `Tour with ${t.guestName}`,
-        description: `${new Date(t.startsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}${t.propertyAddress ? ` — ${t.propertyAddress}` : ''}`,
+        title: copy.title,
+        description: copy.description,
         href: `/s/${slug}/calendar`,
         createdAt: t.startsAt,
         priority: 'high',
@@ -78,11 +92,12 @@ export async function GET(req: NextRequest) {
       .order('followUpAt', { ascending: true })
       .limit(5);
     for (const c of dueFollowUps ?? []) {
+      const copy = notificationForFollowUpDue(c.name, new Date(c.followUpAt), now);
       notifications.push({
         id: `followup-${c.id}`,
         type: 'follow_up_due',
-        title: `Follow up with ${c.name}`,
-        description: `Due ${new Date(c.followUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+        title: copy.title,
+        description: copy.description,
         href: `/s/${slug}/contacts/${c.id}`,
         createdAt: c.followUpAt,
         priority: 'medium',
@@ -96,11 +111,12 @@ export async function GET(req: NextRequest) {
       .eq('spaceId', space.id)
       .eq('status', 'waiting');
     if (waitlistCount && waitlistCount > 0) {
+      const copy = notificationForWaitlist(waitlistCount);
       notifications.push({
         id: 'waitlist',
         type: 'waitlist',
-        title: `${waitlistCount} on waitlist`,
-        description: 'People waiting for tour slots',
+        title: copy.title,
+        description: copy.description,
         href: `/s/${slug}/calendar`,
         createdAt: now.toISOString(),
         priority: 'low',
@@ -126,11 +142,12 @@ export async function GET(req: NextRequest) {
       const dealsSet = new Set((dealsFromTours ?? []).map((d: any) => d.sourceTourId));
       const needsAction = completedNoFollowUp.filter((t: any) => !dealsSet.has(t.id));
       if (needsAction.length > 0) {
+        const copy = notificationForToursNeedingFollowUp(needsAction.length);
         notifications.push({
           id: 'tours-need-action',
           type: 'tour_needs_action',
-          title: `${needsAction.length} tour${needsAction.length > 1 ? 's' : ''} need follow-up`,
-          description: 'Completed tours without a deal — consider converting',
+          title: copy.title,
+          description: copy.description,
           href: `/s/${slug}/calendar`,
           createdAt: now.toISOString(),
           priority: 'medium',

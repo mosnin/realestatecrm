@@ -7,8 +7,6 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { FormBuilder } from '@/components/form-builder';
 import { FormPreview } from '@/components/form-builder/form-preview';
-import { OptimizationPanel } from '@/components/form-builder/optimization-panel';
-import { ScoringPreview } from '@/components/form-builder/scoring-preview';
 import { ScoringTab } from '@/components/form-builder/scoring-tab';
 import { TEMPLATES } from '@/components/form-builder/templates';
 import type { IntakeFormConfig } from '@/components/form-builder/types';
@@ -16,6 +14,7 @@ import type { ScoringModel } from '@/lib/scoring/scoring-model-types';
 import {
   H1,
   TITLE_FONT,
+  BODY_MUTED,
   PRIMARY_PILL,
   QUIET_LINK,
   SECTION_LABEL,
@@ -33,8 +32,6 @@ const SUB_TABS: { value: string; label: string }[] = [
   { value: 'builder', label: 'Questions' },
   { value: 'preview', label: 'Preview' },
   { value: 'scoring', label: 'What makes a good lead' },
-  { value: 'test-scoring', label: 'Try it with a sample' },
-  { value: 'optimize', label: 'Improve' },
 ];
 
 export default function IntakeCustomizePage() {
@@ -284,28 +281,28 @@ export default function IntakeCustomizePage() {
     );
   }
 
-  const formLabel = activeLeadType === 'rental' ? 'rental application' : 'buyer inquiry';
+  const formLabel = activeLeadType === 'rental' ? 'rental form' : 'buyer form';
   const isCustom = configSource === 'custom' && hasSavedConfig;
   const isBrokerage = configSource === 'brokerage';
 
-  // Status line: which version are we editing?
-  let statusLine: string;
-  if (isCustom) {
-    statusLine = `Editing your custom ${formLabel}.`;
-  } else if (isBrokerage) {
-    statusLine = `Editing the brokerage ${formLabel}.`;
-  } else {
-    statusLine = `Editing the default ${formLabel}.`;
-  }
+  const subtitleBase = isCustom
+    ? `Your ${formLabel}.`
+    : isBrokerage
+      ? `Brokerage ${formLabel}.`
+      : `Default ${formLabel}.`;
+  const subtitle = hasChanges ? `${subtitleBase} Unsaved changes.` : subtitleBase;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_480px] gap-6 max-w-[1600px]">
       <div className={cn(SECTION_RHYTHM, 'min-w-0')}>
-      {/* Header */}
+      {/* Header — H1 + Chippi narration */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-        <h1 className={H1} style={TITLE_FONT}>
-          Customize
-        </h1>
+        <div className="space-y-1.5">
+          <h1 className={H1} style={TITLE_FONT}>
+            Customize
+          </h1>
+          <p className={BODY_MUTED}>{subtitle}</p>
+        </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
             type="button"
@@ -362,19 +359,6 @@ export default function IntakeCustomizePage() {
         })}
       </div>
 
-      {/* Status line — replaces both the "Editing:" badge card and the blue info banner */}
-      <div className="flex items-baseline justify-between gap-3 text-sm">
-        <p className="text-muted-foreground">
-          {statusLine}
-          {!isCustom && !isBrokerage && (
-            <span className="text-muted-foreground/70"> Save to create your own version.</span>
-          )}
-          {hasChanges && (
-            <span className="text-foreground"> Unsaved changes.</span>
-          )}
-        </p>
-      </div>
-
       {/* Sub-tabs — secondary underline row */}
       <div className="flex items-center gap-1 border-b border-border/70 overflow-x-auto">
         {SUB_TABS.map((tab) => {
@@ -423,8 +407,6 @@ export default function IntakeCustomizePage() {
             }}
           />
         )}
-        {activeSubTab === 'optimize' && <OptimizationPanel slug={slug} />}
-        {activeSubTab === 'test-scoring' && <ScoringPreview config={config} slug={slug} />}
       </div>
       </div>
 

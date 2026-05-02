@@ -5,7 +5,7 @@
  * (select/eq/is/in/order/limit/maybeSingle/single + insert + update).
  *
  * For scenarios that need different rows per table-visit (e.g.,
- * advance_deal_stage fetches Deal then NewStage then OldStage), wire the
+ * move_deal_stage fetches Deal then NewStage then OldStage), wire the
  * mock via `mockByTable[tableName]` — the mock returns the same shape for
  * every touch of the same table, which is fine for single-path tests.
  */
@@ -65,8 +65,7 @@ vi.mock('@/lib/sms', () => ({ sendSMS: sendSMSMock }));
 const { notifyNewDealMock } = vi.hoisted(() => ({ notifyNewDealMock: vi.fn(async () => undefined) }));
 vi.mock('@/lib/notify', () => ({ notifyNewDeal: notifyNewDealMock }));
 
-import { updateContactTool } from '@/lib/ai-tools/tools/update-contact';
-import { advanceDealStageTool } from '@/lib/ai-tools/tools/advance-deal-stage';
+import { moveDealStageTool } from '@/lib/ai-tools/tools/move-deal-stage';
 import { scheduleTourTool } from '@/lib/ai-tools/tools/schedule-tour';
 import { addChecklistItemTool } from '@/lib/ai-tools/tools/add-checklist-item';
 import { sendSmsTool } from '@/lib/ai-tools/tools/send-sms';
@@ -90,54 +89,17 @@ beforeEach(() => {
   notifyNewDealMock.mockClear();
 });
 
-// ── update_contact ───────────────────────────────────────────────────────
-describe('updateContactTool', () => {
+// ── move_deal_stage ──────────────────────────────────────────────────────
+describe('moveDealStageTool', () => {
   it('requires approval', () => {
-    expect(updateContactTool.requiresApproval).toBe(true);
-  });
-
-  it('rejects an empty update (must include at least one field)', () => {
-    expect(() => updateContactTool.parameters.parse({ contactId: 'c_1' })).toThrow();
-  });
-
-  it('updates name + reindexes', async () => {
-    mockByTable = {
-      Contact: { single: { id: 'c_1', type: 'QUALIFICATION', name: 'Old Name' } },
-    };
-    const result = await updateContactTool.handler(
-      { contactId: 'c_1', name: 'New Name' },
-      makeCtx(),
-    );
-    expect(result.display).toBe('success');
-    expect(result.summary).toMatch(/Old Name/);
-    expect((result.data as { changed: string[] }).changed).toContain('name');
-    // syncContact is fire-and-forget; assert it was enqueued.
-    expect(syncContactMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('errors when the contact does not exist in this space', async () => {
-    mockByTable = { Contact: { single: null } };
-    const result = await updateContactTool.handler(
-      { contactId: 'missing', name: 'X' },
-      makeCtx(),
-    );
-    expect(result.display).toBe('error');
-    expect(result.summary).toMatch(/No contact/);
-    expect(syncContactMock).not.toHaveBeenCalled();
-  });
-});
-
-// ── advance_deal_stage ───────────────────────────────────────────────────
-describe('advanceDealStageTool', () => {
-  it('requires approval', () => {
-    expect(advanceDealStageTool.requiresApproval).toBe(true);
+    expect(moveDealStageTool.requiresApproval).toBe(true);
   });
 
   it('no-ops when the deal is already in the target stage', async () => {
     mockByTable = {
       Deal: { single: { id: 'd_1', title: 'Test', stageId: 'stage_a', status: 'active' } },
     };
-    const result = await advanceDealStageTool.handler(
+    const result = await moveDealStageTool.handler(
       { dealId: 'd_1', stageId: 'stage_a' },
       makeCtx(),
     );
@@ -148,7 +110,7 @@ describe('advanceDealStageTool', () => {
 
   it('errors when the deal is missing', async () => {
     mockByTable = { Deal: { single: null } };
-    const result = await advanceDealStageTool.handler(
+    const result = await moveDealStageTool.handler(
       { dealId: 'missing', stageId: 'stage_b' },
       makeCtx(),
     );

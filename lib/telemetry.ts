@@ -24,7 +24,12 @@ import { logger } from '@/lib/logger';
 export type TelemetryEventName =
   | 'signup_completed'
   | 'chippi_first_message'
-  | 'agent_first_action_completed';
+  | 'agent_first_action_completed'
+  // Per-tool-call observability for the chat agent. Payload carries the
+  // tool name + reasoning sentence (the assistant text immediately
+  // before the tool call) + the arg snapshot. Used to debug tool-pick
+  // regressions and to feed the eval harness with real-traffic samples.
+  | 'agent_tool_called';
 
 export interface EmitArgs {
   event: TelemetryEventName;
@@ -134,6 +139,7 @@ export const SIDE_EFFECTING_TOOLS: ReadonlySet<string> = new Set([
   // Legacy in-process tools (lib/ai-tools/tools/*)
   'add_checklist_item',
   'advance_deal_stage',
+  'move_deal_stage',
   'create_deal',
   'schedule_tour',
   'send_email',

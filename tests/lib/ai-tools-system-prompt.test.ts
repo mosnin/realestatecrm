@@ -33,9 +33,32 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toMatch(/approval/i);
   });
 
+  it('pins the verb-shaped contract for connected-app vs native draft tools', () => {
+    const prompt = buildSystemPrompt(makeCtx());
+    // Snapshot the exact bullet so any future softening surfaces in CI.
+    expect(prompt).toContain(
+      `- Sending verbs ("send", "email", "schedule", "post") prefer the connected-app tool — it acts through the realtor's account. Drafting verbs ("draft", "compose", "write me") use the native draft tools. When the verb is ambiguous, draft.`,
+    );
+  });
+
+  it('pins the reasoning-before-mutation contract so the realtor sees a why before tapping Approve', () => {
+    const prompt = buildSystemPrompt(makeCtx());
+    expect(prompt).toMatch(/BEFORE calling a mutating tool/);
+    expect(prompt).toMatch(/WHO you're acting on and WHY/);
+  });
+
+  it('pins the subject-disambiguation guard — the agent must not pick when there are multiple candidates', () => {
+    const prompt = buildSystemPrompt(makeCtx());
+    expect(prompt).toMatch(/subject must be unambiguous/);
+    expect(prompt).toMatch(/do NOT pick/);
+    // The "approval covers the verb, not the subject" reasoning is the load-bearing
+    // sentence — pin its presence so a future edit can't quietly soften the contract.
+    expect(prompt).toMatch(/approval covers the verb, not the subject/);
+  });
+
   it('stays compact — enough for tone guidance, not a manifesto', () => {
     const prompt = buildSystemPrompt(makeCtx());
-    // Sanity upper bound: if we ever exceed 2000 chars we should revisit.
-    expect(prompt.length).toBeLessThan(2000);
+    // Sanity upper bound: if we ever exceed 3000 chars we should revisit.
+    expect(prompt.length).toBeLessThan(3000);
   });
 });
