@@ -47,6 +47,11 @@ interface ChippiWorkspaceProps {
    *  shortcuts on /contacts and /deals, and by morning-actions. Distinct
    *  from `initialInput` which auto-sends. */
   initialPrefill?: string;
+  /** When true, render the "Connect Gmail to send your drafts →" tertiary
+   *  line under the post-tour affordance. Snapshot at page load: the realtor
+   *  has zero active integrations AND Composio is configured. Once they
+   *  connect, the OAuth round-trip reloads the page and this flips false. */
+  showConnectBanner?: boolean;
 }
 
 const MESSAGE_LIMIT = 50;
@@ -70,6 +75,7 @@ export function ChippiWorkspace({
   initialConversationId,
   initialInput,
   initialPrefill,
+  showConnectBanner = false,
 }: ChippiWorkspaceProps) {
   const { user } = useUser();
   const searchParams = useSearchParams();
@@ -615,6 +621,16 @@ export function ChippiWorkspace({
                     Just toured? Log it &rarr;
                   </Link>
                 </div>
+                {showConnectBanner && (
+                  <div className="mt-1.5 text-center">
+                    <Link
+                      href={`/s/${slug}/integrations`}
+                      className="inline-flex items-center text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Connect Gmail to send your drafts &rarr;
+                    </Link>
+                  </div>
+                )}
               </div>
 
               {/* Today's work — one focal item with Send / Edit / Hold. */}

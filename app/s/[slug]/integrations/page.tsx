@@ -61,6 +61,10 @@ export default async function IntegrationsPage({
           send mail. Tours land on your calendar. Notes show up where your
           team works.
         </p>
+        <p className={BODY_MUTED}>
+          Chippi never sends without your tap. Connecting just means your
+          approved drafts go through your account.
+        </p>
       </header>
 
       <ConnectedAppsSection />

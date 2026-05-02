@@ -16,7 +16,11 @@ import { getSpaceForUser } from '@/lib/space';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { listTools } from '@/lib/ai-tools/registry';
 import { getOpenAIClient, MissingOpenAIKeyError } from '@/lib/ai-tools/openai-client';
-import { attachHumanSummaries, proposeActions } from '@/lib/chippi/post-tour';
+import {
+  attachHumanSummaries,
+  loadPostTourIntegrationTools,
+  proposeActions,
+} from '@/lib/chippi/post-tour';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 
@@ -71,10 +75,18 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Load the realtor's connected-app tools (Gmail, Calendar, ...) so
+    // the orchestrator can propose actually sending instead of merely
+    // drafting. Failure here degrades gracefully to native-only.
+    const integrationTools = await loadPostTourIntegrationTools({
+      spaceId: space.id,
+      userId,
+    });
     const proposals = await proposeActions(client, {
       transcript,
       contextHint,
       tools: listTools(),
+      integrationTools,
     });
     const enriched = await attachHumanSummaries(supabase, space.id, proposals);
     return NextResponse.json({ proposals: enriched });

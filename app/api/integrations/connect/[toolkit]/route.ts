@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
-import { findIntegration } from '@/lib/integrations/catalog';
+import { COMING_SOON_TOOLKITS, findIntegration } from '@/lib/integrations/catalog';
 import { initiateConnection } from '@/lib/integrations/composio';
 import { findActive, revoke } from '@/lib/integrations/connections';
 import { logger } from '@/lib/logger';
@@ -40,12 +40,13 @@ export async function POST(
     );
   }
 
-  // Follow-up Boss is in our catalog but Composio doesn't have a toolkit
-  // for it today. Surface a clear "not yet" rather than a Composio 404
-  // when the realtor taps Connect.
-  if (toolkit === 'follow_up_boss') {
+  // Some catalog entries (Follow-up Boss, Compass, BoomTown, kvCORE, Real
+  // Geeks) are real-estate apps Composio doesn't have a toolkit for yet.
+  // The UI renders them with a disabled "Coming soon" pill, so reaching
+  // this path means a stale client. Refuse cleanly and name the app.
+  if (COMING_SOON_TOOLKITS.has(toolkit)) {
     return NextResponse.json(
-      { error: 'Follow-up Boss support is in progress. We will let you know when it lands.' },
+      { error: `${app.name} support is in progress. We will let you know when it lands.` },
       { status: 501 },
     );
   }

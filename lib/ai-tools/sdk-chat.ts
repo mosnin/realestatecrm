@@ -33,7 +33,7 @@ import { buildPipelineAnalystAgent, buildContactResearcherAgent } from './sdk-sk
 import { buildSystemPrompt } from './system-prompt';
 import { ALL_TOOLS } from './tools';
 import type { ToolContext, ToolDefinition } from './types';
-import { activeToolkits } from '@/lib/integrations/connections';
+import { activeToolkits, markExpiredByToolkit } from '@/lib/integrations/connections';
 import { loadToolsForEntity, composioConfigured } from '@/lib/integrations/composio';
 import { logger } from '@/lib/logger';
 
@@ -94,21 +94,107 @@ export function buildChatAgent(
  * error, we log and proceed WITHOUT integration tools. The chat keeps
  * working on its native catalog. Hard-fail would mean a Composio outage
  * takes down all chat — wrong tradeoff.
+ *
+ * Reconcile-on-error: per-toolkit load so a single dead connection (the
+ * realtor revoked our OAuth grant on the provider's side and our row is
+ * still 'active') doesn't poison the entire batch. When the SDK throws a
+ * `ComposioConnectedAccountNotFoundError` or an HTTP 401/403 on a
+ * specific toolkit, we flip that row to 'expired' before continuing.
+ * Next time the realtor opens /integrations, they see amber + Reconnect
+ * — no toast, no surprise, just truth on the page.
  */
 export async function loadIntegrationTools(ctx: ToolContext): Promise<SdkTool[]> {
   if (!composioConfigured()) return [];
+  let toolkits: string[];
   try {
-    const toolkits = await activeToolkits({ spaceId: ctx.space.id, userId: ctx.userId });
-    if (toolkits.length === 0) return [];
-    const tools = await loadToolsForEntity({ entityId: ctx.userId, toolkits });
-    return tools as unknown as SdkTool[];
+    toolkits = await activeToolkits({ spaceId: ctx.space.id, userId: ctx.userId });
   } catch (err) {
-    logger.warn(
-      '[sdk-chat] integration tools load failed — proceeding without them',
-      { spaceId: ctx.space.id, userId: ctx.userId, err: err instanceof Error ? err.message : String(err) },
-    );
+    logger.warn('[sdk-chat] activeToolkits lookup failed — proceeding without integration tools', {
+      spaceId: ctx.space.id,
+      userId: ctx.userId,
+      err: err instanceof Error ? err.message : String(err),
+    });
     return [];
   }
+  if (toolkits.length === 0) return [];
+
+  // Per-toolkit load lets us attribute auth failures to the right row.
+  // The cost is N round-trips instead of 1, but N is bounded by how
+  // many apps the realtor has connected (typically 2-5).
+  const collected: SdkTool[] = [];
+  for (const toolkit of toolkits) {
+    try {
+      const tools = await loadToolsForEntity({ entityId: ctx.userId, toolkits: [toolkit] });
+      collected.push(...(tools as unknown as SdkTool[]));
+    } catch (err) {
+      if (isAuthLikeError(err)) {
+        // Don't await — keep the chat hot. The DB write is fire-and-
+        // forget; worst case is the row stays 'active' for one more
+        // turn and we do this dance again. Catch internal failures so
+        // a Supabase blip doesn't bubble up here.
+        void markExpiredByToolkit({
+          spaceId: ctx.space.id,
+          userId: ctx.userId,
+          toolkit,
+          error: err,
+        }).catch((dbErr) => {
+          logger.warn('[sdk-chat] markExpired failed', {
+            toolkit,
+            err: dbErr instanceof Error ? dbErr.message : String(dbErr),
+          });
+        });
+        logger.warn('[sdk-chat] integration auth failed — row flipped to expired', {
+          spaceId: ctx.space.id,
+          userId: ctx.userId,
+          toolkit,
+          err: err instanceof Error ? err.message : String(err),
+        });
+      } else {
+        logger.warn('[sdk-chat] integration tools load failed for toolkit — skipping', {
+          spaceId: ctx.space.id,
+          userId: ctx.userId,
+          toolkit,
+          err: err instanceof Error ? err.message : String(err),
+        });
+      }
+      // In all error cases, drop this toolkit's tools and keep going.
+    }
+  }
+  return collected;
+}
+
+/**
+ * Heuristic: is this error from Composio one we should treat as
+ * "connection is dead, flip the row to expired"?
+ *
+ * We don't import the SDK error class to compare with `instanceof` —
+ * the bridge keeps the SDK behind a thin wrapper, and a class compare
+ * couples this file to a specific Composio version. Match by name and
+ * by HTTP status code instead. Both are stable across SDK versions.
+ *
+ * Matched conditions:
+ *   - `ComposioConnectedAccountNotFoundError` (the canonical "user
+ *     revoked or never had this account")
+ *   - HTTP 401 / 403 from Composio (auth refused at the provider)
+ *   - error code starting with `CONNECTED_ACCOUNT_` (Composio's own
+ *     code namespace for connected-account problems)
+ *
+ * Anything else (network errors, 5xx, validation errors) is treated
+ * as transient and the row is left alone.
+ */
+export function isAuthLikeError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as {
+    name?: string;
+    statusCode?: number;
+    code?: string;
+    cause?: { statusCode?: number };
+  };
+  if (e.name === 'ComposioConnectedAccountNotFoundError') return true;
+  if (e.statusCode === 401 || e.statusCode === 403) return true;
+  if (e.cause && (e.cause.statusCode === 401 || e.cause.statusCode === 403)) return true;
+  if (typeof e.code === 'string' && e.code.startsWith('CONNECTED_ACCOUNT_')) return true;
+  return false;
 }
 
 // ── Fresh-turn entry point ─────────────────────────────────────────────────

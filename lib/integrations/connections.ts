@@ -137,6 +137,63 @@ export async function revoke(row: IntegrationConnectionRow): Promise<void> {
   await setStatus({ id: row.id, status: 'revoked' });
 }
 
+/**
+ * Flip the row matching this Composio connection id to 'expired'. Used by
+ * the chat agent when the SDK reports the connected account is gone or
+ * unauthorized — typically because the realtor revoked our OAuth grant on
+ * the provider's side. Reflects truth on the integrations panel (amber
+ * dot + "Reconnect") the moment we discover the drift; no toast, no
+ * notification, just the page being honest the next time they look.
+ *
+ * Idempotent: a no-op if no row matches (the connection may have been
+ * deleted on our side already).
+ */
+export async function markExpiredByComposioId(
+  composioConnectionId: string,
+  error: unknown,
+): Promise<void> {
+  const row = await findByComposioId(composioConnectionId);
+  if (!row) return;
+  // Don't downgrade an already-revoked or already-expired row — the
+  // realtor's already seen the truth, and a chat-time write would be
+  // pure churn.
+  if (row.status === 'revoked' || row.status === 'expired') return;
+  const message = error instanceof Error ? error.message : String(error);
+  await setStatus({ id: row.id, status: 'expired', lastError: message });
+  logger.info('[integrations.connections] marked expired from chat', {
+    id: row.id,
+    composioConnectionId,
+    err: message,
+  });
+}
+
+/**
+ * Same as `markExpiredByComposioId` but keyed by (space, user, toolkit) —
+ * the chat agent's catch path knows the toolkit it tried to load tools
+ * for, but not necessarily the Composio connected-account id (the SDK
+ * doesn't always surface it on the error). Idempotent.
+ */
+export async function markExpiredByToolkit(args: {
+  spaceId: string;
+  userId: string;
+  toolkit: string;
+  error: unknown;
+}): Promise<void> {
+  const row = await findActive({
+    spaceId: args.spaceId,
+    userId: args.userId,
+    toolkit: args.toolkit,
+  });
+  if (!row) return;
+  const message = args.error instanceof Error ? args.error.message : String(args.error);
+  await setStatus({ id: row.id, status: 'expired', lastError: message });
+  logger.info('[integrations.connections] marked expired from chat', {
+    id: row.id,
+    toolkit: args.toolkit,
+    err: message,
+  });
+}
+
 /** Find any active row for this (space, user, toolkit). Helper for callback. */
 export async function findActive(args: {
   spaceId: string;

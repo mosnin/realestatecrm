@@ -37,7 +37,8 @@ interface ConnectionRow {
 }
 
 const CATEGORY_LABEL: Record<IntegrationCategory, string> = {
-  communication: 'Communication',
+  email: 'Email',
+  messaging: 'Messaging',
   calendar: 'Calendar',
   docs: 'Documents',
   crm: 'CRM',
@@ -50,7 +51,8 @@ const CATEGORY_LABEL: Record<IntegrationCategory, string> = {
 };
 
 const CATEGORY_ORDER: IntegrationCategory[] = [
-  'communication',
+  'email',
+  'messaging',
   'calendar',
   'docs',
   'crm',
@@ -217,29 +219,35 @@ function Row({
   onDisconnect: () => void;
 }) {
   const status = connection?.status ?? null;
+  const action = pickRowAction({ comingSoon: app.comingSoon, status, busy });
 
   return (
     <div className="flex items-center gap-3 px-4 py-3">
-      <Dot status={status} />
+      <Dot status={status} comingSoon={app.comingSoon} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{app.name}</p>
         <p className="text-xs text-muted-foreground truncate">
           {connection?.label ? connection.label : app.blurb}
         </p>
       </div>
-      <Action
-        status={status}
-        busy={busy}
-        onConnect={onConnect}
-        onDisconnect={onDisconnect}
-      />
+      <Action action={action} onConnect={onConnect} onDisconnect={onDisconnect} />
     </div>
   );
 }
 
-function Dot({ status }: { status: ConnectionRow['status'] | null }) {
-  const color =
-    status === 'active'
+function Dot({
+  status,
+  comingSoon,
+}: {
+  status: ConnectionRow['status'] | null;
+  comingSoon?: boolean;
+}) {
+  // Coming-soon rows have no real status — keep the dot empty so the
+  // "Coming soon" pill carries the meaning. Showing a colored dot on an
+  // unconnectable row would imply state that isn't there.
+  const color = comingSoon
+    ? 'bg-border'
+    : status === 'active'
       ? 'bg-emerald-500'
       : status === 'expired'
         ? 'bg-amber-500'
@@ -249,21 +257,58 @@ function Dot({ status }: { status: ConnectionRow['status'] | null }) {
   return <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', color)} aria-hidden />;
 }
 
+/**
+ * The action a row should render. Pure — pulled out so it's testable
+ * without rendering. Three real states + a busy spinner + the
+ * coming-soon pill for catalog placeholders that have no Composio
+ * toolkit yet.
+ */
+export type RowAction =
+  | { kind: 'busy' }
+  | { kind: 'coming-soon' }
+  | { kind: 'disconnect' }
+  | { kind: 'reconnect' }
+  | { kind: 'connect' };
+
+export function pickRowAction(args: {
+  comingSoon?: boolean;
+  status: ConnectionRow['status'] | null;
+  busy: boolean;
+}): RowAction {
+  // Coming-soon wins over everything (including busy) — these rows have
+  // no connect path at all, so a spinner would be a lie.
+  if (args.comingSoon) return { kind: 'coming-soon' };
+  if (args.busy) return { kind: 'busy' };
+  if (args.status === 'active') return { kind: 'disconnect' };
+  if (args.status === 'expired' || args.status === 'failed') return { kind: 'reconnect' };
+  return { kind: 'connect' };
+}
+
 function Action({
-  status,
-  busy,
+  action,
   onConnect,
   onDisconnect,
 }: {
-  status: ConnectionRow['status'] | null;
-  busy: boolean;
+  action: RowAction;
   onConnect: () => void;
   onDisconnect: () => void;
 }) {
-  if (busy) {
+  if (action.kind === 'busy') {
     return <Loader2 size={14} className="animate-spin text-muted-foreground" />;
   }
-  if (status === 'active') {
+  if (action.kind === 'coming-soon') {
+    // Disabled, no click target. The realtor can read the row, can see
+    // the app exists, and isn't lured into tapping a button that 501s.
+    return (
+      <span
+        aria-disabled="true"
+        className="inline-flex items-center h-7 px-3 rounded-full text-xs font-medium bg-muted text-muted-foreground"
+      >
+        Coming soon
+      </span>
+    );
+  }
+  if (action.kind === 'disconnect') {
     return (
       <button
         type="button"
@@ -274,7 +319,7 @@ function Action({
       </button>
     );
   }
-  if (status === 'expired' || status === 'failed') {
+  if (action.kind === 'reconnect') {
     return (
       <button
         type="button"

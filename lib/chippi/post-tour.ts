@@ -50,6 +50,24 @@ export const POST_TOUR_TOOL_ALLOWLIST = [
 
 export type PostTourToolName = (typeof POST_TOUR_TOOL_ALLOWLIST)[number];
 
+/**
+ * A Composio tool the realtor's connected accounts expose. We pull this
+ * straight from `loadToolsForEntity` and re-shape into the minimal pair
+ * (slug, description, toolkit) the orchestrator needs to know about.
+ *
+ * The `toolkit` is the parent app slug ("gmail", "googlecalendar") — used
+ * for the done-verb resolver, NOT shown to the realtor in the proposal
+ * stack. The verb does the talking; no "via Gmail" badges.
+ */
+export interface IntegrationToolSpec {
+  /** Composio tool slug — e.g. "GMAIL_SEND_EMAIL". The proposal model emits this verbatim. */
+  slug: string;
+  /** Realtor-readable description. May be Composio's text, may be pre-processed. */
+  description: string;
+  /** Parent toolkit slug — "gmail", "googlecalendar". Used for verb resolution only. */
+  toolkit: string;
+}
+
 /** What the model is asked to return. */
 const ProposalSchema = z.object({
   tool: z.string().min(1),
@@ -61,7 +79,8 @@ const OrchestratorOutputSchema = z.object({
 });
 
 export interface ProposedAction {
-  tool: PostTourToolName;
+  /** Native tool name OR Composio tool slug. The execute route branches on this. */
+  tool: PostTourToolName | string;
   args: Record<string, unknown>;
   /** Human-readable line — the row label in the approval stack. */
   summary: string;
@@ -72,6 +91,12 @@ export interface ProposedAction {
   humanSummary?: string;
   /** Whether this verb mutates state (i.e. needs the realtor's yes). */
   mutates: boolean;
+  /**
+   * Toolkit slug ("gmail", "googlecalendar") for proposals that came from
+   * a connected app. Absent for native tools. The execute route uses this
+   * to route Composio calls and to build the done-sentence verb.
+   */
+  integrationToolkit?: string;
 }
 
 export interface ContextHint {
@@ -79,16 +104,43 @@ export interface ContextHint {
   dealId?: string;
 }
 
-/** System prompt fed to the orchestrator. Tight contract, no manifesto. */
-export function buildSystemPrompt(allowedTools: readonly ToolDefinition[]): string {
-  const catalog = allowedTools
+/** System prompt fed to the orchestrator. Tight contract, no manifesto.
+ *
+ *  When the realtor has connected apps (Gmail, Google Calendar, ...),
+ *  their Composio tools are appended as a second catalog block. The
+ *  proposal model picks between native (`draft_email`) and connected
+ *  (`GMAIL_SEND_EMAIL`) on intent — drafting vs. actually sending. */
+export function buildSystemPrompt(
+  allowedTools: readonly ToolDefinition[],
+  integrationTools: readonly IntegrationToolSpec[] = [],
+): string {
+  const native = allowedTools
     .map((t) => `- ${t.name}: ${t.description}`)
     .join('\n');
-  return [
+
+  const lines: string[] = [
     'Turn a realtor\'s post-tour debrief into 2-5 proposed actions. Return intent only — never execute.',
     '',
     'Allowed tools:',
-    catalog,
+    native,
+  ];
+
+  if (integrationTools.length > 0) {
+    const integ = integrationTools
+      .map((t) => `- ${t.slug}: ${t.description}`)
+      .join('\n');
+    lines.push(
+      '',
+      'Connected-app tools (the realtor has authorized these):',
+      integ,
+      '',
+      'When the realtor\'s intent is to actually send, schedule, or post — not draft — prefer the connected-app tool.',
+      'Examples: "send Sam a follow-up" → GMAIL_SEND_EMAIL (if Gmail connected). "put the tour on my calendar" → GOOGLECALENDAR_CREATE_EVENT.',
+      'If the realtor only wants to see what they\'d say (a draft), use the draft_* tools instead.',
+    );
+  }
+
+  lines.push(
     '',
     'Rules:',
     '- Use a personId/dealId only when the user payload contains one. If not, drop the action.',
@@ -96,17 +148,31 @@ export function buildSystemPrompt(allowedTools: readonly ToolDefinition[]): stri
     '- Skip any action the transcript doesn\'t justify.',
     '',
     'Output JSON: { "proposals": [ { "tool": "<name>", "args": { ... } } ] }',
-  ].join('\n');
+  );
+
+  return lines.join('\n');
 }
 
 /** Given the model's raw output, produce sanitized ProposedActions. The
  *  function is intentionally pure — it does no DB reads — so unit tests
- *  cover the whole shaping layer without mocking. */
+ *  cover the whole shaping layer without mocking.
+ *
+ *  Integration tool slugs (passed via opts.integrationTools) are kept
+ *  alongside the native allowlist. Native tools are validated against
+ *  the in-process registry; integration tools come from the realtor's
+ *  connected apps and are trusted as-is — there's no zod schema for them
+ *  on this side, the model picks args based on Composio's description. */
 export function shapeProposals(
   raw: unknown,
-  opts: { allowlist?: readonly string[] } = {},
+  opts: {
+    allowlist?: readonly string[];
+    integrationTools?: readonly IntegrationToolSpec[];
+  } = {},
 ): ProposedAction[] {
-  const allow = new Set(opts.allowlist ?? POST_TOUR_TOOL_ALLOWLIST);
+  const nativeAllow = new Set(opts.allowlist ?? POST_TOUR_TOOL_ALLOWLIST);
+  const integByName = new Map(
+    (opts.integrationTools ?? []).map((t) => [t.slug, t]),
+  );
   const parsed = OrchestratorOutputSchema.safeParse(raw);
   if (!parsed.success) return [];
 
@@ -114,37 +180,72 @@ export function shapeProposals(
   const seen = new Set<string>();
 
   for (const item of parsed.data.proposals) {
-    if (!allow.has(item.tool)) continue;
-    const def = getTool(item.tool);
-    if (!def) continue;
-
     // De-dupe identical (tool, args) pairs — the model occasionally
     // proposes the same action twice when the transcript mentions
     // something twice.
     const key = `${item.tool}::${stableStringify(item.args)}`;
     if (seen.has(key)) continue;
-    seen.add(key);
 
-    let summary: string;
-    try {
-      summary = def.summariseCall
-        ? (def.summariseCall as (a: unknown) => string)(item.args)
-        : `Run ${item.tool}`;
-    } catch {
-      summary = `Run ${item.tool}`;
+    if (nativeAllow.has(item.tool)) {
+      const def = getTool(item.tool);
+      if (!def) continue;
+      seen.add(key);
+
+      let summary: string;
+      try {
+        summary = def.summariseCall
+          ? (def.summariseCall as (a: unknown) => string)(item.args)
+          : `Run ${item.tool}`;
+      } catch {
+        summary = `Run ${item.tool}`;
+      }
+
+      out.push({
+        tool: item.tool as PostTourToolName,
+        args: item.args,
+        summary,
+        mutates: def.requiresApproval !== false,
+      });
+    } else if (integByName.has(item.tool)) {
+      const integ = integByName.get(item.tool)!;
+      seen.add(key);
+      out.push({
+        tool: item.tool,
+        args: item.args,
+        summary: integrationProposalSummary(integ.toolkit, item.args),
+        mutates: true,
+        integrationToolkit: integ.toolkit,
+      });
+    } else {
+      continue;
     }
-
-    out.push({
-      tool: item.tool as PostTourToolName,
-      args: item.args,
-      summary,
-      mutates: def.requiresApproval !== false,
-    });
 
     if (out.length >= MAX_PROPOSALS) break;
   }
 
   return out;
+}
+
+/** Realtor-voice summary for an integration proposal. The toolkit slug
+ *  carries the verb; we never show "via Gmail" — the verb tells the truth.
+ *  Used as a fallback when there's no resolved person name to humanize. */
+function integrationProposalSummary(
+  toolkit: string,
+  args: Record<string, unknown>,
+): string {
+  const verb = realtorVerbForToolkit(toolkit);
+  // Try a few common arg keys for a recipient hint, but don't hard-fail.
+  const recipient = pickFirstString(args, ['to', 'recipient', 'recipient_email', 'attendees', 'email']);
+  return recipient ? `${verb} to ${recipient}` : verb;
+}
+
+function pickFirstString(args: Record<string, unknown>, keys: string[]): string | null {
+  for (const k of keys) {
+    const v = args[k];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+    if (Array.isArray(v) && typeof v[0] === 'string' && v[0].trim()) return v[0].trim();
+  }
+  return null;
 }
 
 /** JSON.stringify with sorted keys — needed for de-dup to work across
@@ -165,7 +266,13 @@ function stableStringify(value: unknown): string {
  *  Caller is responsible for the auth and rate-limit gates. */
 export async function proposeActions(
   openai: OpenAI,
-  input: { transcript: string; contextHint?: ContextHint; tools: ToolDefinition[]; model?: string },
+  input: {
+    transcript: string;
+    contextHint?: ContextHint;
+    tools: ToolDefinition[];
+    integrationTools?: IntegrationToolSpec[];
+    model?: string;
+  },
 ): Promise<ProposedAction[]> {
   const transcript = input.transcript.trim();
   if (!transcript) return [];
@@ -173,6 +280,7 @@ export async function proposeActions(
   const allowed = input.tools.filter((t) =>
     (POST_TOUR_TOOL_ALLOWLIST as readonly string[]).includes(t.name),
   );
+  const integrationTools = input.integrationTools ?? [];
 
   const userPayload: Record<string, unknown> = { transcript };
   if (input.contextHint?.personId) userPayload.personId = input.contextHint.personId;
@@ -183,7 +291,7 @@ export async function proposeActions(
     temperature: 0.2,
     response_format: { type: 'json_object' },
     messages: [
-      { role: 'system', content: buildSystemPrompt(allowed) },
+      { role: 'system', content: buildSystemPrompt(allowed, integrationTools) },
       { role: 'user', content: JSON.stringify(userPayload) },
     ],
   });
@@ -197,7 +305,86 @@ export async function proposeActions(
   } catch {
     return [];
   }
-  return shapeProposals(raw);
+  return shapeProposals(raw, { integrationTools });
+}
+
+// ── Integration tool loading ──────────────────────────────────────────────
+
+/**
+ * Resolve the Composio tools the realtor's post-tour orchestrator should
+ * see. Mirrors `loadIntegrationTools` from `sdk-chat.ts` — fresh per
+ * request, no cache. Failure modes (Composio unconfigured, unreachable,
+ * any throw) degrade gracefully to `[]`: the orchestrator runs on its
+ * native catalog and the realtor never sees the seam.
+ *
+ * The shape returned (`IntegrationToolSpec[]`) is the bridge between the
+ * SDK Agent tool surface (`{ name, description, parameters, invoke }`)
+ * and our JSON-inference orchestrator. The orchestrator only needs name
+ * + description; the execute path re-fetches the slug to actually fire it.
+ */
+export async function loadPostTourIntegrationTools(args: {
+  spaceId: string;
+  userId: string;
+}): Promise<IntegrationToolSpec[]> {
+  // Lazy imports so this module stays usable in pure unit tests that
+  // don't mock the integrations layer.
+  const { composioConfigured, loadToolsForEntity } = await import(
+    '@/lib/integrations/composio'
+  );
+  const { activeToolkits } = await import('@/lib/integrations/connections');
+  const { logger } = await import('@/lib/logger');
+
+  if (!composioConfigured()) return [];
+  try {
+    const toolkits = await activeToolkits({ spaceId: args.spaceId, userId: args.userId });
+    if (toolkits.length === 0) return [];
+    const sdkTools = await loadToolsForEntity({ entityId: args.userId, toolkits });
+    return reshapeSdkToolsForOrchestrator(sdkTools, toolkits);
+  } catch (err) {
+    logger.warn(
+      '[post-tour] integration tools load failed — proceeding without them',
+      { spaceId: args.spaceId, userId: args.userId, err: err instanceof Error ? err.message : String(err) },
+    );
+    return [];
+  }
+}
+
+/**
+ * Take Composio's SDK Agent tools and normalize into IntegrationToolSpec.
+ * The slug naming convention is `<TOOLKIT>_<ACTION>` (uppercase). We split
+ * once on `_` to recover the toolkit, then cross-check against the list
+ * we asked for so a Composio rename doesn't poison the verb resolver.
+ */
+function reshapeSdkToolsForOrchestrator(
+  sdkTools: ReadonlyArray<{ name?: unknown; description?: unknown }>,
+  authorizedToolkits: readonly string[],
+): IntegrationToolSpec[] {
+  const known = new Set(authorizedToolkits);
+  const out: IntegrationToolSpec[] = [];
+  for (const t of sdkTools) {
+    if (typeof t.name !== 'string' || !t.name) continue;
+    const description = typeof t.description === 'string' ? t.description : '';
+    const toolkit = inferToolkitFromSlug(t.name, known);
+    if (!toolkit) continue;
+    out.push({ slug: t.name, description, toolkit });
+  }
+  return out;
+}
+
+/** Recover the toolkit slug from a Composio tool name like
+ *  `GMAIL_SEND_EMAIL` → `gmail`. Cross-checks against the realtor's
+ *  authorized toolkits so a rename or third-party prefix can't slip past. */
+function inferToolkitFromSlug(slug: string, authorized: ReadonlySet<string>): string | null {
+  // Composio's toolkit prefix is the leading underscore-separated chunk,
+  // case-insensitive. `googlecalendar` and `googlesheets` are single tokens.
+  const lower = slug.toLowerCase();
+  // Try the exact authorized slugs first — handles `googlecalendar` etc.
+  for (const t of authorized) {
+    if (lower.startsWith(`${t}_`)) return t;
+  }
+  // Fallback: first underscore-separated chunk.
+  const head = lower.split('_', 1)[0];
+  return authorized.has(head) ? head : null;
 }
 
 // ── humanSummary resolution ───────────────────────────────────────────────
@@ -277,6 +464,16 @@ export function formatHumanSummary(
   const personName = typeof a.personId === 'string' ? people.get(a.personId) : undefined;
   const dealName = typeof a.dealId === 'string' ? deals.get(a.dealId) : undefined;
 
+  // Integration proposals come from connected apps. The realtor doesn't
+  // know integrations exist — show the verb, and a recipient name when we
+  // can find one. NEVER a "via Gmail" badge.
+  if (proposal.integrationToolkit) {
+    const verb = realtorVerbForToolkit(proposal.integrationToolkit);
+    if (personName) return `${verb} to ${personName}`;
+    const recipient = pickFirstString(a, ['to', 'recipient', 'recipient_email', 'attendees', 'email']);
+    return recipient ? `${verb} to ${recipient}` : verb;
+  }
+
   switch (proposal.tool) {
     case 'log_call': {
       if (!personName) return null;
@@ -353,6 +550,96 @@ function describeIntent(v: unknown): string {
     default: return 'check-in';
   }
 }
+
+// ── Integration verb resolution ───────────────────────────────────────────
+
+/**
+ * Realtor-voice verb for the proposal stack. The realtor doesn't know
+ * the toolkit name; the verb tells the truth. "Email Sam Chen", not
+ * "Send via Gmail to Sam Chen". Configuration-as-decision: one verb per
+ * toolkit, no per-proposal channel picker.
+ */
+export function realtorVerbForToolkit(toolkit: string): string {
+  switch (toolkit) {
+    case 'gmail': return 'Email';
+    case 'outlook': return 'Email';
+    case 'googlecalendar': return 'Add to calendar';
+    case 'outlook_calendar': return 'Add to calendar';
+    case 'calendly': return 'Open Calendly slot';
+    case 'cal': return 'Open Cal.com slot';
+    case 'slack': return 'Post to Slack';
+    case 'discord': return 'Post to Discord';
+    case 'microsoft_teams': return 'Post to Teams';
+    case 'notion': return 'Save in Notion';
+    case 'googledocs': return 'Open in Google Docs';
+    case 'googlesheets': return 'Update sheet';
+    case 'googledrive': return 'Save to Drive';
+    case 'onedrive': return 'Save to OneDrive';
+    case 'dropbox': return 'Save to Dropbox';
+    case 'hubspot': return 'Push to HubSpot';
+    case 'salesforce': return 'Push to Salesforce';
+    case 'pipedrive': return 'Push to Pipedrive';
+    case 'zoho': return 'Push to Zoho';
+    case 'docusign': return 'Send for signature';
+    case 'dropbox_sign': return 'Send for signature';
+    case 'asana': return 'Add task in Asana';
+    case 'trello': return 'Add card in Trello';
+    case 'linear': return 'Open issue in Linear';
+    case 'monday': return 'Add item in Monday';
+    case 'typeform': return 'Pull form responses';
+    case 'googleforms': return 'Pull form responses';
+    case 'zoom': return 'Schedule Zoom';
+    case 'googlemeet': return 'Schedule Meet';
+    case 'airtable': return 'Update Airtable';
+    default: return 'Run connected action';
+  }
+}
+
+/**
+ * Done-sentence verb for the toast after execution. Past-tense, terse —
+ * the realtor reads this on the way back to their car. Falls back to a
+ * short toolkit-name confirmation when the slug isn't known. Returns
+ * null when the toolkit is missing — the caller should drop it from the
+ * done sentence rather than say "undefined fired".
+ */
+export function doneVerbForToolkit(toolkit: string | undefined): string | null {
+  if (!toolkit) return null;
+  switch (toolkit) {
+    case 'gmail': return 'email sent';
+    case 'outlook': return 'email sent';
+    case 'googlecalendar': return 'on the calendar';
+    case 'outlook_calendar': return 'on the calendar';
+    case 'calendly': return 'Calendly slot booked';
+    case 'cal': return 'Cal.com slot booked';
+    case 'slack': return 'posted to Slack';
+    case 'discord': return 'posted to Discord';
+    case 'microsoft_teams': return 'posted to Teams';
+    case 'notion': return 'saved in Notion';
+    case 'googlesheets': return 'sheet updated';
+    case 'googledocs': return 'doc updated';
+    case 'googledrive': return 'saved to Drive';
+    case 'onedrive': return 'saved to OneDrive';
+    case 'dropbox': return 'saved to Dropbox';
+    case 'hubspot': return 'pushed to HubSpot';
+    case 'salesforce': return 'pushed to Salesforce';
+    case 'pipedrive': return 'pushed to Pipedrive';
+    case 'zoho': return 'pushed to Zoho';
+    case 'docusign': return 'sent for signature';
+    case 'dropbox_sign': return 'sent for signature';
+    case 'asana': return 'task added';
+    case 'trello': return 'card added';
+    case 'linear': return 'issue opened';
+    case 'monday': return 'item added';
+    case 'zoom': return 'Zoom scheduled';
+    case 'googlemeet': return 'Meet scheduled';
+    case 'airtable': return 'Airtable updated';
+    case 'typeform': return 'forms pulled';
+    case 'googleforms': return 'forms pulled';
+    default: return `${toolkit} fired`;
+  }
+}
+
+// ── Date helpers ──────────────────────────────────────────────────────────
 
 /** Render an ISO date or weekday phrase as a clean human string ("Friday",
  *  "May 8"). Falls back to the raw string. Pure — no Date.now leakage. */

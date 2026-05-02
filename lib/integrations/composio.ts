@@ -113,3 +113,23 @@ export async function loadToolsForEntity(args: {
   const composio = getComposio();
   return composio.tools.get(args.entityId, { toolkits: args.toolkits });
 }
+
+/**
+ * Execute a single Composio tool by slug for a given user. Used by the
+ * post-tour execute path, which fires approved proposals imperatively
+ * (no model loop). The SDK does the auth, params shaping, and call.
+ *
+ * Returns the raw `ToolExecuteResponse`. Caller maps `successful`/`error`
+ * onto our own ResultOut shape.
+ */
+export async function executeToolForEntity(args: {
+  entityId: string;
+  slug: string;
+  arguments: Record<string, unknown>;
+}) {
+  const composio = getComposio();
+  return composio.tools.execute(args.slug, {
+    userId: args.entityId,
+    arguments: args.arguments,
+  });
+}
