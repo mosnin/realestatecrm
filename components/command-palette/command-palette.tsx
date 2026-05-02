@@ -17,6 +17,7 @@ import {
   MessageSquare,
   UserPlus,
   PhoneCall,
+  Plug,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -66,6 +67,7 @@ export function CommandPalette({ slug }: Props) {
     { kind: 'route', id: 'nav-calendar', group: 'Navigate', label: 'Calendar',  icon: Calendar,     href: `${base}/calendar` },
     { kind: 'route', id: 'nav-analytics',group: 'Navigate', label: 'Analytics', icon: BarChart2,    href: `${base}/analytics` },
     { kind: 'route', id: 'nav-commissions', group: 'Navigate', label: 'Commissions', icon: BarChart2, href: `${base}/properties/commissions` },
+    { kind: 'route', id: 'nav-integrations', group: 'Navigate', label: 'Integrations', icon: Plug, href: `${base}/integrations` },
     { kind: 'route', id: 'nav-assistant',group: 'Navigate', label: 'Assistant', icon: Sparkles,     href: `${base}/ai` },
     { kind: 'route', id: 'nav-drafts',   group: 'Navigate', label: 'AI drafts', icon: Sparkles,     href: `${base}/agent` },
     { kind: 'route', id: 'nav-settings', group: 'Navigate', label: 'Settings',  icon: Settings,     href: `${base}/settings` },
