@@ -213,12 +213,17 @@ export function ChippiWorkspace({
     void (async () => {
       try {
         const res = await fetch(`/api/ai/messages?conversationId=${urlConversationId}`);
-        if (res.ok) {
-          const data = (await res.json()) as LegacyMessage[];
-          setMessages(legacyToUi(data));
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          console.error('[Chat] Load failed', res.status, body);
+          toast.error("Couldn't load that conversation. Try again.");
+          return;
         }
+        const data = (await res.json()) as LegacyMessage[];
+        setMessages(legacyToUi(data));
       } catch (err) {
         console.error('[Chat] Failed to load conversation:', err);
+        toast.error("Couldn't load that conversation. Try again.");
       }
     })();
   }, [urlConversationId, isStreaming, setMessages]);
