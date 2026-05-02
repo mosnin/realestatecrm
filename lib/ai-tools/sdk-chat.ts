@@ -29,6 +29,7 @@ import {
   applyApprovalDecision,
   type ApprovalDecision,
 } from './sdk-bridge';
+import { buildPipelineAnalystAgent, buildContactResearcherAgent } from './sdk-skills';
 import { buildSystemPrompt } from './system-prompt';
 import { ALL_TOOLS } from './tools';
 import type { ToolContext, ToolDefinition } from './types';
@@ -46,11 +47,33 @@ const DEFAULT_MODEL = 'gpt-4.1-mini';
  * produced the state for deserialization.
  */
 export function buildChatAgent(ctx: ToolContext, opts: { model?: string } = {}): Agent {
-  const tools = ALL_TOOLS.map((t: ToolDefinition) => toSdkTool(t, ctx));
+  const domainTools = ALL_TOOLS.map((t: ToolDefinition) => toSdkTool(t, ctx));
+
+  // Sub-agent skills attached as tools via the SDK's native `Agent.asTool()`.
+  // This replaces the custom-loop `delegate_to_subagent` router for the SDK
+  // runtime — the model picks these by tool description, no system-prompt
+  // sentence needed. The custom loop's router stays in place for the legacy
+  // path until the cutover PR.
+  const pipelineAnalyst = buildPipelineAnalystAgent(ctx, { model: opts.model });
+  const contactResearcher = buildContactResearcherAgent(ctx, { model: opts.model });
+
+  const skillTools = [
+    pipelineAnalyst.asTool({
+      toolName: 'analyze_pipeline',
+      toolDescription:
+        'Analyze the pipeline for stuck deals, quiet hot persons, and overdue follow-ups.',
+    }),
+    contactResearcher.asTool({
+      toolName: 'research_person',
+      toolDescription:
+        'Research everything we know about a person and recommend the next action.',
+    }),
+  ];
+
   return new Agent({
     name: 'Chippi',
     instructions: buildSystemPrompt(ctx),
-    tools,
+    tools: [...domainTools, ...skillTools],
     model: opts.model ?? DEFAULT_MODEL,
   });
 }
