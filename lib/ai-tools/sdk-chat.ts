@@ -22,7 +22,7 @@
  *     bridge stay pure and testable.
  */
 
-import { Agent, run, type RunState } from '@openai/agents';
+import { Agent, run, type RunState, type Tool as SdkTool } from '@openai/agents';
 import {
   toSdkTool,
   restoreRunState,
@@ -33,6 +33,9 @@ import { buildPipelineAnalystAgent, buildContactResearcherAgent } from './sdk-sk
 import { buildSystemPrompt } from './system-prompt';
 import { ALL_TOOLS } from './tools';
 import type { ToolContext, ToolDefinition } from './types';
+import { activeToolkits } from '@/lib/integrations/connections';
+import { loadToolsForEntity, composioConfigured } from '@/lib/integrations/composio';
+import { logger } from '@/lib/logger';
 
 // ── Config ─────────────────────────────────────────────────────────────────
 
@@ -45,15 +48,19 @@ const DEFAULT_MODEL = 'gpt-4.1-mini';
  * Build the chat agent. Public so the resume path can hand the same shape
  * to `restoreRunState` — the SDK requires the agent that originally
  * produced the state for deserialization.
+ *
+ * Optional `integrationTools` carry the Composio-loaded SDK tools for
+ * whichever third-party apps the realtor has connected. Loaded dynamically
+ * by `loadIntegrationTools` below; passed in here so this function stays
+ * synchronous and pure for the resume path.
  */
-export function buildChatAgent(ctx: ToolContext, opts: { model?: string } = {}): Agent {
+export function buildChatAgent(
+  ctx: ToolContext,
+  opts: { model?: string; integrationTools?: SdkTool[] } = {},
+): Agent {
   const domainTools = ALL_TOOLS.map((t: ToolDefinition) => toSdkTool(t, ctx));
 
   // Sub-agent skills attached as tools via the SDK's native `Agent.asTool()`.
-  // This replaces the custom-loop `delegate_to_subagent` router for the SDK
-  // runtime — the model picks these by tool description, no system-prompt
-  // sentence needed. The custom loop's router stays in place for the legacy
-  // path until the cutover PR.
   const pipelineAnalyst = buildPipelineAnalystAgent(ctx, { model: opts.model });
   const contactResearcher = buildContactResearcherAgent(ctx, { model: opts.model });
 
@@ -73,9 +80,35 @@ export function buildChatAgent(ctx: ToolContext, opts: { model?: string } = {}):
   return new Agent({
     name: 'Chippi',
     instructions: buildSystemPrompt(ctx),
-    tools: [...domainTools, ...skillTools],
+    tools: [...domainTools, ...skillTools, ...(opts.integrationTools ?? [])],
     model: opts.model ?? DEFAULT_MODEL,
   });
+}
+
+/**
+ * Resolve the Composio tools the realtor's chat should see this turn.
+ * Loaded fresh per request — connect/disconnect changes take effect on
+ * the next message without any cache invalidation.
+ *
+ * Failure mode: if Composio is unconfigured, unreachable, or returns an
+ * error, we log and proceed WITHOUT integration tools. The chat keeps
+ * working on its native catalog. Hard-fail would mean a Composio outage
+ * takes down all chat — wrong tradeoff.
+ */
+export async function loadIntegrationTools(ctx: ToolContext): Promise<SdkTool[]> {
+  if (!composioConfigured()) return [];
+  try {
+    const toolkits = await activeToolkits({ spaceId: ctx.space.id, userId: ctx.userId });
+    if (toolkits.length === 0) return [];
+    const tools = await loadToolsForEntity({ entityId: ctx.userId, toolkits });
+    return tools as unknown as SdkTool[];
+  } catch (err) {
+    logger.warn(
+      '[sdk-chat] integration tools load failed — proceeding without them',
+      { spaceId: ctx.space.id, userId: ctx.userId, err: err instanceof Error ? err.message : String(err) },
+    );
+    return [];
+  }
 }
 
 // ── Fresh-turn entry point ─────────────────────────────────────────────────
@@ -101,7 +134,8 @@ export interface RunChatTurnInput {
  * `result.completed` to know when persistence is safe.
  */
 export async function runChatTurn(input: RunChatTurnInput) {
-  const agent = buildChatAgent(input.ctx, { model: input.model });
+  const integrationTools = await loadIntegrationTools(input.ctx);
+  const agent = buildChatAgent(input.ctx, { model: input.model, integrationTools });
   const result = await run(agent, input.userMessage, {
     stream: true,
     signal: input.ctx.signal,
@@ -132,7 +166,8 @@ export interface ResumeChatTurnInput {
  * same way regardless of which path produced them.
  */
 export async function resumeChatTurn(input: ResumeChatTurnInput) {
-  const agent = buildChatAgent(input.ctx, { model: input.model });
+  const integrationTools = await loadIntegrationTools(input.ctx);
+  const agent = buildChatAgent(input.ctx, { model: input.model, integrationTools });
   const state = await restoreRunState(agent, input.serializedState);
 
   // Find the matching approval item on the rehydrated state. The SDK

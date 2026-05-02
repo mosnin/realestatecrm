@@ -7,6 +7,7 @@ import { ProfileSection } from './profile-section';
 import { NotificationsSection } from './notifications-section';
 import { LegalSettingsForm } from './legal/legal-settings-form';
 import { IntegrationsSection } from './integrations-section';
+import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
 import type { SpaceSetting } from '@/lib/types';
 import {
   H1,
@@ -149,12 +150,21 @@ export default async function SettingsPage({
         />
       </section>
 
-      {/* INTEGRATIONS — MCP keys + message templates */}
+      {/* CONNECTED APPS — Composio integrations */}
       <section
         id="integrations"
         className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
       >
-        <p className={SECTION_LABEL}>Integrations</p>
+        <p className={SECTION_LABEL}>Connected apps</p>
+        <ConnectedAppsSection />
+      </section>
+
+      {/* MCP KEYS + MESSAGE TEMPLATES */}
+      <section
+        id="api-keys"
+        className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+      >
+        <p className={SECTION_LABEL}>API keys &amp; templates</p>
         <IntegrationsSection slug={space.slug} />
       </section>
 
