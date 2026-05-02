@@ -518,8 +518,8 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       streamingMsgIdRef.current = contId;
       setMessages((prev) => [...prev, contMsg]);
 
-      await consumeStream(`/api/ai/task/approve/${encodeURIComponent(requestId)}`, {
-        decision: 'approved',
+      await consumeStream(`/api/ai/task/resume/${encodeURIComponent(requestId)}`, {
+        approved: true,
         ...(editedArgs ? { editedArgs } : {}),
       });
     },
@@ -570,8 +570,8 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       streamingMsgIdRef.current = contId;
       setMessages((prev) => [...prev, contMsg]);
 
-      await consumeStream(`/api/ai/task/approve/${encodeURIComponent(requestId)}`, {
-        decision: 'denied',
+      await consumeStream(`/api/ai/task/resume/${encodeURIComponent(requestId)}`, {
+        approved: false,
       });
     },
     [isStreaming, pendingApproval, consumeStream],
