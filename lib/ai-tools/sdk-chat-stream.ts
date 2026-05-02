@@ -50,7 +50,11 @@ export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
     conversationId: input.conversationId,
     abortController: input.abortController,
     start: async () => {
-      const { result } = await runChatTurn({ ctx: input.ctx, userMessage: input.userMessage });
+      const { result } = await runChatTurn({
+        ctx: input.ctx,
+        userMessage: input.userMessage,
+        history: input.history,
+      });
       return { result: result as unknown as SdkResultLike };
     },
   });

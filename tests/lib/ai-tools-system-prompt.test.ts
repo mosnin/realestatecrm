@@ -41,9 +41,15 @@ describe('buildSystemPrompt', () => {
     );
   });
 
+  it('pins the reasoning-before-mutation contract so the realtor sees a why before tapping Approve', () => {
+    const prompt = buildSystemPrompt(makeCtx());
+    expect(prompt).toMatch(/BEFORE calling a mutating tool/);
+    expect(prompt).toMatch(/WHO you're acting on and WHY/);
+  });
+
   it('stays compact — enough for tone guidance, not a manifesto', () => {
     const prompt = buildSystemPrompt(makeCtx());
-    // Sanity upper bound: if we ever exceed 2400 chars we should revisit.
-    expect(prompt.length).toBeLessThan(2400);
+    // Sanity upper bound: if we ever exceed 3000 chars we should revisit.
+    expect(prompt.length).toBeLessThan(3000);
   });
 });

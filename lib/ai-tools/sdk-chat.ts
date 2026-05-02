@@ -22,7 +22,7 @@
  *     bridge stay pure and testable.
  */
 
-import { Agent, run, type RunState, type Tool as SdkTool } from '@openai/agents';
+import { Agent, run, type RunState, type Tool as SdkTool, type AgentInputItem } from '@openai/agents';
 import {
   toSdkTool,
   restoreRunState,
@@ -30,7 +30,7 @@ import {
   type ApprovalDecision,
 } from './sdk-bridge';
 import { buildPipelineAnalystAgent, buildContactResearcherAgent } from './sdk-skills';
-import { buildSystemPrompt } from './system-prompt';
+import { buildSystemPrompt, buildPersonalizedSystemPrompt } from './system-prompt';
 import { ALL_TOOLS } from './tools';
 import type { ToolContext, ToolDefinition } from './types';
 import { activeToolkits, markExpiredByToolkit } from '@/lib/integrations/connections';
@@ -56,7 +56,7 @@ const DEFAULT_MODEL = 'gpt-4.1-mini';
  */
 export function buildChatAgent(
   ctx: ToolContext,
-  opts: { model?: string; integrationTools?: SdkTool[] } = {},
+  opts: { model?: string; integrationTools?: SdkTool[]; instructions?: string } = {},
 ): Agent {
   const domainTools = ALL_TOOLS.map((t: ToolDefinition) => toSdkTool(t, ctx));
 
@@ -77,9 +77,13 @@ export function buildChatAgent(
     }),
   ];
 
+  // Personalized prompt is async — it loads a snapshot of the realtor's
+  // pipeline + connected apps. Callers that already awaited it pass it
+  // through `opts.instructions`. The fallback path uses the synchronous
+  // static prompt so resume / tests / failure modes still work.
   return new Agent({
     name: 'Chippi',
-    instructions: buildSystemPrompt(ctx),
+    instructions: opts.instructions ?? buildSystemPrompt(ctx),
     tools: [...domainTools, ...skillTools, ...(opts.integrationTools ?? [])],
     model: opts.model ?? DEFAULT_MODEL,
   });
@@ -199,14 +203,29 @@ export function isAuthLikeError(err: unknown): boolean {
 
 // ── Fresh-turn entry point ─────────────────────────────────────────────────
 
+export interface ChatHistoryRow {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface RunChatTurnInput {
   ctx: ToolContext;
   /**
-   * The user's new message. Plain string — we let the SDK fold it into the
-   * conversation history with whatever session callback we configure
-   * (default: append after history).
+   * The user's new message. Becomes the trailing item in the input array
+   * we hand the SDK.
    */
   userMessage: string;
+  /**
+   * Prior turns from the same conversation, oldest first. Caller is
+   * responsible for capping (the route uses HISTORY_LIMIT=20) and for
+   * de-duping the just-saved user message before passing it in.
+   *
+   * The agent without history is the agent without memory of what the
+   * realtor just said — every turn becomes a fresh start. Passing history
+   * here is the difference between "Sam who?" and "right, Sam who you
+   * mentioned two messages ago."
+   */
+  history?: ChatHistoryRow[];
   /**
    * Optional override for the model (tests, A/B). The default
    * `gpt-4.1-mini` matches the bridge.
@@ -220,9 +239,31 @@ export interface RunChatTurnInput {
  * `result.completed` to know when persistence is safe.
  */
 export async function runChatTurn(input: RunChatTurnInput) {
-  const integrationTools = await loadIntegrationTools(input.ctx);
-  const agent = buildChatAgent(input.ctx, { model: input.model, integrationTools });
-  const result = await run(agent, input.userMessage, {
+  // Load integration tools and personalized instructions in parallel —
+  // both are I/O-bound (Composio fetch + DB snapshot). The SDK's Agent
+  // construction is synchronous so we await both before building.
+  const [integrationTools, instructions] = await Promise.all([
+    loadIntegrationTools(input.ctx),
+    buildPersonalizedSystemPrompt(input.ctx),
+  ]);
+  const agent = buildChatAgent(input.ctx, {
+    model: input.model,
+    integrationTools,
+    instructions,
+  });
+
+  // Build the SDK input as history + new user message. The SDK accepts
+  // either a string OR an `AgentInputItem[]`; we use the array form so
+  // the agent sees the conversation, not just the trailing turn.
+  const items: AgentInputItem[] = [
+    ...(input.history ?? []).map((row) => ({
+      role: row.role,
+      content: row.content,
+    })),
+    { role: 'user', content: input.userMessage },
+  ] as unknown as AgentInputItem[];
+
+  const result = await run(agent, items, {
     stream: true,
     signal: input.ctx.signal,
   });
@@ -252,8 +293,15 @@ export interface ResumeChatTurnInput {
  * same way regardless of which path produced them.
  */
 export async function resumeChatTurn(input: ResumeChatTurnInput) {
-  const integrationTools = await loadIntegrationTools(input.ctx);
-  const agent = buildChatAgent(input.ctx, { model: input.model, integrationTools });
+  const [integrationTools, instructions] = await Promise.all([
+    loadIntegrationTools(input.ctx),
+    buildPersonalizedSystemPrompt(input.ctx),
+  ]);
+  const agent = buildChatAgent(input.ctx, {
+    model: input.model,
+    integrationTools,
+    instructions,
+  });
   const state = await restoreRunState(agent, input.serializedState);
 
   // Find the matching approval item on the rehydrated state. The SDK
