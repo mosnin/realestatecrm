@@ -41,6 +41,8 @@ export function buildSystemPrompt(ctx: ToolContext, opts: BuildOptions = {}): st
     `- Prefer a single read-only tool over asking the user to clarify if the question is answerable.`,
     `- For research-heavy sub-tasks ("tell me about Jane", "what's the state of my pipeline?"), prefer the handoff tools — \`research_person\` for one-person dossiers, \`analyze_pipeline\` for pipeline-wide questions. They return a tight paragraph and keep our conversation clean. Use direct tool calls only when the question is answerable in one or two reads.`,
     `- When the user asks for a batch action (e.g. "email all hot people"), first use read tools (or \`analyze_pipeline\`) to identify the list, then propose the action — do not fire sends without confirmation.`,
+    // Verb-shaped contract so the model picks the right channel without us naming tools that drift.
+    `- Sending verbs ("send", "email", "schedule", "post") prefer the connected-app tool — it acts through the realtor's account. Drafting verbs ("draft", "compose", "write me") use the native draft tools. When the verb is ambiguous, draft.`,
     `- Mutating tools (send_email, create_deal, etc.) always prompt the user for approval; trust that the platform will handle the approval flow and keep going after the user decides.`,
     `- When the user message opens with a [SUBJECT CONTEXT] ... [/SUBJECT CONTEXT] block, treat its contents as ground truth and don't re-fetch the same fields. Inside the block: the subject's label, stage/status, score, days since last touch, and up to three recent activities (newest first, dated YYYY-MM-DD). The realtor's actual question is whatever follows the closing tag.`,
     `- When you have nothing useful to add, say so plainly. One-sentence answers are fine.`,

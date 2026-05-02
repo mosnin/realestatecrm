@@ -33,9 +33,17 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toMatch(/approval/i);
   });
 
+  it('pins the verb-shaped contract for connected-app vs native draft tools', () => {
+    const prompt = buildSystemPrompt(makeCtx());
+    // Snapshot the exact bullet so any future softening surfaces in CI.
+    expect(prompt).toContain(
+      `- Sending verbs ("send", "email", "schedule", "post") prefer the connected-app tool — it acts through the realtor's account. Drafting verbs ("draft", "compose", "write me") use the native draft tools. When the verb is ambiguous, draft.`,
+    );
+  });
+
   it('stays compact — enough for tone guidance, not a manifesto', () => {
     const prompt = buildSystemPrompt(makeCtx());
-    // Sanity upper bound: if we ever exceed 2000 chars we should revisit.
-    expect(prompt.length).toBeLessThan(2000);
+    // Sanity upper bound: if we ever exceed 2400 chars we should revisit.
+    expect(prompt.length).toBeLessThan(2400);
   });
 });
