@@ -47,6 +47,7 @@ import { createDealTool } from './create-deal';
 import { moveDealStageTool } from './move-deal-stage';
 import { updateDealValueTool } from './update-deal-value';
 import { updateDealCloseDateTool } from './update-deal-close-date';
+import { updateDealProbabilityTool } from './update-deal-probability';
 import { attachPropertyToDealTool } from './attach-property-to-deal';
 import { markDealWonTool } from './mark-deal-won';
 import { markDealLostTool } from './mark-deal-lost';
@@ -62,6 +63,7 @@ import { findToursTool } from './find-tours';
 // Properties
 import { findPropertyTool } from './find-property';
 import { findComparablePropertiesTool } from './find-comparable-properties';
+import { addPropertyTool } from './add-property';
 import { updatePropertyStatusTool } from './update-property-status';
 import { noteOnPropertyTool } from './note-on-property';
 
@@ -80,15 +82,18 @@ import { draftEmailTool } from './draft-email';
 import { draftSmsTool } from './draft-sms';
 import { sendEmailTool } from './send-email';
 import { sendSmsTool } from './send-sms';
+import { sendPropertyPacketTool } from './send-property-packet';
 import { logEmailSentTool } from './log-email-sent';
 import { logSmsSentTool } from './log-sms-sent';
 
 // Brokerage — broker-role gated
 import { summarizeRealtorTool } from './summarize-realtor';
 import { assignLeadToRealtorTool } from './assign-lead-to-realtor';
+import { requestDealReviewTool } from './request-deal-review';
 
 // Memory
 import { recallHistoryTool } from './recall-history';
+import { readAttachmentTool } from './read-attachment';
 
 /**
  * Domain tools only. The orchestrator's `delegate_to_subagent` tool is
@@ -117,6 +122,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   moveDealStageTool as ToolDefinition,
   updateDealValueTool as ToolDefinition,
   updateDealCloseDateTool as ToolDefinition,
+  updateDealProbabilityTool as ToolDefinition,
   attachPropertyToDealTool as ToolDefinition,
   markDealWonTool as ToolDefinition,
   markDealLostTool as ToolDefinition,
@@ -132,6 +138,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // ── Properties ─────────────────────────────────────────────────────────
   findPropertyTool as ToolDefinition,
   findComparablePropertiesTool as ToolDefinition,
+  addPropertyTool as ToolDefinition,
   updatePropertyStatusTool as ToolDefinition,
   noteOnPropertyTool as ToolDefinition,
 
@@ -150,13 +157,16 @@ export const ALL_TOOLS: ToolDefinition[] = [
   draftSmsTool as ToolDefinition,
   sendEmailTool as ToolDefinition,
   sendSmsTool as ToolDefinition,
+  sendPropertyPacketTool as ToolDefinition,
   logEmailSentTool as ToolDefinition,
   logSmsSentTool as ToolDefinition,
 
   // ── Brokerage ──────────────────────────────────────────────────────────
   summarizeRealtorTool as ToolDefinition,
   assignLeadToRealtorTool as ToolDefinition,
+  requestDealReviewTool as ToolDefinition,
 
   // ── Memory ─────────────────────────────────────────────────────────────
   recallHistoryTool as ToolDefinition,
+  readAttachmentTool as ToolDefinition,
 ];
