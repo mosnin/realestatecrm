@@ -171,6 +171,66 @@ describe('toSdkTool', () => {
   });
 });
 
+describe('toSdkTool — strict-mode schema rewriting', () => {
+  it('keeps optional zod fields in the JSON schema as required + nullable so OpenAI strict mode accepts them', () => {
+    const def = defineTool({
+      name: 'find_widget',
+      description: 'find a widget',
+      parameters: z.object({
+        query: z.string().min(1).optional(),
+        limit: z.number().int().min(1).max(8).optional().default(8),
+      }),
+      requiresApproval: false,
+      handler: async () => ({ summary: 'ok' }),
+    });
+
+    const sdk = toSdkTool(def, makeCtx());
+    // The SDK normalises our zod into a JSON schema on the `parameters`
+    // field. Inspect it directly: every key in `properties` must also
+    // appear in `required`, and the OPTIONAL fields must allow null.
+    const schema = (sdk as { parameters: Record<string, unknown> }).parameters;
+    const props = schema.properties as Record<string, unknown>;
+    const required = schema.required as string[];
+
+    expect(Object.keys(props).sort()).toEqual(['limit', 'query']);
+    expect(required.sort()).toEqual(['limit', 'query']);
+  });
+
+  it('handler still receives null for fields the model passes as null (handlers use ?? defaults — null and undefined both fall through)', async () => {
+    const handler = vi.fn(async () => ({ summary: 'ok' }));
+    const def = defineTool({
+      name: 'noop',
+      description: 'noop',
+      parameters: z.object({
+        query: z.string().optional(),
+      }),
+      requiresApproval: false,
+      handler,
+    });
+
+    const sdk = toSdkTool(def, makeCtx());
+    await sdk.invoke(new RunContext(), JSON.stringify({ query: null }));
+    expect(handler).toHaveBeenCalledWith({ query: null }, expect.anything());
+  });
+
+  it('handler receives string when the model provides one', async () => {
+    const handler = vi.fn(async () => ({ summary: 'ok' }));
+    const def = defineTool({
+      name: 'noop',
+      description: 'noop',
+      parameters: z.object({
+        query: z.string().optional(),
+      }),
+      requiresApproval: false,
+      handler,
+    });
+
+    const sdk = toSdkTool(def, makeCtx());
+    await sdk.invoke(new RunContext(), JSON.stringify({ query: 'sam' }));
+    expect(handler).toHaveBeenCalledWith({ query: 'sam' }, expect.anything());
+  });
+});
+
 describe('extractApprovals', () => {
   const registry = [
     defineTool({

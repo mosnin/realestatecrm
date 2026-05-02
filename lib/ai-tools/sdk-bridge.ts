@@ -36,7 +36,7 @@
  */
 
 import { Agent, run, tool, RunState, type RunContext, type RunResult } from '@openai/agents';
-import type { z } from 'zod';
+import { z } from 'zod';
 import type { ToolContext, ToolDefinition, ToolResult } from './types';
 
 const DEFAULT_MODEL = 'gpt-4.1-mini';
@@ -64,7 +64,20 @@ export function toSdkTool<TArgs, TData>(def: ToolDefinition<TArgs, TData>, ctx: 
   return tool({
     name: def.name,
     description: def.description,
-    parameters: def.parameters as z.ZodObject<z.ZodRawShape>,
+    // Transform our zod schema so OpenAI's strict-mode JSON-schema
+    // accepts it. Strict mode requires every key in `properties` to
+    // also appear in `required`; zod `.optional()` produces a schema
+    // missing the field from `required` and OpenAI rejects with
+    // "Invalid schema for function ...: 'required' is required to be
+    // supplied and to be an array including every key in properties."
+    //
+    // We apply `strictifySchema` (below) which rewrites every
+    // `.optional()` and `.default()` into `.nullable()`. The field
+    // stays REQUIRED (so the model has to set it), but the value can
+    // be `null` (so the model has an out). Handler logic that does
+    // `args.x ?? fallback` already treats null and undefined the same,
+    // so 47 tool handlers don't need to change.
+    parameters: strictifySchema(def.parameters as z.ZodObject<z.ZodRawShape>),
     strict: true,
     needsApproval,
     async execute(input) {
@@ -97,6 +110,73 @@ export function toSdkTool<TArgs, TData>(def: ToolDefinition<TArgs, TData>, ctx: 
  *     event stream surfaced them to the UI separately).
  *   - On error: prefix "Error: " so the model recognises the failure.
  */
+/**
+ * Transform a zod ObjectSchema so every field is required at the JSON-
+ * schema level — needed for OpenAI strict-mode tool schemas. Optional
+ * fields become nullable instead: the model has to provide them, but
+ * `null` is a valid value.
+ *
+ * Why not just rewrite the 47 tool schemas to be strict-compatible?
+ * It would work, but every handler has to be audited for the new shape
+ * (`undefined` → `null`). The transformation here keeps tool authors
+ * writing idiomatic zod (`.optional()`, `.default()`) and pays the
+ * conversion cost once at registration time.
+ *
+ * Behaviors preserved:
+ *   - Validators (.min, .max, .email, etc.) on the inner type still apply
+ *     when a non-null value comes in.
+ *   - `.default()` becomes `.nullable()` — the default is no longer
+ *     applied automatically, but every handler that uses `args.x ??
+ *     defaultValue` keeps working because `??` treats null and
+ *     undefined the same way.
+ *   - Top-level `.describe()` on the schema is preserved.
+ */
+function strictifySchema(
+  schema: z.ZodObject<z.ZodRawShape>,
+): z.ZodObject<z.ZodRawShape> {
+  // Spread to drop the readonly index signature so we can iterate + write.
+  const sourceShape: Record<string, z.ZodTypeAny> = { ...(schema.shape as Record<string, z.ZodTypeAny>) };
+  const newShape: Record<string, z.ZodTypeAny> = {};
+  for (const [key, value] of Object.entries(sourceShape)) {
+    newShape[key] = makeRequiredNullable(value);
+  }
+  const rebuilt = z.object(newShape) as z.ZodObject<z.ZodRawShape>;
+  // `.describe()` is metadata on _def — preserve if the source had one.
+  // The cast is safe: ZodObject._def includes the description on every
+  // version we use.
+  const desc = (schema as unknown as { _def?: { description?: string } })._def
+    ?.description;
+  return desc ? rebuilt.describe(desc) : rebuilt;
+}
+
+function makeRequiredNullable(field: z.ZodTypeAny): z.ZodTypeAny {
+  // Unwrap one or more layers of ZodOptional / ZodDefault until we reach
+  // the inner type. Then wrap with .nullable().
+  let inner: z.ZodTypeAny = field;
+  let preservedDescription: string | undefined;
+  // Capture the topmost description so we don't lose it on rewrap.
+  const def = (inner as unknown as { _def?: { description?: string } })._def;
+  if (def?.description) preservedDescription = def.description;
+
+  // Walk down through Optional/Default wrappers.
+  while (true) {
+    const typeName = (inner as unknown as { _def?: { typeName?: string } })._def
+      ?.typeName;
+    if (typeName === 'ZodOptional' || typeName === 'ZodDefault') {
+      const next = (
+        inner as unknown as { _def: { innerType: z.ZodTypeAny } }
+      )._def.innerType;
+      inner = next;
+      continue;
+    }
+    break;
+  }
+
+  // If the inner type is already nullable, no change beyond unwrapping.
+  const nullable = inner.nullable();
+  return preservedDescription ? nullable.describe(preservedDescription) : nullable;
+}
+
 function serialiseResult(result: ToolResult): string {
   if (result.display === 'error') return `Error: ${result.summary}`;
   return result.summary;
