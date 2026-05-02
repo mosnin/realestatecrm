@@ -172,6 +172,142 @@ describe('toSdkTool', () => {
 });
 
 describe('toSdkTool — strict-mode schema rewriting', () => {
+  /**
+   * Walk the produced JSON schema and assert that NO constraint OpenAI
+   * strict mode rejects is anywhere in the tree. This is the load-bearing
+   * regression test — a new tool that uses `.url()` / `.email()` /
+   * `.min()` / `.max()` / `.regex()` / `.datetime()` will fail the chat
+   * in production. This test catches it locally.
+   */
+  function assertNoStrictModeViolations(schema: unknown): void {
+    if (!schema || typeof schema !== 'object') return;
+    const s = schema as Record<string, unknown>;
+    const banned = [
+      'format',
+      'minLength',
+      'maxLength',
+      'minimum',
+      'maximum',
+      'minItems',
+      'maxItems',
+      'pattern',
+      'multipleOf',
+      'minProperties',
+      'maxProperties',
+      'uniqueItems',
+    ];
+    for (const key of banned) {
+      if (key in s) {
+        throw new Error(`Strict-mode-incompatible key "${key}" present in schema: ${JSON.stringify(schema)}`);
+      }
+    }
+    // Recurse into nested schemas
+    for (const value of Object.values(s)) {
+      if (Array.isArray(value)) {
+        for (const v of value) assertNoStrictModeViolations(v);
+      } else if (value && typeof value === 'object') {
+        assertNoStrictModeViolations(value);
+      }
+    }
+  }
+
+  it('strips `format: "uri"` from .url() fields (the add_property bug)', () => {
+    const def = defineTool({
+      name: 'add_property_like',
+      description: 'mimics add_property',
+      parameters: z.object({
+        listingUrl: z.string().trim().url().max(2000).optional(),
+      }),
+      requiresApproval: false,
+      handler: async () => ({ summary: 'ok' }),
+    });
+    const sdk = toSdkTool(def, makeCtx());
+    const schema = (sdk as { parameters: unknown }).parameters;
+    assertNoStrictModeViolations(schema);
+  });
+
+  it('strips `format: "date-time"` from .datetime() fields (block_time, check_availability)', () => {
+    const def = defineTool({
+      name: 'block_time_like',
+      description: 'mimics block_time',
+      parameters: z.object({
+        from: z.string().datetime(),
+        to: z.string().datetime(),
+      }),
+      requiresApproval: false,
+      handler: async () => ({ summary: 'ok' }),
+    });
+    const sdk = toSdkTool(def, makeCtx());
+    assertNoStrictModeViolations((sdk as { parameters: unknown }).parameters);
+  });
+
+  it('strips `format: "email"` and `format: "uuid"` from .email() / .uuid()', () => {
+    const def = defineTool({
+      name: 'email_like',
+      description: 'mimics email',
+      parameters: z.object({
+        recipient: z.string().email(),
+        threadId: z.string().uuid(),
+      }),
+      requiresApproval: false,
+      handler: async () => ({ summary: 'ok' }),
+    });
+    const sdk = toSdkTool(def, makeCtx());
+    assertNoStrictModeViolations((sdk as { parameters: unknown }).parameters);
+  });
+
+  it('strips minLength / maxLength / minimum / maximum / pattern', () => {
+    const def = defineTool({
+      name: 'limits_like',
+      description: 'mimics tools with min/max',
+      parameters: z.object({
+        name: z.string().min(1).max(120),
+        score: z.number().min(0).max(100),
+        slug: z.string().regex(/^[a-z]+$/),
+      }),
+      requiresApproval: false,
+      handler: async () => ({ summary: 'ok' }),
+    });
+    const sdk = toSdkTool(def, makeCtx());
+    assertNoStrictModeViolations((sdk as { parameters: unknown }).parameters);
+  });
+
+  it('preserves enum values (strict mode allows enums)', () => {
+    const def = defineTool({
+      name: 'enum_like',
+      description: 'mimics enum tools',
+      parameters: z.object({
+        tier: z.enum(['hot', 'warm', 'cold']).optional(),
+      }),
+      requiresApproval: false,
+      handler: async () => ({ summary: 'ok' }),
+    });
+    const sdk = toSdkTool(def, makeCtx());
+    const schema = JSON.stringify((sdk as { parameters: unknown }).parameters);
+    expect(schema).toMatch(/"hot"/);
+    expect(schema).toMatch(/"warm"/);
+    expect(schema).toMatch(/"cold"/);
+    assertNoStrictModeViolations((sdk as { parameters: unknown }).parameters);
+  });
+
+  it('recursively strips constraints inside nested objects and arrays', () => {
+    const def = defineTool({
+      name: 'nested',
+      description: 'nested',
+      parameters: z.object({
+        attendees: z.array(z.string().email().min(1)),
+        owner: z.object({
+          email: z.string().email(),
+          age: z.number().min(0).max(120),
+        }),
+      }),
+      requiresApproval: false,
+      handler: async () => ({ summary: 'ok' }),
+    });
+    const sdk = toSdkTool(def, makeCtx());
+    assertNoStrictModeViolations((sdk as { parameters: unknown }).parameters);
+  });
+
   it('keeps optional zod fields in the JSON schema as required + nullable so OpenAI strict mode accepts them', () => {
     const def = defineTool({
       name: 'find_widget',
