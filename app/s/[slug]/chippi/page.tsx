@@ -12,10 +12,10 @@ export default async function ChippiPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ q?: string; tab?: string; prefill?: string }>;
+  searchParams: Promise<{ q?: string; tab?: string; prefill?: string; conversationId?: string }>;
 }) {
   const { slug } = await params;
-  const { q, tab, prefill } = await searchParams;
+  const { q, tab, prefill, conversationId: urlConversationId } = await searchParams;
   const initialInput = typeof q === 'string' && q.trim() ? q.trim() : undefined;
   // `prefill` populates the composer but does NOT auto-send — the realtor
   // finishes the sentence themselves. Used by "or just tell Chippi →" shortcuts
@@ -53,14 +53,21 @@ export default async function ChippiPage({
       .limit(50);
     conversations = (convData ?? []) as Conversation[];
 
-    // Load messages from the most recent conversation
-    if (conversations.length > 0) {
-      const latestConv = conversations[0];
-      initialConversationId = latestConv.id;
+    // Pick which conversation to hydrate. The URL is the source of truth —
+    // when the realtor clicks a conversation in the sidebar, the Link
+    // navigates to `?conversationId=…` and we re-render the workspace with
+    // that conversation's messages already in props. No client-side
+    // round-trip; the URL drives state directly.
+    const targetConvId =
+      urlConversationId && conversations.some((c) => c.id === urlConversationId)
+        ? urlConversationId
+        : conversations[0]?.id ?? null;
+    if (targetConvId) {
+      initialConversationId = targetConvId;
       const { data: msgData } = await supabase
         .from('Message')
         .select('role, content, blocks')
-        .eq('conversationId', latestConv.id)
+        .eq('conversationId', targetConvId)
         .order('createdAt', { ascending: true })
         .limit(50);
       initialMessages = ((msgData ?? []) as { role: string; content: string; blocks: MessageBlock[] | null }[]).map((m) => ({

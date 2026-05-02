@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, useTransition } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { ChippiPromptBox, type MentionItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
@@ -78,15 +78,19 @@ export function ChippiWorkspace({
   showConnectBanner = false,
 }: ChippiWorkspaceProps) {
   const { user } = useUser();
-  const searchParams = useSearchParams();
-  const urlConversationId = searchParams.get('conversationId');
+  const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
-    urlConversationId ?? initialConversationId,
+    initialConversationId,
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
-  const [loadingMessages, setLoadingMessages] = useState(false);
+  // Server-driven loading: pending during the soft-nav so we can show the
+  // "One moment" placeholder instead of the previous conversation's
+  // transcript flashing for a beat. `useTransition` is the natural fit —
+  // wrap the `router.push` calls and the `isPending` flag flips for the
+  // duration of the server re-render.
+  const [isLoadingConversation, startConversationTransition] = useTransition();
   // The single sentence the realtor sees when they approve a celebrate-able
   // tool from the chat permission prompt. Set the moment the wrapped
   // approve/alwaysAllow callback fires; cleared by the celebration's own
@@ -113,6 +117,9 @@ export function ChippiWorkspace({
     conversationId: activeConversationId,
     onConversationCreated: (id) => {
       setActiveConversationId(id);
+      // Mark it synced so the prop-sync effect doesn't try to re-hydrate
+      // (and clobber the streaming bubble) when the URL update below arrives.
+      lastSyncedConvIdRef.current = id;
       // Minimal placeholder — the sidebar picks up the real title on refresh,
       // and `send` already titled the conversation server-side.
       setConversations((prev) =>
@@ -129,6 +136,10 @@ export function ChippiWorkspace({
               ...prev,
             ],
       );
+      // Reflect the new conversation in the URL so a refresh (or share)
+      // lands on the same transcript. `replace` so the history doesn't
+      // grow a step for every new chat.
+      router.replace(`/s/${slug}/chippi?conversationId=${id}`, { scroll: false });
     },
   });
 
@@ -164,79 +175,41 @@ export function ChippiWorkspace({
   const approveCelebrating = celebrateThen(approve);
   const alwaysAllowCelebrating = celebrateThen(alwaysAllow);
 
-  // Hydrate the transcript from initial server data on first render.
-  const hydratedRef = useRef(false);
-  useEffect(() => {
-    if (hydratedRef.current) return;
-    hydratedRef.current = true;
-    if (initialMessages.length > 0) {
-      setMessages(legacyToUi(initialMessages));
-    }
-  }, [initialMessages, setMessages]);
-
-  // React to URL-driven conversation switches. The sidebar's conversation
-  // list uses `?conversationId=…` to deep-link a transcript; when the URL
-  // changes we sync local state and load that transcript.
+  // The server is the source of truth for which conversation we're viewing.
+  // chippi/page.tsx reads `?conversationId=` from the URL, fetches that
+  // transcript, and passes it down as `initialConversationId` /
+  // `initialMessages`. This effect adopts the props whenever they change —
+  // which happens on every soft-nav from the sidebar (Link → URL → server
+  // re-renders → props change → we sync). No client-side fetch needed.
   //
-  // CRITICAL — do NOT wipe state when the URL has no `?conversationId=`.
-  // The steady state on `/s/<slug>/chippi` is "no query param." If the
-  // user sends a fresh message, `useAgentTask.send()` calls
-  // `onConversationCreated(newId)` which mutates local state — at which
-  // point this effect was previously firing with `urlConversationId=null,
-  // activeConversationId=newId` and wiping both. The optimistic user
-  // bubble + streaming assistant placeholder both vanished mid-send;
-  // every subsequent stream event no-op'd because `streamingMsgIdRef`
-  // pointed at a deleted bubble. Visible symptom: message disappears,
-  // screen flickers back to home, nothing else happens. This was the
-  // production "chat is broken" bug.
+  // The previous implementation hydrated once via `hydratedRef` and then
+  // tried to fetch on URL change in the client. The client effect wasn't
+  // firing reliably (visible symptom: clicking the sidebar did nothing).
+  // Letting the server own this is also faster — single round-trip,
+  // streaming-friendly, and no flicker.
   //
-  // Fresh-conversation creation already calls `setMessages([])` directly
-  // (see `handleNewConversation`). Deletion already calls it too (see
-  // `handleDeleteConversation`). The URL-cleared branch was doing nobody's
-  // job — removed.
+  // We track the last `initialConversationId` we adopted so a streaming
+  // mid-send (which mutates `messages` locally) doesn't get clobbered by
+  // a no-op prop arrival. We only re-sync when the server hands us a
+  // genuinely different conversation.
+  const lastSyncedConvIdRef = useRef<string | null>(initialConversationId);
   useEffect(() => {
-    if (!hydratedRef.current) return;
-    if (!urlConversationId) return;
-    if (urlConversationId === activeConversationId) return;
-    setActiveConversationId(urlConversationId);
-    void (async () => {
-      setLoadingMessages(true);
-      try {
-        const res = await fetch(`/api/ai/messages?conversationId=${urlConversationId}`);
-        if (res.ok) {
-          const data = (await res.json()) as LegacyMessage[];
-          setMessages(legacyToUi(data));
-        }
-      } finally {
-        setLoadingMessages(false);
-      }
-    })();
-  }, [urlConversationId, activeConversationId, setMessages]);
+    if (initialConversationId === lastSyncedConvIdRef.current) return;
+    lastSyncedConvIdRef.current = initialConversationId;
+    setActiveConversationId(initialConversationId);
+    setMessages(initialMessages.length > 0 ? legacyToUi(initialMessages) : []);
+  }, [initialConversationId, initialMessages, setMessages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, pendingApproval, isStreaming]);
 
-  const loadConversationMessages = useCallback(
-    async (conversationId: string) => {
-      setLoadingMessages(true);
-      try {
-        const res = await fetch(`/api/ai/messages?conversationId=${conversationId}`);
-        if (res.ok) {
-          const data = (await res.json()) as LegacyMessage[];
-          setMessages(legacyToUi(data));
-        }
-      } finally {
-        setLoadingMessages(false);
-      }
-    },
-    [setMessages],
-  );
-
-  async function handleSelectConversation(conv: Conversation) {
-    setActiveConversationId(conv.id);
+  function handleSelectConversation(conv: Conversation) {
     setDrawerOpen(false);
-    await loadConversationMessages(conv.id);
+    if (conv.id === activeConversationId) return;
+    startConversationTransition(() => {
+      router.push(`/s/${slug}/chippi?conversationId=${conv.id}`, { scroll: false });
+    });
   }
 
   async function handleNewConversation() {
@@ -248,9 +221,10 @@ export function ChippiWorkspace({
     if (res.ok) {
       const conv = (await res.json()) as Conversation;
       setConversations((prev) => [conv, ...prev]);
-      setActiveConversationId(conv.id);
-      setMessages([]);
       setDrawerOpen(false);
+      startConversationTransition(() => {
+        router.push(`/s/${slug}/chippi?conversationId=${conv.id}`, { scroll: false });
+      });
     }
   }
 
@@ -263,8 +237,9 @@ export function ChippiWorkspace({
       }
       setConversations((prev) => prev.filter((c) => c.id !== id));
       if (activeConversationId === id) {
-        setActiveConversationId(null);
-        setMessages([]);
+        startConversationTransition(() => {
+          router.push(`/s/${slug}/chippi`, { scroll: false });
+        });
       }
     } catch (err) {
       console.error('[Chat] Error deleting conversation:', err);
@@ -369,7 +344,7 @@ export function ChippiWorkspace({
   }, []);
 
   const atLimit = messages.length >= MESSAGE_LIMIT;
-  const isEmpty = messages.length === 0 && !loadingMessages;
+  const isEmpty = messages.length === 0 && !isLoadingConversation;
   const firstName = user?.firstName ?? '';
 
   // Composer prefill — bumped by the day-one welcome's "Tell me about a lead"
@@ -598,7 +573,7 @@ export function ChippiWorkspace({
       )}
 
       {/* ── Today view (no active conversation) ───────────────────── */}
-      {loadingMessages ? (
+      {isLoadingConversation ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
           One moment.
         </div>
