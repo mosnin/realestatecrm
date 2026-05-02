@@ -7,6 +7,12 @@ import type { Conversation } from '@/lib/types';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { composioConfigured } from '@/lib/integrations/composio';
 
+// Force dynamic rendering — the page reads searchParams to pick which
+// conversation to hydrate, and we need a fresh server render on every
+// query-string change. Without this, Next.js can serve a cached render
+// across navigations and the workspace ends up with stale initialMessages.
+export const dynamic = 'force-dynamic';
+
 export default async function ChippiPage({
   params,
   searchParams,

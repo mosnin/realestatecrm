@@ -175,39 +175,45 @@ export function ChippiWorkspace({
   const approveCelebrating = celebrateThen(approve);
   const alwaysAllowCelebrating = celebrateThen(alwaysAllow);
 
-  // Hydrate once on mount from the server-fetched props.
-  const hydratedRef = useRef(false);
-  useEffect(() => {
-    if (hydratedRef.current) return;
-    hydratedRef.current = true;
-    if (initialMessages.length > 0) {
-      setMessages(legacyToUi(initialMessages));
-    }
-  }, [initialMessages, setMessages]);
-
-  // After the first paint, the URL is the source of truth for which
-  // conversation we're viewing. The dashboard sidebar's `<Link>` flips
-  // `?conversationId=…` and `useSearchParams` updates synchronously
-  // (the sidebar's highlight already proves the hook reacts). When the
-  // URL points to a conversation that isn't the one the transcript is
-  // showing, fetch its messages and swap them in.
+  // Two redundant paths feed messages into the transcript so a flake on
+  // one path doesn't black-hole the user:
   //
-  // `lastLoadedConvIdRef` tracks the last id we successfully loaded so
-  // we don't re-fetch when the user clicks the same conversation
-  // they're already on, and so a fresh-message send (which sets
-  // `activeConversationId` and updates the URL synchronously via
-  // `onConversationCreated`) doesn't clobber the streaming bubble
-  // mid-flight. The bare `/chippi` URL (no query) is treated as
-  // "nothing to load" — fresh-conv creation already calls
-  // `setMessages([])` directly.
+  //  1. Server-driven prop sync. Whenever the page server component
+  //     re-renders (it reads `?conversationId=` and fetches the matching
+  //     transcript), the new `initialMessages` / `initialConversationId`
+  //     props arrive and we adopt them. We DON'T gate this with a one-shot
+  //     `hydratedRef` — that meant a server re-render couldn't update the
+  //     transcript. The streaming guard prevents clobbering a mid-flight
+  //     bubble.
+  //
+  //  2. Client-side URL fetch. `useSearchParams` updates on every Link
+  //     click; when `?conversationId=X` differs from what we last loaded,
+  //     hit `/api/ai/messages?conversationId=X` directly. Belt-and-suspenders
+  //     in case Next.js's router cache serves a stale render.
+  //
+  // Either path produces the same end state (messages = X's messages).
+  // Whichever wins the race, the transcript ends up correct.
   const searchParams = useSearchParams();
   const urlConversationId = searchParams.get('conversationId');
-  const lastLoadedConvIdRef = useRef<string | null>(initialConversationId);
+  const lastLoadedConvIdRef = useRef<string | null>(null);
+
+  // Path 1 — adopt props.
   useEffect(() => {
-    if (!hydratedRef.current) return;
-    if (!urlConversationId) return;
-    if (urlConversationId === lastLoadedConvIdRef.current) return;
     if (isStreaming) return;
+    if (initialConversationId === lastLoadedConvIdRef.current) return;
+    if (!initialConversationId) return;
+    console.log('[Chat] sync from props', initialConversationId, 'msgs:', initialMessages.length);
+    lastLoadedConvIdRef.current = initialConversationId;
+    setActiveConversationId(initialConversationId);
+    setMessages(initialMessages.length > 0 ? legacyToUi(initialMessages) : []);
+  }, [initialConversationId, initialMessages, isStreaming, setMessages]);
+
+  // Path 2 — fetch on URL change.
+  useEffect(() => {
+    if (!urlConversationId) return;
+    if (isStreaming) return;
+    if (urlConversationId === lastLoadedConvIdRef.current) return;
+    console.log('[Chat] url-effect fetching', urlConversationId);
     lastLoadedConvIdRef.current = urlConversationId;
     setActiveConversationId(urlConversationId);
     void (async () => {
@@ -220,6 +226,7 @@ export function ChippiWorkspace({
           return;
         }
         const data = (await res.json()) as LegacyMessage[];
+        console.log('[Chat] url-effect loaded', urlConversationId, 'msgs:', data.length);
         setMessages(legacyToUi(data));
       } catch (err) {
         console.error('[Chat] Failed to load conversation:', err);
