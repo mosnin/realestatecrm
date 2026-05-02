@@ -19,9 +19,14 @@ vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: vi.fn(async () => ({ allowed: true })),
 }));
 
-const { proposeActionsMock, attachHumanSummariesMock } = vi.hoisted(() => ({
+const {
+  proposeActionsMock,
+  attachHumanSummariesMock,
+  loadPostTourIntegrationToolsMock,
+} = vi.hoisted(() => ({
   proposeActionsMock: vi.fn(),
   attachHumanSummariesMock: vi.fn(),
+  loadPostTourIntegrationToolsMock: vi.fn(),
 }));
 vi.mock('@/lib/chippi/post-tour', async () => {
   const actual =
@@ -30,6 +35,7 @@ vi.mock('@/lib/chippi/post-tour', async () => {
     ...actual,
     proposeActions: proposeActionsMock,
     attachHumanSummaries: attachHumanSummariesMock,
+    loadPostTourIntegrationTools: loadPostTourIntegrationToolsMock,
   };
 });
 
@@ -67,6 +73,8 @@ describe('POST /api/chippi/post-tour', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OPENAI_API_KEY = 'sk-test';
+    // Default to no connected apps — the graceful-degradation baseline.
+    loadPostTourIntegrationToolsMock.mockResolvedValue([]);
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -174,5 +182,85 @@ describe('POST /api/chippi/post-tour', () => {
       contextHint?: { personId?: string; dealId?: string };
     };
     expect(arg.contextHint).toEqual({});
+  });
+
+  // ── Integration path ───────────────────────────────────────────────────
+
+  it('forwards integration tools to the orchestrator when the realtor has connected apps', async () => {
+    // The Gmail-connected case: the orchestrator must be told the
+    // GMAIL_SEND_EMAIL tool exists, otherwise the post-tour stack can
+    // only ever propose drafts. This test pins that contract.
+    mockRequireAuth.mockResolvedValue({ userId: 'user_1' });
+    mockGetSpaceForUser.mockResolvedValue({
+      id: 'space_1',
+      slug: 's',
+      name: 'Test',
+      ownerId: 'owner_1',
+    } as never);
+    loadPostTourIntegrationToolsMock.mockResolvedValue([
+      { slug: 'GMAIL_SEND_EMAIL', description: 'Send an email through Gmail.', toolkit: 'gmail' },
+    ]);
+    proposeActionsMock.mockResolvedValue([
+      {
+        tool: 'GMAIL_SEND_EMAIL',
+        args: { to: 'sam@chen.com', subject: 'Tour follow-up', body: '...' },
+        summary: 'Email to sam@chen.com',
+        mutates: true,
+        integrationToolkit: 'gmail',
+      },
+    ]);
+    attachHumanSummariesMock.mockImplementation(async (_s, _id, proposals) => proposals);
+
+    const res = await POST(makeReq({ transcript: 'Send Sam a follow-up.' }));
+    expect(res.status).toBe(200);
+
+    expect(loadPostTourIntegrationToolsMock).toHaveBeenCalledOnce();
+    expect(loadPostTourIntegrationToolsMock).toHaveBeenCalledWith({
+      spaceId: 'space_1',
+      userId: 'user_1',
+    });
+
+    const arg = proposeActionsMock.mock.calls[0][1] as {
+      integrationTools?: Array<{ slug: string; toolkit: string }>;
+    };
+    expect(arg.integrationTools).toEqual([
+      { slug: 'GMAIL_SEND_EMAIL', description: expect.any(String), toolkit: 'gmail' },
+    ]);
+
+    const json = (await res.json()) as { proposals: Array<{ tool: string; integrationToolkit?: string }> };
+    expect(json.proposals[0].tool).toBe('GMAIL_SEND_EMAIL');
+    expect(json.proposals[0].integrationToolkit).toBe('gmail');
+  });
+
+  it('keeps the existing flow intact when no toolkits are connected', async () => {
+    // Graceful-degradation contract: no Composio config, no active
+    // toolkits, the orchestrator runs on its native catalog and the
+    // route returns the same shape it always did. If this regresses, we
+    // broke the demo on every non-integrated account.
+    mockRequireAuth.mockResolvedValue({ userId: 'user_1' });
+    mockGetSpaceForUser.mockResolvedValue({
+      id: 'space_1',
+      slug: 's',
+      name: 'Test',
+      ownerId: 'owner_1',
+    } as never);
+    loadPostTourIntegrationToolsMock.mockResolvedValue([]);
+    proposeActionsMock.mockResolvedValue([
+      { tool: 'log_call', args: { personId: 'p1', summary: 'Tour' }, summary: 'Log call', mutates: true },
+    ]);
+    attachHumanSummariesMock.mockImplementation(async (_s, _id, proposals) => proposals);
+
+    const res = await POST(makeReq({ transcript: 'Sam loved it.' }));
+    expect(res.status).toBe(200);
+
+    const arg = proposeActionsMock.mock.calls[0][1] as {
+      integrationTools?: Array<unknown>;
+    };
+    expect(arg.integrationTools).toEqual([]);
+
+    const json = (await res.json()) as { proposals: Array<{ tool: string; integrationToolkit?: string }> };
+    expect(json.proposals).toHaveLength(1);
+    expect(json.proposals[0].tool).toBe('log_call');
+    expect(json.proposals[0].integrationToolkit).toBeUndefined();
   });
 });

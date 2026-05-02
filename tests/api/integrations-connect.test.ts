@@ -40,7 +40,8 @@ vi.mock('@/lib/integrations/composio', () => ({
 }));
 
 const { findActiveMock, revokeMock } = vi.hoisted(() => ({
-  findActiveMock: vi.fn(async () => null),
+  // Loose return type so individual tests can mock the row shape they need.
+  findActiveMock: vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => null),
   revokeMock: vi.fn(async () => undefined),
 }));
 vi.mock('@/lib/integrations/connections', () => ({
@@ -69,11 +70,15 @@ beforeEach(() => {
     id: 's_1',
     slug: 'jane',
     name: 'Jane',
-    emoji: null,
+    emoji: '',
     ownerId: 'u_1',
     brokerageId: null,
-    createdAt: '2026-04-01T00:00:00.000Z',
-  } as Awaited<ReturnType<typeof getSpaceForUser>>);
+    createdAt: new Date('2026-04-01T00:00:00.000Z'),
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    stripeSubscriptionStatus: 'active',
+    stripePeriodEnd: null,
+  });
   findActiveMock.mockResolvedValue(null);
   revokeMock.mockResolvedValue(undefined);
   initiateMock.mockResolvedValue({

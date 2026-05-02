@@ -13,7 +13,11 @@ import {
   formatHumanSummary,
   attachHumanSummaries,
   prettifyWhen,
+  buildSystemPrompt,
+  realtorVerbForToolkit,
+  doneVerbForToolkit,
   type ProposedAction,
+  type IntegrationToolSpec,
 } from '@/lib/chippi/post-tour';
 
 describe('shapeProposals', () => {
@@ -200,6 +204,166 @@ describe('formatHumanSummary', () => {
       DEALS,
     );
     expect(s).toBeNull();
+  });
+});
+
+// ─── Integration tools (Composio bridge) ─────────────────────────────────
+
+describe('shapeProposals — integration tools', () => {
+  const GMAIL: IntegrationToolSpec = {
+    slug: 'GMAIL_SEND_EMAIL',
+    description: 'Send an email through the user\'s Gmail account.',
+    toolkit: 'gmail',
+  };
+  const GCAL: IntegrationToolSpec = {
+    slug: 'GOOGLECALENDAR_CREATE_EVENT',
+    description: 'Create a calendar event in the user\'s Google Calendar.',
+    toolkit: 'googlecalendar',
+  };
+
+  it('keeps integration slugs that match the realtor\'s connected apps', () => {
+    const out = shapeProposals(
+      {
+        proposals: [
+          { tool: 'GMAIL_SEND_EMAIL', args: { to: 'sam@chen.com', subject: 'Tour follow-up', body: 'Loved meeting you' } },
+        ],
+      },
+      { integrationTools: [GMAIL] },
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].tool).toBe('GMAIL_SEND_EMAIL');
+    expect(out[0].integrationToolkit).toBe('gmail');
+    expect(out[0].mutates).toBe(true);
+  });
+
+  it('drops integration slugs the realtor has NOT connected', () => {
+    // Model hallucinated an Outlook tool but only Gmail is connected.
+    const out = shapeProposals(
+      { proposals: [{ tool: 'OUTLOOK_SEND_EMAIL', args: {} }] },
+      { integrationTools: [GMAIL] },
+    );
+    expect(out).toHaveLength(0);
+  });
+
+  it('keeps native and integration tools side by side', () => {
+    const out = shapeProposals(
+      {
+        proposals: [
+          { tool: 'log_call', args: { personId: 'p1', summary: 'tour' } },
+          { tool: 'GMAIL_SEND_EMAIL', args: { to: 'sam@chen.com' } },
+          { tool: 'GOOGLECALENDAR_CREATE_EVENT', args: { summary: 'follow-up tour' } },
+        ],
+      },
+      { integrationTools: [GMAIL, GCAL] },
+    );
+    expect(out).toHaveLength(3);
+    expect(out[0].tool).toBe('log_call');
+    expect(out[0].integrationToolkit).toBeUndefined();
+    expect(out[1].integrationToolkit).toBe('gmail');
+    expect(out[2].integrationToolkit).toBe('googlecalendar');
+  });
+
+  it('produces a clean realtor-voice summary without "via Gmail"', () => {
+    const out = shapeProposals(
+      { proposals: [{ tool: 'GMAIL_SEND_EMAIL', args: { to: 'sam@chen.com' } }] },
+      { integrationTools: [GMAIL] },
+    );
+    expect(out[0].summary).not.toMatch(/via gmail/i);
+    // Verb is the truth: "Email" tells the realtor what's happening.
+    expect(out[0].summary).toMatch(/^Email/);
+  });
+
+  it('default behavior is unchanged when no integration tools are passed', () => {
+    // The graceful-degradation guarantee: same input + no toolkits === today's behavior.
+    const proposals = {
+      proposals: [
+        { tool: 'log_call', args: { personId: 'p1', summary: 'tour' } },
+        { tool: 'GMAIL_SEND_EMAIL', args: { to: 'sam@chen.com' } }, // dropped: nothing connected
+      ],
+    };
+    const out = shapeProposals(proposals);
+    expect(out).toHaveLength(1);
+    expect(out[0].tool).toBe('log_call');
+  });
+});
+
+describe('buildSystemPrompt — integration catalog', () => {
+  const GMAIL: IntegrationToolSpec = {
+    slug: 'GMAIL_SEND_EMAIL',
+    description: 'Send an email through Gmail.',
+    toolkit: 'gmail',
+  };
+
+  it('omits the connected-apps section entirely when no integrations are passed', () => {
+    const prompt = buildSystemPrompt([]);
+    expect(prompt).not.toMatch(/Connected-app tools/);
+  });
+
+  it('renders the connected-apps block when integration tools are present', () => {
+    const prompt = buildSystemPrompt([], [GMAIL]);
+    expect(prompt).toMatch(/Connected-app tools/);
+    expect(prompt).toMatch(/GMAIL_SEND_EMAIL/);
+  });
+
+  it('tells the model to prefer connected-app tools when intent is to actually send', () => {
+    const prompt = buildSystemPrompt([], [GMAIL]);
+    expect(prompt).toMatch(/prefer the connected-app tool/);
+  });
+});
+
+describe('realtorVerbForToolkit / doneVerbForToolkit', () => {
+  it('returns concise verbs for known toolkits', () => {
+    expect(realtorVerbForToolkit('gmail')).toBe('Email');
+    expect(realtorVerbForToolkit('googlecalendar')).toBe('Add to calendar');
+    expect(doneVerbForToolkit('gmail')).toBe('email sent');
+    expect(doneVerbForToolkit('googlecalendar')).toBe('on the calendar');
+  });
+
+  it('falls back gracefully for unknown toolkits', () => {
+    expect(realtorVerbForToolkit('weird-app')).toBe('Run connected action');
+    expect(doneVerbForToolkit('weird-app')).toBe('weird-app fired');
+  });
+
+  it('doneVerbForToolkit returns null when toolkit is missing', () => {
+    expect(doneVerbForToolkit(undefined)).toBeNull();
+  });
+});
+
+describe('formatHumanSummary — integration proposals', () => {
+  it('uses the toolkit verb and the resolved person name', () => {
+    const proposal: ProposedAction = {
+      tool: 'GMAIL_SEND_EMAIL',
+      args: { personId: 'p1' },
+      summary: 'Email sam@chen.com',
+      mutates: true,
+      integrationToolkit: 'gmail',
+    };
+    const s = formatHumanSummary(proposal, PEOPLE, DEALS);
+    expect(s).toBe('Email to Sam Chen');
+  });
+
+  it('falls back to the recipient hint when no personId is set', () => {
+    const proposal: ProposedAction = {
+      tool: 'GMAIL_SEND_EMAIL',
+      args: { to: 'sam@chen.com' },
+      summary: 'Email sam@chen.com',
+      mutates: true,
+      integrationToolkit: 'gmail',
+    };
+    const s = formatHumanSummary(proposal, PEOPLE, DEALS);
+    expect(s).toBe('Email to sam@chen.com');
+  });
+
+  it('never inserts "via Gmail" — the verb is the truth', () => {
+    const proposal: ProposedAction = {
+      tool: 'GMAIL_SEND_EMAIL',
+      args: { personId: 'p1' },
+      summary: '',
+      mutates: true,
+      integrationToolkit: 'gmail',
+    };
+    const s = formatHumanSummary(proposal, PEOPLE, DEALS);
+    expect(s).not.toMatch(/via gmail/i);
   });
 });
 
