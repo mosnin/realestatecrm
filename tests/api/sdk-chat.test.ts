@@ -160,42 +160,37 @@ describe('POST /api/ai/task — input validation', () => {
   });
 });
 
-describe('POST /api/ai/task — runtime branch (default = modal)', () => {
-  it('proxies to Modal when CHIPPI_CHAT_RUNTIME is unset', async () => {
+describe('POST /api/ai/task — runtime branch (default = ts)', () => {
+  it('routes to streamTsChatTurn when CHIPPI_CHAT_RUNTIME is unset', async () => {
     delete process.env.CHIPPI_CHAT_RUNTIME;
-    const res = await POST(makeRequest());
-    expect(res.status).toBe(200);
-    // Modal fetch was called.
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://modal.example/chat',
-      expect.objectContaining({ method: 'POST' }),
-    );
-    // TS streamer NOT touched.
-    expect(tsStreamMock).not.toHaveBeenCalled();
-  });
-
-  it('proxies to Modal when CHIPPI_CHAT_RUNTIME is set to anything other than "ts"', async () => {
-    process.env.CHIPPI_CHAT_RUNTIME = 'TS'; // wrong case → still modal
-    await POST(makeRequest());
-    expect(fetchMock).toHaveBeenCalled();
-    expect(tsStreamMock).not.toHaveBeenCalled();
-
-    fetchMock.mockClear();
-    tsStreamMock.mockClear();
-    process.env.CHIPPI_CHAT_RUNTIME = 'modal';
-    await POST(makeRequest());
-    expect(fetchMock).toHaveBeenCalled();
-    expect(tsStreamMock).not.toHaveBeenCalled();
-  });
-});
-
-describe('POST /api/ai/task — runtime branch (CHIPPI_CHAT_RUNTIME=ts)', () => {
-  it('routes to streamTsChatTurn when the flag is on', async () => {
-    process.env.CHIPPI_CHAT_RUNTIME = 'ts';
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
     expect(tsStreamMock).toHaveBeenCalledTimes(1);
     // Modal fetch is NEVER touched on the ts path.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('routes to streamTsChatTurn for any value other than the exact string "modal"', async () => {
+    process.env.CHIPPI_CHAT_RUNTIME = 'TS'; // wrong case → still ts
+    await POST(makeRequest());
+    expect(tsStreamMock).toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fetchMock.mockClear();
+    tsStreamMock.mockClear();
+    process.env.CHIPPI_CHAT_RUNTIME = 'ts';
+    await POST(makeRequest());
+    expect(tsStreamMock).toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/ai/task — runtime branch (CHIPPI_CHAT_RUNTIME=modal opt-out)', () => {
+  it('returns 501 when the realtor explicitly opts back into the retired modal runtime', async () => {
+    process.env.CHIPPI_CHAT_RUNTIME = 'modal';
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(501);
+    expect(tsStreamMock).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
