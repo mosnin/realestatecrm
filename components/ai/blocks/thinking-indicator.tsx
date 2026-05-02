@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
+import { LoaderIcon } from '@/components/ui/icons/loader-icon';
 
 /**
  * Thinking indicator for the Chippi chat transcript. Shimmer "Thinking" line
@@ -43,7 +43,7 @@ export function ThinkingIndicator({
     <div className={cn('flex flex-col gap-2.5 max-w-xl', className)}>
       {/* Shimmer line + timer */}
       <div className="flex items-center gap-2 text-sm">
-        <Loader2 size={14} className="text-muted-foreground/70 animate-spin flex-shrink-0" />
+        <LoaderIcon autoPlay size={14} className="text-muted-foreground/70 flex-shrink-0" />
         <span
           aria-live="polite"
           className="bg-[linear-gradient(110deg,hsl(var(--muted-foreground)),35%,hsl(var(--foreground)),50%,hsl(var(--muted-foreground)),75%,hsl(var(--muted-foreground)))] bg-[length:200%_100%] bg-clip-text text-transparent"
