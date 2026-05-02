@@ -31,7 +31,14 @@ import type { Deal, DealStage } from '@/lib/types';
 const parameters = z
   .object({
     title: z.string().min(1).max(255).describe('Short label shown on the kanban card.'),
-    stageId: z.string().min(1).describe('Target DealStage.id. Must belong to this space.'),
+    stageId: z
+      .string()
+      .min(1)
+      .nullable()
+      .optional()
+      .describe(
+        'Target DealStage.id. Optional — if omitted or null the deal lands in the first stage of the appropriate pipeline (buyer pipeline when a buyer contact is attached, otherwise the seller pipeline). Only set this when the realtor explicitly named the stage.',
+      ),
     description: z.string().max(5000).optional(),
     value: z.number().nonnegative().nullable().optional().describe('Deal value in dollars.'),
     address: z.string().max(500).optional().describe('Property address, if relevant.'),
@@ -43,7 +50,9 @@ const parameters = z
       .optional()
       .describe('Contacts to link to this deal (buyers, sellers, co-agents).'),
   })
-  .describe('Create a new deal in a pipeline stage. Prompts for approval first.');
+  .describe(
+    'Create a new deal. Stage is optional — leave it blank and we land it in the first stage of the right pipeline. Prompts for approval first.',
+  );
 
 interface CreateDealResult {
   dealId: string;
@@ -68,22 +77,10 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
   },
 
   async handler(args, ctx) {
-    // Stage must exist in this space.
-    const { data: stage, error: stageErr } = await supabase
-      .from('DealStage')
-      .select('id, name, pipelineType')
-      .eq('id', args.stageId)
-      .eq('spaceId', ctx.space.id)
-      .maybeSingle();
-    if (stageErr) {
-      return { summary: `Stage lookup failed: ${stageErr.message}`, display: 'error' };
-    }
-    if (!stage) {
-      return { summary: `Stage "${args.stageId}" not found in this workspace.`, display: 'error' };
-    }
-
     // Validate every contactId belongs to this space. Mirror the PATCH
     // route's silent-filter behavior: drop unknown ids rather than 400.
+    // Hoisted above the stage resolution because the contacts' leadType
+    // determines which pipeline a defaulted stage falls into.
     let validContactIds: string[] = [];
     let buyerAmongContacts = false;
     if (args.contactIds && args.contactIds.length > 0) {
@@ -104,12 +101,66 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
       );
     }
 
+    // Stage resolution. If the model passed a real stageId, validate and
+    // use it (with the existing buyer-pipeline auto-route below). If it
+    // was omitted or null, default to the first stage of the appropriate
+    // pipeline so the realtor doesn't have to know stage ids.
+    type StageRow = { id: string; name: string; pipelineType: string | null };
+    let stage: StageRow | null = null;
+    if (args.stageId) {
+      const { data: row, error: stageErr } = await supabase
+        .from('DealStage')
+        .select('id, name, pipelineType')
+        .eq('id', args.stageId)
+        .eq('spaceId', ctx.space.id)
+        .maybeSingle();
+      if (stageErr) {
+        return { summary: `Stage lookup failed: ${stageErr.message}`, display: 'error' };
+      }
+      stage = (row ?? null) as StageRow | null;
+    }
+
+    if (!stage) {
+      const preferredPipeline = buyerAmongContacts ? 'buyer' : 'seller';
+      const { data: defaults } = await supabase
+        .from('DealStage')
+        .select('id, name, pipelineType')
+        .eq('spaceId', ctx.space.id)
+        .eq('pipelineType', preferredPipeline)
+        .order('position', { ascending: true })
+        .limit(1);
+      const defaultRows = (defaults ?? []) as StageRow[];
+      if (defaultRows.length > 0) {
+        stage = defaultRows[0];
+      } else {
+        // Workspace has no buyer/seller pipeline configured — fall back
+        // to whatever stage exists at position 0.
+        const { data: anyStage } = await supabase
+          .from('DealStage')
+          .select('id, name, pipelineType')
+          .eq('spaceId', ctx.space.id)
+          .order('position', { ascending: true })
+          .limit(1);
+        const anyRows = (anyStage ?? []) as StageRow[];
+        if (anyRows.length > 0) {
+          stage = anyRows[0];
+        }
+      }
+    }
+
+    if (!stage) {
+      return {
+        summary: 'No pipeline stages configured in this workspace yet — set one up before creating deals.',
+        display: 'error',
+      };
+    }
+
     // Auto-route buyer deals to the buyer pipeline's first stage — mirrors
     // POST /api/deals. A realtor who says "create a deal for Jane (a buyer)"
     // in the seller pipeline should land the deal where buyer workflows
     // actually live, not in a mismatched stage that will confuse the kanban.
-    let finalStageId = args.stageId;
-    let finalStage = stage;
+    let finalStageId = stage.id;
+    let finalStage: StageRow = stage;
     if (buyerAmongContacts && stage.pipelineType !== 'buyer') {
       const { data: buyerStages } = await supabase
         .from('DealStage')
@@ -118,9 +169,10 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
         .eq('pipelineType', 'buyer')
         .order('position', { ascending: true })
         .limit(1);
-      if (buyerStages && buyerStages.length > 0) {
-        finalStageId = buyerStages[0].id;
-        finalStage = buyerStages[0] as typeof stage;
+      const buyerRows = (buyerStages ?? []) as StageRow[];
+      if (buyerRows.length > 0) {
+        finalStageId = buyerRows[0].id;
+        finalStage = buyerRows[0];
       }
     }
 
@@ -195,7 +247,7 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
     }
 
     const reroutedNote =
-      finalStageId !== args.stageId
+      args.stageId && finalStageId !== args.stageId
         ? ` (auto-routed to the buyer pipeline because a buyer contact is attached)`
         : '';
 
