@@ -174,18 +174,30 @@ export function ChippiWorkspace({
     }
   }, [initialMessages, setMessages]);
 
-  // React to URL-driven conversation switches (sidebar list links with
-  // `?conversationId=…`). When the URL diverges from local state, sync local
-  // state and load the matching transcript. Skipped on the initial mount —
-  // the server already pre-hydrated us with the right conversation.
+  // React to URL-driven conversation switches. The sidebar's conversation
+  // list uses `?conversationId=…` to deep-link a transcript; when the URL
+  // changes we sync local state and load that transcript.
+  //
+  // CRITICAL — do NOT wipe state when the URL has no `?conversationId=`.
+  // The steady state on `/s/<slug>/chippi` is "no query param." If the
+  // user sends a fresh message, `useAgentTask.send()` calls
+  // `onConversationCreated(newId)` which mutates local state — at which
+  // point this effect was previously firing with `urlConversationId=null,
+  // activeConversationId=newId` and wiping both. The optimistic user
+  // bubble + streaming assistant placeholder both vanished mid-send;
+  // every subsequent stream event no-op'd because `streamingMsgIdRef`
+  // pointed at a deleted bubble. Visible symptom: message disappears,
+  // screen flickers back to home, nothing else happens. This was the
+  // production "chat is broken" bug.
+  //
+  // Fresh-conversation creation already calls `setMessages([])` directly
+  // (see `handleNewConversation`). Deletion already calls it too (see
+  // `handleDeleteConversation`). The URL-cleared branch was doing nobody's
+  // job — removed.
   useEffect(() => {
     if (!hydratedRef.current) return;
+    if (!urlConversationId) return;
     if (urlConversationId === activeConversationId) return;
-    if (!urlConversationId) {
-      setActiveConversationId(null);
-      setMessages([]);
-      return;
-    }
     setActiveConversationId(urlConversationId);
     void (async () => {
       setLoadingMessages(true);

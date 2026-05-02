@@ -226,8 +226,23 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         if (!event.delta) return;
         const targetId = streamingMsgIdRef.current;
         if (!targetId) return;
-        setMessages((prev) =>
-          prev.map((m) => {
+        setMessages((prev) => {
+          // Defense-in-depth: if the target bubble is gone (some external
+          // setter wiped messages while a stream was open), recreate a
+          // tail assistant bubble at the new id instead of silently
+          // no-op'ing every delta. The previous behavior turned every
+          // mid-stream wipe into a totally invisible failure for the
+          // realtor.
+          if (!prev.some((m) => m.id === targetId)) {
+            const recovered: UiMessage = {
+              id: targetId,
+              role: 'assistant',
+              blocks: [{ type: 'text', content: event.delta }],
+              streaming: true,
+            };
+            return [...prev, recovered];
+          }
+          return prev.map((m) => {
             if (m.id !== targetId) return m;
             const last = m.blocks[m.blocks.length - 1];
             if (last?.type === 'text') {
@@ -236,8 +251,8 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
               return { ...m, blocks: updated };
             }
             return { ...m, blocks: [...m.blocks, { type: 'text', content: event.delta }] };
-          }),
-        );
+          });
+        });
         return;
       }
 

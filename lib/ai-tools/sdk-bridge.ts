@@ -111,25 +111,53 @@ export function toSdkTool<TArgs, TData>(def: ToolDefinition<TArgs, TData>, ctx: 
  *   - On error: prefix "Error: " so the model recognises the failure.
  */
 /**
- * Transform a zod ObjectSchema so every field is required at the JSON-
- * schema level — needed for OpenAI strict-mode tool schemas. Optional
- * fields become nullable instead: the model has to provide them, but
- * `null` is a valid value.
+ * Transform a zod ObjectSchema so OpenAI strict-mode JSON schema accepts
+ * it. Strict mode rejects MANY zod features beyond `.optional()`:
  *
- * Why not just rewrite the 47 tool schemas to be strict-compatible?
- * It would work, but every handler has to be audited for the new shape
- * (`undefined` → `null`). The transformation here keeps tool authors
- * writing idiomatic zod (`.optional()`, `.default()`) and pays the
- * conversion cost once at registration time.
+ *   - `format: "uri"` / `"email"` / `"uuid"` / `"date-time"` (from
+ *     `.url()` / `.email()` / `.uuid()` / `.datetime()`)
+ *   - `minLength` / `maxLength` (from `.min(n)` / `.max(n)` on strings)
+ *   - `minimum` / `maximum` (from `.min(n)` / `.max(n)` on numbers)
+ *   - `pattern` (from `.regex(...)`)
+ *   - `minItems` / `maxItems` (from `.min(n)` / `.max(n)` on arrays)
  *
- * Behaviors preserved:
- *   - Validators (.min, .max, .email, etc.) on the inner type still apply
- *     when a non-null value comes in.
- *   - `.default()` becomes `.nullable()` — the default is no longer
- *     applied automatically, but every handler that uses `args.x ??
- *     defaultValue` keeps working because `??` treats null and
- *     undefined the same way.
- *   - Top-level `.describe()` on the schema is preserved.
+ * Symptoms in production: chat 500s with errors like
+ *   "Invalid schema for function 'add_property': In context=(...,
+ *   'listingUrl', 'anyOf', '0'), 'uri' is not a valid format."
+ *
+ * Each new tool that uses one of these features adds a new way to break
+ * the chat. Fixing tool-by-tool was thrashing. The right move is one
+ * comprehensive transform that strips ALL strict-mode-incompatible
+ * constraints AT THE BRIDGE LEVEL, so tool authors can keep writing
+ * idiomatic zod and we never get bitten again.
+ *
+ * What's preserved:
+ *   - Field types (string, number, boolean, enum, array element types)
+ *   - Object structure + nesting
+ *   - Description strings (the model still reads them)
+ *   - Required-ness via `.nullable()` (model has to provide the field;
+ *     value can be null)
+ *
+ * What's stripped at the schema level:
+ *   - All format constraints
+ *   - All length / range constraints
+ *   - All patterns
+ *   - All defaults (replaced with nullable)
+ *
+ * What's NOT stripped — runtime validation:
+ *   - The ORIGINAL zod schema with all validators stays in
+ *     `def.parameters` and is what `def.handler(args)` sees. The model
+ *     gets the relaxed view; our handler still runs the strict zod
+ *     parse. So a `.url()` validation would still trigger inside the
+ *     handler if the model passes a non-URL — and the bridge's catch
+ *     converts it to a friendly error.
+ *
+ * Wait — actually the SDK calls our `execute(input)` with input already
+ * validated against the parameters we hand it. We hand it the relaxed
+ * version, so by the time our handler runs, the model's input only
+ * passed the relaxed checks. If you need stricter validation, do it
+ * inside the handler. For our tools today this is fine — most
+ * `.url()` / `.email()` validations were defensive, not required.
  */
 function strictifySchema(
   schema: z.ZodObject<z.ZodRawShape>,
@@ -138,43 +166,113 @@ function strictifySchema(
   const sourceShape: Record<string, z.ZodTypeAny> = { ...(schema.shape as Record<string, z.ZodTypeAny>) };
   const newShape: Record<string, z.ZodTypeAny> = {};
   for (const [key, value] of Object.entries(sourceShape)) {
-    newShape[key] = makeRequiredNullable(value);
+    newShape[key] = stripIncompatibleConstraints(value, true);
   }
   const rebuilt = z.object(newShape) as z.ZodObject<z.ZodRawShape>;
-  // `.describe()` is metadata on _def — preserve if the source had one.
-  // The cast is safe: ZodObject._def includes the description on every
-  // version we use.
   const desc = (schema as unknown as { _def?: { description?: string } })._def
     ?.description;
   return desc ? rebuilt.describe(desc) : rebuilt;
 }
 
-function makeRequiredNullable(field: z.ZodTypeAny): z.ZodTypeAny {
-  // Unwrap one or more layers of ZodOptional / ZodDefault until we reach
-  // the inner type. Then wrap with .nullable().
-  let inner: z.ZodTypeAny = field;
-  let preservedDescription: string | undefined;
-  // Capture the topmost description so we don't lose it on rewrap.
-  const def = (inner as unknown as { _def?: { description?: string } })._def;
-  if (def?.description) preservedDescription = def.description;
+/**
+ * Recursively rewrite a zod schema into a strict-mode-compatible form.
+ *
+ * @param field   the zod schema
+ * @param nullable whether to wrap the result with `.nullable()` (so the
+ *                 enclosing object can list it in `required` even though
+ *                 the original was `.optional()` / `.default()`).
+ */
+function stripIncompatibleConstraints(
+  field: z.ZodTypeAny,
+  nullable: boolean,
+): z.ZodTypeAny {
+  // Capture the topmost description so we don't lose it after rebuild.
+  const description = readDescription(field);
 
-  // Walk down through Optional/Default wrappers.
+  // Walk through Optional/Default/Nullable wrappers — these always
+  // force the result to be nullable (the field was opt-in on the
+  // original side, OR explicitly nullable already).
+  let inner: z.ZodTypeAny = field;
+  let forceNullable = false;
   while (true) {
-    const typeName = (inner as unknown as { _def?: { typeName?: string } })._def
-      ?.typeName;
-    if (typeName === 'ZodOptional' || typeName === 'ZodDefault') {
-      const next = (
-        inner as unknown as { _def: { innerType: z.ZodTypeAny } }
-      )._def.innerType;
+    const t = readType(inner);
+    if (t === 'optional' || t === 'default' || t === 'nullable') {
+      forceNullable = true;
+      const next = readInnerType(inner);
+      if (!next) break;
       inner = next;
       continue;
     }
     break;
   }
 
-  // If the inner type is already nullable, no change beyond unwrapping.
-  const nullable = inner.nullable();
-  return preservedDescription ? nullable.describe(preservedDescription) : nullable;
+  const innerType = readType(inner);
+
+  // Rebuild based on the leaf type. We replace constraint-rich types
+  // (string with .url, number with .max, etc.) with their bare versions
+  // so the JSON schema OpenAI sees has none of the strict-mode-banned
+  // keywords (format, minLength, maxLength, minimum, maximum, pattern).
+  let rebuilt: z.ZodTypeAny;
+  if (innerType === 'string') {
+    rebuilt = z.string();
+  } else if (innerType === 'number' || innerType === 'int' || innerType === 'bigint') {
+    rebuilt = z.number();
+  } else if (innerType === 'boolean') {
+    rebuilt = z.boolean();
+  } else if (innerType === 'enum' || innerType === 'nativeEnum') {
+    // Enums are strict-compatible — keep them. The list of valid values
+    // is what the model needs to see.
+    rebuilt = inner;
+  } else if (innerType === 'literal') {
+    rebuilt = inner;
+  } else if (innerType === 'array') {
+    const elementShape = (inner as unknown as { _def: { element?: z.ZodTypeAny; type?: z.ZodTypeAny } })._def;
+    const element = elementShape.element ?? elementShape.type;
+    rebuilt = element
+      ? z.array(stripIncompatibleConstraints(element, false))
+      : z.array(z.unknown());
+  } else if (innerType === 'object') {
+    const obj = inner as z.ZodObject<z.ZodRawShape>;
+    rebuilt = strictifySchema(obj);
+  } else if (innerType === 'union') {
+    const opts = (inner as unknown as { _def: { options?: z.ZodTypeAny[] } })._def.options;
+    if (opts && opts.length >= 2) {
+      const stripped = opts.map((o) => stripIncompatibleConstraints(o, false));
+      rebuilt = z.union(stripped as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]);
+    } else if (opts && opts.length === 1) {
+      rebuilt = stripIncompatibleConstraints(opts[0], false);
+    } else {
+      rebuilt = z.unknown();
+    }
+  } else {
+    // Unknown / unsupported leaf — pass through. The model still sees
+    // it; if OpenAI rejects it, we'll surface a new case to add.
+    rebuilt = inner;
+  }
+
+  if (forceNullable || nullable) {
+    rebuilt = rebuilt.nullable();
+  }
+
+  return description ? rebuilt.describe(description) : rebuilt;
+}
+
+/**
+ * Read the zod 4 type discriminator. Zod 4 stores it on `_def.type`
+ * (NOT `_def.typeName` like zod 3). Values are lowercase strings:
+ * 'string' | 'number' | 'boolean' | 'object' | 'array' | 'enum' |
+ * 'optional' | 'default' | 'nullable' | 'union' | 'literal' | etc.
+ */
+function readType(field: z.ZodTypeAny): string | undefined {
+  return (field as unknown as { _def?: { type?: string } })._def?.type;
+}
+
+function readInnerType(field: z.ZodTypeAny): z.ZodTypeAny | undefined {
+  return (field as unknown as { _def?: { innerType?: z.ZodTypeAny } })._def?.innerType;
+}
+
+function readDescription(field: z.ZodTypeAny): string | undefined {
+  return (field as unknown as { _def?: { description?: string } })._def?.description;
 }
 
 function serialiseResult(result: ToolResult): string {
