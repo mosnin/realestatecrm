@@ -29,6 +29,7 @@ import { runChatTurn, resumeChatTurn } from '@/lib/ai-tools/sdk-chat';
 import { mapSdkEvent, type SdkStreamEventLike } from '@/lib/ai-tools/sdk-event-mapper';
 import { extractApprovals, serializeRunState } from '@/lib/ai-tools/sdk-bridge';
 import { ALL_TOOLS } from '@/lib/ai-tools/tools';
+import { emit as emitTelemetry } from '@/lib/telemetry';
 
 interface HistoryRow {
   role: 'user' | 'assistant';
@@ -118,8 +119,39 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
       const nextSeq = createSeqCounter();
       let textBuffer = '';
 
+      // Track the assistant text that's accumulated since the last tool
+      // call landed. This is the "reasoning" we pin to the next tool
+      // call's telemetry — the sentence the realtor sees before the
+      // approval prompt. Reset on every tool_call_start.
+      let reasoningBuffer = '';
+
       const pushEvent = (event: PushableEvent) => {
-        if (event.type === 'text_delta') textBuffer += event.delta;
+        if (event.type === 'text_delta') {
+          textBuffer += event.delta;
+          reasoningBuffer += event.delta;
+        }
+        if (event.type === 'tool_call_start') {
+          // Fire-and-forget — telemetry must never block the stream.
+          // Trim aggressively; we want the closest preceding sentence,
+          // not the whole turn's prose.
+          const reasoning = trimReasoning(reasoningBuffer);
+          void emitTelemetry({
+            event: 'agent_tool_called',
+            spaceId: input.ctx.space.id,
+            userId: input.ctx.userId,
+            payload: {
+              toolName: event.name,
+              callId: event.callId,
+              args: event.args,
+              reasoning,
+              conversationId: input.conversationId,
+            },
+          });
+          // Reset for the next tool call. If multiple tool calls fire
+          // back-to-back without intervening text, the reasoning for
+          // the second one is empty — that's honest.
+          reasoningBuffer = '';
+        }
         const full = { ...event, seq: nextSeq(), ts: new Date().toISOString() } as AgentEvent;
         try {
           controller.enqueue(encodeEvent(full));
@@ -291,6 +323,22 @@ async function persistPausedRun(input: PersistPausedInput): Promise<string | nul
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * The agent's reasoning sentence — the last thing the model said before
+ * deciding to fire a tool. We keep it short: enough to capture WHY the
+ * tool fired without dumping a paragraph into telemetry. Falls back to
+ * an empty string when the model went straight from history to tool
+ * (which is honest — there was no spoken reason).
+ */
+function trimReasoning(buffer: string): string {
+  const cleaned = buffer.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return '';
+  // Last sentence-ish chunk. Match from the latest sentence break to end.
+  const parts = cleaned.split(/(?<=[.!?])\s+/);
+  const last = parts[parts.length - 1] ?? cleaned;
+  return last.length > 280 ? last.slice(0, 277) + '…' : last;
+}
 
 function asRecord(v: unknown): Record<string, unknown> {
   return v && typeof v === 'object' ? (v as Record<string, unknown>) : {};

@@ -42,6 +42,16 @@ import { logger } from '@/lib/logger';
 /** Same model the bridge defaults to. Cheap enough to absorb chat traffic. */
 const DEFAULT_MODEL = 'gpt-4.1-mini';
 
+/**
+ * Hard ceiling on tool-call iterations per chat turn. The SDK has its
+ * own internal default; we set ours explicitly so a model that decides
+ * to spelunk the catalog can't run our token bill into the ground. 8 is
+ * generous for a real conversation: read-research-think-act-confirm
+ * fits inside it. If the model needs more, it should ask the realtor
+ * a clarifying question, not loop.
+ */
+const MAX_TURNS_PER_TURN = 8;
+
 // ── Agent construction ─────────────────────────────────────────────────────
 
 /**
@@ -266,6 +276,7 @@ export async function runChatTurn(input: RunChatTurnInput) {
   const result = await run(agent, items, {
     stream: true,
     signal: input.ctx.signal,
+    maxTurns: MAX_TURNS_PER_TURN,
   });
   return { result, agent };
 }
@@ -317,6 +328,7 @@ export async function resumeChatTurn(input: ResumeChatTurnInput) {
   const result = await run(agent, state, {
     stream: true,
     signal: input.ctx.signal,
+    maxTurns: MAX_TURNS_PER_TURN,
   });
   return { result, agent };
 }

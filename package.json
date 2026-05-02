@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:contract": "node --test scripts/*.test.mjs"
+    "test:contract": "node --test scripts/*.test.mjs",
+    "eval": "RUN_EVALS=1 vitest run tests/evals/"
   },
   "dependencies": {
     "@amplitude/unified": "^1.0.5",
