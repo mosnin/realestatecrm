@@ -18,10 +18,17 @@ export const metadata = { title: 'Log a tour — Chippi' };
 
 export default async function PostTourPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  /** `?personId=` and `?dealId=` arrive when the realtor opens this page from
+   *  a contact or deal detail. They bias the proposal model toward that
+   *  subject so the call/note/follow-up lands on the right record. The page
+   *  works fine without them — the recorder UI doesn't change either way. */
+  searchParams: Promise<{ personId?: string; dealId?: string }>;
 }) {
   const { slug } = await params;
+  const { personId, dealId } = await searchParams;
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
 
@@ -38,7 +45,11 @@ export default async function PostTourPage({
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-4 py-12">
-      <PostTourRecorder slug={slug} />
+      <PostTourRecorder
+        slug={slug}
+        personId={typeof personId === 'string' && personId ? personId : undefined}
+        dealId={typeof dealId === 'string' && dealId ? dealId : undefined}
+      />
     </div>
   );
 }

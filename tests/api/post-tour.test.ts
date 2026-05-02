@@ -119,4 +119,60 @@ describe('POST /api/chippi/post-tour', () => {
     expect(attachHumanSummariesMock).toHaveBeenCalledOnce();
     expect(attachHumanSummariesMock).toHaveBeenCalledWith(expect.anything(), 'space_1', expect.any(Array));
   });
+
+  it('forwards a contextHint with personId/dealId to the orchestrator', async () => {
+    // Surfaces the URL-driven pre-fill — when the realtor opens the recorder
+    // from a contact or deal page, the page wires `?personId=` / `?dealId=`
+    // into the recorder, and the recorder ships the hint in the request
+    // body. The orchestrator uses it to bias proposals toward the right
+    // subject; if this regresses the recorder silently stops pre-biasing.
+    mockRequireAuth.mockResolvedValue({ userId: 'user_1' });
+    mockGetSpaceForUser.mockResolvedValue({
+      id: 'space_1',
+      slug: 's',
+      name: 'Test',
+      ownerId: 'owner_1',
+    } as never);
+    proposeActionsMock.mockResolvedValue([]);
+    attachHumanSummariesMock.mockImplementation(async (_s, _id, proposals) => proposals);
+
+    await POST(
+      makeReq({
+        transcript: 'Quick recap.',
+        contextHint: { personId: 'person-abc', dealId: 'deal-xyz' },
+      }),
+    );
+
+    expect(proposeActionsMock).toHaveBeenCalledOnce();
+    const arg = proposeActionsMock.mock.calls[0][1] as {
+      contextHint?: { personId?: string; dealId?: string };
+    };
+    expect(arg.contextHint).toEqual({ personId: 'person-abc', dealId: 'deal-xyz' });
+  });
+
+  it('drops non-string contextHint fields defensively', async () => {
+    // Anything other than a string id is dropped — keeps the orchestrator's
+    // resolver from receiving structured junk through the wire.
+    mockRequireAuth.mockResolvedValue({ userId: 'user_1' });
+    mockGetSpaceForUser.mockResolvedValue({
+      id: 'space_1',
+      slug: 's',
+      name: 'Test',
+      ownerId: 'owner_1',
+    } as never);
+    proposeActionsMock.mockResolvedValue([]);
+    attachHumanSummariesMock.mockImplementation(async (_s, _id, proposals) => proposals);
+
+    await POST(
+      makeReq({
+        transcript: 'hi',
+        contextHint: { personId: 42, dealId: { evil: true } },
+      }),
+    );
+
+    const arg = proposeActionsMock.mock.calls[0][1] as {
+      contextHint?: { personId?: string; dealId?: string };
+    };
+    expect(arg.contextHint).toEqual({});
+  });
 });

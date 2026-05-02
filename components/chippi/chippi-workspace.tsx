@@ -599,7 +599,23 @@ export function ChippiWorkspace({
                   MorningReplay recap card (the agent talking about itself
                   instead of about the deals). The home now answers one
                   question: what should I do next? */}
-              <MorningStory slug={slug} />
+              {/* Morning sentence + post-tour affordance — wrapped together so
+                  the tertiary "Just toured? Log it →" line sits tight under the
+                  headline (mt-3) instead of joining the page's space-y-12
+                  rhythm. The affordance is muted, single-line, centered — it
+                  has to be *findable* the second time a realtor uses Chippi
+                  without competing with the morning's primary action. */}
+              <div>
+                <MorningStory slug={slug} />
+                <div className="mt-3 text-center">
+                  <Link
+                    href={`/s/${slug}/chippi/log`}
+                    className="inline-flex items-center text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Just toured? Log it &rarr;
+                  </Link>
+                </div>
+              </div>
 
               {/* Today's work — one focal item with Send / Edit / Hold. */}
               <TodayFeed

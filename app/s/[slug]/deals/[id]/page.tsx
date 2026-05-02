@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Mic } from 'lucide-react';
 import type { DealStage, DealActivity, DealMilestone } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatCompact } from '@/lib/formatting';
@@ -188,6 +188,22 @@ export default async function DealDetailPage({
         <div className="px-5 py-3.5 border-b border-border flex items-center justify-between gap-4">
           <h1 className="text-base font-semibold truncate">{title}</h1>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Log a tour — the post-tour record moment, one click away from
+                the deal it'll land on. Outline chip, same shape as
+                FlagForReview so the row reads as one toolbar. The page works
+                fine without it; with the dealId pre-fill, the recorder biases
+                the proposal model toward this deal. */}
+            <Link
+              href={`/s/${slug}/chippi/log?dealId=${id}`}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md border border-border bg-background',
+                'px-2.5 h-8 text-xs font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors',
+              )}
+              title="Record a quick post-tour debrief"
+            >
+              <Mic size={13} />
+              Log a tour
+            </Link>
             <FlagForReviewButton
               dealId={id}
               hasOpenReview={hasOpenReview}

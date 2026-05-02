@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Sparkles,
   Calendar,
+  Mic,
 } from 'lucide-react';
 import type { Contact, ApplicationData, LeadScoreDetails, IntakeFormConfig } from '@/lib/types';
 import { ContactActivityTab } from '@/components/contacts/contact-activity-tab';
@@ -149,14 +150,26 @@ export default async function ClientDetailPage({
       </header>
 
       {/* Action pills — same vocabulary as the morning home's compose
-          actions. State picks them; the realtor doesn't. */}
-      {actions.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {actions.map((a, i) => (
-            <ActionPill key={a.id} action={a} primary={i === 0} />
-          ))}
-        </div>
-      )}
+          actions. State picks them; the realtor doesn't. The "Log a tour"
+          pill is always present (it's a doorway, not a state-driven verb)
+          and uses the same outline shape as a secondary action so it reads
+          as a peer to "Schedule a tour" / "Send a check-in" without
+          competing for the primary slot. */}
+      <div className="flex flex-wrap gap-2">
+        {actions.map((a, i) => (
+          <ActionPill key={a.id} action={a} primary={i === 0} />
+        ))}
+        <Link
+          href={`/s/${slug}/chippi/log?personId=${contact.id}`}
+          className={cn(
+            'inline-flex items-center gap-1.5 h-9 rounded-full px-4 text-sm transition-colors',
+            'border border-border/70 bg-background text-foreground hover:bg-muted/40',
+          )}
+        >
+          <Mic size={13} />
+          Log a tour
+        </Link>
+      </div>
 
       {/* Quick contact bar — email/phone/address inline, applicant portal
           tucked in. Hairline on the page, not a card. */}

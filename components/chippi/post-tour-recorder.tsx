@@ -62,11 +62,19 @@ interface UiProposal extends Proposal {
 
 interface Props {
   slug: string;
+  /** Optional pre-fill from the URL — biases the orchestrator's proposals
+   *  toward this person. Sent through as `contextHint` on the post-tour
+   *  request body. The recorder UI is unchanged; the realtor never sees
+   *  the id. */
+  personId?: string;
+  /** Same as `personId` but for a deal — used when the recorder is reached
+   *  from a deal detail page so the proposed actions land on the right deal. */
+  dealId?: string;
 }
 
 const MAX_RECORDING_MS = 5 * 60 * 1000; // 5 minutes — Whisper can take more, but a tour debrief shouldn't.
 
-export function PostTourRecorder({ slug }: Props) {
+export function PostTourRecorder({ slug, personId, dealId }: Props) {
   const [state, setState] = useState<State>('idle');
   const [elapsed, setElapsed] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -78,6 +86,15 @@ export function PostTourRecorder({ slug }: Props) {
   const tickRef = useRef<number | null>(null);
   const startedAtRef = useRef<number>(0);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Stash the optional URL-driven context in a ref so processAudio (memoized
+  // with [] deps) reads the latest values without re-binding on every render.
+  // The realtor never sees these — they're a hint to the proposal model so
+  // calls/notes/follow-ups land on the right person or deal.
+  const contextHintRef = useRef<{ personId?: string; dealId?: string }>({});
+  useEffect(() => {
+    contextHintRef.current = { personId, dealId };
+  }, [personId, dealId]);
 
   // Cleanup any open mic on unmount.
   useEffect(() => {
@@ -186,7 +203,10 @@ export function PostTourRecorder({ slug }: Props) {
       const res = await fetch('/api/chippi/post-tour', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript }),
+        body: JSON.stringify({
+          transcript,
+          contextHint: buildContextHint(contextHintRef.current),
+        }),
       });
       if (!res.ok) throw new Error(await res.text());
       const json = (await res.json()) as { proposals?: Proposal[] };
@@ -683,6 +703,23 @@ function firstNameFrom(humanSummary: string): string | null {
 
 function cap(s: string): string {
   return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1);
+}
+
+/** Build the `contextHint` payload for the orchestrator. Omits the field
+ *  entirely when both ids are absent so the wire payload stays clean for
+ *  the no-context case (the orchestrator branches on presence). Trims and
+ *  drops empty strings — defensive against a stray `?personId=` on the URL. */
+export function buildContextHint(
+  raw: { personId?: string | null; dealId?: string | null } | null | undefined,
+): { personId?: string; dealId?: string } | undefined {
+  if (!raw) return undefined;
+  const personId = typeof raw.personId === 'string' ? raw.personId.trim() : '';
+  const dealId = typeof raw.dealId === 'string' ? raw.dealId.trim() : '';
+  if (!personId && !dealId) return undefined;
+  const out: { personId?: string; dealId?: string } = {};
+  if (personId) out.personId = personId;
+  if (dealId) out.dealId = dealId;
+  return out;
 }
 
 function describe(tool: string): string | null {
