@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ queued: false, reason: 'Redis error' });
   }
 
-  // Step 2: For time-critical events, fire the Modal agent immediately.
+  // Step 2: For all accepted events, fire the Modal agent immediately.
   // Non-blocking: we don't await this or let it fail the request.
   // The trigger is already in Redis, so worst case the agent catches it at
   // the next heartbeat.
