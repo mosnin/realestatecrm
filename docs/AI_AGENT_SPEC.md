@@ -13,6 +13,8 @@ flow work: the SSE event union, the persisted block shape, the tool
 registry, the pending-approval store, and the sub-agent ("Skill") pattern
 layered on top.
 
+**Runtime status (May 2026).** Chat turns run in-process via the TypeScript OpenAI Agents SDK runtime; background, event-driven activation is handled by Redis + Modal webhook triggers in `POST /api/agent/trigger` (policy controlled by `AGENT_IMMEDIATE_EVENTS`: `all` by default, or a comma-separated subset of event names).
+
 **Table of contents**
 
 1. [Architecture](#1-architecture)
@@ -38,12 +40,10 @@ POST /api/ai/task  (app/api/ai/task/route.ts)
    │  loadHistory (20 messages)
    │  saveUserMessage
    ▼
-runTurn()  (lib/ai-tools/loop.ts)
-   │  round loop, capped at MAX_ROUNDS = 8  (loop.ts:41)
-   │  ┌─ streaming OpenAI call with tools array
-   │  ├─ text_delta events  → TextBlock
-   │  ├─ tool_call events   → executeTool() → ToolCallBlock
-   │  └─ mutating tool?      → pause + pushEvent('permission_required')
+streamTsChatTurn()  (lib/ai-tools/sdk-chat-stream.ts)
+   │  OpenAI Agents SDK runtime (`@openai/agents`)
+   │  ┌─ text deltas / tool call events / approval interrupts
+   │  └─ mutating tool? → pause + persist AgentPausedRun for resume
    ▼
 if paused:
    savePendingApproval → Redis  (lib/ai-tools/pending-approvals.ts)

@@ -29,9 +29,21 @@ type TriggerEvent = typeof VALID_EVENTS[number];
 const RATE_LIMIT = 20;
 const RATE_WINDOW_S = 60;
 
-// Time-critical events that should fire Modal immediately, not just queue.
-// These have specialist agents that need to act within minutes.
-const IMMEDIATE_EVENTS = new Set<TriggerEvent>(['tour_completed', 'application_submitted']);
+// Phase 2: make immediate-fire policy configurable without a deploy.
+// AGENT_IMMEDIATE_EVENTS supports: 'all' (default) or comma-separated
+// subset from VALID_EVENTS (e.g. 'tour_completed,application_submitted').
+
+function immediateEvents(): Set<TriggerEvent> {
+  const raw = process.env.AGENT_IMMEDIATE_EVENTS?.trim();
+  if (!raw || raw.toLowerCase() === 'all') return new Set<TriggerEvent>(VALID_EVENTS);
+
+  const parsed = raw
+    .split(',')
+    .map((v) => v.trim())
+    .filter((v): v is TriggerEvent => VALID_EVENTS.includes(v as TriggerEvent));
+
+  return new Set<TriggerEvent>(parsed);
+}
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 const MODAL_WEBHOOK_URL = process.env.MODAL_WEBHOOK_URL ?? '';
@@ -106,12 +118,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ queued: false, reason: 'Redis error' });
   }
 
-  // Step 2: For time-critical events, fire the Modal agent immediately.
+  // Step 2: For all accepted events, fire the Modal agent immediately.
   // Non-blocking: we don't await this or let it fail the request.
   // The trigger is already in Redis, so worst case the agent catches it at
   // the next heartbeat.
   let firedImmediately = false;
-  if (IMMEDIATE_EVENTS.has(event) && MODAL_WEBHOOK_URL && AGENT_INTERNAL_SECRET) {
+  if (immediateEvents().has(event) && MODAL_WEBHOOK_URL && AGENT_INTERNAL_SECRET) {
     // Fire-and-forget. The agent will pop the trigger from Redis when it runs.
     fetch(MODAL_WEBHOOK_URL, {
       method: 'POST',
