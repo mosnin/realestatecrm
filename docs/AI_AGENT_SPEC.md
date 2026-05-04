@@ -1,6 +1,6 @@
-# AI Agent System
+# AI Agent Runtime
 
-> The on-demand agent that turns a realtor's natural-language request into a
+> The core agent runtime that turns a realtor's natural-language request into a
 > streamed sequence of tool calls, approval prompts for mutations, and final
 > text — all persisted as a typed `MessageBlock[]` so conversations survive
 > reload and broker-review.
@@ -9,9 +9,9 @@ A realtor types `"email Jane about the tour Friday"`; the server opens an SSE
 stream, the model plans a `send_email` call, the client shows an approval
 card, the realtor approves, the email ships, and a `ToolCallBlock` lands in
 the transcript. This doc is the reference for every contract that makes that
-flow work: the SSE event union, the persisted block shape, the tool
-registry, the pending-approval store, and the sub-agent ("Skill") pattern
-layered on top.
+flow work: the SSE event union, the persisted block shape, the tool registry, the pending-approval store, and the sub-agent ("Skill") pattern layered on top.
+
+**Runtime status (May 2026).** Chat turns run in-process via the TypeScript OpenAI Agents SDK runtime; background, event-driven activation is handled by Redis + Modal webhook triggers in `POST /api/agent/trigger` (policy controlled by `AGENT_IMMEDIATE_EVENTS`: `all` by default, or a comma-separated subset of event names; invalid values fail safe to `all`).
 
 **Table of contents**
 
@@ -38,12 +38,10 @@ POST /api/ai/task  (app/api/ai/task/route.ts)
    │  loadHistory (20 messages)
    │  saveUserMessage
    ▼
-runTurn()  (lib/ai-tools/loop.ts)
-   │  round loop, capped at MAX_ROUNDS = 8  (loop.ts:41)
-   │  ┌─ streaming OpenAI call with tools array
-   │  ├─ text_delta events  → TextBlock
-   │  ├─ tool_call events   → executeTool() → ToolCallBlock
-   │  └─ mutating tool?      → pause + pushEvent('permission_required')
+streamTsChatTurn()  (lib/ai-tools/sdk-chat-stream.ts)
+   │  OpenAI Agents SDK runtime (`@openai/agents`)
+   │  ┌─ text deltas / tool call events / approval interrupts
+   │  └─ mutating tool? → pause + persist AgentPausedRun for resume
    ▼
 if paused:
    savePendingApproval → Redis  (lib/ai-tools/pending-approvals.ts)
