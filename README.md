@@ -1,12 +1,12 @@
 # Chippi
 
-Real estate CRM and lead management platform for realtors and brokerages.
+Agentic operating system for realtors and brokerages.
 
 ---
 
 ## What is Chippi?
 
-Chippi is a SaaS platform that helps realtors capture, qualify, and manage rental leads through a streamlined workflow. It combines a public-facing intake form, AI-powered lead scoring, a full CRM pipeline, tour scheduling, and brokerage team management into a single product.
+Chippi is an agentic operating system for realtors and brokerages. It combines always-on AI agent workflows, lead intake, qualification, follow-up orchestration, and brokerage coordination into a single operational platform.
 
 ### Key features
 
@@ -15,7 +15,9 @@ Chippi is a SaaS platform that helps realtors capture, qualify, and manage renta
 - **CRM pipeline** — Kanban-style deal management with customizable stages, drag-and-drop, and contact linking
 - **Tour scheduling** — Public booking page, calendar integration, automated confirmations/reminders
 - **Brokerage management** — Multi-user team dashboards, invite system, performance tracking across realtors
-- **AI assistant** — On-demand agent with a tool-use loop over the realtor's CRM (read-only tools auto-run; mutating tools — email, SMS, deal/stage changes, tours — require per-call user approval). Delegates research questions to read-only sub-agents so profile lookups don't bloat the orchestrator's context. See `lib/ai-tools/tools/index.ts` for the tool registry and `lib/ai-tools/skills/*` for the sub-agents.
+- **AI agent** — Agent runtime with tool-use over the realtor operating system (read-only tools auto-run; mutating tools — email, SMS, deal/stage changes, tours — require per-call user approval). Delegates research questions to read-only sub-agents so profile lookups don't bloat the orchestrator's context. See `lib/ai-tools/tools/index.ts` for the tool registry and `lib/ai-tools/skills/*` for the sub-agents.
+- **Always-on background activation** — Incoming CRM events are queued in Redis and immediately attempt a Modal webhook fire (`POST /api/agent/trigger`) so per-realtor agents can react in near real-time with queue-based fallback if Modal is unavailable. Immediate fire policy is configurable with `AGENT_IMMEDIATE_EVENTS` (`all` by default, or comma-separated event names; invalid values fail safe to `all`).
+- **Trigger operations runbook** — Operational endpoints, env vars, alerting, and replay workflow are documented in `docs/AGENT_TRIGGER_OPERATIONS.md`.
 - **Brokerage tier** — Multi-agent organisation with per-seat billing: brokerage membership + role tiers (`broker_owner`, `broker_admin`, `realtor_member`) in `lib/permissions.ts`; lead routing across agents (`lib/brokerage-routing.ts`); commission ledger (`lib/commissions.ts`); Stripe-backed seat subscriptions (`lib/brokerage-seats.ts`, `app/api/billing/*`)
 - **Notifications** — Email (Resend) and SMS (Telnyx) notifications for leads, tours, deals, and follow-ups
 - **Analytics** — Weekly trends, conversion funnels, and team performance metrics
