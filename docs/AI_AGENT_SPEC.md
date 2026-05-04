@@ -13,7 +13,7 @@ flow work: the SSE event union, the persisted block shape, the tool
 registry, the pending-approval store, and the sub-agent ("Skill") pattern
 layered on top.
 
-**Runtime status (May 2026).** Chat turns run in-process via the TypeScript OpenAI Agents SDK runtime; background, event-driven activation is handled by Redis + Modal webhook triggers in `POST /api/agent/trigger`.
+**Runtime status (May 2026).** Chat turns run in-process via the TypeScript OpenAI Agents SDK runtime; background, event-driven activation is handled by Redis + Modal webhook triggers in `POST /api/agent/trigger` (policy controlled by `AGENT_IMMEDIATE_EVENTS`: `all` by default, or a comma-separated subset of event names).
 
 **Table of contents**
 

@@ -29,10 +29,21 @@ type TriggerEvent = typeof VALID_EVENTS[number];
 const RATE_LIMIT = 20;
 const RATE_WINDOW_S = 60;
 
-// Fire Modal immediately for every accepted CRM event so the background
-// agent reacts continuously as new information arrives. Redis remains the
-// durable queue fallback if the immediate webhook call fails.
-const IMMEDIATE_EVENTS = new Set<TriggerEvent>(VALID_EVENTS);
+// Phase 2: make immediate-fire policy configurable without a deploy.
+// AGENT_IMMEDIATE_EVENTS supports: 'all' (default) or comma-separated
+// subset from VALID_EVENTS (e.g. 'tour_completed,application_submitted').
+
+function immediateEvents(): Set<TriggerEvent> {
+  const raw = process.env.AGENT_IMMEDIATE_EVENTS?.trim();
+  if (!raw || raw.toLowerCase() === 'all') return new Set<TriggerEvent>(VALID_EVENTS);
+
+  const parsed = raw
+    .split(',')
+    .map((v) => v.trim())
+    .filter((v): v is TriggerEvent => VALID_EVENTS.includes(v as TriggerEvent));
+
+  return new Set<TriggerEvent>(parsed);
+}
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 const MODAL_WEBHOOK_URL = process.env.MODAL_WEBHOOK_URL ?? '';
@@ -112,7 +123,7 @@ export async function POST(req: NextRequest) {
   // The trigger is already in Redis, so worst case the agent catches it at
   // the next heartbeat.
   let firedImmediately = false;
-  if (IMMEDIATE_EVENTS.has(event) && MODAL_WEBHOOK_URL && AGENT_INTERNAL_SECRET) {
+  if (immediateEvents().has(event) && MODAL_WEBHOOK_URL && AGENT_INTERNAL_SECRET) {
     // Fire-and-forget. The agent will pop the trigger from Redis when it runs.
     fetch(MODAL_WEBHOOK_URL, {
       method: 'POST',
