@@ -22,6 +22,8 @@ interface MobileNavProps {
 export function MobileNav({ slug, isBroker = false, isBrokerOnly = false }: MobileNavProps) {
   const pathname = usePathname();
   const base = `/s/${slug}`;
+
+  if (pathname?.startsWith(`${base}/chippi`)) return null;
   const isOnBrokerPage = pathname.startsWith('/broker');
 
   // When broker is on /broker/* pages (or broker-only), show team nav
