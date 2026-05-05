@@ -52,18 +52,13 @@ export default async function IntegrationsPage({
 
   return (
     <div className={PAGE_RHYTHM}>
-      <header className="space-y-2">
+      <header className="space-y-1.5">
+        <p className={BODY_MUTED}>Integrations.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Integrations
+          Connected apps
         </h1>
         <p className={BODY_MUTED}>
-          Connect Chippi to the apps you already use. Drafts go where you
-          send mail. Tours land on your calendar. Notes show up where your
-          team works.
-        </p>
-        <p className={BODY_MUTED}>
-          Chippi never sends without your tap. Connecting just means your
-          approved drafts go through your account.
+          Connect Chippi to the apps you already use. Drafts go where you send mail. Tours land on your calendar. Chippi never sends without your tap.
         </p>
       </header>
 

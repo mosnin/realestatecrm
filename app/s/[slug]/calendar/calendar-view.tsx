@@ -853,15 +853,20 @@ export function CalendarView({
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-4">
-      {/* Header — title + the tour-booking primary action. Calendar
-          absorbed Tours, so the "Schedule tour" pill lives here now. The
-          voice lives on /chippi home; this surface is utility chrome. */}
-      <header>
+    <div className="space-y-6">
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Calendar.</p>
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-          <h1 className={H1} style={TITLE_FONT}>
-            Calendar
-          </h1>
+          <div className="space-y-1.5">
+            <h1 className={H1} style={TITLE_FONT}>
+              Calendar
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {tours.length > 0
+                ? `${tours.length} ${tours.length === 1 ? 'tour' : 'tours'} scheduled${contactFollowUps.length + dealFollowUps.length > 0 ? `, ${contactFollowUps.length + dealFollowUps.length} follow-up${contactFollowUps.length + dealFollowUps.length === 1 ? '' : 's'} on the list` : ''}.`
+                : 'Nothing scheduled — quiet week.'}
+            </p>
+          </div>
           <Link
             href={`/book/${slug}`}
             target="_blank"

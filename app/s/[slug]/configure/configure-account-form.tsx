@@ -9,6 +9,7 @@ import { buildIntakeUrl } from '@/lib/intake';
 import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle2, Loader2, User, Link2, Bell, AlertCircle, Image, Palette, Plus, Trash2, Upload, Eye, FileText, Video, Moon, ListChecks, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { H1, TITLE_FONT } from '@/lib/typography';
 
 interface ConfigureAccountFormProps {
   initialData: {
@@ -264,12 +265,15 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-xl font-bold tracking-tight">Configure your account</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Update your profile, intake link, and notification preferences.
+      <header className="space-y-1.5 mb-6">
+        <p className="text-sm text-muted-foreground">Configure.</p>
+        <h1 className={H1} style={TITLE_FONT}>
+          Your workspace
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Profile, intake link, and notification preferences.
         </p>
-      </div>
+      </header>
 
       {/* Section nav */}
       <div className="flex items-center gap-3 overflow-x-auto pb-1 mb-2">

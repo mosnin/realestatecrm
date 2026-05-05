@@ -94,7 +94,8 @@ export default async function SettingsPage({
   return (
     <div className={`${SECTION_RHYTHM} ${READING_MAX}`}>
       {/* Page header */}
-      <div className="space-y-2">
+      <header className="space-y-1.5">
+        <p className={BODY_MUTED}>Settings.</p>
         <h1 className={H1} style={TITLE_FONT}>
           Settings
         </h1>
@@ -112,7 +113,7 @@ export default async function SettingsPage({
             </>
           )}
         </p>
-      </div>
+      </header>
 
       {/* WORKSPACE */}
       <section className="space-y-5 pt-4">

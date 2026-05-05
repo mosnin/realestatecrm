@@ -114,11 +114,12 @@ export default async function PropertiesCommissionsPage({
           The stat strip below is the supporting evidence. Commissions is its
           own destination now (the standalone Properties list has been cut),
           so no back-link — the sidebar is the way home. */}
-      <header className="space-y-2">
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Commissions.</p>
         <h1 className={H1} style={TITLE_FONT}>
           Commissions
         </h1>
-        <p className="text-lg text-muted-foreground" style={TITLE_FONT}>
+        <p className="text-sm text-muted-foreground">
           {subtitle}
         </p>
       </header>
