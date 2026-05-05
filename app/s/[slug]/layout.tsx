@@ -274,15 +274,16 @@ export default async function DashboardLayout({
           </main>
         ) : (
           <main className="flex-1 overflow-y-auto flex flex-col bg-background text-foreground">
-            {/* Inline Tailwind utilities — proven to reach the DOM in this
-                build. The earlier `.dashboard-content` raw-CSS class shipped
-                but didn't apply (visible regression); inlining sidesteps
-                whatever was breaking the cascade. */}
-            <div className="w-full max-w-[1500px] mx-auto flex-1 min-w-0 px-4 sm:px-6 md:px-10 lg:px-12 py-5 md:py-7 pb-40 md:pb-24">
+            {/* Both mechanisms in tandem: Tailwind utilities for normal builds,
+                raw CSS class (`dashboard-content`) as an unlayered fallback that
+                the browser applies regardless of Tailwind's @layer cascade.
+                Unlayered CSS beats @layer utilities, so the raw class wins when
+                Tailwind's responsive utilities fail to reach the DOM. */}
+            <div className="dashboard-content w-full max-w-[1500px] mx-auto flex-1 min-w-0 px-4 sm:px-6 md:px-10 lg:px-12 py-5 md:py-7 pb-40 md:pb-24">
               <LiveNotifications spaceId={space.id} slug={slug} />
               <PageTransition>{children}</PageTransition>
             </div>
-            <div className="w-full max-w-[1500px] mx-auto px-4 sm:px-6 md:px-10 lg:px-12 pb-4">
+            <div className="dashboard-footer-wrap w-full max-w-[1500px] mx-auto px-4 sm:px-6 md:px-10 lg:px-12 pb-4">
               <DashboardFooter />
             </div>
           </main>

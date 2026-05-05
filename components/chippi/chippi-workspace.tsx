@@ -197,16 +197,21 @@ export function ChippiWorkspace({
   const urlConversationId = searchParams.get('conversationId');
   const lastLoadedConvIdRef = useRef<string | null>(null);
 
-  // Path 1 — adopt props.
+  // Path 1 — adopt props from the server render.
+  // Guard: if the URL already names a *different* conversation than what the
+  // server sent, the server payload is a stale router-cache entry. Adopting
+  // it would overwrite whatever Path 2 just correctly loaded. Skip it — Path 2
+  // will (or already has) fetched the right transcript directly.
   useEffect(() => {
     if (isStreaming) return;
     if (initialConversationId === lastLoadedConvIdRef.current) return;
     if (!initialConversationId) return;
+    if (urlConversationId && urlConversationId !== initialConversationId) return;
     console.log('[Chat] sync from props', initialConversationId, 'msgs:', initialMessages.length);
     lastLoadedConvIdRef.current = initialConversationId;
     setActiveConversationId(initialConversationId);
     setMessages(initialMessages.length > 0 ? legacyToUi(initialMessages) : []);
-  }, [initialConversationId, initialMessages, isStreaming, setMessages]);
+  }, [initialConversationId, initialMessages, isStreaming, setMessages, urlConversationId]);
 
   // Path 2 — fetch on URL change.
   useEffect(() => {
