@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Search, Trash2, Loader2, AlertCircle, User, Briefcase, Globe } from 'lucide-react';
+import { Search, Trash2, Loader2, AlertCircle, User, Briefcase, Globe, Wrench, MessageCircle, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { toast } from 'sonner';
@@ -18,6 +18,9 @@ interface MemoryRow {
   expiresAt: string | null;
   createdAt: string;
   updatedAt: string;
+  sourceRunId: string | null;
+  sourceToolName: string | null;
+  sourceConversationId: string | null;
 }
 
 const TYPE_LABEL: Record<MemoryRow['memoryType'], string> = {
@@ -231,6 +234,26 @@ export function MemoryFeed({ slug }: { slug: string }) {
                               <span className="inline-flex items-center gap-1">
                                 <AlertCircle size={10} />
                                 expires {timeAgo(memory.expiresAt)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1.5 flex items-center gap-2">
+                            {memory.sourceToolName && (
+                              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground/70">
+                                <Wrench size={10} />
+                                {memory.sourceToolName}
+                              </span>
+                            )}
+                            {!memory.sourceToolName && memory.sourceConversationId && (
+                              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground/70">
+                                <MessageCircle size={10} />
+                                chat
+                              </span>
+                            )}
+                            {!memory.sourceToolName && !memory.sourceConversationId && memory.sourceRunId && (
+                              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground/70">
+                                <Play size={10} />
+                                auto-run
                               </span>
                             )}
                           </div>

@@ -22,7 +22,8 @@ export type AgentEvent =
   | PermissionResolvedEvent
   | PlanCreatedEvent
   | TurnCompleteEvent
-  | ErrorEvent;
+  | ErrorEvent
+  | SystemEvent;
 
 interface BaseEvent {
   seq: number;
@@ -129,6 +130,16 @@ export interface TurnCompleteEvent extends BaseEvent {
   type: 'turn_complete';
   /** 'complete' = model finished naturally. 'paused' = awaiting permission. 'aborted' = user cancelled / network dropped. */
   reason: 'complete' | 'paused' | 'aborted';
+}
+
+/**
+ * Out-of-band notice from the infrastructure layer — not a model output.
+ * Currently used to signal context compaction so the UI can show a subtle
+ * indicator. The content field is human-readable but intentionally terse.
+ */
+export interface SystemEvent extends BaseEvent {
+  type: 'system';
+  content: string;
 }
 
 /** Unrecoverable turn failure. Different from a tool error (which keeps the turn alive). */

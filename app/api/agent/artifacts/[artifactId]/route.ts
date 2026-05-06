@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // GET /api/agent/artifacts/[artifactId]
 export async function GET(
@@ -11,6 +12,14 @@ export async function GET(
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
+
+  const rl = await checkRateLimit(`agent:artifacts:get:${userId}`, 60, 60);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', retryAfter: undefined },
+      { status: 429 },
+    );
+  }
 
   const { artifactId } = await params;
 
@@ -57,6 +66,14 @@ export async function PATCH(
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
+
+  const rl = await checkRateLimit(`agent:artifacts:version:${userId}`, 20, 60);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', retryAfter: undefined },
+      { status: 429 },
+    );
+  }
 
   const { artifactId } = await params;
 

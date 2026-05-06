@@ -57,6 +57,7 @@ function makeExcerpt(content: string): string {
 
 export const recallHistoryTool = defineTool<typeof parameters, RecallResult>({
   name: 'recall_history',
+  riskLevel: 'safe',
   description:
     'Recall what was said in past conversations using semantic search. Returns ranked memories about a person or deal.',
   parameters,

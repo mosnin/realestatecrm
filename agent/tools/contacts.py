@@ -9,6 +9,7 @@ from typing import Any, Literal
 from agents import RunContextWrapper, function_tool
 
 from db import supabase
+from errors import AgentError, from_supabase_error, from_exception
 from memory.store import save_memory
 from security.context import AgentContext
 from tools.base import with_retry
@@ -170,7 +171,8 @@ async def update_contact(
         .execute()
     )
     if not check.data:
-        return {"error": "Contact not found in space"}
+        agent_err = from_supabase_error({"message": "Contact not found in space", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
     contact = check.data
     contact_name = contact.get("name", "contact")
 
@@ -195,7 +197,8 @@ async def update_contact(
     # ── Pipeline type ──
     if new_pipeline_type:
         if new_pipeline_type not in _VALID_TYPES:
-            return {"error": f"new_pipeline_type must be one of {_VALID_TYPES}"}
+            agent_err = from_supabase_error({"message": f"new_pipeline_type must be one of {_VALID_TYPES}", "code": None})
+            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
         old_type = contact.get("type", "QUALIFICATION")
         if old_type != new_pipeline_type:
             update["type"] = new_pipeline_type

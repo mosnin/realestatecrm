@@ -50,15 +50,43 @@ interface StreamTsChatTurnInput {
 }
 
 export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
+  // Run compaction synchronously-ish by capturing the async work in a
+  // promise that resolves before `start` is awaited inside buildSseStream.
+  // We need to mutate history before the agent call, so we do the work up
+  // front and carry it into the closure.
+  const initialEvents: PushableEvent[] = [];
+  const historyPromise: Promise<HistoryRow[]> = (async () => {
+    const history = input.history ?? [];
+    if (estimateContextChars(history) > COMPACTION_THRESHOLD_CHARS) {
+      try {
+        const compacted = await compactContext({
+          messages: history,
+          maxContextChars: COMPACTION_THRESHOLD_CHARS,
+          model: 'gpt-4.1-mini',
+        });
+        initialEvents.push({
+          type: 'system',
+          content: 'Context compacted to fit within model limits.',
+        });
+        return compacted.messages as HistoryRow[];
+      } catch {
+        // Non-blocking: compaction failure never stops the agent.
+      }
+    }
+    return history;
+  })();
+
   const stream = buildSseStream({
     ctx: input.ctx,
     conversationId: input.conversationId,
     abortController: input.abortController,
+    initialEvents,
     start: async () => {
+      const history = await historyPromise;
       const { result } = await runChatTurn({
         ctx: input.ctx,
         userMessage: input.userMessage,
-        history: input.history,
+        history,
       });
       return { result: result as unknown as SdkResultLike };
     },

@@ -8,6 +8,7 @@ import {
   VALID_TRANSITIONS,
   type TaskStatus,
 } from '@/lib/agent/task-state-machine';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const VALID_STATUSES = Object.keys(VALID_TRANSITIONS) as TaskStatus[];
 
@@ -21,6 +22,14 @@ export async function PATCH(
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
+
+  const rl = await checkRateLimit(`agent:tasks:status:${userId}`, 30, 60);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', retryAfter: undefined },
+      { status: 429 },
+    );
+  }
 
   const { taskId } = await params;
 
@@ -70,10 +79,35 @@ export async function PATCH(
   if (status === 'completed') meta.completedAt = now;
   if (status === 'running')   meta.startedAt   = now;
 
+  const previousStatus = task.status as TaskStatus;
   const result = await transitionTask(taskId, status, meta);
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error ?? 'Transition failed' }, { status: 409 });
+  }
+
+  // Log human interventions to the activity audit trail (non-blocking).
+  const actionTypeMap: Partial<Record<TaskStatus, string>> = {
+    paused: 'task_paused',
+    cancelled: 'task_cancelled',
+    running: 'task_resumed',
+    completed: 'task_completed',
+  };
+  const actionType = actionTypeMap[status];
+  if (actionType) {
+    void Promise.resolve(
+      supabase
+        .from('AgentActivityLog')
+        .insert({
+          spaceId: space.id,
+          runId: taskId,
+          agentType: 'human',
+          actionType,
+          outcome: 'completed',
+          reversible: status !== 'cancelled',
+          metadata: { previousStatus, triggeredBy: 'user', userId },
+        }),
+    ).catch(() => {});
   }
 
   return NextResponse.json({ ok: true, task: { id: taskId, status } });

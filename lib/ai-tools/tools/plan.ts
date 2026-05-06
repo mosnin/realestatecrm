@@ -42,6 +42,7 @@ interface PlanResult {
 
 export const createPlanTool = defineTool<typeof parameters, PlanResult>({
   name: 'create_plan',
+  riskLevel: 'safe',
   description:
     'Emit a structured multi-step execution plan for a complex task. Call this once with the full task and an ordered list of 2–7 concrete steps.',
   parameters,

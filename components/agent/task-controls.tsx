@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Pause, Play, X, Loader2 } from 'lucide-react';
+import { Pause, Play, X, Loader2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ControlAction = 'paused' | 'running' | 'cancelled';
+type ControlAction = 'paused' | 'running' | 'cancelled' | 'queued';
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
@@ -25,8 +25,8 @@ export function TaskControls({
   const [loading, setLoading] = useState<ControlAction | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Terminal states — nothing to show
-  if (['completed', 'failed', 'cancelled'].includes(status)) return null;
+  // Terminal states — nothing to show (failed is handled below with retry)
+  if (['completed', 'cancelled'].includes(status)) return null;
 
   async function handleAction(action: ControlAction) {
     setLoading(action);
@@ -109,6 +109,27 @@ export function TaskControls({
               <X size={13} />
             )}
             Cancel
+          </Button>
+        )}
+
+        {/* Retry button — only when failed */}
+        {status === 'failed' && (
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              'gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50 hover:text-blue-800',
+              'dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/40 dark:hover:text-blue-300',
+            )}
+            disabled={loading !== null}
+            onClick={() => void handleAction('queued')}
+          >
+            {loading === 'queued' ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <RotateCcw size={13} />
+            )}
+            Retry
           </Button>
         )}
       </div>

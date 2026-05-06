@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // GET /api/agent/artifacts?spaceId=xxx[&taskId=yyy][&type=zzz]
 export async function GET(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
+
+  const rl = await checkRateLimit(`agent:artifacts:list:${userId}`, 60, 60);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', retryAfter: undefined },
+      { status: 429 },
+    );
+  }
 
   const spaceId = req.nextUrl.searchParams.get('spaceId');
   if (!spaceId) return NextResponse.json({ error: 'spaceId required' }, { status: 400 });
@@ -45,6 +54,14 @@ export async function POST(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
+
+  const rl = await checkRateLimit(`agent:artifacts:create:${userId}`, 20, 60);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', retryAfter: undefined },
+      { status: 429 },
+    );
+  }
 
   let body: { spaceId?: string; taskId?: string; type?: string; title?: string; content?: string };
   try {
