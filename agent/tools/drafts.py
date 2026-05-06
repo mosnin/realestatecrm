@@ -116,7 +116,11 @@ async def draft_message(
         "expiresAt": expires_at,
     }
 
-    result = await with_retry(lambda: db.table("AgentDraft").insert(draft).execute())
+    try:
+        result = await with_retry(lambda: db.table("AgentDraft").insert(draft).execute())
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     await publish_event(
         ctx.context,
@@ -134,8 +138,9 @@ async def draft_message(
             contact_id=contact_id,
             deal_id=deal_id,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     created = result.data[0] if result.data else draft
     return {

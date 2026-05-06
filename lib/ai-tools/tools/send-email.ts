@@ -68,6 +68,7 @@ interface SendEmailResult {
 
 export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
   name: 'send_email',
+  riskLevel: 'high',
   description:
     'Send an email to a person. Always prompts the user before sending. Use for follow-ups, tour confirmations, and check-ins.',
   parameters,
