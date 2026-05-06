@@ -475,6 +475,8 @@ export type Conversation = {
   title: string;
   createdAt: Date;
   updatedAt: Date;
+  /** Last message content truncated to 60 chars, or null if no messages yet. */
+  preview?: string | null;
 };
 
 export type TourStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';

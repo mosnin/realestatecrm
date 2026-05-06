@@ -157,8 +157,8 @@ export function SidebarConversations({
             ))}
           </div>
         ) : conversations.length === 0 ? (
-          <p className={cn(CAPTION, 'px-2.5 py-2 leading-snug')}>
-            Nothing here yet. Start one above.
+          <p className="text-xs text-muted-foreground/60 text-center px-4 py-6 leading-snug">
+            Start a conversation to build your history here.
           </p>
         ) : (
           <motion.ul
@@ -223,6 +223,15 @@ export function SidebarConversations({
                         >
                           {truncateTitle(conv.title)}
                         </p>
+                        {conv.preview ? (
+                          <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5 leading-tight">
+                            {conv.preview}
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground/40 truncate mt-0.5 leading-tight">
+                            No messages yet
+                          </p>
+                        )}
                         <p className={cn(META, 'leading-tight mt-0.5')}>
                           {timeAgo(conv.updatedAt)}
                         </p>
