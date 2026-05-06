@@ -13,6 +13,24 @@ import { MorningActionSheet } from './morning-action-sheet';
 interface Props {
   /** Workspace slug — needed to deep-link the inline actions. */
   slug: string;
+  /**
+   * True only on day one — zero contacts, zero deals, nothing in the
+   * pipeline. MorningStory shows a different sentence so the space is never
+   * blank for a first-time user.
+   */
+  isFresh?: boolean;
+}
+
+type LoadState = 'loading' | 'ok' | 'error';
+
+/**
+ * Chippi-voiced fallback sentences. Called when the API is unavailable or
+ * when the data is empty/null. The sentences are direct, useful, one idea.
+ */
+function getFallback(state: LoadState, isFresh: boolean): string {
+  if (isFresh) return "Ready to get to work. Add your first lead and I'll start tracking.";
+  if (state === 'error') return "Ready when you are.";
+  return "Pipeline looks clear today. A good day to reach out cold.";
 }
 
 /**
@@ -20,9 +38,10 @@ interface Props {
  * panel; Phase 7 made the panel actually do work — compose actions now
  * draft, preview, and send inline. The realtor never leaves the home.
  */
-export function MorningStory({ slug }: Props) {
+export function MorningStory({ slug, isFresh = false }: Props) {
   const [summary, setSummary] = useState<MorningSummary | null>(null);
   const [agentSentence, setAgentSentence] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<LoadState>('loading');
   const [open, setOpen] = useState(false);
   /** Which compose action is currently expanded into a draft sheet. */
   const [activeCompose, setActiveCompose] = useState<MorningAction | null>(null);
@@ -43,9 +62,15 @@ export function MorningStory({ slug }: Props) {
           const data = (await res.json()) as MorningResponse;
           setSummary(data);
           setAgentSentence(data.composedSentence ?? null);
+          setLoadState('ok');
+        } else {
+          setLoadState('error');
         }
-      } catch {
-        // non-critical — we render nothing rather than a marketing line
+      } catch (err) {
+        // AbortError fires on unmount — don't transition to error state for that
+        if (err instanceof Error && err.name !== 'AbortError') {
+          setLoadState('error');
+        }
       }
     })();
     return () => controller.abort();
@@ -81,9 +106,10 @@ export function MorningStory({ slug }: Props) {
     };
   }, [open]);
 
-  // While loading we render a non-breaking space so the layout doesn't
-  // jump but no placeholder copy.
-  if (!summary) {
+  // While loading, render a non-breaking space to hold the layout without
+  // showing placeholder copy. On error or missing data, show a Chippi-voiced
+  // fallback — never leave the H1 blank.
+  if (loadState === 'loading') {
     return (
       <h1
         className="text-[2.25rem] sm:text-[2.5rem] tracking-tight text-foreground leading-tight text-center"
@@ -94,9 +120,26 @@ export function MorningStory({ slug }: Props) {
     );
   }
 
+  if (!summary) {
+    // API failed or returned an error — show a calm fallback in the same style.
+    const displaySentence = getFallback(loadState, isFresh);
+    return (
+      <h1
+        className="text-[2.25rem] sm:text-[2.5rem] tracking-tight text-foreground leading-tight text-center"
+        style={{ fontFamily: 'var(--font-title)' }}
+      >
+        {displaySentence}
+      </h1>
+    );
+  }
+
   const candidateCount = countMorningCandidates(summary);
   const effectiveSkip = Math.min(skip, Math.max(0, candidateCount - 1));
   const story = composeMorningStory(summary, agentSentence, { skip: effectiveSkip });
+  // Guard: never render a blank or whitespace-only heading. composeMorningStory
+  // always returns a non-empty string for valid data, but a corrupted API
+  // response could produce an empty composedSentence that slips through.
+  const displaySentence = story.text?.trim() || getFallback(loadState, isFresh);
   const actions = buildMorningActions(story.doorway, summary, slug);
   const isInteractive = actions.length > 0;
   // Pill renders only when there's actually a next subject to cycle to. Once
@@ -160,7 +203,7 @@ export function MorningStory({ slug }: Props) {
             setActiveCompose(null);
           }}
           aria-expanded={open}
-          key={story.text}
+          key={displaySentence}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
@@ -170,18 +213,18 @@ export function MorningStory({ slug }: Props) {
           )}
           style={{ fontFamily: 'var(--font-title)' }}
         >
-          {story.text}
+          {displaySentence}
         </motion.button>
       ) : (
         <motion.h1
-          key={story.text}
+          key={displaySentence}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
           className="text-[2.25rem] sm:text-[2.5rem] tracking-tight leading-tight text-center block mx-auto text-foreground"
           style={{ fontFamily: 'var(--font-title)' }}
         >
-          {story.text}
+          {displaySentence}
         </motion.h1>
       )}
 
