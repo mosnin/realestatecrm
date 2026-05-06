@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { getOpenAIClient } from '@/lib/ai-tools/openai-client';
+import { runParallel } from './parallel-executor';
+import type { StepResult } from './parallel-executor';
 
 export interface SubgoalStep {
   id: string;
@@ -145,4 +147,38 @@ export async function persistDecomposition(
   }
 
   return decompositionId;
+}
+
+/**
+ * Executes a decomposed goal's steps using the parallel executor.
+ *
+ * Takes the SubgoalStep array produced by `decomposeGoal` (or stored in a
+ * GoalDecomposition row) and fans them out via wave-based parallel execution,
+ * respecting the `dependsOn` relationships between steps.
+ *
+ * @param steps      - The ordered list of SubgoalStep objects.
+ * @param executeFn  - Caller-supplied function that runs a single step and
+ *                     returns its output.  Receives the full SubgoalStep so the
+ *                     caller can read title, description, and toolHints.
+ * @returns          - Array of StepResult (one per step) in completion order.
+ */
+export async function executeDecomposedGoal(
+  steps: SubgoalStep[],
+  executeFn: (step: SubgoalStep) => Promise<unknown>,
+): Promise<StepResult[]> {
+  // Build the flat dependency edge list that runParallel expects.
+  const dependencies: Array<{ stepId: string; dependsOnStepId: string }> = [];
+  for (const step of steps) {
+    for (const depId of step.dependsOn ?? []) {
+      if (depId !== step.id) {
+        dependencies.push({ stepId: step.id, dependsOnStepId: depId });
+      }
+    }
+  }
+
+  return runParallel(
+    steps as Array<SubgoalStep & { [k: string]: unknown }>,
+    executeFn as (step: { id: string; [k: string]: unknown }) => Promise<unknown>,
+    dependencies,
+  );
 }

@@ -47,6 +47,7 @@ import {
 } from '@/lib/telemetry';
 import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
 import { streamTsChatTurn } from '@/lib/ai-tools/sdk-chat-stream';
+import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
 
 interface HistoryRow {
   role: 'user' | 'assistant';
@@ -203,6 +204,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'message too long (8000 char max)' }, { status: 400 });
   }
 
+  const sanitized = sanitizeUserInput(rawMessage);
+  if (!sanitized.safe) {
+    return NextResponse.json(
+      { error: 'Message blocked by safety filter', violations: sanitized.violations },
+      { status: 400 },
+    );
+  }
+  const message = sanitized.sanitized;
+
   // Modal opt-out is failed closed post-cutover. The modal proxy code is
   // gone; the value exists only as an escape hatch we'd need to put code
   // back behind in an emergency. Surface a clear error rather than a
@@ -249,14 +259,14 @@ export async function POST(req: NextRequest) {
 
   let conversationId: string;
   try {
-    conversationId = await resolveConversation(ctx.space.id, body.conversationId ?? null, rawMessage);
+    conversationId = await resolveConversation(ctx.space.id, body.conversationId ?? null, message);
   } catch (err) {
     logger.error('[ai/task] conversation resolve failed', { spaceSlug }, err);
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
 
   try {
-    await saveUserMessage({ spaceId: ctx.space.id, conversationId, content: rawMessage });
+    await saveUserMessage({ spaceId: ctx.space.id, conversationId, content: message });
   } catch (err) {
     logger.error('[ai/task] save user message failed', { spaceSlug }, err);
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
@@ -273,7 +283,7 @@ export async function POST(req: NextRequest) {
         userId: ctx.userId,
         payload: {
           conversationId,
-          messagePreview: rawMessage.slice(0, 50),
+          messagePreview: message.slice(0, 50),
           secondsFromSignup: secondsBetween(signupAt, new Date()),
         },
       });
@@ -294,7 +304,7 @@ export async function POST(req: NextRequest) {
   // row — the runner expects history to be PRIOR turns + a separate `message`.
   if (history.length > 0) {
     const last = history[history.length - 1];
-    if (last.role === 'user' && last.content === rawMessage) history.pop();
+    if (last.role === 'user' && last.content === message) history.pop();
   }
 
   // Attachments resolved + passed through; the SDK runtime's system prompt
@@ -304,7 +314,7 @@ export async function POST(req: NextRequest) {
   return streamTsChatTurn({
     ctx,
     conversationId,
-    userMessage: rawMessage,
+    userMessage: message,
     history,
     abortController,
   });
