@@ -23,6 +23,7 @@ import { supabase } from '@/lib/supabase';
 import { sendEmailFromCRM } from '@/lib/email';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+import { makeIdempotencyKey, withIdempotency } from '@/lib/agent/ts-idempotency';
 
 const parameters = z
   .object({
@@ -145,14 +146,17 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
     const fromName =
       (settings?.businessName as string | undefined) || ctx.space.name;
 
+    const idemKey = makeIdempotencyKey('send_email', ctx.space.id, resolvedEmail, args.subject);
     try {
-      await sendEmailFromCRM({
-        toEmail: resolvedEmail,
-        fromName,
-        subject: args.subject,
-        body: args.body,
-        replyTo: args.replyTo,
-      });
+      await withIdempotency(idemKey, () =>
+        sendEmailFromCRM({
+          toEmail: resolvedEmail!,
+          fromName,
+          subject: args.subject,
+          body: args.body,
+          replyTo: args.replyTo,
+        }),
+      );
     } catch (err) {
       logger.error(
         '[tools.send_email] delivery failed',
