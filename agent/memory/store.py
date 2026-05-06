@@ -19,6 +19,8 @@ impossible by construction.
 from __future__ import annotations
 
 import json
+import logging
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -32,6 +34,12 @@ _EMBED_MODEL = "text-embedding-3-small"
 _EMBED_DIMS = 1536
 
 _openai: AsyncOpenAI | None = None
+
+logger = logging.getLogger(__name__)
+
+# Kill-switch cache: space_id -> (is_disabled, expires_at_timestamp)
+_kill_switch_cache: dict[str, tuple[bool, float]] = {}
+_KILL_SWITCH_TTL = 30.0  # seconds
 
 
 def _client() -> AsyncOpenAI:
@@ -64,6 +72,39 @@ async def _embed(text: str) -> list[float] | None:
 def _vector_literal(vec: list[float]) -> str:
     """pgvector accepts string form: '[0.1,0.2,...]'."""
     return "[" + ",".join(f"{x:.7f}" for x in vec) + "]"
+
+
+async def is_space_disabled(space_id: str) -> bool:
+    """Check whether a space is currently disabled via the kill switch.
+
+    Results are cached for 30 seconds to avoid hammering the DB on every
+    memory operation. Fails open on DB errors — memory ops should not be
+    blocked by a transient DB issue.
+    """
+    now = time.monotonic()
+    cached = _kill_switch_cache.get(space_id)
+    if cached is not None:
+        value, expires_at = cached
+        if now < expires_at:
+            return value
+
+    try:
+        db = await supabase()
+        result = await (
+            db.table("DisabledSpace")
+            .select("id")
+            .eq("spaceId", space_id)
+            .eq("isActive", True)
+            .maybeSingle()
+            .execute()
+        )
+        is_disabled = result.data is not None
+    except Exception:
+        logger.warning("is_space_disabled: DB error for space %s — failing open", space_id)
+        return False
+
+    _kill_switch_cache[space_id] = (is_disabled, now + _KILL_SWITCH_TTL)
+    return is_disabled
 
 
 async def load_memories(
@@ -161,12 +202,19 @@ async def save_memory(
     content: str,
     importance: float = 0.5,
     expires_at: str | None = None,
+    task_id: str | None = None,
 ) -> dict[str, Any]:
     """Persist a memory and embed it for future semantic recall.
 
     Embedding failures don't abort the save — the row still lands, just
     without a vector. Better partial than nothing.
+
+    Raises RuntimeError("space_disabled:<space_id>") if the space has been
+    disabled via the kill switch. All other DB errors are non-blocking.
     """
+    if await is_space_disabled(space_id):
+        raise RuntimeError(f"space_disabled:{space_id}")
+
     pool = await get_pool()
     new_id = str(uuid.uuid4())
     importance_clamped = max(0.0, min(1.0, importance))
@@ -174,25 +222,93 @@ async def save_memory(
     vec = await _embed(content)
     vec_lit = _vector_literal(vec) if vec is not None else None
 
-    sql = """
-        INSERT INTO "AgentMemory" (
-            id, "spaceId", "entityType", "entityId", "memoryType",
-            content, importance, embedding, "expiresAt"
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9)
-        RETURNING id, "entityType", "entityId", "memoryType",
-                  content, importance, "createdAt", "updatedAt"
+    if task_id is not None:
+        sql = """
+            INSERT INTO "AgentMemory" (
+                id, "spaceId", "entityType", "entityId", "memoryType",
+                content, importance, embedding, "expiresAt", "taskId"
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9, $10)
+            RETURNING id, "entityType", "entityId", "memoryType",
+                      content, importance, "createdAt", "updatedAt"
+        """
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                sql,
+                new_id, space_id, entity_type, entity_id, memory_type,
+                content, importance_clamped, vec_lit, expires_at, task_id,
+            )
+    else:
+        sql = """
+            INSERT INTO "AgentMemory" (
+                id, "spaceId", "entityType", "entityId", "memoryType",
+                content, importance, embedding, "expiresAt"
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9)
+            RETURNING id, "entityType", "entityId", "memoryType",
+                      content, importance, "createdAt", "updatedAt"
+        """
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                sql,
+                new_id, space_id, entity_type, entity_id, memory_type,
+                content, importance_clamped, vec_lit, expires_at,
+            )
+
+    return dict(row) if row else {
+        "id": new_id, "spaceId": space_id, "entityType": entity_type,
+        "entityId": entity_id, "memoryType": memory_type, "content": content,
+        "importance": importance_clamped,
+    }
+
+
+async def load_task_memories(
+    space_id: str,
+    task_id: str,
+    limit: int = 20,
+) -> list[dict]:
+    """Load memories scoped to a specific task within a space.
+
+    Ordered by importance DESC then createdAt DESC. Useful for injecting
+    task-specific context at the start of a sub-task run.
     """
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            sql,
-            new_id, space_id, entity_type, entity_id, memory_type,
-            content, importance_clamped, vec_lit, expires_at,
+    db = await supabase()
+
+    result = await (
+        db.table("AgentMemory")
+        .select("id,entityType,entityId,memoryType,content,importance,taskId,createdAt,updatedAt")
+        .eq("spaceId", space_id)
+        .eq("taskId", task_id)
+        .order("importance", desc=True)
+        .order("createdAt", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return result.data or []
+
+
+async def prune_task_memories(space_id: str, task_id: str) -> int:
+    """Delete all memories for a given spaceId + taskId combination.
+
+    Returns the count of deleted rows. Intended for cleanup after a task
+    completes so task-scoped memories don't pollute the global memory pool.
+    DB errors are non-blocking — log and return 0.
+    """
+    try:
+        db = await supabase()
+        result = await (
+            db.table("AgentMemory")
+            .delete()
+            .eq("spaceId", space_id)
+            .eq("taskId", task_id)
+            .execute()
         )
-        return dict(row) if row else {
-            "id": new_id, "spaceId": space_id, "entityType": entity_type,
-            "entityId": entity_id, "memoryType": memory_type, "content": content,
-            "importance": importance_clamped,
-        }
+        return len(result.data) if result.data else 0
+    except Exception:
+        logger.warning(
+            "prune_task_memories: DB error for space %s task %s — skipping",
+            space_id,
+            task_id,
+        )
+        return 0
 
 
 async def prune_expired(space_id: str) -> int:
