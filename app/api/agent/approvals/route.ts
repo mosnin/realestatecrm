@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
 
 // ── GET /api/agent/approvals ──────────────────────────────────────────────────
 // Returns all AgentTask rows in 'paused' status with a non-null
@@ -20,6 +21,12 @@ export async function GET(req: NextRequest) {
   const space = await getSpaceForUser(userId);
   if (!space) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  try {
+    await assertSpaceEnabled(space.id);
+  } catch {
+    return NextResponse.json({ error: 'Space is disabled' }, { status: 403 });
   }
 
   // Filter: paused tasks where metadata->approvalRequired is not null.
@@ -57,6 +64,12 @@ export async function POST(req: NextRequest) {
   const space = await getSpaceForUser(userId);
   if (!space) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  try {
+    await assertSpaceEnabled(space.id);
+  } catch {
+    return NextResponse.json({ error: 'Space is disabled' }, { status: 403 });
   }
 
   let body: { taskId?: string; action?: string; reason?: string };

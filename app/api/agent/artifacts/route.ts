@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
 
 // GET /api/agent/artifacts?spaceId=xxx[&taskId=yyy][&type=zzz]
 export async function GET(req: NextRequest) {
@@ -26,6 +27,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  try {
+    await assertSpaceEnabled(spaceId);
+  } catch {
+    return NextResponse.json({ error: 'Space is disabled' }, { status: 403 });
+  }
+
   const taskId = req.nextUrl.searchParams.get('taskId');
   const type = req.nextUrl.searchParams.get('type');
 
@@ -37,7 +44,7 @@ export async function GET(req: NextRequest) {
     .limit(50);
 
   if (taskId) query = query.eq('taskId', taskId);
-  if (type) query = query.eq('type', type);
+  if (type) query = query.eq('artifactType', type);
 
   const { data, error } = await query;
   if (error) {
@@ -84,10 +91,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  try {
+    await assertSpaceEnabled(spaceId);
+  } catch {
+    return NextResponse.json({ error: 'Space is disabled' }, { status: 403 });
+  }
+
   // Step 1: insert Artifact without currentVersionId
   const artifactInsert: Record<string, unknown> = {
     spaceId,
-    type,
+    artifactType: type,
     title,
   };
   if (taskId) artifactInsert.taskId = taskId;

@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { enqueueTask } from '@/lib/agent/task-state-machine';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
 
 // ── GET /api/agent/tasks?spaceId=... ─────────────────────────────────────────
 // List tasks for a space, ordered newest-first, capped at 50.
@@ -30,6 +31,12 @@ export async function GET(req: NextRequest) {
   const space = await getSpaceForUser(userId);
   if (!space || space.id !== spaceId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  try {
+    await assertSpaceEnabled(spaceId);
+  } catch {
+    return NextResponse.json({ error: 'Space is disabled' }, { status: 403 });
   }
 
   const { data: tasks, error } = await supabase
@@ -77,6 +84,12 @@ export async function POST(req: NextRequest) {
   const space = await getSpaceForUser(userId);
   if (!space || space.id !== spaceId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  try {
+    await assertSpaceEnabled(spaceId);
+  } catch {
+    return NextResponse.json({ error: 'Space is disabled' }, { status: 403 });
   }
 
   try {
