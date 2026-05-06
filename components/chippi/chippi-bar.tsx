@@ -33,6 +33,34 @@ export function ChippiBar({ slug }: Props) {
   const pathname = usePathname() ?? '';
   const onChippiPage = pathname.endsWith(`/s/${slug}/chippi`) || pathname.startsWith(`/s/${slug}/chippi/`);
 
+  const contextPlaceholder = useMemo(() => {
+    if (pathname.includes('/contacts') || pathname.includes('/people')) {
+      return 'Ask about a contact or draft a follow-up…';
+    }
+    if (pathname.includes('/deals')) {
+      return 'Ask about a deal or find what\'s stuck…';
+    }
+    if (pathname.includes('/calendar')) {
+      return 'Schedule a tour or check availability…';
+    }
+    if (pathname.includes('/leads')) {
+      return 'Ask about a lead or set a follow-up…';
+    }
+    if (pathname.includes('/analytics')) {
+      return 'Ask about your pipeline or run a summary…';
+    }
+    if (pathname.includes('/commissions')) {
+      return 'Ask about your earnings or a specific deal…';
+    }
+    if (pathname.includes('/integrations')) {
+      return 'Ask about your connected tools…';
+    }
+    if (pathname.includes('/settings') || pathname.includes('/configure')) {
+      return 'Ask Chippi anything about your setup…';
+    }
+    return 'Ask Chippi or just talk…';
+  }, [pathname]);
+
   const [convId, setConvId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState('');
@@ -299,7 +327,7 @@ export function ChippiBar({ slug }: Props) {
           'pl-4 pr-1.5 py-1.5 shadow-lg',
         )}
       >
-        <Sparkles size={13} className="text-muted-foreground/60 flex-shrink-0" />
+        <Sparkles size={13} className="text-muted-foreground/80 flex-shrink-0" />
         <input
           ref={inputRef}
           id="chippi-bar-input"
@@ -307,7 +335,7 @@ export function ChippiBar({ slug }: Props) {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onFocus={() => setExpanded(true)}
-          placeholder={dictation.listening ? 'Listening…' : 'Ask Chippi or just talk…'}
+          placeholder={dictation.listening ? 'Listening…' : contextPlaceholder}
           disabled={!!pendingApproval}
           aria-label="Message Chippi"
           className="flex-1 min-w-0 bg-transparent border-0 outline-none text-sm placeholder:text-muted-foreground/70 disabled:opacity-50"
