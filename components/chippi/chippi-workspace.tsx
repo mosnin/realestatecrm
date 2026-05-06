@@ -196,9 +196,10 @@ export function ChippiWorkspace({
     conversationId: activeConversationId,
     onConversationCreated: (id) => {
       setActiveConversationId(id);
-      // Mark it synced so the prop-sync effect doesn't try to re-hydrate
-      // (and clobber the streaming bubble) when the URL update below arrives.
-      lastLoadedConvIdRef.current = id;
+      // Mark as loaded so the conversation-loading effect won't try to
+      // re-fetch when the URL update below arrives (messages are already
+      // in the UI from the optimistic send).
+      loadedConvIdRef.current = id;
       // Minimal placeholder — the sidebar picks up the real title on refresh,
       // and `send` already titled the conversation server-side.
       setConversations((prev) =>
@@ -298,71 +299,41 @@ export function ChippiWorkspace({
   const approveCelebrating = celebrateThen(approve);
   const alwaysAllowCelebrating = celebrateThen(alwaysAllow);
 
-  // Two redundant paths feed messages into the transcript so a flake on
-  // one path doesn't black-hole the user:
+  // ── Conversation loading ─────────────────────────────────────────────────
   //
-  //  1. Server-driven prop sync. Whenever the page server component
-  //     re-renders (it reads `?conversationId=` and fetches the matching
-  //     transcript), the new `initialMessages` / `initialConversationId`
-  //     props arrive and we adopt them. We DON'T gate this with a one-shot
-  //     `hydratedRef` — that meant a server re-render couldn't update the
-  //     transcript. The streaming guard prevents clobbering a mid-flight
-  //     bubble.
+  // Single source of truth: the URL's `?conversationId=` param.
   //
-  //  2. Client-side URL fetch. `useSearchParams` updates on every Link
-  //     click; when `?conversationId=X` differs from what we last loaded,
-  //     hit `/api/ai/messages?conversationId=X` directly. Belt-and-suspenders
-  //     in case Next.js's router cache serves a stale render.
+  // When the URL changes (sidebar click, new conversation, etc.) we load the
+  // matching messages. On initial mount we prefer the server-provided
+  // initialMessages (already fetched server-side) to avoid a redundant
+  // round-trip. When the server props are stale or empty we fall back to a
+  // client fetch from /api/ai/messages.
   //
-  // Either path produces the same end state (messages = X's messages).
-  // Whichever wins the race, the transcript ends up correct.
+  // loadedConvIdRef guards against re-loading the same conversation twice
+  // (e.g. when React fires the effect after an unrelated state change, or
+  // when onConversationCreated updates the URL to the just-created conv).
   const searchParams = useSearchParams();
   const urlConversationId = searchParams.get('conversationId');
-  const lastLoadedConvIdRef = useRef<string | null>(null);
+  const loadedConvIdRef = useRef<string | null>(null);
 
-  // Path 1 — adopt props from the server render.
-  // Guard: if the URL already names a *different* conversation than what the
-  // server sent, the server payload is a stale router-cache entry. Adopting
-  // it would overwrite whatever Path 2 just correctly loaded. Skip it — Path 2
-  // will (or already has) fetched the right transcript directly.
-  useEffect(() => {
-    if (isStreaming) return;
-    if (initialConversationId === lastLoadedConvIdRef.current) return;
-    if (!initialConversationId) return;
-    if (urlConversationId && urlConversationId !== initialConversationId) return;
-    console.log('[Chat] sync from props', initialConversationId, 'msgs:', initialMessages.length);
-    lastLoadedConvIdRef.current = initialConversationId;
-    setActiveConversationId(initialConversationId);
-    setMessages(initialMessages.length > 0 ? legacyToUi(initialMessages) : []);
-  }, [initialConversationId, initialMessages, isStreaming, setMessages, urlConversationId]);
-
-  // Path 2 — fetch on URL change.
-  // Extracted so the toast retry action can re-invoke the same logic.
   const loadConversation = useCallback(
     async (convId: string) => {
       try {
         const res = await fetch(`/api/ai/messages?conversationId=${convId}`);
         if (!res.ok) {
-          const body = await res.text().catch(() => '');
-          console.error('[Chat] Load failed', res.status, body);
+          const errBody = await res.text().catch(() => '');
+          console.error('[Chat] fetch failed', res.status, errBody);
           toast.error("Couldn't load that conversation.", {
-            action: {
-              label: 'Retry',
-              onClick: () => void loadConversation(convId),
-            },
+            action: { label: 'Retry', onClick: () => void loadConversation(convId) },
           });
           return;
         }
         const data = (await res.json()) as LegacyMessage[];
-        console.log('[Chat] url-effect loaded', convId, 'msgs:', data.length);
         setMessages(legacyToUi(data));
       } catch (err) {
-        console.error('[Chat] Failed to load conversation:', err);
+        console.error('[Chat] fetch error', err);
         toast.error("Couldn't load that conversation.", {
-          action: {
-            label: 'Retry',
-            onClick: () => void loadConversation(convId),
-          },
+          action: { label: 'Retry', onClick: () => void loadConversation(convId) },
         });
       }
     },
@@ -370,14 +341,38 @@ export function ChippiWorkspace({
   );
 
   useEffect(() => {
-    if (!urlConversationId) return;
     if (isStreaming) return;
-    if (urlConversationId === lastLoadedConvIdRef.current) return;
-    console.log('[Chat] url-effect fetching', urlConversationId);
-    lastLoadedConvIdRef.current = urlConversationId;
-    setActiveConversationId(urlConversationId);
-    void loadConversation(urlConversationId);
-  }, [urlConversationId, isStreaming, loadConversation]);
+
+    // Determine which conversation the user should see right now.
+    // URL is authoritative; fall back to what the server pre-loaded.
+    const targetId = urlConversationId ?? initialConversationId ?? null;
+    if (!targetId) {
+      // No conversation at all — ensure empty state.
+      if (loadedConvIdRef.current !== '') {
+        loadedConvIdRef.current = '';
+        setActiveConversationId(null);
+        setMessages([]);
+      }
+      return;
+    }
+
+    // Already showing this conversation — nothing to do.
+    if (targetId === loadedConvIdRef.current) return;
+
+    loadedConvIdRef.current = targetId;
+    setActiveConversationId(targetId);
+
+    // Server already fetched the right messages for this exact conversation —
+    // use them immediately (zero extra round-trip).
+    if (targetId === initialConversationId && initialMessages.length > 0) {
+      setMessages(legacyToUi(initialMessages));
+      return;
+    }
+
+    // Server props are empty or stale (e.g. router-cache served an old render,
+    // or this is a conversation outside the server's top-50 list). Fetch fresh.
+    void loadConversation(targetId);
+  }, [urlConversationId, initialConversationId, initialMessages, isStreaming, loadConversation, setMessages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
