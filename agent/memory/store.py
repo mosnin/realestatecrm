@@ -203,8 +203,22 @@ async def save_memory(
     importance: float = 0.5,
     expires_at: str | None = None,
     task_id: str | None = None,
+    source_run_id: str | None = None,
+    source_tool_name: str | None = None,
+    source_conversation_id: str | None = None,
 ) -> dict[str, Any]:
     """Persist a memory and embed it for future semantic recall.
+
+    Upsert behaviour: if a memory with the same (spaceId, entityType,
+    entityId, memoryType) already exists, its content, importance, and
+    embedding are updated in-place rather than creating a duplicate row.
+    This keeps the memory pool clean across repeated agent runs.
+
+    Source attribution: the optional source_run_id, source_tool_name, and
+    source_conversation_id parameters are stored when provided so every
+    memory row can be traced back to the tool/run that created it.
+    These columns are added by migration 20260601000007. If the migration
+    has not yet run the write falls back gracefully without those columns.
 
     Embedding failures don't abort the save — the row still lands, just
     without a vector. Better partial than nothing.
@@ -216,45 +230,121 @@ async def save_memory(
         raise RuntimeError(f"space_disabled:{space_id}")
 
     pool = await get_pool()
-    new_id = str(uuid.uuid4())
     importance_clamped = max(0.0, min(1.0, importance))
 
     vec = await _embed(content)
     vec_lit = _vector_literal(vec) if vec is not None else None
 
-    if task_id is not None:
-        sql = """
-            INSERT INTO "AgentMemory" (
-                id, "spaceId", "entityType", "entityId", "memoryType",
-                content, importance, embedding, "expiresAt", "taskId"
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9, $10)
-            RETURNING id, "entityType", "entityId", "memoryType",
-                      content, importance, "createdAt", "updatedAt"
-        """
-        async with pool.acquire() as conn:
-            row = await conn.fetchrow(
-                sql,
-                new_id, space_id, entity_type, entity_id, memory_type,
-                content, importance_clamped, vec_lit, expires_at, task_id,
-            )
-    else:
-        sql = """
-            INSERT INTO "AgentMemory" (
-                id, "spaceId", "entityType", "entityId", "memoryType",
-                content, importance, embedding, "expiresAt"
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9)
-            RETURNING id, "entityType", "entityId", "memoryType",
-                      content, importance, "createdAt", "updatedAt"
-        """
-        async with pool.acquire() as conn:
-            row = await conn.fetchrow(
-                sql,
-                new_id, space_id, entity_type, entity_id, memory_type,
-                content, importance_clamped, vec_lit, expires_at,
-            )
+    # Check for an existing row with the same natural key so we can upsert.
+    # No unique constraint exists on these four columns in the DB schema, so
+    # we use a SELECT-first approach rather than ON CONFLICT.
+    check_sql = """
+        SELECT id FROM "AgentMemory"
+        WHERE "spaceId" = $1
+          AND "entityType" IS NOT DISTINCT FROM $2
+          AND "entityId" IS NOT DISTINCT FROM $3
+          AND "memoryType" = $4
+        LIMIT 1
+    """
 
+    async with pool.acquire() as conn:
+        existing = await conn.fetchrow(
+            check_sql, space_id, entity_type, entity_id, memory_type
+        )
+
+        if existing:
+            # UPDATE the existing row: refresh content, importance, embedding,
+            # expiry, and source attribution. taskId is left unchanged on
+            # update (it was set at insert time for task-scoped memories).
+            try:
+                update_sql = """
+                    UPDATE "AgentMemory"
+                    SET content = $1,
+                        importance = $2,
+                        embedding = $3::vector,
+                        "expiresAt" = $4,
+                        "sourceRunId" = $5,
+                        "sourceToolName" = $6,
+                        "sourceConversationId" = $7,
+                        "updatedAt" = NOW()
+                    WHERE id = $8
+                    RETURNING id, "entityType", "entityId", "memoryType",
+                              content, importance, "createdAt", "updatedAt"
+                """
+                row = await conn.fetchrow(
+                    update_sql,
+                    content, importance_clamped, vec_lit, expires_at,
+                    source_run_id, source_tool_name, source_conversation_id,
+                    existing["id"],
+                )
+            except Exception:
+                # Source attribution columns may not exist yet if migration
+                # 20260601000007 hasn't run. Fall back to updating without them.
+                logger.warning(
+                    "save_memory: source attribution columns unavailable, "
+                    "updating without attribution for space %s", space_id
+                )
+                update_sql_fallback = """
+                    UPDATE "AgentMemory"
+                    SET content = $1,
+                        importance = $2,
+                        embedding = $3::vector,
+                        "expiresAt" = $4,
+                        "updatedAt" = NOW()
+                    WHERE id = $5
+                    RETURNING id, "entityType", "entityId", "memoryType",
+                              content, importance, "createdAt", "updatedAt"
+                """
+                row = await conn.fetchrow(
+                    update_sql_fallback,
+                    content, importance_clamped, vec_lit, expires_at,
+                    existing["id"],
+                )
+        else:
+            # INSERT a new row. Try with source attribution columns first;
+            # fall back without them if the migration hasn't run yet.
+            new_id = str(uuid.uuid4())
+            try:
+                insert_sql = """
+                    INSERT INTO "AgentMemory" (
+                        id, "spaceId", "entityType", "entityId", "memoryType",
+                        content, importance, embedding, "expiresAt", "taskId",
+                        "sourceRunId", "sourceToolName", "sourceConversationId"
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9, $10,
+                              $11, $12, $13)
+                    RETURNING id, "entityType", "entityId", "memoryType",
+                              content, importance, "createdAt", "updatedAt"
+                """
+                row = await conn.fetchrow(
+                    insert_sql,
+                    new_id, space_id, entity_type, entity_id, memory_type,
+                    content, importance_clamped, vec_lit, expires_at, task_id,
+                    source_run_id, source_tool_name, source_conversation_id,
+                )
+            except Exception:
+                # Source attribution columns may not exist yet. Fall back to
+                # insert without them so the write still succeeds.
+                logger.warning(
+                    "save_memory: source attribution columns unavailable, "
+                    "inserting without attribution for space %s", space_id
+                )
+                insert_sql_fallback = """
+                    INSERT INTO "AgentMemory" (
+                        id, "spaceId", "entityType", "entityId", "memoryType",
+                        content, importance, embedding, "expiresAt", "taskId"
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9, $10)
+                    RETURNING id, "entityType", "entityId", "memoryType",
+                              content, importance, "createdAt", "updatedAt"
+                """
+                row = await conn.fetchrow(
+                    insert_sql_fallback,
+                    new_id, space_id, entity_type, entity_id, memory_type,
+                    content, importance_clamped, vec_lit, expires_at, task_id,
+                )
+
+    existing_id = existing["id"] if existing else new_id  # type: ignore[possibly-undefined]
     return dict(row) if row else {
-        "id": new_id, "spaceId": space_id, "entityType": entity_type,
+        "id": existing_id, "spaceId": space_id, "entityType": entity_type,
         "entityId": entity_id, "memoryType": memory_type, "content": content,
         "importance": importance_clamped,
     }

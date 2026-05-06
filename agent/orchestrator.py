@@ -14,12 +14,14 @@ RunContextWrapper. No tool ever accepts spaceId as an argument.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
 
 import structlog
 from agents import InputGuardrailTripwireTriggered, ModelSettings, RunConfig, Runner
+from openai import AsyncOpenAI, APIStatusError, RateLimitError
 
 from config import settings
 from db import supabase
@@ -31,7 +33,140 @@ from security.context import AgentContext
 from chippi import make_chippi_agent
 from tools.streaming import publish_event
 
+# ---------------------------------------------------------------------------
+# Optional module guards (T8 modules — may not be committed yet)
+# ---------------------------------------------------------------------------
+
+try:
+    from checkpoints import save_checkpoint, load_checkpoint
+    _CHECKPOINTS_AVAILABLE = True
+except ImportError:
+    _CHECKPOINTS_AVAILABLE = False
+    save_checkpoint = load_checkpoint = None  # type: ignore[assignment]
+
+try:
+    from heartbeat import HeartbeatPinger
+    _HEARTBEAT_AVAILABLE = True
+except ImportError:
+    _HEARTBEAT_AVAILABLE = False
+    HeartbeatPinger = None  # type: ignore[assignment,misc]
+
+try:
+    from compaction import compact_messages
+    _COMPACTION_AVAILABLE = True
+except ImportError:
+    _COMPACTION_AVAILABLE = False
+    compact_messages = None  # type: ignore[assignment]
+
+# ---------------------------------------------------------------------------
+# Model fallback list (KR2)
+# ---------------------------------------------------------------------------
+
+_FALLBACK_MODELS = ["gpt-4.1-mini", "gpt-4o-mini", "gpt-4.1-nano"]
+
+# ---------------------------------------------------------------------------
+# High-risk tool detection (KR4)
+# ---------------------------------------------------------------------------
+
+_HIGH_RISK_PATTERNS = ["send_", "archive_", "delete_", "mark_deal_lost", "mark_person"]
+
+
+def _is_high_risk_tool(tool_name: str) -> bool:
+    """Return True when a tool name matches a high-risk operation pattern."""
+    return any(tool_name.startswith(p) or p in tool_name for p in _HIGH_RISK_PATTERNS)
+
 logger = structlog.get_logger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Model-fallback runner (KR2)
+# ---------------------------------------------------------------------------
+
+async def _run_with_fallback(
+    agent,
+    input_data,
+    run_config: RunConfig,
+    context,
+) -> object:
+    """Run the agent, falling back through _FALLBACK_MODELS on 429 errors.
+
+    The agent's model attribute is patched per attempt. On exhaustion raises
+    RuntimeError so the caller can surface a clean error rather than a bare
+    exception.
+    """
+    last_exc: Exception | None = None
+    for i, model in enumerate(_FALLBACK_MODELS):
+        try:
+            agent.model = model
+            result = await Runner.run(
+                agent, input=input_data, run_config=run_config, context=context
+            )
+            return result
+        except (RateLimitError, APIStatusError) as exc:
+            status = getattr(exc, "status_code", None)
+            err_str = str(exc)
+            is_429 = isinstance(exc, RateLimitError) or status == 429 or "429" in err_str
+            if is_429 and i < len(_FALLBACK_MODELS) - 1:
+                next_model = _FALLBACK_MODELS[i + 1]
+                logger.warning(
+                    "model_rate_limited_falling_back",
+                    model=model,
+                    next_model=next_model,
+                    attempt=i + 1,
+                )
+                await asyncio.sleep(2)
+                last_exc = exc
+                continue
+            raise
+        except Exception as exc:
+            err_str = str(exc)
+            if ("429" in err_str or "rate_limit" in err_str.lower()) and i < len(_FALLBACK_MODELS) - 1:
+                next_model = _FALLBACK_MODELS[i + 1]
+                logger.warning(
+                    "model_rate_limited_falling_back",
+                    model=model,
+                    next_model=next_model,
+                    attempt=i + 1,
+                )
+                await asyncio.sleep(2)
+                last_exc = exc
+                continue
+            raise
+    raise RuntimeError(f"All models exhausted after rate-limit errors") from last_exc
+
+
+# ---------------------------------------------------------------------------
+# Critic / verifier (KR3)
+# ---------------------------------------------------------------------------
+
+async def _run_critic(goal: str, outcome_summary: str, client: AsyncOpenAI) -> str:
+    """Ask a cheap LLM whether the agent accomplished its goal.
+
+    Returns a short verdict string like "YES — the agent ..." or "NO — ...".
+    On failure returns "UNKNOWN" so the caller can still store a metadata entry.
+    """
+    try:
+        resp = await client.chat.completions.create(
+            model="gpt-4.1-nano",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You evaluate if an agent completed its goal. "
+                        "Respond: YES or NO, then one sentence why."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Goal: {goal}\n\nOutcome: {outcome_summary}",
+                },
+            ],
+            max_tokens=100,
+        )
+        return resp.choices[0].message.content or "UNKNOWN"
+    except Exception as exc:
+        logger.warning("critic_call_failed", error=str(exc))
+        return "UNKNOWN"
 
 
 async def pop_triggers(space_id: str) -> list[dict]:

@@ -42,6 +42,7 @@ interface FindToursResult {
 
 export const findToursTool = defineTool<typeof parameters, FindToursResult>({
   name: 'find_tours',
+  riskLevel: 'safe',
   description:
     "List tours filtered by person, property, date range, or status. Up to 20, sorted by start time.",
   parameters,

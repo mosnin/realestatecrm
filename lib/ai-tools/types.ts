@@ -27,6 +27,18 @@
 
 import type { z } from 'zod';
 
+// ── Risk level for autonomous agent approval gating ───────────────────────
+
+/**
+ * Machine-readable risk classification for the autonomous orchestrator.
+ *
+ * - `safe`        — read-only; no side effects (find, search, get, list).
+ * - `low`         — internal mutation; reversible (update contact, schedule follow-up).
+ * - `high`        — external communication or user-visible side effect (send_email, send_sms).
+ * - `destructive` — irreversible or high-impact action (archive, mark_lost, merge).
+ */
+export type RiskLevel = 'safe' | 'low' | 'high' | 'destructive';
+
 // ── Context the loop passes to every handler ──────────────────────────────
 
 /**
@@ -87,6 +99,8 @@ interface BaseToolFields<TArgs, TData> {
   parameters: z.ZodType<TArgs>;
   /** The actual work. Must respect ctx.signal for cancellation. */
   handler: ToolHandler<TArgs, TData>;
+  /** Risk level for autonomous sweep approval gating. Defaults to 'safe'. */
+  riskLevel?: RiskLevel;
 }
 
 /**
@@ -147,4 +161,12 @@ export function defineTool<TSchema extends z.ZodType, TData = unknown>(
       }),
 ): ToolDefinition<z.infer<TSchema>, TData> {
   return def as ToolDefinition<z.infer<TSchema>, TData>;
+}
+
+/**
+ * Returns the declared risk level for a tool, or 'safe' if unset.
+ * Use this in the orchestrator before deciding whether to gate execution.
+ */
+export function getRiskLevel(tool: ToolDefinition): RiskLevel {
+  return tool.riskLevel ?? 'safe';
 }

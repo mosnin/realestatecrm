@@ -31,6 +31,9 @@ import { extractApprovals, serializeRunState } from '@/lib/ai-tools/sdk-bridge';
 import { ALL_TOOLS } from '@/lib/ai-tools/tools';
 import { emit as emitTelemetry } from '@/lib/telemetry';
 import { logToolCallStart, logToolCallComplete, logToolCallError } from '@/lib/agent/tool-call-logger';
+import { compactContext, estimateContextChars } from '@/lib/agent/compaction';
+
+const COMPACTION_THRESHOLD_CHARS = 80_000;
 
 interface HistoryRow {
   role: 'user' | 'assistant';
@@ -100,6 +103,12 @@ interface BuildStreamInput {
   abortController: AbortController;
   /** Returns the SDK streamed result. Either fresh or resumed. */
   start: () => Promise<{ result: SdkResultLike }>;
+  /**
+   * Events to push immediately after the stream opens, before the agent
+   * call fires. Used to relay compaction notices assembled before the
+   * ReadableStream constructor ran (where pushEvent isn't yet available).
+   */
+  initialEvents?: PushableEvent[];
 }
 
 /**
@@ -130,6 +139,9 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
       // back to the row we inserted on tool_call_start.
       const callIdToStepId = new Map<string, string>();
 
+      // Drain any events that were queued before the stream opened
+      // (e.g. compaction notice assembled in streamTsChatTurn).
+      // We define pushEvent first and call it immediately after.
       const pushEvent = (event: PushableEvent) => {
         if (event.type === 'text_delta') {
           textBuffer += event.delta;
