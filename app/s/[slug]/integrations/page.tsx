@@ -9,6 +9,16 @@
  * The realtor's lens — what does Chippi DO once I connect Gmail? — is
  * answered by the app's blurb in the row, not by a help article. If the
  * blurb doesn't sell it, fix the blurb.
+ *
+ * Health status: ConnectedAppsSection fetches /api/integrations/health
+ * client-side (non-blocking, refreshes on window focus) and shows a
+ * colored dot + label next to each connected app:
+ *   - green  "Connected"        — Composio reports ACTIVE
+ *   - yellow "Auth expired"     — Composio reports EXPIRED; realtor must reconnect
+ *   - red    "Connection error" — Composio reports FAILED or a fetch error
+ *   - gray   "Not connected"    — no connection in our DB or Composio
+ * This surfaces broken auth before Chippi tries to use the integration,
+ * eliminating silent task failures.
  */
 
 import { notFound, redirect } from 'next/navigation';
