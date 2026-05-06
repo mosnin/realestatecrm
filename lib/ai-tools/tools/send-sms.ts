@@ -55,6 +55,7 @@ interface SendSMSResult {
 
 export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
   name: 'send_sms',
+  riskLevel: 'high',
   description:
     'Send an SMS to a person (or free-form phone number). Always prompts for approval. Use for tour confirmations, quick check-ins.',
   parameters,
