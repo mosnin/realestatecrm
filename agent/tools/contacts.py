@@ -12,7 +12,7 @@ from db import supabase
 from errors import AgentError, from_supabase_error, from_exception
 from memory.store import save_memory
 from security.context import AgentContext
-from tools.base import with_retry
+from tools.base import idempotent_tool, with_retry
 from tools.streaming import publish_event
 
 _CLIP = 300
@@ -133,6 +133,7 @@ async def get_contact_activity(
 _VALID_TYPES = {"QUALIFICATION", "TOUR", "APPLICATION"}
 
 
+@idempotent_tool
 @function_tool
 async def update_contact(
     ctx: RunContextWrapper[AgentContext],

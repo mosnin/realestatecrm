@@ -257,6 +257,46 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Daily token quota check. Sum inputTokens + outputTokens from AgentTask
+  // rows created today for this space and compare against the configured
+  // dailyTokenBudget. Falls back to a hard 500,000-token safety cap when no
+  // budget row exists.
+  try {
+    const { data: agentSettingsRow } = await supabase
+      .from('AgentSettings')
+      .select('dailyTokenBudget')
+      .eq('spaceId', ctx.space.id)
+      .maybeSingle();
+
+    const dailyTokenBudget: number =
+      (agentSettingsRow?.dailyTokenBudget as number | null | undefined) ?? 500_000;
+
+    const todayUtc = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const { data: usageRows } = await supabase
+      .from('AgentTask')
+      .select('inputTokens, outputTokens')
+      .eq('spaceId', ctx.space.id)
+      .gte('createdAt', `${todayUtc}T00:00:00.000Z`);
+
+    const todayTokens = (usageRows ?? []).reduce(
+      (sum: number, row: { inputTokens: number | null; outputTokens: number | null }) =>
+        sum + (row.inputTokens ?? 0) + (row.outputTokens ?? 0),
+      0,
+    );
+
+    if (todayTokens >= dailyTokenBudget) {
+      logger.warn('[ai/task] daily token budget exceeded', {
+        spaceId: ctx.space.id,
+        todayTokens,
+        dailyTokenBudget,
+      });
+      return NextResponse.json({ error: 'Daily token budget exceeded' }, { status: 429 });
+    }
+  } catch (err) {
+    // Non-fatal: a budget check failure should not block the user. Log and continue.
+    logger.warn('[ai/task] token budget check failed — continuing', { spaceSlug }, err);
+  }
+
   let conversationId: string;
   try {
     conversationId = await resolveConversation(ctx.space.id, body.conversationId ?? null, message);

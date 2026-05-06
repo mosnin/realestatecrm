@@ -12,7 +12,7 @@ from db import supabase
 from errors import AgentError, from_supabase_error, from_exception
 from security.context import AgentContext
 from tools.activities import persist_log
-from tools.base import with_retry
+from tools.base import idempotent_tool, with_retry
 from tools.streaming import publish_event
 
 _CLIP = 300
@@ -96,6 +96,7 @@ async def find_deals(
     return result.data or []
 
 
+@idempotent_tool
 @function_tool
 async def update_deal(
     ctx: RunContextWrapper[AgentContext],
