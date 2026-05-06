@@ -29,7 +29,7 @@ import {
   applyApprovalDecision,
   type ApprovalDecision,
 } from './sdk-bridge';
-import { buildPipelineAnalystAgent, buildContactResearcherAgent } from './sdk-skills';
+import { buildPipelineAnalystAgent, buildContactResearcherAgent, buildPlannerAgent } from './sdk-skills';
 import { buildSystemPrompt, buildPersonalizedSystemPrompt } from './system-prompt';
 import { ALL_TOOLS } from './tools';
 import type { ToolContext, ToolDefinition } from './types';
@@ -45,12 +45,13 @@ const DEFAULT_MODEL = 'gpt-4.1-mini';
 /**
  * Hard ceiling on tool-call iterations per chat turn. The SDK has its
  * own internal default; we set ours explicitly so a model that decides
- * to spelunk the catalog can't run our token bill into the ground. 8 is
- * generous for a real conversation: read-research-think-act-confirm
- * fits inside it. If the model needs more, it should ask the realtor
- * a clarifying question, not loop.
+ * to spelunk the catalog can't run our token bill into the ground. 15
+ * gives the agent enough headroom to chain multi-step workflows
+ * autonomously (look up a person → read their activity → find their
+ * deal → draft a follow-up) without stopping mid-task to ask the
+ * realtor a clarifying question.
  */
-const MAX_TURNS_PER_TURN = 8;
+const MAX_TURNS_PER_TURN = 15;
 
 // ── Agent construction ─────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ export function buildChatAgent(
   // Sub-agent skills attached as tools via the SDK's native `Agent.asTool()`.
   const pipelineAnalyst = buildPipelineAnalystAgent(ctx, { model: opts.model });
   const contactResearcher = buildContactResearcherAgent(ctx, { model: opts.model });
+  const planner = buildPlannerAgent(ctx, { model: opts.model });
 
   const skillTools = [
     pipelineAnalyst.asTool({
@@ -84,6 +86,11 @@ export function buildChatAgent(
       toolName: 'research_person',
       toolDescription:
         'Research everything we know about a person and recommend the next action.',
+    }),
+    planner.asTool({
+      toolName: 'planner',
+      toolDescription:
+        'Break a complex multi-step task into a concrete execution plan before starting work. Call this first when the user asks for something that requires several distinct actions.',
     }),
   ];
 

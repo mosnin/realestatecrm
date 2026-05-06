@@ -79,3 +79,20 @@ export function buildContactResearcherAgent(ctx: ToolContext, opts: { model?: st
     model: opts.model ?? DEFAULT_MODEL,
   });
 }
+
+/**
+ * Planner — decomposes a complex user task into a concrete multi-step
+ * execution plan and surfaces it to the UI via `create_plan` before any
+ * domain tools run.
+ */
+export function buildPlannerAgent(ctx: ToolContext, opts: { model?: string } = {}): Agent {
+  const tools = pickTools(['create_plan']).map((t) => toSdkTool(t, ctx));
+
+  return new Agent({
+    name: 'planner',
+    instructions:
+      'Given a complex user task, break it into 3-7 concrete steps. Call create_plan with the full task description and an array of steps. Each step needs a short title (≤6 words) and a one-sentence description of what will happen. Be specific to the actual task — no generic steps.',
+    tools,
+    model: opts.model ?? DEFAULT_MODEL,
+  });
+}
