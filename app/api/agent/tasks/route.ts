@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { enqueueTask } from '@/lib/agent/task-state-machine';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // ── GET /api/agent/tasks?spaceId=... ─────────────────────────────────────────
 // List tasks for a space, ordered newest-first, capped at 50.
@@ -16,6 +17,14 @@ export async function GET(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
+
+  const rl = await checkRateLimit(`agent:tasks:list:${userId}`, 60, 60);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', retryAfter: undefined },
+      { status: 429 },
+    );
+  }
 
   // Verify the space belongs to the calling user.
   const space = await getSpaceForUser(userId);
@@ -55,6 +64,14 @@ export async function POST(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
+
+  const rl = await checkRateLimit(`agent:tasks:create:${userId}`, 10, 60);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', retryAfter: undefined },
+      { status: 429 },
+    );
+  }
 
   // Verify the space belongs to the calling user.
   const space = await getSpaceForUser(userId);

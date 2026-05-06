@@ -216,6 +216,11 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
         }
       };
 
+      // Emit any events queued before the stream opened (e.g. compaction notice).
+      for (const ev of input.initialEvents ?? []) {
+        pushEvent(ev);
+      }
+
       let result: SdkResultLike;
       try {
         ({ result } = await input.start());

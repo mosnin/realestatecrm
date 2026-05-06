@@ -30,6 +30,7 @@ interface FindStuckDealsResult {
 
 export const findStuckDealsTool = defineTool<typeof parameters, FindStuckDealsResult>({
   name: 'find_stuck_deals',
+  riskLevel: 'safe',
   description: 'Find active deals where updatedAt is older than minDaysQuiet (default 7).',
   parameters,
   requiresApproval: false,

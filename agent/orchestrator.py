@@ -257,14 +257,28 @@ def _build_opening_prompt(
     ).strip()
 
 
-async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> None:
+async def run_agent_for_space(
+    space: Space,
+    agent_settings: AgentSettings,
+    task_id: str | None = None,
+) -> None:
     """Execute one autonomous run for a space.
 
     Called from Modal `run_now_webhook` (manual trigger or trigger-queue
     drain). Skips if the space's daily token budget is exhausted.
+
+    Parameters
+    ----------
+    space:
+        The workspace to run against.
+    agent_settings:
+        Per-space agent configuration including the daily token budget.
+    task_id:
+        Optional AgentTask id. When provided, checkpoints are saved/restored
+        and the heartbeat pinger is active. Autonomous sweeps pass None.
     """
     run_id = str(uuid.uuid4())
-    log = logger.bind(space_id=space.id, space_slug=space.slug, run_id=run_id)
+    log = logger.bind(space_id=space.id, space_slug=space.slug, run_id=run_id, task_id=task_id)
 
     if not await check_budget(space.id, agent_settings.daily_token_budget):
         log.warning("agent_run_skipped_budget_exhausted")
@@ -310,13 +324,107 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
 
     # task_id is not available for autonomous sweeps (no AgentTask row exists).
     # The ledger will skip DB writes gracefully when task_id is None.
-    ledger = StepLedger(space_id=space.id, task_id=None)
+    ledger = StepLedger(space_id=space.id, task_id=task_id)
+
+    # ── KR4: Approval gate — inspect tool roster before running ────────────
+    # In autonomous mode, any high-risk tool in the agent's toolkit requires
+    # explicit approval. We emit a requires_approval event and pause the task
+    # so the realtor can greenlight the action before it executes.
+    agent_tool_names = [
+        getattr(t, "name", "") or getattr(t, "__name__", "") or ""
+        for t in (chippi.tools or [])
+    ]
+    risky_tools = [name for name in agent_tool_names if name and _is_high_risk_tool(name)]
+    if risky_tools:
+        log.info("approval_gate_triggered", risky_tools=risky_tools)
+        await publish_event(
+            ctx, "info",
+            f"Run paused — high-risk tools require approval: {', '.join(risky_tools)}",
+            metadata={
+                "approvalRequired": True,
+                "pendingAction": risky_tools[0],
+                "allRiskyTools": risky_tools,
+            },
+            agent_type="chippi",
+        )
+        # Persist the paused state so the Next.js poller can surface it.
+        if task_id:
+            try:
+                db = await supabase()
+                await db.table("AgentTask").update(
+                    {
+                        "status": "paused",
+                        "metadata": {
+                            "approvalRequired": True,
+                            "pendingAction": risky_tools[0],
+                            "allRiskyTools": risky_tools,
+                        },
+                    }
+                ).eq("id", task_id).execute()
+            except Exception as exc:
+                log.warning("approval_gate_db_update_failed", error=str(exc))
+        # Emit to Redis for real-time notification.
+        try:
+            if settings.kv_rest_api_url and settings.kv_rest_api_token:
+                from upstash_redis.asyncio import Redis
+                r = Redis(url=settings.kv_rest_api_url, token=settings.kv_rest_api_token)
+                event_payload = json.dumps({
+                    "event": "requires_approval",
+                    "spaceId": space.id,
+                    "taskId": task_id,
+                    "riskyTools": risky_tools,
+                })
+                await r.lpush(f"agent:approvals:{space.id}", event_payload)
+        except Exception as exc:
+            log.warning("approval_gate_redis_failed", error=str(exc))
+        return
+
+    # ── KR1: Checkpoint restore — pick up from last known state ────────────
+    initial_messages: list[dict] = []
+    current_step_index: int = 0
+    if _CHECKPOINTS_AVAILABLE and task_id:
+        checkpoint = await load_checkpoint(task_id)  # type: ignore[misc]
+        if checkpoint:
+            initial_messages = checkpoint.get("messages", [])
+            current_step_index = checkpoint.get("stepIndex", 0)
+            log.info(
+                "checkpoint_restored",
+                task_id=task_id,
+                step_index=current_step_index,
+                message_count=len(initial_messages),
+            )
+
+    # ── KR5: Heartbeat — keep the task alive during long runs ──────────────
+    pinger = (
+        HeartbeatPinger(task_id=task_id)  # type: ignore[misc]
+        if _HEARTBEAT_AVAILABLE and HeartbeatPinger is not None and task_id
+        else None
+    )
+    if pinger:
+        await pinger.start()
+
+    # Shared OpenAI client for critic and compaction calls.
+    openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
 
     total_tokens = 0
     final_summary: str | None = None
 
     try:
-        result = await Runner.run(chippi, input=prompt, context=ctx, run_config=run_config)
+        # ── KR5: Compaction — trim history before running ───────────────────
+        messages_to_run = initial_messages or [{"role": "user", "content": prompt}]
+        if not initial_messages:
+            # First run — seed with the opening prompt as the user turn.
+            messages_to_run = [{"role": "user", "content": prompt}]
+        if _COMPACTION_AVAILABLE and compact_messages is not None:
+            messages_to_run = await compact_messages(
+                messages_to_run, max_chars=80_000, client=openai_client
+            )
+
+        # ── KR2: Model fallback — run with automatic retry on 429 ───────────
+        # When initial_messages are present we pass them directly; the first
+        # run uses the prompt string for a cleaner Runner.run() call.
+        agent_input = prompt if not initial_messages else messages_to_run
+        result = await _run_with_fallback(chippi, agent_input, run_config, ctx)
 
         usage = getattr(result, "usage", None)
         tokens_in: int = 0
@@ -331,17 +439,53 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
         if isinstance(final_output, str):
             final_summary = final_output[:280]
 
+        # ── KR1: Checkpoint save — persist state after successful run ───────
+        if _CHECKPOINTS_AVAILABLE and save_checkpoint is not None and task_id:
+            # Extract message history from the result for checkpoint storage.
+            result_messages: list[dict] = []
+            raw_history = getattr(result, "raw_responses", None) or []
+            for resp in raw_history:
+                content = getattr(resp, "output", None)
+                if content:
+                    result_messages.append({"role": "assistant", "content": str(content)[:2000]})
+            current_step_index += 1
+            await save_checkpoint(  # type: ignore[misc]
+                task_id=task_id,
+                space_id=space.id,
+                step_index=current_step_index,
+                messages=result_messages,
+                metadata={"lastOutputSummary": final_summary or ""},
+            )
+
         # Record the full agent run as a single LLM-call step in the ledger.
         await ledger.record_llm_call(
             tool_name="chippi",
             input_summary=prompt[:500],
             output_summary=final_summary or f"{total_tokens:,} tokens used",
-            model=settings.orchestrator_model,
+            model=chippi.model or settings.orchestrator_model,
             tokens_in=tokens_in,
             tokens_out=tokens_out,
         )
 
-        log.info("agent_run_completed", total_tokens=total_tokens)
+        log.info("agent_run_completed", total_tokens=total_tokens, model_used=chippi.model)
+
+        # ── KR3: Critic — verify the agent accomplished the goal ────────────
+        outcome_text = final_summary or f"{total_tokens:,} tokens used, no text output."
+        critic_verdict = await _run_critic(
+            goal=prompt[:500],
+            outcome_summary=outcome_text,
+            client=openai_client,
+        )
+        log.info("critic_verdict", verdict=critic_verdict[:120])
+        # Store verdict in AgentTask metadata when a task_id is available.
+        if task_id:
+            try:
+                db = await supabase()
+                await db.table("AgentTask").update(
+                    {"metadata": {"criticVerdict": critic_verdict}}
+                ).eq("id", task_id).execute()
+            except Exception as exc:
+                log.warning("critic_verdict_store_failed", error=str(exc))
 
     except InputGuardrailTripwireTriggered as exc:
         info = exc.guardrail_result.output.output_info or {}
@@ -357,6 +501,11 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
     except Exception as exc:
         log.exception("agent_run_failed")
         await publish_event(ctx, "error", f"Agent error: {exc}", agent_type="chippi")
+
+    finally:
+        # ── KR5: Heartbeat — always stop the pinger ─────────────────────────
+        if pinger:
+            await pinger.stop()
 
     if total_tokens > 0:
         memory_content = (

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { transitionTask } from '@/lib/agent/task-state-machine';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // ── GET /api/agent/tasks/[taskId] ─────────────────────────────────────────────
 // Fetch a single task and its execution steps.
@@ -14,6 +15,14 @@ export async function GET(
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
+
+  const rl = await checkRateLimit(`agent:tasks:get:${userId}`, 60, 60);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', retryAfter: undefined },
+      { status: 429 },
+    );
+  }
 
   const { taskId } = await params;
 
@@ -63,6 +72,14 @@ export async function DELETE(
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
+
+  const rl = await checkRateLimit(`agent:tasks:cancel:${userId}`, 30, 60);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', retryAfter: undefined },
+      { status: 429 },
+    );
+  }
 
   const { taskId } = await params;
 
