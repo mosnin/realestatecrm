@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo, useTransition } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
@@ -549,11 +550,56 @@ export function ChippiWorkspace({
   }
 
   // The trailing assistant message — used to detect the "thinking" state
-  // (streaming but no blocks have landed yet) and to pin the permission
-  // prompt at the end of the transcript.
+  // and to pin the permission prompt at the end of the transcript.
   const tailMessage = useMemo(() => messages[messages.length - 1] ?? null, [messages]);
-  const showThinking =
-    isStreaming && tailMessage?.role === 'assistant' && tailMessage.blocks.length === 0;
+  // Keep the ThinkingIndicator visible for the entire streaming turn, not just
+  // while blocks are empty — it moves to the bottom of the turn as a persistent
+  // "still working" signal.
+  const showThinking = isStreaming && tailMessage?.role === 'assistant';
+
+  // Map in-flight tool call names to human-readable status phrases.
+  const TOOL_ACTION_MAP: Record<string, string> = {
+    search_contacts: 'Searching your contacts…',
+    find_person: 'Searching your contacts…',
+    get_contact: 'Looking up contact…',
+    pipeline_summary: 'Analyzing your pipeline…',
+    find_stuck_deals: 'Analyzing your pipeline…',
+    find_deal: 'Looking up deals…',
+    search_deals: 'Looking up deals…',
+    schedule_tour: 'Checking the calendar…',
+    reschedule_tour: 'Checking the calendar…',
+    find_tours: 'Checking the calendar…',
+    send_email: 'Drafting your email…',
+    draft_email: 'Drafting your email…',
+    send_sms: 'Drafting your message…',
+    draft_sms: 'Drafting your message…',
+    recall_history: 'Checking history…',
+    set_followup: 'Updating follow-up…',
+    clear_followup: 'Updating follow-up…',
+    create_deal: 'Updating deal…',
+    mark_deal_won: 'Updating deal…',
+    mark_deal_lost: 'Updating deal…',
+    note_on_person: 'Adding note…',
+    note_on_deal: 'Adding note…',
+    planner: 'Building a plan…',
+    create_plan: 'Building a plan…',
+  };
+
+  const currentAction = useMemo<string | null>(() => {
+    if (!tailMessage || !liveCallIds || liveCallIds.size === 0) return null;
+    for (const block of tailMessage.blocks) {
+      if (
+        block.type === 'tool_call' &&
+        'callId' in block &&
+        liveCallIds.has((block as { callId: string }).callId)
+      ) {
+        const name = (block as { name: string }).name;
+        return TOOL_ACTION_MAP[name] ?? 'Working on it…';
+      }
+    }
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tailMessage, liveCallIds]);
 
   // Reusable input — shared between the empty hero and the docked footer
   // so the focal point lives wherever it should. Wrapped in a relative
@@ -840,7 +886,7 @@ export function ChippiWorkspace({
           {/* Active thread */}
           <div className="flex-1 min-h-0 overflow-hidden">
             <ScrollArea className="h-full">
-              <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-12 sm:pt-14 pb-4">
+              <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-12 sm:pt-14 pb-36">
                 {/* Conversation title — quiet, only when we have one */}
                 {activeConversationId && (
                   <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-6 truncate">
@@ -931,16 +977,25 @@ export function ChippiWorkspace({
                     );
                   })}
 
-                  {showThinking && (
-                    <div className="flex gap-3">
-                      <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
-                        <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
-                      </div>
-                      <div className="flex-1 min-w-0 pt-0.5">
-                        <ThinkingIndicator />
-                      </div>
-                    </div>
-                  )}
+                  <AnimatePresence>
+                    {showThinking && (
+                      <motion.div
+                        key="thinking-indicator"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                        className="flex gap-3"
+                      >
+                        <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
+                          <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0 pt-0.5">
+                          <ThinkingIndicator currentAction={currentAction} />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {/* Errors land inline as Chippi assistant messages
                       (see useAgentTask.landChippiError) so the failure mode
