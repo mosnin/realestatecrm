@@ -30,6 +30,7 @@ import { mapSdkEvent, type SdkStreamEventLike } from '@/lib/ai-tools/sdk-event-m
 import { extractApprovals, serializeRunState } from '@/lib/ai-tools/sdk-bridge';
 import { ALL_TOOLS } from '@/lib/ai-tools/tools';
 import { emit as emitTelemetry } from '@/lib/telemetry';
+import { logToolCallStart, logToolCallComplete, logToolCallError } from '@/lib/agent/tool-call-logger';
 
 interface HistoryRow {
   role: 'user' | 'assistant';
@@ -125,6 +126,10 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
       // approval prompt. Reset on every tool_call_start.
       let reasoningBuffer = '';
 
+      // Maps callId → ExecutionStep id so we can correlate tool_call_result
+      // back to the row we inserted on tool_call_start.
+      const callIdToStepId = new Map<string, string>();
+
       const pushEvent = (event: PushableEvent) => {
         if (event.type === 'text_delta') {
           textBuffer += event.delta;
@@ -167,6 +172,29 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           // back-to-back without intervening text, the reasoning for
           // the second one is empty — that's honest.
           reasoningBuffer = '';
+
+          // Fire-and-forget ExecutionStep logging. Never awaited — must not
+          // block or affect the stream in any way.
+          void logToolCallStart(
+            input.ctx.space.id,
+            event.name,
+            event.args,
+            undefined,
+          ).then((stepId) => {
+            callIdToStepId.set(event.callId, stepId);
+          }).catch(() => {});
+        }
+
+        if (event.type === 'tool_call_result') {
+          const stepId = callIdToStepId.get(event.callId);
+          if (stepId) {
+            callIdToStepId.delete(event.callId);
+            if (event.ok) {
+              void logToolCallComplete(stepId, event.summary).catch(() => {});
+            } else {
+              void logToolCallError(stepId, event.error ?? event.summary).catch(() => {});
+            }
+          }
         }
         const full = { ...event, seq: nextSeq(), ts: new Date().toISOString() } as AgentEvent;
         try {

@@ -18,14 +18,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
 
 import structlog
 
 from db import supabase
-
-if TYPE_CHECKING:
-    pass
 
 logger = structlog.get_logger(__name__)
 

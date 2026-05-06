@@ -173,6 +173,10 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
         ),
     )
 
+    # task_id is not available for autonomous sweeps (no AgentTask row exists).
+    # The ledger will skip DB writes gracefully when task_id is None.
+    ledger = StepLedger(space_id=space.id, task_id=None)
+
     total_tokens = 0
     final_summary: str | None = None
 
@@ -180,13 +184,27 @@ async def run_agent_for_space(space: Space, agent_settings: AgentSettings) -> No
         result = await Runner.run(chippi, input=prompt, context=ctx, run_config=run_config)
 
         usage = getattr(result, "usage", None)
+        tokens_in: int = 0
+        tokens_out: int = 0
         if usage:
-            total_tokens = getattr(usage, "total_tokens", 0)
+            tokens_in = getattr(usage, "input_tokens", 0) or 0
+            tokens_out = getattr(usage, "output_tokens", 0) or 0
+            total_tokens = getattr(usage, "total_tokens", 0) or (tokens_in + tokens_out)
             ctx.tokens_used = total_tokens
 
         final_output = getattr(result, "final_output", None)
         if isinstance(final_output, str):
             final_summary = final_output[:280]
+
+        # Record the full agent run as a single LLM-call step in the ledger.
+        await ledger.record_llm_call(
+            tool_name="chippi",
+            input_summary=prompt[:500],
+            output_summary=final_summary or f"{total_tokens:,} tokens used",
+            model=settings.orchestrator_model,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+        )
 
         log.info("agent_run_completed", total_tokens=total_tokens)
 
