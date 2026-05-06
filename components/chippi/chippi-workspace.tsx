@@ -6,14 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { ChippiPromptBox, type MentionItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText } from 'lucide-react';
+import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, ListTodo } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { VoiceMode } from '@/components/ai/voice-mode';
 import { Transcript } from '@/components/ai/blocks/transcript';
 import { ThinkingIndicator } from '@/components/ai/blocks/thinking-indicator';
 import { useAgentTask, type UiMessage } from '@/components/ai/hooks/use-agent-task';
-import { blocksFromLegacyContent, type MessageBlock } from '@/lib/ai-tools/blocks';
+import { blocksFromLegacyContent, type MessageBlock, type ToolCallBlock } from '@/lib/ai-tools/blocks';
 import type { Conversation } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { TodayFeed } from './today-feed';
@@ -21,6 +21,7 @@ import { MorningStory } from './morning-story';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { toast } from 'sonner';
 import { approvalKindForTool, approvalSubjectFromArgs, type ApprovalKind } from './approval-celebration';
+import { PlanCard } from '@/components/chippi/plan-card';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -55,6 +56,57 @@ interface ChippiWorkspaceProps {
 }
 
 const MESSAGE_LIMIT = 50;
+
+/** Available slash commands for the autocomplete dropdown. */
+const SLASH_COMMANDS = [
+  {
+    name: '/plan',
+    description: 'Break a complex task into steps',
+    placeholder: '/plan schedule tours for all hot leads this week',
+  },
+] as const;
+
+/**
+ * Extract the task description from a `/plan <task>` message.
+ * Returns null if the message is not a /plan command.
+ */
+function extractPlanTask(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed.toLowerCase().startsWith('/plan')) return null;
+  const task = trimmed.slice('/plan'.length).trim();
+  return task || null;
+}
+
+/**
+ * Transform a /plan message into an agent-friendly directive.
+ * The directive tells the agent to call create_plan before acting.
+ */
+function toPlanDirective(task: string): string {
+  return `[/plan] Before doing anything, call the create_plan tool to break this task into steps. Task: ${task}`;
+}
+
+/**
+ * Parse a create_plan tool call result into { task, steps }.
+ * Returns null if the data doesn't match the expected shape.
+ */
+function parsePlanResult(
+  data: unknown,
+): { task: string; steps: Array<{ title: string; description: string }> } | null {
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
+  const task = typeof d.task === 'string' ? d.task : null;
+  const steps = Array.isArray(d.steps) ? d.steps : null;
+  if (!task || !steps) return null;
+  const parsedSteps = steps.map((s: unknown) => {
+    if (!s || typeof s !== 'object') return { title: '', description: '' };
+    const step = s as Record<string, unknown>;
+    return {
+      title: typeof step.title === 'string' ? step.title : '',
+      description: typeof step.description === 'string' ? step.description : '',
+    };
+  });
+  return { task, steps: parsedSteps };
+}
 
 function legacyToUi(messages: LegacyMessage[]): UiMessage[] {
   return messages.map((m, i) => ({
@@ -100,6 +152,31 @@ export function ChippiWorkspace({
     { messageId: string; kind: ApprovalKind; subject?: string } | null
   >(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Slash-command dropdown state. Opens when the user clicks "/plan" in the
+  // hint strip; closes on outside click, Escape, or after a command is chosen.
+  const [slashOpen, setSlashOpen] = useState(false);
+  const slashRef = useRef<HTMLDivElement>(null);
+
+  // (no per-plan animation state needed — isAnimating is derived from the
+  //  message's streaming flag, which already tracks live vs. settled.)
+
+  // Close slash dropdown on outside click.
+  useEffect(() => {
+    if (!slashOpen) return;
+    function onDown(e: MouseEvent) {
+      if (!slashRef.current?.contains(e.target as Node)) setSlashOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setSlashOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [slashOpen]);
 
   const {
     messages,
@@ -353,7 +430,12 @@ export function ChippiWorkspace({
         );
         contextPrefix = `(Referencing: ${labels.join(', ')})\n\n`;
       }
-      await send(contextPrefix + text, attachmentIds);
+
+      // Slash-command interception: /plan <task> → planning directive.
+      const planTask = extractPlanTask(text);
+      const finalText = planTask ? toPlanDirective(planTask) : text;
+
+      await send(contextPrefix + finalText, attachmentIds);
 
       // Bump the sidebar's conversation ordering.
       const cid = activeConversationId;
@@ -474,18 +556,91 @@ export function ChippiWorkspace({
     isStreaming && tailMessage?.role === 'assistant' && tailMessage.blocks.length === 0;
 
   // Reusable input — shared between the empty hero and the docked footer
-  // so the focal point lives wherever it should.
+  // so the focal point lives wherever it should. Wrapped in a relative
+  // container so the slash-command dropdown can float above it.
   const renderInput = () => (
-    <ChippiPromptBox
-      placeholder="Message Chippi — draft a follow-up, prep a tour, summarize your day…"
-      onSend={handleSend}
-      onMentionSearch={handleMentionSearch}
-      onVoiceStart={() => setVoiceOpen(true)}
-      onAbort={abort}
-      disabled={isStreaming || pendingApproval !== null}
-      isLoading={isStreaming}
-      prefill={prefill ?? undefined}
-    />
+    <div className="relative" ref={slashRef}>
+      {/* Slash-command autocomplete dropdown — floats above the input */}
+      {slashOpen && (
+        <div
+          role="listbox"
+          aria-label="Slash commands"
+          className={cn(
+            'absolute left-0 right-0 bottom-full mb-2 z-30',
+            'rounded-xl border border-border/70 bg-popover shadow-lg shadow-foreground/5',
+            'overflow-hidden py-1',
+          )}
+        >
+          {SLASH_COMMANDS.map((cmd) => (
+            <button
+              key={cmd.name}
+              type="button"
+              role="option"
+              aria-selected={false}
+              onClick={() => {
+                setSlashOpen(false);
+                setPrefill({ text: cmd.name + ' ', nonce: Date.now() });
+              }}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2.5 text-left',
+                'hover:bg-foreground/[0.04] transition-colors duration-100',
+              )}
+            >
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-foreground/[0.05] text-muted-foreground flex-shrink-0">
+                <ListTodo size={13} strokeWidth={1.85} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium text-foreground leading-tight">
+                  {cmd.name}
+                </p>
+                <p className="text-[11px] text-muted-foreground/80 leading-tight mt-0.5">
+                  {cmd.description}
+                </p>
+              </div>
+              <span className="text-[10px] text-muted-foreground/50 truncate max-w-[140px] hidden sm:block">
+                {cmd.placeholder}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Slash-command trigger strip — a quiet "/" hint button left of the
+          composer. Tapping it opens the dropdown; the user picks a command
+          and the text is prefilled into the input. */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setSlashOpen((v) => !v)}
+          disabled={isStreaming || pendingApproval !== null}
+          aria-label="Slash commands"
+          aria-expanded={slashOpen}
+          aria-haspopup="listbox"
+          title="/plan and other commands"
+          className={cn(
+            'flex-shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-lg',
+            'text-[13px] font-mono font-semibold text-muted-foreground/60',
+            'hover:text-foreground hover:bg-foreground/[0.06] transition-colors duration-150',
+            'disabled:opacity-40 disabled:cursor-not-allowed',
+            slashOpen && 'text-foreground bg-foreground/[0.06]',
+          )}
+        >
+          /
+        </button>
+        <div className="flex-1 min-w-0">
+          <ChippiPromptBox
+            placeholder="Message Chippi — draft a follow-up, prep a tour, summarize your day…"
+            onSend={handleSend}
+            onMentionSearch={handleMentionSearch}
+            onVoiceStart={() => setVoiceOpen(true)}
+            onAbort={abort}
+            disabled={isStreaming || pendingApproval !== null}
+            isLoading={isStreaming}
+            prefill={prefill ?? undefined}
+          />
+        </div>
+      </div>
+    </div>
   );
 
   // Settings view — entirely separate surface; no chat input, no today feed.
@@ -705,12 +860,19 @@ export function ChippiWorkspace({
                       return null;
                     }
                     if (msg.role === 'assistant') {
+                      // Find any create_plan tool call in this message and
+                      // render a PlanCard inline below the transcript blocks.
+                      const planBlocks = msg.blocks.filter(
+                        (b): b is ToolCallBlock =>
+                          b.type === 'tool_call' && b.name === 'create_plan',
+                      );
+
                       return (
                         <div key={msg.id} className="flex gap-3">
                           <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
                             <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
                           </div>
-                          <div className="flex-1 min-w-0 pt-0.5">
+                          <div className="flex-1 min-w-0 pt-0.5 space-y-3">
                             <Transcript
                               blocks={msg.blocks}
                               role={msg.role}
@@ -737,6 +899,23 @@ export function ChippiWorkspace({
                                   : undefined
                               }
                             />
+                            {/* PlanCard — rendered for each create_plan tool
+                                call that has resolved with a parseable result. */}
+                            {planBlocks.map((planBlock) => {
+                              const plan = parsePlanResult(planBlock.result?.data);
+                              if (!plan) return null;
+                              // Animate steps in while the message is still
+                              // streaming; show settled state for history.
+                              const isAnimating = !!(msg.streaming && isStreaming);
+                              return (
+                                <PlanCard
+                                  key={planBlock.callId}
+                                  task={plan.task}
+                                  steps={plan.steps}
+                                  isAnimating={isAnimating}
+                                />
+                              );
+                            })}
                           </div>
                         </div>
                       );
