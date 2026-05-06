@@ -39,6 +39,7 @@ interface MergePersonsResult {
 
 export const mergePersonsTool = defineTool<typeof parameters, MergePersonsResult>({
   name: 'merge_persons',
+  riskLevel: 'destructive',
   description:
     'Merge two contacts into one and delete the duplicate. Destructive — prompts for explicit approval.',
   parameters,
