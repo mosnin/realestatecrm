@@ -10,7 +10,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'lib/**/__tests__/**/*.test.ts'],
     // Eval suite is gated by RUN_EVALS — exclude from the default
     // `pnpm test` so commits don't burn OpenAI tokens automatically.
     // Run via `pnpm eval` (which sets RUN_EVALS=1 and removes the
