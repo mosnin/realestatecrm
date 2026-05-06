@@ -1,4 +1,4 @@
-"""Tool primitives — retry with exponential backoff and idempotency caching.
+"""Tool primitives — retry with exponential backoff, idempotency caching, and rate limiting.
 
 Usage
 -----
@@ -9,6 +9,16 @@ Idempotency decorator (applied OUTSIDE @function_tool):
     @idempotent_tool
     @function_tool
     async def create_something(ctx, ...): ...
+
+Rate-limit decorator (applied OUTSIDE @function_tool, outermost):
+    @rate_limited(max_calls=10, window_seconds=3600)
+    @function_tool
+    async def send_email(ctx, ...): ...
+
+    # Or rely on DEFAULT_RATE_LIMITS for known tool names:
+    @rate_limited()
+    @function_tool
+    async def send_sms(ctx, ...): ...
 """
 
 from __future__ import annotations
@@ -16,6 +26,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import time
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from typing import Any, Callable
@@ -159,3 +171,128 @@ def idempotent_tool(tool_fn: Callable) -> Callable:
         return result
 
     return wrapper
+
+
+# ── Rate limiting ──────────────────────────────────────────────────────────────
+
+# Per-tool, per-space rate limit state.
+# key: "tool_name:space_id" → deque of monotonic timestamps (float)
+_RATE_LIMIT_STATE: dict[str, deque] = {}
+
+# Default limits: tool_name → (max_calls, window_seconds)
+# "*" is the fallback for any tool not listed here.
+DEFAULT_RATE_LIMITS: dict[str, tuple[int, int]] = {
+    "send_email": (10, 3600),
+    "send_sms": (5, 3600),
+    "send_message": (10, 3600),
+    "create_deal": (20, 3600),
+    "update_contact": (50, 3600),
+    "archive_contact": (20, 3600),
+    "mark_deal_lost": (10, 3600),
+    "*": (100, 3600),  # fallback for unlisted tools
+}
+
+
+class RateLimiter:
+    """Sliding-window rate limiter backed by per-key timestamp deques.
+
+    State is process-local and in-memory — intentionally; the agent is
+    single-process and we want zero infrastructure for this guard rail.
+    """
+
+    @staticmethod
+    def check_and_increment(
+        tool_name: str,
+        space_id: str,
+        max_calls: int,
+        window_seconds: int,
+    ) -> bool:
+        """Return True if the call is within the allowed rate, False if exceeded.
+
+        When True is returned the call is recorded; when False the caller is
+        expected to raise rather than execute the underlying tool.
+
+        Rate limit state is keyed on ``tool_name:space_id`` — one space's
+        usage never affects another space's budget.
+        """
+        key = f"{tool_name}:{space_id}"
+        now = time.monotonic()
+        window_start = now - window_seconds
+
+        if key not in _RATE_LIMIT_STATE:
+            _RATE_LIMIT_STATE[key] = deque()
+
+        q = _RATE_LIMIT_STATE[key]
+
+        # Evict timestamps that have fallen outside the current window.
+        while q and q[0] < window_start:
+            q.popleft()
+
+        if len(q) >= max_calls:
+            return False  # limit exceeded — do not record
+
+        q.append(now)
+        return True
+
+
+def rate_limited(
+    max_calls: int | None = None,
+    window_seconds: int | None = None,
+) -> Callable:
+    """Decorator that enforces a per-space sliding-window rate limit.
+
+    Apply OUTSIDE ``@function_tool`` so this is the outermost decorator.
+
+    Parameters
+    ----------
+    max_calls:
+        Maximum calls allowed within ``window_seconds``.  If omitted,
+        ``DEFAULT_RATE_LIMITS[tool_name]`` is used; falls back to
+        ``DEFAULT_RATE_LIMITS["*"]`` for unknown tool names.
+    window_seconds:
+        Length of the sliding window in seconds.  Same resolution rules as
+        ``max_calls``.
+
+    Raises
+    ------
+    RuntimeError
+        ``"rate_limit:{tool_name}:{space_id} (max {N}/{W}s)"`` when the limit
+        is exceeded.  The ``with_retry`` helper treats RuntimeError as
+        potentially transient; callers that want to surface this cleanly should
+        catch it before passing through ``with_retry``.
+    """
+    def decorator(fn: Callable) -> Callable:
+        tool_name = fn.__name__
+
+        # Resolve limits: explicit args win; then per-tool default; then "*".
+        _defaults = DEFAULT_RATE_LIMITS.get(tool_name, DEFAULT_RATE_LIMITS["*"])
+        _max: int = max_calls if max_calls is not None else _defaults[0]
+        _window: int = window_seconds if window_seconds is not None else _defaults[1]
+
+        @wraps(fn)
+        async def wrapper(ctx: Any, *args: Any, **kwargs: Any) -> Any:
+            space_id: str = getattr(
+                getattr(ctx, "context", None), "space_id", "unknown"
+            )
+
+            allowed = RateLimiter.check_and_increment(
+                tool_name, space_id, _max, _window
+            )
+
+            if not allowed:
+                log.warning(
+                    "tool.rate_limit_exceeded",
+                    tool=tool_name,
+                    space_id=space_id,
+                    max_calls=_max,
+                    window_seconds=_window,
+                )
+                raise RuntimeError(
+                    f"rate_limit:{tool_name}:{space_id} (max {_max}/{_window}s)"
+                )
+
+            return await fn(ctx, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
