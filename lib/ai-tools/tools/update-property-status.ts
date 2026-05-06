@@ -34,6 +34,7 @@ interface UpdatePropertyStatusResult {
 
 export const updatePropertyStatusTool = defineTool<typeof parameters, UpdatePropertyStatusResult>({
   name: 'update_property_status',
+  riskLevel: 'low',
   description:
     "Update a property's listing status (active, pending, sold, off_market, owned). Prompts for approval first.",
   parameters,

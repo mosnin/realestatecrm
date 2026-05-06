@@ -19,6 +19,7 @@ from typing import Any
 from agents import RunContextWrapper, function_tool
 
 from db import supabase
+from errors import AgentError, from_supabase_error, from_exception
 from security.context import AgentContext
 from tools.activities import persist_log
 from tools.base import with_retry
@@ -55,9 +56,11 @@ async def draft_message(
     space_id = ctx.context.space_id
 
     if channel not in _VALID_CHANNELS:
-        return {"error": f"channel must be one of {_VALID_CHANNELS}"}
+        agent_err = from_supabase_error({"message": f"channel must be one of {_VALID_CHANNELS}", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
     if channel == "email" and not subject:
-        return {"error": "subject is required for email channel"}
+        agent_err = from_supabase_error({"message": "subject is required for email channel", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     db = await supabase()
 
@@ -70,7 +73,8 @@ async def draft_message(
         .execute()
     )
     if not check.data:
-        return {"error": "Contact not found in space"}
+        agent_err = from_supabase_error({"message": "Contact not found in space", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
     contact_name = check.data.get("name", "contact")
 
     # ── Dedup: existing pending draft for same contact+channel in window ──

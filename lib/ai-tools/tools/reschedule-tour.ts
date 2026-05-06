@@ -44,6 +44,7 @@ function pretty(iso: string): string {
 
 export const rescheduleTourTool = defineTool<typeof parameters, RescheduleTourResult>({
   name: 'reschedule_tour',
+  riskLevel: 'low',
   description:
     'Move a tour to a new time. Preserves the original duration unless newEndsAt is given. Prompts for approval first.',
   parameters,
