@@ -63,6 +63,7 @@ vi.mock('@/lib/space', () => ({
 import { GET, POST } from '@/app/api/agent/approvals/route';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import type { Space } from '@/lib/types';
 
 const mockRequireAuth = vi.mocked(requireAuth);
 const mockGetSpaceForUser = vi.mocked(getSpaceForUser);
@@ -77,7 +78,7 @@ const fakeSpace = {
   slug: 'approval-space',
   name: 'Approval Space',
   ownerId: USER_ID,
-} as never;
+} as unknown as Space;
 
 /** A minimal paused task with approvalRequired set in metadata */
 const fakePausedTask = {

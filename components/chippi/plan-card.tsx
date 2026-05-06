@@ -42,7 +42,7 @@ const ICON_VARIANTS = {
       duration: 1.6,
       repeat: Infinity,
       repeatType: 'loop' as const,
-      ease: 'easeInOut',
+      ease: 'easeInOut' as const,
     },
   },
   done: {

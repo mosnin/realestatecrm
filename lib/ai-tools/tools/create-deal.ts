@@ -197,7 +197,7 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
       finalStageId,
       String(args.value ?? ''),
     );
-    const { data: dealRow, error: dealErr } = await withIdempotency(idemKey, () =>
+    const { data: dealRow, error: dealErr } = await withIdempotency(idemKey, async () =>
       supabase
         .from('Deal')
         .insert({

@@ -178,7 +178,7 @@ export async function executeDecomposedGoal(
 
   return runParallel(
     steps as Array<SubgoalStep & { [k: string]: unknown }>,
-    executeFn as (step: { id: string; [k: string]: unknown }) => Promise<unknown>,
+    executeFn as unknown as (step: { id: string; [k: string]: unknown }) => Promise<unknown>,
     dependencies,
   );
 }

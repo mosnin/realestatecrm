@@ -72,6 +72,7 @@ vi.mock('@/lib/agent/task-state-machine', async () => {
 import { GET, POST } from '@/app/api/agent/tasks/route';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import type { Space } from '@/lib/types';
 import { enqueueTask } from '@/lib/agent/task-state-machine';
 
 const mockRequireAuth = vi.mocked(requireAuth);
@@ -88,7 +89,7 @@ const fakeSpace = {
   slug: 'test-space',
   name: 'Test Space',
   ownerId: USER_ID,
-} as never;
+} as unknown as Space;
 
 // ── Request helpers ───────────────────────────────────────────────────────────
 
