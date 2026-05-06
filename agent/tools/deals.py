@@ -11,6 +11,7 @@ from agents import RunContextWrapper, function_tool
 from db import supabase
 from security.context import AgentContext
 from tools.activities import persist_log
+from tools.base import with_retry
 from tools.streaming import publish_event
 
 _CLIP = 300
@@ -165,8 +166,8 @@ async def update_deal(
 
     if update:
         update["updatedAt"] = now
-        await (
-            db.table("Deal")
+        await with_retry(
+            lambda: db.table("Deal")
             .update(update)
             .eq("id", deal_id)
             .eq("spaceId", space_id)

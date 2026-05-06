@@ -21,6 +21,7 @@ from agents import RunContextWrapper, function_tool
 from db import supabase
 from security.context import AgentContext
 from tools.activities import persist_log
+from tools.base import with_retry
 from tools.streaming import publish_event
 
 _VALID_CHANNELS = {"sms", "email", "note"}
@@ -111,7 +112,7 @@ async def draft_message(
         "expiresAt": expires_at,
     }
 
-    result = await db.table("AgentDraft").insert(draft).execute()
+    result = await with_retry(lambda: db.table("AgentDraft").insert(draft).execute())
 
     await publish_event(
         ctx.context,
