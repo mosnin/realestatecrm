@@ -131,6 +131,22 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           reasoningBuffer += event.delta;
         }
         if (event.type === 'tool_call_start') {
+          // When the agent invokes `create_plan`, emit a `plan_created` event
+          // immediately so the frontend can render the PlanCard before any
+          // further tool calls fire. The tool itself is a no-op on the server
+          // (no side effects); its value is purely the plan it carries.
+          if (event.name === 'create_plan') {
+            const args = event.args as { task?: unknown; steps?: unknown };
+            const task = typeof args.task === 'string' ? args.task : '';
+            const steps = Array.isArray(args.steps)
+              ? (args.steps as Array<Record<string, unknown>>).map((s) => ({
+                  title: typeof s['title'] === 'string' ? s['title'] : '',
+                  description: typeof s['description'] === 'string' ? s['description'] : '',
+                }))
+              : [];
+            pushEvent({ type: 'plan_created', task, steps });
+          }
+
           // Fire-and-forget — telemetry must never block the stream.
           // Trim aggressively; we want the closest preceding sentence,
           // not the whole turn's prose.

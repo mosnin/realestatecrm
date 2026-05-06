@@ -20,6 +20,7 @@ export type AgentEvent =
   | ToolCallResultEvent
   | PermissionRequiredEvent
   | PermissionResolvedEvent
+  | PlanCreatedEvent
   | TurnCompleteEvent
   | ErrorEvent;
 
@@ -104,6 +105,23 @@ export interface PermissionResolvedEvent extends BaseEvent {
   decision: 'approved' | 'denied';
   /** If the user edited arguments before approving, they're here. */
   editedArgs?: Record<string, unknown>;
+}
+
+/**
+ * The agent has invoked the `create_plan` tool and a structured plan is ready
+ * to be shown to the user before execution begins. The client renders a
+ * PlanCard from this event; execution continues automatically after the plan
+ * is displayed.
+ */
+export interface PlanCreatedEvent extends BaseEvent {
+  type: 'plan_created';
+  /** High-level description of what the agent is about to do. */
+  task: string;
+  /** Ordered list of steps the agent will execute. */
+  steps: Array<{
+    title: string;
+    description: string;
+  }>;
 }
 
 /** End-of-turn marker. Client disables the input until the user types again. */

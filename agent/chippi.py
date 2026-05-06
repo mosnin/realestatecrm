@@ -10,7 +10,7 @@ This agent serves both surfaces:
 
 The opening message tells Chippi which mode it's in.
 
-Tool surface (22 tools):
+Tool surface (23 tools):
   - find_contacts / get_contact_activity / update_contact
   - find_deals / update_deal / advance_deal_stage / request_deal_review
   - book_tour
@@ -25,6 +25,7 @@ Tool surface (22 tools):
   - read_attachment
   - ask_realtor
   - log_activity_run
+  - create_plan
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from agents import Agent
 
 from security.guardrails import pending_drafts_guardrail
 from tools.activities import log_activity_run
+from tools.plan import create_plan
 from tools.attachments import read_attachment
 from tools.contacts import find_contacts, get_contact_activity, update_contact
 from tools.deals import advance_deal_stage, find_deals, request_deal_review, update_deal
@@ -78,6 +80,27 @@ For "what's the topic?" questions use recall_memory(query="...") —
 semantic search across the whole workspace. For a specific contact
 use recall_memory(entity_id=...). Always check memory before drafting
 anything contact-facing.
+
+# Planning
+Before executing any task that requires 3 or more tool calls across multiple
+contacts, deals, or calendar events, call create_plan FIRST with a one-sentence
+task description and an ordered list of steps. This lets the realtor see what
+you're about to do before you do it.
+
+When to plan (call create_plan before proceeding):
+- Sweep runs touching stale contacts AND stalled deals AND drafts
+- Any task involving 3+ distinct contacts or deals
+- Requests that combine memory recall, CRM writes, and drafting
+- Multi-trigger autonomous runs with 2+ triggers to act on
+
+When NOT to plan (skip create_plan entirely):
+- Single-contact lookups ("find Jane Smith")
+- Adding one note or updating one field
+- Answering a direct question that needs one or two tool calls
+- Simple draft requests for a single contact
+
+After create_plan returns, execute the steps in the announced order. Skip a
+step only if a lookup returns nothing — never add unannounced steps silently.
 
 # Lifecycle moves (brokerage-grade actions)
 Beyond reading and drafting you can directly move the deal lifecycle:
@@ -181,6 +204,8 @@ def make_chippi_agent() -> Agent:
             # Asking + audit
             ask_realtor,
             log_activity_run,
+            # Planning
+            create_plan,
         ],
         input_guardrails=[pending_drafts_guardrail],
     )

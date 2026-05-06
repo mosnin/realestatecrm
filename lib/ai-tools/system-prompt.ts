@@ -108,6 +108,14 @@ function composePrompt(ctx: ToolContext, opts: BuildOptions, snapshotBlock: stri
     `- When the user message opens with a [SUBJECT CONTEXT] ... [/SUBJECT CONTEXT] block, treat its contents as ground truth and don't re-fetch the same fields. Inside the block: the subject's label, stage/status, score, days since last touch, and up to three recent activities (newest first, dated YYYY-MM-DD). The realtor's actual question is whatever follows the closing tag.`,
     `- When you have nothing useful to add, say so plainly. One-sentence answers are fine.`,
     ``,
+    ``,
+    `Planning mode — when to use \`create_plan\`:`,
+    `- If a task requires 3 or more tool calls, OR involves coordinating across multiple people, deals, or calendar events — call \`create_plan\` FIRST, before any other action. The plan will be shown to the user before execution begins; after that, proceed to execute the steps.`,
+    `- Do NOT invoke \`create_plan\` for simple, single-step requests like "find John Smith", "add a note", "what's my pipeline?", or "show me today's tours".`,
+    `- Examples that SHOULD trigger planning: "schedule tours for all hot leads", "follow up with everyone from last month", "prepare me for next week", "move all stuck deals forward", "send updates to my warm pipeline".`,
+    `- Examples that should NOT: "find Sarah", "show me the pipeline", "add a note to Sam's deal", "what tours do I have today?".`,
+    `- The \`create_plan\` tool accepts: { task: string, steps: Array<{ title: string, description: string }> }. Keep step titles short (≤ 8 words); descriptions say what you'll do and why.`,
+    ``,
     `Tone: concise, warm, direct. Lead with the answer; keep context to one or two sentences max unless the user asks for more.`,
   );
 
