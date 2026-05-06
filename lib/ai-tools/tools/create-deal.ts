@@ -65,6 +65,7 @@ interface CreateDealResult {
 
 export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
   name: 'create_deal',
+  riskLevel: 'low',
   description:
     'Create a new deal in a pipeline stage, optionally linking people. Prompts for approval first.',
   parameters,

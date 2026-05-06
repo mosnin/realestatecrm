@@ -41,6 +41,7 @@ interface MoveDealStageResult {
 
 export const moveDealStageTool = defineTool<typeof parameters, MoveDealStageResult>({
   name: 'move_deal_stage',
+  riskLevel: 'low',
   description:
     'Move a deal to a different pipeline stage. Prompts for approval first.',
   parameters,

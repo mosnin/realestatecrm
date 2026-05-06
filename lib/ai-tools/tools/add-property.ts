@@ -60,6 +60,7 @@ interface AddPropertyResult {
 
 export const addPropertyTool = defineTool<typeof parameters, AddPropertyResult>({
   name: 'add_property',
+  riskLevel: 'low',
   description:
     'Add a new property to the workspace. Captures address plus optional list price, beds/baths, MLS number. Prompts for approval first.',
   parameters,

@@ -37,6 +37,7 @@ function fmt(n: number): string {
 
 export const updateDealValueTool = defineTool<typeof parameters, UpdateDealValueResult>({
   name: 'update_deal_value',
+  riskLevel: 'low',
   description:
     "Update a deal's monetary value. Prompts for approval first.",
   parameters,

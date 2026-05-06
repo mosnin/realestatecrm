@@ -99,6 +99,7 @@ interface AddPersonResult {
 
 export const addPersonTool = defineTool<typeof parameters, AddPersonResult>({
   name: 'add_person',
+  riskLevel: 'low',
   description:
     'Create a new person (contact) in the workspace with the realtor-provided details. Prompts for approval first.',
   parameters,

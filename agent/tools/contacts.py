@@ -234,13 +234,17 @@ async def update_contact(
 
     if update:
         update["updatedAt"] = now
-        await with_retry(
-            lambda: db.table("Contact")
-            .update(update)
-            .eq("id", contact_id)
-            .eq("spaceId", space_id)
-            .execute()
-        )
+        try:
+            await with_retry(
+                lambda: db.table("Contact")
+                .update(update)
+                .eq("id", contact_id)
+                .eq("spaceId", space_id)
+                .execute()
+            )
+        except Exception as e:
+            agent_err = from_exception(e)
+            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     # ── Brief / score explanation → high-importance memory (no DB column) ──
     if brief:
@@ -272,14 +276,18 @@ async def update_contact(
 
     # ── Activity log ──
     for act in activities:
-        await db.table("ContactActivity").insert({
-            "id": str(uuid.uuid4()),
-            "contactId": contact_id,
-            "spaceId": space_id,
-            "type": act["type"],
-            "content": act["content"],
-            "metadata": {**act["metadata"], "agentRunId": ctx.context.run_id},
-        }).execute()
+        try:
+            await db.table("ContactActivity").insert({
+                "id": str(uuid.uuid4()),
+                "contactId": contact_id,
+                "spaceId": space_id,
+                "type": act["type"],
+                "content": act["content"],
+                "metadata": {**act["metadata"], "agentRunId": ctx.context.run_id},
+            }).execute()
+        except Exception as e:
+            agent_err = from_exception(e)
+            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     if summary_parts:
         await publish_event(
