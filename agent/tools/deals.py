@@ -9,6 +9,7 @@ from typing import Any
 from agents import RunContextWrapper, function_tool
 
 from db import supabase
+from errors import AgentError, from_supabase_error, from_exception
 from security.context import AgentContext
 from tools.activities import persist_log
 from tools.base import with_retry
@@ -124,7 +125,8 @@ async def update_deal(
         .execute()
     )
     if not check.data:
-        return {"error": "Deal not found in space"}
+        agent_err = from_supabase_error({"message": "Deal not found in space", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
     deal = check.data
     deal_title = deal.get("title") or deal_id[:8]
 
@@ -134,7 +136,8 @@ async def update_deal(
 
     if probability is not None:
         if not (0 <= probability <= 100):
-            return {"error": "probability must be between 0 and 100"}
+            agent_err = from_supabase_error({"message": "probability must be between 0 and 100", "code": None})
+            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
         old_prob = deal.get("probability")
         if old_prob != probability:
             update["probability"] = probability
@@ -157,7 +160,8 @@ async def update_deal(
 
     if note:
         if len(note) > 1000:
-            return {"error": "note must be under 1000 characters"}
+            agent_err = from_supabase_error({"message": "note must be under 1000 characters", "code": None})
+            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         prefix = f"[Agent {date_str}] {note}\n\n"
         existing = deal.get("description") or ""
@@ -166,23 +170,31 @@ async def update_deal(
 
     if update:
         update["updatedAt"] = now
-        await with_retry(
-            lambda: db.table("Deal")
-            .update(update)
-            .eq("id", deal_id)
-            .eq("spaceId", space_id)
-            .execute()
-        )
+        try:
+            await with_retry(
+                lambda: db.table("Deal")
+                .update(update)
+                .eq("id", deal_id)
+                .eq("spaceId", space_id)
+                .execute()
+            )
+        except Exception as e:
+            agent_err = from_exception(e)
+            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     for act in activities:
-        await db.table("DealActivity").insert({
-            "id": str(uuid.uuid4()),
-            "dealId": deal_id,
-            "spaceId": space_id,
-            "type": act["type"],
-            "content": act["content"],
-            "metadata": {**act["metadata"], "agentRunId": ctx.context.run_id},
-        }).execute()
+        try:
+            await db.table("DealActivity").insert({
+                "id": str(uuid.uuid4()),
+                "dealId": deal_id,
+                "spaceId": space_id,
+                "type": act["type"],
+                "content": act["content"],
+                "metadata": {**act["metadata"], "agentRunId": ctx.context.run_id},
+            }).execute()
+        except Exception as e:
+            agent_err = from_exception(e)
+            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     if summary_parts:
         await publish_event(
@@ -220,9 +232,11 @@ async def advance_deal_stage(
     can audit who moved the deal and why.
     """
     if not target_stage_name and not target_stage_id:
-        return {"error": "Pass either target_stage_name or target_stage_id"}
+        agent_err = from_supabase_error({"message": "Pass either target_stage_name or target_stage_id", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
     if new_probability is not None and not (0 <= new_probability <= 100):
-        return {"error": "new_probability must be 0-100"}
+        agent_err = from_supabase_error({"message": "new_probability must be 0-100", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     space_id = ctx.context.space_id
     db = await supabase()
@@ -237,7 +251,8 @@ async def advance_deal_stage(
         .execute()
     )
     if not deal_check.data:
-        return {"error": "Deal not found in space"}
+        agent_err = from_supabase_error({"message": "Deal not found in space", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
     deal = deal_check.data
     deal_title = deal.get("title") or deal_id[:8]
 
@@ -264,7 +279,8 @@ async def advance_deal_stage(
         stage_check = type("R", (), {"data": (stages_res.data[0] if stages_res.data else None)})
 
     if not stage_check.data:
-        return {"error": "Target stage not found in workspace pipeline"}
+        agent_err = from_supabase_error({"message": "Target stage not found in workspace pipeline", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     new_stage_id = stage_check.data["id"]
     new_stage_name = stage_check.data["name"]
@@ -276,32 +292,40 @@ async def advance_deal_stage(
     if new_probability is not None:
         update["probability"] = new_probability
 
-    await (
-        db.table("Deal")
-        .update(update)
-        .eq("id", deal_id)
-        .eq("spaceId", space_id)
-        .execute()
-    )
+    try:
+        await (
+            db.table("Deal")
+            .update(update)
+            .eq("id", deal_id)
+            .eq("spaceId", space_id)
+            .execute()
+        )
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     activity_content = f"[Agent] Stage → {new_stage_name}. {reason}"
     if new_probability is not None:
         activity_content += f" (probability {new_probability}%)"
 
-    await db.table("DealActivity").insert({
-        "id": str(uuid.uuid4()),
-        "dealId": deal_id,
-        "spaceId": space_id,
-        "type": "note",
-        "content": activity_content,
-        "metadata": {
-            "source": "agent",
-            "agentRunId": ctx.context.run_id,
-            "oldStageId": deal.get("stageId"),
-            "newStageId": new_stage_id,
-            "newProbability": new_probability,
-        },
-    }).execute()
+    try:
+        await db.table("DealActivity").insert({
+            "id": str(uuid.uuid4()),
+            "dealId": deal_id,
+            "spaceId": space_id,
+            "type": "note",
+            "content": activity_content,
+            "metadata": {
+                "source": "agent",
+                "agentRunId": ctx.context.run_id,
+                "oldStageId": deal.get("stageId"),
+                "newStageId": new_stage_id,
+                "newProbability": new_probability,
+            },
+        }).execute()
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     await publish_event(
         ctx.context,
@@ -319,8 +343,9 @@ async def advance_deal_stage(
             reasoning=f"{deal_title} → {new_stage_name}. {reason}",
             deal_id=deal_id,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     return {
         "ok": True,
@@ -347,7 +372,8 @@ async def request_deal_review(
     reason: required, 10+ chars. Surfaces verbatim to the broker.
     """
     if not reason or len(reason.strip()) < 10:
-        return {"error": "reason must be at least 10 characters"}
+        agent_err = from_supabase_error({"message": "reason must be at least 10 characters", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     space_id = ctx.context.space_id
     db = await supabase()
@@ -361,7 +387,8 @@ async def request_deal_review(
         .execute()
     )
     if not deal_check.data:
-        return {"error": "Deal not found in space"}
+        agent_err = from_supabase_error({"message": "Deal not found in space", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
     deal_title = deal_check.data.get("title") or deal_id[:8]
 
     space_check = await (
@@ -372,17 +399,22 @@ async def request_deal_review(
         .execute()
     )
     if not space_check.data or not space_check.data.get("brokerageId"):
-        return {"error": "Space is not part of a brokerage — review requests need a broker"}
+        agent_err = from_supabase_error({"message": "Space is not part of a brokerage — review requests need a broker", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     review_id = str(uuid.uuid4())
-    await db.table("DealReviewRequest").insert({
-        "id": review_id,
-        "dealId": deal_id,
-        "requestingUserId": space_check.data["ownerId"],
-        "brokerageId": space_check.data["brokerageId"],
-        "status": "open",
-        "reason": reason.strip(),
-    }).execute()
+    try:
+        await db.table("DealReviewRequest").insert({
+            "id": review_id,
+            "dealId": deal_id,
+            "requestingUserId": space_check.data["ownerId"],
+            "brokerageId": space_check.data["brokerageId"],
+            "status": "open",
+            "reason": reason.strip(),
+        }).execute()
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     await publish_event(
         ctx.context,
@@ -400,8 +432,9 @@ async def request_deal_review(
             reasoning=reason.strip()[:500],
             deal_id=deal_id,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     return {
         "ok": True,

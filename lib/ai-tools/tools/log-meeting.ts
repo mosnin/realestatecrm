@@ -36,6 +36,7 @@ interface LogMeetingResult {
 
 export const logMeetingTool = defineTool<typeof parameters, LogMeetingResult>({
   name: 'log_meeting',
+  riskLevel: 'low',
   description:
     "Log a meeting on a contact's timeline. Prompts for approval first.",
   parameters,

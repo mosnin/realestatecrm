@@ -37,6 +37,7 @@ interface RequestDealReviewResult {
 
 export const requestDealReviewTool = defineTool<typeof parameters, RequestDealReviewResult>({
   name: 'request_deal_review',
+  riskLevel: 'low',
   description:
     "Brokerage-only. Flag a deal for the broker's review queue. Prompts for approval first.",
   parameters,

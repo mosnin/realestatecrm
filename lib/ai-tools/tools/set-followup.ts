@@ -103,6 +103,7 @@ export function resolveWhen(input: string, now: Date = new Date()): string | nul
 
 export const setFollowupTool = defineTool<typeof parameters, SetFollowupResult>({
   name: 'set_followup',
+  riskLevel: 'low',
   description:
     "Schedule a follow-up on a contact. Accepts ISO date or 'today'/'tomorrow'/weekday/'next <weekday>'. Prompts for approval first.",
   parameters,

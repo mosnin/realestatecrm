@@ -31,6 +31,7 @@ interface NoteOnPropertyResult {
 
 export const noteOnPropertyTool = defineTool<typeof parameters, NoteOnPropertyResult>({
   name: 'note_on_property',
+  riskLevel: 'low',
   description:
     "Add a note to a property's notes log. Prompts for approval first.",
   parameters,

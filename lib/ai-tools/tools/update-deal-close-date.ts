@@ -100,6 +100,7 @@ function pretty(iso: string): string {
 
 export const updateDealCloseDateTool = defineTool<typeof parameters, UpdateDealCloseDateResult>({
   name: 'update_deal_close_date',
+  riskLevel: 'low',
   description:
     "Update a deal's projected close date. Accepts ISO or relative phrases. Prompts for approval first.",
   parameters,

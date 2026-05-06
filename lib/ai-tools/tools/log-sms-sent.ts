@@ -30,6 +30,7 @@ interface LogSmsResult {
 
 export const logSmsSentTool = defineTool<typeof parameters, LogSmsResult>({
   name: 'log_sms_sent',
+  riskLevel: 'low',
   description:
     'Record an SMS the realtor sent OUTSIDE Chippi against a contact\'s timeline. Does NOT send anything.',
   parameters,

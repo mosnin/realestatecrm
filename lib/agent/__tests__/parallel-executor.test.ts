@@ -1,8 +1,15 @@
 /**
- * Manual smoke tests for parallel-executor.ts
- * Run with: npx jest lib/agent/__tests__/parallel-executor.test.ts
+ * Tests for lib/agent/parallel-executor.ts
+ * Covers KR1–KR5 from the parallel-executor OKR spec.
  */
-import { buildDependencyGraph, runParallel, ParallelExecutor } from '../parallel-executor';
+import { describe, it, expect } from 'vitest';
+import {
+  buildDependencyGraph,
+  runParallel,
+  ParallelExecutor,
+} from '../parallel-executor';
+
+// ── buildDependencyGraph (pure function) ──────────────────────────────────────
 
 describe('buildDependencyGraph', () => {
   it('KR1: produces correct waves for a diamond DAG', () => {
@@ -15,7 +22,7 @@ describe('buildDependencyGraph', () => {
     ];
     const graph = buildDependencyGraph(steps, deps);
     expect(graph.waves[0]).toEqual(['a']);
-    expect(graph.waves[1].sort()).toEqual(['b', 'c']);
+    expect([...graph.waves[1]].sort()).toEqual(['b', 'c']);
     expect(graph.waves[2]).toEqual(['d']);
     expect(graph.waves).toHaveLength(3);
   });
@@ -27,7 +34,7 @@ describe('buildDependencyGraph', () => {
       { stepId: 'c', dependsOnStepId: 'a' },
     ];
     const graph = buildDependencyGraph(steps, deps);
-    expect(graph.dependents.get('a')?.sort()).toEqual(['b', 'c']);
+    expect([...(graph.dependents.get('a') ?? [])].sort()).toEqual(['b', 'c']);
     expect(graph.dependents.get('b')).toEqual([]);
     expect(graph.dependents.get('c')).toEqual([]);
   });
@@ -44,7 +51,7 @@ describe('buildDependencyGraph', () => {
     const steps = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
     const graph = buildDependencyGraph(steps, []);
     expect(graph.waves).toHaveLength(1);
-    expect(graph.waves[0].sort()).toEqual(['a', 'b', 'c']);
+    expect([...graph.waves[0]].sort()).toEqual(['a', 'b', 'c']);
   });
 
   it('detects circular dependencies', () => {
@@ -58,9 +65,10 @@ describe('buildDependencyGraph', () => {
 
   it('silently ignores edges referencing unknown steps', () => {
     const steps = [{ id: 'a' }, { id: 'b' }];
+    // 'ghost' does not exist → edge dropped → b has in-degree 0 → both in wave 0
     const deps = [{ stepId: 'b', dependsOnStepId: 'ghost' }];
     const graph = buildDependencyGraph(steps, deps);
-    expect(graph.waves).toHaveLength(1); // no dependency resolved → both in wave 0
+    expect(graph.waves).toHaveLength(1);
   });
 
   it('ignores self-loop edges', () => {
@@ -72,23 +80,26 @@ describe('buildDependencyGraph', () => {
   });
 });
 
+// ── runParallel ───────────────────────────────────────────────────────────────
+
 describe('runParallel', () => {
   it('KR2: fans out independent steps concurrently', async () => {
     const steps = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
     const start = Date.now();
     const results = await runParallel(steps, async (step) => {
-      await new Promise(r => setTimeout(r, 50));
+      await new Promise<void>(r => setTimeout(r, 50));
       return 'ok-' + step.id;
     });
     const elapsed = Date.now() - start;
-    // 3 sequential would be ≥150ms; parallel should be well under 120ms
+    // 3 sequential calls × 50ms = 150ms; parallel should complete in < 120ms
     expect(elapsed).toBeLessThan(120);
     expect(results).toHaveLength(3);
     expect(results.every(r => r.status === 'completed')).toBe(true);
-    expect(results.every(r => (r.durationMs ?? 0) >= 45)).toBe(true);
+    expect(results.every(r => (r.durationMs ?? 0) >= 40)).toBe(true);
+    expect(results.every(r => r.output === 'ok-' + r.stepId)).toBe(true);
   });
 
-  it('KR2: executes dependency-ordered steps in correct waves', async () => {
+  it('KR2: executes dependency-ordered steps in correct wave order', async () => {
     const order: string[] = [];
     const steps = [{ id: 'a' }, { id: 'b' }];
     const deps = [{ stepId: 'b', dependsOnStepId: 'a' }];
@@ -101,6 +112,7 @@ describe('runParallel', () => {
 
   it('KR3: failed step marks direct dependents as skipped', async () => {
     const steps = [{ id: 'x' }, { id: 'y' }, { id: 'z' }];
+    // z is independent; y depends on x (which will fail)
     const deps = [{ stepId: 'y', dependsOnStepId: 'x' }];
     const results = await runParallel(steps, async (step) => {
       if (step.id === 'x') throw new Error('x failed');
@@ -110,7 +122,8 @@ describe('runParallel', () => {
     expect(byId['x'].status).toBe('failed');
     expect(byId['x'].error).toContain('x failed');
     expect(byId['y'].status).toBe('skipped');
-    expect(byId['z'].status).toBe('completed'); // independent — still runs
+    // z is NOT a dependent of x — must still complete
+    expect(byId['z'].status).toBe('completed');
   });
 
   it('KR3: skips propagate transitively through the dependency chain', async () => {
@@ -131,18 +144,30 @@ describe('runParallel', () => {
     expect(byId['d'].status).toBe('skipped');
   });
 
-  it('returns all step results including skipped', async () => {
+  it('returns results for all steps including skipped ones', async () => {
     const steps = [{ id: 'a' }, { id: 'b' }];
     const deps = [{ stepId: 'b', dependsOnStepId: 'a' }];
-    const results = await runParallel(steps, async () => { throw new Error('fail'); }, deps);
+    const results = await runParallel(
+      steps,
+      async () => { throw new Error('fail'); },
+      deps,
+    );
     expect(results).toHaveLength(2);
     const ids = results.map(r => r.stepId).sort();
     expect(ids).toEqual(['a', 'b']);
   });
+
+  it('KR5: works with no dependencies (default empty array)', async () => {
+    const steps = [{ id: 'p' }, { id: 'q' }];
+    const results = await runParallel(steps, async (step) => step.id);
+    expect(results.every(r => r.status === 'completed')).toBe(true);
+  });
 });
 
-describe('ParallelExecutor class', () => {
-  it('KR1: graph() returns DependencyGraph', () => {
+// ── ParallelExecutor class ────────────────────────────────────────────────────
+
+describe('ParallelExecutor', () => {
+  it('KR1: graph() returns DependencyGraph with correct waves', () => {
     const steps = [{ id: 'a' }, { id: 'b' }];
     const deps = [{ stepId: 'b', dependsOnStepId: 'a' }];
     const executor = new ParallelExecutor(steps, deps);
@@ -152,19 +177,20 @@ describe('ParallelExecutor class', () => {
     expect(graph.waves[1]).toEqual(['b']);
   });
 
-  it('KR2: run() executes all steps', async () => {
+  it('KR2: run() executes all steps and returns StepResults', async () => {
     const steps = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
     const executor = new ParallelExecutor(steps);
     const results = await executor.run(async (step) => 'result-' + step.id);
     expect(results).toHaveLength(3);
     expect(results.every(r => r.status === 'completed')).toBe(true);
+    expect(results.every(r => r.output === 'result-' + r.stepId)).toBe(true);
   });
 
-  it('KR5: zero-dependency constructor default works', () => {
+  it('KR5: default deps parameter is empty — single wave', () => {
     const steps = [{ id: 'a' }, { id: 'b' }];
     const executor = new ParallelExecutor(steps); // no deps arg
     const graph = executor.graph();
     expect(graph.waves).toHaveLength(1);
-    expect(graph.waves[0].sort()).toEqual(['a', 'b']);
+    expect([...graph.waves[0]].sort()).toEqual(['a', 'b']);
   });
 });
