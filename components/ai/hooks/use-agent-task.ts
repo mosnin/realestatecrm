@@ -71,6 +71,18 @@ export interface UseAgentTaskResult {
   /** Tear down an in-flight stream. Safe to call when nothing is running. */
   abort: () => void;
   clearError: () => void;
+  /**
+   * Re-sends the last user message. Safe to call after an error — the ref
+   * is populated on every `send()` call so the composer doesn't need to
+   * hold onto the text itself.
+   */
+  retryLastMessage: () => Promise<void>;
+  /**
+   * Seconds remaining on a rate-limit cool-down (429). Zero when no
+   * rate-limit is active. The composer can show a countdown and re-enable
+   * itself automatically when this reaches zero.
+   */
+  rateLimitSeconds: number;
 }
 
 /** Short random id for UI-local message keys. */
@@ -88,6 +100,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   const [liveCallIds, setLiveCallIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [allowedTools, setAllowedTools] = useState<Set<string>>(new Set());
+  const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
 
   // Refs shadow the reactive state for places where we need the latest value
   // synchronously without re-closing over it every render. We only sync
@@ -160,6 +173,11 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
   const abortRef = useRef<AbortController | null>(null);
   const streamingMsgIdRef = useRef<string | null>(null);
+  // Fix 2: remember the last user input so the UI can offer a one-tap retry.
+  const lastUserInputRef = useRef<{ text: string; attachmentIds?: string[] } | null>(null);
+  // Fix 3: store the Retry-After value so the countdown effect can read it
+  // without closing over stale state inside consumeStream.
+  const rateLimitSecondsRef = useRef(0);
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -177,6 +195,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   const landChippiError = useCallback((message: string) => {
     setError(message);
     const targetId = streamingMsgIdRef.current;
+    const errorBlock: MessageBlock = { type: 'text', content: message };
     setMessages((prev) => {
       if (targetId) {
         const idx = prev.findIndex((m) => m.id === targetId);
@@ -184,9 +203,17 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           const target = prev[idx];
           if (target.role === 'assistant') {
             const next = [...prev];
+            // Fix 1: if the bubble already has partial content from the
+            // stream, preserve it and append the error notice below it so
+            // the user sees what arrived before the crash.  Only replace
+            // when the bubble was still empty (no content streamed yet).
+            const existingBlocks = target.blocks;
             next[idx] = {
               ...target,
-              blocks: [{ type: 'text', content: message }],
+              blocks:
+                existingBlocks.length > 0
+                  ? [...existingBlocks, errorBlock]
+                  : [errorBlock],
               streaming: false,
             };
             return next;
@@ -203,7 +230,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         {
           id,
           role: 'assistant',
-          blocks: [{ type: 'text', content: message }],
+          blocks: [errorBlock],
           streaming: false,
         },
       ];
@@ -379,6 +406,14 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         });
 
         if (!res.ok) {
+          // Fix 3: on 429 read Retry-After so the composer can count down.
+          if (res.status === 429) {
+            const retryAfter = parseInt(res.headers.get('Retry-After') ?? '0', 10);
+            if (retryAfter > 0) {
+              rateLimitSecondsRef.current = retryAfter;
+              setRateLimitSeconds(retryAfter);
+            }
+          }
           // Server already speaks Chippi for this route; if not, classify
           // by HTTP status as a fallback so the user never sees raw text.
           let message: string | undefined;
@@ -468,6 +503,9 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       // Allow attachment-only sends — the user might just want to drop in a
       // photo with no caption. Block when both text AND attachments are empty.
       if ((!trimmed && !hasAttachments) || isStreaming) return;
+
+      // Fix 2: record immediately so retryLastMessage always has current data.
+      lastUserInputRef.current = { text: trimmed, ...(hasAttachments ? { attachmentIds } : {}) };
 
       // Optimistic UI: push the user message + a streaming assistant
       // placeholder BEFORE we await conversation creation. This is what
@@ -603,6 +641,26 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     [pendingApproval, approve],
   );
 
+  // Fix 2: stable retry callback — calls send() with whatever was last sent.
+  const retryLastMessage = useCallback(async () => {
+    const last = lastUserInputRef.current;
+    if (!last) return;
+    await send(last.text, last.attachmentIds);
+  }, [send]);
+
+  // Fix 3: count down rateLimitSeconds to zero, then auto-unlock the composer.
+  useEffect(() => {
+    if (rateLimitSeconds <= 0) return;
+    const id = setTimeout(() => {
+      setRateLimitSeconds((s) => {
+        const next = s - 1;
+        rateLimitSecondsRef.current = next;
+        return next;
+      });
+    }, 1000);
+    return () => clearTimeout(id);
+  }, [rateLimitSeconds]);
+
   // Auto-approve whenever we're paused on a tool the user has pre-trusted
   // for this chat. Runs after the initial turn's stream closes — that's the
   // moment `pendingApproval` flips to a value AND `isStreaming` goes false.
@@ -636,5 +694,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     allowedTools,
     abort,
     clearError,
+    retryLastMessage,
+    rateLimitSeconds,
   };
 }
