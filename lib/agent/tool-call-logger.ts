@@ -26,6 +26,7 @@ export async function logToolCallStart(
       id: stepId,
       spaceId,
       taskId: taskId ?? null,
+      stepIndex: 0,
       stepType: 'tool_call',
       toolName,
       inputSummary,
@@ -48,6 +49,7 @@ export async function logToolCallComplete(stepId: string, outputSummary: string)
   try {
     await supabase.from('ExecutionStep').update({
       outputSummary: outputSummary.slice(0, 500),
+      toolResult: { output: outputSummary.slice(0, 500) },
       status: 'completed',
       completedAt: new Date().toISOString(),
     }).eq('id', stepId);
@@ -63,7 +65,8 @@ export async function logToolCallError(stepId: string, error: string): Promise<v
 
   try {
     await supabase.from('ExecutionStep').update({
-      error: error.slice(0, 1000),
+      errorMessage: error.slice(0, 1000),
+      outputSummary: error.slice(0, 500),
       status: 'failed',
       completedAt: new Date().toISOString(),
     }).eq('id', stepId);
