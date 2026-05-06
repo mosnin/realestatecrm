@@ -114,12 +114,13 @@ function ErrorRateBadge({ rate }: { rate: number }) {
 export default async function AgentStatsPage({
   searchParams,
 }: {
-  searchParams: { days?: string };
+  searchParams: Promise<{ days?: string }>;
 }) {
   const isAdmin = await isPlatformAdmin();
   if (!isAdmin) redirect('/');
 
-  const days = Math.min(Math.max(1, parseInt(searchParams.days ?? '30', 10) || 30), 365);
+  const { days: daysParam } = await searchParams;
+  const days = Math.min(Math.max(1, parseInt(daysParam ?? '30', 10) || 30), 365);
 
   let stats: AgentStatsResponse | null = null;
   let fetchError = false;
