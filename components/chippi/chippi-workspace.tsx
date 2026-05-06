@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { ChippiPromptBox, type MentionItem } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, ListTodo } from 'lucide-react';
+import { History, X, AlertCircle, Mic, Settings, ArrowLeft, Play, Loader2, NotebookText, ListTodo, RotateCcw } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { VoiceMode } from '@/components/ai/voice-mode';
@@ -185,6 +185,7 @@ export function ChippiWorkspace({
     isStreaming,
     pendingApproval,
     liveCallIds,
+    error: agentError,
     send,
     approve,
     deny,
@@ -220,6 +221,50 @@ export function ChippiWorkspace({
       router.replace(`/s/${slug}/chippi?conversationId=${id}`, { scroll: false });
     },
   });
+
+  // ── Retry support ────────────────────────────────────────────────────────
+  // Store the last user message so the retry button can re-send it without
+  // the user having to retype. Populated on every send() call.
+  const lastUserMsgRef = useRef<string>('');
+
+  // retryLastMessage — re-send the last user message. Falls back to the ref
+  // when the hook doesn't export retryLastMessage (current state of the hook).
+  const retryLastMessage = useCallback(async () => {
+    if (!lastUserMsgRef.current || isStreaming) return;
+    await send(lastUserMsgRef.current);
+  }, [send, isStreaming]);
+
+  // ── Rate-limit countdown ──────────────────────────────────────────────────
+  // When the hook surfaces a rate_limited error, start a local 60-second
+  // countdown so the composer shows "Ready in 0:59…" feedback.
+  const RATE_LIMIT_TEXT = "You've been moving fast";
+  const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
+  const rateLimitTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (agentError && agentError.includes(RATE_LIMIT_TEXT)) {
+      // Clear any existing timer before starting a fresh one.
+      if (rateLimitTimerRef.current) clearInterval(rateLimitTimerRef.current);
+      setRateLimitSeconds(60);
+      rateLimitTimerRef.current = setInterval(() => {
+        setRateLimitSeconds((s) => {
+          if (s <= 1) {
+            if (rateLimitTimerRef.current) clearInterval(rateLimitTimerRef.current);
+            rateLimitTimerRef.current = null;
+            return 0;
+          }
+          return s - 1;
+        });
+      }, 1000);
+    }
+  }, [agentError]);
+
+  // Clean up the interval on unmount.
+  useEffect(() => {
+    return () => {
+      if (rateLimitTimerRef.current) clearInterval(rateLimitTimerRef.current);
+    };
+  }, []);
 
   // Wrap approve / alwaysAllow so the moment the realtor approves a
   // celebrate-able tool, the prompt's surface flips into the win sentence.
@@ -292,6 +337,38 @@ export function ChippiWorkspace({
   }, [initialConversationId, initialMessages, isStreaming, setMessages, urlConversationId]);
 
   // Path 2 — fetch on URL change.
+  // Extracted so the toast retry action can re-invoke the same logic.
+  const loadConversation = useCallback(
+    async (convId: string) => {
+      try {
+        const res = await fetch(`/api/ai/messages?conversationId=${convId}`);
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          console.error('[Chat] Load failed', res.status, body);
+          toast.error("Couldn't load that conversation.", {
+            action: {
+              label: 'Retry',
+              onClick: () => void loadConversation(convId),
+            },
+          });
+          return;
+        }
+        const data = (await res.json()) as LegacyMessage[];
+        console.log('[Chat] url-effect loaded', convId, 'msgs:', data.length);
+        setMessages(legacyToUi(data));
+      } catch (err) {
+        console.error('[Chat] Failed to load conversation:', err);
+        toast.error("Couldn't load that conversation.", {
+          action: {
+            label: 'Retry',
+            onClick: () => void loadConversation(convId),
+          },
+        });
+      }
+    },
+    [setMessages],
+  );
+
   useEffect(() => {
     if (!urlConversationId) return;
     if (isStreaming) return;
@@ -299,24 +376,8 @@ export function ChippiWorkspace({
     console.log('[Chat] url-effect fetching', urlConversationId);
     lastLoadedConvIdRef.current = urlConversationId;
     setActiveConversationId(urlConversationId);
-    void (async () => {
-      try {
-        const res = await fetch(`/api/ai/messages?conversationId=${urlConversationId}`);
-        if (!res.ok) {
-          const body = await res.text().catch(() => '');
-          console.error('[Chat] Load failed', res.status, body);
-          toast.error("Couldn't load that conversation. Try again.");
-          return;
-        }
-        const data = (await res.json()) as LegacyMessage[];
-        console.log('[Chat] url-effect loaded', urlConversationId, 'msgs:', data.length);
-        setMessages(legacyToUi(data));
-      } catch (err) {
-        console.error('[Chat] Failed to load conversation:', err);
-        toast.error("Couldn't load that conversation. Try again.");
-      }
-    })();
-  }, [urlConversationId, isStreaming, setMessages]);
+    void loadConversation(urlConversationId);
+  }, [urlConversationId, isStreaming, loadConversation]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -435,6 +496,9 @@ export function ChippiWorkspace({
       // Slash-command interception: /plan <task> → planning directive.
       const planTask = extractPlanTask(text);
       const finalText = planTask ? toPlanDirective(planTask) : text;
+
+      // Record the full text so the retry button can replay it.
+      lastUserMsgRef.current = contextPrefix + finalText;
 
       await send(contextPrefix + finalText, attachmentIds);
 
@@ -680,12 +744,19 @@ export function ChippiWorkspace({
             onMentionSearch={handleMentionSearch}
             onVoiceStart={() => setVoiceOpen(true)}
             onAbort={abort}
-            disabled={isStreaming || pendingApproval !== null}
+            disabled={isStreaming || pendingApproval !== null || rateLimitSeconds > 0}
             isLoading={isStreaming}
             prefill={prefill ?? undefined}
           />
         </div>
       </div>
+      {/* Rate-limit countdown — shown below the composer when the API is
+          throttling. Counts down from 60 s and disappears automatically. */}
+      {rateLimitSeconds > 0 && (
+        <p className="text-xs text-muted-foreground/70 text-center py-2">
+          Ready in {Math.floor(rateLimitSeconds / 60)}:{String(rateLimitSeconds % 60).padStart(2, '0')}
+        </p>
+      )}
     </div>
   );
 
@@ -962,6 +1033,18 @@ export function ChippiWorkspace({
                                 />
                               );
                             })}
+                            {/* Inline retry button — shown on the tail error
+                                message so the realtor doesn't have to retype. */}
+                            {isTail && agentError && !isStreaming && lastUserMsgRef.current && (
+                              <button
+                                type="button"
+                                onClick={() => void retryLastMessage()}
+                                className="mt-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+                              >
+                                <RotateCcw size={11} />
+                                Try again
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
