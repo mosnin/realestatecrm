@@ -68,6 +68,7 @@ export const realtorNavItems: NavItem[] = [
     href: '/properties',
     label: 'Properties',
     icon: Building2,
+    badgeKey: 'properties',
   },
   {
     href: '/settings',
