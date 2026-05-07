@@ -132,8 +132,11 @@ export function IntakeChat({
           ...(occupants !== undefined && { numberOfOccupants: occupants }),
           ...(preApproval !== undefined && { preApprovalStatus: preApproval }),
           ...(propertyPreferences !== undefined && { propertyAddress: propertyPreferences }),
-          ...(location !== undefined && { additionalNotes: location }),
-          ...(intentLevel !== undefined && { additionalNotes: [location, intentLevel].filter(Boolean).join(' | ') }),
+          // Fold `location` and `intentLevel` into `additionalNotes` since the
+          // legacy schema has no dedicated columns for these AI-specific fields.
+          ...([location, intentLevel].some(Boolean) && {
+            additionalNotes: [location, intentLevel].filter(Boolean).join(' | '),
+          }),
           // Mark this contact as AI-chat-sourced so realtors can distinguish it
           // from traditional form submissions.
           sourceLabel: 'intake-chat-ai',
