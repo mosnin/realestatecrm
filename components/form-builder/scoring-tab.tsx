@@ -164,7 +164,7 @@ function QuestionCard({
   return (
     <div
       className={cn(
-        'rounded-lg border border-border/70 bg-background transition-colors duration-150',
+        'rounded-lg border border-border/70 bg-background transition-colors duration-150 min-w-0',
         !enabled && 'opacity-60',
       )}
     >
@@ -238,92 +238,101 @@ function QuestionCard({
         </div>
       )}
 
-      {/* Expanded details */}
-      {enabled && expanded && (
-        <div className="border-t border-border/70 px-4 py-3 space-y-3">
-          {/* Option scores for radio/select */}
-          {hasOptions && model?.optionScores && (
-            <div className="space-y-2">
-              <p className={SECTION_LABEL}>Option scores</p>
-              {question.options!.map((opt) => {
-                const score = model.optionScores?.[opt.value] ?? 0;
-                return (
-                  <div key={opt.value} className="flex items-center gap-3">
-                    <span className="text-xs text-foreground min-w-0 flex-1 truncate">
-                      {opt.label}
-                    </span>
-                    <div className="w-24 h-1 rounded-full bg-foreground/[0.06] overflow-hidden flex-shrink-0">
-                      <div
-                        className={cn(
-                          'h-full rounded-full bg-foreground transition-all duration-150',
-                          weightFillOpacity(score / 5), // map 0-100 score to opacity buckets
-                        )}
-                        style={{ width: `${score}%` }}
-                      />
-                    </div>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={score}
-                      onChange={(e) => onOptionScoreChange(opt.value, Number(e.target.value) || 0)}
-                      className="w-16 h-7 text-xs text-center bg-background border-border/70"
-                    />
-                  </div>
-                );
-              })}
-            </div>
+      {/* Expanded details — grid-rows trick: always mounted, animates height */}
+      {enabled && showDetails && (
+        <div
+          className={cn(
+            'grid transition-[grid-template-rows] duration-200',
+            expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
           )}
+        >
+          <div className="overflow-hidden">
+            <div className="border-t border-border/70 px-4 py-3 space-y-3">
+              {/* Option scores for radio/select */}
+              {hasOptions && model?.optionScores && (
+                <div className="space-y-2">
+                  <p className={SECTION_LABEL}>Option scores</p>
+                  {question.options!.map((opt) => {
+                    const score = model.optionScores?.[opt.value] ?? 0;
+                    return (
+                      <div key={opt.value} className="flex items-center gap-3">
+                        <span className="text-xs text-foreground min-w-0 flex-1 truncate">
+                          {opt.label}
+                        </span>
+                        <div className="w-24 h-1 rounded-full bg-foreground/[0.06] overflow-hidden flex-shrink-0">
+                          <div
+                            className={cn(
+                              'h-full rounded-full bg-foreground transition-all duration-150',
+                              weightFillOpacity(score / 5),
+                            )}
+                            style={{ width: `${score}%` }}
+                          />
+                        </div>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={score}
+                          onChange={(e) => onOptionScoreChange(opt.value, Number(e.target.value) || 0)}
+                          className="w-16 h-7 text-xs text-center bg-background border-border/70"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
-          {/* Range buckets for number fields */}
-          {hasRanges && (
-            <div className="space-y-2">
-              <p className={SECTION_LABEL}>Score ranges</p>
-              {model!.ranges!.map((range, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    value={range.min}
-                    onChange={(e) => onRangeChange(idx, 'min', Number(e.target.value))}
-                    placeholder="Min"
-                    className="w-20 h-7 text-xs bg-background border-border/70"
-                  />
-                  <span className="text-xs text-muted-foreground">to</span>
-                  <Input
-                    type="number"
-                    value={range.max ?? ''}
-                    onChange={(e) => onRangeChange(idx, 'max', e.target.value ? Number(e.target.value) : null)}
-                    placeholder="Max"
-                    className="w-20 h-7 text-xs bg-background border-border/70"
-                  />
-                  <span className="text-xs text-muted-foreground">=</span>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={range.points}
-                    onChange={(e) => onRangeChange(idx, 'points', Number(e.target.value) || 0)}
-                    className="w-16 h-7 text-xs bg-background border-border/70"
-                  />
-                  <span className="text-[10px] text-muted-foreground">pts</span>
+              {/* Range buckets for number fields */}
+              {hasRanges && (
+                <div className="space-y-2">
+                  <p className={SECTION_LABEL}>Score ranges</p>
+                  {model!.ranges!.map((range, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        value={range.min}
+                        onChange={(e) => onRangeChange(idx, 'min', Number(e.target.value))}
+                        placeholder="Min"
+                        className="w-20 h-7 text-xs bg-background border-border/70"
+                      />
+                      <span className="text-xs text-muted-foreground">to</span>
+                      <Input
+                        type="number"
+                        value={range.max ?? ''}
+                        onChange={(e) => onRangeChange(idx, 'max', e.target.value ? Number(e.target.value) : null)}
+                        placeholder="Max"
+                        className="w-20 h-7 text-xs bg-background border-border/70"
+                      />
+                      <span className="text-xs text-muted-foreground">=</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={range.points}
+                        onChange={(e) => onRangeChange(idx, 'points', Number(e.target.value) || 0)}
+                        className="w-16 h-7 text-xs bg-background border-border/70"
+                      />
+                      <span className="text-[10px] text-muted-foreground">pts</span>
+                      <button
+                        type="button"
+                        onClick={() => onRemoveRange(idx)}
+                        className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
+                      >
+                        <Minus size={12} />
+                      </button>
+                    </div>
+                  ))}
                   <button
                     type="button"
-                    onClick={() => onRemoveRange(idx)}
-                    className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
+                    onClick={onAddRange}
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors duration-150"
                   >
-                    <Minus size={12} />
+                    <Plus size={12} /> Add range
                   </button>
                 </div>
-              ))}
-              <button
-                type="button"
-                onClick={onAddRange}
-                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors duration-150"
-              >
-                <Plus size={12} /> Add range
-              </button>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
@@ -670,7 +679,7 @@ export function ScoringTab({
       )}
 
       {/* Question cards */}
-      <div className="space-y-2">
+      <div className="space-y-2 max-h-[560px] overflow-y-auto min-w-0">
         {scorableQuestions.map((q) => {
           const model = scoringModel.weights[q.id];
           const enabled = model != null && model.weight > 0;

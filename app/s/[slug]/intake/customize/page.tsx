@@ -18,7 +18,6 @@ import {
   PRIMARY_PILL,
   QUIET_LINK,
   SECTION_LABEL,
-  SECTION_RHYTHM,
 } from '@/lib/typography';
 
 function deepClone<T>(obj: T): T {
@@ -293,8 +292,8 @@ export default function IntakeCustomizePage() {
   const subtitle = hasChanges ? `${subtitleBase} Unsaved changes.` : subtitleBase;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_480px] gap-6 max-w-[1600px]">
-      <div className={cn(SECTION_RHYTHM, 'min-w-0')}>
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_480px] gap-x-6 gap-y-0 max-w-[1600px] w-full pb-12">
+      <div className="min-w-0">
       {/* Header — H1 + Chippi narration */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div className="space-y-1.5">
@@ -330,8 +329,8 @@ export default function IntakeCustomizePage() {
         </div>
       </div>
 
-      {/* Form picker — underline tabs */}
-      <div className="flex items-center gap-1 border-b border-border/70">
+      {/* Form picker — underline tabs (no border-b; active tab carries its own 2px underline) */}
+      <div className="flex items-center gap-1 mt-6">
         {(['rental', 'buyer'] as const).map((type) => {
           const isActive = activeLeadType === type;
           const dirty = type === 'rental' ? rentalHasChanges : buyerHasChanges;
@@ -359,8 +358,8 @@ export default function IntakeCustomizePage() {
         })}
       </div>
 
-      {/* Sub-tabs — secondary underline row */}
-      <div className="flex items-center gap-1 border-b border-border/70 overflow-x-auto">
+      {/* Sub-tabs — secondary underline row, flush below form picker */}
+      <div className="flex items-center gap-1 border-b border-border/70 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {SUB_TABS.map((tab) => {
           const isActive = activeSubTab === tab.value;
           return (
@@ -382,7 +381,7 @@ export default function IntakeCustomizePage() {
       </div>
 
       {/* Sub-tab content */}
-      <div>
+      <div className="mt-6 min-w-0">
         {activeSubTab === 'builder' && (
           <FormBuilder config={config} onChange={handleConfigChange} />
         )}

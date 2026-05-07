@@ -49,6 +49,7 @@ from tools.properties import add_property, send_property_packet
 from tools.questions import ask_realtor
 from tools.routing import route_lead
 from tools.tours import book_tour
+from tools.intake_form import intake_form_tools
 
 CHIPPI_INSTRUCTIONS = """
 You are Chippi, an AI cowork for a real estate professional. Direct,

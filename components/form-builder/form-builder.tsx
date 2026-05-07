@@ -1112,13 +1112,14 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
   );
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="flex flex-col lg:flex-row gap-6 min-h-[600px]">
+    <div className="relative">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex flex-col lg:flex-row gap-6 min-h-[600px]">
         {/* Left Panel - Palette */}
         <div className="w-full lg:w-48 flex-shrink-0">
           <div className="sticky top-4 space-y-3">
@@ -1141,8 +1142,8 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
         </div>
 
         {/* Center Panel - Form Layout */}
-        <div className="flex-1 min-w-0">
-          <div className="space-y-3">
+        <div className="flex-1 min-w-0 min-h-0">
+          <div className="space-y-3 pb-8">
             <SortableContext
               items={config.sections.map((s) => s.id)}
               strategy={verticalListSortingStrategy}
@@ -1163,8 +1164,9 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
             </SortableContext>
 
             {config.sections.length === 0 && (
-              <div className="rounded-xl border border-dashed border-border/70 p-8 text-center">
-                <p className="text-sm text-muted-foreground">No sections yet. Add one to get started.</p>
+              <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+                <p className="text-sm text-foreground">No sections yet.</p>
+                <p className="text-xs text-muted-foreground mt-1">Add a section below to start building your form.</p>
               </div>
             )}
 
@@ -1211,54 +1213,55 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
             </div>
           </div>
         </div>
-      </div>
+        </div>
 
-      {/* Drag overlay */}
-      <DragOverlay>
-        {activeDragId && (() => {
-          // If dragging from the palette, show the field type info
-          if (activeDragId.startsWith('palette-')) {
-            const fieldType = activeDragId.replace('palette-', '');
-            const qtConfig = QUESTION_TYPES.find((qt) => qt.type === fieldType);
-            if (qtConfig) {
-              const OverlayIcon = qtConfig.icon;
+        {/* Drag overlay */}
+        <DragOverlay>
+          {activeDragId && (() => {
+            // If dragging from the palette, show the field type info
+            if (activeDragId.startsWith('palette-')) {
+              const fieldType = activeDragId.replace('palette-', '');
+              const qtConfig = QUESTION_TYPES.find((qt) => qt.type === fieldType);
+              if (qtConfig) {
+                const OverlayIcon = qtConfig.icon;
+                return (
+                  <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
+                    <OverlayIcon size={14} className="text-muted-foreground" />
+                    {qtConfig.label}
+                  </div>
+                );
+              }
+            }
+            // For questions, show the question label
+            const draggedQuestion = allQuestions.find((q) => q.id === activeDragId);
+            if (draggedQuestion) {
+              const qtConfig = getQuestionTypeConfig(draggedQuestion.type);
+              const OverlayIcon = qtConfig?.icon;
               return (
                 <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
-                  <OverlayIcon size={14} className="text-muted-foreground" />
-                  {qtConfig.label}
+                  {OverlayIcon && <OverlayIcon size={14} className="text-muted-foreground" />}
+                  {draggedQuestion.label}
                 </div>
               );
             }
-          }
-          // For questions, show the question label
-          const draggedQuestion = allQuestions.find((q) => q.id === activeDragId);
-          if (draggedQuestion) {
-            const qtConfig = getQuestionTypeConfig(draggedQuestion.type);
-            const OverlayIcon = qtConfig?.icon;
+            // For sections, show section title
+            const draggedSection = config.sections.find((s) => s.id === activeDragId);
+            if (draggedSection) {
+              return (
+                <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
+                  <GripVertical size={14} className="text-muted-foreground" />
+                  {draggedSection.title}
+                </div>
+              );
+            }
             return (
-              <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
-                {OverlayIcon && <OverlayIcon size={14} className="text-muted-foreground" />}
-                {draggedQuestion.label}
+              <div className="rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
+                Dragging…
               </div>
             );
-          }
-          // For sections, show section title
-          const draggedSection = config.sections.find((s) => s.id === activeDragId);
-          if (draggedSection) {
-            return (
-              <div className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
-                <GripVertical size={14} className="text-muted-foreground" />
-                {draggedSection.title}
-              </div>
-            );
-          }
-          return (
-            <div className="rounded-md border border-border/70 bg-background px-3 py-2 text-sm font-medium opacity-95">
-              Dragging…
-            </div>
-          );
-        })()}
-      </DragOverlay>
-    </DndContext>
+          })()}
+        </DragOverlay>
+      </DndContext>
+    </div>
   );
 }
