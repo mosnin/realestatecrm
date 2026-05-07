@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { TITLE_FONT, BODY_MUTED, SECTION_LABEL } from '@/lib/typography';
 import type { CustomAgent, SwarmRun, SwarmStatus } from '@/lib/swarm-types';
-import SwarmLaunchForm from '@/components/swarm/swarm-launch-form';
+import { SwarmLaunchForm } from '@/components/swarm/swarm-launch-form';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -1,5 +1,3 @@
-'use client' is NOT here — this is a server component.
-
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
