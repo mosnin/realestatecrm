@@ -23,6 +23,10 @@ import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { toast } from 'sonner';
 import { approvalKindForTool, approvalSubjectFromArgs, type ApprovalKind } from './approval-celebration';
 import { PlanCard } from '@/components/chippi/plan-card';
+import { useSplitPanel } from '@/hooks/use-split-panel';
+import { SplitPanelToggle } from '@/components/chippi/split-panel-toggle';
+import { RightPanel } from '@/components/chippi/right-panel';
+import { PanelResizeHandle } from '@/components/chippi/panel-resize-handle';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -153,6 +157,9 @@ export function ChippiWorkspace({
     { messageId: string; kind: ApprovalKind; subject?: string } | null
   >(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const { isSplit, toggle: toggleSplit, rightTab, setRightTab, leftWidthPercent, setLeftWidthPercent } = useSplitPanel();
 
   // Slash-command dropdown state. Opens when the user clicks "/plan" in the
   // hint strip; closes on outside click, Escape, or after a command is chosen.
@@ -910,6 +917,7 @@ export function ChippiWorkspace({
         >
           <Settings size={15} />
         </Link>
+        <SplitPanelToggle isSplit={isSplit} onToggle={toggleSplit} />
       </div>
 
       {/* Conversation history drawer — softened overlay */}
@@ -942,6 +950,14 @@ export function ChippiWorkspace({
           <div className="flex-1 bg-foreground/10" onClick={() => setDrawerOpen(false)} />
         </div>
       )}
+
+      {/* ── Main content area — supports split panel on desktop ──── */}
+      <div className="flex flex-1 min-w-0 overflow-hidden" ref={containerRef}>
+        {/* Left panel — all chat/workspace content */}
+        <div
+          className="flex flex-col h-full overflow-hidden min-w-0"
+          style={{ width: isSplit ? `${leftWidthPercent}%` : '100%' }}
+        >
 
       {/* ── Today view (no active conversation) ───────────────────── */}
       {isLoadingConversation ? (
@@ -1202,6 +1218,26 @@ export function ChippiWorkspace({
           </div>
         </>
       )}
+
+        </div>{/* end left panel */}
+
+        {/* Right panel — visible only when split */}
+        {isSplit && (
+          <>
+            <PanelResizeHandle
+              onResize={setLeftWidthPercent}
+              containerRef={containerRef}
+              currentLeftWidth={leftWidthPercent}
+            />
+            <RightPanel
+              slug={slug}
+              activeTab={rightTab}
+              onTabChange={setRightTab}
+              className="flex-1 min-w-0"
+            />
+          </>
+        )}
+      </div>{/* end split panel container */}
 
       <VoiceMode
         open={voiceOpen}
