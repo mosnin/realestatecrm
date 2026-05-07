@@ -9,6 +9,7 @@ import {
   BarChart2,
   Wallet,
   Plug,
+  Building2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -35,11 +36,12 @@ export interface NavItem {
 
 // ── Realtor sidebar nav ──────────────────────────────────────────────────────
 //
-// Four items. Chippi is the home — "Today" isn't a separate destination, it's
+// Five items. Chippi is the home — "Today" isn't a separate destination, it's
 // the morning view of the agent surface. Tours/Calendar/Notes/Reviews/
 // Analytics/Intake are reachable by URL but don't earn a nav slot; they'll be
 // absorbed into the agent surface in Phase 5 as inline tools the agent calls.
 //
+// Properties is now a primary nav item (standalone catalogue view).
 // Settings stays as the only true configuration destination. Sub-pages live
 // behind an in-page tab strip in app/s/[slug]/settings/layout.tsx.
 
@@ -61,6 +63,11 @@ export const realtorNavItems: NavItem[] = [
     href: '/deals',
     label: 'Deals',
     icon: Briefcase,
+  },
+  {
+    href: '/properties',
+    label: 'Properties',
+    icon: Building2,
   },
   {
     href: '/settings',
@@ -103,5 +110,6 @@ export const mobileNavItems = [
   { href: '/chippi', label: 'Chippi', icon: Sparkles },
   { href: '/contacts', label: 'People', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
+  { href: '/properties', label: 'Properties', icon: Building2 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ] as const;

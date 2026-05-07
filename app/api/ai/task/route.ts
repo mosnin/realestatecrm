@@ -216,6 +216,9 @@ function proxyModalStream({
       const decoder = new TextDecoder();
       let lineBuf = '';
       const textChunks: string[] = [];
+      // Track args from the most recent create_plan tool_call_start so we can
+      // emit plan_created when the matching tool_call_result arrives.
+      let pendingPlanArgs: Record<string, unknown> | null = null;
 
       try {
         while (true) {
@@ -249,17 +252,37 @@ function proxyModalStream({
               push(controller, { type: 'reasoning_delta', delta: String(evt.delta ?? '') });
 
             } else if (type === 'tool_call_start') {
+              const toolName = String(evt.tool ?? 'tool');
+              const toolArgs = (evt.args ?? {}) as Record<string, unknown>;
+              // Remember create_plan args so we can emit plan_created on result.
+              if (toolName === 'create_plan') {
+                pendingPlanArgs = toolArgs;
+              }
               push(controller, {
                 type: 'tool_call_start',
-                name: evt.tool ?? 'tool',
-                args: evt.args ?? {},
+                name: toolName,
+                args: toolArgs,
                 callId: crypto.randomUUID(),
               });
 
             } else if (type === 'tool_call_result') {
+              const toolName = String(evt.tool ?? 'tool');
+              // Emit plan_created before the result so the browser can render
+              // the plan card immediately, before the tool call settles.
+              if (toolName === 'create_plan' && pendingPlanArgs !== null) {
+                const args = pendingPlanArgs;
+                if (typeof args.task === 'string' && Array.isArray(args.steps)) {
+                  push(controller, {
+                    type: 'plan_created',
+                    task: args.task,
+                    steps: args.steps,
+                  });
+                }
+                pendingPlanArgs = null;
+              }
               push(controller, {
                 type: 'tool_call_result',
-                name: evt.tool ?? 'tool',
+                name: toolName,
                 ok: evt.ok ?? true,
                 summary: evt.summary ?? '',
               });

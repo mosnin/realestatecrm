@@ -187,6 +187,7 @@ export function ChippiWorkspace({
     liveCallIds,
     error: agentError,
     streamingReasoning,
+    activePlan,
     send,
     approve,
     deny,
@@ -645,6 +646,68 @@ export function ChippiWorkspace({
     create_plan: 'Building a plan…',
   };
 
+  // Best-effort: map tool name keywords to which plan step is likely active.
+  // Matches on lower-cased step title. Not guaranteed to be exact — just a
+  // visual hint while the agent is running.
+  const TOOL_STEP_KEYWORDS: Record<string, string[]> = {
+    search_contacts: ['contact'],
+    find_contacts: ['contact'],
+    find_person: ['contact'],
+    get_contact: ['contact'],
+    send_email: ['email', 'draft'],
+    draft_email: ['email', 'draft'],
+    send_sms: ['sms', 'message', 'text'],
+    draft_sms: ['sms', 'message', 'text'],
+    advance_deal_stage: ['deal', 'stage'],
+    create_deal: ['deal'],
+    mark_deal_won: ['deal'],
+    mark_deal_lost: ['deal'],
+    find_deal: ['deal'],
+    search_deals: ['deal'],
+    find_stuck_deals: ['deal'],
+    pipeline_summary: ['pipeline', 'deal'],
+    schedule_tour: ['tour', 'calendar', 'schedule'],
+    reschedule_tour: ['tour', 'calendar', 'schedule'],
+    find_tours: ['tour', 'calendar'],
+    set_followup: ['follow'],
+    clear_followup: ['follow'],
+    recall_history: ['history', 'note'],
+    note_on_person: ['note'],
+    note_on_deal: ['note'],
+  };
+
+  const activePlanStepIndex = useMemo<number | undefined>(() => {
+    if (!tailMessage || !liveCallIds || liveCallIds.size === 0) return undefined;
+    // Find the name of the currently live tool call.
+    let liveToolName: string | undefined;
+    for (const block of tailMessage.blocks) {
+      if (
+        block.type === 'tool_call' &&
+        'callId' in block &&
+        liveCallIds.has((block as { callId: string }).callId)
+      ) {
+        liveToolName = (block as { name: string }).name;
+        break;
+      }
+    }
+    if (!liveToolName) return undefined;
+    // Find the plan (create_plan) block in the same message to get step list.
+    const planBlock = tailMessage.blocks.find(
+      (b): b is ToolCallBlock => b.type === 'tool_call' && (b as ToolCallBlock).name === 'create_plan',
+    );
+    if (!planBlock) return undefined;
+    const plan = parsePlanResult(planBlock.result?.data ?? planBlock.args);
+    if (!plan) return undefined;
+    // Match the live tool name against step titles via keywords.
+    const keywords = TOOL_STEP_KEYWORDS[liveToolName] ?? [];
+    if (keywords.length === 0) return undefined;
+    const matchIndex = plan.steps.findIndex((s) =>
+      keywords.some((kw) => s.title.toLowerCase().includes(kw)),
+    );
+    return matchIndex >= 0 ? matchIndex : undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tailMessage, liveCallIds]);
+
   const currentAction = useMemo<string | null>(() => {
     if (!tailMessage || !liveCallIds || liveCallIds.size === 0) return null;
     for (const block of tailMessage.blocks) {
@@ -986,6 +1049,27 @@ export function ChippiWorkspace({
                             <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
                           </div>
                           <div className="flex-1 min-w-0 pt-0.5 space-y-3">
+                            {/* PlanCard — rendered for each create_plan tool
+                                call. Falls back to args so the card appears
+                                immediately on tool_call_start (before result
+                                comes in), which is the only data available in
+                                the Modal runtime path. */}
+                            {planBlocks.map((planBlock) => {
+                              const plan = parsePlanResult(planBlock.result?.data ?? planBlock.args);
+                              if (!plan) return null;
+                              // Animate steps in while the message is still
+                              // streaming; show settled state for history.
+                              const isAnimating = !!(msg.streaming && isStreaming);
+                              return (
+                                <PlanCard
+                                  key={planBlock.callId}
+                                  task={plan.task}
+                                  steps={plan.steps}
+                                  isAnimating={isAnimating}
+                                  activeStepIndex={isAnimating ? activePlanStepIndex : undefined}
+                                />
+                              );
+                            })}
                             <Transcript
                               blocks={msg.blocks}
                               role={msg.role}
@@ -1012,23 +1096,6 @@ export function ChippiWorkspace({
                                   : undefined
                               }
                             />
-                            {/* PlanCard — rendered for each create_plan tool
-                                call that has resolved with a parseable result. */}
-                            {planBlocks.map((planBlock) => {
-                              const plan = parsePlanResult(planBlock.result?.data);
-                              if (!plan) return null;
-                              // Animate steps in while the message is still
-                              // streaming; show settled state for history.
-                              const isAnimating = !!(msg.streaming && isStreaming);
-                              return (
-                                <PlanCard
-                                  key={planBlock.callId}
-                                  task={plan.task}
-                                  steps={plan.steps}
-                                  isAnimating={isAnimating}
-                                />
-                              );
-                            })}
                             {/* Inline retry button — shown on the tail error
                                 message so the realtor doesn't have to retype. */}
                             {isTail && agentError && !isStreaming && lastUserMsgRef.current && (
@@ -1069,7 +1136,18 @@ export function ChippiWorkspace({
                         <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
                           <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
                         </div>
-                        <div className="flex-1 min-w-0 pt-0.5">
+                        <div className="flex-1 min-w-0 pt-0.5 space-y-3">
+                          {/* Preview PlanCard — appears immediately when the
+                              plan_created event arrives, before the tool call
+                              settles into a message block. */}
+                          {activePlan && (
+                            <PlanCard
+                              task={activePlan.task}
+                              steps={activePlan.steps}
+                              isAnimating={true}
+                              activeStepIndex={activePlanStepIndex}
+                            />
+                          )}
                           <ThinkingIndicator
                             currentAction={currentAction}
                             streamingReasoning={streamingReasoning}

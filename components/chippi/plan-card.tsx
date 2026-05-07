@@ -16,6 +16,9 @@ export interface PlanCardProps {
     description: string;
   }>;
   isAnimating?: boolean;
+  /** Index of the step currently being executed by the agent. Only shown
+   *  when `isAnimating` is true; acts as a best-effort visual indicator. */
+  activeStepIndex?: number;
 }
 
 // ─── Animation variants ───────────────────────────────────────────────────────
@@ -70,7 +73,7 @@ const CHECK_VARIANTS = {
  * a living sparkle pulse into a settled checkmark state, signalling to the
  * realtor that the plan is locked and execution is beginning.
  */
-export function PlanCard({ task, steps, isAnimating = false }: PlanCardProps) {
+export function PlanCard({ task, steps, isAnimating = false, activeStepIndex }: PlanCardProps) {
   // Track how many steps are currently visible during the stagger sequence.
   const [visibleCount, setVisibleCount] = useState(isAnimating ? 0 : steps.length);
   // Whether we've finished the full stagger reveal.
@@ -191,17 +194,32 @@ export function PlanCard({ task, steps, isAnimating = false }: PlanCardProps) {
               )}
 
               {/* Step number badge */}
-              <div
-                className={cn(
-                  'flex-shrink-0 w-[26px] h-[26px] rounded-full flex items-center justify-center',
-                  'text-[11px] font-semibold tabular-nums',
-                  'bg-muted text-muted-foreground',
-                  'transition-colors duration-300',
-                  allVisible && 'bg-foreground/[0.05] text-foreground/60',
-                )}
-              >
-                {index + 1}
-              </div>
+              {isAnimating && activeStepIndex === index ? (
+                <motion.div
+                  animate={{ scale: [1, 1.08, 1] }}
+                  transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                  className={cn(
+                    'flex-shrink-0 w-[26px] h-[26px] rounded-full flex items-center justify-center',
+                    'text-[11px] font-semibold tabular-nums',
+                    'bg-foreground/[0.08] text-foreground',
+                    'transition-colors duration-300',
+                  )}
+                >
+                  {index + 1}
+                </motion.div>
+              ) : (
+                <div
+                  className={cn(
+                    'flex-shrink-0 w-[26px] h-[26px] rounded-full flex items-center justify-center',
+                    'text-[11px] font-semibold tabular-nums',
+                    'bg-muted text-muted-foreground',
+                    'transition-colors duration-300',
+                    allVisible && 'bg-foreground/[0.05] text-foreground/60',
+                  )}
+                >
+                  {index + 1}
+                </div>
+              )}
 
               {/* Step text */}
               <div className="flex-1 min-w-0 pt-0.5">
