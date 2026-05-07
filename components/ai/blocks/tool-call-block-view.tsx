@@ -12,6 +12,7 @@ import {
   Lock,
   Users,
   Briefcase,
+  Building2,
   CalendarDays,
   FileText,
   BarChart3,
@@ -24,6 +25,7 @@ import type { ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { ContactsResult } from './tool-results/contacts-result';
 import { DealsResult } from './tool-results/deals-result';
 import { ToursResult } from './tool-results/tours-result';
+import { PropertiesResult } from './tool-results/properties-result';
 
 /** Per-tool icon map. Generic Wrench fallback keeps unknown tools readable. */
 const TOOL_ICONS: Record<string, typeof Users> = {
@@ -35,6 +37,9 @@ const TOOL_ICONS: Record<string, typeof Users> = {
   get_note: FileText,
   send_email: Mail,
   send_sms: MessageSquare,
+  add_property: Building2,
+  find_property: Building2,
+  search_properties: Building2,
 };
 
 /**
@@ -65,6 +70,9 @@ const TOOL_RUNNING_LABEL: Record<string, string> = {
   note_on_person: 'Saving note…',
   note_on_deal: 'Saving note…',
   note_on_property: 'Saving note…',
+  find_property: 'Looking up…',
+  search_properties: 'Searching…',
+  add_property: 'Saving…',
   create_deal: 'Updating deal…',
   mark_deal_won: 'Updating deal…',
   mark_deal_lost: 'Updating deal…',
@@ -203,6 +211,9 @@ export function ToolCallBlockView({
     }
     if (block.display === 'tours' && Array.isArray((data as { tours?: unknown[] }).tours)) {
       return <ToursResult data={data as { tours: never[] }} />;
+    }
+    if (block.display === 'properties' && Array.isArray((data as { properties?: unknown[] }).properties)) {
+      return <PropertiesResult data={data as { properties: never[] }} />;
     }
     return null;
   })();
