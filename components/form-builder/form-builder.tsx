@@ -1119,10 +1119,17 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex flex-col lg:flex-row gap-6 min-h-[600px]">
+        {/*
+          overflow-hidden prevents the fixed-width palette + properties panels
+          from leaking outside the grid column when viewport is narrow.
+          The DragOverlay is portalled out of this container by dnd-kit so it
+          is unaffected by overflow-hidden.
+        */}
+        <div className="flex flex-col lg:flex-row gap-6 min-h-[600px] overflow-hidden">
         {/* Left Panel - Palette */}
         <div className="w-full lg:w-48 flex-shrink-0">
-          <div className="sticky top-4 space-y-3">
+          {/* top-[4.5rem] = 56px sticky header + 16px — avoids header overlap */}
+          <div className="sticky top-[4.5rem] space-y-3">
             <p className={SECTION_LABEL}>Field types</p>
             <div className="grid grid-cols-2 gap-2">
               {QUESTION_TYPES.map((qt) => (
@@ -1182,11 +1189,12 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
 
         {/* Right Panel - Property Editor */}
         <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
-          <div className="sticky top-4 space-y-3">
+          {/* top-[4.5rem] keeps panel below sticky header; maxHeight fills the rest of the viewport */}
+          <div className="sticky top-[4.5rem] space-y-3">
             <p className={SECTION_LABEL}>Properties</p>
             <div
               className="rounded-xl border border-border/70 bg-background overflow-y-auto"
-              style={{ maxHeight: 'calc(100vh - 160px)' }}
+              style={{ maxHeight: 'calc(100vh - 5.5rem - 4rem)' }}
             >
               <div className="p-4">
                 {selectedQuestion ? (
@@ -1215,8 +1223,13 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
         </div>
         </div>
 
-        {/* Drag overlay */}
-        <DragOverlay>
+        {/*
+          DragOverlay — dnd-kit portals this to <body> at z-index 999 by default.
+          The sticky preview aside uses natural stacking (z-index auto) within
+          the grid column. Setting zIndex here to a lower value ensures the
+          drag ghost never paints over the adjacent preview panel.
+        */}
+        <DragOverlay zIndex={200}>
           {activeDragId && (() => {
             // If dragging from the palette, show the field type info
             if (activeDragId.startsWith('palette-')) {

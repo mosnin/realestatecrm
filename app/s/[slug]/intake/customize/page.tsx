@@ -292,124 +292,131 @@ export default function IntakeCustomizePage() {
   const subtitle = hasChanges ? `${subtitleBase} Unsaved changes.` : subtitleBase;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_480px] gap-x-6 gap-y-0 max-w-[1600px] w-full pb-12">
-      <div className="min-w-0">
-      {/* Header — H1 + Chippi narration */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-        <div className="space-y-1.5">
-          <h1 className={H1} style={TITLE_FONT}>
-            Customize
-          </h1>
-          <p className={BODY_MUTED}>{subtitle}</p>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <button
-            type="button"
-            onClick={handleReset}
-            className={cn(QUIET_LINK, 'px-2 h-9 inline-flex items-center')}
-          >
-            Reset to default
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving || !hasChanges}
-            className={cn(
-              PRIMARY_PILL,
-              'disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100',
-            )}
-          >
-            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {saving
-              ? savingPhase === 'scoring'
-                ? 'Generating scoring…'
-                : 'Saving…'
-              : 'Save'}
-          </button>
-        </div>
-      </div>
-
-      {/* Form picker — underline tabs (no border-b; active tab carries its own 2px underline) */}
-      <div className="flex items-center gap-1 mt-6">
-        {(['rental', 'buyer'] as const).map((type) => {
-          const isActive = activeLeadType === type;
-          const dirty = type === 'rental' ? rentalHasChanges : buyerHasChanges;
-          return (
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_480px] gap-6 max-w-[1600px] pb-12">
+      {/* Left column — scrolls with the page */}
+      <div className="min-w-0 space-y-6">
+        {/* Header — H1 + Chippi narration */}
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div className="space-y-1.5">
+            <h1 className={H1} style={TITLE_FONT}>
+              Customize
+            </h1>
+            <p className={BODY_MUTED}>{subtitle}</p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
-              key={type}
               type="button"
-              onClick={() => setActiveLeadType(type)}
+              onClick={handleReset}
+              className={cn(QUIET_LINK, 'px-2 h-9 inline-flex items-center')}
+            >
+              Reset to default
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || !hasChanges}
               className={cn(
-                'inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-150',
-                isActive
-                  ? 'border-foreground text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
+                PRIMARY_PILL,
+                'disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100',
               )}
             >
-              {type === 'rental' ? 'Rental Form' : 'Buyer Form'}
-              {dirty && (
-                <span
-                  aria-label="unsaved changes"
-                  className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 flex-shrink-0"
-                />
-              )}
+              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {saving
+                ? savingPhase === 'scoring'
+                  ? 'Generating scoring…'
+                  : 'Saving…'
+                : 'Save'}
             </button>
-          );
-        })}
+          </div>
+        </div>
+
+        {/*
+          Tab group — primary (form picker) and secondary (sub-tabs) rows sit
+          flush against each other so they read as one stacked control.
+        */}
+        <div>
+          {/* Form picker — primary underline tabs */}
+          <div className="flex items-center gap-1 border-b border-border/70">
+            {(['rental', 'buyer'] as const).map((type) => {
+              const isActive = activeLeadType === type;
+              const dirty = type === 'rental' ? rentalHasChanges : buyerHasChanges;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setActiveLeadType(type)}
+                  className={cn(
+                    'inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-150',
+                    isActive
+                      ? 'border-foreground text-foreground'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
+                  )}
+                >
+                  {type === 'rental' ? 'Rental Form' : 'Buyer Form'}
+                  {dirty && (
+                    <span
+                      aria-label="unsaved changes"
+                      className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 flex-shrink-0"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Sub-tabs — secondary underline row */}
+          <div className="flex items-center gap-1 border-b border-border/70 overflow-x-auto">
+            {SUB_TABS.map((tab) => {
+              const isActive = activeSubTab === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => setActiveSubTab(tab.value)}
+                  className={cn(
+                    'whitespace-nowrap px-3 py-2 text-[13px] font-medium border-b-2 transition-colors duration-150',
+                    isActive
+                      ? 'border-foreground text-foreground'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
+                  )}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Sub-tab content */}
+        <div className="min-w-0">
+          {activeSubTab === 'builder' && (
+            <FormBuilder config={config} onChange={handleConfigChange} />
+          )}
+          {activeSubTab === 'preview' && <FormPreview config={config} />}
+          {activeSubTab === 'scoring' && (
+            <ScoringTab
+              config={config}
+              slug={slug}
+              leadType={activeLeadType}
+              scoringModel={activeScoringModel}
+              onScoringModelChange={handleScoringModelChange}
+              onSave={async (model) => {
+                const res = await fetch('/api/form-config/save-scoring', {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ slug, leadType: activeLeadType, scoringModel: model }),
+                });
+                if (!res.ok) {
+                  const d = await res.json().catch(() => ({}));
+                  throw new Error(d.error || 'Failed to save scoring model');
+                }
+              }}
+            />
+          )}
+        </div>
       </div>
 
-      {/* Sub-tabs — secondary underline row, flush below form picker */}
-      <div className="flex items-center gap-1 border-b border-border/70 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {SUB_TABS.map((tab) => {
-          const isActive = activeSubTab === tab.value;
-          return (
-            <button
-              key={tab.value}
-              type="button"
-              onClick={() => setActiveSubTab(tab.value)}
-              className={cn(
-                'whitespace-nowrap px-3 py-2 text-[13px] font-medium border-b-2 transition-colors duration-150',
-                isActive
-                  ? 'border-foreground text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
-              )}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Sub-tab content */}
-      <div className="mt-6 min-w-0">
-        {activeSubTab === 'builder' && (
-          <FormBuilder config={config} onChange={handleConfigChange} />
-        )}
-        {activeSubTab === 'preview' && <FormPreview config={config} />}
-        {activeSubTab === 'scoring' && (
-          <ScoringTab
-            config={config}
-            slug={slug}
-            leadType={activeLeadType}
-            scoringModel={activeScoringModel}
-            onScoringModelChange={handleScoringModelChange}
-            onSave={async (model) => {
-              const res = await fetch('/api/form-config/save-scoring', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ slug, leadType: activeLeadType, scoringModel: model }),
-              });
-              if (!res.ok) {
-                const d = await res.json().catch(() => ({}));
-                throw new Error(d.error || 'Failed to save scoring model');
-              }
-            }}
-          />
-        )}
-      </div>
-      </div>
-
-      {/* Live preview — only on wide viewports. Mobile users keep the Preview sub-tab. */}
+      {/* Live preview — sticky on wide viewports. Mobile users keep the Preview sub-tab. */}
       <aside className="hidden lg:block">
         <div className="sticky top-6 h-[calc(100vh-3rem)] flex flex-col rounded-xl border border-border/70 bg-background overflow-hidden">
           <div className="px-4 py-2 border-b border-border/70 flex items-center justify-between flex-shrink-0">

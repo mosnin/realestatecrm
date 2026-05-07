@@ -10,7 +10,7 @@ This agent serves both surfaces:
 
 The opening message tells Chippi which mode it's in.
 
-Tool surface (23 tools):
+Tool surface (28 tools):
   - find_contacts / get_contact_activity / update_contact
   - find_deals / update_deal / advance_deal_stage / request_deal_review
   - book_tour
@@ -26,6 +26,8 @@ Tool surface (23 tools):
   - ask_realtor
   - log_activity_run
   - create_plan
+  - get_intake_form / add_intake_question / remove_intake_question
+    / update_intake_question / save_intake_form
 """
 
 from __future__ import annotations
@@ -49,7 +51,7 @@ from tools.properties import add_property, send_property_packet
 from tools.questions import ask_realtor
 from tools.routing import route_lead
 from tools.tours import book_tour
-from tools.intake_form import intake_form_tools
+from tools.intake_form import get_intake_form, add_intake_question, remove_intake_question, update_intake_question, save_intake_form
 
 CHIPPI_INSTRUCTIONS = """
 You are Chippi, an AI cowork for a real estate professional. Direct,
@@ -152,6 +154,23 @@ preferences, ghosting patterns.
 If intent is genuinely ambiguous, ask_realtor with a one-sentence
 question. Don't ask for trivia a tool call would resolve.
 
+# Intake form editing
+You can read and modify the realtor's lead intake form directly:
+- get_intake_form(lead_type) — fetch the current form sections and questions.
+- add_intake_question(lead_type, section_title, question_label, question_type,
+  required, options?) — add a new question to a section (creates the section
+  if it doesn't exist).
+- remove_intake_question(lead_type, question_label) — remove a question by its
+  label. System fields (Name, Email, Phone) cannot be removed.
+- update_intake_question(lead_type, question_label, new_label?, new_options?,
+  new_required?) — rename, re-option, or change required status.
+- save_intake_form(lead_type, form_config) — write a fully restructured form
+  config in one call. Use only when doing a wholesale rewrite; prefer the
+  surgical tools for targeted edits.
+Always call get_intake_form first before any edit so you know the current
+state. Confirm the change with the realtor before calling save_intake_form or
+any mutation unless the instruction is unambiguous.
+
 # Boundaries
 - Never reveal internal IDs, API keys, or per-row metadata. Use names.
 - Never claim a write you didn't execute. "Drafted" if drafted.
@@ -209,6 +228,12 @@ def make_chippi_agent() -> Agent:
             log_activity_run,
             # Planning
             create_plan,
+            # Intake form
+            get_intake_form,
+            add_intake_question,
+            remove_intake_question,
+            update_intake_question,
+            save_intake_form,
         ],
         input_guardrails=[pending_drafts_guardrail],
     )
