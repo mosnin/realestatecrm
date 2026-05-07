@@ -8,6 +8,7 @@ import { NotificationsSection } from './notifications-section';
 import { LegalSettingsForm } from './legal/legal-settings-form';
 import { IntegrationsSection } from './integrations-section';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
+import { AIProfileForm } from '@/components/profile/ai-profile-form';
 import type { SpaceSetting } from '@/lib/types';
 import {
   H1,
@@ -63,6 +64,13 @@ export default async function SettingsPage({
       </div>
     );
   }
+
+  // Fetch AI profile
+  const { data: aiProfile } = await supabase
+    .from('AIUserProfile')
+    .select('*')
+    .eq('spaceId', space.id)
+    .maybeSingle();
 
   const subStatus =
     (space as { stripeSubscriptionStatus?: string }).stripeSubscriptionStatus ?? 'inactive';
@@ -128,6 +136,17 @@ export default async function SettingsPage({
       >
         <p className={SECTION_LABEL}>Profile</p>
         <ProfileSection slug={space.slug} />
+      </section>
+
+      {/* ── AI Personalization ──────────────────────────────────────── */}
+      <section id="ai-profile" className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24">
+        <div className="mb-6">
+          <h2 className="text-base font-semibold">AI Personalization</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Tell Chippi about you so responses feel tailored, not generic.
+          </p>
+        </div>
+        <AIProfileForm slug={slug} spaceId={space.id} />
       </section>
 
       {/* NOTIFICATIONS */}

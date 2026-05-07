@@ -30,7 +30,7 @@ from memory.store import format_memories_for_prompt, load_memories, prune_expire
 from schemas import AgentSettings, Space
 from security.budget import check_budget, record_usage
 from security.context import AgentContext
-from chippi import make_chippi_agent
+from chippi import load_ai_profile, make_chippi_agent
 from tools.streaming import publish_event
 
 # ---------------------------------------------------------------------------
@@ -310,7 +310,10 @@ async def run_agent_for_space(
         agent_type="chippi",
     )
 
-    chippi = make_chippi_agent()
+    # Load AI profile for personalization
+    db = await supabase()
+    ai_profile = await load_ai_profile(space.id, db)
+    chippi = make_chippi_agent(ai_profile_text=ai_profile)
     prompt = _build_opening_prompt(space, memory_context, triggers)
 
     run_config = RunConfig(

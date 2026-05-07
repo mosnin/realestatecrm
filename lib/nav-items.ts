@@ -10,6 +10,8 @@ import {
   Wallet,
   Plug,
   Building2,
+  Bot,
+  Network,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -95,6 +97,8 @@ export const realtorNavItems: NavItem[] = [
 export const realtorMoreNavItems: NavItem[] = [
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/properties/commissions', label: 'Commissions', icon: Wallet },
+  { href: '/agents', label: 'Agents', icon: Bot },
+  { href: '/swarm', label: 'Swarm', icon: Network },
   { href: '/integrations', label: 'Integrations', icon: Plug },
   { href: '/intake', label: 'Intake form', icon: ClipboardList },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },

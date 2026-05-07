@@ -186,12 +186,52 @@ suggest the closest thing you can.
 """.strip()
 
 
-def make_chippi_agent() -> Agent:
+async def load_ai_profile(space_id: str, db) -> str | None:
+    """Load the AIUserProfile for a space and format it as a prompt injection."""
+    try:
+        result = await db.table("AIUserProfile").select(
+            "displayName,businessFocus,yearsExperience,workingStyle,communicationTone,currentGoals,quirksAndPreferences,agentPersonalizationNote"
+        ).eq("spaceId", space_id).maybeSingle().execute()
+
+        profile = result.data
+        if not profile:
+            return None
+
+        parts = []
+        if profile.get("displayName"):
+            parts.append(f"The realtor's preferred name: {profile['displayName']}")
+        if profile.get("businessFocus"):
+            parts.append(f"Business focus: {', '.join(profile['businessFocus'])}")
+        if profile.get("yearsExperience") is not None:
+            parts.append(f"Years of experience: {profile['yearsExperience']}")
+        if profile.get("workingStyle"):
+            parts.append(f"Working style: {profile['workingStyle']}")
+        if profile.get("communicationTone"):
+            parts.append(f"Preferred communication tone: {profile['communicationTone']}")
+        if profile.get("currentGoals"):
+            parts.append(f"Current goals: {profile['currentGoals']}")
+        if profile.get("quirksAndPreferences"):
+            parts.append(f"Preferences: {profile['quirksAndPreferences']}")
+        if profile.get("agentPersonalizationNote"):
+            parts.append(f"Special instructions: {profile['agentPersonalizationNote']}")
+
+        if not parts:
+            return None
+
+        return "# Realtor profile\n" + "\n".join(f"- {p}" for p in parts)
+    except Exception:
+        return None
+
+
+def make_chippi_agent(ai_profile_text: str | None = None) -> Agent:
     """Build the single Chippi agent. Constructed fresh per run."""
+    instructions = CHIPPI_INSTRUCTIONS
+    if ai_profile_text:
+        instructions = ai_profile_text + "\n\n" + instructions
     return Agent[None](
         name="Chippi",
         model="gpt-5-mini",
-        instructions=CHIPPI_INSTRUCTIONS,
+        instructions=instructions,
         tools=[
             # Contacts
             find_contacts,
