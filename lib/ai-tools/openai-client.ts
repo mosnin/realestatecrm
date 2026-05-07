@@ -13,7 +13,7 @@
 import OpenAI from 'openai';
 
 /** Default model for the on-demand agent. Tool-calling capable. */
-export const AGENT_MODEL = 'gpt-4.1-mini';
+export const AGENT_MODEL = 'gpt-5-mini';
 
 export interface OpenAIClientResult {
   client: OpenAI;

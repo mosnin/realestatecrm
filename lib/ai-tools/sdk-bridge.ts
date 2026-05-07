@@ -39,7 +39,7 @@ import { Agent, run, tool, RunState, type RunContext, type RunResult } from '@op
 import { z } from 'zod';
 import type { ToolContext, ToolDefinition, ToolResult } from './types';
 
-const DEFAULT_MODEL = 'gpt-4.1-mini';
+const DEFAULT_MODEL = 'gpt-5-mini';
 
 /**
  * Convert one of our tools into an SDK `FunctionTool`.
@@ -286,7 +286,7 @@ interface RunAgentInput {
   input: string | Parameters<typeof run>[1];
   tools: ToolDefinition[];
   ctx: ToolContext;
-  /** Override the model. Defaults to `gpt-4.1-mini`. */
+  /** Override the model. Defaults to `gpt-5-mini`. */
   model?: string;
 }
 

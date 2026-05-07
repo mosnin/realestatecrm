@@ -62,7 +62,7 @@ except ImportError:
 # Model fallback list (KR2)
 # ---------------------------------------------------------------------------
 
-_FALLBACK_MODELS = ["gpt-4.1-mini", "gpt-4o-mini", "gpt-4.1-nano"]
+_FALLBACK_MODELS = ["gpt-5-mini", "gpt-4.1-mini", "gpt-4o-mini"]
 
 # ---------------------------------------------------------------------------
 # High-risk tool detection (KR4)
@@ -147,7 +147,7 @@ async def _run_critic(goal: str, outcome_summary: str, client: AsyncOpenAI) -> s
     """
     try:
         resp = await client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-5-mini",
             messages=[
                 {
                     "role": "system",

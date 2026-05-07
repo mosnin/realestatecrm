@@ -30,6 +30,9 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 MODEL_PRICES: dict[str, dict[str, float]] = {
+    "gpt-5-mini":   {"in": 0.75, "out": 4.50},
+    "gpt-5.4-mini": {"in": 0.75, "out": 4.50},
+    "gpt-4.1-mini": {"in": 0.40, "out": 1.60},
     "gpt-4o":       {"in": 2.50, "out": 10.00},
     "gpt-4.1":      {"in": 2.00, "out": 8.00},
     "gpt-4o-mini":  {"in": 0.15, "out": 0.60},

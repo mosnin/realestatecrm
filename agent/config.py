@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     agent_internal_secret: str = Field(alias="AGENT_INTERNAL_SECRET", default="")
 
     # Models
-    orchestrator_model: str = Field(default="gpt-4o")
-    worker_model: str = Field(default="gpt-4o-mini")
+    orchestrator_model: str = Field(default="gpt-5-mini")
+    worker_model: str = Field(default="gpt-5-mini")
 
     # Safety limits
     max_react_iterations: int = Field(default=6)       # max tool-call turns per specialist agent

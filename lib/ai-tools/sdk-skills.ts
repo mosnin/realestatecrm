@@ -23,7 +23,7 @@ import { toSdkTool } from './sdk-bridge';
 import { ALL_TOOLS } from './tools';
 import type { ToolContext, ToolDefinition } from './types';
 
-const DEFAULT_MODEL = 'gpt-4.1-mini';
+const DEFAULT_MODEL = 'gpt-5-mini';
 
 /**
  * Pull tools by name from `ALL_TOOLS`. Unknown names throw at build time —

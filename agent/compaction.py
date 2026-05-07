@@ -19,8 +19,7 @@ from config import settings
 logger = structlog.get_logger(__name__)
 
 _MAX_CHARS_DEFAULT = 80_000
-# gpt-4.1-nano: cheapest available model, more than capable for summarization.
-_COMPACTION_MODEL = "gpt-4.1-nano"
+_COMPACTION_MODEL = "gpt-5-mini"
 
 
 def _estimate_chars(messages: list[dict]) -> int:

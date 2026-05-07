@@ -62,7 +62,7 @@ export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
         const compacted = await compactContext({
           messages: history,
           maxContextChars: COMPACTION_THRESHOLD_CHARS,
-          model: 'gpt-4.1-mini',
+          model: 'gpt-5-mini',
         });
         initialEvents.push({
           type: 'system',

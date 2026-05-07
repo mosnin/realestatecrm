@@ -168,7 +168,7 @@ def make_chippi_agent() -> Agent:
     """Build the single Chippi agent. Constructed fresh per run."""
     return Agent[None](
         name="Chippi",
-        model="gpt-4.1-mini",
+        model="gpt-5-mini",
         instructions=CHIPPI_INSTRUCTIONS,
         tools=[
             # Contacts

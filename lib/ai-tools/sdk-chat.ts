@@ -1,7 +1,7 @@
 /**
- * The new in-process chat runtime, built on `@openai/agents`.
+ * TypeScript in-process chat runtime (fallback). Active when CHIPPI_CHAT_RUNTIME=ts.
  *
- * This replaces the Modal/Python proxy at `app/api/ai/task/route.ts` when
+ * The primary runtime is Modal (agent/modal_app.py). This module is the fallback when
  * `CHIPPI_CHAT_RUNTIME=ts` is set. The flag default is `'modal'`, so this
  * code is dormant until explicitly activated — see `runtime-flag.ts`.
  *
@@ -40,7 +40,7 @@ import { logger } from '@/lib/logger';
 // ── Config ─────────────────────────────────────────────────────────────────
 
 /** Same model the bridge defaults to. Cheap enough to absorb chat traffic. */
-const DEFAULT_MODEL = 'gpt-4.1-mini';
+const DEFAULT_MODEL = 'gpt-5-mini';
 
 /**
  * Hard ceiling on tool-call iterations per chat turn. The SDK has its
@@ -245,7 +245,7 @@ export interface RunChatTurnInput {
   history?: ChatHistoryRow[];
   /**
    * Optional override for the model (tests, A/B). The default
-   * `gpt-4.1-mini` matches the bridge.
+   * `gpt-5-mini` matches the bridge.
    */
   model?: string;
 }

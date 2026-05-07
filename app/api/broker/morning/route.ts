@@ -41,7 +41,7 @@ const QUIET_THRESHOLD_DAYS = 5;
 
 const AGENT_TIMEOUT_MS = 5_000;
 const AGENT_CACHE_TTL_MS = 5 * 60 * 1000;
-const AGENT_MODEL = 'gpt-4.1-mini';
+const AGENT_MODEL = 'gpt-5-mini';
 
 /**
  * Broker prompt — the broker's morning question is about the team, not their

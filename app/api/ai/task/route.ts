@@ -1,28 +1,24 @@
 /**
  * POST /api/ai/task — on-demand agent streaming endpoint.
  *
- * Post-cutover: every chat turn runs through the in-process TS runtime in
- * `lib/ai-tools/sdk-chat-stream.ts` (built on `@openai/agents`). The Modal
- * Python sandbox proxy that previously handled turns has been deleted —
- * its tools are mirrored on the TS side via `lib/ai-tools/tools/*` and the
- * SDK `Agent` runs them in-process.
+ * Every chat turn proxies to the Modal Python sandbox running Chippi via the
+ * OpenAI Agents SDK. Modal provides the secure isolated execution environment
+ * for long-running, autonomous, multi-step reasoning chains. The Next.js layer
+ * handles auth, rate-limiting, persistence, and SSE translation; Modal handles
+ * the actual agent loop.
  *
  * Pipeline:
  *   1. Auth the caller + resolve a ToolContext.
  *   2. Rate-limit (per-user, per-IP, per-space).
  *   3. Resolve/create the conversation; save the user message.
  *   4. Load recent history (capped at HISTORY_LIMIT).
- *   5. Hydrate any referenced Attachment rows for the SDK runtime to
- *      surface as context.
- *   6. Stream events through `streamTsChatTurn` — text deltas, tool
- *      calls, approval interrupts, completion.
- *   7. The stream pump persists the assistant's final text + handles
- *      AgentPausedRun creation for any approval interrupts.
+ *   5. Hydrate any referenced Attachment rows.
+ *   6. POST to Modal chat_turn endpoint with the full context.
+ *   7. Translate Modal SSE events → standard agent event format.
+ *   8. Persist the assistant message on turn completion.
  *
- * `runtime-flag.ts` retains a `'modal'` opt-out for one stability cycle in
- * case we need to revert; the modal proxy itself is gone, so setting
- * `CHIPPI_CHAT_RUNTIME=modal` will fail closed (501). The flag value
- * exists to make a future re-introduction (or full deletion) explicit.
+ * Set CHIPPI_CHAT_RUNTIME=ts to fall back to the in-process TypeScript runtime
+ * (useful for local dev without a Modal deployment).
  */
 
 import crypto from 'crypto';
@@ -31,7 +27,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
-import { saveUserMessage } from '@/lib/ai-tools/persistence';
+import { saveUserMessage, saveAssistantMessage } from '@/lib/ai-tools/persistence';
 import { resolveToolContext } from '@/lib/ai-tools/context';
 import type { ToolContext } from '@/lib/ai-tools/types';
 import {
@@ -72,12 +68,6 @@ interface PostBody {
   attachmentIds?: string[];
 }
 
-/**
- * Fire-and-forget: derive a 3-6 word title from the user's first message via
- * a one-shot LLM call and patch the row. We do NOT await this from the
- * request path. The title call is rate-limited per-space at 60/hour; past
- * that we fall back to a local heuristic.
- */
 function autoTitleConversation(spaceId: string, conversationId: string, userMessage: string): void {
   void (async () => {
     try {
@@ -147,12 +137,6 @@ async function loadHistory(spaceId: string, conversationId: string): Promise<His
     }));
 }
 
-/**
- * Hydrate the Attachment rows the realtor referenced in this turn into the
- * shape the SDK runtime expects. spaceId-scoped — the table is the trust
- * boundary, the same way every other agent tool treats spaceId. Wrapped in
- * try/catch so a transient Supabase blip never crashes the chat turn.
- */
 async function hydrateAttachments(
   spaceId: string,
   ids: string[] | undefined,
@@ -189,6 +173,170 @@ async function hydrateAttachments(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Modal SSE proxy
+// ---------------------------------------------------------------------------
+
+interface ProxyModalStreamInput {
+  modalBody: ReadableStream<Uint8Array>;
+  spaceId: string;
+  conversationId: string;
+  abortController: AbortController;
+}
+
+/**
+ * Translate the SSE stream from Modal's chat_turn endpoint into the standard
+ * agent event format the browser client expects, persisting the assistant
+ * message once the turn completes.
+ *
+ * Modal event → browser event mapping:
+ *   token            → text_delta
+ *   tool_call_start  → tool_call_start  (rename "tool" field → "name")
+ *   tool_call_result → tool_call_result (rename "tool" field → "name")
+ *   done             → turn_complete    (+ persist assistant message)
+ *   error            → error
+ */
+function proxyModalStream({
+  modalBody,
+  spaceId,
+  conversationId,
+  abortController,
+}: ProxyModalStreamInput): Response {
+  const encoder = new TextEncoder();
+  let seq = 0;
+
+  function push(controller: ReadableStreamDefaultController, event: Record<string, unknown>) {
+    const line = `data: ${JSON.stringify({ seq: seq++, ts: new Date().toISOString(), ...event })}\n\n`;
+    controller.enqueue(encoder.encode(line));
+  }
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const reader = modalBody.getReader();
+      const decoder = new TextDecoder();
+      let lineBuf = '';
+      const textChunks: string[] = [];
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          lineBuf += decoder.decode(value, { stream: true });
+          const lines = lineBuf.split('\n');
+          lineBuf = lines.pop() ?? '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const raw = line.slice(6).trim();
+            if (!raw) continue;
+
+            let evt: Record<string, unknown>;
+            try {
+              evt = JSON.parse(raw) as Record<string, unknown>;
+            } catch {
+              continue;
+            }
+
+            const type = typeof evt.type === 'string' ? evt.type : '';
+
+            if (type === 'token') {
+              const delta = String(evt.delta ?? '');
+              textChunks.push(delta);
+              push(controller, { type: 'text_delta', delta });
+
+            } else if (type === 'tool_call_start') {
+              push(controller, {
+                type: 'tool_call_start',
+                name: evt.tool ?? 'tool',
+                args: evt.args ?? {},
+                callId: crypto.randomUUID(),
+              });
+
+            } else if (type === 'tool_call_result') {
+              push(controller, {
+                type: 'tool_call_result',
+                name: evt.tool ?? 'tool',
+                ok: evt.ok ?? true,
+                summary: evt.summary ?? '',
+              });
+
+            } else if (type === 'done') {
+              const finalText =
+                typeof evt.final_text === 'string' && evt.final_text.trim()
+                  ? evt.final_text
+                  : textChunks.join('');
+
+              if (finalText.trim()) {
+                try {
+                  await saveAssistantMessage({
+                    spaceId,
+                    conversationId,
+                    blocks: [{ type: 'text', content: finalText }],
+                  });
+                } catch (err) {
+                  logger.warn('[ai/task] modal: persist assistant message failed', { spaceId }, err);
+                }
+              }
+              push(controller, { type: 'turn_complete', reason: 'complete' });
+
+            } else if (type === 'error') {
+              push(controller, { type: 'error', message: evt.message ?? 'Agent error' });
+            }
+          }
+        }
+
+        // Flush any remaining buffer
+        if (lineBuf.startsWith('data: ')) {
+          const raw = lineBuf.slice(6).trim();
+          if (raw) {
+            try {
+              const evt = JSON.parse(raw) as Record<string, unknown>;
+              if (evt.type === 'done') {
+                const finalText = String(evt.final_text ?? textChunks.join(''));
+                if (finalText.trim()) {
+                  await saveAssistantMessage({
+                    spaceId,
+                    conversationId,
+                    blocks: [{ type: 'text', content: finalText }],
+                  }).catch(() => undefined);
+                }
+                push(controller, { type: 'turn_complete', reason: 'complete' });
+              }
+            } catch {
+              // ignore malformed trailing line
+            }
+          }
+        }
+      } catch (err) {
+        if (!abortController.signal.aborted) {
+          logger.error('[ai/task] modal stream read error', { spaceId }, err);
+          push(controller, { type: 'error', message: chippiErrorMessage('internal') });
+        }
+      } finally {
+        controller.close();
+        reader.releaseLock();
+      }
+    },
+    cancel() {
+      abortController.abort();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// POST handler
+// ---------------------------------------------------------------------------
+
 export async function POST(req: NextRequest) {
   let body: PostBody;
   try {
@@ -213,17 +361,6 @@ export async function POST(req: NextRequest) {
   }
   const message = sanitized.sanitized;
 
-  // Modal opt-out is failed closed post-cutover. The modal proxy code is
-  // gone; the value exists only as an escape hatch we'd need to put code
-  // back behind in an emergency. Surface a clear error rather than a
-  // mysterious 500 if anyone sets it.
-  if (chatRuntime() === 'modal') {
-    return NextResponse.json(
-      { error: 'Modal chat runtime has been retired. Unset CHIPPI_CHAT_RUNTIME or set it to "ts".' },
-      { status: 501 },
-    );
-  }
-
   const abortController = new AbortController();
 
   const ctxOrResponse = await resolveToolContext(spaceSlug, abortController.signal);
@@ -232,15 +369,9 @@ export async function POST(req: NextRequest) {
 
   const { allowed } = await checkRateLimit(`ai:task:${ctx.userId}`, 30, 3600);
   if (!allowed) {
-    return NextResponse.json(
-      { error: chippiErrorMessage('rate_limited') },
-      { status: 429 },
-    );
+    return NextResponse.json({ error: chippiErrorMessage('rate_limited') }, { status: 429 });
   }
 
-  // Cap chat traffic per-IP and per-space. The SDK runtime is in-process so
-  // cold-starts no longer cost Modal money, but the model API itself still
-  // costs real tokens — keep the guardrails tight.
   const ip = getClientIp(req);
   const ipLimit = await checkRateLimit(`chat:ip:${ip}`, 30, 600);
   if (!ipLimit.allowed) {
@@ -257,10 +388,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Daily token quota check. Sum inputTokens + outputTokens from AgentTask
-  // rows created today for this space and compare against the configured
-  // dailyTokenBudget. Falls back to a hard 500,000-token safety cap when no
-  // budget row exists.
   try {
     const { data: agentSettingsRow } = await supabase
       .from('AgentSettings')
@@ -271,7 +398,7 @@ export async function POST(req: NextRequest) {
     const dailyTokenBudget: number =
       (agentSettingsRow?.dailyTokenBudget as number | null | undefined) ?? 500_000;
 
-    const todayUtc = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const todayUtc = new Date().toISOString().slice(0, 10);
     const { data: usageRows } = await supabase
       .from('AgentTask')
       .select('inputTokens, outputTokens')
@@ -293,7 +420,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Daily token budget exceeded' }, { status: 429 });
     }
   } catch (err) {
-    // Non-fatal: a budget check failure should not block the user. Log and continue.
     logger.warn('[ai/task] token budget check failed — continuing', { spaceSlug }, err);
   }
 
@@ -312,7 +438,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
 
-  // Phase 2 telemetry: chippi_first_message — fire exactly once per space.
   void (async () => {
     try {
       if (await hasEmittedTelemetry(ctx.space.id, 'chippi_first_message')) return;
@@ -340,22 +465,67 @@ export async function POST(req: NextRequest) {
     history = [];
   }
 
-  // Drop the just-persisted user message from history if it's the trailing
-  // row — the runner expects history to be PRIOR turns + a separate `message`.
   if (history.length > 0) {
     const last = history[history.length - 1];
     if (last.role === 'user' && last.content === message) history.pop();
   }
 
-  // Attachments resolved + passed through; the SDK runtime's system prompt
-  // surfaces them when present.
-  await hydrateAttachments(ctx.space.id, body.attachmentIds);
+  const hydratedAttachments = await hydrateAttachments(ctx.space.id, body.attachmentIds);
 
-  return streamTsChatTurn({
-    ctx,
+  // ── TS fallback (local dev without Modal) ────────────────────────────────
+  if (chatRuntime() === 'ts') {
+    logger.info('[ai/task] using in-process TS runtime (CHIPPI_CHAT_RUNTIME=ts)', { spaceSlug });
+    return streamTsChatTurn({
+      ctx,
+      conversationId,
+      userMessage: message,
+      history,
+      abortController,
+    });
+  }
+
+  // ── Modal runtime (default) ──────────────────────────────────────────────
+  const modalChatUrl = process.env.MODAL_CHAT_URL;
+  if (!modalChatUrl) {
+    logger.error('[ai/task] MODAL_CHAT_URL not set — cannot route to Modal sandbox', { spaceSlug });
+    return NextResponse.json(
+      { error: 'Agent backend not configured. Set MODAL_CHAT_URL.' },
+      { status: 503 },
+    );
+  }
+
+  const payload = {
+    secret: process.env.AGENT_INTERNAL_SECRET ?? '',
+    space_id: ctx.space.id,
+    message,
+    history: history.map((h) => ({ role: h.role, content: h.content })),
+    conversation_id: conversationId,
+    attachments: hydratedAttachments,
+  };
+
+  let modalRes: Response;
+  try {
+    modalRes = await fetch(modalChatUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: abortController.signal,
+    });
+  } catch (err) {
+    logger.error('[ai/task] Modal fetch failed', { spaceSlug }, err);
+    return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 502 });
+  }
+
+  if (!modalRes.ok || !modalRes.body) {
+    const status = modalRes.status;
+    logger.error('[ai/task] Modal returned error', { status, spaceSlug });
+    return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 502 });
+  }
+
+  return proxyModalStream({
+    modalBody: modalRes.body,
+    spaceId: ctx.space.id,
     conversationId,
-    userMessage: message,
-    history,
     abortController,
   });
 }
