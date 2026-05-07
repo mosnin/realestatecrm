@@ -12,6 +12,8 @@ Chippi is a self-serve SaaS for U.S. realtors focused on faster lead handling th
 
 **Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind 4, Supabase (PostgreSQL, accessed via `@supabase/supabase-js` with the service-role key; schema lives in `supabase/schema.sql`), Clerk (auth), OpenAI (scoring + embeddings + assistant), Supabase pgvector (vector search via the `DocumentEmbedding` table and `match_documents` RPC — see `lib/zilliz.ts` for the pgvector wrapper), Upstash Redis (legacy metadata + rate limiting + pending-approval state), Resend (email), Telnyx (SMS), Stripe (billing), Vercel (deployment target). Prisma is **not** in use — there is no `prisma/schema.prisma`, no `prisma.config.ts`, and `@prisma/client` is not imported anywhere in the codebase.
 
+**AI agent runtime**: Interactive chat turns run via the **OpenAI Agents SDK** (`openai-agents` Python package) inside a **Modal sandbox** (`agent/modal_app.py`), deployed with `modal deploy agent/modal_app.py`. The model is **gpt-5-mini** with `reasoning_effort="medium"`. The Next.js layer (`app/api/ai/task/route.ts`) proxies SSE from Modal and handles auth, rate-limiting, and persistence. Set `CHIPPI_CHAT_RUNTIME=ts` to fall back to the in-process TypeScript runtime for local development. Do **not** reference or revert to the TypeScript-only runtime as the primary path — Modal is the mandatory runtime.
+
 ---
 
 ## 2. Current wedge (must protect)

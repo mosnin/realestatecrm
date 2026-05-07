@@ -11,7 +11,7 @@ card, the realtor approves, the email ships, and a `ToolCallBlock` lands in
 the transcript. This doc is the reference for every contract that makes that
 flow work: the SSE event union, the persisted block shape, the tool registry, the pending-approval store, and the sub-agent ("Skill") pattern layered on top.
 
-**Runtime status (May 2026).** Chat turns run in-process via the TypeScript OpenAI Agents SDK runtime; background, event-driven activation is handled by Redis + Modal webhook triggers in `POST /api/agent/trigger` (policy controlled by `AGENT_IMMEDIATE_EVENTS`: `all` by default, or a comma-separated subset of event names; invalid values fail safe to `all`).
+**Runtime status (May 2026).** Chat turns run inside a **Modal sandbox** (`agent/modal_app.py`) via the **OpenAI Agents SDK** Python package (`openai-agents`), using **gpt-5-mini** with `reasoning_effort="medium"` enabled. The Next.js layer in `POST /api/ai/task` proxies SSE events from Modal, translates them to the standard `AgentEvent` wire format, and persists the turn on completion. Reasoning tokens stream to the browser as `reasoning_delta` events and surface in the collapsible "Thinking" UI. Background, event-driven autonomous activation is handled by Redis + Modal webhook triggers in `POST /api/agent/trigger` (policy controlled by `AGENT_IMMEDIATE_EVENTS`: `all` by default, or a comma-separated subset of event names; invalid values fail safe to `all`). Set `CHIPPI_CHAT_RUNTIME=ts` to fall back to the in-process TypeScript runtime for local development without a Modal deployment.
 
 **Table of contents**
 
@@ -30,25 +30,34 @@ flow work: the SSE event union, the persisted block shape, the tool registry, th
 ## 1. Architecture
 
 ```
-ChatInterface (components/ai/chat-interface.tsx)
+ChippiWorkspace (components/chippi/chippi-workspace.tsx)
    │  useAgentTask hook  (components/ai/hooks/use-agent-task.ts)
    ▼
 POST /api/ai/task  (app/api/ai/task/route.ts)
    │  resolveToolContext → auth + space scope
    │  loadHistory (20 messages)
    │  saveUserMessage
+   │  POST → Modal chat_turn endpoint
    ▼
-streamTsChatTurn()  (lib/ai-tools/sdk-chat-stream.ts)
-   │  OpenAI Agents SDK runtime (`@openai/agents`)
-   │  ┌─ text deltas / tool call events / approval interrupts
-   │  └─ mutating tool? → pause + persist AgentPausedRun for resume
+Modal sandbox  (agent/modal_app.py)
+   │  OpenAI Agents SDK Python (`openai-agents`)
+   │  gpt-5-mini  •  reasoning_effort="medium"
+   │  ┌─ response.output_text.delta → token events
+   │  ├─ response.reasoning_text.delta → reasoning_delta events
+   │  └─ tool_call_item / tool_call_output_item → tool events
    ▼
-if paused:
-   savePendingApproval → Redis  (lib/ai-tools/pending-approvals.ts)
-   SSE stream closes with reason: 'paused'
-else:
-   saveAssistantMessage(blocks)  → Message.blocks JSONB
-   pushEvent('turn_complete', reason: 'complete')
+proxyModalStream()  (app/api/ai/task/route.ts)
+   │  token           → text_delta
+   │  reasoning_delta → reasoning_delta  (streams to "Thinking" UI)
+   │  tool_call_start → tool_call_start  (with fresh callId)
+   │  tool_call_result → tool_call_result
+   │  done            → saveAssistantMessage + turn_complete
+   ▼
+Browser SSE client
+   │  text_delta      → append to streaming text block
+   │  reasoning_delta → accumulate in streamingReasoning (collapsible)
+   │  tool_call_*     → tool call block in transcript
+   └─ turn_complete   → mark turn settled, clear streamingReasoning
 ```
 
 **Pause / resume.** When the model emits a tool call whose
@@ -376,6 +385,7 @@ cited above.
 | `type` | Fields beyond `{seq, ts}` | Emitted when |
 |---|---|---|
 | `text_delta` | `delta: string` | Every text chunk streamed by OpenAI |
+| `reasoning_delta` | `delta: string` | Model reasoning token chunk; accumulated in `streamingReasoning` for the collapsible "Thinking" UI; never stored in `MessageBlock[]` |
 | `tool_call_start` | `callId, name, args, display?` | Loop has validated args and is about to invoke `executeTool` |
 | `tool_call_result` | `callId, ok, summary, data?, error?` | `executeTool` returned (success or handled failure) |
 | `permission_required` | `requestId, callId, name, args, summary, display?, otherPendingCalls?` | Loop hit a mutating tool; `otherPendingCalls` enumerates the cascade-deny targets |

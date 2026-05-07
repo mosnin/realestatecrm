@@ -216,6 +216,7 @@ async def chat_turn(item: dict):
         return {"error": f"space or agent settings not found: {space_id}"}
 
     from agents import InputGuardrailTripwireTriggered, ModelSettings, RunConfig, Runner
+    from openai.types.shared import Reasoning
     from schemas import AgentSettings, Space
     from security.context import AgentContext
     from chippi import make_chippi_agent
@@ -289,20 +290,20 @@ async def chat_turn(item: dict):
             data = getattr(event, "data", None)
             if data is None:
                 return None
-            # The Responses API streams BOTH response.output_text.delta
-            # (model text) and response.function_call_arguments.delta
-            # (the JSON args being constructed for a tool call). Both
-            # carry a `delta` attribute. Without filtering, the function-
-            # call arg JSON leaks into the chat as "raw" model text right
-            # before each tool card. Only forward genuine output_text
-            # deltas; function-call args land properly via the
-            # RunItemStreamEvent → tool_call_item path below.
             data_type = getattr(data, "type", "") or ""
-            if data_type and data_type != "response.output_text.delta":
-                return None
-            delta = getattr(data, "delta", None)
-            if delta:
-                return {"type": "token", "delta": str(delta)}
+            # Forward genuine output_text deltas as tokens.
+            # Forward reasoning_text deltas as reasoning_delta (shown in the
+            # collapsible "Thinking" section in the client).
+            # Filter everything else (function_call_arguments.delta etc.) so
+            # raw tool-arg JSON doesn't leak into the chat as model text.
+            if data_type == "response.output_text.delta":
+                delta = getattr(data, "delta", None)
+                if delta:
+                    return {"type": "token", "delta": str(delta)}
+            elif data_type == "response.reasoning_text.delta":
+                delta = getattr(data, "delta", None)
+                if delta:
+                    return {"type": "reasoning_delta", "delta": str(delta)}
             return None
 
         if name == "RunItemStreamEvent":
@@ -363,7 +364,10 @@ async def chat_turn(item: dict):
 
     run_config = RunConfig(
         tracing_disabled=False,
-        model_settings=ModelSettings(truncation="auto"),
+        model_settings=ModelSettings(
+            truncation="auto",
+            reasoning=Reasoning(effort="medium"),
+        ),
     )
 
     async def event_stream():

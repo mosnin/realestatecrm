@@ -57,6 +57,8 @@ export interface UseAgentTaskResult {
   pendingApproval: PermissionPromptData | null;
   liveCallIds: Set<string>;
   error: string | null;
+  /** Accumulated reasoning tokens for the current streaming turn. Empty string when not streaming. */
+  streamingReasoning: string;
   send: (text: string, attachmentIds?: string[]) => Promise<void>;
   approve: (requestId: string, editedArgs?: Record<string, unknown>) => Promise<void>;
   deny: (requestId: string) => Promise<void>;
@@ -101,6 +103,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   const [error, setError] = useState<string | null>(null);
   const [allowedTools, setAllowedTools] = useState<Set<string>>(new Set());
   const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
+  const [streamingReasoning, setStreamingReasoning] = useState('');
 
   // Refs shadow the reactive state for places where we need the latest value
   // synchronously without re-closing over it every render. We only sync
@@ -361,6 +364,12 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         return;
       }
 
+      case 'reasoning_delta': {
+        if (!event.delta) return;
+        setStreamingReasoning((prev) => prev + event.delta);
+        return;
+      }
+
       case 'turn_complete': {
         const targetId = streamingMsgIdRef.current;
         if (targetId) {
@@ -368,6 +377,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
             prev.map((m) => (m.id === targetId ? { ...m, streaming: false } : m)),
           );
         }
+        setStreamingReasoning('');
         return;
       }
 
@@ -472,6 +482,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         streamingMsgIdRef.current = null;
         setIsStreaming(false);
         setLiveCallIds(new Set());
+        setStreamingReasoning('');
       }
     },
     [abort, applyEvent, landChippiError],
@@ -687,6 +698,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     pendingApproval,
     liveCallIds,
     error,
+    streamingReasoning,
     send,
     approve,
     deny,

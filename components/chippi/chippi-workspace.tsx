@@ -186,6 +186,7 @@ export function ChippiWorkspace({
     pendingApproval,
     liveCallIds,
     error: agentError,
+    streamingReasoning,
     send,
     approve,
     deny,
@@ -1069,7 +1070,10 @@ export function ChippiWorkspace({
                           <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 min-w-0 pt-0.5">
-                          <ThinkingIndicator currentAction={currentAction} />
+                          <ThinkingIndicator
+                            currentAction={currentAction}
+                            streamingReasoning={streamingReasoning}
+                          />
                         </div>
                       </motion.div>
                     )}

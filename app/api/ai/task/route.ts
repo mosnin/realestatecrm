@@ -245,6 +245,9 @@ function proxyModalStream({
               textChunks.push(delta);
               push(controller, { type: 'text_delta', delta });
 
+            } else if (type === 'reasoning_delta') {
+              push(controller, { type: 'reasoning_delta', delta: String(evt.delta ?? '') });
+
             } else if (type === 'tool_call_start') {
               push(controller, {
                 type: 'tool_call_start',

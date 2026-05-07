@@ -23,8 +23,8 @@ System map for Chippi. Based on actual repository contents.
 | UI | React 19, Tailwind 4, Radix/shadcn-style components | framer-motion + GSAP for animations |
 | Auth | Clerk (`@clerk/nextjs@^7.0.1`) | Middleware-based route protection |
 | Database | Supabase PostgreSQL (`@supabase/supabase-js@^2.99.1`) | Service-role key, server-side only |
-| AI - scoring | OpenAI (`openai@^6.26.0`) | `gpt-4o-mini`, structured JSON output |
-| AI - assistant | OpenAI (`openai@^6.26.0`) | `gpt-4.1-mini` |
+| AI - scoring | OpenAI (`openai@^6.26.0`) | `gpt-4o-mini`, structured JSON output (scoring only) |
+| AI - assistant | OpenAI Agents SDK (Python `agents` + TS `@openai/agents`) running in **Modal sandbox** | `gpt-5-mini` with reasoning, tool-calling loop, fallback chain |
 | AI - embeddings | OpenAI `text-embedding-3-small` | 1536-dim vectors |
 | Vector DB | Supabase pgvector (`DocumentEmbedding` table) | Per-space rows, HNSW index, COSINE metric via `match_documents` RPC |
 | Cache/legacy | Upstash Redis (`@upstash/redis@^1.34.9`) | Slug metadata, admin path |
@@ -105,7 +105,7 @@ realestatecrm/
 | Onboarding API | `app/api/onboarding/route.ts` | Multi-action POST: `start`, `save_step`, `save_profile`, `create_space`, `save_notifications`, `complete`, `check_slug` |
 | Public intake form | `app/apply/[slug]/page.tsx`, `application-form.tsx` | Prospect-facing form: name (req), phone (req), email, budget, timeline, areas, notes |
 | Intake ingestion | `app/api/public/apply/route.ts` | Creates Contact, deduplicates within 2min window, triggers scoring |
-| Lead scoring | `lib/lead-scoring.ts` | OpenAI gpt-4o-mini, structured JSON, score 0-100, labels hot/warm/cold/unscored |
+| Lead scoring | `lib/lead-scoring.ts` | OpenAI gpt-4o-mini (scoring only — not the agent) |
 | CRM workspace | `app/s/[slug]/*` | Leads list, contacts CRUD, deals kanban, AI assistant, settings, profile |
 | Contacts API | `app/api/contacts/route.ts`, `[id]/route.ts` | CRUD with search/filter, async vector sync on create |
 | Deals API | `app/api/deals/route.ts`, `[id]/route.ts`, `reorder/route.ts` | CRUD with stage association, position ordering, async vector sync |
@@ -193,7 +193,7 @@ Completion sets `onboardingCurrentStep = 7` and `onboardingCompletedAt = now()`.
 ## 8. Scoring flow
 
 - **Function**: `scoreLeadApplication` in `lib/lead-scoring.ts`
-- **Model**: OpenAI `gpt-4o-mini`, temperature 0
+- **Model**: OpenAI `gpt-4o-mini`, temperature 0 (lead-scoring only; chat agent uses `gpt-5-mini`)
 - **Format**: Structured JSON output via `response_format.json_schema`
 - **Input**: name, email, phone, budget, timeline, preferredAreas, notes
 - **Output contract** (`LeadScoringResult`):

@@ -16,6 +16,7 @@ import type { ToolResult } from './types';
 
 export type AgentEvent =
   | TextDeltaEvent
+  | ReasoningDeltaEvent
   | ToolCallStartEvent
   | ToolCallResultEvent
   | PermissionRequiredEvent
@@ -34,6 +35,16 @@ interface BaseEvent {
 export interface TextDeltaEvent extends BaseEvent {
   type: 'text_delta';
   /** The incremental text. May be empty. */
+  delta: string;
+}
+
+/**
+ * A chunk of the model's internal reasoning (thinking tokens). Streamed when
+ * reasoning_effort is enabled on gpt-5-mini. The client accumulates these into
+ * a collapsible "Thinking" section — they are NOT shown inline in the transcript.
+ */
+export interface ReasoningDeltaEvent extends BaseEvent {
+  type: 'reasoning_delta';
   delta: string;
 }
 
