@@ -165,6 +165,8 @@ export default async function DealDetailPage({
     .filter((dc) => dc.contact !== null)
     .map((dc) => ({ ...dc.contact!, role: dc.role as import('@/lib/types').DealContactRole | null }));
 
+  const pipelineType = allStages.find((s) => s.id === stageId)?.pipelineType ?? null;
+
   return (
     <div className="space-y-0">
       {/* Back nav */}
@@ -425,7 +427,7 @@ export default async function DealDetailPage({
             )}
 
             {activeTab === 'documents' && (
-              <DealDocuments dealId={id} initial={documents} />
+              <DealDocuments dealId={id} initial={documents} pipelineType={pipelineType} />
             )}
 
             {/* Legacy milestones tab kept reachable via explicit ?tab=milestones

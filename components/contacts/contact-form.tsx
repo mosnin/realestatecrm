@@ -179,7 +179,7 @@ type ParsedContact = {
   name: string;
   email: string | null;
   phone: string | null;
-  type: 'rental' | 'buyer' | null;
+  type: 'rental' | 'buyer' | 'seller' | null;
   stage: 'Qualifying' | 'Tour' | 'Application' | null;
   monthlyBudget: number | null;
   properties: string[];

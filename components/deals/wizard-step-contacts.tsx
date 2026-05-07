@@ -9,7 +9,7 @@ interface WizardContact {
   id: string;
   name: string;
   email: string | null;
-  leadType: 'rental' | 'buyer';
+  leadType: 'rental' | 'buyer' | 'seller';
 }
 
 interface WizardStepContactsProps {
@@ -41,12 +41,12 @@ export function WizardStepContacts({ slug, selectedContacts, onSelectionChange }
           id: string;
           name: string;
           email: string | null;
-          leadType?: 'rental' | 'buyer' | null;
+          leadType?: 'rental' | 'buyer' | 'seller' | null;
         }>).map((c) => ({
           id: c.id,
           name: c.name,
           email: c.email ?? null,
-          leadType: c.leadType === 'buyer' ? 'buyer' : 'rental',
+          leadType: c.leadType === 'buyer' ? 'buyer' : c.leadType === 'seller' ? 'seller' : 'rental',
         }));
         setResults(normalized);
       }
@@ -79,6 +79,7 @@ export function WizardStepContacts({ slug, selectedContacts, onSelectionChange }
   }
 
   const hasBuyer = selectedContacts.some((c) => c.leadType === 'buyer');
+  const hasSeller = selectedContacts.some((c) => c.leadType === 'seller');
 
   return (
     <div className="space-y-4">
@@ -161,9 +162,11 @@ export function WizardStepContacts({ slug, selectedContacts, onSelectionChange }
                   'text-[10px] font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0',
                   result.leadType === 'buyer'
                     ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400'
+                    : result.leadType === 'seller'
+                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
                     : 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400'
                 )}>
-                  {result.leadType === 'buyer' ? 'Buyer' : 'Rental'}
+                  {result.leadType === 'buyer' ? 'Buyer' : result.leadType === 'seller' ? 'Seller' : 'Rental'}
                 </span>
 
                 {/* Check / plus icon */}
@@ -178,11 +181,17 @@ export function WizardStepContacts({ slug, selectedContacts, onSelectionChange }
         </div>
       )}
 
-      {/* Buyer pipeline suggestion info */}
+      {/* Pipeline suggestion info */}
       {hasBuyer && (
         <div className="flex items-center gap-2 rounded-md bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 px-3 py-2 text-xs font-medium">
           <Info size={13} className="flex-shrink-0" />
           Buyer pipeline will be suggested
+        </div>
+      )}
+      {hasSeller && !hasBuyer && (
+        <div className="flex items-center gap-2 rounded-md bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 px-3 py-2 text-xs font-medium">
+          <Info size={13} className="flex-shrink-0" />
+          Seller pipeline will be suggested
         </div>
       )}
     </div>

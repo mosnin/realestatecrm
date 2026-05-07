@@ -7,11 +7,11 @@ import type { DealStage } from '@/lib/types';
 
 interface WizardStepPipelineProps {
   slug: string;
-  pipelineType: 'rental' | 'buyer';
-  onPipelineChange: (type: 'rental' | 'buyer') => void;
+  pipelineType: 'rental' | 'buyer' | 'seller';
+  onPipelineChange: (type: 'rental' | 'buyer' | 'seller') => void;
   stageId: string;
   onStageChange: (stageId: string) => void;
-  detectedPipelineType?: 'rental' | 'buyer' | null;
+  detectedPipelineType?: 'rental' | 'buyer' | 'seller' | null;
   error?: string;
 }
 
@@ -24,6 +24,7 @@ export function WizardStepPipeline({
   detectedPipelineType,
   error,
 }: WizardStepPipelineProps) {
+  type PipelineType = 'rental' | 'buyer' | 'seller';
   const [allStages, setAllStages] = useState<DealStage[]>([]);
   const [loadingStages, setLoadingStages] = useState(true);
 
@@ -58,7 +59,7 @@ export function WizardStepPipeline({
     .filter((s) => s.pipelineType === pipelineType)
     .sort((a, b) => a.position - b.position);
 
-  function handlePipelineChange(type: 'rental' | 'buyer') {
+  function handlePipelineChange(type: PipelineType) {
     onPipelineChange(type);
     // Clear stage selection if the current stage doesn't belong to the new pipeline type
     const stageInNewPipeline = allStages.some((s) => s.id === stageId && s.pipelineType === type);
@@ -76,7 +77,14 @@ export function WizardStepPipeline({
 
       {/* Detected pipeline suggestion banner */}
       {detectedPipelineType && (
-        <div className="flex items-center gap-2 rounded-md bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 px-3 py-2 text-xs font-medium">
+        <div className={cn(
+          'flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium',
+          detectedPipelineType === 'buyer'
+            ? 'bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400'
+            : detectedPipelineType === 'seller'
+            ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400'
+            : 'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400'
+        )}>
           <Info size={13} className="flex-shrink-0" />
           Based on your contact&apos;s profile, we suggest the{' '}
           <span className="font-semibold capitalize">{detectedPipelineType}</span>{' '}
@@ -100,7 +108,7 @@ export function WizardStepPipeline({
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            Rental Pipeline
+            Rental
           </button>
           <button
             type="button"
@@ -112,7 +120,19 @@ export function WizardStepPipeline({
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            Buyer Pipeline
+            Buyer
+          </button>
+          <button
+            type="button"
+            onClick={() => handlePipelineChange('seller')}
+            className={cn(
+              'px-4 py-1.5 text-sm font-medium rounded-md transition-colors',
+              pipelineType === 'seller'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Seller
           </button>
         </div>
       </div>

@@ -11,7 +11,7 @@ import { WizardStepDetails } from '@/components/deals/wizard-step-details';
 import { WizardStepNotes } from '@/components/deals/wizard-step-notes';
 import { toast } from 'sonner';
 
-type ContactResult = { id: string; name: string; email: string | null; leadType: 'rental' | 'buyer' };
+type ContactResult = { id: string; name: string; email: string | null; leadType: 'rental' | 'buyer' | 'seller' };
 
 export default function NewDealPage() {
   const router = useRouter();
@@ -21,7 +21,7 @@ export default function NewDealPage() {
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [selectedContacts, setSelectedContacts] = useState<ContactResult[]>([]);
-  const [pipelineType, setPipelineType] = useState<'rental' | 'buyer'>('rental');
+  const [pipelineType, setPipelineType] = useState<'rental' | 'buyer' | 'seller'>('rental');
   const [stageId, setStageId] = useState(searchParams.get('stageId') ?? '');
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM');
@@ -40,7 +40,9 @@ export default function NewDealPage() {
     if (step === 1) {
       // Only auto-update pipelineType if contacts were actually selected.
       if (selectedContacts.length > 0) {
-        const detected = selectedContacts.some(c => c.leadType === 'buyer') ? 'buyer' : 'rental';
+        const hasBuyer = selectedContacts.some(c => c.leadType === 'buyer');
+        const hasSeller = selectedContacts.some(c => c.leadType === 'seller');
+        const detected = hasBuyer ? 'buyer' : hasSeller ? 'seller' : 'rental';
         setPipelineType(detected);
       }
       setStep(2);
@@ -102,7 +104,11 @@ export default function NewDealPage() {
   // Only surface a detected pipeline type when at least one contact is selected.
   // With no contacts, we have nothing to base the suggestion on.
   const detectedPipelineType = selectedContacts.length > 0
-    ? (selectedContacts.some(c => c.leadType === 'buyer') ? 'buyer' : 'rental')
+    ? (selectedContacts.some(c => c.leadType === 'buyer')
+        ? 'buyer'
+        : selectedContacts.some(c => c.leadType === 'seller')
+        ? 'seller'
+        : 'rental')
     : null;
 
   return (
@@ -142,7 +148,7 @@ export default function NewDealPage() {
           <WizardStepPipeline
             slug={slug}
             pipelineType={pipelineType}
-            onPipelineChange={(type) => { setPipelineType(type); setStageId(''); setStageError(''); }}
+            onPipelineChange={(type: 'rental' | 'buyer' | 'seller') => { setPipelineType(type); setStageId(''); setStageError(''); }}
             stageId={stageId}
             onStageChange={(id) => { setStageId(id); if (id) setStageError(''); }}
             detectedPipelineType={detectedPipelineType}
