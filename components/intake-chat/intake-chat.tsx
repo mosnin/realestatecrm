@@ -31,6 +31,18 @@ export interface IntakeChatProps {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
+/**
+ * The marker the ASSISTANT emits to signal that the intake interview is
+ * complete and the collected fields JSON follows.
+ *
+ * SECURITY: This marker is only read from the streamed ASSISTANT response
+ * (the `accumulated` buffer built from the OpenAI stream).  User-supplied
+ * message content is sent to the server and is never scanned for this marker
+ * on the client side — only the AI's own stream output is checked.  This
+ * means a user who types "__FIELDS__:{...}" cannot trigger a false submission,
+ * because their message goes to the server as a user-role message and the
+ * streamed bytes we read here come exclusively from the OpenAI completion.
+ */
 const FIELDS_MARKER = '__FIELDS__:';
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -75,10 +87,43 @@ export function IntakeChat({
   const submitApplication = useCallback(
     async (fields: Record<string, unknown>) => {
       try {
+        // The AI emits `name`, `budget`, and `timing`/`timeline` keys that don't
+        // match the apply endpoint's legacy schema field names. Map them here so
+        // the endpoint can always find the right values regardless of which
+        // validation path (dynamic form config or legacy) is used.
+        const { name, budget, timing, timeline, ...rest } = fields as {
+          name?: string;
+          budget?: unknown;
+          timing?: string;
+          timeline?: string;
+          leadType?: string;
+          [key: string]: unknown;
+        };
+
+        const leadType = (fields.leadType as string) ?? 'rental';
+
+        const mappedFields: Record<string, unknown> = {
+          ...rest,
+          // Legacy schema requires `legalName`; dynamic path's extractContactFields
+          // also reads `data.name` as a fallback, so send both.
+          legalName: name ?? '',
+          name: name ?? '',
+          // Map generic `budget` to the correct per-leadType field so the apply
+          // endpoint's parseBudgetToNumber call can find it.
+          ...(leadType === 'buyer'
+            ? { buyerBudget: budget }
+            : { monthlyRent: budget }),
+          // Preserve timing under both names so both form paths find it.
+          targetMoveInDate: timing ?? timeline ?? '',
+          // Mark this contact as AI-chat-sourced so realtors can distinguish it
+          // from traditional form submissions.
+          sourceLabel: 'intake-chat-ai',
+        };
+
         const res = await fetch('/api/public/apply', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slug, spaceId, ...fields }),
+          body: JSON.stringify({ slug, spaceId, ...mappedFields }),
         });
 
         if (!res.ok) {

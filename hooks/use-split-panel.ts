@@ -36,6 +36,14 @@ function loadFromStorage(): SplitPanelState {
   }
 }
 
+function persistState(next: SplitPanelState): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // localStorage may be unavailable (private browsing quota, etc.) — fail silently
+  }
+}
+
 /**
  * Manages Chippi split-panel layout state, persisted in localStorage.
  *
@@ -60,11 +68,7 @@ export function useSplitPanel() {
   const updateState = useCallback((updates: Partial<SplitPanelState>) => {
     setState(prev => {
       const next = { ...prev, ...updates };
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // localStorage may be unavailable (private browsing quota, etc.) — fail silently
-      }
+      persistState(next);
       return next;
     });
   }, []);
@@ -81,9 +85,14 @@ export function useSplitPanel() {
     return () => window.removeEventListener('resize', check);
   }, [state.isSplit, updateState]);
 
+  // Use functional setState to avoid stale closure on rapid toggles
   const toggle = useCallback(() => {
-    updateState({ isSplit: !state.isSplit });
-  }, [state.isSplit, updateState]);
+    setState(prev => {
+      const next = { ...prev, isSplit: !prev.isSplit };
+      persistState(next);
+      return next;
+    });
+  }, []);
 
   const setRightTab = useCallback(
     (tab: RightPanelTab) => {

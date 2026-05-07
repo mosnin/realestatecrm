@@ -208,7 +208,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     space = await getSpaceFromSlug(slug);
   } catch (err) {
     logger.error('[intake-chat] getSpaceFromSlug failed', { slug }, err);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Server error' }, { status: 500, headers: CORS_HEADERS });
   }
 
   if (!space) {
@@ -309,6 +309,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   return new Response(readable, {
     status: 200,
     headers: {
+      ...CORS_HEADERS,
       'Content-Type': 'text/plain; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
       'X-Accel-Buffering': 'no',
