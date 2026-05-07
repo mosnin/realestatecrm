@@ -102,8 +102,19 @@ export function IntakeChat({
 
         const leadType = (fields.leadType as string) ?? 'rental';
 
+        const { income, employment, occupants, preApproval, propertyPreferences, location, intentLevel, ...coreRest } = rest as {
+          income?: unknown;
+          employment?: string;
+          occupants?: unknown;
+          preApproval?: string;
+          propertyPreferences?: string;
+          location?: string;
+          intentLevel?: string;
+          [key: string]: unknown;
+        };
+
         const mappedFields: Record<string, unknown> = {
-          ...rest,
+          ...coreRest,
           // Legacy schema requires `legalName`; dynamic path's extractContactFields
           // also reads `data.name` as a fallback, so send both.
           legalName: name ?? '',
@@ -115,9 +126,21 @@ export function IntakeChat({
             : { monthlyRent: budget }),
           // Preserve timing under both names so both form paths find it.
           targetMoveInDate: timing ?? timeline ?? '',
+          // Map additional AI field names to legacy schema field names.
+          ...(income !== undefined && { monthlyGrossIncome: income }),
+          ...(employment !== undefined && { employmentStatus: employment }),
+          ...(occupants !== undefined && { numberOfOccupants: occupants }),
+          ...(preApproval !== undefined && { preApprovalStatus: preApproval }),
+          ...(propertyPreferences !== undefined && { propertyAddress: propertyPreferences }),
+          ...(location !== undefined && { additionalNotes: location }),
+          ...(intentLevel !== undefined && { additionalNotes: [location, intentLevel].filter(Boolean).join(' | ') }),
           // Mark this contact as AI-chat-sourced so realtors can distinguish it
           // from traditional form submissions.
           sourceLabel: 'intake-chat-ai',
+          // Implicit consent: the user actively engaged with the AI intake chat.
+          // `privacyConsent` drives consentGiven/consentTimestamp/consentIp on
+          // the server; sending it as `true` here records full consent provenance.
+          privacyConsent: true,
         };
 
         const res = await fetch('/api/public/apply', {
