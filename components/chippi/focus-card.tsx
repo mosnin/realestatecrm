@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import {
   Send, Pencil, Clock, Loader2, MessageSquare, Mail, StickyNote, AlertTriangle,
-  CheckCircle2, ArrowRight, HelpCircle,
+  CheckCircle2, ArrowRight, HelpCircle, Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -556,11 +557,15 @@ function FocusWelcome({
 
   return (
     <div className="max-w-2xl mx-auto text-center py-10">
-      {/* Calm warm circle, paper-flat — no shadow, no animation. */}
-      <div
+      {/* Amber circle with a slow breathing pulse — signals life, not decoration. */}
+      <motion.div
         aria-hidden
-        className="mx-auto mb-6 w-16 h-16 rounded-full bg-amber-100/70 dark:bg-amber-500/10"
-      />
+        className="mx-auto mb-6 w-16 h-16 rounded-full bg-amber-100/70 dark:bg-amber-500/10 flex items-center justify-center"
+        animate={{ scale: [1, 1.04, 1] }}
+        transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
+      >
+        <Sparkles size={20} className="text-amber-500 dark:text-amber-400" aria-hidden />
+      </motion.div>
       <h2
         className="text-3xl tracking-tight text-foreground"
         style={TITLE_FONT}
@@ -568,7 +573,7 @@ function FocusWelcome({
         Welcome{firstName ? `, ${firstName}` : ''}.
       </h2>
       <p className={cn(BODY_MUTED, 'mt-2 max-w-md mx-auto leading-relaxed')}>
-        Tell me about your most recent lead and I&apos;ll start your pipeline.
+        I track your deals, draft your follow-ups, and flag what&apos;s stuck &mdash; automatically. Start with a lead and I&apos;ll show you.
       </p>
       <div className="mt-6 flex flex-col items-center gap-3">
         <button
@@ -577,7 +582,7 @@ function FocusWelcome({
           className={PRIMARY_PILL}
           disabled={!onTellMeAboutLead}
         >
-          Tell me about a lead
+          Tell me about a lead →
         </button>
         <button
           type="button"
@@ -636,6 +641,9 @@ function FocusEmpty({
       <p className="text-base text-foreground">You&apos;re clear.</p>
       <p className="mt-1 text-sm text-muted-foreground">
         Nothing waiting on you. I&apos;ll let you know when something needs you.
+      </p>
+      <p className="text-xs text-muted-foreground/70 mt-3 text-center">
+        Try asking: &ldquo;Who should I call today?&rdquo; or &ldquo;Draft a check-in for my hottest lead.&rdquo;
       </p>
       <button
         type="button"

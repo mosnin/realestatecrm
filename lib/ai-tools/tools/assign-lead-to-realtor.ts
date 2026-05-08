@@ -39,6 +39,7 @@ interface AssignResult {
 
 export const assignLeadToRealtorTool = defineTool<typeof parameters, AssignResult>({
   name: 'assign_lead_to_realtor',
+  riskLevel: 'low',
   description:
     'Broker-only. Reassign a Contact to a different realtor in the same brokerage. Prompts for approval.',
   parameters,

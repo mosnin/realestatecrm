@@ -75,7 +75,7 @@ export async function computeConversationTitle(userMessage: string): Promise<str
     const { getOpenAIClient } = await import('./openai-client');
     const { client } = getOpenAIClient();
     const result = await client.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5-mini',
       messages: [
         { role: 'system', content: TITLE_SYSTEM_PROMPT },
         { role: 'user', content: trimmed },

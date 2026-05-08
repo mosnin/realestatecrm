@@ -34,6 +34,7 @@ interface DraftEmailResult {
 
 export const draftEmailTool = defineTool<typeof parameters, DraftEmailResult>({
   name: 'draft_email',
+  riskLevel: 'safe',
   description:
     'Compose an email draft for a contact (no send, no persistence). Returns subject and body.',
   parameters,

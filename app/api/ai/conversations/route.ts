@@ -30,7 +30,40 @@ export async function GET(req: NextRequest) {
       .order('updatedAt', { ascending: false });
     if (error) return NextResponse.json({ error: 'Failed to load conversations' }, { status: 500 });
 
-    return NextResponse.json(data ?? []);
+    const conversations = data ?? [];
+
+    // Fetch the last message for each conversation to provide a preview line.
+    // Single query: grab the most-recent message per conversationId for this
+    // set of conversations, then map them back by id.
+    const ids = conversations.map((c) => c.id);
+    let previewMap: Record<string, string> = {};
+    if (ids.length > 0) {
+      // PostgREST doesn't support GROUP BY, so we fetch with a high-enough
+      // limit and deduplicate in JS. We order descending so the first row we
+      // see for each conversationId is the latest one.
+      const { data: msgs } = await supabase
+        .from('Message')
+        .select('conversationId, content')
+        .in('conversationId', ids)
+        .order('createdAt', { ascending: false })
+        .limit(ids.length * 20); // generous cap; deduplication below
+
+      if (msgs) {
+        for (const msg of msgs) {
+          if (msg.conversationId && !(msg.conversationId in previewMap)) {
+            const text = (msg.content ?? '').replace(/\s+/g, ' ').trim();
+            previewMap[msg.conversationId] = text.length > 60 ? text.slice(0, 59) + '…' : text;
+          }
+        }
+      }
+    }
+
+    const result = conversations.map((c) => ({
+      ...c,
+      preview: previewMap[c.id] ?? null,
+    }));
+
+    return NextResponse.json(result);
   } catch (err) {
     console.error('[conversations] GET error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

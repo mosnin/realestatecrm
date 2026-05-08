@@ -53,6 +53,7 @@ interface Summary {
 
 export const pipelineSummaryTool = defineTool<typeof parameters, { summary: Summary }>({
   name: 'pipeline_summary',
+  riskLevel: 'safe',
   description:
     'Snapshot of the user\'s pipeline: active count + value, deals closing this week, at-risk / stuck deals, and deals with overdue next actions. Use for "how\'s my week looking" questions.',
   parameters,

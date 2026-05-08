@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     agent_internal_secret: str = Field(alias="AGENT_INTERNAL_SECRET", default="")
 
     # Models
-    orchestrator_model: str = Field(default="gpt-4o")
-    worker_model: str = Field(default="gpt-4o-mini")
+    orchestrator_model: str = Field(default="gpt-5-mini")
+    worker_model: str = Field(default="gpt-5-mini")
 
     # Safety limits
     max_react_iterations: int = Field(default=6)       # max tool-call turns per specialist agent
@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     # Context window management
     memory_chars_budget: int = Field(default=3_000)   # ~750 tokens for memory injection
-    max_output_tokens: int = Field(default=1_000)      # cap LLM output per turn
+    max_output_tokens: int = Field(default=4_096)      # cap LLM output per turn
 
     # Coordinator — covers survey turns + all specialist handoff turns
     # Budget: ~3 coordinator turns + 4 specialists × 8 turns each = ~35; 50 gives headroom

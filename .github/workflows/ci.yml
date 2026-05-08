@@ -43,6 +43,13 @@ jobs:
 
       - name: Unit tests (Vitest)
         run: pnpm test
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          SUPABASE_SERVICE_ROLE_KEY: placeholder
+          OPENAI_API_KEY: placeholder
+          CLERK_SECRET_KEY: placeholder
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: placeholder
 
       - name: Contract tests
         run: pnpm test:contract

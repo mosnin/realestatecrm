@@ -29,6 +29,7 @@ interface NoteOnPersonResult {
 
 export const noteOnPersonTool = defineTool<typeof parameters, NoteOnPersonResult>({
   name: 'note_on_person',
+  riskLevel: 'low',
   description:
     "Add a plain note to a contact's timeline. Prompts for approval first.",
   parameters,

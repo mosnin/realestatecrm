@@ -34,6 +34,7 @@ interface ReadAttachmentResult {
 
 export const readAttachmentTool = defineTool<typeof parameters, ReadAttachmentResult>({
   name: 'read_attachment',
+  riskLevel: 'safe',
   description:
     'Look up an attachment by id and return its filename, mime type, and extraction status. Does not return file contents.',
   parameters,

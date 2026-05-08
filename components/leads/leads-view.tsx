@@ -147,7 +147,7 @@ interface LeadsViewProps {
 }
 
 type SortKey = 'newest' | 'oldest' | 'score' | 'score-low' | 'name-az' | 'name-za' | 'followup';
-type LeadTypeFilter = 'all' | 'rental' | 'buyer';
+type LeadTypeFilter = 'all' | 'rental' | 'buyer' | 'seller';
 type ViewMode = 'card' | 'list';
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
@@ -167,7 +167,7 @@ function isValidSort(v: string | null): v is SortKey {
   return v != null && SORT_OPTIONS.some((o) => o.value === v);
 }
 function isValidLeadType(v: string | null): v is LeadTypeFilter {
-  return v != null && ['all', 'rental', 'buyer'].includes(v);
+  return v != null && ['all', 'rental', 'buyer', 'seller'].includes(v);
 }
 function isValidView(v: string | null): v is ViewMode {
   return v != null && ['card', 'list'].includes(v);
@@ -304,6 +304,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
       'needs-followup': leads.filter((l) => l.followUpAt && new Date(l.followUpAt) < now).length,
       rental: leads.filter((l) => l.leadType === 'rental').length,
       buyer: leads.filter((l) => l.leadType === 'buyer').length,
+      seller: leads.filter((l) => l.leadType === 'seller').length,
     };
   }, [leads]);
 
@@ -509,7 +510,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] text-muted-foreground select-none">Type:</span>
           <div className="flex gap-1">
-            {(['all', 'rental', 'buyer'] as const).map((key) => (
+            {(['all', 'rental', 'buyer', 'seller'] as const).map((key) => (
               <button
                 key={key}
                 type="button"
@@ -521,7 +522,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                     : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80',
                 )}
               >
-                {key === 'all' ? 'All' : key === 'rental' ? 'Rental' : 'Buyer'}
+                {key === 'all' ? 'All' : key === 'rental' ? 'Rental' : key === 'buyer' ? 'Buyer' : 'Seller'}
                 {key !== 'all' && (
                   <span className={cn('ml-1 tabular-nums', leadTypeFilter === key ? 'opacity-80' : 'opacity-60')}>
                     {filterCounts[key]}
@@ -727,17 +728,10 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                           {lead.name}
                         </Link>
                         {/* Lead type badge */}
-                        {lead.leadType === 'buyer' ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground flex-shrink-0">
-                            <Home size={9} />
-                            Buyer
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground flex-shrink-0">
-                            <Home size={9} />
-                            Rental
-                          </span>
-                        )}
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground flex-shrink-0">
+                          <Home size={9} />
+                          {lead.leadType === 'buyer' ? 'Buyer' : lead.leadType === 'seller' ? 'Seller' : 'Rental'}
+                        </span>
                         {isNew && (
                           <span className="inline-flex text-[10px] font-bold bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 rounded-md px-2 py-0.5 flex-shrink-0">
                             NEW
@@ -817,17 +811,17 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
 
                 {/* Key qualification data */}
                 <div className="px-4 pb-3 flex flex-wrap gap-1.5">
-                  {lead.leadType === 'buyer' && (
+                  {lead.leadType !== 'rental' && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground">
                       <Home size={9} />
-                      Buyer
+                      {lead.leadType === 'buyer' ? 'Buyer' : 'Seller'}
                     </span>
                   )}
                   {lead.phone && <QChip icon={Phone} label={lead.phone} href={`tel:${lead.phone}`} />}
                   {lead.email && <QChip icon={Mail} label={lead.email} href={`mailto:${lead.email}`} />}
-                  {lead.leadType === 'buyer' ? (
+                  {(lead.leadType === 'buyer' || lead.leadType === 'seller') ? (
                     <>
-                      {/* Buyer-specific fields */}
+                      {/* Buyer/seller-specific fields */}
                       {budgetDisplay && <QChip icon={DollarSign} label={`Budget: ${budgetDisplay}`} highlight />}
                       {app?.preApprovalStatus && (
                         <span className={cn(
@@ -1004,11 +998,9 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="font-medium hover:text-foreground transition-colors">{lead.name}</span>
-                              {lead.leadType === 'buyer' ? (
-                                <span className="text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground">Buyer</span>
-                              ) : (
-                                <span className="text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground">Rental</span>
-                              )}
+                              <span className="text-[10px] font-medium rounded-md px-1.5 py-0.5 border border-border text-muted-foreground">
+                                {lead.leadType === 'buyer' ? 'Buyer' : lead.leadType === 'seller' ? 'Seller' : 'Rental'}
+                              </span>
                               {isNew && (
                                 <span className="text-[10px] font-bold bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 rounded-md px-1.5 py-0.5">NEW</span>
                               )}

@@ -33,6 +33,7 @@ interface MarkColdResult {
 
 export const markPersonColdTool = defineTool<typeof parameters, MarkColdResult>({
   name: 'mark_person_cold',
+  riskLevel: 'low',
   description:
     "Mark a contact as a cold lead. Tags scoreLabel='cold' and clamps lead score downward. Prompts for approval first.",
   parameters,

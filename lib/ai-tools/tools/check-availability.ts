@@ -55,6 +55,7 @@ function eventBand(date: string, time: string | null): { startsAt: string; endsA
 
 export const checkAvailabilityTool = defineTool<typeof parameters, CheckAvailabilityResult>({
   name: 'check_availability',
+  riskLevel: 'safe',
   description:
     'Check whether the realtor has Tours or CalendarEvents booked in a given ISO time window.',
   parameters,

@@ -34,6 +34,7 @@ interface ArchivePersonResult {
 
 export const archivePersonTool = defineTool<typeof parameters, ArchivePersonResult>({
   name: 'archive_person',
+  riskLevel: 'destructive',
   description:
     "Archive a contact — hides them from the active People list. Reversible by clearing snoozedUntil. Prompts for approval first.",
   parameters,

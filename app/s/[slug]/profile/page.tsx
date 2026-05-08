@@ -13,6 +13,7 @@ import { UserButton } from '@clerk/nextjs';
 import { Link2, ArrowUpRight, ExternalLink } from 'lucide-react';
 import { buildIntakeUrl } from '@/lib/intake';
 import { CopyLinkButton } from '../copy-link-button';
+import { H1, TITLE_FONT } from '@/lib/typography';
 
 export default function ProfilePage() {
   const params = useParams<{ slug: string }>();
@@ -77,10 +78,13 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-5 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Profile</h1>
-        <p className="text-muted-foreground text-sm">Manage your personal information and intake link</p>
-      </div>
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Profile.</p>
+        <h1 className={H1} style={TITLE_FONT}>
+          Your account
+        </h1>
+        <p className="text-sm text-muted-foreground">Name, intake link, and public-facing details.</p>
+      </header>
 
       {/* Intake link card */}
       <div className="rounded-lg border border-border bg-card overflow-hidden">

@@ -47,6 +47,7 @@ interface LogCallResult {
 
 export const logCallTool = defineTool<typeof parameters, LogCallResult>({
   name: 'log_call',
+  riskLevel: 'low',
   description:
     "Log a phone call on a contact's timeline. Stores the summary, optional sentiment and duration. Prompts for approval first.",
   parameters,

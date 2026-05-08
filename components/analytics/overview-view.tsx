@@ -20,7 +20,7 @@ import {
 } from './chart-primitives';
 import type { ChartConfig } from './chart-primitives';
 import type { OverviewData } from '@/lib/analytics-data';
-import { SECTION_RHYTHM } from '@/lib/typography';
+import { H1, TITLE_FONT, SECTION_RHYTHM } from '@/lib/typography';
 
 const leadsConfig = {
   count: { label: 'Leads', color: 'hsl(var(--foreground))' },
@@ -31,8 +31,20 @@ const dealsConfig = {
 } satisfies ChartConfig;
 
 export function OverviewView({ data }: { data: OverviewData }) {
+  const statusSentence = data.totalContacts > 0
+    ? `${data.totalContacts} ${data.totalContacts === 1 ? 'person' : 'people'} in the CRM, ${data.totalDeals} active ${data.totalDeals === 1 ? 'deal' : 'deals'}.`
+    : 'No data yet — start by adding your first contact.';
+
   return (
     <div className={SECTION_RHYTHM}>
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Analytics.</p>
+        <h1 className={H1} style={TITLE_FONT}>
+          Overview
+        </h1>
+        <p className="text-sm text-muted-foreground">{statusSentence}</p>
+      </header>
+
       {/* Stats strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
         <StatCell label="New people" value={data.totalLeads} sub="all time" />

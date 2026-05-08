@@ -30,6 +30,10 @@ import { mapSdkEvent, type SdkStreamEventLike } from '@/lib/ai-tools/sdk-event-m
 import { extractApprovals, serializeRunState } from '@/lib/ai-tools/sdk-bridge';
 import { ALL_TOOLS } from '@/lib/ai-tools/tools';
 import { emit as emitTelemetry } from '@/lib/telemetry';
+import { logToolCallStart, logToolCallComplete, logToolCallError } from '@/lib/agent/tool-call-logger';
+import { compactContext, estimateContextChars } from '@/lib/agent/compaction';
+
+const COMPACTION_THRESHOLD_CHARS = 80_000;
 
 interface HistoryRow {
   role: 'user' | 'assistant';
@@ -46,15 +50,43 @@ interface StreamTsChatTurnInput {
 }
 
 export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
+  // Run compaction synchronously-ish by capturing the async work in a
+  // promise that resolves before `start` is awaited inside buildSseStream.
+  // We need to mutate history before the agent call, so we do the work up
+  // front and carry it into the closure.
+  const initialEvents: PushableEvent[] = [];
+  const historyPromise: Promise<HistoryRow[]> = (async () => {
+    const history = input.history ?? [];
+    if (estimateContextChars(history) > COMPACTION_THRESHOLD_CHARS) {
+      try {
+        const compacted = await compactContext({
+          messages: history,
+          maxContextChars: COMPACTION_THRESHOLD_CHARS,
+          model: 'gpt-5-mini',
+        });
+        initialEvents.push({
+          type: 'system',
+          content: 'Context compacted to fit within model limits.',
+        });
+        return compacted.messages as HistoryRow[];
+      } catch {
+        // Non-blocking: compaction failure never stops the agent.
+      }
+    }
+    return history;
+  })();
+
   const stream = buildSseStream({
     ctx: input.ctx,
     conversationId: input.conversationId,
     abortController: input.abortController,
+    initialEvents,
     start: async () => {
+      const history = await historyPromise;
       const { result } = await runChatTurn({
         ctx: input.ctx,
         userMessage: input.userMessage,
-        history: input.history,
+        history,
       });
       return { result: result as unknown as SdkResultLike };
     },
@@ -99,6 +131,12 @@ interface BuildStreamInput {
   abortController: AbortController;
   /** Returns the SDK streamed result. Either fresh or resumed. */
   start: () => Promise<{ result: SdkResultLike }>;
+  /**
+   * Events to push immediately after the stream opens, before the agent
+   * call fires. Used to relay compaction notices assembled before the
+   * ReadableStream constructor ran (where pushEvent isn't yet available).
+   */
+  initialEvents?: PushableEvent[];
 }
 
 /**
@@ -125,12 +163,35 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
       // approval prompt. Reset on every tool_call_start.
       let reasoningBuffer = '';
 
+      // Maps callId → ExecutionStep id so we can correlate tool_call_result
+      // back to the row we inserted on tool_call_start.
+      const callIdToStepId = new Map<string, string>();
+
+      // Drain any events that were queued before the stream opened
+      // (e.g. compaction notice assembled in streamTsChatTurn).
+      // We define pushEvent first and call it immediately after.
       const pushEvent = (event: PushableEvent) => {
         if (event.type === 'text_delta') {
           textBuffer += event.delta;
           reasoningBuffer += event.delta;
         }
         if (event.type === 'tool_call_start') {
+          // When the agent invokes `create_plan`, emit a `plan_created` event
+          // immediately so the frontend can render the PlanCard before any
+          // further tool calls fire. The tool itself is a no-op on the server
+          // (no side effects); its value is purely the plan it carries.
+          if (event.name === 'create_plan') {
+            const args = event.args as { task?: unknown; steps?: unknown };
+            const task = typeof args.task === 'string' ? args.task : '';
+            const steps = Array.isArray(args.steps)
+              ? (args.steps as Array<Record<string, unknown>>).map((s) => ({
+                  title: typeof s['title'] === 'string' ? s['title'] : '',
+                  description: typeof s['description'] === 'string' ? s['description'] : '',
+                }))
+              : [];
+            pushEvent({ type: 'plan_created', task, steps });
+          }
+
           // Fire-and-forget — telemetry must never block the stream.
           // Trim aggressively; we want the closest preceding sentence,
           // not the whole turn's prose.
@@ -151,6 +212,29 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           // back-to-back without intervening text, the reasoning for
           // the second one is empty — that's honest.
           reasoningBuffer = '';
+
+          // Fire-and-forget ExecutionStep logging. Never awaited — must not
+          // block or affect the stream in any way.
+          void logToolCallStart(
+            input.ctx.space.id,
+            event.name,
+            event.args,
+            undefined,
+          ).then((stepId) => {
+            callIdToStepId.set(event.callId, stepId);
+          }).catch(() => {});
+        }
+
+        if (event.type === 'tool_call_result') {
+          const stepId = callIdToStepId.get(event.callId);
+          if (stepId) {
+            callIdToStepId.delete(event.callId);
+            if (event.ok) {
+              void logToolCallComplete(stepId, event.summary).catch(() => {});
+            } else {
+              void logToolCallError(stepId, event.error ?? event.summary).catch(() => {});
+            }
+          }
         }
         const full = { ...event, seq: nextSeq(), ts: new Date().toISOString() } as AgentEvent;
         try {
@@ -159,6 +243,11 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           /* controller already closed */
         }
       };
+
+      // Emit any events queued before the stream opened (e.g. compaction notice).
+      for (const ev of input.initialEvents ?? []) {
+        pushEvent(ev);
+      }
 
       let result: SdkResultLike;
       try {

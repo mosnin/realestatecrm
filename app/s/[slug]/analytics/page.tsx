@@ -30,9 +30,9 @@ export default async function AnalyticsOverviewPage({
 function AnalyticsErrorBlock({ href }: { href: string }) {
   return (
     <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center space-y-3">
-      <p className={H1} style={TITLE_FONT}>
+      <h2 className={H1} style={TITLE_FONT}>
         Something went wrong
-      </p>
+      </h2>
       <p className={BODY_MUTED}>
         We couldn&apos;t load your data. This is usually temporary.
       </p>

@@ -37,6 +37,7 @@ interface MarkHotResult {
 
 export const markPersonHotTool = defineTool<typeof parameters, MarkHotResult>({
   name: 'mark_person_hot',
+  riskLevel: 'low',
   description:
     "Mark a contact as a hot lead. Bumps lead score to at least the hot threshold and tags scoreLabel='hot'. Prompts for approval first.",
   parameters,

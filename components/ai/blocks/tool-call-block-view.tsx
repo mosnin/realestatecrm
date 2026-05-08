@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import {
   CheckCircle2,
   ChevronDown,
@@ -11,6 +12,7 @@ import {
   Lock,
   Users,
   Briefcase,
+  Building2,
   CalendarDays,
   FileText,
   BarChart3,
@@ -23,6 +25,7 @@ import type { ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { ContactsResult } from './tool-results/contacts-result';
 import { DealsResult } from './tool-results/deals-result';
 import { ToursResult } from './tool-results/tours-result';
+import { PropertiesResult } from './tool-results/properties-result';
 
 /** Per-tool icon map. Generic Wrench fallback keeps unknown tools readable. */
 const TOOL_ICONS: Record<string, typeof Users> = {
@@ -34,6 +37,48 @@ const TOOL_ICONS: Record<string, typeof Users> = {
   get_note: FileText,
   send_email: Mail,
   send_sms: MessageSquare,
+  add_property: Building2,
+  find_property: Building2,
+  search_properties: Building2,
+};
+
+/**
+ * Tool-specific running verb. Realtors don't think in developer words like
+ * "Running" — they think in actions. Each verb maps to what the tool is
+ * actually doing from the user's perspective.
+ */
+const TOOL_RUNNING_LABEL: Record<string, string> = {
+  search_contacts: 'Searching…',
+  find_person: 'Searching…',
+  get_contact: 'Searching…',
+  pipeline_summary: 'Analyzing…',
+  find_stuck_deals: 'Analyzing…',
+  find_quiet_hot_persons: 'Analyzing…',
+  find_deal: 'Looking up…',
+  find_overdue_followups: 'Looking up…',
+  schedule_tour: 'Checking calendar…',
+  reschedule_tour: 'Checking calendar…',
+  check_availability: 'Checking calendar…',
+  find_tours: 'Checking calendar…',
+  send_email: 'Drafting…',
+  draft_email: 'Drafting…',
+  send_sms: 'Writing…',
+  draft_sms: 'Writing…',
+  recall_history: 'Checking history…',
+  create_plan: 'Planning…',
+  planner: 'Planning…',
+  note_on_person: 'Saving note…',
+  note_on_deal: 'Saving note…',
+  note_on_property: 'Saving note…',
+  find_property: 'Looking up…',
+  search_properties: 'Searching…',
+  add_property: 'Saving…',
+  create_deal: 'Updating deal…',
+  mark_deal_won: 'Updating deal…',
+  mark_deal_lost: 'Updating deal…',
+  move_deal_stage: 'Updating deal…',
+  set_followup: 'Updating…',
+  clear_followup: 'Updating…',
 };
 
 /** Friendly title — the tool's name is snake_case, UI wants "Search contacts". */
@@ -44,14 +89,66 @@ function friendlyName(name: string): string {
     .join(' ');
 }
 
+/**
+ * Produce a short prose hint from the tool args that a realtor can read at
+ * a glance. UUID fields (contactId, dealId) are meaningless to realtors so
+ * we skip them. Returns null when nothing useful can be shown.
+ */
+function argsProseHint(args: Record<string, unknown> | undefined | null): string | null {
+  if (!args) return null;
+
+  // UUIDs: skip entirely — they mean nothing to a realtor.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const isUUID = (v: unknown): boolean =>
+    typeof v === 'string' && UUID_RE.test(v);
+
+  if (typeof args.name === 'string' && args.name && !isUUID(args.name)) {
+    return `for ${args.name}`;
+  }
+  if (typeof args.query === 'string' && args.query) {
+    return `for ${args.query}`;
+  }
+  if (typeof args.subject === 'string' && args.subject) {
+    return `re: ${args.subject}`;
+  }
+  if (typeof args.stage === 'string' && args.stage) {
+    return `→ ${args.stage}`;
+  }
+
+  // Skip if the only fields are UUIDs or known-useless ids.
+  const UUID_KEYS = new Set(['contactId', 'dealId', 'tourId', 'propertyId', 'id']);
+  const meaningful = Object.entries(args).filter(
+    ([k, v]) => !UUID_KEYS.has(k) && !isUUID(v) && typeof v !== 'object',
+  );
+  if (meaningful.length === 0) return null;
+
+  // Fall back to first meaningful string value.
+  const [, val] = meaningful[0];
+  if (typeof val === 'string' && val) return val.slice(0, 60);
+  if (typeof val === 'number') return String(val);
+
+  return null;
+}
+
 interface ToolCallBlockViewProps {
   block: ToolCallBlock;
   /** Is this call currently running? Overrides persisted status for live turns. */
   live?: boolean;
+  /**
+   * When true a subtle left accent timeline bar is rendered, signalling this
+   * tool call is part of a multi-step sequence. Wire from the parent once
+   * sequence detection is implemented; default false today.
+   */
+  isPartOfSequence?: boolean;
   className?: string;
 }
 
-export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewProps) {
+export function ToolCallBlockView({
+  block,
+  live,
+  isPartOfSequence = false,
+  className,
+}: ToolCallBlockViewProps) {
   const [expanded, setExpanded] = useState(false);
   const Icon = TOOL_ICONS[block.name] ?? Wrench;
 
@@ -65,7 +162,7 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
     switch (status) {
       case 'running':
         return {
-          label: 'Running',
+          label: TOOL_RUNNING_LABEL[block.name] ?? 'Working…',
           iconEl: <Loader2 size={12} className="animate-spin" />,
           tint: 'text-muted-foreground',
         };
@@ -98,8 +195,6 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
     }
   })();
 
-  const hasDetails = !!block.result?.summary || Object.keys(block.args ?? {}).length > 0;
-
   // Phase 5 — rich inline result rendering. Tools opt in via the `display`
   // hint on their handler return. When the result resolves successfully and
   // the data shape is one we know how to render, we show the rich card stack
@@ -117,8 +212,21 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
     if (block.display === 'tours' && Array.isArray((data as { tours?: unknown[] }).tours)) {
       return <ToursResult data={data as { tours: never[] }} />;
     }
+    if (block.display === 'properties' && Array.isArray((data as { properties?: unknown[] }).properties)) {
+      return <PropertiesResult data={data as { properties: never[] }} />;
+    }
     return null;
   })();
+
+  // Whether there is a rich display card below this pill.
+  const hasRich = richResult !== null;
+
+  // Inline text summary shown when there's no rich card and the tool finished
+  // successfully. Realtors get the answer without having to click expand.
+  const inlineSummary =
+    status === 'complete' && !hasRich && block.result?.summary
+      ? block.result.summary
+      : null;
 
   // The handler's `display` hint tints the card so at-a-glance scanning
   // of the transcript tells a realtor which rows landed safely vs which
@@ -137,16 +245,8 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
             ? 'border-emerald-500/25 bg-emerald-500/5'
             : 'border-border bg-muted/30';
 
-  // Derive a brief args hint shown inline (first key=value pair, truncated).
-  const argsEntries = Object.entries(block.args ?? {});
-  const argsHint =
-    argsEntries.length > 0
-      ? argsEntries
-          .slice(0, 2)
-          .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
-          .join(', ')
-          .slice(0, 60) + (argsEntries.length > 2 ? ' …' : '')
-      : null;
+  // Prose hint derived from args — non-monospace, human readable.
+  const argsHint = argsProseHint(block.args);
 
   // Colored left-edge bar mirrors the displayTint semantic so the row is
   // scannable without reading the status badge.
@@ -161,8 +261,22 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
             ? 'bg-emerald-500/60'
             : 'bg-muted-foreground/20';
 
+  // Expand is only useful when there are args or a result summary to show in
+  // the collapsible detail pane (not the same as the inline summary).
+  const argsEntries = Object.entries(block.args ?? {});
+  const hasDetails = argsEntries.length > 0 || !!block.result?.summary || !!block.result?.error;
+
   return (
-    <div className={cn('group relative flex flex-col', className)}>
+    <motion.div
+      className={cn(
+        'group relative flex flex-col',
+        isPartOfSequence && 'border-l border-border/40 ml-1 pl-2',
+        className,
+      )}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+    >
       {/* Compact step row */}
       <button
         type="button"
@@ -192,9 +306,9 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
           {friendlyName(block.name)}
         </span>
 
-        {/* Args hint — shown only when not expanded and args exist */}
+        {/* Args hint — prose, non-monospace, only when not expanded */}
         {argsHint && !expanded && (
-          <span className="text-[11px] text-muted-foreground/70 truncate flex-1 min-w-0 font-mono">
+          <span className="text-[11px] text-muted-foreground truncate flex-1 min-w-0">
             {argsHint}
           </span>
         )}
@@ -213,7 +327,7 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
           {label}
         </span>
 
-        {/* Expand chevron */}
+        {/* Expand chevron — only shown when there's something to expand */}
         {hasDetails && (
           <span className="text-muted-foreground/50 flex-shrink-0 ml-0.5">
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -221,8 +335,16 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
         )}
       </button>
 
+      {/* Inline text summary for non-rich completed tools. No expand needed —
+          the answer is right here. */}
+      {inlineSummary && !expanded && (
+        <p className="text-[12px] text-muted-foreground/80 mt-1 px-1 leading-snug">
+          {inlineSummary}
+        </p>
+      )}
+
       {/* Rich inline result rendering — visible by default for known data
-          shapes (contacts, deals) so the realtor doesn't have to expand. */}
+          shapes (contacts, deals, tours) so the realtor doesn't have to expand. */}
       {richResult}
 
       {/* Collapsible details — rendered below the row, slightly indented */}
@@ -258,6 +380,6 @@ export function ToolCallBlockView({ block, live, className }: ToolCallBlockViewP
           )}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

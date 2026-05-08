@@ -55,6 +55,7 @@ interface AddChecklistItemResult {
 
 export const addChecklistItemTool = defineTool<typeof parameters, AddChecklistItemResult>({
   name: 'add_checklist_item',
+  riskLevel: 'low',
   description:
     "Add a single task to a deal's closing checklist (earnest money, inspection, appraisal, etc.). Prompts for approval first.",
   parameters,

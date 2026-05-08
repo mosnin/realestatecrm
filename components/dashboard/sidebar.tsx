@@ -56,6 +56,7 @@ interface SidebarProps {
   unreadLeadCount: number;
   pendingDraftCount?: number;
   overdueFollowUpCount?: number;
+  activePropertyCount?: number;
   isBroker?: boolean;
   isBrokerOnly?: boolean;
   brokerageName?: string | null;
@@ -809,6 +810,7 @@ function RealtorNav({
   unreadLeadCount,
   overdueFollowUpCount,
   pendingDraftCount,
+  activePropertyCount,
 }: {
   slug: string;
   base: string;
@@ -817,6 +819,7 @@ function RealtorNav({
   unreadLeadCount: number;
   overdueFollowUpCount: number;
   pendingDraftCount: number;
+  activePropertyCount: number;
 }) {
   const { collapsed } = useSidebarCollapsed();
   const settingsItem = realtorNavItems.find((item) => item.href === '/settings')!;
@@ -870,6 +873,13 @@ function RealtorNav({
         </span>
       );
     }
+    if (item.badgeKey === 'properties' && activePropertyCount > 0) {
+      return (
+        <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-medium tabular-nums flex-shrink-0 bg-secondary text-muted-foreground">
+          {activePropertyCount > 99 ? '99+' : activePropertyCount}
+        </span>
+      );
+    }
     return undefined;
   };
 
@@ -879,6 +889,9 @@ function RealtorNav({
     }
     if (item.badgeKey === 'pendingDrafts' && pendingDraftCount > 0) {
       return pendingDraftCount > 99 ? '99+' : String(pendingDraftCount);
+    }
+    if (item.badgeKey === 'properties' && activePropertyCount > 0) {
+      return activePropertyCount > 99 ? '99+' : String(activePropertyCount);
     }
     return undefined;
   };
@@ -967,6 +980,7 @@ export function Sidebar({
   unreadLeadCount,
   pendingDraftCount = 0,
   overdueFollowUpCount = 0,
+  activePropertyCount = 0,
   isBroker = false,
   isBrokerOnly = false,
   brokerageName = null,
@@ -1143,6 +1157,7 @@ export function Sidebar({
         unreadLeadCount={unreadLeadCount}
         overdueFollowUpCount={overdueFollowUpCount}
         pendingDraftCount={pendingDraftCount}
+        activePropertyCount={activePropertyCount}
         brokerageMemberships={brokerageMemberships}
         isOnBrokerPage={isOnBrokerPage}
         displayName={displayName}
@@ -1167,6 +1182,7 @@ function RealtorSidebarShell({
   unreadLeadCount,
   overdueFollowUpCount,
   pendingDraftCount,
+  activePropertyCount,
   brokerageMemberships,
   isOnBrokerPage,
   displayName,
@@ -1180,6 +1196,7 @@ function RealtorSidebarShell({
   unreadLeadCount: number;
   overdueFollowUpCount: number;
   pendingDraftCount: number;
+  activePropertyCount: number;
   brokerageMemberships: { id: string; name: string; role: string }[];
   isOnBrokerPage: boolean;
   displayName: string;
@@ -1246,6 +1263,7 @@ function RealtorSidebarShell({
           unreadLeadCount={unreadLeadCount}
           overdueFollowUpCount={overdueFollowUpCount}
           pendingDraftCount={pendingDraftCount}
+          activePropertyCount={activePropertyCount}
         />
 
         {/* User footer pinned at bottom, separated by a hairline. The

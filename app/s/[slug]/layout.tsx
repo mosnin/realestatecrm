@@ -5,7 +5,6 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
-import { DashboardFooter } from '@/components/dashboard/footer';
 import { supabase } from '@/lib/supabase';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 import { getBrokerContext } from '@/lib/permissions';
@@ -14,7 +13,7 @@ import { PlatformBanner } from '@/components/platform-banner';
 import { CommandPalette } from '@/components/command-palette/command-palette';
 import { AgentStatusBar } from '@/components/agent/agent-status-bar';
 import { ChippiBar } from '@/components/chippi/chippi-bar';
-import { PageTransition } from '@/components/motion/page-transition';
+import { LayoutShell } from '@/components/dashboard/layout-shell';
 
 
 export default async function DashboardLayout({
@@ -179,8 +178,9 @@ export default async function DashboardLayout({
   let unreadLeadCount = 0;
   let overdueFollowUpCount = 0;
   let pendingDraftCount = 0;
+  let activePropertyCount = 0;
   try {
-    const [leadResult, followUpResult, draftResult] = await Promise.all([
+    const [leadResult, followUpResult, draftResult, propertyResult] = await Promise.all([
       supabase
         .from('Contact')
         .select('*', { count: 'exact', head: true })
@@ -199,15 +199,22 @@ export default async function DashboardLayout({
         .select('id', { count: 'exact', head: true })
         .eq('spaceId', space.id)
         .eq('status', 'pending'),
+      supabase
+        .from('Property')
+        .select('id', { count: 'exact', head: true })
+        .eq('spaceId', space.id)
+        .in('listingStatus', ['active', 'pending']),
     ]);
     if (leadResult.error) throw leadResult.error;
     unreadLeadCount = leadResult.count ?? 0;
     overdueFollowUpCount = followUpResult.count ?? 0;
     pendingDraftCount = draftResult.count ?? 0;
+    activePropertyCount = propertyResult.count ?? 0;
   } catch {
     unreadLeadCount = 0;
     overdueFollowUpCount = 0;
     pendingDraftCount = 0;
+    activePropertyCount = 0;
   }
 
   // Check broker context and brokerage memberships for sidebar
@@ -236,67 +243,19 @@ export default async function DashboardLayout({
     isBroker = false;
   }
 
-  // Route-aware shell: the Chippi chat surface gets a different chrome
-  // treatment than the dashboard pages — full-height main, no padded
-  // wrapper, no footer, mobile bottom-clearance for MobileNav. Read the
-  // pathname from the request headers (Next.js doesn't surface it on
-  // server layouts directly). Fallback chain matches the broker layout.
-  const headerStore = await headers();
-  const requestPath =
-    headerStore.get('x-pathname') ||
-    headerStore.get('x-invoke-path') ||
-    headerStore.get('x-matched-path') ||
-    headerStore.get('next-url') ||
-    '';
-  const isChippiRoute = /\/s\/[^/]+\/chippi(?:\/|$|\?)/.test(requestPath);
-
   return (
     <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
-      <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} pendingDraftCount={pendingDraftCount ?? 0} overdueFollowUpCount={overdueFollowUpCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} />
+      <Sidebar slug={slug} spaceName={space.name} unreadLeadCount={unreadLeadCount} pendingDraftCount={pendingDraftCount ?? 0} overdueFollowUpCount={overdueFollowUpCount} activePropertyCount={activePropertyCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <PlatformBanner />
         <Header slug={slug} spaceName={space.name} title={space.name} isBroker={isBroker} brokerageName={brokerageName} />
         <AgentStatusBar slug={slug} />
-        {isChippiRoute ? (
-          // Chippi is the chat surface — fills the available height, no
-          // dashboard padding wrapper, no footer. The MobileNav is hidden
-          // below (a "Chippi" tab on the page you're already on is redundant
-          // chrome that eats composer space). Only the iOS safe-area inset
-          // is reserved at the bottom.
-          <main className="flex-1 min-h-0 flex flex-col bg-background text-foreground pb-[env(safe-area-inset-bottom)] md:pb-0">
-            <LiveNotifications spaceId={space.id} slug={slug} />
-            {/* PageTransition gets `flex-1 min-h-0 flex flex-col` so the
-                Chippi page's `h-full` actually has a filled height to
-                resolve against. Without this, the chat workspace collapses
-                to content height and the composer ends up mid-screen
-                instead of pinned to the viewport bottom. */}
-            <PageTransition className="flex-1 min-h-0 flex flex-col">{children}</PageTransition>
-          </main>
-        ) : (
-          <main className="flex-1 overflow-y-auto flex flex-col bg-background text-foreground">
-            {/* Page content grows; footer always pins to the visible bottom of
-                <main> regardless of how short the page is. The `.dashboard-content`
-                class is defensive raw-CSS padding (defined in globals.css) that
-                duplicates the Tailwind `px-4 sm:px-6 md:px-10 lg:px-12` ramp.
-                A prior staging regression had Tailwind utilities not reaching
-                the DOM on mobile; the explicit class can't be purged. */}
-            <div className="w-full max-w-[1500px] mx-auto flex-1 min-w-0 dashboard-content">
-              <LiveNotifications spaceId={space.id} slug={slug} />
-              <PageTransition>{children}</PageTransition>
-            </div>
-            <div className="w-full max-w-[1500px] mx-auto dashboard-footer-wrap">
-              <DashboardFooter />
-            </div>
-          </main>
-        )}
+        <LayoutShell slug={slug} liveNotifications={<LiveNotifications spaceId={space.id} slug={slug} />}>
+          {children}
+        </LayoutShell>
       </div>
-      {/* MobileNav — hidden on the chat surface so the composer can use the
-          full bottom edge. Realtor returns to the rest of the app via the
-          left-edge sidebar trigger or any link in the chat itself. */}
-      {!isChippiRoute && <MobileNav slug={slug} isBroker={isBroker} />}
-      {/* Persistent agent presence on every workspace page (hides itself on /chippi). */}
+      <MobileNav slug={slug} isBroker={isBroker} />
       <ChippiBar slug={slug} />
-      {/* ⌘K palette — listens globally, renders a modal when open. */}
       <CommandPalette slug={slug} />
     </div>
   );

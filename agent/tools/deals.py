@@ -9,8 +9,10 @@ from typing import Any
 from agents import RunContextWrapper, function_tool
 
 from db import supabase
+from errors import AgentError, from_supabase_error, from_exception
 from security.context import AgentContext
 from tools.activities import persist_log
+from tools.base import idempotent_tool, with_retry
 from tools.streaming import publish_event
 
 _CLIP = 300
@@ -94,6 +96,7 @@ async def find_deals(
     return result.data or []
 
 
+@idempotent_tool
 @function_tool
 async def update_deal(
     ctx: RunContextWrapper[AgentContext],
@@ -123,7 +126,8 @@ async def update_deal(
         .execute()
     )
     if not check.data:
-        return {"error": "Deal not found in space"}
+        agent_err = from_supabase_error({"message": "Deal not found in space", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
     deal = check.data
     deal_title = deal.get("title") or deal_id[:8]
 
@@ -133,7 +137,8 @@ async def update_deal(
 
     if probability is not None:
         if not (0 <= probability <= 100):
-            return {"error": "probability must be between 0 and 100"}
+            agent_err = from_supabase_error({"message": "probability must be between 0 and 100", "code": None})
+            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
         old_prob = deal.get("probability")
         if old_prob != probability:
             update["probability"] = probability
@@ -156,7 +161,8 @@ async def update_deal(
 
     if note:
         if len(note) > 1000:
-            return {"error": "note must be under 1000 characters"}
+            agent_err = from_supabase_error({"message": "note must be under 1000 characters", "code": None})
+            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         prefix = f"[Agent {date_str}] {note}\n\n"
         existing = deal.get("description") or ""
@@ -165,23 +171,31 @@ async def update_deal(
 
     if update:
         update["updatedAt"] = now
-        await (
-            db.table("Deal")
-            .update(update)
-            .eq("id", deal_id)
-            .eq("spaceId", space_id)
-            .execute()
-        )
+        try:
+            await with_retry(
+                lambda: db.table("Deal")
+                .update(update)
+                .eq("id", deal_id)
+                .eq("spaceId", space_id)
+                .execute()
+            )
+        except Exception as e:
+            agent_err = from_exception(e)
+            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     for act in activities:
-        await db.table("DealActivity").insert({
-            "id": str(uuid.uuid4()),
-            "dealId": deal_id,
-            "spaceId": space_id,
-            "type": act["type"],
-            "content": act["content"],
-            "metadata": {**act["metadata"], "agentRunId": ctx.context.run_id},
-        }).execute()
+        try:
+            await db.table("DealActivity").insert({
+                "id": str(uuid.uuid4()),
+                "dealId": deal_id,
+                "spaceId": space_id,
+                "type": act["type"],
+                "content": act["content"],
+                "metadata": {**act["metadata"], "agentRunId": ctx.context.run_id},
+            }).execute()
+        except Exception as e:
+            agent_err = from_exception(e)
+            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     if summary_parts:
         await publish_event(
@@ -219,9 +233,11 @@ async def advance_deal_stage(
     can audit who moved the deal and why.
     """
     if not target_stage_name and not target_stage_id:
-        return {"error": "Pass either target_stage_name or target_stage_id"}
+        agent_err = from_supabase_error({"message": "Pass either target_stage_name or target_stage_id", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
     if new_probability is not None and not (0 <= new_probability <= 100):
-        return {"error": "new_probability must be 0-100"}
+        agent_err = from_supabase_error({"message": "new_probability must be 0-100", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     space_id = ctx.context.space_id
     db = await supabase()
@@ -236,7 +252,8 @@ async def advance_deal_stage(
         .execute()
     )
     if not deal_check.data:
-        return {"error": "Deal not found in space"}
+        agent_err = from_supabase_error({"message": "Deal not found in space", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
     deal = deal_check.data
     deal_title = deal.get("title") or deal_id[:8]
 
@@ -263,7 +280,8 @@ async def advance_deal_stage(
         stage_check = type("R", (), {"data": (stages_res.data[0] if stages_res.data else None)})
 
     if not stage_check.data:
-        return {"error": "Target stage not found in workspace pipeline"}
+        agent_err = from_supabase_error({"message": "Target stage not found in workspace pipeline", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     new_stage_id = stage_check.data["id"]
     new_stage_name = stage_check.data["name"]
@@ -275,32 +293,40 @@ async def advance_deal_stage(
     if new_probability is not None:
         update["probability"] = new_probability
 
-    await (
-        db.table("Deal")
-        .update(update)
-        .eq("id", deal_id)
-        .eq("spaceId", space_id)
-        .execute()
-    )
+    try:
+        await (
+            db.table("Deal")
+            .update(update)
+            .eq("id", deal_id)
+            .eq("spaceId", space_id)
+            .execute()
+        )
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     activity_content = f"[Agent] Stage → {new_stage_name}. {reason}"
     if new_probability is not None:
         activity_content += f" (probability {new_probability}%)"
 
-    await db.table("DealActivity").insert({
-        "id": str(uuid.uuid4()),
-        "dealId": deal_id,
-        "spaceId": space_id,
-        "type": "note",
-        "content": activity_content,
-        "metadata": {
-            "source": "agent",
-            "agentRunId": ctx.context.run_id,
-            "oldStageId": deal.get("stageId"),
-            "newStageId": new_stage_id,
-            "newProbability": new_probability,
-        },
-    }).execute()
+    try:
+        await db.table("DealActivity").insert({
+            "id": str(uuid.uuid4()),
+            "dealId": deal_id,
+            "spaceId": space_id,
+            "type": "note",
+            "content": activity_content,
+            "metadata": {
+                "source": "agent",
+                "agentRunId": ctx.context.run_id,
+                "oldStageId": deal.get("stageId"),
+                "newStageId": new_stage_id,
+                "newProbability": new_probability,
+            },
+        }).execute()
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     await publish_event(
         ctx.context,
@@ -318,14 +344,212 @@ async def advance_deal_stage(
             reasoning=f"{deal_title} → {new_stage_name}. {reason}",
             deal_id=deal_id,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     return {
         "ok": True,
         "dealId": deal_id,
         "stage": new_stage_name,
         "probability": new_probability,
+    }
+
+
+@function_tool
+async def create_deal(
+    ctx: RunContextWrapper[AgentContext],
+    title: str,
+    stage_id: str | None = None,
+    description: str | None = None,
+    value: float | None = None,
+    address: str | None = None,
+    priority: str | None = None,
+    close_date: str | None = None,
+    contact_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    """Create a new deal in a pipeline stage.
+
+    title: short label shown on the kanban card. Required.
+    stage_id: target DealStage.id. Optional — if omitted the deal lands in the
+      first stage of the buyer pipeline when a buyer contact is linked, otherwise
+      the first stage of the seller pipeline.
+    description: optional deal notes / description.
+    value: deal value in dollars.
+    address: property address if relevant.
+    priority: 'LOW' | 'MEDIUM' | 'HIGH'. Defaults to MEDIUM.
+    close_date: ISO 8601 date/datetime string for expected close.
+    contact_ids: list of Contact.id values to link to this deal.
+
+    Use when the realtor says "create a deal", "add a deal", "start a deal",
+    "open a deal for [name]", etc.
+    """
+    space_id = ctx.context.space_id
+    db = await supabase()
+    now = datetime.now(timezone.utc).isoformat()
+
+    clean_title = title.strip()[:255] if title else ""
+    if not clean_title:
+        return {"error": "title is required"}
+
+    valid_priorities = {"LOW", "MEDIUM", "HIGH"}
+    clean_priority = (priority or "MEDIUM").strip().upper()
+    if clean_priority not in valid_priorities:
+        clean_priority = "MEDIUM"
+
+    # Validate contact IDs and detect pipeline type from lead types
+    valid_contact_ids: list[str] = []
+    buyer_among_contacts = False
+    if contact_ids:
+        contacts_res = await (
+            db.table("Contact")
+            .select("id,leadType")
+            .in_("id", contact_ids[:10])
+            .eq("spaceId", space_id)
+            .execute()
+        )
+        valid_rows = contacts_res.data or []
+        valid_set = {r["id"] for r in valid_rows}
+        valid_contact_ids = [cid for cid in contact_ids if cid in valid_set]
+        buyer_among_contacts = any(r.get("leadType") == "buyer" for r in valid_rows)
+
+    # Stage resolution
+    stage: dict[str, Any] | None = None
+    if stage_id:
+        stage_res = await (
+            db.table("DealStage")
+            .select("id,name,pipelineType")
+            .eq("id", stage_id)
+            .eq("spaceId", space_id)
+            .maybe_single()
+            .execute()
+        )
+        stage = stage_res.data
+
+    if not stage:
+        preferred = "buyer" if buyer_among_contacts else "seller"
+        fallback_res = await (
+            db.table("DealStage")
+            .select("id,name,pipelineType")
+            .eq("spaceId", space_id)
+            .eq("pipelineType", preferred)
+            .order("position")
+            .limit(1)
+            .execute()
+        )
+        if fallback_res.data:
+            stage = fallback_res.data[0]
+        else:
+            any_res = await (
+                db.table("DealStage")
+                .select("id,name,pipelineType")
+                .eq("spaceId", space_id)
+                .order("position")
+                .limit(1)
+                .execute()
+            )
+            if any_res.data:
+                stage = any_res.data[0]
+
+    if not stage:
+        return {"error": "No pipeline stages configured in this workspace — set one up before creating deals."}
+
+    # Auto-route buyer deals to buyer pipeline
+    final_stage = stage
+    if buyer_among_contacts and stage.get("pipelineType") != "buyer":
+        buyer_res = await (
+            db.table("DealStage")
+            .select("id,name,pipelineType")
+            .eq("spaceId", space_id)
+            .eq("pipelineType", "buyer")
+            .order("position")
+            .limit(1)
+            .execute()
+        )
+        if buyer_res.data:
+            final_stage = buyer_res.data[0]
+
+    final_stage_id = final_stage["id"]
+
+    # Position at bottom of stage
+    pos_res = await (
+        db.table("Deal")
+        .select("position")
+        .eq("stageId", final_stage_id)
+        .eq("spaceId", space_id)
+        .order("position", desc=True)
+        .limit(1)
+        .execute()
+    )
+    last_pos = (pos_res.data[0]["position"] if pos_res.data else -1)
+    next_position = last_pos + 1
+
+    import uuid as _uuid
+    deal_id = str(_uuid.uuid4())
+
+    deal_row: dict[str, Any] = {
+        "id": deal_id,
+        "spaceId": space_id,
+        "title": clean_title,
+        "stageId": final_stage_id,
+        "priority": clean_priority,
+        "position": next_position,
+        "status": "active",
+        "createdAt": now,
+        "updatedAt": now,
+    }
+    if description:
+        deal_row["description"] = description.strip()[:5000]
+    if value is not None and value >= 0:
+        deal_row["value"] = value
+    if address:
+        deal_row["address"] = address.strip()[:500]
+    if close_date:
+        deal_row["closeDate"] = close_date
+
+    try:
+        await db.table("Deal").insert(deal_row).execute()
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
+
+    # Link contacts
+    if valid_contact_ids:
+        try:
+            await db.table("DealContact").insert([
+                {"dealId": deal_id, "contactId": cid}
+                for cid in valid_contact_ids
+            ]).execute()
+        except Exception:
+            pass
+
+    # Activity row
+    try:
+        await db.table("DealActivity").insert({
+            "id": str(_uuid.uuid4()),
+            "dealId": deal_id,
+            "spaceId": space_id,
+            "type": "note",
+            "content": f"[Agent] Deal created: {clean_title}",
+            "metadata": {"source": "agent", "agentRunId": ctx.context.run_id},
+        }).execute()
+    except Exception:
+        pass
+
+    await publish_event(
+        ctx.context,
+        "action",
+        f"Created deal '{clean_title}' in {final_stage['name']}",
+        agent_type=ctx.context.current_agent_type,
+        metadata={"dealId": deal_id, "stageId": final_stage_id},
+    )
+
+    return {
+        "ok": True,
+        "dealId": deal_id,
+        "title": clean_title,
+        "stageName": final_stage["name"],
+        "linkedContactIds": valid_contact_ids,
     }
 
 
@@ -346,7 +570,8 @@ async def request_deal_review(
     reason: required, 10+ chars. Surfaces verbatim to the broker.
     """
     if not reason or len(reason.strip()) < 10:
-        return {"error": "reason must be at least 10 characters"}
+        agent_err = from_supabase_error({"message": "reason must be at least 10 characters", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     space_id = ctx.context.space_id
     db = await supabase()
@@ -360,7 +585,8 @@ async def request_deal_review(
         .execute()
     )
     if not deal_check.data:
-        return {"error": "Deal not found in space"}
+        agent_err = from_supabase_error({"message": "Deal not found in space", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
     deal_title = deal_check.data.get("title") or deal_id[:8]
 
     space_check = await (
@@ -371,17 +597,22 @@ async def request_deal_review(
         .execute()
     )
     if not space_check.data or not space_check.data.get("brokerageId"):
-        return {"error": "Space is not part of a brokerage — review requests need a broker"}
+        agent_err = from_supabase_error({"message": "Space is not part of a brokerage — review requests need a broker", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     review_id = str(uuid.uuid4())
-    await db.table("DealReviewRequest").insert({
-        "id": review_id,
-        "dealId": deal_id,
-        "requestingUserId": space_check.data["ownerId"],
-        "brokerageId": space_check.data["brokerageId"],
-        "status": "open",
-        "reason": reason.strip(),
-    }).execute()
+    try:
+        await db.table("DealReviewRequest").insert({
+            "id": review_id,
+            "dealId": deal_id,
+            "requestingUserId": space_check.data["ownerId"],
+            "brokerageId": space_check.data["brokerageId"],
+            "status": "open",
+            "reason": reason.strip(),
+        }).execute()
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     await publish_event(
         ctx.context,
@@ -399,8 +630,9 @@ async def request_deal_review(
             reasoning=reason.strip()[:500],
             deal_id=deal_id,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     return {
         "ok": True,

@@ -36,7 +36,7 @@ import { enrichContext, type EnrichedContext } from '@/lib/ai-tools/context-enri
 import { getRecentVoiceSamples, type VoiceSample } from '@/lib/draft-voice';
 
 const TIMEOUT_MS = 5_000;
-const MODEL = 'gpt-4.1-mini';
+const MODEL = 'gpt-5-mini';
 
 type Intent = 'check-in' | 'log-call' | 'welcome' | 'reach-out';
 type Context = 'deal' | 'person';

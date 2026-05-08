@@ -1,7 +1,7 @@
 /**
  * POST /api/agent/trigger
  *
- * Fires an agent trigger for a CRM event. Two things happen:
+ * Fires an agent trigger for a workspace event. Two things happen:
  *
  * 1. The trigger is pushed to the Redis queue so the agent has it when it runs.
  * 2. If MODAL_WEBHOOK_URL is configured, the Modal agent is called immediately
@@ -17,24 +17,75 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
-
-const VALID_EVENTS = [
-  'new_lead',
-  'tour_completed',
-  'deal_stage_changed',
-  'application_submitted',
-] as const;
-type TriggerEvent = typeof VALID_EVENTS[number];
+import { isTriggerEvent, parseImmediateEvents, type TriggerEvent } from '@/lib/agent/trigger-policy';
 
 const RATE_LIMIT = 20;
 const RATE_WINDOW_S = 60;
-
-// Time-critical events that should fire Modal immediately, not just queue.
-// These have specialist agents that need to act within minutes.
-const IMMEDIATE_EVENTS = new Set<TriggerEvent>(['tour_completed', 'application_submitted']);
+const DEDUPE_WINDOW_S = Number(process.env.AGENT_TRIGGER_DEDUPE_WINDOW_S ?? '120');
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 const MODAL_WEBHOOK_URL = process.env.MODAL_WEBHOOK_URL ?? '';
+
+
+async function recordTriggerOutcome(input: {
+  kvUrl: string;
+  kvToken: string;
+  spaceId: string;
+  event: TriggerEvent;
+  contactId?: string;
+  dealId?: string;
+  status: 'deduped' | 'queued' | 'queued_modal';
+}): Promise<void> {
+  const key = `agent:trigger:events:${input.spaceId}`;
+  const payload = JSON.stringify({
+    event: input.event,
+    contactId: input.contactId ?? null,
+    dealId: input.dealId ?? null,
+    status: input.status,
+    at: new Date().toISOString(),
+  });
+  try {
+    await fetch(`${input.kvUrl}/lpush/${encodeURIComponent(key)}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${input.kvToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([payload]),
+    });
+    await fetch(`${input.kvUrl}/ltrim/${encodeURIComponent(key)}/0/199`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${input.kvToken}` },
+    });
+  } catch {
+    // Best-effort observability only; never fail trigger delivery path.
+  }
+}
+
+async function dedupeGuard(input: {
+  kvUrl: string;
+  kvToken: string;
+  spaceId: string;
+  event: TriggerEvent;
+  contactId?: string;
+  dealId?: string;
+}): Promise<{ duplicate: boolean }> {
+  const bucket = Math.floor(Date.now() / Math.max(1, DEDUPE_WINDOW_S * 1000));
+  const key = `agent:trigger-dedupe:${input.spaceId}:${input.event}:${input.contactId ?? 'none'}:${input.dealId ?? 'none'}:${bucket}`;
+  const res = await fetch(`${input.kvUrl}/incr/${encodeURIComponent(key)}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${input.kvToken}` },
+  });
+  if (!res.ok) return { duplicate: false };
+  const { result: count } = await res.json() as { result: number };
+  if (count === 1) {
+    await fetch(`${input.kvUrl}/expire/${encodeURIComponent(key)}/${Math.max(1, DEDUPE_WINDOW_S * 2)}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${input.kvToken}` },
+    });
+  }
+  return { duplicate: count > 1 };
+}
 
 export async function POST(req: NextRequest) {
   const authResult = await requireAuth();
@@ -51,7 +102,7 @@ export async function POST(req: NextRequest) {
     dealId?: string;
   };
 
-  if (!event || !VALID_EVENTS.includes(event)) {
+  if (!event || !isTriggerEvent(event)) {
     return NextResponse.json({ error: 'Invalid event type' }, { status: 400 });
   }
 
@@ -81,6 +132,26 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const dedupe = await dedupeGuard({
+    kvUrl,
+    kvToken,
+    spaceId: space.id,
+    event,
+    contactId,
+    dealId,
+  });
+  if (dedupe.duplicate) {
+    await recordTriggerOutcome({ kvUrl, kvToken, spaceId: space.id, event, contactId, dealId, status: 'deduped' });
+    return NextResponse.json({
+      queued: true,
+      deduped: true,
+      event,
+      spaceId: space.id,
+      firedImmediately: false,
+      method: 'redis',
+    });
+  }
+
   const trigger = JSON.stringify({
     event,
     contactId: contactId ?? null,
@@ -106,12 +177,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ queued: false, reason: 'Redis error' });
   }
 
-  // Step 2: For time-critical events, fire the Modal agent immediately.
+  // Step 2: For all accepted events, fire the Modal agent immediately.
   // Non-blocking: we don't await this or let it fail the request.
   // The trigger is already in Redis, so worst case the agent catches it at
   // the next heartbeat.
   let firedImmediately = false;
-  if (IMMEDIATE_EVENTS.has(event) && MODAL_WEBHOOK_URL && AGENT_INTERNAL_SECRET) {
+  const immediateEventSet = parseImmediateEvents(process.env.AGENT_IMMEDIATE_EVENTS);
+  if (immediateEventSet.has(event) && MODAL_WEBHOOK_URL && AGENT_INTERNAL_SECRET) {
     // Fire-and-forget. The agent will pop the trigger from Redis when it runs.
     fetch(MODAL_WEBHOOK_URL, {
       method: 'POST',
@@ -126,6 +198,16 @@ export async function POST(req: NextRequest) {
     });
     firedImmediately = true;
   }
+
+  await recordTriggerOutcome({
+    kvUrl,
+    kvToken,
+    spaceId: space.id,
+    event,
+    contactId,
+    dealId,
+    status: firedImmediately ? 'queued_modal' : 'queued',
+  });
 
   return NextResponse.json({
     queued: true,

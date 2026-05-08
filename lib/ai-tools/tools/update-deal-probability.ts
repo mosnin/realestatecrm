@@ -43,6 +43,7 @@ export const updateDealProbabilityTool = defineTool<
   UpdateDealProbabilityResult
 >({
   name: 'update_deal_probability',
+  riskLevel: 'low',
   description:
     "Update a deal's close probability (0-100). Prompts for approval first.",
   parameters,

@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { buildIntakeUrl } from '@/lib/intake';
 import { IntakeLinkRow } from './intake-link-row';
 import { timeAgo } from '@/lib/formatting';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import {
   H1,
   H3,
@@ -89,6 +89,8 @@ export default async function IntakeOverviewPage({
 
   const intakeUrl = buildIntakeUrl(space.slug);
   const intakePath = `/apply/${space.slug}`;
+  const chatUrl = `${intakeUrl}/chat`;
+  const chatPath = `${intakePath}/chat`;
 
   // Chippi narration ladder — one sentence describing the state of intake
   // right now. No counts in stat tiles; the count lives in the sentence so
@@ -138,6 +140,21 @@ export default async function IntakeOverviewPage({
           </Link>
         </div>
         <IntakeLinkRow url={intakeUrl} previewHref={intakePath} />
+      </section>
+
+      {/* AI chat mode — informational, near the share link */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Sparkles size={13} className="text-muted-foreground/70" />
+          <h2 className={H3}>AI chat mode</h2>
+          <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-foreground/[0.06] text-muted-foreground font-medium">
+            New
+          </span>
+        </div>
+        <p className="text-[13px] text-muted-foreground">
+          Applicants can apply via a conversational AI chatbot instead of the traditional form.
+        </p>
+        <IntakeLinkRow url={chatUrl} previewHref={chatPath} />
       </section>
 
       {/* Recent submissions — the second thing they come here for */}

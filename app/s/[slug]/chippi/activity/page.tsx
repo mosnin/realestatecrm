@@ -39,7 +39,7 @@ export default async function ChippiActivityPage({
         <ArrowLeft size={12} />
         Back to Chippi
       </Link>
-      <PageTitle subtitle="Every action Chippi has taken — with reasoning. Undo anything reversible.">
+      <PageTitle label="Chippi." subtitle="Every action Chippi has taken — with reasoning. Undo anything reversible.">
         What I did
       </PageTitle>
 

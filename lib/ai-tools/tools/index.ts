@@ -31,6 +31,7 @@ import type { ToolDefinition } from '../types';
 
 // People — find + state changes + activity capture
 import { findPersonTool } from './find-person';
+import { addPersonTool } from './add-person';
 import { logCallTool } from './log-call';
 import { logMeetingTool } from './log-meeting';
 import { setFollowupTool } from './set-followup';
@@ -95,6 +96,9 @@ import { requestDealReviewTool } from './request-deal-review';
 import { recallHistoryTool } from './recall-history';
 import { readAttachmentTool } from './read-attachment';
 
+// Planning
+import { createPlanTool } from './plan';
+
 /**
  * Domain tools only. The orchestrator's `delegate_to_subagent` tool is
  * intentionally NOT in this list — it gets added at the `registry` layer.
@@ -106,6 +110,7 @@ import { readAttachmentTool } from './read-attachment';
 export const ALL_TOOLS: ToolDefinition[] = [
   // ── People ─────────────────────────────────────────────────────────────
   findPersonTool as ToolDefinition,
+  addPersonTool as ToolDefinition,
   logCallTool as ToolDefinition,
   logMeetingTool as ToolDefinition,
   setFollowupTool as ToolDefinition,
@@ -169,4 +174,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // ── Memory ─────────────────────────────────────────────────────────────
   recallHistoryTool as ToolDefinition,
   readAttachmentTool as ToolDefinition,
+
+  // ── Planning ───────────────────────────────────────────────────────────
+  createPlanTool as ToolDefinition,
 ];

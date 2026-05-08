@@ -187,14 +187,16 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
 
   if (totalCount === 0) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-3 p-8 max-w-sm">
-          <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center mx-auto">
-            <CheckCircle2 size={24} className="text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <h2 className="text-lg font-semibold">You&apos;re caught up.</h2>
-          <p className="text-sm text-muted-foreground">
-            Nothing to chase. Set a follow-up from a person or deal and it&apos;ll land here.
+      <div className="space-y-6 max-w-[900px]">
+        <header className="space-y-1.5">
+          <p className="text-sm text-muted-foreground">Follow-ups.</p>
+          <h1 className={H1} style={TITLE_FONT}>Nothing due.</h1>
+          <p className="text-sm text-muted-foreground">You&apos;re all caught up — quiet day.</p>
+        </header>
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <p className="text-sm text-foreground">Nothing to chase.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Set a follow-up from any person or deal and it&apos;ll land here.
           </p>
         </div>
       </div>
@@ -209,12 +211,16 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
 
   return (
     <div className="space-y-6 max-w-[900px]">
-      {/* Header — H1 only. The voice lives on /chippi home; this surface
-          is utility chrome — tabs, lists, snooze. */}
-      <header>
+      <header className="space-y-1.5">
+        <p className="text-sm text-muted-foreground">Follow-ups.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Follow-ups
+          {overdueCount > 0 ? `${overdueCount} overdue.` : 'On schedule.'}
         </h1>
+        <p className="text-sm text-muted-foreground">
+          {overdueCount > 0
+            ? `${overdueCount} ${overdueCount === 1 ? 'contact or deal' : 'contacts and deals'} past due.`
+            : `${totalCount} ${totalCount === 1 ? 'follow-up' : 'follow-ups'} scheduled.`}
+        </p>
       </header>
 
       {/* Tabs */}
@@ -248,10 +254,10 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
       {/* Contact follow-ups */}
       {visibleContacts.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60 px-1 pb-1">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground px-1 pb-1">
             Contacts
           </p>
-          <div className="rounded-lg border border-border divide-y divide-border bg-card">
+          <div className="rounded-xl border border-border/70 divide-y divide-border/60 bg-card">
             {visibleContacts.map(contact => {
               const isBusy = busy.has(contact.id);
               const overdueBool = isOverdue(contact.followUpAt);
@@ -357,10 +363,10 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
       {/* Deal follow-ups */}
       {visibleDeals.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60 px-1 pb-1">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground px-1 pb-1">
             Deals
           </p>
-          <div className="rounded-lg border border-border divide-y divide-border bg-card">
+          <div className="rounded-xl border border-border/70 divide-y divide-border/60 bg-card">
             {visibleDeals.map(deal => {
               const isBusy = busy.has(deal.id);
               const overdueBool = isOverdue(deal.followUpAt);

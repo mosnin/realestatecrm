@@ -9,8 +9,10 @@ from typing import Any, Literal
 from agents import RunContextWrapper, function_tool
 
 from db import supabase
+from errors import AgentError, from_supabase_error, from_exception
 from memory.store import save_memory
 from security.context import AgentContext
+from tools.base import idempotent_tool, with_retry
 from tools.streaming import publish_event
 
 _CLIP = 300
@@ -128,9 +130,111 @@ async def get_contact_activity(
     return rows
 
 
+@function_tool
+async def create_contact(
+    ctx: RunContextWrapper[AgentContext],
+    name: str,
+    lead_type: str = "buyer",
+    email: str | None = None,
+    phone: str | None = None,
+    budget: float | None = None,
+    preferences: str | None = None,
+    notes: str | None = None,
+    tags: list[str] | None = None,
+) -> dict[str, Any]:
+    """Create a new contact (person) in the workspace.
+
+    name: full name. Required.
+    lead_type: 'buyer' | 'rental' | 'seller'. Default 'buyer'.
+    email: email address if known.
+    phone: phone number in any format.
+    budget: dollars. For rentals this is monthly; for buyers, purchase price.
+    preferences: free-form — neighborhood, bedrooms, must-haves, etc.
+    notes: any initial notes stored verbatim on the contact record.
+    tags: optional labels. Use 'new-lead' for fresh leads.
+
+    Use when the realtor says "add a lead", "log a new contact", "create a
+    person", etc. Never store in memory when you can create the actual record.
+    """
+    space_id = ctx.context.space_id
+    db = await supabase()
+    now = datetime.now(timezone.utc).isoformat()
+
+    clean_name = name.strip()[:200] if name else ""
+    if not clean_name:
+        return {"error": "name is required"}
+
+    valid_lead_types = {"buyer", "rental", "seller"}
+    clean_lead_type = lead_type.strip().lower() if lead_type else "buyer"
+    if clean_lead_type not in valid_lead_types:
+        clean_lead_type = "buyer"
+
+    clean_tags = [t.strip()[:60] for t in (tags or []) if t.strip()][:10]
+
+    import uuid as _uuid
+    contact_id = str(_uuid.uuid4())
+
+    row: dict[str, Any] = {
+        "id": contact_id,
+        "spaceId": space_id,
+        "name": clean_name,
+        "leadType": clean_lead_type,
+        "type": "QUALIFICATION",
+        "properties": [],
+        "tags": clean_tags,
+        "createdAt": now,
+        "updatedAt": now,
+    }
+    if email:
+        row["email"] = email.strip()[:320]
+    if phone:
+        row["phone"] = phone.strip()[:40]
+    if budget is not None and budget >= 0:
+        row["budget"] = budget
+    if preferences:
+        row["preferences"] = preferences.strip()[:2000]
+    if notes:
+        row["notes"] = notes.strip()[:5000]
+
+    try:
+        await db.table("Contact").insert(row).execute()
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
+
+    # Activity log for the creation event
+    try:
+        await db.table("ContactActivity").insert({
+            "id": str(_uuid.uuid4()),
+            "contactId": contact_id,
+            "spaceId": space_id,
+            "type": "note",
+            "content": f"[Agent] Contact created: {clean_name}",
+            "metadata": {"source": "agent", "agentRunId": ctx.context.run_id},
+        }).execute()
+    except Exception:
+        pass
+
+    await publish_event(
+        ctx.context,
+        "action",
+        f"Created contact {clean_name}",
+        agent_type=ctx.context.current_agent_type,
+        metadata={"contactId": contact_id},
+    )
+
+    return {
+        "ok": True,
+        "contactId": contact_id,
+        "name": clean_name,
+        "leadType": clean_lead_type,
+    }
+
+
 _VALID_TYPES = {"QUALIFICATION", "TOUR", "APPLICATION"}
 
 
+@idempotent_tool
 @function_tool
 async def update_contact(
     ctx: RunContextWrapper[AgentContext],
@@ -169,7 +273,8 @@ async def update_contact(
         .execute()
     )
     if not check.data:
-        return {"error": "Contact not found in space"}
+        agent_err = from_supabase_error({"message": "Contact not found in space", "code": None})
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
     contact = check.data
     contact_name = contact.get("name", "contact")
 
@@ -194,7 +299,8 @@ async def update_contact(
     # ── Pipeline type ──
     if new_pipeline_type:
         if new_pipeline_type not in _VALID_TYPES:
-            return {"error": f"new_pipeline_type must be one of {_VALID_TYPES}"}
+            agent_err = from_supabase_error({"message": f"new_pipeline_type must be one of {_VALID_TYPES}", "code": None})
+            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
         old_type = contact.get("type", "QUALIFICATION")
         if old_type != new_pipeline_type:
             update["type"] = new_pipeline_type
@@ -230,13 +336,17 @@ async def update_contact(
 
     if update:
         update["updatedAt"] = now
-        await (
-            db.table("Contact")
-            .update(update)
-            .eq("id", contact_id)
-            .eq("spaceId", space_id)
-            .execute()
-        )
+        try:
+            await with_retry(
+                lambda: db.table("Contact")
+                .update(update)
+                .eq("id", contact_id)
+                .eq("spaceId", space_id)
+                .execute()
+            )
+        except Exception as e:
+            agent_err = from_exception(e)
+            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     # ── Brief / score explanation → high-importance memory (no DB column) ──
     if brief:
@@ -268,14 +378,18 @@ async def update_contact(
 
     # ── Activity log ──
     for act in activities:
-        await db.table("ContactActivity").insert({
-            "id": str(uuid.uuid4()),
-            "contactId": contact_id,
-            "spaceId": space_id,
-            "type": act["type"],
-            "content": act["content"],
-            "metadata": {**act["metadata"], "agentRunId": ctx.context.run_id},
-        }).execute()
+        try:
+            await db.table("ContactActivity").insert({
+                "id": str(uuid.uuid4()),
+                "contactId": contact_id,
+                "spaceId": space_id,
+                "type": act["type"],
+                "content": act["content"],
+                "metadata": {**act["metadata"], "agentRunId": ctx.context.run_id},
+            }).execute()
+        except Exception as e:
+            agent_err = from_exception(e)
+            return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
 
     if summary_parts:
         await publish_event(

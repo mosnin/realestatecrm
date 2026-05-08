@@ -186,7 +186,7 @@ export function LeadDetailPanel({
                 </span>
               )}
               <span className="text-[11px] text-muted-foreground">
-                {lead.leadType === 'buyer' ? 'Buyer' : 'Rental'}
+                {lead.leadType === 'buyer' ? 'Buyer' : lead.leadType === 'seller' ? 'Seller' : 'Rental'}
                 {' · '}
                 {timeAgo(new Date(lead.createdAt))}
               </span>
@@ -338,7 +338,7 @@ export function LeadDetailPanel({
                     {budgetDisplay}
                   </span>
                 )}
-                {lead.leadType === 'buyer' ? (
+                {(lead.leadType === 'buyer' || lead.leadType === 'seller') ? (
                   <>
                     {app?.preApprovalStatus && (
                       <span

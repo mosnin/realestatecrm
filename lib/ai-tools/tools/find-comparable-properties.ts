@@ -51,6 +51,7 @@ interface FindCompsResult {
 
 export const findComparablePropertiesTool = defineTool<typeof parameters, FindCompsResult>({
   name: 'find_comparable_properties',
+  riskLevel: 'safe',
   description:
     'Search saved Property rows in this workspace by location, beds/baths, price range, status. Returns up to 6. Does NOT query MLS.',
   parameters,

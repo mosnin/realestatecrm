@@ -16,6 +16,7 @@ import {
   LineChart,
   BarChart3,
   Activity,
+  Bot,
   Menu,
   Sun,
   Moon,
@@ -59,6 +60,7 @@ const navSections = [
     label: 'System',
     items: [
       { href: '/admin/scoring-health', label: 'Scoring Health', icon: Activity, exact: false },
+      { href: '/admin/agent-stats', label: 'Agent Health', icon: Bot, exact: false },
       { href: '/admin/audit-log', label: 'Audit Log', icon: ScrollText, exact: false },
     ],
   },

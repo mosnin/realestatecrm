@@ -16,12 +16,15 @@ import type { ToolResult } from './types';
 
 export type AgentEvent =
   | TextDeltaEvent
+  | ReasoningDeltaEvent
   | ToolCallStartEvent
   | ToolCallResultEvent
   | PermissionRequiredEvent
   | PermissionResolvedEvent
+  | PlanCreatedEvent
   | TurnCompleteEvent
-  | ErrorEvent;
+  | ErrorEvent
+  | SystemEvent;
 
 interface BaseEvent {
   seq: number;
@@ -32,6 +35,16 @@ interface BaseEvent {
 export interface TextDeltaEvent extends BaseEvent {
   type: 'text_delta';
   /** The incremental text. May be empty. */
+  delta: string;
+}
+
+/**
+ * A chunk of the model's internal reasoning (thinking tokens). Streamed when
+ * reasoning_effort is enabled on gpt-5-mini. The client accumulates these into
+ * a collapsible "Thinking" section — they are NOT shown inline in the transcript.
+ */
+export interface ReasoningDeltaEvent extends BaseEvent {
+  type: 'reasoning_delta';
   delta: string;
 }
 
@@ -106,11 +119,38 @@ export interface PermissionResolvedEvent extends BaseEvent {
   editedArgs?: Record<string, unknown>;
 }
 
+/**
+ * The agent has invoked the `create_plan` tool and a structured plan is ready
+ * to be shown to the user before execution begins. The client renders a
+ * PlanCard from this event; execution continues automatically after the plan
+ * is displayed.
+ */
+export interface PlanCreatedEvent extends BaseEvent {
+  type: 'plan_created';
+  /** High-level description of what the agent is about to do. */
+  task: string;
+  /** Ordered list of steps the agent will execute. */
+  steps: Array<{
+    title: string;
+    description: string;
+  }>;
+}
+
 /** End-of-turn marker. Client disables the input until the user types again. */
 export interface TurnCompleteEvent extends BaseEvent {
   type: 'turn_complete';
   /** 'complete' = model finished naturally. 'paused' = awaiting permission. 'aborted' = user cancelled / network dropped. */
   reason: 'complete' | 'paused' | 'aborted';
+}
+
+/**
+ * Out-of-band notice from the infrastructure layer — not a model output.
+ * Currently used to signal context compaction so the UI can show a subtle
+ * indicator. The content field is human-readable but intentionally terse.
+ */
+export interface SystemEvent extends BaseEvent {
+  type: 'system';
+  content: string;
 }
 
 /** Unrecoverable turn failure. Different from a tool error (which keeps the turn alive). */

@@ -32,6 +32,7 @@ export const findQuietHotPersonsTool = defineTool<
   FindQuietHotPersonsResult
 >({
   name: 'find_quiet_hot_persons',
+  riskLevel: 'safe',
   description: 'Find hot-scored contacts who haven\'t been contacted in minDaysQuiet days (default 7).',
   parameters,
   requiresApproval: false,

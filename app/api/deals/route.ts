@@ -106,27 +106,51 @@ export async function POST(req: NextRequest) {
   if (stageCheckErr) throw stageCheckErr;
   if (!stageCheck) return NextResponse.json({ error: 'Invalid stage' }, { status: 400 });
 
-  // If contacts include a buyer, auto-assign to buyer pipeline first stage
+  // If contacts include a buyer or seller, auto-assign to the matching pipeline's first stage.
+  // Buyer takes precedence over seller when both are present.
   let finalStageId = stageId;
-  if (contactIds?.length && stageCheck.pipelineType !== 'buyer') {
-    const { data: buyerContacts } = await supabase
-      .from('Contact')
-      .select('id, leadType')
-      .in('id', contactIds)
-      .eq('spaceId', space.id)
-      .eq('leadType', 'buyer')
-      .limit(1);
-    if (buyerContacts && buyerContacts.length > 0) {
-      // Find the first buyer pipeline stage for this space
-      const { data: buyerStage } = await supabase
-        .from('DealStage')
-        .select('id')
+  if (contactIds?.length) {
+    const currentPipeline = stageCheck.pipelineType as string | null;
+    if (currentPipeline !== 'buyer') {
+      const { data: buyerContacts } = await supabase
+        .from('Contact')
+        .select('id, leadType')
+        .in('id', contactIds)
         .eq('spaceId', space.id)
-        .eq('pipelineType', 'buyer')
-        .order('position', { ascending: true })
+        .eq('leadType', 'buyer')
         .limit(1);
-      if (buyerStage && buyerStage.length > 0) {
-        finalStageId = buyerStage[0].id;
+      if (buyerContacts && buyerContacts.length > 0) {
+        const { data: buyerStage } = await supabase
+          .from('DealStage')
+          .select('id')
+          .eq('spaceId', space.id)
+          .eq('pipelineType', 'buyer')
+          .order('position', { ascending: true })
+          .limit(1);
+        if (buyerStage && buyerStage.length > 0) {
+          finalStageId = buyerStage[0].id;
+        }
+      }
+    }
+    if (finalStageId === stageId && currentPipeline !== 'seller') {
+      const { data: sellerContacts } = await supabase
+        .from('Contact')
+        .select('id, leadType')
+        .in('id', contactIds)
+        .eq('spaceId', space.id)
+        .eq('leadType', 'seller')
+        .limit(1);
+      if (sellerContacts && sellerContacts.length > 0) {
+        const { data: sellerStage } = await supabase
+          .from('DealStage')
+          .select('id')
+          .eq('spaceId', space.id)
+          .eq('pipelineType', 'seller')
+          .order('position', { ascending: true })
+          .limit(1);
+        if (sellerStage && sellerStage.length > 0) {
+          finalStageId = sellerStage[0].id;
+        }
       }
     }
   }

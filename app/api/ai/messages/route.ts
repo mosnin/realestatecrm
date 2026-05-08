@@ -12,21 +12,45 @@ export async function GET(req: NextRequest) {
     const conversationId = req.nextUrl.searchParams.get('conversationId');
     if (!conversationId) return NextResponse.json({ error: 'conversationId required' }, { status: 400 });
 
-    // Verify conversation belongs to a space the user owns
-    const { data: conv } = await supabase
+    // Two flat queries instead of an embedded join — `Space(ownerId)` can
+    // come back either as an object or an array depending on PostgREST's
+    // FK inference, and the previous code (`conv.Space.ownerId`) silently
+    // produced `undefined` in the array case, killing the auth check
+    // with a 403 the client couldn't see.
+    const { data: conv, error: convErr } = await supabase
       .from('Conversation')
-      .select('id, spaceId, Space(ownerId)')
+      .select('id, spaceId')
       .eq('id', conversationId)
       .maybeSingle();
+    if (convErr) {
+      console.error('[messages] Conversation lookup failed:', convErr);
+      return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
+    }
     if (!conv) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const { data: user } = await supabase
+    const { data: dbUser, error: userErr } = await supabase
       .from('User')
       .select('id')
       .eq('clerkId', userId)
-      .eq('id', (conv as any).Space.ownerId)
       .maybeSingle();
-    if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (userErr) {
+      console.error('[messages] User lookup failed:', userErr);
+      return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
+    }
+    if (!dbUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const { data: space, error: spaceErr } = await supabase
+      .from('Space')
+      .select('id, ownerId')
+      .eq('id', conv.spaceId)
+      .maybeSingle();
+    if (spaceErr) {
+      console.error('[messages] Space lookup failed:', spaceErr);
+      return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
+    }
+    if (!space || space.ownerId !== dbUser.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const { data, error } = await supabase
       .from('Message')
@@ -34,7 +58,10 @@ export async function GET(req: NextRequest) {
       .eq('conversationId', conversationId)
       .order('createdAt', { ascending: true })
       .limit(MESSAGE_LIMIT);
-    if (error) return NextResponse.json({ error: 'Failed to load messages' }, { status: 500 });
+    if (error) {
+      console.error('[messages] Message lookup failed:', error);
+      return NextResponse.json({ error: 'Failed to load messages' }, { status: 500 });
+    }
 
     return NextResponse.json(data ?? []);
   } catch (err) {

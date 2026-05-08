@@ -7,15 +7,21 @@ import type { Conversation } from '@/lib/types';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { composioConfigured } from '@/lib/integrations/composio';
 
+// Force dynamic rendering — the page reads searchParams to pick which
+// conversation to hydrate, and we need a fresh server render on every
+// query-string change. Without this, Next.js can serve a cached render
+// across navigations and the workspace ends up with stale initialMessages.
+export const dynamic = 'force-dynamic';
+
 export default async function ChippiPage({
   params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ q?: string; tab?: string; prefill?: string }>;
+  searchParams: Promise<{ q?: string; tab?: string; prefill?: string; conversationId?: string }>;
 }) {
   const { slug } = await params;
-  const { q, tab, prefill } = await searchParams;
+  const { q, tab, prefill, conversationId: urlConversationId } = await searchParams;
   const initialInput = typeof q === 'string' && q.trim() ? q.trim() : undefined;
   // `prefill` populates the composer but does NOT auto-send — the realtor
   // finishes the sentence themselves. Used by "or just tell Chippi →" shortcuts
@@ -53,14 +59,15 @@ export default async function ChippiPage({
       .limit(50);
     conversations = (convData ?? []) as Conversation[];
 
-    // Load messages from the most recent conversation
-    if (conversations.length > 0) {
-      const latestConv = conversations[0];
-      initialConversationId = latestConv.id;
+    // Pick which conversation to hydrate. URL is the source of truth.
+    // No URL param → show the new-chat screen (targetConvId = null).
+    const targetConvId = urlConversationId ?? null;
+    if (targetConvId) {
+      initialConversationId = targetConvId;
       const { data: msgData } = await supabase
         .from('Message')
         .select('role, content, blocks')
-        .eq('conversationId', latestConv.id)
+        .eq('conversationId', targetConvId)
         .order('createdAt', { ascending: true })
         .limit(50);
       initialMessages = ((msgData ?? []) as { role: string; content: string; blocks: MessageBlock[] | null }[]).map((m) => ({

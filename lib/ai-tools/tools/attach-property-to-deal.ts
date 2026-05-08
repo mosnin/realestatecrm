@@ -29,6 +29,7 @@ interface AttachPropertyResult {
 
 export const attachPropertyToDealTool = defineTool<typeof parameters, AttachPropertyResult>({
   name: 'attach_property_to_deal',
+  riskLevel: 'low',
   description:
     'Link an existing property to a deal. Prompts for approval first.',
   parameters,
