@@ -357,6 +357,203 @@ async def advance_deal_stage(
 
 
 @function_tool
+async def create_deal(
+    ctx: RunContextWrapper[AgentContext],
+    title: str,
+    stage_id: str | None = None,
+    description: str | None = None,
+    value: float | None = None,
+    address: str | None = None,
+    priority: str | None = None,
+    close_date: str | None = None,
+    contact_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    """Create a new deal in a pipeline stage.
+
+    title: short label shown on the kanban card. Required.
+    stage_id: target DealStage.id. Optional — if omitted the deal lands in the
+      first stage of the buyer pipeline when a buyer contact is linked, otherwise
+      the first stage of the seller pipeline.
+    description: optional deal notes / description.
+    value: deal value in dollars.
+    address: property address if relevant.
+    priority: 'LOW' | 'MEDIUM' | 'HIGH'. Defaults to MEDIUM.
+    close_date: ISO 8601 date/datetime string for expected close.
+    contact_ids: list of Contact.id values to link to this deal.
+
+    Use when the realtor says "create a deal", "add a deal", "start a deal",
+    "open a deal for [name]", etc.
+    """
+    space_id = ctx.context.space_id
+    db = await supabase()
+    now = datetime.now(timezone.utc).isoformat()
+
+    clean_title = title.strip()[:255] if title else ""
+    if not clean_title:
+        return {"error": "title is required"}
+
+    valid_priorities = {"LOW", "MEDIUM", "HIGH"}
+    clean_priority = (priority or "MEDIUM").strip().upper()
+    if clean_priority not in valid_priorities:
+        clean_priority = "MEDIUM"
+
+    # Validate contact IDs and detect pipeline type from lead types
+    valid_contact_ids: list[str] = []
+    buyer_among_contacts = False
+    if contact_ids:
+        contacts_res = await (
+            db.table("Contact")
+            .select("id,leadType")
+            .in_("id", contact_ids[:10])
+            .eq("spaceId", space_id)
+            .execute()
+        )
+        valid_rows = contacts_res.data or []
+        valid_set = {r["id"] for r in valid_rows}
+        valid_contact_ids = [cid for cid in contact_ids if cid in valid_set]
+        buyer_among_contacts = any(r.get("leadType") == "buyer" for r in valid_rows)
+
+    # Stage resolution
+    stage: dict[str, Any] | None = None
+    if stage_id:
+        stage_res = await (
+            db.table("DealStage")
+            .select("id,name,pipelineType")
+            .eq("id", stage_id)
+            .eq("spaceId", space_id)
+            .maybe_single()
+            .execute()
+        )
+        stage = stage_res.data
+
+    if not stage:
+        preferred = "buyer" if buyer_among_contacts else "seller"
+        fallback_res = await (
+            db.table("DealStage")
+            .select("id,name,pipelineType")
+            .eq("spaceId", space_id)
+            .eq("pipelineType", preferred)
+            .order("position")
+            .limit(1)
+            .execute()
+        )
+        if fallback_res.data:
+            stage = fallback_res.data[0]
+        else:
+            any_res = await (
+                db.table("DealStage")
+                .select("id,name,pipelineType")
+                .eq("spaceId", space_id)
+                .order("position")
+                .limit(1)
+                .execute()
+            )
+            if any_res.data:
+                stage = any_res.data[0]
+
+    if not stage:
+        return {"error": "No pipeline stages configured in this workspace — set one up before creating deals."}
+
+    # Auto-route buyer deals to buyer pipeline
+    final_stage = stage
+    if buyer_among_contacts and stage.get("pipelineType") != "buyer":
+        buyer_res = await (
+            db.table("DealStage")
+            .select("id,name,pipelineType")
+            .eq("spaceId", space_id)
+            .eq("pipelineType", "buyer")
+            .order("position")
+            .limit(1)
+            .execute()
+        )
+        if buyer_res.data:
+            final_stage = buyer_res.data[0]
+
+    final_stage_id = final_stage["id"]
+
+    # Position at bottom of stage
+    pos_res = await (
+        db.table("Deal")
+        .select("position")
+        .eq("stageId", final_stage_id)
+        .eq("spaceId", space_id)
+        .order("position", desc=True)
+        .limit(1)
+        .execute()
+    )
+    last_pos = (pos_res.data[0]["position"] if pos_res.data else -1)
+    next_position = last_pos + 1
+
+    import uuid as _uuid
+    deal_id = str(_uuid.uuid4())
+
+    deal_row: dict[str, Any] = {
+        "id": deal_id,
+        "spaceId": space_id,
+        "title": clean_title,
+        "stageId": final_stage_id,
+        "priority": clean_priority,
+        "position": next_position,
+        "status": "active",
+        "createdAt": now,
+        "updatedAt": now,
+    }
+    if description:
+        deal_row["description"] = description.strip()[:5000]
+    if value is not None and value >= 0:
+        deal_row["value"] = value
+    if address:
+        deal_row["address"] = address.strip()[:500]
+    if close_date:
+        deal_row["closeDate"] = close_date
+
+    try:
+        await db.table("Deal").insert(deal_row).execute()
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
+
+    # Link contacts
+    if valid_contact_ids:
+        try:
+            await db.table("DealContact").insert([
+                {"dealId": deal_id, "contactId": cid}
+                for cid in valid_contact_ids
+            ]).execute()
+        except Exception:
+            pass
+
+    # Activity row
+    try:
+        await db.table("DealActivity").insert({
+            "id": str(_uuid.uuid4()),
+            "dealId": deal_id,
+            "spaceId": space_id,
+            "type": "note",
+            "content": f"[Agent] Deal created: {clean_title}",
+            "metadata": {"source": "agent", "agentRunId": ctx.context.run_id},
+        }).execute()
+    except Exception:
+        pass
+
+    await publish_event(
+        ctx.context,
+        "action",
+        f"Created deal '{clean_title}' in {final_stage['name']}",
+        agent_type=ctx.context.current_agent_type,
+        metadata={"dealId": deal_id, "stageId": final_stage_id},
+    )
+
+    return {
+        "ok": True,
+        "dealId": deal_id,
+        "title": clean_title,
+        "stageName": final_stage["name"],
+        "linkedContactIds": valid_contact_ids,
+    }
+
+
+@function_tool
 async def request_deal_review(
     ctx: RunContextWrapper[AgentContext],
     deal_id: str,

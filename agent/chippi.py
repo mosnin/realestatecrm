@@ -10,9 +10,10 @@ This agent serves both surfaces:
 
 The opening message tells Chippi which mode it's in.
 
-Tool surface (28 tools):
-  - find_contacts / get_contact_activity / update_contact
-  - find_deals / update_deal / advance_deal_stage / request_deal_review
+Tool surface (31 tools):
+  - create_contact / find_contacts / get_contact_activity / update_contact
+  - create_deal / find_deals / update_deal / advance_deal_stage / request_deal_review
+  - recall_docs
   - book_tour
   - route_lead
   - add_property / send_property_packet
@@ -36,10 +37,11 @@ from agents import Agent
 
 from security.guardrails import pending_drafts_guardrail
 from tools.activities import log_activity_run
+from tools.docs import recall_docs
 from tools.plan import create_plan
 from tools.attachments import read_attachment
-from tools.contacts import find_contacts, get_contact_activity, update_contact
-from tools.deals import advance_deal_stage, find_deals, request_deal_review, update_deal
+from tools.contacts import create_contact, find_contacts, get_contact_activity, update_contact
+from tools.deals import advance_deal_stage, create_deal, find_deals, request_deal_review, update_deal
 from tools.drafts import draft_message
 from tools.goals import manage_goal
 from tools.inbound import process_inbound_message
@@ -107,6 +109,19 @@ When NOT to plan (skip create_plan entirely):
 After create_plan returns, execute the steps in the announced order. Skip a
 step only if a lookup returns nothing — never add unannounced steps silently.
 
+# Creating records
+When the realtor says "add a lead", "create a contact", "log a new person",
+"add a buyer/rental/seller" — call create_contact immediately. Don't ask for
+permission, don't store in memory instead. The contact goes in the real CRM.
+
+When the realtor says "create a deal", "start a deal", "open a deal for [name]"
+— call create_deal. Link the relevant contact_ids if you have them. Stage is
+optional — leave it blank and the deal lands in the right pipeline automatically.
+
+Never say "I've noted this" or "I've added this to memory" as a substitute for
+actually creating the record. Memory is for observations; create_contact and
+create_deal are for CRM records.
+
 # Lifecycle moves (brokerage-grade actions)
 Beyond reading and drafting you can directly move the deal lifecycle:
 
@@ -149,6 +164,12 @@ preferences, ghosting patterns.
   Skip conversational framing. Contact-facing? draft_message it.
 - [Think: ...] → systematic. State what you know, what you don't,
   what tools you'll use, then execute.
+
+# App help and how-to questions
+When the realtor asks "how do I...", "where is...", "why isn't... working",
+or "what does X do" — call recall_docs(query="...") first. It searches the
+app knowledge base and returns accurate how-to content. Don't guess at app
+behavior — look it up. This tool is never called for routine CRM tasks.
 
 # Asking
 If intent is genuinely ambiguous, ask_realtor with a one-sentence
@@ -234,10 +255,12 @@ def make_chippi_agent(ai_profile_text: str | None = None) -> Agent:
         instructions=instructions,
         tools=[
             # Contacts
+            create_contact,
             find_contacts,
             get_contact_activity,
             update_contact,
             # Deals + lifecycle
+            create_deal,
             find_deals,
             update_deal,
             advance_deal_stage,
@@ -266,6 +289,8 @@ def make_chippi_agent(ai_profile_text: str | None = None) -> Agent:
             # Asking + audit
             ask_realtor,
             log_activity_run,
+            # App knowledge base (help / how-to — lazy loaded)
+            recall_docs,
             # Planning
             create_plan,
             # Intake form

@@ -130,6 +130,107 @@ async def get_contact_activity(
     return rows
 
 
+@function_tool
+async def create_contact(
+    ctx: RunContextWrapper[AgentContext],
+    name: str,
+    lead_type: str = "buyer",
+    email: str | None = None,
+    phone: str | None = None,
+    budget: float | None = None,
+    preferences: str | None = None,
+    notes: str | None = None,
+    tags: list[str] | None = None,
+) -> dict[str, Any]:
+    """Create a new contact (person) in the workspace.
+
+    name: full name. Required.
+    lead_type: 'buyer' | 'rental' | 'seller'. Default 'buyer'.
+    email: email address if known.
+    phone: phone number in any format.
+    budget: dollars. For rentals this is monthly; for buyers, purchase price.
+    preferences: free-form — neighborhood, bedrooms, must-haves, etc.
+    notes: any initial notes stored verbatim on the contact record.
+    tags: optional labels. Use 'new-lead' for fresh leads.
+
+    Use when the realtor says "add a lead", "log a new contact", "create a
+    person", etc. Never store in memory when you can create the actual record.
+    """
+    space_id = ctx.context.space_id
+    db = await supabase()
+    now = datetime.now(timezone.utc).isoformat()
+
+    clean_name = name.strip()[:200] if name else ""
+    if not clean_name:
+        return {"error": "name is required"}
+
+    valid_lead_types = {"buyer", "rental", "seller"}
+    clean_lead_type = lead_type.strip().lower() if lead_type else "buyer"
+    if clean_lead_type not in valid_lead_types:
+        clean_lead_type = "buyer"
+
+    clean_tags = [t.strip()[:60] for t in (tags or []) if t.strip()][:10]
+
+    import uuid as _uuid
+    contact_id = str(_uuid.uuid4())
+
+    row: dict[str, Any] = {
+        "id": contact_id,
+        "spaceId": space_id,
+        "name": clean_name,
+        "leadType": clean_lead_type,
+        "type": "QUALIFICATION",
+        "properties": [],
+        "tags": clean_tags,
+        "createdAt": now,
+        "updatedAt": now,
+    }
+    if email:
+        row["email"] = email.strip()[:320]
+    if phone:
+        row["phone"] = phone.strip()[:40]
+    if budget is not None and budget >= 0:
+        row["budget"] = budget
+    if preferences:
+        row["preferences"] = preferences.strip()[:2000]
+    if notes:
+        row["notes"] = notes.strip()[:5000]
+
+    try:
+        await db.table("Contact").insert(row).execute()
+    except Exception as e:
+        agent_err = from_exception(e)
+        return {"error": agent_err.message, "code": agent_err.code, "retryable": agent_err.retryable}
+
+    # Activity log for the creation event
+    try:
+        await db.table("ContactActivity").insert({
+            "id": str(_uuid.uuid4()),
+            "contactId": contact_id,
+            "spaceId": space_id,
+            "type": "note",
+            "content": f"[Agent] Contact created: {clean_name}",
+            "metadata": {"source": "agent", "agentRunId": ctx.context.run_id},
+        }).execute()
+    except Exception:
+        pass
+
+    await publish_event(
+        ctx.context,
+        "action",
+        f"Created contact {clean_name}",
+        agent_type=ctx.context.current_agent_type,
+        metadata={"contactId": contact_id},
+    )
+
+    return {
+        "ok": True,
+        "contactId": contact_id,
+        "name": clean_name,
+        "leadType": clean_lead_type,
+    }
+
+
 _VALID_TYPES = {"QUALIFICATION", "TOUR", "APPLICATION"}
 
 

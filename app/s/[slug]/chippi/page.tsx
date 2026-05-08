@@ -59,12 +59,9 @@ export default async function ChippiPage({
       .limit(50);
     conversations = (convData ?? []) as Conversation[];
 
-    // Pick which conversation to hydrate. URL is the source of truth — use
-    // it directly when provided, regardless of whether it appears in the
-    // conversations list (the list is capped at 50; older conversations are
-    // valid targets). Fall back to the most-recent conversation when no
-    // explicit ID is in the URL.
-    const targetConvId = urlConversationId ?? conversations[0]?.id ?? null;
+    // Pick which conversation to hydrate. URL is the source of truth.
+    // No URL param → show the new-chat screen (targetConvId = null).
+    const targetConvId = urlConversationId ?? null;
     if (targetConvId) {
       initialConversationId = targetConvId;
       const { data: msgData } = await supabase

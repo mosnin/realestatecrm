@@ -957,7 +957,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                 right. The previous trio of @ / paperclip / draft was visually
                 loud for daily use; the Plus pattern matches Slack / iMessage /
                 ChatGPT and lets us add affordances later without crowding. */}
-            <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-1">
+            <div className="flex items-center justify-between gap-2 px-2 py-2">
               <div className="relative" ref={plusMenuRef}>
                 <Tooltip>
                   <TooltipTrigger asChild>
