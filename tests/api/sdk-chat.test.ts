@@ -160,37 +160,37 @@ describe('POST /api/ai/task — input validation', () => {
   });
 });
 
-describe('POST /api/ai/task — runtime branch (default = ts)', () => {
-  it('routes to streamTsChatTurn when CHIPPI_CHAT_RUNTIME is unset', async () => {
+describe('POST /api/ai/task — runtime branch (default = modal)', () => {
+  it('routes to Modal when CHIPPI_CHAT_RUNTIME is unset', async () => {
     delete process.env.CHIPPI_CHAT_RUNTIME;
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
-    expect(tsStreamMock).toHaveBeenCalledTimes(1);
-    // Modal fetch is NEVER touched on the ts path.
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // TS streamer is NEVER touched on the modal path.
+    expect(tsStreamMock).not.toHaveBeenCalled();
   });
 
-  it('routes to streamTsChatTurn for any value other than the exact string "modal"', async () => {
-    process.env.CHIPPI_CHAT_RUNTIME = 'TS'; // wrong case → still ts
+  it('routes to Modal for any value other than the exact string "ts"', async () => {
+    process.env.CHIPPI_CHAT_RUNTIME = 'TS'; // wrong case → still modal
     await POST(makeRequest());
-    expect(tsStreamMock).toHaveBeenCalled();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalled();
+    expect(tsStreamMock).not.toHaveBeenCalled();
 
     fetchMock.mockClear();
     tsStreamMock.mockClear();
-    process.env.CHIPPI_CHAT_RUNTIME = 'ts';
+    process.env.CHIPPI_CHAT_RUNTIME = 'modal'; // explicit modal → still modal
     await POST(makeRequest());
-    expect(tsStreamMock).toHaveBeenCalled();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalled();
+    expect(tsStreamMock).not.toHaveBeenCalled();
   });
 });
 
-describe('POST /api/ai/task — runtime branch (CHIPPI_CHAT_RUNTIME=modal opt-out)', () => {
-  it('returns 501 when the realtor explicitly opts back into the retired modal runtime', async () => {
-    process.env.CHIPPI_CHAT_RUNTIME = 'modal';
+describe('POST /api/ai/task — runtime branch (CHIPPI_CHAT_RUNTIME=ts opt-in)', () => {
+  it('routes to streamTsChatTurn when CHIPPI_CHAT_RUNTIME is explicitly "ts"', async () => {
+    process.env.CHIPPI_CHAT_RUNTIME = 'ts';
     const res = await POST(makeRequest());
-    expect(res.status).toBe(501);
-    expect(tsStreamMock).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(tsStreamMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

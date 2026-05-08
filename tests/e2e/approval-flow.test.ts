@@ -59,6 +59,13 @@ vi.mock('@/lib/space', () => ({
   getSpaceForUser: vi.fn(),
 }));
 
+// ── Kill-switch mock ──────────────────────────────────────────────────────────
+// assertSpaceEnabled would otherwise hit Supabase and consume queue entries.
+
+vi.mock('@/lib/agent/kill-switch', () => ({
+  assertSpaceEnabled: vi.fn(() => Promise.resolve()),
+}));
+
 // Import AFTER all mocks are registered.
 import { GET, POST } from '@/app/api/agent/approvals/route';
 import { requireAuth } from '@/lib/api-auth';

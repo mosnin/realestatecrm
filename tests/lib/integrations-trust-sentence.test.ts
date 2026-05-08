@@ -24,8 +24,7 @@ const PAGE_PATH = resolve(
 );
 
 const TRUST_SENTENCE =
-  'Chippi never sends without your tap. Connecting just means your\n' +
-  '          approved drafts go through your account.';
+  'Connect Chippi to the apps you already use. Drafts go where you send mail. Tours land on your calendar. Chippi never sends without your tap.';
 
 describe('integrations page — trust sentence', () => {
   it('contains the exact realtor-facing consent line', () => {

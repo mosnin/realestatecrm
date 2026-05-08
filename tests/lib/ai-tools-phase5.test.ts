@@ -308,7 +308,10 @@ describe('createDealTool', () => {
       makeCtx(),
     );
     expect(result.display).toBe('error');
-    expect(result.summary).toMatch(/Stage.*not found/);
+    // Stage not found → falls through to "no stages configured" message because
+    // create-deal.ts now auto-routes to the first available stage when the provided
+    // stageId doesn't match. With an empty mock the fallback also returns nothing.
+    expect(result.summary).toMatch(/stage.*not found|No pipeline stages/i);
     expect(syncDealMock).not.toHaveBeenCalled();
   });
 });

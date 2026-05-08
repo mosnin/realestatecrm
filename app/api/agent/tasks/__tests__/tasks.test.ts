@@ -54,6 +54,12 @@ vi.mock('@/lib/space', () => ({
   getSpaceForUser: vi.fn(),
 }));
 
+// ── Kill-switch mock ──────────────────────────────────────────────────────────
+
+vi.mock('@/lib/agent/kill-switch', () => ({
+  assertSpaceEnabled: vi.fn(() => Promise.resolve()),
+}));
+
 // ── task-state-machine mock (enqueueTask only) ────────────────────────────────
 
 vi.mock('@/lib/agent/task-state-machine', async () => {

@@ -25,7 +25,8 @@ describe('buildSystemPrompt', () => {
 
   it('tells the model to use tools instead of speculating', () => {
     const prompt = buildSystemPrompt(makeCtx());
-    expect(prompt).toMatch(/do not speculate/i);
+    // Prompt was expanded to "Never invent CRM data … don't fabricate."
+    expect(prompt).toMatch(/don't fabricate|do not speculate|never invent/i);
   });
 
   it('mentions that mutating tools prompt for approval', () => {
@@ -53,12 +54,13 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toMatch(/do NOT pick/);
     // The "approval covers the verb, not the subject" reasoning is the load-bearing
     // sentence — pin its presence so a future edit can't quietly soften the contract.
-    expect(prompt).toMatch(/approval covers the verb, not the subject/);
+    expect(prompt).toMatch(/approval covers the verb, not the subject/i);
   });
 
   it('stays compact — enough for tone guidance, not a manifesto', () => {
     const prompt = buildSystemPrompt(makeCtx());
-    // Sanity upper bound: if we ever exceed 3000 chars we should revisit.
-    expect(prompt.length).toBeLessThan(3000);
+    // Upper bound updated when the prompt was expanded to cover multi-step
+    // execution, planning mode, and subject-disambiguation guidance.
+    expect(prompt.length).toBeLessThan(7000);
   });
 });

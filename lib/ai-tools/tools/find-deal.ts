@@ -80,6 +80,7 @@ interface RawDeal {
   stageId: string;
   closeDate: string | null;
   updatedAt: string;
+  stageChangedAt: string | null;
 }
 
 function daysSince(iso: string | null, now: Date): number | null {
@@ -114,13 +115,7 @@ async function enrichOne(
     stageId: d.stageId,
     stageName: stageNames.get(d.stageId) ?? null,
     status: d.status,
-    // `Deal.stageChangedAt` is optional in the schema (added in migration
-    // 20260526000000). Until that migration runs we surface null so the
-    // model knows the signal is unavailable instead of crashing the call.
-    // After the migration runs in prod we can switch this back to
-    // `daysSince(d.stageChangedAt, now)` and add the column back to the
-    // SELECT above.
-    daysInStage: null,
+    daysInStage: daysSince(d.stageChangedAt, now),
     daysSinceUpdate: daysSince(d.updatedAt, now),
     contact_name: contactName,
     property_address: d.address,
@@ -162,7 +157,7 @@ export const findDealTool = defineTool<typeof parameters, FindDealResult>({
 
     let query = supabase
       .from('Deal')
-      .select('id, title, address, value, status, stageId, closeDate, updatedAt')
+      .select('id, title, address, value, status, stageId, closeDate, updatedAt, stageChangedAt')
       .eq('spaceId', ctx.space.id)
       .order('updatedAt', { ascending: false })
       .limit(limit);
