@@ -191,11 +191,11 @@ async function handleDeal(id: string, spaceId: string): Promise<NextResponse> {
     : null;
 
   // Supabase returns the embedded relation as an array or object depending on
-  // the join cardinality — cast to any to avoid fighting the generated types.
+  // the join cardinality — use a loose Record type to avoid fighting generated types.
   const contacts = (contactsResult.data ?? [])
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map((dc: any) => {
-      const c = Array.isArray(dc.Contact) ? dc.Contact[0] : dc.Contact;
+    .map((dc: Record<string, unknown>) => {
+      const raw = dc.Contact;
+      const c = Array.isArray(raw) ? (raw[0] as Record<string, unknown> | undefined) : (raw as Record<string, unknown> | null);
       return c ? { id: c.id as string, name: c.name as string } : null;
     })
     .filter((c): c is { id: string; name: string } => c !== null);
