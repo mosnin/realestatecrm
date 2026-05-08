@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
-import { Building2, ArrowRight } from 'lucide-react';
+import { Building2, ArrowRight, Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { formatCurrency } from '@/lib/formatting';
@@ -84,16 +84,25 @@ export default async function PropertiesPage({
   return (
     <div className={cn('space-y-6', PAGE_MAX)}>
       {/* Page header */}
-      <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Properties.</p>
-        <h1 className={cn(H1)} style={TITLE_FONT}>
-          All properties
-        </h1>
-        <p className={cn(BODY_MUTED)}>
-          {properties.length === 0
-            ? 'No properties yet.'
-            : `${properties.length} ${properties.length === 1 ? 'property' : 'properties'}`}
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div className="space-y-1.5">
+          <p className={cn(BODY_MUTED)}>Properties.</p>
+          <h1 className={cn(H1)} style={TITLE_FONT}>
+            All properties
+          </h1>
+          <p className={cn(BODY_MUTED)}>
+            {properties.length === 0
+              ? 'No properties yet.'
+              : `${properties.length} ${properties.length === 1 ? 'property' : 'properties'}`}
+          </p>
+        </div>
+        <Link
+          href={`/s/${slug}/properties/new`}
+          className="inline-flex items-center gap-1.5 rounded-md bg-foreground text-background text-sm font-semibold px-3 py-2 hover:bg-foreground/90 transition-colors flex-shrink-0"
+        >
+          <Plus size={14} />
+          Add property
+        </Link>
       </header>
 
       {/* Empty state */}
@@ -102,13 +111,13 @@ export default async function PropertiesPage({
           <Building2 size={28} className="mx-auto mb-3 text-muted-foreground/60" />
           <p className="text-sm text-foreground font-medium">No properties yet.</p>
           <p className={cn('text-xs mt-1', BODY_MUTED)}>
-            Properties are added when you create deals.
+            Add your first property to get started.
           </p>
           <Link
-            href={`/s/${slug}/deals`}
-            className="inline-flex items-center gap-1.5 mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            href={`/s/${slug}/properties/new`}
+            className="inline-flex items-center gap-1.5 mt-4 text-xs font-medium text-foreground hover:text-foreground/80 transition-colors"
           >
-            Go to deals <ArrowRight size={12} />
+            Add a property <ArrowRight size={12} />
           </Link>
         </div>
       ) : (

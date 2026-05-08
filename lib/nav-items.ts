@@ -70,10 +70,6 @@ export const realtorNavItems: NavItem[] = [
     label: 'Properties',
     icon: Building2,
     badgeKey: 'properties',
-    children: [
-      { href: '/deals/new', label: 'Add property' },
-      { href: '/properties/commissions', label: 'Commissions' },
-    ],
   },
   {
     href: '/settings',
@@ -99,6 +95,7 @@ export const realtorNavItems: NavItem[] = [
  */
 export const realtorMoreNavItems: NavItem[] = [
   { href: '/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/properties/commissions', label: 'Commissions', icon: Wallet },
   { href: '/agents', label: 'Agents', icon: Bot },
   { href: '/integrations', label: 'Integrations', icon: Plug },
   { href: '/intake', label: 'Intake form', icon: ClipboardList },
