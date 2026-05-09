@@ -25,6 +25,16 @@ interface DealRow {
   commissionRate: number | null;
   closeDate: string | null;
   updatedAt: string;
+  propertyId: string | null;
+}
+
+interface PropertyAddrRow {
+  id: string;
+  address: string;
+  unitNumber: string | null;
+  city: string | null;
+  stateRegion: string | null;
+  postalCode: string | null;
 }
 
 /**
@@ -48,7 +58,7 @@ export default async function PropertiesCommissionsPage({
   const [dealsResult, splitsResult] = await Promise.all([
     supabase
       .from('Deal')
-      .select('id, title, status, value, commissionRate, closeDate, updatedAt')
+      .select('id, title, status, value, commissionRate, closeDate, updatedAt, propertyId')
       .eq('spaceId', space.id)
       .order('updatedAt', { ascending: false }),
     supabase
@@ -64,6 +74,23 @@ export default async function PropertiesCommissionsPage({
     const arr = splitsByDeal.get(s.dealId) ?? [];
     arr.push(s);
     splitsByDeal.set(s.dealId, arr);
+  }
+
+  // Look up the addresses for any properties referenced by these deals so the
+  // table can show which property each commission line came from. Single
+  // round-trip; nothing if no deals have a propertyId.
+  const propertyIds = Array.from(
+    new Set(deals.map((d) => d.propertyId).filter((id): id is string => Boolean(id))),
+  );
+  const propertyById = new Map<string, PropertyAddrRow>();
+  if (propertyIds.length > 0) {
+    const { data: props } = await supabase
+      .from('Property')
+      .select('id, address, unitNumber, city, stateRegion, postalCode')
+      .in('id', propertyIds);
+    for (const p of (props ?? []) as PropertyAddrRow[]) {
+      propertyById.set(p.id, p);
+    }
   }
 
   const closedYtd = deals.filter(
@@ -156,7 +183,12 @@ export default async function PropertiesCommissionsPage({
         }
       >
         {closedYtd.length > 0 && (
-          <CommissionTable rows={closedYtd} splitsByDeal={splitsByDeal} slug={slug} />
+          <CommissionTable
+            rows={closedYtd}
+            splitsByDeal={splitsByDeal}
+            propertyById={propertyById}
+            slug={slug}
+          />
         )}
       </Section>
 
@@ -167,7 +199,12 @@ export default async function PropertiesCommissionsPage({
         empty={<EmptyRow text="Nothing in flight. Quiet pipeline." />}
       >
         {inFlight.length > 0 && (
-          <CommissionTable rows={inFlight} splitsByDeal={splitsByDeal} slug={slug} />
+          <CommissionTable
+            rows={inFlight}
+            splitsByDeal={splitsByDeal}
+            propertyById={propertyById}
+            slug={slug}
+          />
         )}
       </Section>
     </div>
@@ -203,16 +240,27 @@ function EmptyRow({ text }: { text: string }) {
 function CommissionTable({
   rows,
   splitsByDeal,
+  propertyById,
   slug,
 }: {
   rows: DealRow[];
   splitsByDeal: Map<string, CommissionSplit[]>;
+  propertyById: Map<string, PropertyAddrRow>;
   slug: string;
 }) {
+  // Property column on the right of the deal info — click to jump to the
+  // property detail. This is the field that connects this revenue view back
+  // to the Properties surface up in the sidebar.
   return (
     <div className="divide-y divide-border/70">
-      <div className={cn('hidden sm:grid grid-cols-[minmax(0,2fr)_100px_70px_100px_110px_28px] px-5 py-2 bg-foreground/[0.02]', SECTION_LABEL)}>
+      <div
+        className={cn(
+          'hidden sm:grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_100px_70px_100px_110px_28px] px-5 py-2 bg-foreground/[0.02]',
+          SECTION_LABEL,
+        )}
+      >
         <span>Deal</span>
+        <span>Property</span>
         <span className="text-right">Value</span>
         <span className="text-right">Rate</span>
         <span className="text-right">GCI</span>
@@ -221,13 +269,16 @@ function CommissionTable({
       </div>
       {rows.map((d) => {
         const r = computeCommission(d.value, d.commissionRate, splitsByDeal.get(d.id) ?? []);
+        const property = d.propertyId ? propertyById.get(d.propertyId) : null;
+        const propertyAddress = property
+          ? [property.address, property.unitNumber].filter(Boolean).join(' ')
+          : null;
         return (
-          <Link
+          <div
             key={d.id}
-            href={`/s/${slug}/deals/${d.id}`}
-            className="group flex flex-col sm:grid sm:grid-cols-[minmax(0,2fr)_100px_70px_100px_110px_28px] sm:items-center px-5 py-3 hover:bg-foreground/[0.04] active:bg-foreground/[0.045] transition-colors duration-150"
+            className="group flex flex-col sm:grid sm:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_100px_70px_100px_110px_28px] sm:items-center px-5 py-3 hover:bg-foreground/[0.04] active:bg-foreground/[0.045] transition-colors duration-150"
           >
-            <div className="min-w-0">
+            <Link href={`/s/${slug}/deals/${d.id}`} className="min-w-0">
               <p className="text-sm font-medium text-foreground truncate">{d.title}</p>
               {d.closeDate && (
                 <p className="text-[11px] text-muted-foreground">
@@ -238,23 +289,53 @@ function CommissionTable({
                   })}
                 </p>
               )}
-            </div>
-            <span className="hidden sm:block text-right tabular-nums text-sm">
+            </Link>
+            {/* Property cell — separate Link so the realtor can jump straight
+                to the property without going through the deal first. Falls
+                back to a quiet em-dash when no property is attached. */}
+            <span className="hidden sm:block min-w-0">
+              {property ? (
+                <Link
+                  href={`/s/${slug}/properties/${property.id}`}
+                  className="text-sm text-muted-foreground hover:text-foreground hover:underline truncate inline-block max-w-full"
+                >
+                  {propertyAddress}
+                </Link>
+              ) : (
+                <span className="text-sm text-muted-foreground/50">—</span>
+              )}
+            </span>
+            <Link
+              href={`/s/${slug}/deals/${d.id}`}
+              className="hidden sm:block text-right tabular-nums text-sm"
+            >
               {d.value != null ? formatCurrency(d.value) : '—'}
-            </span>
-            <span className="hidden sm:block text-right tabular-nums text-sm text-muted-foreground">
+            </Link>
+            <Link
+              href={`/s/${slug}/deals/${d.id}`}
+              className="hidden sm:block text-right tabular-nums text-sm text-muted-foreground"
+            >
               {d.commissionRate != null ? `${d.commissionRate}%` : '—'}
-            </span>
-            <span className="hidden sm:block text-right tabular-nums text-sm text-muted-foreground">
+            </Link>
+            <Link
+              href={`/s/${slug}/deals/${d.id}`}
+              className="hidden sm:block text-right tabular-nums text-sm text-muted-foreground"
+            >
               {formatCurrency(r.gci)}
-            </span>
-            <span className="hidden sm:block text-right tabular-nums text-sm text-foreground">
+            </Link>
+            <Link
+              href={`/s/${slug}/deals/${d.id}`}
+              className="hidden sm:block text-right tabular-nums text-sm text-foreground"
+            >
               {formatCurrency(r.net)}
-            </span>
-            <span className="hidden sm:flex justify-end text-muted-foreground/40 group-hover:text-foreground transition-colors duration-150">
+            </Link>
+            <Link
+              href={`/s/${slug}/deals/${d.id}`}
+              className="hidden sm:flex justify-end text-muted-foreground/40 group-hover:text-foreground transition-colors duration-150"
+            >
               <ArrowRight size={13} strokeWidth={1.75} />
-            </span>
-          </Link>
+            </Link>
+          </div>
         );
       })}
     </div>

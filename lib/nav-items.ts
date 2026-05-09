@@ -4,11 +4,10 @@ import {
   Sparkles,
   Settings,
   Calendar,
-  FileText,
   ClipboardList,
   BarChart2,
-  Wallet,
   Plug,
+  Building2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -35,10 +34,11 @@ export interface NavItem {
 
 // ── Realtor sidebar nav ──────────────────────────────────────────────────────
 //
-// Four items. Chippi is the home — "Today" isn't a separate destination, it's
-// the morning view of the agent surface. Tours/Calendar/Notes/Reviews/
-// Analytics/Intake are reachable by URL but don't earn a nav slot; they'll be
-// absorbed into the agent surface in Phase 5 as inline tools the agent calls.
+// Realtor mental model: properties first, then deals. A realtor has an
+// inventory of listings/rentals they're working; leads come in; a lead gets
+// attached to a property as a deal. Putting Properties above Deals reflects
+// that order. Commissions is a money-view of the same property inventory
+// (revenue per closing), so it sits as a child under Properties.
 //
 // Settings stays as the only true configuration destination. Sub-pages live
 // behind an in-page tab strip in app/s/[slug]/settings/layout.tsx.
@@ -56,6 +56,14 @@ export const realtorNavItems: NavItem[] = [
     label: 'People',
     icon: Users,
     badgeKey: 'leads',
+  },
+  {
+    href: '/properties',
+    label: 'Properties',
+    icon: Building2,
+    children: [
+      { href: '/properties/commissions', label: 'Commissions' },
+    ],
   },
   {
     href: '/deals',
@@ -78,15 +86,12 @@ export const realtorNavItems: NavItem[] = [
  * Sub-pages for Share / Tracking / Submissions were configuration disguised
  * as features and have been cut.
  *
- * The standalone Properties list is gone. Realtors who use Chippi properties
- * use them via deals — properties enter the system through /deals/new and are
- * read from deal-detail. The only standalone properties surface that earns
- * its place is the YTD commissions roll-up (a revenue view, not a property
- * catalogue), which lives on its own here.
+ * Properties + Commissions used to live here; promoted up to the primary
+ * nav so the realtor's inventory is one click away (matches their workflow:
+ * properties first, then leads against properties as deals).
  */
 export const realtorMoreNavItems: NavItem[] = [
   { href: '/calendar', label: 'Calendar', icon: Calendar },
-  { href: '/properties/commissions', label: 'Commissions', icon: Wallet },
   { href: '/integrations', label: 'Integrations', icon: Plug },
   { href: '/intake', label: 'Intake form', icon: ClipboardList },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },

@@ -1,25 +1,37 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Pencil, Trash2, ExternalLink, Building2, Briefcase, CalendarDays, Share2 } from 'lucide-react';
+import { Pencil, Trash2, ExternalLink, Building2, Briefcase, CalendarDays, Share2, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Property } from '@/lib/types';
 import { formatCurrency } from '@/lib/formatting';
 import { formatPropertyAddress, formatPropertyFacts, PROPERTY_LISTING_STATUS_OPTIONS } from '@/lib/properties';
+import { computeCommission, type CommissionSplit } from '@/lib/commissions';
 import { PropertyForm } from './property-form';
 import { PropertyShareDialog } from './property-share-dialog';
+
+interface LinkedDeal {
+  id: string;
+  title: string;
+  status: string;
+  value: number | null;
+  commissionRate: number | null;
+  closeDate: string | null;
+}
 
 interface Props {
   slug: string;
   initial: Property;
-  linkedDeals: { id: string; title: string; status: string; value: number | null; closeDate: string | null }[];
+  linkedDeals: LinkedDeal[];
   linkedTours: { id: string; guestName: string; startsAt: string; status: string }[];
+  /** All commission splits for this property's deals — used by the commission summary. */
+  commissionSplits: CommissionSplit[];
 }
 
-export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }: Props) {
+export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours, commissionSplits }: Props) {
   const router = useRouter();
   const [property, setProperty] = useState(initial);
   const [editing, setEditing] = useState(false);
@@ -54,8 +66,41 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
     const res = await fetch(`/api/properties/${property.id}`, { method: 'DELETE' });
     if (!res.ok) { toast.error("Couldn't delete that property."); return; }
     toast.success('Deleted.');
-    router.push(`/s/${slug}/properties/commissions`);
+    router.push(`/s/${slug}/properties`);
   }
+
+  // Commission summary across this property's deals — the field that
+  // connects the detail page to the Commissions sub-page in the sidebar.
+  // Splits are bucketed by dealId then folded with the same computeCommission
+  // helper the YTD page uses, so the numbers always agree across surfaces.
+  const commissionSummary = useMemo(() => {
+    const splitsByDeal = new Map<string, CommissionSplit[]>();
+    for (const s of commissionSplits) {
+      const arr = splitsByDeal.get(s.dealId) ?? [];
+      arr.push(s);
+      splitsByDeal.set(s.dealId, arr);
+    }
+    let closedNet = 0;
+    let closedGci = 0;
+    let expectedNet = 0;
+    let wonCount = 0;
+    let activeCount = 0;
+    for (const d of linkedDeals) {
+      const r = computeCommission(d.value, d.commissionRate, splitsByDeal.get(d.id) ?? []);
+      if (d.status === 'won') {
+        closedNet += r.net;
+        closedGci += r.gci;
+        wonCount += 1;
+      } else if (d.status === 'active') {
+        expectedNet += r.net;
+        activeCount += 1;
+      }
+    }
+    return { closedNet, closedGci, expectedNet, wonCount, activeCount };
+  }, [linkedDeals, commissionSplits]);
+
+  const hasAnyCommission =
+    commissionSummary.closedNet > 0 || commissionSummary.expectedNet > 0;
 
   const statusLabel = PROPERTY_LISTING_STATUS_OPTIONS.find((o) => o.value === property.listingStatus)?.label
     ?? property.listingStatus;
@@ -166,8 +211,48 @@ export function PropertyDetailClient({ slug, initial, linkedDeals, linkedTours }
         </div>
       </div>
 
-      {/* Right: linked deals + tours */}
+      {/* Right: commission summary + linked deals + tours */}
       <div className="space-y-4">
+        {/* Commission section — aggregates earned + in-flight across this
+            property's deals. Hidden when there's no signal at all and no
+            deals linked, so the empty state isn't noisy. */}
+        {(hasAnyCommission || linkedDeals.length > 0) && (
+          <div className="rounded-lg border border-border/70 bg-card overflow-hidden">
+            <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+              <Wallet size={14} className="text-muted-foreground" />
+              <h2 className="text-sm font-semibold">Commission</h2>
+              <Link
+                href={`/s/${slug}/properties/commissions`}
+                className="ml-auto text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+              >
+                Full breakdown &rarr;
+              </Link>
+            </div>
+            {hasAnyCommission ? (
+              <div className="grid grid-cols-3 divide-x divide-border">
+                <CommissionStat
+                  label="Earned"
+                  value={formatCurrency(commissionSummary.closedNet)}
+                  sub={`${commissionSummary.wonCount} won`}
+                />
+                <CommissionStat
+                  label="In flight"
+                  value={formatCurrency(commissionSummary.expectedNet)}
+                  sub={`${commissionSummary.activeCount} active`}
+                />
+                <CommissionStat
+                  label="Closed GCI"
+                  value={formatCurrency(commissionSummary.closedGci)}
+                  sub="before splits"
+                />
+              </div>
+            ) : (
+              <p className="px-4 py-5 text-xs text-muted-foreground text-center">
+                No commissions tracked here yet. Set a value + rate on a linked deal.
+              </p>
+            )}
+          </div>
+        )}
         <LinkedSection
           title="Linked deals"
           icon={Briefcase}
@@ -208,6 +293,16 @@ function Fact({ label, value }: { label: string; value: string }) {
       <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</dt>
       <dd className="text-foreground">{value}</dd>
     </>
+  );
+}
+
+function CommissionStat({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div className="px-4 py-3">
+      <p className="text-sm font-semibold tabular-nums">{value}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-1">{label}</p>
+      <p className="text-[10px] text-muted-foreground/80 mt-0.5">{sub}</p>
+    </div>
   );
 }
 

@@ -28,7 +28,7 @@ export default async function PropertyDetailPage({
   const [{ data: deals }, { data: tours }] = await Promise.all([
     supabase
       .from('Deal')
-      .select('id, title, status, value, closeDate')
+      .select('id, title, status, value, commissionRate, closeDate')
       .eq('propertyId', id)
       .eq('spaceId', space.id)
       .order('updatedAt', { ascending: false }),
@@ -41,20 +41,36 @@ export default async function PropertyDetailPage({
       .limit(20),
   ]);
 
+  // Pull splits for this property's deals so the detail page can show what
+  // it's earned (the commission section is the field that connects this
+  // surface to the Commissions sub-page in the sidebar).
+  type DealLite = { id: string; title: string; status: string; value: number | null; commissionRate: number | null; closeDate: string | null };
+  const dealRows = (deals ?? []) as DealLite[];
+  let splits: import('@/lib/commissions').CommissionSplit[] = [];
+  if (dealRows.length > 0) {
+    const { data: splitData } = await supabase
+      .from('CommissionSplit')
+      .select('*')
+      .eq('spaceId', space.id)
+      .in('dealId', dealRows.map((d) => d.id));
+    splits = (splitData ?? []) as import('@/lib/commissions').CommissionSplit[];
+  }
+
   return (
     <div className="space-y-4 max-w-[1200px]">
       <Link
-        href={`/s/${slug}/deals`}
+        href={`/s/${slug}/properties`}
         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft size={12} /> Deals
+        <ArrowLeft size={12} /> Properties
       </Link>
 
       <PropertyDetailClient
         slug={slug}
         initial={property as Property}
-        linkedDeals={(deals ?? []) as { id: string; title: string; status: string; value: number | null; closeDate: string | null }[]}
+        linkedDeals={dealRows}
         linkedTours={(tours ?? []) as { id: string; guestName: string; startsAt: string; status: string }[]}
+        commissionSplits={splits}
       />
     </div>
   );
