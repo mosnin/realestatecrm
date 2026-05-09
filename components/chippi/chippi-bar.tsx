@@ -256,12 +256,12 @@ export function ChippiBar({ slug }: Props) {
               })}
 
               {showThinking && (
-                <div className="flex gap-2.5">
-                  <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-border/60">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
                   </div>
-                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground pt-1.5">
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                     <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse" />
                     <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:0.2s]" />
                     <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:0.4s]" />
