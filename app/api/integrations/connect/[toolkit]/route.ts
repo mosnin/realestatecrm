@@ -87,9 +87,23 @@ export async function POST(
   }
 }
 
-/** The URL Composio sends the realtor to after OAuth completes. */
+/**
+ * The URL Composio sends the realtor to after OAuth completes.
+ *
+ * Returns undefined when neither `NEXT_PUBLIC_APP_URL` nor `APP_URL` is set —
+ * Composio falls back to its own default in that case, which means the
+ * realtor completes OAuth at the provider but never lands back in the app.
+ * Logs loud on the server so this misconfiguration is detectable in
+ * production logs without the realtor having to report a confused
+ * post-OAuth experience.
+ */
 function composioCallbackUrl(): string | undefined {
   const base = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
-  if (!base) return undefined;
+  if (!base) {
+    logger.error(
+      '[integrations.connect] NEXT_PUBLIC_APP_URL is not set — Composio will redirect to its default URL after OAuth, not back to this app. Set NEXT_PUBLIC_APP_URL on Vercel and redeploy.',
+    );
+    return undefined;
+  }
   return `${base.replace(/\/$/, '')}/integrations/callback`;
 }

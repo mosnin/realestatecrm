@@ -25,8 +25,25 @@ export async function GET() {
   // Drop revoked rows — they're audit-only, not realtor-facing.
   const visible = all.filter((c) => c.status !== 'revoked');
 
+  // Setup diagnostics — surfaced on the settings panel when something's
+  // missing. The OAuth callback URL Composio redirects to is composed from
+  // NEXT_PUBLIC_APP_URL (with APP_URL as fallback). Without either, the
+  // callback URL is undefined, the realtor completes OAuth at the provider,
+  // and Composio falls back to its own default — which doesn't land them
+  // back in our app. Hardest bug to diagnose without an explicit warning.
+  const apiKeySet = composioConfigured();
+  const appUrlSet = Boolean(process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL);
+  const setup = {
+    apiKeySet,
+    appUrlSet,
+    callbackUrl: appUrlSet
+      ? `${(process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '').replace(/\/$/, '')}/integrations/callback`
+      : null,
+  };
+
   return NextResponse.json({
-    configured: composioConfigured(),
+    configured: apiKeySet,
+    setup,
     connections: visible.map((c) => ({
       id: c.id,
       toolkit: c.toolkit,
