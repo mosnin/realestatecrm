@@ -493,7 +493,27 @@ function Row({
     <div className="flex items-start gap-3 px-4 py-3">
       <Dot status={status} comingSoon={app.comingSoon} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{app.name}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-foreground truncate">{app.name}</p>
+          {/* State pill — explicit "Connected" / "Auth expired" / "Connection
+              error" so the row state is unambiguous. The Disconnect/Reconnect
+              link below is the action, not the state. */}
+          {!app.comingSoon && status === 'active' && (
+            <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+              Connected
+            </span>
+          )}
+          {!app.comingSoon && status === 'expired' && (
+            <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400">
+              Auth expired
+            </span>
+          )}
+          {!app.comingSoon && status === 'failed' && (
+            <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400">
+              Connection error
+            </span>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground truncate">
           {connection?.label ? connection.label : app.blurb}
         </p>
