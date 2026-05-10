@@ -31,6 +31,10 @@ const { listConnectionsMock, composioConfiguredMock } = vi.hoisted(() => ({
 
 vi.mock('@/lib/integrations/connections', () => ({
   listConnections: listConnectionsMock,
+  // Reconcile is best-effort and called from this route. No-op in
+  // tests — the route's contract is "what's in the DB," not "what
+  // Composio knows about." Reconcile behavior is covered separately.
+  reconcileFromComposio: vi.fn(async () => undefined),
 }));
 
 vi.mock('@/lib/integrations/composio', () => ({

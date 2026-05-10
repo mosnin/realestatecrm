@@ -7,12 +7,16 @@
  * flow. After the realtor approves, Composio sends them back to our
  * /api/integrations/callback route with the connected-account id.
  *
- * Body: optional { spaceSlug?: string } — defaults to the user's
- * resolved space. We also persist a *pending* row so the callback can
- * tie the returned id back to (space, user, toolkit). Pending rows
- * appear as `status='active'` because Composio's OAuth flow is the
- * source of truth: when the user completes auth, the connection IS
- * active. If they bail, we sweep stale pending rows in a follow-up.
+ * IMPORTANT: We persist the IntegrationConnection row HERE — at
+ * initiate-time — using the `request.id` Composio returns. The OAuth
+ * round-trip is cross-site and unreliable: cookies can drop, redirects
+ * can land on the homepage instead of /settings, sessions can expire.
+ * If the row only existed in the callback path, any of those failures
+ * silently dropped the connection. Inserting at initiate-time means
+ * the row is in the DB the moment the user leaves for the provider,
+ * regardless of whether the callback ever fires. The callback's job
+ * shrinks to "update the label / log the result"; if it gets dropped
+ * entirely, the realtor still sees the row.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -20,7 +24,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { COMING_SOON_TOOLKITS, findIntegration } from '@/lib/integrations/catalog';
 import { initiateConnection } from '@/lib/integrations/composio';
-import { findActive, revoke } from '@/lib/integrations/connections';
+import { findActive, insertConnection, revoke } from '@/lib/integrations/connections';
 import { logger } from '@/lib/logger';
 
 export async function POST(
@@ -69,6 +73,36 @@ export async function POST(
       toolkit,
       callbackUrl,
     });
+
+    // Persist the row NOW, before the realtor leaves for OAuth. The
+    // callback used to own this insert; that meant any cross-site cookie
+    // drop, redirect-to-homepage glitch, or Vercel preview-domain quirk
+    // silently lost the row. Composio's `request.id` IS the
+    // connectedAccountId we'll get back in the callback (same value), so
+    // this insert is forward-compatible — the callback updates the label
+    // and surfaces success to the user, but the row exists either way.
+    //
+    // Failure mode: if the realtor bails on the OAuth screen, we have a
+    // row pointing at an unfinished Composio connection. The chat agent's
+    // first attempt to use it will trip the auth-error reconcile path and
+    // flip the row to 'expired' (amber dot + Reconnect). Acceptable.
+    const inserted = await insertConnection({
+      spaceId: space.id,
+      userId,
+      toolkit,
+      composioConnectionId: request.id,
+    });
+    if (!inserted) {
+      logger.error('[integrations.connect] persist-at-connect failed', {
+        userId,
+        toolkit,
+        composioConnectionId: request.id,
+      });
+      return NextResponse.json(
+        { error: `Could not save the ${app.name} connection. Try again.` },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({
       redirectUrl: request.redirectUrl,
