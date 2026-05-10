@@ -76,14 +76,20 @@ export async function POST(
       toolkit,
     });
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     logger.error(
       '[integrations.connect] initiate failed',
-      { userId, toolkit, err: err instanceof Error ? err.message : String(err) },
+      { userId, toolkit, err: message },
     );
-    return NextResponse.json(
-      { error: `Could not start ${app.name} connect. Try again in a moment.` },
-      { status: 502 },
-    );
+    // Surface OUR known-actionable error sentences (e.g. "No Auth Config
+    // exists for …") to the realtor verbatim — they tell the realtor what
+    // to do. Raw vendor 5xx/4xx noise stays hidden behind the generic line
+    // so we don't leak Composio internals.
+    const isActionable = message.startsWith('No Auth Config');
+    const surfaced = isActionable
+      ? message
+      : `Could not start ${app.name} connect. Try again in a moment.`;
+    return NextResponse.json({ error: surfaced }, { status: 502 });
   }
 }
 

@@ -106,7 +106,22 @@ export async function insertConnection(args: {
     .select('*')
     .single();
   if (error) {
-    logger.error('[integrations.connections] insert failed', { args, err: error.message });
+    // Log the full error shape — code, details, hint — so post-mortem can
+    // tell apart a unique-constraint clash from an RLS rejection from a
+    // missing column. The previous version logged only `error.message`,
+    // which Supabase often returns as a generic "duplicate key value" or
+    // "permission denied" without enough context to fix.
+    logger.error('[integrations.connections] insert failed', {
+      spaceId: args.spaceId,
+      userId: args.userId,
+      toolkit: args.toolkit,
+      composioConnectionId: args.composioConnectionId,
+      hasLabel: Boolean(args.label),
+      errCode: (error as { code?: string }).code ?? null,
+      errMessage: error.message,
+      errDetails: (error as { details?: string }).details ?? null,
+      errHint: (error as { hint?: string }).hint ?? null,
+    });
     return null;
   }
   return data as IntegrationConnectionRow;

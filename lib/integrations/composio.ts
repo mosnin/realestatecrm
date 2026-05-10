@@ -57,6 +57,13 @@ export function composioConfigured(): boolean {
  * `entityId` should be the realtor's Clerk userId — Composio scopes
  * connections per "entity" so a future broker dashboard can list a
  * realtor's connected accounts cleanly.
+ *
+ * Composio's v3 SDK signature is `initiate(userId, authConfigId, options)` —
+ * NOT `(userId, toolkit, options)`. We were passing the toolkit slug where
+ * an `ac_…` id is expected, which made every connect attempt 502 even when
+ * the realtor's Auth Configs were correctly set up in the Composio dashboard.
+ * Fix: look up the realtor's Auth Config for the toolkit, then pass its
+ * actual id to `initiate`.
  */
 export async function initiateConnection(args: {
   entityId: string;
@@ -64,14 +71,36 @@ export async function initiateConnection(args: {
   callbackUrl?: string;
 }): Promise<ConnectionRequest> {
   const composio = getComposio();
+  let authConfigId: string;
   try {
-    return await composio.connectedAccounts.initiate(args.entityId, args.toolkit, {
+    const list = await composio.authConfigs.list({ toolkit: args.toolkit });
+    const items = (list?.items ?? []) as Array<{ id: string }>;
+    if (items.length === 0) {
+      throw new Error(
+        `No Auth Config exists for "${args.toolkit}". Open the Composio dashboard → Authentication management → Create Auth Config for ${args.toolkit}, then try again.`,
+      );
+    }
+    // Take the first (or first composio-managed) auth config. Most realtors
+    // will only ever have one per toolkit. If we surface multiples in the
+    // future, the catalog can let them pick.
+    authConfigId = items[0].id;
+  } catch (err) {
+    logger.error(
+      '[integrations.composio] auth config lookup failed',
+      { entityId: args.entityId, toolkit: args.toolkit },
+      err,
+    );
+    throw err;
+  }
+
+  try {
+    return await composio.connectedAccounts.initiate(args.entityId, authConfigId, {
       callbackUrl: args.callbackUrl,
     });
   } catch (err) {
     logger.error(
       '[integrations.composio] initiate failed',
-      { entityId: args.entityId, toolkit: args.toolkit },
+      { entityId: args.entityId, toolkit: args.toolkit, authConfigId },
       err,
     );
     throw err;
