@@ -11,6 +11,13 @@
  *
  * Server component so the persistence happens before the realtor ever
  * sees a UI flash.
+ *
+ * Every branch logs through `logger.info` / `logger.warn` / `logger.error`
+ * with `[integrations.callback]` so production logs tell us exactly which
+ * step failed when a realtor reports "I connected at the provider but the
+ * row didn't show up." The previous implementation logged only on the
+ * SDK-fetch path; every other failure mode redirected silently and made
+ * post-mortem impossible.
  */
 
 import { redirect } from 'next/navigation';
@@ -26,24 +33,48 @@ export default async function IntegrationsCallback({
 }: {
   searchParams: Promise<{ connected_account_id?: string; status?: string; app?: string }>;
 }) {
-  const { connected_account_id: connectedAccountId, status, app: appQuery } =
-    await searchParams;
+  const sp = await searchParams;
+  const { connected_account_id: connectedAccountId, status, app: appQuery } = sp;
+
+  logger.info('[integrations.callback] entered', {
+    hasConnectedAccountId: Boolean(connectedAccountId),
+    status: status ?? null,
+    appQuery: appQuery ?? null,
+  });
 
   const { userId } = await auth();
-  if (!userId) redirect('/login/realtor');
+  if (!userId) {
+    logger.warn('[integrations.callback] no clerk session — redirecting to login');
+    redirect('/login/realtor');
+  }
 
   if (!connectedAccountId) {
+    logger.warn('[integrations.callback] missing connected_account_id query param', { sp });
     return redirect(buildBackUrl({ ok: false, reason: 'missing_account' }));
   }
 
   // Resolve the realtor's space — we won't ship without it.
-  const { data: spaceRow } = await supabase
+  const dbUserId = await getDbUserId(userId);
+  if (!dbUserId) {
+    logger.error('[integrations.callback] db user not found for clerk id', { clerkId: userId });
+    return redirect(buildBackUrl({ ok: false, reason: 'no_space' }));
+  }
+
+  const { data: spaceRow, error: spaceErr } = await supabase
     .from('Space')
     .select('id, slug, ownerId')
-    .eq('ownerId', (await getDbUserId(userId)) ?? '')
+    .eq('ownerId', dbUserId)
     .maybeSingle();
+  if (spaceErr) {
+    logger.error('[integrations.callback] space lookup failed', {
+      dbUserId,
+      err: spaceErr.message,
+    });
+    return redirect(buildBackUrl({ ok: false, reason: 'no_space' }));
+  }
   const space = (spaceRow ?? null) as { id: string; slug: string } | null;
   if (!space) {
+    logger.warn('[integrations.callback] no space owned by user', { dbUserId, clerkId: userId });
     return redirect(buildBackUrl({ ok: false, reason: 'no_space' }));
   }
 
@@ -51,27 +82,43 @@ export default async function IntegrationsCallback({
   // the toolkit slug from there rather than trust the query param.
   let toolkit: string | null = null;
   let label: string | null = null;
+  let accountFetchError: string | null = null;
   try {
     const composio = getComposio();
     const account = await composio.connectedAccounts.get(connectedAccountId);
     toolkit = (account?.toolkit?.slug ?? appQuery ?? null) as string | null;
-    // The API often surfaces the connected user's email or username on
-    // the account; we fall back to the toolkit name otherwise.
     label = pickLabel(account);
-  } catch (err) {
-    logger.warn('[integrations.callback] account fetch failed', {
+    logger.info('[integrations.callback] account fetched', {
       connectedAccountId,
-      err: err instanceof Error ? err.message : String(err),
+      toolkit,
+      hasLabel: Boolean(label),
+      accountStatus: (account as { status?: string } | null)?.status ?? null,
     });
+  } catch (err) {
+    accountFetchError = err instanceof Error ? err.message : String(err);
+    logger.error('[integrations.callback] account fetch failed', {
+      connectedAccountId,
+      err: accountFetchError,
+    });
+    // Fall back to ?app= if Composio's get() failed but the URL hint exists.
+    toolkit = appQuery ?? null;
   }
 
   if (!toolkit) {
-    return redirect(buildBackUrl({ ok: false, reason: 'unknown_toolkit' }));
+    logger.warn('[integrations.callback] no toolkit could be resolved', {
+      connectedAccountId,
+      appQuery,
+      accountFetchError,
+    });
+    return redirect(
+      buildBackUrl({ ok: false, reason: 'unknown_toolkit', slug: space.slug }),
+    );
   }
 
   // Reject toolkits we don't have in our catalog so a stray callback
   // doesn't write an orphan row.
   if (!findIntegration(toolkit)) {
+    logger.warn('[integrations.callback] toolkit not in catalog', { toolkit });
     return redirect(buildBackUrl({ ok: false, reason: 'unsupported_toolkit', slug: space.slug }));
   }
 
@@ -79,6 +126,10 @@ export default async function IntegrationsCallback({
   // insert the new one. Same invariant the connect route holds.
   const existing = await findActive({ spaceId: space.id, userId, toolkit });
   if (existing) {
+    logger.info('[integrations.callback] revoking prior active row before reconnect', {
+      id: existing.id,
+      toolkit,
+    });
     await revoke(existing);
   }
 
@@ -91,8 +142,20 @@ export default async function IntegrationsCallback({
   });
 
   if (!inserted) {
-    return redirect(buildBackUrl({ ok: false, reason: 'persist_failed', slug: space.slug }));
+    logger.error('[integrations.callback] insertConnection returned null', {
+      spaceId: space.id,
+      userId,
+      toolkit,
+      connectedAccountId,
+    });
+    return redirect(buildBackUrl({ ok: false, reason: 'persist_failed', slug: space.slug, toolkit }));
   }
+
+  logger.info('[integrations.callback] connection persisted', {
+    id: inserted.id,
+    toolkit,
+    spaceId: space.id,
+  });
 
   // Status from Composio: 'ACTIVE' is the green path. Anything else, we
   // mark it failed but keep the row so the realtor sees something
@@ -102,7 +165,7 @@ export default async function IntegrationsCallback({
       connectedAccountId,
       status,
     });
-    return redirect(buildBackUrl({ ok: false, reason: status, slug: space.slug }));
+    return redirect(buildBackUrl({ ok: false, reason: status, slug: space.slug, toolkit }));
   }
 
   return redirect(buildBackUrl({ ok: true, slug: space.slug, toolkit }));
