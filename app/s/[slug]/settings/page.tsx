@@ -29,10 +29,17 @@ import {
  */
 export default async function SettingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  // `?integration=connected|failed&reason=...&toolkit=...` lands here after
+  // the OAuth callback redirects the realtor back. Read it on the server so
+  // ConnectedAppsSection can render a visible banner explaining what
+  // happened — silent failure was the #1 reported bug.
+  searchParams: Promise<{ integration?: string; reason?: string; toolkit?: string }>;
 }) {
   const { slug } = await params;
+  const sp = await searchParams;
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
 
@@ -176,7 +183,17 @@ export default async function SettingsPage({
         className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
       >
         <p className={SECTION_LABEL}>Connected apps</p>
-        <ConnectedAppsSection />
+        <ConnectedAppsSection
+          callbackResult={
+            sp.integration === 'connected' || sp.integration === 'failed'
+              ? {
+                  ok: sp.integration === 'connected',
+                  reason: sp.reason ?? null,
+                  toolkit: sp.toolkit ?? null,
+                }
+              : null
+          }
+        />
       </section>
 
       {/* MCP KEYS + MESSAGE TEMPLATES */}

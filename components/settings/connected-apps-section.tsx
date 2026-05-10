@@ -148,11 +148,58 @@ const CATEGORY_ORDER: IntegrationCategory[] = [
   'storage',
 ];
 
-export function ConnectedAppsSection() {
+export interface CallbackResult {
+  /** True when Composio said the connection succeeded. */
+  ok: boolean;
+  /** Composio's status string when ok=false (e.g. "ACTIVE", "FAILED",
+   *  "missing_account", "unknown_toolkit", "Auth_Config_NotFound"). */
+  reason: string | null;
+  /** The toolkit slug Composio attempted to connect (gmail, slack, …). */
+  toolkit: string | null;
+}
+
+/**
+ * Translate the raw `reason` string from the OAuth callback into a sentence
+ * the realtor can act on. Composio errors like `Auth_Config_NotFound` are
+ * meaningless to a non-engineer — we map them to "set up the auth config in
+ * the Composio dashboard" so the realtor knows where to go.
+ */
+function explainCallbackReason(reason: string | null, toolkit: string | null): string {
+  const tk = toolkit ? ` (${toolkit})` : '';
+  if (!reason) return `Connection didn't complete${tk}. Try again.`;
+  const r = reason.toLowerCase();
+  if (r === 'missing_account')
+    return `Composio didn't return a connection id${tk}. The OAuth flow may have been cancelled.`;
+  if (r === 'no_space')
+    return `We couldn't resolve your workspace. Sign out and back in, then retry.`;
+  if (r === 'unknown_toolkit' || r === 'unsupported_toolkit')
+    return `That integration isn't in the supported catalog yet${tk}.`;
+  if (r === 'persist_failed')
+    return `OAuth completed but we couldn't save the connection${tk}. Try once more.`;
+  if (r.includes('auth_config_not_found') || r.includes('auth config'))
+    return `${toolkit ?? 'That toolkit'} needs an Auth Config in your Composio dashboard. Open Composio → Authentication management → Create Auth Config for ${toolkit ?? 'the toolkit'}, then come back.`;
+  if (r.includes('failed') || r.includes('expired') || r.includes('error'))
+    return `Composio reported "${reason}"${tk}. Check the Composio dashboard for the connection status.`;
+  // Pass through anything else verbatim — better than guessing.
+  return `${reason}${tk}`;
+}
+
+interface SetupHealth {
+  apiKeySet: boolean;
+  appUrlSet: boolean;
+  callbackUrl: string | null;
+}
+
+export function ConnectedAppsSection({ callbackResult }: { callbackResult?: CallbackResult | null } = {}) {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [connections, setConnections] = useState<ConnectionRow[]>([]);
+  const [setup, setSetup] = useState<SetupHealth | null>(null);
   const [busyToolkit, setBusyToolkit] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Auto-clear the callback banner when the realtor dismisses it. Persisted
+  // in component state — refreshing the page brings it back via searchParams,
+  // which is the right behaviour (the banner reflects the URL, not history).
+  const [callbackDismissed, setCallbackDismissed] = useState(false);
 
   // Health state: null = not yet fetched, true = loading, false = loaded/failed.
   const [healthLoading, setHealthLoading] = useState(false);
@@ -173,9 +220,11 @@ export function ConnectedAppsSection() {
       }
       const data = (await res.json()) as {
         configured: boolean;
+        setup?: SetupHealth;
         connections: ConnectionRow[];
       };
       setConfigured(data.configured);
+      setSetup(data.setup ?? null);
       setConnections(data.connections);
     } catch {
       setConfigured(false);
@@ -273,17 +322,97 @@ export function ConnectedAppsSection() {
   const grouped = integrationsByCategory();
 
   if (configured === false) {
+    // Replace the silent "not configured" line with an actionable checklist —
+    // the realtor (or their dev) needs to know exactly which env var is
+    // missing on Vercel and where to grab the value. Silent state was the
+    // most-reported integrations bug.
     return (
-      <p className={BODY_MUTED}>
-        App connections aren&apos;t configured for this workspace yet.
-      </p>
+      <div className="rounded-xl border border-amber-300/60 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30 p-5 space-y-3">
+        <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+          Integrations aren&apos;t configured yet.
+        </p>
+        <ol className="text-sm text-amber-900/90 dark:text-amber-100/90 list-decimal list-inside space-y-1.5 leading-relaxed">
+          <li>
+            Set <code className="px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 text-[12px] font-mono">COMPOSIO_API_KEY</code> on Vercel (Settings → Environment Variables → Production + Preview). Grab the key from the Composio dashboard → Settings.
+          </li>
+          <li>
+            Set <code className="px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 text-[12px] font-mono">NEXT_PUBLIC_APP_URL</code> to your production URL — the OAuth callback uses it.
+          </li>
+          <li>
+            In the Composio dashboard, enable each toolkit you want (Gmail, Slack, Calendar, …) AND create an Auth Config under Authentication management. Just enabling the toolkit isn&apos;t enough — without the Auth Config, connection initiation fails.
+          </li>
+          <li>Redeploy. Env-var changes don&apos;t apply to existing deploys.</li>
+        </ol>
+      </div>
     );
   }
 
+  // Configured, but the callback URL env var is missing — this is the silent
+  // killer the audit identified: OAuth completes, Composio redirects to a
+  // default URL, the realtor never lands back in the app and the connection
+  // never persists. Surface it loud.
+  const showAppUrlWarning = setup && setup.apiKeySet && !setup.appUrlSet;
+  const showCallbackBanner = callbackResult && !callbackDismissed;
+
   return (
     <div className="space-y-8">
+      {/* OAuth callback banner — green on success, amber on failure. The
+          previous build silently dropped these results so the realtor never
+          knew the connection had failed; now the failure reason gets
+          translated to a sentence they can act on. */}
+      {showCallbackBanner && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={cn(
+            'rounded-lg border px-4 py-3 flex items-start gap-3',
+            callbackResult!.ok
+              ? 'border-green-300/60 bg-green-50 text-green-900 dark:border-green-900/60 dark:bg-green-950/40 dark:text-green-100'
+              : 'border-amber-300/60 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100',
+          )}
+        >
+          <span
+            aria-hidden
+            className={cn(
+              'mt-1 w-2 h-2 rounded-full flex-shrink-0',
+              callbackResult!.ok ? 'bg-green-500' : 'bg-amber-500',
+            )}
+          />
+          <div className="flex-1 min-w-0 text-sm">
+            <p className="font-medium">
+              {callbackResult!.ok
+                ? `${callbackResult!.toolkit ? `${callbackResult!.toolkit}` : 'Integration'} connected.`
+                : "Couldn't connect."}
+            </p>
+            {!callbackResult!.ok && (
+              <p className="mt-1 text-[13px] leading-relaxed opacity-90">
+                {explainCallbackReason(callbackResult!.reason, callbackResult!.toolkit)}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setCallbackDismissed(true)}
+            className="text-xs opacity-70 hover:opacity-100 transition-opacity"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {error && (
         <p className="text-sm text-destructive">{error}</p>
+      )}
+
+      {showAppUrlWarning && (
+        <div className="rounded-lg border border-amber-300/60 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-100 leading-relaxed">
+          <p className="font-medium">
+            <code className="px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 text-[12px] font-mono">NEXT_PUBLIC_APP_URL</code> isn&apos;t set.
+          </p>
+          <p className="mt-1 opacity-90">
+            New connections will OAuth at the provider but won&apos;t make it back to this app — Composio redirects to its default URL instead. Set <code className="px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 text-[12px] font-mono">NEXT_PUBLIC_APP_URL</code> to your production domain on Vercel and redeploy.
+          </p>
+        </div>
       )}
 
       {CATEGORY_ORDER.map((cat) => {
@@ -352,15 +481,27 @@ function Row({
 }) {
   const status = connection?.status ?? null;
   const action = pickRowAction({ comingSoon: app.comingSoon, status, busy });
+  // Surface the failure reason to the realtor when a connection is amber/red.
+  // The reason was being captured (`IntegrationConnection.lastError`) but
+  // never rendered — silent state was the bug the audit flagged. Translate
+  // known Composio error shapes to a sentence the realtor can act on.
+  const errorLine = connection?.lastError && status !== 'active'
+    ? explainCallbackReason(connection.lastError, app.toolkit)
+    : null;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-start gap-3 px-4 py-3">
       <Dot status={status} comingSoon={app.comingSoon} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{app.name}</p>
         <p className="text-xs text-muted-foreground truncate">
           {connection?.label ? connection.label : app.blurb}
         </p>
+        {errorLine && (
+          <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+            {errorLine}
+          </p>
+        )}
       </div>
       {/* Health badge: only rendered for connected (non-coming-soon) rows. */}
       {(health !== null || healthLoading) && (
